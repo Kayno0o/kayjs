@@ -4,7 +4,7 @@ import type { BeforeSaveChange, BeforeSaveEvent, EntryState, SaveEvent } from '.
 import { decide, dispatch } from 'kay/library'
 import { entries } from './kay/content'
 import { log } from './log'
-import { settings } from './settings'
+import { hooksOf } from './settings'
 
 // A refusal of `cms({ beforeSave })`, as the issues of a schema refusal, so the entry form shows it the same way; `status` is the hook's.
 export interface HookRefusal {
@@ -20,10 +20,8 @@ export async function previousOf(ref: EntryRef): Promise<EntryState | undefined>
 }
 
 // Whether a hook wants the stored entry, which costs a read.
-export function hooked(): boolean {
-  const { beforeSave, onSave } = settings()
-
-  return beforeSave !== undefined || onSave !== undefined
+export function hooked(collection: string): boolean {
+  return [...hooksOf('beforeSave', collection), ...hooksOf('onSave', collection)].some(hook => hook !== undefined)
 }
 
 // A hook's refusal as the issues of an entry: its field errors by path, else its message for the entry as a whole.
@@ -36,7 +34,7 @@ export function refusalOf(ref: EntryRef, { status, message, errors }: ErrorShape
 
 // Asks `cms({ beforeSave })` and answers what it changed or why it refused. A change that is not an object, or a body that is not text, is a hook's mistake: reported, and the write refused as a throw would.
 export async function askBeforeSave(event: BeforeSaveEvent): Promise<{ change: Partial<BeforeSaveChange> } | HookRefusal> {
-  const answer = await decide('cms.beforeSave', [settings().beforeSave], event)
+  const answer = await decide('cms.beforeSave', hooksOf('beforeSave', event.collection), event)
 
   if ('refused' in answer)
     return refusalOf(event, answer.refused)
@@ -54,5 +52,5 @@ export async function askBeforeSave(event: BeforeSaveEvent): Promise<{ change: P
 
 // Tells `cms({ onSave })`: a throw or a hook still running past ten seconds is reported with source `cms.onSave` and never undoes the save.
 export async function tellOnSave(event: SaveEvent): Promise<void> {
-  await dispatch('cms.onSave', [settings().onSave], event)
+  await dispatch('cms.onSave', hooksOf('onSave', event.collection), event)
 }

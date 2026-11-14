@@ -40,7 +40,7 @@ export const posts = collection(pgLoader({ name: 'posts', source: process.env.DA
 
 1. `kay add cms`, and set `preview: {}` in `kay.config.ts` (edit mode is kay's preview mode, signed with a key from `KAY_SECRET`).
 2. Declare each editable collection over a loader as above, `order`, `draft`, `publishAt` and `localized` working as on a folder.
-3. Add `cms({ guard })` to `extensions`, the guard being who may edit, such as kayjs-auth's `auth.guard({ require: 'editor' })`. A loader needs no `files` saver: that is for folder entries.
+3. Add `cms({ access: 'editor' })` to `extensions`, `access` being who may edit: a kayjs-auth role, a password or a function. A loader needs no `files` saver: that is for folder entries.
 4. Put the database where a deploy keeps it: a volume for the SQLite file, the app's `DATABASE_URL` for Postgres.
 5. Read the collections in pages as usual (`all()`, `get()`); add `live: true` to the collection so open pages follow a save. Nothing else is needed for several processes: see [Other processes and edits made outside the CMS](#other-processes-and-edits-made-outside-the-cms).
 

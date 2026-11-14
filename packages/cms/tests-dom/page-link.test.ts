@@ -334,3 +334,17 @@ test('a cookie merely ending in the hint name is no hint', async () => {
   document.cookie = `x_${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
   expect(fetched).not.toHaveBeenCalled()
 })
+
+test('draws no button of its own when the check says button: false, and still fills the app\'s own link', async () => {
+  answering(200, { ...ANSWER, button: false })
+  document.body.innerHTML = '<a data-kcms-edit-page hidden>x</a>'
+  await run()
+
+  expect(document.querySelector(BUTTON)).toBeNull()
+  expect(document.querySelector<HTMLAnchorElement>('[data-kcms-edit-page]')?.hidden).toBe(false)
+  expect(document.querySelector<HTMLAnchorElement>('[data-kcms-edit-page]')?.getAttribute('href')).toContain('/admin/page?path=')
+
+  document.body.innerHTML = '<p>Read</p>'
+  await run()
+  expect(document.querySelector(BUTTON)).toBeNull()
+})

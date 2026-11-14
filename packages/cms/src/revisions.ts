@@ -121,7 +121,7 @@ export async function openTrail(ref: EntryRef, current: (() => Promise<Version |
           ats.push(at)
           writes.push({ slug: revisionPlace(place, at), data: { verb: saved.verb, ...author && { author: author.name }, data: saved.data } satisfies Stored, body: saved.body })
 
-          const pruned = ats.splice(0, Math.max(0, ats.length - settings().history!.revisions))
+          const pruned = ats.splice(0, Math.max(0, ats.length - (settings().history?.revisions ?? Infinity)))
           // A fresh start may reuse the millisecond of an old revision, whose row the new one has just replaced.
           const gone = [...fresh ? earlier : [], ...pruned].filter(old => !ats.includes(old))
 

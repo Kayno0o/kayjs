@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 
 import { aiLanguage } from '../src/check/ai-language'
+import { cmsOptions } from '../src/check/cms-options'
 
 import { applySafeFixes } from '../src/check/fixes'
 import { localState } from '../src/check/local-state'
@@ -32,6 +33,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-import-path': movedImports,
   'deprecated-schema-type': schemaType,
   'deprecated-test-helpers': testHelpers,
+  'deprecated-cms-options': cmsOptions,
   'deprecated-package-names': async (root, options) => renamedPackages(root, options.lints),
   // Its fix is safe only in a project that lists kayjs-ui, where the new form comes from.
   'deprecated-mail-form': async (root, options) => {

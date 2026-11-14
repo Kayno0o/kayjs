@@ -31,7 +31,7 @@ export default defineConfig({
   extensions: [
     auth({ module: './src/auth' }),
     // Who may use the screens and save: the kayjs-auth users with this role. Edit mode alone only reads.
-    cms({ role: 'editor' }),
+    cms({ access: 'editor' }),
   ],
   // Edit mode is kay's preview mode; its cookie is signed with a key derived from KAY_SECRET.
   preview: {},
@@ -44,7 +44,9 @@ The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is o
 
 `guard` is the other way to say who gets in, and you give one or the other. It takes a guard loaded on the first request, `{ load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) }`, so `kay.config.ts` imports nothing of the app's auth or database. It also takes the built guard itself. Then `kay.config.ts` imports `./src/auth`, and with it the app's database, for every `kay build` and `kay check`.
 
-Without `files`, saves go to the working tree, which suits `kay dev`. A production server without it commits them to Forgejo, through `forgejo()` built from `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and the optional `CMS_BRANCH`, or through `github()` or `gitlab()` when `CMS_HOST` is `github` or `gitlab`, which need no `CMS_BASE_URL` unless it is a GitHub Enterprise Server or a self-managed GitLab.
+Without `files`, saves go to the working tree, which suits `kay dev`. A production server without it commits them to the forge `CMS_URL` names.
+
+`CMS_URL` names the forge the way `MAIL_URL` names the mail server: `forgejo://TOKEN@git.example.com/owner/repo`, `github://TOKEN@owner/repo` or `gitlab://TOKEN@group/project`, the token percent-encoded, `?branch=` the branch and `?baseUrl=` the address of a GitHub Enterprise Server's API, a self-managed GitLab or a Forgejo that is not https. The older `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN`, `CMS_BRANCH` and `CMS_HOST` are read when `CMS_URL` is not set.
 
 `kay env` lists them. With none of them set, the server refuses to boot, as the next deploy would drop its saves.
 
@@ -52,13 +54,13 @@ Without `files`, saves go to the working tree, which suits `kay dev`. A producti
 
 A visitor the guard turns away as anonymous lands on a sign-in screen, not a bare 403, and comes back to the exact page they asked for, query included. The screen is the sign-in page of kayjs-auth when the app has one, or the cms's own when the guard is `passwordGuard`.
 
-For a small site with no members, `passwordGuard` is the whole setup. It takes one password, or one per role:
+For a small site with no members, `access: { password }` is the whole setup. It takes one password, or one per role:
 
 ```ts
-import { cms, passwordGuard } from '@kayjs/cms'
+import { cms } from '@kayjs/cms'
 
-cms({ guard: passwordGuard(env.EDITOR_PASSWORD) })
-cms({ guard: passwordGuard({ editor: env.EDITOR_PASSWORD, admin: env.ADMIN_PASSWORD }, { maxAge: '30d' }) })
+cms({ access: { password: env.EDITOR_PASSWORD } })
+cms({ access: { password: { editor: env.EDITOR_PASSWORD, admin: env.ADMIN_PASSWORD }, maxAge: '30d' } })
 ```
 
 A lone password signs in as `editor`. The sign-in lasts 14 days unless `maxAge` says otherwise, and it is a signed cookie, so changing a password signs out everyone who used it. 
@@ -89,9 +91,9 @@ expect((await editor.signInWith('wrong')).status).toBe(401)
 
 Saves go to the content the test site holds, never to the project's `src/content`. `save`, `delete` and `rename` read the entry's version themselves, as the editor does, so a test names one only to try a stale one. `move(collection, slug, 'up')` and `upload(collection, file)` do the rest of the editor's calls; an upload answers the path to keep, under `/_kay/files/cms-media/`.
 
-`signInAs` works with `passwordGuard()` only. On kayjs-auth, sign the site in with `auth.test(site).signInAs(...)` and use the other methods of `cmsTest(site)` on that session. `signInWith(password)` posts the sign-in form as a visitor does, to test a wrong password.
+`signInAs` works with a password `access` only. On kayjs-auth, sign the site in with `auth.test(site).signInAs(...)` and use the other methods of `cmsTest(site)` on that session. `signInWith(password)` posts the sign-in form as a visitor does, to test a wrong password.
 
-The admin header shows who is signed in, a username or an email with kayjs-auth and the role with `passwordGuard`, and a Sign out button.
+The admin header shows who is signed in, a username or an email with kayjs-auth and the role with a password `access`, and a Sign out button.
 
 By default everyone the guard admits can do everything. `roles` limits what a role may do beyond editing:
 
@@ -152,7 +154,7 @@ A key of `roles` written `org:<role>` is a role held in any kayjs-auth organizat
 
 A writer whose roles lack `publish` sends a draft for review with Submit for review, on its entry screen and in the editor on the page. The list, the entry screen and the editor then show it as In review. A person with `review` approves it, which publishes it (or schedules it at its publish date), or sends it back with a note the writer reads above the form. Anyone admitted may send a draft for review.
 
-Approving and sending back are checked on the server for kayjs-auth, `passwordGuard` and `member` roles alike. Every step is kept with who took it and when, in a log on the entry screen.
+Approving and sending back are checked on the server for kayjs-auth, password and `access` function roles alike. Every step is kept with who took it and when, in a log on the entry screen.
 
 The state is kept outside the entry, so no schema changes. A loaded collection keeps it in a hidden collection of its loader, a folder collection in a small file under `.cms/review` written through the `files` saver. The users holding a reviewing role, a site role of kayjs-auth or an `org:` role in the writer's organizations, are told of a submission with `notify()`, and the writer of an approval or a send-back. A person of `passwordGuard` or `member` has no inbox, so none of them is told.
 
@@ -162,7 +164,7 @@ A reviewer may approve a draft they sent themselves. Set `fourEyes: true` in `cm
 
 <ReadMore href="/llms/kayjs-cms-review">The routes, the storage, the notifications and what they cannot reach.</ReadMore>
 
-A guard of your own, neither kayjs-auth nor `passwordGuard`, holds no role until `member` says who it let in. It also runs on screens the guard does not cover, so it returns nothing for a visitor who is not signed in. When given, it replaces kayjs-auth's lookup and never falls back to it:
+An `access` function names the person with `{ name, email, roles }`; a `guard` of your own, neither kayjs-auth nor a password, holds no role until the older `member` says who it let in. It also runs on screens the guard does not cover, so it returns nothing for a visitor who is not signed in. When given, it replaces kayjs-auth's lookup and never falls back to it:
 
 ```ts
 cms({
@@ -262,7 +264,7 @@ When the dev tool is docked to the right or the bottom, the editor sits beside i
 
 An edit cookie or link is tied to no user, so it reads only the entries the pages it showed in edit mode read, never a customer or order collection the page does not render. A signed-in editor the guard admits reads any entry. The list of those entries lives in the server's memory, so after a restart, or on another replica, load the page again.
 
-Once there is a guard, every save needs it, edit mode included. Without one, saving from an edit link works under `kay dev` only: any other server refuses every save, publish, delete and upload from an edit cookie or link, and warns at boot to set `cms({ role })` or `cms({ guard })`. With a guard, `author` names who a save is committed as, such as the signed-in user.
+Once there is an `access`, every save needs it, edit mode included. Without one, saving from an edit link works under `kay dev` only: any other server refuses every save, publish, delete and upload from an edit cookie or link, and warns at boot to set `cms({ access })`. With a guard, `author` names who a save is committed as, such as the signed-in user.
 
 Without `author`, the forge commits as the account behind its token, so no editor's name or email reaches git. Give `author` the real name and email only when the editors agree to appear in the history: a commit cannot be erased from it later, so a request to delete someone's data (RGPD art. 17) cannot reach their name there. A pseudonym keeps the history useful and the editor private:
 
@@ -636,7 +638,7 @@ To wire the whole thing:
 
 1. Run `kay add cms` and set `preview: {}` in `kay.config.ts`, with `KAY_SECRET` set in production.
 2. Declare each editable collection over a loader, as above.
-3. Add `cms({ role })` to `extensions`, with the kayjs-auth role of who may edit, or `cms({ guard })` with a guard of your own. A loader needs no `files` saver, which is for folder entries.
+3. Add `cms({ access })` to `extensions`, with the kayjs-auth role of who may edit, a password or a function. A loader needs no `files` saver, which is for folder entries.
 4. Keep the database where a deploy leaves it: a volume for the SQLite file, your `DATABASE_URL` for Postgres.
 5. Read the collections in your pages as usual. Add `live: true` to the collection so open pages follow a save.
 

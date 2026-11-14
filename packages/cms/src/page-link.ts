@@ -16,7 +16,7 @@ const HINT_AGE = 90 * 24 * 60 * 60
 // It runs wherever a page reads it, so it stays free of imports and of anything the server alone has.
 export function pageLink(hint: string, attribute: string, endpoint: string, signedIn: string): void {
   const base = document.querySelector<HTMLMetaElement>('meta[name=kay-base]')?.content ?? ''
-  let verified: Promise<{ label: string, href: string } | undefined> | undefined
+  let verified: Promise<{ label: string, href: string, button?: boolean } | undefined> | undefined
   let verifiedFor: string | undefined
   let button: HTMLAnchorElement | undefined
 
@@ -39,7 +39,7 @@ export function pageLink(hint: string, attribute: string, endpoint: string, sign
       const response = await fetch(`${base}${endpoint}`, { headers: { accept: 'application/json' }, redirect: 'manual' })
 
       if (response.ok)
-        return await response.json() as { label: string, href: string }
+        return await response.json() as { label: string, href: string, button?: boolean }
 
       // Refused, or redirected to a sign-in: the session is over, so the hint goes.
       if (response.status === 0 || response.status === 401 || response.status === 403) {
@@ -90,8 +90,8 @@ export function pageLink(hint: string, attribute: string, endpoint: string, sign
         link.textContent = found.label
     }
 
-    // The app's own link takes the place of ours.
-    if (links.length > 0) {
+    // The app's own link takes the place of ours, which `button: false` never draws.
+    if (links.length > 0 || found.button === false) {
       button?.remove()
       button = undefined
 

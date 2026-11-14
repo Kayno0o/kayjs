@@ -4,16 +4,16 @@ import { decide } from 'kay/library'
 import { holdsType, SNIFFED_BYTES, typeOfName } from 'kay/server'
 import { wording } from 'kay/words'
 import { MEDIA_FOLDER } from './media'
-import { ENVELOPE, settings } from './settings'
+import { ENVELOPE, hooksOf, largestUpload, uploadsOf } from './settings'
 
 const NAME_EXTENSION = /\.[a-z\d]{1,10}$/i
 const TYPE_PARAMETERS = /;.*$/
 // A storage folder takes letters, digits, `-` and `_`, and a collection's export name may hold `$`.
 const NOT_FOLDER = /[^\w-]/g
 
-// The most bytes the upload route reads, in place of the app's `maxSize`, which a 20 MB photo would exceed; the file's own size is checked against `uploads.maxSize` after it.
+// The most bytes the upload route reads, in place of the app's `maxSize`, which a 20 MB photo would exceed; the file's own size is checked against `uploads.maxSize`, the collection's own when it has one, after it.
 export function uploadMaxSize(): number {
-  return settings().maxSize + ENVELOPE
+  return largestUpload() + ENVELOPE
 }
 
 // The folder of kay's file storage a collection's uploads go to.
@@ -27,8 +27,8 @@ export function uploadFolders(collection: string): string[] {
 }
 
 // Why the CMS refuses the upload, or undefined when `uploads` takes its type and its bytes are that type: the type is the one kay's storage serves it as, its name's extension's in any case, else the type it was sent with.
-export async function uploadRefusal(file: File): Promise<string | undefined> {
-  const { uploads } = settings()
+export async function uploadRefusal(file: File, collection?: string): Promise<string | undefined> {
+  const { types: uploads } = uploadsOf(collection)
   const type = (NAME_EXTENSION.test(file.name) ? typeOfName(file.name) : file.type).replace(TYPE_PARAMETERS, '') || 'application/octet-stream'
   const name = file.name || wording('cms.upload.theFile', 'The file')
 
@@ -40,14 +40,14 @@ export async function uploadRefusal(file: File): Promise<string | undefined> {
 
 // Asks `cms({ beforeUpload })` about a file whose size and type are accepted: the file to store, which is the same one when the hook changed nothing, or why it was refused.
 export async function askBeforeUpload(file: File, { collection, author }: { collection: string, author: Identity | undefined }): Promise<{ file: File } | { refused: ErrorShape }> {
-  const { beforeUpload } = settings()
+  const hooks = hooksOf('beforeUpload', collection)
 
-  if (beforeUpload === undefined)
+  if (hooks.every(hook => hook === undefined))
     return { file }
 
   const name = file.name
   const type = file.type
-  const answer = await decide('cms.beforeUpload', [beforeUpload], { collection, name, type, size: file.size, bytes: await file.bytes(), ...author !== undefined && { author } })
+  const answer = await decide('cms.beforeUpload', hooks, { collection, name, type, size: file.size, bytes: await file.bytes(), ...author !== undefined && { author } })
 
   if ('refused' in answer)
     return answer
@@ -61,9 +61,9 @@ export async function askBeforeUpload(file: File, { collection, author }: { coll
 }
 
 // What the pickers offer, as `accept` attributes: every type `uploads` takes, and for an image field the image ones, else all.
-export function uploadRules(): { accept: string, images: string, maxSize: number } {
-  const { uploads } = settings()
+export function uploadRules(collection?: string): { accept: string, images: string, maxSize: number } {
+  const { types: uploads, maxSize } = uploadsOf(collection)
   const images = uploads.filter(type => type.startsWith('image/'))
 
-  return { accept: uploads.join(','), images: (images.length > 0 ? images : uploads).join(','), maxSize: settings().maxSize }
+  return { accept: uploads.join(','), images: (images.length > 0 ? images : uploads).join(','), maxSize }
 }

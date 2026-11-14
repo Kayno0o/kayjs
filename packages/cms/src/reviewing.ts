@@ -92,7 +92,7 @@ async function submitEntryAnswer(ref: EntryRef, actor: Actor, author?: Identity)
 
   await tell(actor.reviewers, wording('cms.review.submitted', '{name} sent {title} for review', { name: actor.name, title: entryTitle(collection, entry) }), ref)
 
-  return { saved: true, review: viewOf(next, actor) }
+  return { saved: true, review: viewOf(next, actor, ref.collection) }
 }
 
 async function approveEntryAnswer(ref: EntryRef, actor: Actor, author: Identity | undefined, seen: string | undefined): Promise<ReviewAnswer> {
@@ -106,7 +106,7 @@ async function approveEntryAnswer(ref: EntryRef, actor: Actor, author: Identity 
   if (review?.status !== 'review' || !entry.draft)
     return refused(ref, wording('cms.review.notInReview', '{slug} is not in review', { slug: ref.slug }))
 
-  const barred = approvalBarred(review, actor)
+  const barred = approvalBarred(review, actor, ref.collection)
 
   if (barred === 'own')
     return refused(ref, wording('cms.review.ownApproval', 'You sent this entry for review: another person approves it'))
@@ -140,7 +140,7 @@ async function approveEntryAnswer(ref: EntryRef, actor: Actor, author: Identity 
 
   const after = await entryOf(ref, collection)
 
-  return { saved: true, review: viewOf(next, actor), entry: after && { data: after.data, body: after.body, version: after.version } }
+  return { saved: true, review: viewOf(next, actor, ref.collection), entry: after && { data: after.data, body: after.body, version: after.version } }
 }
 
 async function sendBackEntryAnswer(ref: EntryRef, note: string, actor: Actor, author?: Identity): Promise<ReviewAnswer> {
@@ -170,7 +170,7 @@ async function sendBackEntryAnswer(ref: EntryRef, note: string, actor: Actor, au
 
   await tell(review.byId === undefined ? [] : [review.byId], wording('cms.review.sentBack', '{name} sent {title} back: {note}', { name: actor.name, title: entryTitle(collection, entry), note: said }), ref)
 
-  return { saved: true, review: viewOf(next) }
+  return { saved: true, review: viewOf(next, undefined, ref.collection) }
 }
 
 // Sends a draft for review: its writer waits for a reviewer, who is told. A draft sent back may be sent again.

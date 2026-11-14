@@ -9,15 +9,15 @@ A collection read through a SQLite or Postgres loader keeps what an editor saved
 `cms({ history: false })` turns it off for the app, a collection's `history: false` for one collection (no revisions, no trash, no buttons; what it kept stays in the store).
 
 ```ts
-cms({ guard, files, collections: { notes: { history: false } } })
+cms({ access: 'editor', files, collections: { notes: { history: false } } })
 ```
 
 ### Keep more revisions or a longer trash
 
-`history.revisions` is the number of saves kept per entry, `history.trash` how long a deleted entry stays, a duration or `false` for none, and `history.maxAge` how old a revision or an activity event may get, `'365d'` by default, `false` for no limit.
+`history.revisions` is the number of saves kept per entry, `false` for none, `history.trash` how long a deleted entry stays, a duration or `false` for none, and `history.maxAge` how old a revision or an activity event may get, `'365d'` by default, `false` for no limit.
 
 ```ts
-cms({ guard, files, history: { revisions: 100, trash: '7d', maxAge: '90d' } })
+cms({ access: 'editor', files, history: { revisions: 100, trash: '7d', maxAge: '90d' } })
 ```
 
 ### Give a loader of your own a history
@@ -37,7 +37,7 @@ const loader = {
 ### Revisions
 
 - Each save, publish, unpublish, duplicate and restore of a loaded entry keeps the data and body it wrote, who saved it (`cms({ author })`) and when, in a hidden collection beside the entry's own. The first save of an entry the history has never seen also keeps the entry as it stood before, as a version `Before the first saved change`. A save that changes nothing keeps nothing, and a reorder (`move`) is not a save.
-- `cms({ history: { revisions: 100 } })` keeps another number per entry, the oldest going first. It takes a positive whole number or throws as `kay.config.ts` loads.
+- `cms({ history: { revisions: 100 } })` keeps another number per entry, the oldest going first, and `revisions: false` keeps none (no History button, the trash and the activity log staying). It takes a positive whole number or `false`, or throws as `kay.config.ts` loads. `history: false` is the three parts off at once.
 - The history is read at `<prefix>/history/<collection>/<slug>`, where an entry's screen has a History button: the versions newest first, each with who, when, how and the fields it changed from the version before (the old text struck, the new one beside it), the one the entry holds now marked Current, and a Restore on the others.
 - Restore saves the older version again as a new version (`verb: 'restore'` in `onSave`): the schema, the version check and `cms({ roles })` apply as for any save. It keeps the entry's current `translationKey`, and a reference to an entry renamed since follows the rename (read from the activity log). The editor's page names the entry's version, so a restore over a save made since is refused with the usual message. A role that may not `publish` restores with the draft flag and the publish and unpublish dates the entry has now, as a save of it would have to.
 - Nothing else sees the history: it never shows in `all()`, a list, a count or a search, and a deleted entry's revisions stay.

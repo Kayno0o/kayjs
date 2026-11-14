@@ -206,7 +206,7 @@ describe('cms({ role })', () => {
     try {
       expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(false)
       expect(await admitted(older)).toBe(false)
-      expect(logged.mock.calls.map(call => String(call[0]))).toEqual([expect.stringContaining('cms({ role: \'editor\' }) found no kayjs-auth')])
+      expect(logged.mock.calls.map(call => String(call[0]))).toEqual([expect.stringContaining('found no kayjs-auth')])
     }
     finally {
       logged.mockRestore()
@@ -324,7 +324,7 @@ describe('the screens\' guard', () => {
     configure({})
 
     for (const path of ['/admin', '/admin/not-found', '/admin/uploads', '/admin/collections/posts'])
-      await expect(screenGuard(screen(path))).rejects.toThrow('no guard')
+      await expect(screenGuard(screen(path))).rejects.toThrow('no one let in')
   })
 
   test('lets in whom the app\'s guard admits', async () => {
@@ -332,5 +332,86 @@ describe('the screens\' guard', () => {
 
     await expect(screenGuard(screen('/admin/not-found'))).rejects.toThrow('Editors only')
     await expect(Promise.resolve(screenGuard(screen('/admin/not-found', { 'x-editor': '1' })))).resolves.toBeUndefined()
+  })
+})
+
+describe('cms({ access })', () => {
+  const REQUIRES = Symbol.for('kayjs-auth.requires')
+
+  // kayjs-auth's `ctx.locals.auth` for a user holding `roles`, admitting what any one of the roles asked names.
+  function signedIn(roles: string[], asked: unknown[]): GuardContext {
+    const ctx = context('POST', '/entries/posts/hello', false)
+    const requireUser = async ({ require }: { require: string | string[] }) => {
+      asked.push(require)
+
+      return [require].flat().some(role => roles.includes(role)) ? { id: 'u1', roles } : ctx.deny(403)
+    }
+
+    return Object.assign(ctx, { locals: { auth: { user: async () => ({ id: 'u1', roles }), requireUser, [REQUIRES]: true } } })
+  }
+
+  test('a role, or a list of which one is enough, is what kayjs-auth admits', async () => {
+    const asked: unknown[] = []
+
+    configure({ access: 'editor' })
+    expect(await admitted(signedIn(['editor'], asked))).toBe(true)
+    expect(await admitted(signedIn(['reader'], asked))).toBe(false)
+
+    configure({ access: ['editor', 'admin'] })
+    expect(await admitted(signedIn(['admin'], asked))).toBe(true)
+    expect(await admitted(signedIn(['reader'], asked))).toBe(false)
+    expect(asked).toEqual(['editor', 'editor', ['editor', 'admin'], ['editor', 'admin']])
+  })
+
+  test('is inferred from kayjs-auth and the roles listed: their holders are let in, the other users are not', async () => {
+    const asked: unknown[] = []
+
+    configure({ roles: { 'editor': [], 'org:owner': ['publish'], 'admin': ['publish'] } })
+    expect(await admitted(signedIn(['admin'], asked))).toBe(true)
+    expect(await admitted(signedIn(['reader'], asked))).toBe(false)
+    expect(asked).toEqual([['editor', 'admin'], ['editor', 'admin']])
+  })
+
+  test('a function names the person: it admits whom it returns, refuses the rest with a 401, and gives the roles', async () => {
+    const calls: string[] = []
+
+    configure({ access: ({ request }) => {
+      calls.push('asked')
+
+      return request.headers.has('x-user') ? { name: 'Ada', email: 'ada@example.com', roles: ['editor'] } : undefined
+    }, roles: { editor: [], admin: ['publish'] } })
+
+    const { memberOf } = await import('../src/access')
+    const ctx = context('POST', '/entries/posts/hello', false)
+
+    expect(await admitted(ctx)).toBe(false)
+
+    const visitor = Object.assign(context('GET', '/entries/posts/hello', false), { request: new Request('http://site.test/_kay/cms/entries/posts/hello', { headers: { 'x-user': '1', 'x-edit': 'posts/hello' } }) })
+
+    expect(await admitted(visitor)).toBe(true)
+    expect(await memberOf(visitor)).toEqual({ name: 'Ada', email: 'ada@example.com', held: ['editor'] })
+    // Read once for the request, by the guard and by the roles alike.
+    expect(calls).toEqual(['asked', 'asked'])
+  })
+
+  test('a password signs in at the screens, and its options go beside it', async () => {
+    configure({ access: { password: 'a password of its own', maxAge: '30d' } })
+
+    expect(await admitted(Object.assign(context('POST', '/entries/posts/hello', false), { cookies: new Bun.CookieMap('') }))).toBe(false)
+  })
+
+  test('false admits everyone', async () => {
+    configure({ access: false })
+
+    expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(true)
+  })
+
+  test('is one option: not given with guard, role or member, and refused when it is nothing a role is', () => {
+    expect(() => configure({ access: 'editor', guard: () => undefined })).toThrow('not given with')
+    expect(() => configure({ access: 'editor', role: 'editor' })).toThrow('not given with')
+    expect(() => configure({ access: 'editor', member: () => undefined })).toThrow('not given with')
+    expect(() => configure({ access: '' })).toThrow('it takes a kayjs-auth role')
+    expect(() => configure({ access: [] })).toThrow('it takes a kayjs-auth role')
+    expect(() => configure({ access: 3 as never })).toThrow('it takes a kayjs-auth role')
   })
 })

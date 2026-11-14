@@ -186,7 +186,7 @@ A `path` is one route and a `prefix` a subtree. Every `guard` option takes a gua
 | `health.path`, `metrics.path` | One route | Open, `metrics` takes a token | No guard option |
 | `jobs.path`, `jobs.guard` | One route | The server does not start: the page lists payloads | Refused |
 | `vitals({ prefix, guard })` | Prefix | Closed, 403 | Opens the screen |
-| `cms({ prefix, guard })` | Prefix | Closed, 403 | Admits everyone |
+| `cms({ prefix, access })` | Prefix | Closed, 403 | Admits everyone |
 | `images.guard` | Runs before `images.resolve` | Open | Not needed |
 | A page's `guards: false`, an API module's `api({ guards: false })` | One page or module | Under the guards above it | Skips them |
 

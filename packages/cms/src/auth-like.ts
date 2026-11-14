@@ -13,7 +13,7 @@ interface AuthLike {
   userIdsHolding?: (role: string) => Promise<string[]>
   signInUrl?: (back?: string) => string
   signOut?: () => Promise<void>
-  requireUser?: (options: { require: string, bare: true }) => Promise<unknown>
+  requireUser?: (options: { require: string | readonly string[], bare: true }) => Promise<unknown>
   [REQUIRES]?: unknown
 }
 
@@ -39,15 +39,15 @@ export function authOf(ctx: GuardContext): AuthLike | undefined {
 
 let unauthed = false
 
-// What `cms({ role })` guards with: kayjs-auth's `requireUser({ require: role })`, so the app's `authorize` decides as in `auth.guard()`; a request with no kayjs-auth in its locals is refused, never let through.
-export function roleGuard(role: string): Guard {
+// What `cms({ access: role })` guards with: kayjs-auth's `requireUser({ require: role })`, one role or a list of which one is enough, so the app's `authorize` decides as in `auth.guard()`; a request with no kayjs-auth in its locals is refused, never let through.
+export function roleGuard(role: string | readonly string[]): Guard {
   return async (ctx) => {
     const auth = authOf(ctx)
 
     if (typeof auth?.requireUser !== 'function' || auth[REQUIRES] !== true) {
       if (!unauthed) {
         unauthed = true
-        log.error(`cms({ role: '${role}' }) found no kayjs-auth of this release on the request, so it refuses every editor: list auth() in the extensions of kay.config.ts at the cms's version, or give cms({ guard }) instead`)
+        log.error(`cms({ access: ${JSON.stringify(role)} }) found no kayjs-auth of this release on the request, so it refuses every editor: list auth() in the extensions of kay.config.ts at the cms's version, or give cms({ access }) a password or a function instead`)
       }
 
       return ctx.deny(403)

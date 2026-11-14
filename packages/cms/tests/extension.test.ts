@@ -30,6 +30,7 @@ describe('cms()', () => {
   test('puts the page link loader in the head of every page, and leaves it out with pageLink: false', () => {
     expect(JSON.stringify(cms().config)).toContain('kay_editor=')
     expect(cms({ pageLink: false }).config).toBeUndefined()
+    expect(JSON.stringify(cms({ pageLink: { button: false } }).config)).toContain('kay_editor=')
   })
 
   test('refuses to boot a production server that would save to the working tree by default', () => {
@@ -40,7 +41,7 @@ describe('cms()', () => {
     expect(() => {
       if (typeof server === 'function')
         void server({ root: process.cwd(), modules: {}, extensions: [] })
-    }).toThrow('kay: a production server saves no edit to the working tree, which the next deploy replaces: set CMS_BASE_URL, CMS_REPO and CMS_TOKEN')
+    }).toThrow('kay: a production server saves no edit to the working tree, which the next deploy replaces: set CMS_URL')
   })
 
   test('boots a production server told where files go, and any server outside production', () => {
@@ -95,7 +96,7 @@ describe('cms()', () => {
         await settings().files.save({ repoPath: 'src/content/posts/a.md', absolute: '/nowhere/a.md', text: 'hi', message: 'add a' })
 
         expect(posted).toEqual([{ path: '/api/v1/repos/team/site/contents', token: 'token secret', body: expect.objectContaining({ branch: 'content' }) }])
-        expect(Object.keys(cms().env?.properties ?? {})).toEqual(['CMS_HOST', ...Object.keys(variables)])
+        expect(Object.keys(cms().env?.properties ?? {})).toEqual(['CMS_URL', 'CMS_HOST', ...Object.keys(variables)])
       }
       finally {
         await forge.stop()
@@ -178,7 +179,7 @@ describe('cms()', () => {
     })
   })
 
-  test('warns a server outside kay dev without a guard, naming cms({ guard }), and no other', () => {
+  test('warns a server outside kay dev without an access, naming cms({ access }), and no other', () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
     const boot = (underDev: boolean, options: Parameters<typeof cms>[0]): string[] => {
       if (underDev)
@@ -197,9 +198,12 @@ describe('cms()', () => {
     }
 
     try {
-      expect(boot(false, {})).toEqual([expect.stringContaining('no cms({ guard })')])
+      expect(boot(false, {})).toEqual([expect.stringContaining('no cms({ access })')])
       expect(boot(false, { guard: () => undefined })).toEqual([])
       expect(boot(false, { role: 'editor' })).toEqual([])
+      expect(boot(false, { access: 'editor' })).toEqual([])
+      expect(boot(false, { access: { password: 'a password of its own' } })).toEqual([])
+      expect(boot(false, { access: () => undefined })).toEqual([])
       expect(boot(true, {})).toEqual([])
     }
     finally {
@@ -345,6 +349,6 @@ describe('the environment', () => {
   test('lists only CMS_ variables', () => {
     const names = Object.keys((cms().env as unknown as { properties: object }).properties)
 
-    expect(names).toEqual(['CMS_HOST', 'CMS_BASE_URL', 'CMS_REPO', 'CMS_TOKEN', 'CMS_BRANCH'])
+    expect(names).toEqual(['CMS_URL', 'CMS_HOST', 'CMS_BASE_URL', 'CMS_REPO', 'CMS_TOKEN', 'CMS_BRANCH'])
   })
 })

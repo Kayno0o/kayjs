@@ -38,7 +38,7 @@ export default api()
     // The names and notes of a review are for the staff the guard admits, not for an edit link's holder.
     const review = screen.entry && !linkReaders.has(request) ? await readReview({ collection: params.collection, slug: params.slug, locale: query.locale }) : undefined
 
-    return screen.entry ? { collection: screen.collection, entry: screen.entry, review: review && viewOf(review, await memberOfRequest(request)) } : status(404, wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: params.slug, collection: params.collection }))
+    return screen.entry ? { collection: screen.collection, entry: screen.entry, review: review && viewOf(review, await memberOfRequest(request), params.collection) } : status(404, wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: params.slug, collection: params.collection }))
   }, { query: locale })
   .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: stamped(request, await withHold(request, params.collection, body.data)), body: body.body }, { create: body.create, version: body.version, required: true, author: authors.get(request) }), {
     body: s.Object({

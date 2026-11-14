@@ -6,6 +6,7 @@ import { checkOptionKeys, configError, serverRoot, underKayDev, viewPresenceWith
 import { api, defineEnv, setSharedNotBefore } from 'kay/server'
 import { viewMembers } from './editor-names'
 import { forgejo } from './files'
+import { forgeFromUrl } from './forge-url'
 import { github } from './github'
 import { gitlab } from './gitlab'
 import { stopWalks } from './history'
@@ -46,18 +47,22 @@ async function setupWarnings(): Promise<string[]> {
 
 // What a production server with no `cms({ files })` commits through, listed for `kay env`.
 const CMS_ENV = s.Object({
-  CMS_HOST: s.Optional(s.Union([s.Literal('forgejo'), s.Literal('github'), s.Literal('gitlab')], { description: 'the kind of git host a production cms commits edits to, forgejo by default, when cms({ files }) is not set' })),
+  CMS_URL: s.Optional(s.String({ description: 'the repository a production cms commits edits to, token included, when cms({ files }) is not set: forgejo://TOKEN@git.example.com/owner/repo, github://TOKEN@owner/repo or gitlab://TOKEN@group/project, with ?branch= for the branch (the repository\'s default when unset) and ?baseUrl= for the address of a GitHub Enterprise Server\'s API or a self-managed GitLab, or a Forgejo that is not https' })),
+  CMS_HOST: s.Optional(s.Union([s.Literal('forgejo'), s.Literal('github'), s.Literal('gitlab')], { description: 'the older form of CMS_URL: the kind of git host a production cms commits edits to, forgejo by default, when cms({ files }) is not set' })),
   CMS_BASE_URL: s.Optional(s.String({ description: 'the address of that host: the Forgejo, such as https://git.example.com, or for github the API of a GitHub Enterprise Server (https://api.github.com when unset), or for gitlab a self-managed GitLab (https://gitlab.com when unset)' })),
   CMS_REPO: s.Optional(s.String({ description: 'the repository the cms commits to, as owner/name' })),
   CMS_TOKEN: s.Optional(s.String({ description: 'a token of that host allowed to write that repository\'s contents' })),
   CMS_BRANCH: s.Optional(s.String({ description: 'the branch the cms commits to, the repository\'s default when unset' })),
 })
 
-const NO_SAVER = 'a production server saves no edit to the working tree, which the next deploy replaces: set CMS_BASE_URL, CMS_REPO and CMS_TOKEN for a Forgejo (or CMS_HOST=github or CMS_HOST=gitlab with CMS_REPO and CMS_TOKEN for GitHub or GitLab), or cms({ files: forgejo(...) }), cms({ files: github(...) }) or cms({ files: gitlab(...) }), or cms({ files: workingTree() }) where the files outlive a deploy'
+const NO_SAVER = 'a production server saves no edit to the working tree, which the next deploy replaces: set CMS_URL, as forgejo://TOKEN@git.example.com/owner/repo, github://TOKEN@owner/repo or gitlab://TOKEN@group/project, or cms({ files: forgejo(...) }), cms({ files: github(...) }) or cms({ files: gitlab(...) }), or cms({ files: workingTree() }) where the files outlive a deploy'
 
-// The Forgejo, GitHub or GitLab the environment names, for a production server given no `files`; with none of it set, or part of it, the boot stops naming what is missing.
+// The Forgejo, GitHub or GitLab the environment names, for a production server given no `files`: `CMS_URL`, else the older `CMS_*` variables; with none of it set, or part of it, the boot stops naming what is missing.
 function savedFromEnv(): FileSaver {
-  const { CMS_HOST: host = 'forgejo', CMS_BASE_URL: baseUrl, CMS_REPO: repo, CMS_TOKEN: token, CMS_BRANCH: branch } = defineEnv(CMS_ENV)
+  const { CMS_URL: url, CMS_HOST: host = 'forgejo', CMS_BASE_URL: baseUrl, CMS_REPO: repo, CMS_TOKEN: token, CMS_BRANCH: branch } = defineEnv(CMS_ENV)
+
+  if (url !== undefined)
+    return forgeFromUrl(url)
 
   if (baseUrl === undefined && repo === undefined && token === undefined)
     throw configError('cms', 'files', NO_SAVER)
@@ -82,7 +87,7 @@ function savedFromEnv(): FileSaver {
 
 const UNCHECKED = 'the collections could not be checked for field kinds with no component or a layout naming a field they lack, or a `when` waiting for none'
 
-const KNOWN_OPTIONS: Record<keyof CmsOptions, true> = { prefix: true, guard: true, role: true, files: true, uploads: true, pageSize: true, rawHtml: true, collections: true, pageLink: true, newsletter: true, roles: true, can: true, member: true, author: true, fourEyes: true, onSave: true, beforeSave: true, beforeUpload: true, onUpload: true, history: true }
+const KNOWN_OPTIONS: Record<keyof CmsOptions, true> = { prefix: true, access: true, guard: true, role: true, files: true, uploads: true, pageSize: true, rawHtml: true, collections: true, pageLink: true, newsletter: true, roles: true, can: true, member: true, author: true, fourEyes: true, onSave: true, beforeSave: true, beforeUpload: true, onUpload: true, history: true }
 
 // The one line an app adds to kay.config.ts. `editor` is the island kay renders at the end of every page in edit mode only.
 export function cms(options: CmsOptions = {}): KayExtension {
@@ -121,8 +126,8 @@ export function cms(options: CmsOptions = {}): KayExtension {
       if (options.files === undefined && process.env.NODE_ENV === 'production')
         settings().files = savedFromEnv()
 
-      if (options.guard === undefined && options.role === undefined && !underKayDev())
-        log.warn('no cms({ guard }): outside `kay dev` an edit link or cookie reads only the entries of the pages it opens and saves, publishes, deletes and uploads nothing, and the admin screens stay closed; set cms({ role }) or cms({ guard }) to let editors write')
+      if (settings().guard === undefined && !underKayDev())
+        log.warn('no cms({ access }): outside `kay dev` an edit link or cookie reads only the entries of the pages it opens and saves, publishes, deletes and uploads nothing, and the admin screens stay closed; set cms({ access }) to let editors write')
 
       const plugin = api()
 

@@ -240,6 +240,11 @@ function deniedTo(member: Member | undefined, target: Target = {}): Denials {
   return found
 }
 
+// Whether the app limits what a person may do, by `roles` or by `can`; without either everyone admitted does it all.
+export function ruled(): boolean {
+  return settings().roles !== undefined || settings().can !== undefined
+}
+
 export async function denials(ctx: GuardContext, target?: Target): Promise<Denials> {
   return deniedTo(settings().roles === undefined ? undefined : await memberOf(ctx), target)
 }
@@ -280,7 +285,7 @@ function refusal(doing: Doing | 'site', reachable = false): string {
 
 // Whether the signed-in person may do it: see `allows`.
 export async function may(ctx: GuardContext, doing: Doing, target?: Target): Promise<boolean> {
-  return settings().roles === undefined || allows(await memberOf(ctx), doing, target)
+  return !ruled() || allows(await memberOf(ctx), doing, target)
 }
 
 export function forbidden(ctx: GuardContext, doing: Doing | 'site', target?: Target): never {

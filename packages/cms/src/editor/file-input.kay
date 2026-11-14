@@ -44,7 +44,7 @@ let cancel: AbortController | undefined
 guardLeave(() => sent() !== undefined)
 
 async function offer(): Promise<void> {
-  const rules = await uploadRules()
+  const rules = await uploadRules(collection)
 
   accept = upload.accept?.join(',') ?? (rules === undefined ? undefined : image ? rules.images : rules.accept)
   maxSize = Math.min(upload.maxSize ?? Infinity, rules?.maxSize ?? Infinity)

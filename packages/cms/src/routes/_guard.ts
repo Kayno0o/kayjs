@@ -2,7 +2,7 @@ import type { GuardContext } from 'kay'
 import { guard } from 'kay'
 import { overHttps } from 'kay/library'
 import { wording } from 'kay/words'
-import { forbidden, may, routePath, sendToSignIn, whoOf } from '../access'
+import { forbidden, may, routePath, ruled, sendToSignIn, whoOf } from '../access'
 import { admitEditor } from '../editor-names'
 import { EDITOR_COOKIE, editorCookie, hintCookie } from '../page-link'
 import { settings } from '../settings'
@@ -43,7 +43,7 @@ export default guard(async (ctx) => {
   const { guard: admits, pageLink } = settings()
 
   if (!admits)
-    return ctx.deny(403, 'kayjs-cms has no guard: give cms() a kayjs-auth role, cms({ role: \'editor\' }), or a guard such as passwordGuard()')
+    return ctx.deny(403, 'kayjs-cms has no one let in: give cms() an access, a kayjs-auth role as cms({ access: \'editor\' }), or a password as cms({ access: { password } })')
 
   try {
     await admits(ctx)
@@ -54,7 +54,7 @@ export default guard(async (ctx) => {
     throw error
   }
 
-  const below = settings().roles === undefined ? undefined : belowPrefix(ctx)
+  const below = ruled() ? belowPrefix(ctx) : undefined
 
   if (below === null)
     return ctx.deny(403, wording('cms.guard.unplaced', 'The cms could not place this request among its routes'))

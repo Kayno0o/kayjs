@@ -422,10 +422,10 @@ describe('the array form of an older config', () => {
 })
 
 describe('the config', () => {
-  const check = (roles: Record<string, unknown>) => () => checkRoles(roles as never, true)
+  const check = (roles: Record<string, unknown>) => () => checkRoles(roles as never)
 
   test('reads the limits of a role', () => {
-    const roles = checkRoles({ blogger: { collections: ['posts'], own: 'author', actions: ['publish'] }, editor: [] }, true)!
+    const roles = checkRoles({ blogger: { collections: ['posts'], own: 'author', actions: ['publish'] }, editor: [] })!
 
     expect(roles.get('blogger')).toEqual({ actions: new Set(['publish']), collections: new Set(['posts']), own: 'author' })
     expect(roles.get('editor')).toEqual({ actions: new Set(), collections: undefined, own: undefined })
@@ -619,7 +619,19 @@ describe('cms({ can })', () => {
     expect(await send(me, 'GET', '/entries/posts/mine')).toBe(403)
   })
 
-  test('is given with roles only', () => {
-    expect(() => configure({ guard: () => undefined, can: () => true })).toThrow('roles')
+  test('is a function, given with or without roles', () => {
+    expect(() => configure({ guard: () => undefined, can: 'yes' as never })).toThrow('function')
+    expect(() => configure({ guard: () => undefined, can: () => true })).not.toThrow()
+  })
+})
+
+describe('an app with a can hook and no roles', () => {
+  test('asks it about every request, which only narrows what everyone admitted may do', async () => {
+    configure({ guard: async () => undefined, can: ({ action }) => action !== 'delete' })
+
+    const boss = { id: 'u3', roles: ['boss'] }
+
+    expect(await send(boss, 'DELETE', '/entries/posts/mine')).toBe(403)
+    expect(await send(boss, 'POST', '/entries/posts/mine/publish')).toBe(200)
   })
 })

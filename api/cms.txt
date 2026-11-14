@@ -52,6 +52,9 @@ interface Choice
 [.] cms
 function cms(options?: CmsOptions): KayExtension<AnyElysia>
 
+[.] CmsAccess
+type CmsAccess = string | readonly string[] | PasswordAccess | MemberAccess | false
+
 [.] CmsAction
 type CmsAction = typeof ACTIONS[number]
 
@@ -100,6 +103,7 @@ function cmsDrafts({
 
 [.] CmsOptions
 interface CmsOptions
+  access?: CmsAccess | undefined
   author?: ((ctx: GuardContext) => Identity | Promise<Identity | undefined> | undefined) | undefined
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
@@ -109,7 +113,7 @@ interface CmsOptions
   fourEyes?: boolean | undefined
   guard?: GuardOption | false | undefined
   history?: false | undefined | {
-  revisions?: number | undefined;
+  revisions?: false | number | undefined;
   trash?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined;
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined;
 }
@@ -117,7 +121,7 @@ interface CmsOptions
   newsletter?: Record<string, NewsletterOptions> | undefined
   onSave?: Hook<SaveEvent> | undefined
   onUpload?: Hook<UploadEvent> | undefined
-  pageLink?: false | undefined
+  pageLink?: PageLinkOptions | boolean | undefined
   pageSize?: number | undefined
   prefix?: string | undefined
   rawHtml?: string[] | undefined
@@ -137,6 +141,15 @@ interface CollectionLayout
 
 [.] collectionScreen
 function collectionScreen(name: string): Promise<undefined | { prefix: string; collection: ScreenCollection; }>
+
+[.] CollectionSettings
+interface CollectionSettings
+  beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
+  beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
+  fourEyes?: boolean | undefined
+  onSave?: Hook<SaveEvent> | undefined
+  onUpload?: Hook<UploadEvent> | undefined
+  uploads?: UploadOptions | undefined
 
 [.] Commit
 interface Commit
@@ -347,7 +360,7 @@ interface GitlabOptions
   token: string
 
 [.] GivenLayout
-type GivenLayout = CollectionLayout & { icon?: IconProps | undefined, history?: false | undefined }
+type GivenLayout = CollectionLayout & CollectionSettings & { icon?: IconProps | undefined, history?: false | undefined }
 
 [.] GivenRole
 type GivenRole = readonly CmsAction[] | RoleScope
@@ -422,14 +435,29 @@ interface MarkedField
   marker: FieldMarker
   start?: Comment | undefined
 
+[.] MemberAccess
+type MemberAccess = (ctx: GuardContext) => MemberInfo | undefined | Promise<MemberInfo | undefined>
+
 [.] MemberInfo
 interface MemberInfo
   email?: string | undefined
   name?: string | undefined
   roles: readonly string[]
 
+[.] PageLinkOptions
+interface PageLinkOptions
+  button?: boolean | undefined
+
 [.] parseMarker
 function parseMarker(value: string, body?: boolean): FieldMarker | undefined
+
+[.] PasswordAccess
+interface PasswordAccess extends PasswordOptions
+  kv?: KvStore | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  password: Record<string, string> | string
+  secret?: string | undefined
+  store?: RateStore | undefined
 
 [.] passwordGuard
 function passwordGuard(passwords: Record<string, string> | string, { maxAge, secret, store, kv: signedOut }?: PasswordOptions): Guard

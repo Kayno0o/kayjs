@@ -205,3 +205,21 @@ test('the upload module declares its own body limit, which the app-wide 1 MB cap
   expect(limit).toBe(uploadMaxSize)
   expect(uploadMaxSize()).toBeGreaterThan(1024 * 1024)
 })
+
+test('a collection\'s own uploads replace the cms\'s for it alone, and the route reads the largest', async () => {
+  configure({ uploads: { types: ['image/*'], maxSize: '1mb' }, collections: { documents: { uploads: { types: ['application/pdf'], maxSize: '40mb' } }, notes: { uploads: { maxSize: '2mb' } } } })
+
+  expect(await uploadRefusal(upload('brochure.pdf', PDF), 'documents')).toBeUndefined()
+  expect(await uploadRefusal(upload('brochure.pdf', PDF), 'notes')).toContain('which uploads here do not take: image/*')
+  expect(await uploadRefusal(upload('brochure.pdf', PDF))).toContain('which uploads here do not take: image/*')
+  expect(uploadRules('documents')).toEqual({ accept: 'application/pdf', images: 'application/pdf', maxSize: 40 * 1024 * 1024 })
+  expect(uploadRules('notes')).toEqual({ accept: 'image/*', images: 'image/*', maxSize: 2 * 1024 * 1024 })
+  expect(uploadRules()).toMatchObject({ accept: 'image/*', maxSize: 1024 * 1024 })
+  expect(uploadMaxSize()).toBe(40 * 1024 * 1024 + 64 * 1024)
+})
+
+test('refuses a collection\'s uploads that are not a size or a list of types', () => {
+  expect(() => configure({ collections: { notes: { uploads: { maxSize: 0 } } } })).toThrow('cms({ collections: { "notes": { uploads: { maxSize } } } })')
+  expect(() => configure({ collections: { notes: { uploads: { types: 'image/*' as never } } } })).toThrow('takes a list of field names')
+  expect(() => configure({ collections: { notes: { uploads: { size: 1 } as never } } })).toThrow('uploads')
+})

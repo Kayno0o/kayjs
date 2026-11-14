@@ -1,9 +1,13 @@
 import type { IconProps } from 'kay/icons'
 import type { FormLayout, GivenLayout, ListLayout, RowAction, ToolbarAction } from './kay/contract'
+import type { CollectionSettings } from './settings'
 import { configError } from 'kay/library'
 import { ROW_ACTIONS, TOOLBAR_BUTTONS } from './layout'
 
 const ACTIONS = new Set<string>(ROW_ACTIONS)
+const HOOKS = ['onSave', 'beforeSave', 'beforeUpload', 'onUpload'] as const
+const SETTING_KEYS = ['uploads', 'fourEyes', ...HOOKS]
+const LAYOUT_KEYS = ['form', 'list', 'group', 'order', 'icon', 'history', ...SETTING_KEYS]
 
 function strings(where: string, value: unknown): string[] {
   if (!Array.isArray(value) || value.some(name => typeof name !== 'string' || name === ''))
@@ -118,7 +122,7 @@ export function checkLayouts(collections: unknown): ReadonlyMap<string, GivenLay
 
   for (const [name, value] of Object.entries(plain('cms({ collections })', collections))) {
     const where = `cms({ collections: { ${JSON.stringify(name)} } })`
-    const { form, list, group, order, icon, history } = plain(where, value, ['form', 'list', 'group', 'order', 'icon', 'history'])
+    const { form, list, group, order, icon, history } = plain(where, value, LAYOUT_KEYS)
 
     if (group !== undefined && (typeof group !== 'string' || group.trim() === ''))
       throw configError('cms', 'layout', `\`${where}.group\` takes a heading, got ${JSON.stringify(group)}`)
@@ -136,4 +140,47 @@ export function checkLayouts(collections: unknown): ReadonlyMap<string, GivenLay
   }
 
   return layouts
+}
+
+// What each collection of `cms({ collections })` sets beside the cms's own, checked as kay.config.ts loads; a collection with none is left out.
+export function checkCollectionSettings(collections: unknown): ReadonlyMap<string, CollectionSettings> {
+  const found = new Map<string, CollectionSettings>()
+
+  if (collections === undefined)
+    return found
+
+  for (const [name, value] of Object.entries(plain('cms({ collections })', collections))) {
+    const where = `cms({ collections: { ${JSON.stringify(name)} } })`
+    const given = plain(where, value, LAYOUT_KEYS)
+    const { uploads, fourEyes } = given
+    const kept: CollectionSettings = {}
+
+    for (const hook of HOOKS) {
+      if (given[hook] !== undefined && typeof given[hook] !== 'function')
+        throw configError('cms', 'layout', `\`${where}.${hook}\` takes a function, got ${JSON.stringify(given[hook])}`)
+
+      if (given[hook] !== undefined)
+        Object.assign(kept, { [hook]: given[hook] })
+    }
+
+    if (fourEyes !== undefined && typeof fourEyes !== 'boolean')
+      throw configError('cms', 'layout', `\`${where}.fourEyes\` takes true or false, got ${JSON.stringify(fourEyes)}`)
+
+    if (uploads !== undefined) {
+      const { types } = plain(`${where}.uploads`, uploads, ['types', 'maxSize'])
+
+      if (types !== undefined)
+        strings(`${where}.uploads.types`, types)
+
+      kept.uploads = uploads as CollectionSettings['uploads']
+    }
+
+    if (fourEyes !== undefined)
+      kept.fourEyes = fourEyes
+
+    if (Object.keys(kept).length > 0)
+      found.set(name, kept)
+  }
+
+  return found
 }

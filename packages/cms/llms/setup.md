@@ -6,14 +6,24 @@ Installing the cms, where a folder entry's file goes when an editor saves, and h
 
 ### Install the cms
 
-`kay add cms` installs the packages and adds `cms()` to `extensions`. `role` lets in the kayjs-auth users holding it, the app's `authorize` deciding as in `auth.guard()`; a production server with no `files` commits to the Forgejo `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and `CMS_BRANCH` name, or to GitHub or GitLab with `CMS_HOST=github` or `CMS_HOST=gitlab` and the same minus `CMS_BASE_URL` (`kay env` lists them), and refuses to boot without them. Hosts: Forgejo, GitHub (github.com and GitHub Enterprise Server) and GitLab (gitlab.com and self-managed) ship a saver; `forgejo()` is written against Forgejo's batch contents endpoint and is not verified against Gitea, and any other host needs a saver of your own, below.
+`kay add cms` installs the packages and adds `cms()` to `extensions`. `access` says who is let in: a kayjs-auth role (`'editor'`), a password, or a function; with kayjs-auth registered and `roles` listed it is inferred, their holders being let in. A production server with no `files` commits to the repository `CMS_URL` names (`forgejo://TOKEN@git.example.com/owner/repo`, `github://TOKEN@owner/repo` or `gitlab://TOKEN@group/project`, `?branch=` and `?baseUrl=` after it; `kay env` lists it), and refuses to boot without it. Hosts: Forgejo, GitHub (github.com and GitHub Enterprise Server) and GitLab (gitlab.com and self-managed) ship a saver; `forgejo()` is written against Forgejo's batch contents endpoint and is not verified against Gitea, and any other host needs a saver of your own, below.
 
 ```ts
 import { auth } from '@kayjs/auth'
 import { cms } from '@kayjs/cms'
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ extensions: [auth({ module: './src/auth' }), cms({ role: 'editor' })] })
+export default defineConfig({ extensions: [auth({ module: './src/auth' }), cms({ access: 'editor' })] })
+```
+
+### Name the repository in one variable
+
+`CMS_URL` is the forge, the way `MAIL_URL` is the mail server: the scheme is the host (`forgejo`, `github`, `gitlab`), the token goes before the `@`, percent-encoded, and the repository follows. `?branch=` sets the branch committed to, the repository's default when left out, and `?baseUrl=` the address a scheme does not give: a GitHub Enterprise Server's API (`https://github.example.com/api/v3`), a self-managed GitLab, a Forgejo that is not https. A Forgejo takes its address from the host, https. `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN`, `CMS_BRANCH` and `CMS_HOST` still work when `CMS_URL` is not set.
+
+```sh
+CMS_URL=forgejo://TOKEN@git.example.com/me/site?branch=content
+CMS_URL=github://TOKEN@me/site
+CMS_URL=gitlab://TOKEN@me/site?baseUrl=https://gitlab.example.com
 ```
 
 ### Commit saves to Forgejo
@@ -21,7 +31,7 @@ export default defineConfig({ extensions: [auth({ module: './src/auth' }), cms({
 `forgejo({ baseUrl, repo, branch?, token, timeout?, fetch? })` commits each file through Forgejo's contents API. All three forge savers refuse a redirect (`redirect: 'error'`, so a renamed repository needs its new `repo` or `baseUrl`, and the token never follows one to another host) and read at most 64 KB of a refusal's body.
 
 ```ts
-cms({ guard, files: forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: env.FORGEJO_TOKEN }) })
+cms({ access: 'editor', files: forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: env.FORGEJO_TOKEN }) })
 ```
 
 ### Commit saves to GitHub
@@ -29,7 +39,7 @@ cms({ guard, files: forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site
 `github({ repo, branch?, token, baseUrl?, timeout?, fetch? })` commits through GitHub's Git Data API: it reads the branch's head, builds a tree and a commit on it, and moves the branch to it. A save of several files (a rename with the entries that named the renamed one) is one commit or nothing. The token needs write access to the repository's contents.
 
 ```ts
-cms({ guard, files: github({ repo: 'me/site', token: env.GITHUB_TOKEN }) })
+cms({ access: 'editor', files: github({ repo: 'me/site', token: env.GITHUB_TOKEN }) })
 ```
 
 ### Commit saves to GitLab
@@ -37,7 +47,7 @@ cms({ guard, files: github({ repo: 'me/site', token: env.GITHUB_TOKEN }) })
 `gitlab({ repo, branch?, token, baseUrl?, timeout?, fetch? })` commits through GitLab's Commits API, which takes every file of a save in one commit. `repo` is `group/name` (or `group/subgroup/name`), `baseUrl` the address of a self-managed GitLab, and the token needs the `api` scope.
 
 ```ts
-cms({ guard, files: gitlab({ repo: 'me/site', token: env.GITLAB_TOKEN }) })
+cms({ access: 'editor', files: gitlab({ repo: 'me/site', token: env.GITLAB_TOKEN }) })
 ```
 
 ### Write saves in the working tree
@@ -45,7 +55,7 @@ cms({ guard, files: gitlab({ repo: 'me/site', token: env.GITLAB_TOKEN }) })
 `workingTree()` writes or deletes the file in place, for `kay dev` or a server whose files outlive a deploy; a production server refuses to boot with it unless named.
 
 ```ts
-cms({ guard, files: workingTree() })
+cms({ access: 'editor', files: workingTree() })
 ```
 
 ### Write a saver of your own
@@ -64,7 +74,7 @@ const saver: FileSaver = {
 
 ## Reference
 
-- `cms({ prefix, role, guard, files, uploads, pageSize, collections, rawHtml, author, onSave })`: `prefix` is where the screens live (`/admin`), `role` the kayjs-auth role an editor needs, or `guard` who may use them and the API, as `{ load }` returning the guard (not both), `files` where a folder entry's file goes (`workingTree()` by default; a production server takes `forgejo()`, or `github()` or `gitlab()` with `CMS_HOST=github` or `gitlab`, from the `CMS_*` variables, else refuses to boot unless named). Every option, the upload checks, `rawHtml` and `author` are in [Options of cms()](options.md).
+- `cms({ prefix, access, files, uploads, pageSize, collections, rawHtml, author, onSave })`: `prefix` is where the screens live (`/admin`), `access` who may use them and the API, `files` where a folder entry's file goes (`workingTree()` by default; a production server takes `forgejo()`, `github()` or `gitlab()` from `CMS_URL`, else refuses to boot unless named). Every option, the upload checks, `rawHtml` and `author` are in [Options of cms()](options.md).
 - `gitlab({ repo, branch?, token, baseUrl?, timeout?, fetch? })`: `repo` is the project path (`group/name`, sent URL-encoded), `baseUrl` the GitLab's address (`https://gitlab.com` by default, https or http on localhost), the token goes as `PRIVATE-TOKEN`. A save reads the branch's head, then the file's blob id and last commit id there (Repository Files API), checks `base`, and posts one commit with an action per file (`create`, `update`, `delete`, or `move` with the `also` files as `update`s) naming each file's `last_commit_id`, the editor as `author_name` and `author_email`. A file GitLab refuses as changed since, already existing or gone (400 or 409) restarts from the read, up to three times, so a save only conflicts when its own file changed; a file still changing after the third is a `SaveConflictError` with no `current`. Any other refusal (a protected branch) is a `ForgeError` at once, saying GitLab, and a failure after the commit was sent says the save may have gone through. The default branch is looked up on each save when `branch` is left out.
 - `github({ repo, branch?, token, baseUrl?, timeout?, fetch? })`: `baseUrl` is the REST API's address, `https://api.github.com` by default and `https://<host>/api/v3` for GitHub Enterprise Server, https or http on localhost as for `forgejo()`; the token goes as a Bearer. A save reads the file's blob sha at the branch's head (Contents API), checks `base`, then creates a tree and a commit (`parents` the head, the commit's `author` the editor's, GitHub taking the committer from it) and updates the ref without `force`. A ref update GitHub refuses as not a fast forward (another push or save moved the branch, 422 or 409) restarts from the read, up to three times, so a save only conflicts when its own file changed, and `SaveConflictError` then carries that file's version; a branch still moving after the third is a `SaveConflictError` with no `current`. Any other refusal of the update (a protected branch, a required status check) is a `ForgeError` at once. `move` is one commit with the `also` files (`together: true`), so a refused referrer writes nothing. Errors are `ForgeError` as for `forgejo()`, saying GitHub; a failure after the ref update was sent says the save may have gone through. The default branch is looked up on each save when `branch` is left out.
 - `forgejo({ baseUrl, repo, branch?, token, timeout?, fetch? })`: `baseUrl` must be https, or http on `localhost`, `127.x.x.x` or `[::1]`, else it throws, as the token travels in every request; commits each file through Forgejo's contents API, reading the file's sha first. Throws `ForgeError` with Forgejo's `status` and message, its first 200 characters (the log gets the rest), 504 when the save, its requests together, takes over `timeout` (a duration string, `'15s'`, a bare number throws; the read naming the version after a conflict has its own), or 502 naming why the forge could not be reached; one failing once the commit was sent says it may have gone through. The editor sees it as the save's issue, the log getting the whole error. Forgejo refusing the commit's sha (409, or 422 naming the sha) throws `SaveConflictError`.

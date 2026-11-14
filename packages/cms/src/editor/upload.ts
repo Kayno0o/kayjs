@@ -79,19 +79,26 @@ export function uploadRefusal(collection: string): Signal<string | undefined> {
   return reason
 }
 
-let rules: Promise<UploadRules | undefined> | undefined
+const rules = new Map<string, Promise<UploadRules | undefined>>()
 
-// What the server takes, asked once; undefined when it could not be asked, the server then refusing in its own words.
-export async function uploadRules(): Promise<UploadRules | undefined> {
-  return rules ??= load()
+// What the server takes in a collection, asked once for each; undefined when it could not be asked, the server then refusing in its own words.
+export async function uploadRules(collection: string): Promise<UploadRules | undefined> {
+  let found = rules.get(collection)
+
+  if (found === undefined) {
+    found = load(collection)
+    rules.set(collection, found)
+  }
+
+  return found
 }
 
-async function load(): Promise<UploadRules | undefined> {
+async function load(collection: string): Promise<UploadRules | undefined> {
   try {
-    return await call(filesApi, '/rules')
+    return await call(filesApi, '/rules', { query: { collection } })
   }
   catch {
-    rules = undefined
+    rules.delete(collection)
 
     return undefined
   }
@@ -149,7 +156,7 @@ export async function uploadFile(collection: string, file: File, { progress, sig
     if (file.size === 0)
       throw refused(400, emptyFile(file.name))
 
-    const limits = await uploadRules()
+    const limits = await uploadRules(collection)
     const maxSize = Math.min(own?.maxSize ?? Infinity, limits?.maxSize ?? Infinity)
 
     if (file.size > maxSize)

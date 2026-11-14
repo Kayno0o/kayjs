@@ -3,13 +3,13 @@ import { apiUrl, guard } from 'kay'
 import { editSessionAdmitted, READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
-import { memberOf, reaches, refusalStatus, routePath } from '../access'
+import { memberOf, reaches, refusalStatus, routePath, ruled } from '../access'
 import { authOf, organizationMembers, siteRoleHolders } from '../auth-like'
 import { actors, authors, linkReaders, testAddresses } from '../authors'
 import { admitEditor } from '../editor-names'
 import { log } from '../log'
 import { decoded, enforceRoles } from '../role-check'
-import { settings } from '../settings'
+import { anyFourEyes, settings } from '../settings'
 import devApi from './dev'
 import iconsApi from './icons'
 import previewApi from './preview'
@@ -118,7 +118,7 @@ function refusal(editing: boolean, reading: boolean): string {
   if (!editing)
     return wording('cms.guard.notEditing', 'Not in edit mode')
 
-  return reading ? wording('cms.guard.notOnPage', 'Not an entry of the pages shown in edit mode') : wording('cms.guard.needsGuard', 'Saving needs cms({ role }) or cms({ guard })')
+  return reading ? wording('cms.guard.notOnPage', 'Not an entry of the pages shown in edit mode') : wording('cms.guard.needsGuard', 'Saving needs cms({ access })')
 }
 
 // An edit cookie or link reads the entries the pages it opened render, leaves edit mode, and under `kay dev` writes while the app has no guard; every other request is whom the app's guard admits, and any other server without one admits no write at all.
@@ -158,10 +158,10 @@ export default guard(async (ctx) => {
   admitEditor(ctx)
 
   // Read now so the route that tells what the person may do has it, and the entry's read the review it may not approve; every other route reads it only when it needs it.
-  if (method === 'GET' && (EDITOR_CAN.test(ownPath(ctx.url.pathname, root)) || (settings().fourEyes && ENTRY.test(ownPath(ctx.url.pathname, root)))))
+  if (method === 'GET' && (EDITOR_CAN.test(ownPath(ctx.url.pathname, root)) || (anyFourEyes() && ENTRY.test(ownPath(ctx.url.pathname, root)))))
     await memberOf(ctx)
 
-  if (settings().roles !== undefined) {
+  if (ruled()) {
     const path = ownPath(routePath(ctx.url), root)
 
     // A request the guard cannot place below the cms's mount would skip every role check, so it is refused.

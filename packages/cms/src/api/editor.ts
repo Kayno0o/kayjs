@@ -18,7 +18,7 @@ export default api()
 
     keepCookiesPrivate(set)
 
-    return { label: wording('cms.page.edit', 'Edit this page'), href: screenPath(settings().prefix, '/page') }
+    return { label: wording('cms.page.edit', 'Edit this page'), href: screenPath(settings().prefix, '/page'), ...!settings().pageButton && { button: false } }
   })
   // What the signed-in person's role may not do, with the reason, so the controls for it are disabled; empty when the app lists no roles. The server refuses it all the same. The screens' prefix is where the page editor leads after it deletes the entry its page shows.
   .get('/can', async ({ request, query, set }) => {

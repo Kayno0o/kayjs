@@ -2,7 +2,7 @@
 
 > A CMS for kay sites: content edited on the page it renders, and collection screens.
 
-Setup: `cms()` runs with no argument and `cms({ role, files, ... })` takes its options inline, in `kay.config.ts`, which kay reads for `kay check` and the editor with no server running, so there is no module form.
+Setup: `cms()` runs with no argument and `cms({ access, files, ... })` takes its options inline, in `kay.config.ts`, which kay reads for `kay check` and the editor with no server running, so there is no module form.
 
 ## Topics
 
@@ -28,4 +28,4 @@ Setup: `cms()` runs with no argument and `cms({ role, files, ... })` takes its o
 
 ## Environment
 
-Every variable starts `CMS_`: `CMS_HOST`, `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN`, `CMS_BRANCH`.
+`CMS_URL` names the forge a production server commits to: `forgejo://TOKEN@git.example.com/owner/repo`, `github://TOKEN@owner/repo` or `gitlab://TOKEN@group/project`, with `?branch=` and `?baseUrl=`. The older `CMS_HOST`, `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and `CMS_BRANCH` are read without it.

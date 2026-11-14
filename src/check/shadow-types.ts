@@ -34,16 +34,17 @@ import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes,
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
 import { aiLanguage } from './ai-language'
+import { cmsOptions } from './cms-options'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
+
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
+
 import { unguardedRoutes, unguardedTools } from './guards'
-
 import { islandOnlyComponents } from './island-only'
-import { largePublicImages } from './large-images'
 
+import { largePublicImages } from './large-images'
 import { localState } from './local-state'
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
@@ -171,6 +172,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => aiLanguage(root, options),
   async ({ root, options }) => mailApi(root, options),
   async ({ root, options }) => testHelpers(root, options),
+  async ({ root, options }) => cmsOptions(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

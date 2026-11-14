@@ -159,6 +159,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { s } from \'kay/server\'\n\nconst Form = s.Object({ name: s.String() })\n---\np x',
     right: '---\nimport { s } from \'kay\'\n\nconst Form = s.Object({ name: s.String() })\n---\np x',
   },
+  'deprecated-cms-options': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`role` and `guard: passwordGuard()` in the options of `cms()`, `access` since 1.105: one option says who is let in, a kayjs-auth role (`access: \'editor\'`, or a list of them), `{ password }` for a site with no users (the options of `passwordGuard()` beside it) or a function returning the person, which `member` gave a custom guard on its own; an `uploads` list is `uploads: { types }`. The old forms work until 1.108. Found on a call of `cms` imported from `@kayjs/cms`, in the options object written in the call, in the TypeScript files and `.kay` files of the project. The fix renames `role`, writes `access: { password }` for the `passwordGuard()` call (the import it leaves unused can go) and wraps the `uploads` list; a `member`, which needs its guard folded into one function, is reported with no fix, and so is an options object that spreads another or holds `access` already.',
+    wrong: '// kay.config.ts\nimport { cms } from \'@kayjs/cms\'\n\nexport default { extensions: [cms({ role: \'editor\', uploads: [\'image/*\'] })] }',
+    right: '// kay.config.ts\nimport { cms } from \'@kayjs/cms\'\n\nexport default { extensions: [cms({ access: \'editor\', uploads: { types: [\'image/*\'] } })] }',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

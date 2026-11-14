@@ -2,6 +2,7 @@
 import type { CollectionInfo, SourceEntry } from 'kay/content'
 import type { EntryRef } from 'kay/edit'
 import type { IconProps } from 'kay/icons'
+import type { CollectionSettings } from '../settings'
 
 export type { EntryRef }
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, FieldHint, FieldInputOptions, JsonSchema, SourceEntry, TranslationIndex } from 'kay/content'
@@ -40,8 +41,8 @@ export interface CollectionLayout {
   list?: ListLayout | undefined
 }
 
-// What `cms({ collections })` gave a collection: its layout, the icon the content list draws before it, which stays on the server, as the editor's islands would otherwise carry it with each page, and `history: false` to keep neither its revisions nor its trash.
-export type GivenLayout = CollectionLayout & { icon?: IconProps | undefined, history?: false | undefined }
+// What `cms({ collections })` gave a collection: its layout, the icon the content list draws before it, which stays on the server, as the editor's islands would otherwise carry it with each page, `history: false` to keep neither its revisions nor its trash, and the settings it has beside the cms's own.
+export type GivenLayout = CollectionLayout & CollectionSettings & { icon?: IconProps | undefined, history?: false | undefined }
 
 // A collection as the screens read it: kay's, with the layout `cms({ collections })` gave it.
 // `history` is set for a collection that keeps its entries' revisions, and `trash` for one that keeps its deleted entries, which the screens then link to; `newsletter` for one whose entries an editor can send to a list, and `review` for one whose drafts an editor can send for review.

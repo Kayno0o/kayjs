@@ -202,7 +202,7 @@ export async function replaceImage(drafts: Drafts, bar: Pick<ImageBar, 'entry' |
       return
     }
 
-    const accept = field.upload?.accept?.join(',') ?? (await uploadRules())?.images
+    const accept = field.upload?.accept?.join(',') ?? (await uploadRules(marker.collection))?.images
 
     if (accept !== undefined && !acceptsFile(accept, file)) {
       toast.error(notTaken(file, accept))

@@ -63,12 +63,9 @@ function checkScope(role: string, scope: RoleScope): Role {
 }
 
 // The roles of `cms({ roles })` as a map, so a role named `__proto__` or `constructor` is a name like any other; undefined when the app gave none.
-export function checkRoles(roles: Record<string, GivenRole> | undefined, guarded: boolean): ReadonlyMap<string, Role> | undefined {
+export function checkRoles(roles: Record<string, GivenRole> | undefined): ReadonlyMap<string, Role> | undefined {
   if (roles === undefined)
     return undefined
-
-  if (!guarded)
-    throw configError('cms', 'roles', '`cms({ roles })` needs a `guard`, which says who the signed-in person is')
 
   const checked = new Map<string, Role>()
 

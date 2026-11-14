@@ -78,6 +78,19 @@ describe('revisions', () => {
     expect(() => configure({ history: { revisions: 0 } })).toThrow('positive whole number')
   })
 
+  test('keeps no revision with revisions: false, and still keeps the trash', async () => {
+    notes()
+    configure({ history: { revisions: false } })
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ ...ref, data: { title: 'Two' } })
+    expect(await revisionsOf(ref)).toEqual([])
+    expect((await findCollection('notes'))?.history).toBeUndefined()
+
+    await deleteEntry(ref)
+    expect((await findCollection('notes'))?.trash).toBe(true)
+    expect((await trashOf('notes')).length).toBe(1)
+  })
+
   test('keeps nothing when the history is off, and leaves the collection unmarked', async () => {
     notes()
     configure({ history: false })

@@ -20,7 +20,7 @@ import { missingReferences, pointReferences, referrersWith, UnreadReferrersError
 import { forgetReview, moveReview, readReview, reviewable, settleReview } from './review'
 import { moveRevisions, openTrail } from './revisions'
 import { askBeforeSave, hooked, previousOf, tellOnSave } from './save-hooks'
-import { settings } from './settings'
+import { hooksOf, settings } from './settings'
 import { pairKey } from './translations'
 import { discardTrashed, keepDeleted } from './trash'
 import { namingFields, withFreeUniques } from './unique'
@@ -238,12 +238,12 @@ async function saved(event: SaveEvent): Promise<void> {
 
 async function saveEntryAnswer(given: CmsDraftEntry, options: SaveOptions = {}): Promise<Answer> {
   const verb = options.verb ?? (options.create === true ? 'add' : 'update')
-  const previous = verb !== 'move' && options.create !== true && hooked() ? await previousOf(given) : undefined
+  const previous = verb !== 'move' && options.create !== true && hooked(given.collection) ? await previousOf(given) : undefined
   let entry = given
   let kept = options
 
   // A reorder is a position, not something an editor wrote.
-  if (verb !== 'move' && options.unasked !== true && settings().beforeSave !== undefined) {
+  if (verb !== 'move' && options.unasked !== true && hooksOf('beforeSave', given.collection).some(hook => hook !== undefined)) {
     const asked = await askBeforeSave({ collection: given.collection, slug: given.slug, ...given.locale !== undefined && { locale: given.locale }, verb, ...options.author !== undefined && { author: options.author }, data: given.data, ...given.body !== undefined && { body: given.body }, ...previous !== undefined && { previous } })
 
     if ('issues' in asked)
@@ -371,7 +371,7 @@ async function writeEntry(entry: CmsDraftEntry, { create = false, version, requi
 }
 
 async function deleteEntryAnswer(ref: EntryRef, author?: Identity, options: { version?: string | undefined } & VersionRule = {}): Promise<Answer> {
-  const previous = hooked() ? await previousOf(ref) : undefined
+  const previous = hooked(ref.collection) ? await previousOf(ref) : undefined
   const asked = await askBeforeSave({ collection: ref.collection, slug: ref.slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'delete', ...author !== undefined && { author }, data: previous?.data ?? {}, ...previous?.body !== undefined && { body: previous.body }, ...previous !== undefined && { previous } })
 
   if ('issues' in asked)

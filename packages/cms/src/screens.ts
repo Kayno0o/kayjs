@@ -46,7 +46,7 @@ export async function entryScreen(ref: EntryRef, viewer?: Viewer): Promise<Entry
   const screen = await readEntry(ref)
   const review = screen?.entry && screen.collection.review ? await readReview(ref) : undefined
 
-  return screen && { prefix: settings().prefix, ...screen, ...review && { review: viewOf(review, viewer) } }
+  return screen && { prefix: settings().prefix, ...screen, ...review && { review: viewOf(review, viewer, ref.collection) } }
 }
 
 // What a new entry's screen reads: the collection alone.
@@ -267,7 +267,7 @@ export async function historyScreen(ref: EntryRef, viewer?: Viewer): Promise<His
 
   const review = await readReview(ref)
 
-  return { prefix: settings().prefix, collection, entry, rows: rows.reverse(), ...review && { review: viewOf(review, viewer) } }
+  return { prefix: settings().prefix, collection, entry, rows: rows.reverse(), ...review && { review: viewOf(review, viewer, ref.collection) } }
 }
 
 // A trashed entry as the page shows it: the entry itself stays server side.

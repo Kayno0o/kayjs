@@ -10,7 +10,7 @@ import { rowOf } from './hidden'
 import { collectionLoader } from './kay/content'
 import { log } from './log'
 import { placeOf } from './revisions'
-import { settings } from './settings'
+import { fourEyesOf, settings } from './settings'
 
 // What a draft is waiting for: a reviewer (`review`), the writer after a send-back (`sent-back`), or nothing once approved or published (`approved`, kept for the log).
 export type ReviewStatus = 'review' | 'sent-back' | 'approved'
@@ -61,9 +61,9 @@ function identified(viewer: Viewer | undefined): boolean {
   return viewer !== undefined && (viewer.id !== undefined || (viewer.name !== '' && viewer.name !== wording('cms.review.someone', 'Someone')))
 }
 
-// Why `cms({ fourEyes })` keeps this person from approving the entry in review: they sent it, or the guard names no one, so nothing says they did not.
-export function approvalBarred(review: Review, viewer: Viewer | undefined): 'own' | 'unnamed' | undefined {
-  if (!settings().fourEyes || review.status !== 'review')
+// Why `fourEyes` keeps this person from approving the entry in review: they sent it, or the guard names no one, so nothing says they did not.
+export function approvalBarred(review: Review, viewer: Viewer | undefined, collection?: string): 'own' | 'unnamed' | undefined {
+  if (!fourEyesOf(collection) || review.status !== 'review')
     return undefined
 
   if (!identified(viewer))
@@ -106,8 +106,8 @@ async function jsonOf(file: string): Promise<unknown> {
   }
 }
 
-export function viewOf(review: Review, viewer?: Viewer): ReviewView {
-  return { status: review.status, ...review.by !== undefined && { by: review.by }, events: review.events.map(({ at, ...event }) => ({ ...event, doneAt: new Date(at) })), ...approvalBarred(review, viewer) === 'own' && { own: true as const }, ...approvalBarred(review, viewer) === 'unnamed' && { unnamed: true as const } }
+export function viewOf(review: Review, viewer?: Viewer, collection?: string): ReviewView {
+  return { status: review.status, ...review.by !== undefined && { by: review.by }, events: review.events.map(({ at, ...event }) => ({ ...event, doneAt: new Date(at) })), ...approvalBarred(review, viewer, collection) === 'own' && { own: true as const }, ...approvalBarred(review, viewer, collection) === 'unnamed' && { unnamed: true as const } }
 }
 
 // A stored value as a review, undefined for anything else.

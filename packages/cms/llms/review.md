@@ -9,7 +9,7 @@ A writer who may not publish sends a draft for review; a reviewer approves it, w
 Give the reviewers the `review` action of `cms({ roles })`, and the writers none of `publish`. Nothing else is declared:
 
 ```ts
-cms({ guard, roles: { writer: [], reviewer: ['review'], publisher: ['publish', 'review'] } })
+cms({ access: 'editor', roles: { writer: [], reviewer: ['review'], publisher: ['publish', 'review'] } })
 ```
 
 A writer's entry screen and on-page editor offer Submit for review on a draft; a reviewer sees In review and Approve and Send back on it.
@@ -19,7 +19,7 @@ A writer's entry screen and on-page editor offer Submit for review on a draft; a
 A key of `roles` written `org:<role>` is held by a person holding `<role>` in any organization they belong to, `org:<organization>:<role>` in that one, named by its id or slug:
 
 ```ts
-cms({ guard, roles: { 'org:writer': [], 'org:reviewer': ['review'], 'org:acme:owner': ['publish', 'review'] } })
+cms({ access: 'editor', roles: { 'org:writer': [], 'org:reviewer': ['review'], 'org:acme:owner': ['publish', 'review'] } })
 ```
 
 ### Tell reviewers of a submission

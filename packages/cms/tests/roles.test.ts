@@ -308,8 +308,7 @@ describe('a new entry in a collection with a publish date and no draft flag', ()
 })
 
 describe('cms({ roles })', () => {
-  test('needs a guard, and only the known actions', () => {
-    expect(() => configure({ roles })).toThrow('needs a `guard`')
+  test('takes only the known actions', () => {
     expect(() => configure({ guard: () => undefined, roles: { editor: ['everything'] as never } })).toThrow('everything')
     expect(() => configure({ guard: () => undefined, roles: { editor: 'publish' as never } })).toThrow('list of')
   })
