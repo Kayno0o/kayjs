@@ -97,7 +97,7 @@ export async function pageOverLimit(route: { pattern: string }, modules: object[
   return new Denied(429, `Too many requests; try again in ${wait} s`)
 }
 
-// Why `kay build` does not keep a page nothing marks: it sets `ttl`, which has a stale copy rendered again for every visitor with the request a page reads, which an unmarked page was never asked to, or `rateLimit`, which only the server counts. A marked page is written all the same, with a warning for `rateLimit`: a static host serves the file with no count.
+// Why `kay build` does not keep a page nothing marks: it sets `cache`, which has a stale copy rendered again for every visitor with the request a page reads, which an unmarked page was never asked to, or `rateLimit`, which only the server counts. A marked page is written all the same, with a warning for `rateLimit`: a static host serves the file with no count.
 export function keptStop(file: string, revalidate: unknown, chain: object[], auto: boolean, skip: (why: string) => unknown): boolean {
   const limited = limitedPage(chain) === true
 

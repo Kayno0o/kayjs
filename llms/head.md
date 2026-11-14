@@ -118,7 +118,7 @@ export const page = { seo: { noindex: true } }
 h1 Legal notice
 ```
 
-In a layout's `page` it covers every page under it, the sitemap and the search index too; a page's own `noindex: false` takes it back. `seo.noindex` in kay.config.ts does it for the whole site, as a staging site wants.
+In a layout's `page` it covers every page under it, the sitemap and the search index too; a page's own `seo: { noindex: false }` takes it back. `seo.noindex` in kay.config.ts does it for the whole site, as a staging site wants.
 
 ### Cache a prerendered page
 

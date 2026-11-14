@@ -18,6 +18,11 @@ describe('deprecated-page-seo', () => {
     expect(fixed(page('{ prerender: true, noindex: true, sitemap: false }'), 'deprecated-page-seo')).toEqual({ found: 2, text: page('{ prerender: true, seo: { noindex: true, sitemap: false } }') })
   })
 
+  it('keeps the object whole with three or more inline settings, whatever their order', () => {
+    expect(fixed(page('{ noindex: true, search: false, sitemap: false }'), 'deprecated-page-seo').text).toBe(page('{ seo: { noindex: true, search: false, sitemap: false } }'))
+    expect(fixed(page('{ feed: false, prerender: true, lastmod: \'2026-01-01\', noindex: true }'), 'deprecated-page-seo').text).toBe(page('{ seo: { feed: false, lastmod: \'2026-01-01\', noindex: true }, prerender: true }'))
+  })
+
   it('takes a setting on its own line out with its line', () => {
     expect(fixed(page('{\n  prerender: true,\n  noindex: true,\n  search: false,\n}'), 'deprecated-page-seo').text).toBe(page('{\n  prerender: true,\n  seo: { noindex: true, search: false },\n}'))
   })

@@ -45,7 +45,7 @@ export const ERRORS = {
   },
   'head-invalid': {
     group: 'compile',
-    summary: 'A `head` block written twice, nested, given attributes or holding no head tag; an `html` tag outside it.',
+    summary: 'A `head` block written twice, nested, given an attribute other than `title`, `description`, `image`, `canonical` or `noindex`, or holding no head tag; an `html` tag outside it.',
     fix: { file: 'llms/head.md', heading: 'Head' },
   },
   'slot-invalid': {

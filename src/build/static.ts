@@ -264,7 +264,7 @@ function pageFiles(path: string): string[] {
 
 // The headers a server would send every response, for a host to send: `_headers` for those reading one, and an nginx include.
 // A page's own `security` is not part of them, and neither is the CSP report endpoint, which a static site lacks.
-// A page with a `ttl` or a `cacheControl` gets its `cache-control` in `_headers` too, by its path under the base; nginx cannot say it per path, so the include leaves it out.
+// A page with a `cache` gets its `cache-control` in `_headers` too, by its path under the base; nginx cannot say it per path, so the include leaves it out.
 async function writeHeaders(out: string, config: KayConfig, pages: Awaited<ReturnType<typeof pagesApp>>, caches: ReadonlyMap<string, string>): Promise<string[]> {
   const security = config.security === false || config.security?.reports !== true ? config.security : { ...config.security, reports: undefined }
   const headers = securityHeaders({ ...pages.securityOptions, security })

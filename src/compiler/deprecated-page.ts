@@ -4,37 +4,17 @@ import type { ServerAnalysis } from './script'
 // The settings of `page` that moved into `seo` in 1.105.
 const SEO_KEYS = ['noindex', 'sitemap', 'lastmod', 'search', 'feed']
 
+const SPACE = /\s/
 const within = (inner: Span, outer: Span) => inner.start >= outer.start && inner.end <= outer.end
 
-// The range a setting leaves when it is taken out of `page`: its line when it has one to itself, else the entry and its comma.
+// The range a setting leaves when it is taken out of `page` after the first one moved: the comma before it and the entry, so the ranges of several settings never meet.
 function removal(source: string, key: Span, value: Span): { start: number, end: number } {
-  let end = value.end
-
-  while (source[end] === ' ' || source[end] === '\t')
-    end++
-
-  const last = source[end] !== ','
-
-  if (!last) {
-    end++
-
-    while (source[end] === ' ' || source[end] === '\t')
-      end++
-  }
-  else {
-    end = value.end
-  }
-
   let start = key.start
 
-  while (source[start - 1] === ' ' || source[start - 1] === '\t')
+  while (SPACE.test(source[start - 1] ?? '') && start > 0)
     start--
 
-  if ((start === 0 || source[start - 1] === '\n') && source[end] === '\n')
-    return { start, end: end + 1 }
-
-  // The last entry takes the comma before it along, the one after it being none.
-  return { start: last ? start - (source[start - 1] === ',' ? 1 : 0) : key.start, end }
+  return { start: source[start - 1] === ',' ? start - 1 : key.start, end: value.end }
 }
 
 // What a page wrote before 1.105 for its head, its sitemap entry and its cache: `noindex`, `sitemap`, `lastmod`, `search` and `feed` are the `seo` group, `ttl` and `cacheControl` are `cache`.
@@ -48,7 +28,7 @@ export function deprecatedPageSettings(source: string, server: ServerAnalysis | 
   const seo = settings.get('seo')
   const text = (span: Span) => source.slice(span.start, span.end)
   // The settings read from inside `seo` are in the map by their own names too.
-  const moved = SEO_KEYS.flatMap(name => settings.has(name) && !(seo && within(settings.get(name)!.key, seo.value)) ? [{ name, ...settings.get(name)! }] : [])
+  const moved = SEO_KEYS.flatMap(name => settings.has(name) && !(seo && within(settings.get(name)!.key, seo.value)) ? [{ name, ...settings.get(name)! }] : []).toSorted((a, b) => a.key.start - b.key.start)
   const found: Diagnostic[] = []
 
   if (moved.length > 0) {

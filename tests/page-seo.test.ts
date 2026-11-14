@@ -27,6 +27,7 @@ describe('page seo, cache and head shorthand', () => {
         Bun.write(join(fixture, 'src/routes/seo.kay'), '--- server\nexport const page = { prerender: true, seo: { title: \'Seo title\', description: \'Seo description\', canonical: \'https://example.com/elsewhere\', noindex: true } }\n---\nh1 Seo\n'),
         Bun.write(join(fixture, 'src/routes/short.kay'), 'head(title="Short title" description="Short description")\nh1 Short\n'),
         Bun.write(join(fixture, 'src/routes/wins.kay'), 'head(title="Shorthand title")\n  title Block title\nh1 Wins\n'),
+        Bun.write(join(fixture, 'src/routes/block.kay'), 'head(description="Shorthand description" canonical="https://example.com/a" noindex)\n  meta(name="description" content="Block description")\n  link(rel="canonical" href="https://example.com/b")\n  meta(name="robots" content="index")\nh1 Block\n'),
         Bun.write(join(fixture, 'src/routes/hidden.kay'), '--- server\nconst hidden = true\n---\nhead(noindex={hidden})\nh1 Hidden\n'),
       ])
 
@@ -55,6 +56,14 @@ describe('page seo, cache and head shorthand', () => {
       expect(short).not.toMatch(NOINDEX)
       expect(await written(elsewhere, 'wins')).toContain('<title>Block title</title>')
       expect(await written(elsewhere, 'hidden')).toMatch(NOINDEX)
+
+      const block = await written(elsewhere, 'block')
+
+      expect(block).toContain('content="Block description"')
+      expect(block).not.toContain('Shorthand description')
+      expect(block).toContain('href="https://example.com/b"')
+      expect(block).not.toContain('https://example.com/a')
+      expect(block).not.toMatch(NOINDEX)
     }
     finally {
       await rm(fixture, { recursive: true, force: true })

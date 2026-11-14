@@ -11,7 +11,7 @@ import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } 
 import { actionUrl } from '../runtime/action'
 import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, slotNames, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
-import { addIslandShorthandTitle, addShorthandTags, hasShorthandTitle, shorthandExpressions } from './head-shorthand'
+import { addIslandShorthandTitle, addShorthandChecks, addShorthandGroup, hasShorthandTitle } from './head-shorthand'
 import { emitHeadTag, emitHeadText } from './head-tags'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
@@ -961,9 +961,7 @@ class ModuleShell {
     const tags = head.children.filter((child): child is ElementNode => headTagProblem(child) === undefined)
 
     if (this.mode === 'check') {
-      for (const span of shorthandExpressions(head))
-        b.add('void (').addSource(span).add(');\n')
-
+      addShorthandChecks(b, head)
       b.add('void (<>')
       this.jsx.emitChildren(tags)
       b.add('</>);\n')
@@ -971,8 +969,10 @@ class ModuleShell {
       return
     }
 
-    b.add(this.mode === 'html' ? 'KayHead([' : 'KayUseHead([')
-    addShorthandTags(b, head, span => this.text(span), this.kind === 'island')
+    const call = this.mode === 'html' ? 'KayHead([' : 'KayUseHead(['
+
+    addShorthandGroup(b, call, head, span => this.text(span), this.kind === 'island')
+    b.add(call)
     for (const tag of tags) {
       emitHeadTag(b, tag, span => this.text(span), this.kind === 'island')
       b.add(', ')

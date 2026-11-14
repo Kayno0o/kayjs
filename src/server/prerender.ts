@@ -194,8 +194,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const module = await import(route.file) as Record<string, unknown>
     // A layout's `cache`, `noindex` and `search` apply to every page under it, the innermost setting winning.
     const chain = [...await Promise.all(route.layouts.map(async layout => import(layout) as Promise<object>)), module]
-    const revalidate = revalidatePeriod(file, chainCache(chain).ttl)
-    const cacheControl = sharedCacheControl(file, revalidate, chainCache(chain).cacheControl)
+    const { revalidate, cacheControl } = cachePolicy(file, chain)
 
     if (keptStop(file, revalidate, chain, auto, skip))
       return []
@@ -645,6 +644,14 @@ async function searchWeight(setting: unknown, params: ListedParams, file: string
     throw new KayError('page-settings-invalid', `kay: the \`search\` of ${file} is ${JSON.stringify(value)}, which is no search setting: it takes \`false\` or \`{ weight }\` with a weight of 0 or more`)
 
   return weight
+}
+
+// A page's lifetime in seconds and the `cache-control` it answers everyone with, from its `cache` and its layouts'.
+function cachePolicy(file: string, chain: object[]): { revalidate: number | undefined, cacheControl: string | undefined } {
+  const { ttl, cacheControl } = chainCache(chain)
+  const revalidate = revalidatePeriod(file, ttl)
+
+  return { revalidate, cacheControl: sharedCacheControl(file, revalidate, cacheControl) }
 }
 
 // A page's `ttl` in seconds, or undefined when it has none.

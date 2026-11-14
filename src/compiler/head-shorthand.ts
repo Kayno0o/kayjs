@@ -20,15 +20,20 @@ export function shorthandProblems(head: ElementNode | undefined, text: Text): [S
   const problems = (head?.attributes ?? []).flatMap((attribute): [Span, string][] => {
     const span = attribute.kind === 'spread' ? attribute.expression : attribute.name
 
-    return attribute.kind !== 'spread' && HEAD_SHORTHAND.has(text(attribute.name)) ? [] : [[span, message]]
+    const name = attribute.kind === 'spread' ? '' : text(attribute.name)
+
+    return HEAD_SHORTHAND.has(name) && (attribute.kind !== 'boolean' || name === 'noindex') ? [] : [[span, message]]
   })
 
   return head !== undefined && (head.classes.length > 0 || head.id) ? [[head, 'A `head` block takes no class or id'], ...problems] : problems
 }
 
-// The expressions of the shorthand attributes, which a check reads as the template's own.
-export function shorthandExpressions(head: ElementNode): Span[] {
-  return head.attributes.flatMap(attribute => attribute.kind === 'expression' ? [attribute.expression] : [])
+// The expressions of the shorthand attributes as statements, which a check reads as the template's own.
+export function addShorthandChecks(b: CodeBuilder, head: ElementNode): void {
+  for (const attribute of head.attributes) {
+    if (attribute.kind === 'expression')
+      b.add('void (').addSource(attribute.expression).add(');\n')
+  }
 }
 
 // Whether `head(...)` gives a `title`, which an island follows.
@@ -58,6 +63,16 @@ export function addIslandShorthandTitle(b: CodeBuilder, head: ElementNode, text:
   b.add(`${helper}(() => `)
   addValue(b, given)
   b.add(', false);\n')
+}
+
+// The shorthand attributes as a `head()` call of their own, ahead of the block's: a tag of the block replaces the attribute that sets the same one.
+export function addShorthandGroup(b: CodeBuilder, call: string, head: ElementNode, text: Text, island: boolean): void {
+  if (head.attributes.length === 0)
+    return
+
+  b.add(call)
+  addShorthandTags(b, head, text, island)
+  b.add(']);\n')
 }
 
 // The `head()` tags of the shorthand attributes as object literals, each followed by a comma, ahead of the block's own tags, which win over them. An island's title is marked, for the server to wrap as it does the island's.

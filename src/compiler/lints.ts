@@ -654,9 +654,9 @@ export const LINTS = {
     level: 'warn',
     group: 'seo',
     site: true,
-    summary: 'A prerendered page whose head says `noindex` while the sitemap lists it, which asks search engines to crawl what they may not index. `export const page = { noindex: true }` sets the tag and leaves the page out of the sitemap.',
+    summary: 'A prerendered page whose head says `noindex` while the sitemap lists it, which asks search engines to crawl what they may not index. `export const page = { seo: { noindex: true } }` sets the tag and leaves the page out of the sitemap.',
     wrong: 'head\n  meta(name="robots" content="noindex")',
-    right: '--- server\nexport const page = { noindex: true }\n---',
+    right: '--- server\nexport const page = { seo: { noindex: true } }\n---',
   },
   'removed-ui-token': {
     level: 'warn',

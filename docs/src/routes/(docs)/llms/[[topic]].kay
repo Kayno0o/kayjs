@@ -10,7 +10,7 @@ export const page = {
     return (await reference.all()).map(topic => topic.slug === 'overview' ? {} : { topic: topic.slug })
   },
   // Written for agents: its hits come after the pages written for people.
-  search: { weight: 0.25 },
+  seo: { search: { weight: 0.25 } },
 }
 
 const topic = await reference.get(ctx.params.topic ?? 'overview') ?? ctx.notFound()

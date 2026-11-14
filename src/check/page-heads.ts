@@ -155,7 +155,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
       report('unsized-share-image', { ...at, message: `The share image of \`${route.pattern}\` has no size`, note: `kay reads no size off ${image}, so a network fetches it before laying the card out`, help: 'link a public file, an imported image, `shareImage()` or `shareCard()`, or set `og:image:width` and `og:image:height`' })
 
     if (facts.robots?.text !== undefined && NOINDEX.test(facts.robots.text) && noindex !== 'true' && !page.sitemap && options.site !== undefined)
-      report('noindex-in-sitemap', { ...at, message: `\`${route.pattern}\` is in the sitemap, though its head says \`noindex\``, help: '`export const page = { noindex: true }` in its server fence sets the tag and leaves it out of the sitemap' })
+      report('noindex-in-sitemap', { ...at, message: `\`${route.pattern}\` is in the sitemap, though its head says \`noindex\``, help: '`export const page = { seo: { noindex: true } }` in its server fence sets the tag and leaves it out of the sitemap' })
   }
 
   return found
@@ -206,6 +206,10 @@ function headFacts(file: KayFile): HeadFacts {
   // The attributes of `head(...)` give what a tag of the block leaves out.
   facts.title ??= title && { ...title, wrapped: true }
   facts.description ??= shorthand('description')
+
+  if (head?.attributes.some(entry => entry.kind !== 'spread' && file.source.slice(entry.name.start, entry.name.end) === 'noindex' && entry.kind !== 'static'))
+    facts.robots ??= { text: 'noindex' }
+
   facts.image ??= shorthand('image')
 
   return facts

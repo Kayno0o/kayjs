@@ -5,6 +5,9 @@ import { pageSeo } from './page-settings'
 
 // The head tags a module's `page.seo` gives, its text read in the locale being rendered: registered as a group before the module's own `head`, so the module's blocks still win and the page's win over its layouts'.
 export function seoTags(module: object): HeadTag[] {
+  if ((module as { page?: { seo?: unknown } }).page?.seo === undefined)
+    return []
+
   const state = localeState()
   const text = (name: 'title' | 'description' | 'image' | 'canonical') => localizedText(pageSeo(module, name) as string | undefined, state?.locale, state?.settings.defaultLocale)
   const [title, description, image, canonical] = [text('title'), text('description'), text('image'), text('canonical')]

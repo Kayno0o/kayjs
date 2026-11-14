@@ -225,7 +225,7 @@ export default (value: string) =>
 - A page's settings are the keys of one object its server fence exports, `export const page = { prerender: true, cache: '1h' }`.
 - `kay` exports the type `PageSettings`, which `kay check` types the object by (`satisfies PageSettings`): the editor completes the keys and an unknown one is a type error.
 - kay reads the object as written, a literal with no spread, computed key or method, and `guards` and `layouts` as a literal `true` or `false`: a variable or an expression there is reported by `kay check` and `kay dev`, not ignored.
-- A layout takes `layouts`, `query`, `security`, `reload`, `seo` (its `noindex` and `search`), `cache`, `rateLimit` and `timeout`, all but `layouts` and `query` applying to every page under it (for `noindex`, `cache`, `rateLimit` and `search` the innermost layout or page that sets one wins, so a page's `seo: { noindex: false }` undoes its layout's), and `guards: false`, which opens its own actions alone, the pages under it keeping their guards.
+- A layout takes `layouts`, `query`, `security`, `reload`, `seo` (its `noindex` and `search`), `cache` and `rateLimit`, all but `layouts` and `query` applying to every page under it (for `noindex`, `cache`, `rateLimit` and `search` the innermost layout or page that sets one wins, so a page's `seo: { noindex: false }` undoes its layout's), and `guards: false`, which opens its own actions alone, the pages under it keeping their guards.
 - `query` on a special page is reported; a layout sets it like a page does (see `ctx.query`).
 - A setting exported under its own name, `export const prerender = true` or `export async function prerender()`, is a compile error.
 - `kay check --fix` moves it into `page`, a function as an arrow, unless the fence names a value `page` itself or reads the setting.
@@ -234,18 +234,14 @@ export default (value: string) =>
 | --- | --- | --- |
 | `prerender` | `true`, `false`, a list of params, a function returning one, a content collection or `paginate()` | [Prerendering](prerendering.md#prerendering) |
 | `keep` | `true` to say the build is to keep the page prerendered on its own, `unkept-page` naming what stops it | [Prerendering](prerendering.md#prerendering) |
-| `ttl` | a `Duration`, how old a prerendered page gets before it is rendered again, and how long a CDN keeps it (`revalidate` was its name before 1.87, gone since 1.91) | [Prerendering](prerendering.md#prerendering) |
-| `cacheControl` | the `cache-control` text a prerendered page sends everyone, `false` for the default | [Prerendering](prerendering.md#prerendering) |
+| `cache` | `'1h'`, `{ browser, shared, swr }`, `'private'` or `false`: how long a prerendered page is kept before it renders again, and the `cache-control` it sends everyone (`ttl` and `cacheControl` before 1.105) | [Prerendering](prerendering.md#prerendering) |
+| `seo` | `{ title, description, image, canonical, noindex, sitemap, lastmod, search, feed }`: the head of the page and what the sitemap and the site search read of it (the five last were keys of `page` before 1.105) | [Head and SEO](head.md), [Sitemap](sitemap-search-fonts.md#sitemap-and-robotstxt) |
 | `layouts` | `false` only, to drop the layouts above | this section |
 | `query` | a schema `ctx.query` is read against | `ctx.query`, below |
-| `sitemap` | what `prerender` takes, or `false` | [Head and SEO](head.md) |
-| `lastmod` | a `Date`, a date string or a function of each listed URL's params returning one, for the sitemap's `<lastmod>` | [Sitemap](sitemap-search-fonts.md#sitemap-and-robotstxt) |
-| `noindex` | `true` to keep the page from search engines and the sitemap | [Head and SEO](head.md) |
 | `guards` | `false` only, to run none of the `_guard.ts` files above; on a layout, above its actions alone | [Server](server.md) |
 | `rateLimit` | `{ max, window, key? }` or a list, counted per page after its guards, 429 with `Retry-After` past it; `false` lifts a layout's | [Rate limits](rate-limits.md) |
 | `security` | `{ csp, headers }` added to the site's security headers for the page's responses | [Production](proxy-and-security.md#security-headers) |
 | `reload` | `true` to load the page fully from any link or form, past the page swap | [Islands](islands.md) |
-| `search` | `false` to leave the page out of the site search, `{ weight }` to scale what its words count, or a function of the params of each page returning either (nothing means weight 1) | [Head](sitemap-search-fonts.md#site-search) |
 
 - A page or a layout whose `page` has `layouts: false` among its keys is wrapped by none of the layouts above it.
 - `export const page = { layouts: false }` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header.
