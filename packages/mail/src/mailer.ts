@@ -526,6 +526,9 @@ function checkMailerOptions(options: MailerOptions): void {
   if (options.store !== undefined && (options.listStore !== undefined || options.suppressionStore !== undefined))
     throw configError('mail', 'store', 'mailer() takes `store`, which replaces `listStore` and `suppressionStore`: give `store: { lists, suppressions }`, not both')
 
+  if (options.store?.lists !== undefined && options.store.file !== undefined)
+    throw configError('mail', 'store', 'mailer({ store }) holds `lists` or a `file`, not both: `sqliteMail(path)` names one file for the lists and the bounces')
+
   if (options.url !== undefined && options.transport !== undefined)
     throw configError('mail', 'url', 'mailer() takes `url` or `transport`, not both: `url` names the server the environment would, which a `transport` replaces')
 

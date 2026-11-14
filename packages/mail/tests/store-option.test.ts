@@ -60,3 +60,12 @@ describe('the store of a mailer and of a list', () => {
     expect(sqlite.openLists).toBe(sqlite.sqliteLists)
   })
 })
+
+describe('a store holding lists and a file', () => {
+  it('is refused by a mailer and by a list, which keep the bounces with the lists or in the file', () => {
+    const lists = sqliteLists(':memory:')
+
+    expect(() => mailer({ from: 'a@fixture.test', store: { lists, file: 'x.sqlite' } })).toThrow('`lists` or a `file`')
+    expect(() => mailer({ from: 'a@fixture.test' }).list('news', { store: { lists, file: 'x.sqlite' } })).toThrow('`lists` or a `file`')
+  })
+})

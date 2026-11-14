@@ -175,7 +175,7 @@ export function pgCms(options: PgCmsOptions): ContentLoader {
   }
 }
 
-// The table of every collection a `pgCms` loader keeps, `kay_content` unless a loader names its own `table`: `ignoreTables` of an app's own pg-orm `sync`.
+// The default table of every collection a `pgCms` loader keeps, for `ignoreTables` of an app's own pg-orm `sync`. A loader given its own `table` is added by the app.
 export const cmsTables = [DEFAULT_TABLE] as const
 
 /** @deprecated Use `pgCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */

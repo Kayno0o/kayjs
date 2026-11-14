@@ -248,6 +248,9 @@ function sourcesOf(name: string, options: ListOptions): { store: ListStore | und
 
   const { lists, file } = partsOf(options.store)
 
+  if (lists !== undefined && file !== undefined)
+    throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): a store holds \`lists\` or a \`file\`, not both`)
+
   return { store: lists, file: file ?? options.file }
 }
 
