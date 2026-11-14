@@ -113,7 +113,7 @@ describe('seo and cache along the layouts, the config and a wrong cache', () => 
     }
   })
 
-  it('the config\'s seo.noindex adds the robots tag to every page', async () => {
+  it('the config\'s seo.noindex adds the robots tag to every page, a page\'s seo.noindex false taking it back', async () => {
     const built = await build({
       'all.kay': 'h1 All\n',
       'open.kay': '--- server\nexport const page = { prerender: true, seo: { noindex: false } }\n---\nh1 Open\n',
@@ -122,7 +122,7 @@ describe('seo and cache along the layouts, the config and a wrong cache', () => 
     try {
       expect(built.code).toBe(0)
       expect(await written(built.dir, 'all')).toMatch(NOINDEX)
-      expect(await written(built.dir, 'open')).toMatch(NOINDEX)
+      expect(await written(built.dir, 'open')).not.toMatch(NOINDEX)
     }
     finally {
       await rm(built.fixture, { recursive: true, force: true })
