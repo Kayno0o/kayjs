@@ -71,3 +71,99 @@ describe('page seo, cache and head shorthand', () => {
     }
   })
 })
+
+describe('seo and cache along the layouts, the config and a wrong cache', () => {
+  async function build(files: Record<string, string>, config?: string): Promise<{ code: number, output: string, dir: string, fixture: string }> {
+    const fixture = await fixtureCopy('static')
+    const dir = await mkdtemp(join(tmpdir(), 'kay-page-seo-'))
+
+    await Promise.all(Object.entries(files).map(async ([name, text]) => Bun.write(join(fixture, 'src/routes', name), text)))
+
+    if (config !== undefined) {
+      const path = join(fixture, 'kay.config.ts')
+
+      await Bun.write(path, (await Bun.file(path).text()).replace('base: \'/repo\',', `base: '/repo', ${config},`))
+    }
+
+    const { code, output } = await kayBuild([fixture, '--no-check', '--static', '--outdir', dir], { NODE_ENV: 'development' })
+
+    return { code, output, dir, fixture }
+  }
+
+  it('a layout\'s seo and cache apply under it, the page\'s own winning', async () => {
+    const built = await build({
+      'inherit/_layout.kay': '--- server\nexport const page = { cache: \'1h\', seo: { noindex: true } }\n---\nslot\n',
+      'inherit/child.kay': '--- server\nexport const page = { prerender: true }\n---\nh1 Child\n',
+      'inherit/own.kay': '--- server\nexport const page = { prerender: true, cache: \'private\', seo: { noindex: false } }\n---\nh1 Own\n',
+    })
+
+    try {
+      expect(built.code).toBe(0)
+
+      const headers = await Bun.file(join(built.dir, '_headers')).text()
+
+      expect(headers).toContain('\n/repo/inherit/child\n  Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600\n')
+      expect(headers).toContain('\n/repo/inherit/own\n  Cache-Control: private\n')
+      expect(await written(built.dir, 'inherit/child')).toMatch(NOINDEX)
+      expect(await written(built.dir, 'inherit/own')).not.toMatch(NOINDEX)
+    }
+    finally {
+      await rm(built.fixture, { recursive: true, force: true })
+      await rm(built.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('the config\'s seo.noindex adds the robots tag to every page', async () => {
+    const built = await build({
+      'all.kay': 'h1 All\n',
+      'open.kay': '--- server\nexport const page = { prerender: true, seo: { noindex: false } }\n---\nh1 Open\n',
+    }, 'seo: { noindex: true }')
+
+    try {
+      expect(built.code).toBe(0)
+      expect(await written(built.dir, 'all')).toMatch(NOINDEX)
+      expect(await written(built.dir, 'open')).toMatch(NOINDEX)
+    }
+    finally {
+      await rm(built.fixture, { recursive: true, force: true })
+      await rm(built.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a nested seo.sitemap false leaves the page out of the sitemap', async () => {
+    const built = await build({
+      'listed.kay': '--- server\nexport const page = { prerender: true }\n---\nh1 Listed\n',
+      'unlisted.kay': '--- server\nexport const page = { prerender: true, seo: { sitemap: false } }\n---\nh1 Unlisted\n',
+    })
+
+    try {
+      expect(built.code).toBe(0)
+
+      const sitemap = await Bun.file(join(built.dir, 'sitemap.xml')).text()
+
+      expect(sitemap).toContain('/listed')
+      expect(sitemap).not.toContain('/unlisted')
+    }
+    finally {
+      await rm(built.fixture, { recursive: true, force: true })
+      await rm(built.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a cache that is not a duration, an object, private or false, naming the page and the forms', async () => {
+    for (const cache of ['null', '\'soon\'', '5', '[]']) {
+      const built = await build({ 'bad.kay': `--- server\nexport const page = { prerender: true, cache: ${cache} }\n---\nh1 Bad\n` })
+
+      try {
+        expect(built.code).not.toBe(0)
+        expect(built.output).toContain('the `cache` of')
+        expect(built.output).toContain('bad.kay')
+        expect(built.output).toContain('`\'1h\'`, `{ browser, shared, swr }`, `\'private\'` or `false`')
+      }
+      finally {
+        await rm(built.fixture, { recursive: true, force: true })
+        await rm(built.dir, { recursive: true, force: true })
+      }
+    }
+  })
+})

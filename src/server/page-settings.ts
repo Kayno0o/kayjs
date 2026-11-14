@@ -1,17 +1,16 @@
 import type { Collection } from '../content'
 import type { PageSettings } from '../runtime'
+import { KayError } from '../compiler/errors'
+import { SEO_SETTINGS } from '../compiler/page-settings'
 import { isRouteOf } from '../content/claims'
 import { registeredCollections } from '../content/edit-registry'
 import { durationSeconds } from '../runtime/duration'
-
-// The settings of `seo` that were top-level keys of `page` before 1.105.
-const SEO_SETTINGS = new Set<string>(['noindex', 'sitemap', 'lastmod', 'search', 'feed'])
 
 // A setting of a page module: its key of `export const page`, those of `seo` read from there first.
 export function pageSetting(module: object, name: keyof PageSettings): unknown {
   const page = (module as { page?: PageSettings }).page
 
-  return SEO_SETTINGS.has(name) ? ((page?.seo as Record<string, unknown> | undefined)?.[name] ?? page?.[name]) : page?.[name]
+  return SEO_SETTINGS.includes(name) ? ((page?.seo as Record<string, unknown> | undefined)?.[name] ?? page?.[name]) : page?.[name]
 }
 
 // A text of a page's `seo` group, as it is written.
@@ -19,23 +18,43 @@ export function pageSeo(module: object, name: 'title' | 'description' | 'image' 
   return (module as { page?: PageSettings }).page?.seo?.[name]
 }
 
-// The seconds of a duration a `cache` object gives, or undefined for a part it leaves out.
-function cacheSeconds(value: unknown): number | undefined {
-  return value === undefined ? undefined : durationSeconds(value, 'the `cache` of a page')
+const CACHE_FORMS = '`\'1h\'`, `{ browser, shared, swr }`, `\'private\'` or `false`'
+
+function invalidCache(file: string, problem: string): KayError {
+  return new KayError('page-settings-invalid', `kay: the \`cache\` of ${file} ${problem}; it takes ${CACHE_FORMS}`)
+}
+
+// The seconds of a duration in a page's `cache`, or undefined for a part it leaves out.
+function cacheSeconds(file: string, value: unknown): number | undefined {
+  if (value === undefined)
+    return undefined
+
+  try {
+    return durationSeconds(value, `the \`cache\` of ${file}`)
+  }
+  catch {
+    throw invalidCache(file, `is ${JSON.stringify(value) ?? String(value)}, which is no duration such as '250ms', '5m' or '30d'`)
+  }
 }
 
 // What a module's `cache` says as the `ttl` and `cacheControl` the prerender reads: a duration is a `ttl`, an object sets each part of the header and `shared` is the `ttl`, `'private'` and `false` set the header alone.
-function cacheOf(cache: NonNullable<PageSettings['cache']>): { ttl: unknown, cacheControl: unknown } {
+function cacheOf(file: string, cache: NonNullable<PageSettings['cache']>): { ttl: unknown, cacheControl: unknown } {
   if (cache === false)
     return { ttl: undefined, cacheControl: false }
 
   if (cache === 'private')
     return { ttl: undefined, cacheControl: 'private' }
 
-  if (typeof cache !== 'object')
-    return { ttl: cache, cacheControl: undefined }
+  if (typeof cache !== 'object') {
+    cacheSeconds(file, cache)
 
-  const [browser, shared, swr] = [cache.browser, cache.shared, cache.swr].map(cacheSeconds)
+    return { ttl: cache, cacheControl: undefined }
+  }
+
+  if (cache === null || Array.isArray(cache))
+    throw invalidCache(file, `is ${cache === null ? 'null' : 'a list'}`)
+
+  const [browser, shared, swr] = [cache.browser, cache.shared, cache.swr].map(value => cacheSeconds(file, value))
   const parts = [`public, max-age=${Math.ceil(browser ?? 0)}`, shared === undefined ? '' : `s-maxage=${Math.ceil(shared)}`, swr === undefined ? '' : `stale-while-revalidate=${Math.ceil(swr)}`]
 
   return { ttl: cache.shared, cacheControl: parts.filter(part => part !== '').join(', ') }
@@ -54,7 +73,7 @@ export function chainSetting(modules: object[], name: keyof PageSettings): unkno
 }
 
 // A page's lifetime and `cache-control` along its route: the `cache` of the innermost module that sets one, else its `ttl` and `cacheControl` as they were written before 1.105, each the innermost that sets it.
-export function chainCache(modules: object[]): { ttl: unknown, cacheControl: unknown } {
+export function chainCache(file: string, modules: object[]): { ttl: unknown, cacheControl: unknown } {
   let ttl: unknown
   let cacheControl: unknown
 
@@ -62,7 +81,7 @@ export function chainCache(modules: object[]): { ttl: unknown, cacheControl: unk
     const page = (modules[index] as { page?: PageSettings }).page
 
     if (page?.cache !== undefined) {
-      const given = cacheOf(page.cache)
+      const given = cacheOf(file, page.cache)
 
       return { ttl: ttl ?? given.ttl, cacheControl: cacheControl ?? given.cacheControl }
     }

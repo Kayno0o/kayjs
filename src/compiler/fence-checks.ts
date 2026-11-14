@@ -10,7 +10,7 @@ import { eachNode } from './each-node'
 import { isPlainProperty } from './estree'
 import { isFunction, optionalParts } from './fence-nodes'
 import { openRedirects } from './fence-redirects'
-import { PAGE } from './page-settings'
+import { PAGE, SEO_SETTINGS } from './page-settings'
 import { patternNames } from './pattern-names'
 import { parseFence } from './script'
 import { walkScope } from './walk'
@@ -25,7 +25,8 @@ export function separatePageSettings(source: string, server: ServerAnalysis): Di
 
   // A fence naming a value `page` itself, as a paginated list often does, renames it before `page` can hold the settings.
   const taken = !server.page && (server.data.some(data => data.name === PAGE) || server.imports.some(binding => binding.local === PAGE))
-  const movable = taken ? [] : separate.filter(setting => setting.movable && !server.page?.settings.has(setting.name))
+  // Where `page` has a `seo` of its own, the setting moves by hand into it.
+  const movable = taken ? [] : separate.filter(setting => setting.movable && !server.page?.settings.has(setting.name) && !(SEO_SETTINGS.includes(setting.name) && server.page?.settings.has('seo')))
   const fix = movable.length > 0 ? moveIntoPage(source, server.page, movable) : undefined
 
   return separate.map((setting) => {
@@ -43,7 +44,8 @@ export function separatePageSettings(source: string, server: ServerAnalysis): Di
 }
 
 function moveIntoPage(source: string, page: PageSettings | undefined, settings: SeparateSetting[]): Fix {
-  const entries = settings.map(setting => `${setting.name}: ${indentValue(setting.value)}`)
+  const seo = settings.filter(setting => SEO_SETTINGS.includes(setting.name))
+  const entries = [...settings.filter(setting => !seo.includes(setting)).map(setting => `${setting.name}: ${indentValue(setting.value)}`), ...seo.length > 0 ? [seoEntry(seo)] : []]
   const removals = settings.map(setting => ({ start: setting.statement.start, end: lineEnd(source, setting.statement.end), text: '' }))
   const title = `Move ${settings.length === 1 ? 'it' : 'them'} into \`page\``
 
@@ -69,6 +71,14 @@ function moveIntoPage(source: string, page: PageSettings | undefined, settings: 
     text = `${trimmed.endsWith(',') ? '' : ','} ${entries.join(', ')}`
 
   return { title, edits: [{ start: end, end, text }, ...removals], safe: true }
+}
+
+// The `seo` group the settings of `seo` move into, on one line unless a value spans several.
+function seoEntry(settings: SeparateSetting[]): string {
+  if (!settings.some(setting => setting.value.includes('\n')))
+    return `seo: { ${settings.map(setting => `${setting.name}: ${setting.value}`).join(', ')} }`
+
+  return `seo: {\n${settings.map(setting => `    ${setting.name}: ${indentValue(indentValue(setting.value))},`).join('\n')}\n  }`
 }
 
 // A value moving into `page` one level deeper, unless a template literal's own lines would change with it.

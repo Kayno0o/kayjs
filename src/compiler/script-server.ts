@@ -8,7 +8,7 @@ import type { ImportBinding, ParsedFence } from './script-shared'
 import { eachNode } from './each-node'
 import { isPlainProperty } from './estree'
 import { bodyFact } from './load-facts'
-import { PAGE, PAGE_SETTINGS, unreadSettingReport } from './page-settings'
+import { PAGE, PAGE_SETTINGS, SEO_SETTINGS, unreadSettingReport } from './page-settings'
 import { declaredIdentifiers, keyName, LITERAL_SETTING, plainNames } from './script-shared'
 import { splitFence } from './script-split'
 import { traverse, walkScope } from './walk'
@@ -157,7 +157,6 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
 }
 
 // The settings of `page.seo` the checks and the sitemap read where `page` once held them.
-const SEO_SETTINGS = new Set(['noindex', 'sitemap', 'lastmod', 'search', 'feed'])
 
 // Reads `export const page` as written, and the settings exported under their own names, as they were before `page`.
 function pageSettings(ast: Program, statement: Statement, declaration: NodeOfType<'VariableDeclaration'>, span: Span, shift: (node: Node) => Span, text: TextOf, analysis: ServerAnalysis): void {
@@ -209,7 +208,7 @@ function pageSettings(ast: Program, statement: Statement, declaration: NodeOfTyp
           continue
 
         // The top-level key of the setting, for those the sitemap and the checks read where `page` once held them; the others as `seo.title` and so on.
-        const registered = SEO_SETTINGS.has(innerKey) ? innerKey : `seo.${innerKey}`
+        const registered = SEO_SETTINGS.includes(innerKey) ? innerKey : `seo.${innerKey}`
 
         if (!settings.has(registered))
           settings.set(registered, { key: shift(inner.key), value: shift(inner.value) })

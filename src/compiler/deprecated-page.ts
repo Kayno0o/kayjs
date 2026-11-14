@@ -1,8 +1,6 @@
 import type { Diagnostic, Span } from './ast'
 import type { ServerAnalysis } from './script'
-
-// The settings of `page` that moved into `seo` in 1.105.
-const SEO_KEYS = ['noindex', 'sitemap', 'lastmod', 'search', 'feed']
+import { SEO_SETTINGS } from './page-settings'
 
 const SPACE = /\s/
 const within = (inner: Span, outer: Span) => inner.start >= outer.start && inner.end <= outer.end
@@ -28,7 +26,7 @@ export function deprecatedPageSettings(source: string, server: ServerAnalysis | 
   const seo = settings.get('seo')
   const text = (span: Span) => source.slice(span.start, span.end)
   // The settings read from inside `seo` are in the map by their own names too.
-  const moved = SEO_KEYS.flatMap(name => settings.has(name) && !(seo && within(settings.get(name)!.key, seo.value)) ? [{ name, ...settings.get(name)! }] : []).toSorted((a, b) => a.key.start - b.key.start)
+  const moved = SEO_SETTINGS.flatMap(name => settings.has(name) && !(seo && within(settings.get(name)!.key, seo.value)) ? [{ name, ...settings.get(name)! }] : []).toSorted((a, b) => a.key.start - b.key.start)
   const found: Diagnostic[] = []
 
   if (moved.length > 0) {

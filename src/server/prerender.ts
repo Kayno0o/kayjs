@@ -648,7 +648,7 @@ async function searchWeight(setting: unknown, params: ListedParams, file: string
 
 // A page's lifetime in seconds and the `cache-control` it answers everyone with, from its `cache` and its layouts'.
 function cachePolicy(file: string, chain: object[]): { revalidate: number | undefined, cacheControl: string | undefined } {
-  const { ttl, cacheControl } = chainCache(chain)
+  const { ttl, cacheControl } = chainCache(file, chain)
   const revalidate = revalidatePeriod(file, ttl)
 
   return { revalidate, cacheControl: sharedCacheControl(file, revalidate, cacheControl) }

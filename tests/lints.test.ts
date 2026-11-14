@@ -548,7 +548,7 @@ describe('page settings', () => {
 
     expect(lints(declared)).toEqual([{ code: 'page-settings-invalid', severity: undefined, at: 'prerender' }])
     expect(fixed(declared)).toEqual(['--- server\nexport const page = {\n  prerender: async (): Promise<{ slug: string }[]> => {\n    return [{ slug: \'a\' }]\n  },\n}\n---\np x'])
-    expect(fixed('--- server\nexport function sitemap(locale = \'en\') {\n  return [{ locale }]\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  sitemap: (locale = \'en\') => {\n    return [{ locale }]\n  },\n}\n---\np x'])
+    expect(fixed('--- server\nexport function sitemap(locale = \'en\') {\n  return [{ locale }]\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  seo: {\n    sitemap: (locale = \'en\') => {\n      return [{ locale }]\n    },\n  },\n}\n---\np x'])
     expect(fixed('--- server\nexport function* prerender() {\n  yield { slug: \'a\' }\n}\n---\np x')).toEqual([])
   })
 
@@ -556,7 +556,7 @@ describe('page settings', () => {
     expect(fixed('--- server\nexport function sitemap(n = 1) {\n  return n > 3 ? [] : sitemap(n + 1)\n}\n---\np x')).toEqual([])
     expect(fixed('--- server\nexport function sitemap() {\n  return [this]\n}\n---\np x')).toEqual([])
     expect(fixed('--- server\nexport function sitemap() {\n  return () => arguments\n}\n---\np x')).toEqual([])
-    expect(fixed('--- server\nexport function sitemap() {\n  const sitemap = 1\n\n  return function () {\n    return [this, arguments, sitemap]\n  }\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  sitemap: () => {\n    const sitemap = 1\n\n    return function () {\n      return [this, arguments, sitemap]\n    }\n  },\n}\n---\np x'])
+    expect(fixed('--- server\nexport function sitemap() {\n  const sitemap = 1\n\n  return function () {\n    return [this, arguments, sitemap]\n  }\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  seo: {\n    sitemap: () => {\n      const sitemap = 1\n\n      return function () {\n        return [this, arguments, sitemap]\n      }\n    },\n  },\n}\n---\np x'])
   })
 
   it.each([

@@ -51,3 +51,23 @@ describe('deprecated-page-cache', () => {
     }
   })
 })
+
+describe('exported seo settings', () => {
+  function moved(source: string): string {
+    const edits = compileKay(source, 'x.kay', { check: true }).diagnostics.flatMap(one => one.fixes?.find(fix => fix.safe)?.edits ?? [])
+    const unique = [...new Map(edits.map(edit => [`${edit.start}:${edit.end}`, edit])).values()]
+
+    return unique.toSorted((a, b) => b.start - a.start).reduce((text, edit) => `${text.slice(0, edit.start)}${edit.text}${text.slice(edit.end)}`, source)
+  }
+
+  it('moves an exported noindex and sitemap straight into seo, so one pass leaves nothing to upgrade', () => {
+    const once = moved('--- server\nexport const noindex = true\nexport const sitemap = false\n---\np Hi\n')
+
+    expect(once).toContain('export const page = { seo: { noindex: true, sitemap: false } }')
+    expect(compileKay(once, 'x.kay', { check: true }).diagnostics.filter(one => one.code?.startsWith('deprecated-') || one.message.includes('not an export of its own'))).toEqual([])
+  })
+
+  it('moves one beside the settings of a page that has no seo yet', () => {
+    expect(moved('--- server\nexport const page = { prerender: true }\nexport const noindex = true\n---\np Hi\n')).toContain('{ prerender: true, seo: { noindex: true } }')
+  })
+})
