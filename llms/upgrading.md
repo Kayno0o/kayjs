@@ -134,38 +134,4 @@ A page without a `--- server` fence is checked as one with it: `--- island` on i
 
 In an app with Tailwind, a recipe's utility classes become one short class per string, with its rule in the `utilities.recipe` layer ([styles](styles-and-assets.md)). Two things an app can see change: a variant's utility replaces the base's at every width (`md:px-4` in the base against `px-8` in a variant gives `px-8` at `md` too), and a `!` utility of the recipe beats the app's. Nothing to change unless a page relied on the old order; add the utility to the app's `class`.
 
-## 1.102.0
-
-### The `analytics()` option names 1.98 deprecated are gone
-
-`deprecated-analytics-options` goes with them: run `kay upgrade` on 1.101 first. A server that still has `host`, `domain`, `hostname` or `policyUrl` does not boot, naming the new key: write `url`, `site` (for the `domain` of Plausible and the `hostname` of Simple Analytics) and `privacy`.
-
-### The `kay.config.ts` keys 1.98 deprecated are gone
-
-`deprecated-config-keys` goes with them: run `kay upgrade` on 1.101 first. `serve.apiPath` is `serve.apiPrefix`, `live: { perMinute: 120 }` and `images: { perMinute: 120 }` are `rateLimit: { max: 120, window: '1m' }`, `mcp: { rateLimit: 60 }` is `{ max: 60, window: '1m' }` (a number now fails at boot), and a Fontsource entry's `subset` and `weight` are `subsets` and `weights`, each a list. An old key is an unknown key now, so `kay check` reports it, and a Fontsource entry with `subset` or `weight` stops the build, naming the new key.
-
-### The `tz` of `schedule()` that 1.98 deprecated is gone
-
-`deprecated-schedule-tz` goes with it: run `kay upgrade` on 1.101 first. A `schedule()` that still has `tz` throws at boot: write `timeZone`.
-
-### The `id` of a workflow's `start()` that 1.98 deprecated is gone
-
-`deprecated-workflow-start-id` goes with it: run `kay upgrade` on 1.101 first. A `start(input, { id })` throws: write `key`.
-
-### Content dates that named no day are refused
-
-An `s.Date()` field written `2024-02-30`, `2024-2-30`, `2024/02/30` or `2024-03-10T24:00:00Z` used to decode to the next day or month; it now fails `kay check` and `kay build` at its field, so correct the date. A date with a time and no seconds, `2024-03-10 10:00`, which crashed `kay check`, is refused the same way: write `2024-03-10T10:00:00Z`. Heading ids of a title with letters beyond ASCII change (`Café` was `caf`, now `café`), as do repeats that collided, so a link to one of those anchors needs the new id; ids of ASCII titles are unchanged, a typographic apostrophe included (`Don’t stop` keeps `dont-stop`).
-
-### `--- script` opening a file is written `---`
-
-`--- script` as the first fence of a file is `---` spelled out, so it is the `deprecated-script-fence` lint, which `kay upgrade` rewrites; it works until 1.105. A script that follows a `--- server`, `--- module` or `--- style` fence keeps `--- script`, as a bare `---` there closes that fence instead.
-
-### `if cond as name` is `if cond then name`
-
-`as` is a TypeScript cast and nothing else: the alias of an `if` or `else if` takes the word `await x then name` uses, so `if user as u` is `if user then u` and `else if list.find(f) as item` is `else if list.find(f) then item`. Before, a last `as` followed by a lowercase name aliased the condition and a capitalized name was a cast, so a lowercase type alias read as an alias. The old spelling still aliases until 1.105; the `deprecated-if-alias` lint reports it and `kay upgrade` writes `then`.
-
-### A blank query param reads the default, a blank list reads `[]`
-
-In `ctx.query` and `queryParam`, a blank param (`?q=`) of an optional field with a default reads that default, and a blank list param (`?tags=`) reads `[]`, where it read `[""]`, or answered 400 for a list of numbers. `persisted.query` writes `?q=` or `?tags=` when the user clears a field whose default is not empty, so a reload keeps it. A required field keeps its blank, and an action's body reads as before. A page that took a blank list as one empty item, or relied on a blank number list answering 400, reads the new value.
-
-Releases before 1.102 are in [Upgrading, older releases](upgrading-archive.md).
+Releases before 1.103 are in [Upgrading, older releases](upgrading-archive.md).

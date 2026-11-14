@@ -88,20 +88,17 @@
     "max-lines-per-function": 398,
     "complexity": 115
   },
-  "src/compiler/ast.ts": {
-    "max-lines": 651
-  },
   "src/compiler/codegen.ts": {
     "max-lines": 774,
     "complexity": 90
   },
   "src/compiler/dom.ts": {
-    "max-lines-per-function": 170,
-    "complexity": 57
+    "max-lines-per-function": 166,
+    "complexity": 53
   },
   "src/compiler/html.ts": {
-    "max-lines": 750,
-    "max-lines-per-function": 299,
+    "max-lines": 717,
+    "max-lines-per-function": 283,
     "complexity": 82
   },
   "src/compiler/index.ts": {
@@ -114,8 +111,8 @@
     "max-lines": 960
   },
   "src/compiler/markup.ts": {
-    "max-lines": 609,
-    "complexity": 75
+    "max-lines": 608,
+    "complexity": 69
   },
   "src/compiler/parser.ts": {
     "max-lines": 1041

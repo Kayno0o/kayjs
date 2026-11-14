@@ -30,6 +30,13 @@ kay [./test] TestSite.refusal	1.108.0	deprecated-test-helpers	`site.expectRefuse
 kay [./test] TestSite.socketRefusal	1.108.0	deprecated-test-helpers	`site.socket.refused`, beside the `site.socket` it refuses. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 kay [.] Local.pending	2.0.0	deprecated-local-state	The count of writes the server has not taken, which `unsynced()` reads; `pending()` is a boolean at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it.
 kay [.] Local.status	2.0.0	deprecated-local-state	`syncStatus()` reads these states, `unsynced` for `pending`; `status()` is `idle|loading|ready|failed` at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it.
+kay [.] PageSettings.cacheControl	1.108.0	deprecated-page-cache	Write `cache: { browser, shared, swr }`, or `cache: false`. Removed in 1.108.0; `deprecated-page-cache` rewrites `false`.
+kay [.] PageSettings.feed	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
+kay [.] PageSettings.lastmod	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
+kay [.] PageSettings.noindex	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
+kay [.] PageSettings.search	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
+kay [.] PageSettings.sitemap	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
+kay [.] PageSettings.ttl	1.108.0	deprecated-page-cache	Write `cache: '1h'`. Removed in 1.108.0; `deprecated-page-cache` rewrites it.
 kay [.] onBeforeNavigate	1.108.0	deprecated-navigation-hooks	Call `navigation.onBeforeNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it.
 kay [.] onNavigate	1.108.0	deprecated-navigation-hooks	Call `navigation.onNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it.
 mail [./test] mailTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
