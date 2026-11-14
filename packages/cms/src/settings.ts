@@ -145,12 +145,12 @@ export interface CollectionSettings {
   uploads?: UploadOptions | undefined
   fourEyes?: boolean | undefined
   afterSave?: Hook<SaveEvent> | undefined
-  /** @deprecated `afterSave`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onSave?: Hook<SaveEvent> | undefined
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
   afterUpload?: Hook<UploadEvent> | undefined
-  /** @deprecated `afterUpload`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onUpload?: Hook<UploadEvent> | undefined
 }
 
@@ -195,7 +195,7 @@ export interface CmsOptions {
   fourEyes?: boolean | undefined
   // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. It is told the entry's `data` and `previous` too. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is reported with source `cms.onSave` and never undoes the save.
   afterSave?: Hook<SaveEvent> | undefined
-  /** @deprecated `afterSave`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onSave?: Hook<SaveEvent> | undefined
   // Runs before every save, publish, unpublish, duplicate, restore, deletion and rename, after the role and `can` checks (and `fourEyes` for an approval) and before the entry is checked against its schema, so what it changes is checked. Returns nothing, `{ data, body }` to write instead, `false` or throws `refuse(message, { errors })` to refuse: the entry form shows it as it shows a schema refusal, the API answers `error.status` 403 or 422. A throw of any other kind refuses with 500 and is reported with source `cms.beforeSave`.
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
@@ -203,7 +203,7 @@ export interface CmsOptions {
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
   // Runs after a file is stored: a CDN purge, a media record. A throw is reported with source `cms.onUpload` and the upload stands.
   afterUpload?: Hook<UploadEvent> | undefined
-  /** @deprecated `afterUpload`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onUpload?: Hook<UploadEvent> | undefined
   // What a loaded collection keeps beside its entries, on by default for a loader with a `sibling` (SQLite and Postgres): the last `revisions` saves of each entry, 50 by default, which an editor lists, compares and restores, `false` for none, and the entries deleted, kept for `trash`, `'30d'` by default, `false` for none. `maxAge` is how old a revision or an activity event may get before it is dropped, `'365d'` by default, `false` for no limit. `false` turns all three off, and `collections: { name: { history: false } }` for one collection.
   history?: false | { revisions?: number | false | undefined, trash?: Duration | false | undefined, maxAge?: Duration | false | undefined } | undefined

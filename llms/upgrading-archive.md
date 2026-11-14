@@ -1,6 +1,63 @@
 # Upgrading, older releases
 
-What each minor release before 1.103 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.105 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.104.0
+
+### Rate limits are one type and one check
+
+`limit.enforce(ctx)` on what `rateLimit()` returns is `limit.check(ctx)`: `limiter().enforce(key)` counts under a key and refuses nothing, so the one name held two jobs. `limit.count(request)` gives the window, `{ count, resetAt, wait }`, where `hit` gives the wait alone. kayjs-auth's `rateLimit` is grouped by feature: `signInAccount` is `signIn.account`, `signInAccountAll` `signIn.accountAll`, a bare `signIn` limit is `signIn.ip`, likewise `{ ip, account }` on `resend`, `forgot`, `magicLink`, `emailChange`, `twoFactor` and `emailCode`, `invite` is `invite.sender` and `inviteAddress` `invite.address`, and `oauthRegister`, `oauthRegisterAll`, `oauthDocument` and `oauthToken` are `oauth.register`, `.registerAll`, `.document` and `.token`. The old forms work until 1.108. `kay upgrade` rewrites both (`deprecated-rate-enforce`, `deprecated-auth-rate-limits`). Nothing else changes: `images.rateLimit`, `mcp.rateLimit`, `live.rateLimit` and `basicAuth({ rateLimit })` now also take `store` and `onLimit`.
+
+### The forms 1.100 deprecated are gone
+
+`deprecated-ui-item-keys`, `deprecated-infinite-list-options` and `deprecated-cms-test-helpers` go with them: run `kay upgrade` on 1.103 first and it rewrites every one it can find. On 1.104 the old names are refused or ignored.
+
+- A TreeNode takes `key`, not `id`, and a Bell or BellInbox item `key`, `label` and `href`, not `id`, `title` and `url`; `nodeKey()` and `KeyedTreeNode` are gone, a node is read as `node.key`. What `notifications.inbox()` answers and `notify()` takes keeps `{ id, title, url }`.
+- `infiniteList` takes `limit`, and `pageSize` is ignored.
+- `cmsSignInAs`, `cmsSignInWith` and `cmsSignOut` of `@kayjs/cms/test` are gone: `cmsTest(site).signInAs(role)`, `.signInWith(password)` and `.signOut()`.
+- `CollectionInfo` from `collectionInfo()` and `collections()` of `kay/content` has `total` only: `count` is gone.
+
+### kay and its libraries are `@kayjs/*`
+
+kay is `@kayjs/kay`, and kayjs-ui, kayjs-auth, kayjs-mail, kayjs-cms and kayjs-ai are `@kayjs/ui`, `@kayjs/auth`, `@kayjs/mail`, `@kayjs/cms` and `@kayjs/ai`, published to npm and to the Forgejo registry; `@kaynooo/kayjs` and `@kaynooo/kayjs-*` stop at 1.103, which stays installable. `kay upgrade` writes the new names in `package.json` (the `kay` alias becomes `"kay": "npm:@kayjs/kay@~1.104.0"`, so imports of `kay` are unchanged), installs, and rewrites every `@kaynooo/kayjs-*` import, config key and stylesheet import (`deprecated-package-names`). From an app on 1.103 or before, run it from the new kay: `bunx -p @kayjs/kay kay upgrade`. By hand: replace each name in `package.json`, run `bun install`, then `kay check --fix` for the sources. `@kaynooo/utils`, `@kaynooo/eslint`, `@kaynooo/pg-orm` and `@kaynooo/cli-kit` keep their names.
+
+### The optional peers are the app's dev dependencies
+
+`typescript7` and `axe-core` (since 1.97) and `@happy-dom/global-registrator` and `@kaynooo/pg-orm` are optional peers of kay, which a fresh install no longer brings: an app that only had them because an older install or the renamed package left them in `node_modules` loses them when the install is redone, and `kay check` stops with "typescript7 is not installed", the a11y tests with "axe-core is not installed". `kay upgrade` adds each one the app had installed without declaring it to `devDependencies`. By hand: `bun add -d typescript7@npm:typescript@^7.0.2 axe-core@^4.14.0`, plus `@happy-dom/global-registrator@^21.0.3` for an app testing with `kay/test/dom` and `@kaynooo/pg-orm@^8.0.0` for one using the database.
+
+## 1.103.0
+
+### A page with `--- island` or `--- client` is refused
+
+A page without a `--- server` fence is checked as one with it: `--- island` on it is `island-marker` and `--- client` is `client-route-fence`, `--- client` failing `kay check` and the build too, and `--- island` failing `kay check` while the build now ignores it, so the page no longer hydrates. Move what needs the browser into a component of its own, written `--- island` (or `--- client`), and render it from the page. No `kay upgrade` fix exists, as the fix moves code into a new file.
+
+### `TSchema` is `Schema`
+
+`TSchema` from `kay/library` is `Schema`, kay's own name for what `s` builds, so your signatures do not name TypeBox. The old name works until 1.106, and `kay upgrade` rewrites the import and its uses (`deprecated-schema-type`). `Static` and every schema option are unchanged, and an Elysia `t.Object(...)` is still accepted as a `Schema`.
+
+### The 1.99 DOM event names are gone
+
+`deprecated-event-names` goes with them: run `kay upgrade` on 1.102 first. `kay-renew`, `kay-dev-built`, `kay-dev-types`, `kay:install` on the window, `kai-chat-open`, `kai-chat-send`, `kai-chat-draft`, `kai-chat-new` and `kui-hold-defaults` are no longer fired or heard, so a listener or a dispatch under one does nothing: write `kay:renew`, `kay:dev-built`, `kay:dev-types`, `kay:install`, `kai:chat-open`, `kai:chat-send`, `kai:chat-draft`, `kai:chat-new` and `kui:hold-defaults` on `document`, the chat's with `{ text }` as `detail`. [Events](events.md) lists them.
+
+### `consent` of `analytics()` and `vitals()` is `awaitConsent`
+
+`deprecated-await-consent` goes with it: run `kay upgrade` on 1.102 first. `analytics({ consent })` and `vitals({ consent })` throw at boot naming `awaitConsent`.
+
+### kayjs-ai: `effort`, `approval`, `showReasoning` and `waitingLabel`
+
+`deprecated-ai-options` and `deprecated-ai-props` go with them: run `kay upgrade` on 1.102 first. `ask(messages, { reasoning })` and `{ confirm }` fail `kay check` (they are not options of `AskOptions`) and are ignored at run time, so a call loses its effort and its approval step: write `effort` and `approval`. Chat and ChatLauncher no longer read `reasoning` and `thinkingLabel`: write `showReasoning` and `waitingLabel`.
+
+### kayjs-cms: `form.hide` is `exclude`
+
+`deprecated-filter-options` goes with it: run `kay upgrade` on 1.102 first. A collection's `form: { hide }` throws at boot, listing the options a form layout takes: write `exclude`.
+
+### kayjs-ui items: `label`, `key`, `href`
+
+`deprecated-ui-items` goes with it: run `kay upgrade` on 1.102 first. A Timeline entry's `text` is `label`, an Accordion item's `value` and `title` are `key` and `label`, a MediaGallery item's `title` is `label`, an AppSwitcher app's `id` is `key`, and an AudioChapter's `title` and `url` are `label` and `href`: the old names fail `kay check` and draw nothing. The helper types `LabelledTimelineEntry`, `KeyedSwitcherApp` and `LabelledChapter` are gone, as their blocks and callbacks hand the item itself.
+
+### A recipe's utilities are lifted into a layer
+
+In an app with Tailwind, a recipe's utility classes become one short class per string, with its rule in the `utilities.recipe` layer ([styles](styles-and-assets.md)). Two things an app can see change: a variant's utility replaces the base's at every width (`md:px-4` in the base against `px-8` in a variant gives `px-8` at `md` too), and a `!` utility of the recipe beats the app's. Nothing to change unless a page relied on the old order; add the utility to the app's `class`.
 
 ## 1.102.0
 
@@ -117,85 +174,4 @@ A Popover panel, which had no role unless given one, is `role="dialog"` by defau
 
 An IconButton with a `label` shows it as a tooltip, so a disabled one is `aria-disabled="true"` with no `disabled` attribute, to stay reachable for its tooltip (since 1.80): a test reading `button.disabled` reads `aria-disabled` instead.
 
-## 1.97.0
-
-### Deploy workflow replicas together
-
-A workflow run now keeps each step's result in its own row of the job store. A replica still on an older kay cannot read a run kept this way and leaves its rows behind when it completes it, so move every process sharing a store to this version at once, and do not roll back while runs are in flight.
-
-### `typescript7` and `axe-core` are the app's dev dependencies
-
-kay no longer installs the native compiler (`typescript7`) or `axe-core` with itself: both are optional peers, so a production install carries neither. No `deprecated` lint can carry this: `kay check` needs `typescript7` to run at all, so a lint inside it could not report its absence. The first `kay check` after the upgrade (`kay upgrade` runs it) adds both to `devDependencies`; an app upgraded by hand runs `bun add -d typescript7@npm:typescript@^7.0.2 axe-core@^4.14.0`. Without `typescript7`, `kay check`, `kay build` (which checks) and the editor server stop at once naming that command, and without `axe-core` so do `kay a11y` and `page.a11y()`; `kay doctor` lists both under `peers`. A Docker build that installs with `--production` and runs `kay build` passes `--no-check`, or keeps them installed.
-
-### `kay mcp` needs `--write` to POST and to test
-
-An agent's `render` with a `body` or a method other than GET, HEAD or OPTIONS, and its `test` tool, are refused by a read-only `kay mcp`. Register the server as `kay mcp --write` (in `.mcp.json`) to allow them.
-
-### A `workflow()` run keeps 2 MB at most
-
-A run whose input, events no wait named and kept results (their text) pass 2,000,000 characters fails on its next step, with no retry, naming the cap: a run already past it when you upgrade fails the same way. Return an id from a step that makes a large result and keep the result elsewhere, or split a long loop into runs.
-
-### kayjs-ai: no credentials in an API root
-
-`AI_BASE_URL`, `AI_AUDIO_URL`, `AI_EMBED_URL` and `baseUrl` throw at their first use for an address like `https://user:pass@host/v1`; move the secret to `OPENAI_API_KEY`, `AI_AUDIO_KEY`, `AI_EMBED_KEY` or `apiKey`.
-
-### A template `innerHTML` is checked at runtime
-
-`innerHTML={expr}` on an element now drops a string nothing vouched for with `sanitizeHtml`, `trustHtml` or an icon import, as a spread already did, so a value cast to `SafeHtml` (`as`, `any`) no longer carries markup in; the element stays empty and development warns. A string written out and a project file imported as text are not checked. Wrap the value in `sanitizeHtml(...)` or `trustHtml(...)` where it is used. No `kay check` lint recognises it: a cast leaves no trace once the types are erased.
-
-### kayjs-cms: a forge redirect fails, and `fourEyes` needs a named approver
-
-`forgejo()`, `github()` and `gitlab()` refuse a redirect from the forge, where they followed it with the token: a repository renamed or moved needs its new `repo` in the config. With `cms({ fourEyes: true })`, an approval by a person the guard cannot name (no id, no name) is refused, as it cannot be told from the sender: an app with its own guard passes `cms({ member })` so each person is named.
-
-### kayjs-auth: member emails, a new notice, the forward route's second factor
-
-- `organizations.members(ref)` gives `user.email` as `null` for every other member when the caller does not hold the `manage` role of the organizations options: a page listing members by email shows their username, or whatever the app keeps, instead.
-- `email-change-requested` is a new notice kind (`SecurityEvent`) mailed to the address an account is leaving when `email.change` sends its link, and a new event for `onEvent`: an app with its own `templates`, or a mailer switching on `mail.kind` exhaustively, handles it or falls back to the built-in.
-- `forwardAuth`'s `/forward` route now applies `twoFactor.require`: a user it names without two-factor is sent to the security page (a 403 without the prebuilt pages), where only `requireTwoFactor` did so before. Passing `requireTwoFactor` with a passkey sign-in no longer sends the user to set up an authenticator.
-
-### A `role="group"` is marked `data-invalid`, not `aria-invalid`
-
-ChipGroup, FileDrop, RowsField and the group a FormField marks, and `markInvalid` on any `role="group"`, set `data-invalid` where they set `aria-invalid="true"`, as ARIA 1.2 allows `aria-invalid` on a radio group but not on a plain group. `focusInvalid` finds both, and a `data-invalid` group with no focusable self focuses its first control. An app's CSS or test reading `[aria-invalid]` on one of those groups reads `[data-invalid]` now; a field and a radiogroup (RadioGroup, Segmented, Rating) keep `aria-invalid`. The message still reaches a screen reader through the group's `aria-describedby`.
-
-## 1.96.0
-
-### An `Entry` has `excerpt`, `body` and `html`
-
-An `Entry` literal in an app's tests, passed to a component as a prop, is a type error without them: build it with `testEntry(data, members?)` from `kay/test`, which fills every member and takes the ones a test names.
-
-### An impersonating admin is held to 30 minutes, and mails the user
-
-- kayjs-auth: every organization write (`create`, `update`, `invite`, `revokeInvitation`, `acceptInvitation`, `rejectInvitation`, `setMemberRoles`, `removeMember`, `leave`, `delete`) answers `impersonating` while an admin acts as the user, so an `admin.impersonate` flow that edited organizations is refused, and a `switch` on the failure code now sees the new one (`OrganizationWriteFailure`).
-- `impersonation-started` is now a notice kind (`SecurityEvent`) mailed to the user: an app with its own `templates`, or a mailer switching on `mail.kind` exhaustively, handles it or falls back to the built-in. An impersonation ends after 30 minutes, signing the browser out.
-
-### A Menu entry's `danger` and a toast's `type` are gone
-
-Their lint (`deprecated-menu-danger`) goes with them: run `kay upgrade` on 1.95 first and it rewrites the entries written out in a Menu's `items`.
-
-- A `MenuAction` flagged `danger: true` is `tone: 'danger'`; the flag is a type error now, and an entry built elsewhere that still sets it is drawn without the danger colour.
-- `Toast` is `{ id, message, tone, ... }`: `ToastType` and `Toast.type` are gone, so `toasts()[n].type`, or a `@toast` block reading `item.type`, reads `tone` instead, where `error` was `danger` (`info` and `success` are unchanged). `toast.error`, `toast.success` and `toast.info` stay.
-
-### A call whose action redirects rejects
-
-The call used to stay pending for good once the browser went to the redirect's target; it now rejects with `ActionRedirectError` (with `location`), as it already did when a leave guard kept the visitor on the page. The navigation goes on either way.
-
-- A `finally` after the call, or a `settled()` waiting on it, now runs on the page that is going away, and `pending()` is false.
-- A call nobody awaits, as `onClick={() => logout()}`, reports nothing: the runtime ignores the rejection of a redirect. Code that awaits the call and reacts to any error (a `catch` that shows a failure) ignores an `ActionRedirectError` first; kayjs-ui's forms, `attempt` and the chat do. On a full load, `pending()` clears while the old page is still shown, for a moment.
-- The call's own `onError` hooks still skip a redirect, and `onSettled` runs for it.
-
-### A websocket route and the image route have limits by default
-
-No lint can see these: they depend on the traffic an app gets, not on its code.
-
-- A `.ws()` route refuses a client's 21st open socket with 429. An app whose clients share one address (an office behind one NAT, a proxy kay is not told to trust) or open many sockets on one route sets `detail.messages.connections` to its number, or `false` ([API routes](api-routes.md)).
-- The image route answers 429 past 120 new variants a minute for one client and 503 past 128 waiting draws, and keeps at most 256 cached variants of one source, removing the oldest to make room; variants already made never count against the rate. An app that draws more raises `images.rateLimit`, `images.maxVariants` or `images.queue`, or sets `false` ([limits on encoding](images-runtime-and-remote.md#limits-on-encoding)).
-
-### A `local()` mirror is emptied at the first sign-in after the upgrade
-
-A browser's mirror and unsent writes made before this version carry no person, so the first sign-in that tags the browser empties them, even for the same person: they cannot be told from another's. Nothing to change; a write queued offline across the upgrade and a sign-in is lost once, so release it while the browsers are online.
-
-### The auth result and stream `onOpen` lints of 1.92 are gone
-
-`deprecated-auth-error` and `deprecated-stream-open` go, their three minors over: run `kay upgrade` on 1.95 first and it rewrites what it can. A `result.error === 'limited'` left over is now TypeScript's own error, a string compared with an `ErrorShape`: read `result.error.code`. A `.onOpen(reconnected => ...)` left over still compiles and runs on every open: write `.onOpen(({ reconnected }) => ...)`.
-
-Releases before 1.96 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.98 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.

@@ -377,15 +377,15 @@ export interface AskHooks {
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   // Called after each request of the reply to the provider, a tool loop making one per round.
   afterStep?: Hook<Step> | undefined
-  /** @deprecated `afterStep`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onStep?: Hook<Step> | undefined
   // Called as each tool call starts (`running`) and again as it ends (`done` or `failed`).
   afterToolCall?: Hook<AiToolCall> | undefined
-  /** @deprecated `afterToolCall`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onToolCall?: Hook<AiToolCall> | undefined
   // Called once the reply ended, finished, cut short or stopped (`stopped`).
   afterRequest?: Hook<FinishHookCall> | undefined
-  /** @deprecated `afterRequest`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onSuccess?: Hook<FinishHookCall> | undefined
   // Called when the reply fails, with the error its readers get, and for each failed request that was retried or fell back.
   onError?: Hook<ErrorHookCall> | undefined

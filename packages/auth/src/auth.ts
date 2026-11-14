@@ -75,7 +75,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   signUp?: false | undefined
   // Called once a new user exists, to create the app's own records for them. It gets one object: `user`, the provider's `profile` for a sign-up by a provider account, and `context`. A throw is logged and reported to the app's `onError` with source `auth.afterSignUp`, and never fails the sign-up.
   afterSignUp?: ((event: { user: User, profile: Profile | undefined, context: AuthHookContext }) => unknown) | undefined
-  /** @deprecated `afterSignUp`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterSignUp`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onSignUp?: ((event: { user: User, profile: Profile | undefined, context: AuthHookContext }) => unknown) | undefined
   // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `afterSignUp`, and a link.
   // What the app keeps on each user, an object schema such as `s.Object({ avatar: s.Optional(s.String()) })`: `auth.user()` returns it typed as `data`, `profileFields` fills it, and a store keeps it as JSON.

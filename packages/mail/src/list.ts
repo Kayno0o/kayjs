@@ -67,19 +67,19 @@ export interface ListOptions {
   privacy?: string | undefined
   // Told when an address signs up through the form of this list, once its confirmation is mailed; not for one asking again while pending, nor one confirmed already. A throw is reported and the sign-up stands.
   afterSubscribe?: Hook<ListEvent> | undefined
-  /** @deprecated `afterSubscribe`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterSubscribe`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onSubscribe?: Hook<ListEvent> | undefined
   // Told when the address confirms, once. Needs a store with `find`, as `sqliteLists` and `pgLists` have.
   afterConfirm?: Hook<ListEvent> | undefined
-  /** @deprecated `afterConfirm`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterConfirm`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onConfirm?: Hook<ListEvent> | undefined
   // Told when the address leaves the list by its unsubscribe link or `list.unsubscribe()`, once. A removal by `mail.erase()`, a bounce or a complaint tells nothing. The link needs a store with `find`.
   afterUnsubscribe?: Hook<ListEvent> | undefined
-  /** @deprecated `afterUnsubscribe`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterUnsubscribe`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onUnsubscribe?: Hook<ListEvent> | undefined
   // Told once when a broadcast has been handed to every subscriber, with how many mails went and how many were given up.
   afterBroadcast?: Hook<BroadcastEvent> | undefined
-  /** @deprecated `afterBroadcast`, since 1.105; the old name works until 1.108. */
+  /** @deprecated Written `afterBroadcast`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onBroadcast?: Hook<BroadcastEvent> | undefined
 }
 

@@ -104,6 +104,8 @@ function cmsDrafts({
 [.] CmsOptions
 interface CmsOptions
   access?: CmsAccess | undefined
+  afterSave?: Hook<SaveEvent> | undefined
+  afterUpload?: Hook<UploadEvent> | undefined
   author?: ((ctx: GuardContext) => Identity | Promise<Identity | undefined> | undefined) | undefined
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
@@ -119,8 +121,8 @@ interface CmsOptions
 }
   member?: ((ctx: GuardContext) => MemberInfo | Promise<MemberInfo | undefined> | undefined) | undefined
   newsletter?: Record<string, NewsletterOptions> | undefined
-  onSave?: Hook<SaveEvent> | undefined
-  onUpload?: Hook<UploadEvent> | undefined
+  /** @deprecated Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSave?: Hook<SaveEvent> | undefined
+  /** @deprecated Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onUpload?: Hook<UploadEvent> | undefined
   pageLink?: PageLinkOptions | boolean | undefined
   pageSize?: number | undefined
   prefix?: string | undefined
@@ -144,11 +146,13 @@ function collectionScreen(name: string): Promise<undefined | { prefix: string; c
 
 [.] CollectionSettings
 interface CollectionSettings
+  afterSave?: Hook<SaveEvent> | undefined
+  afterUpload?: Hook<UploadEvent> | undefined
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
   fourEyes?: boolean | undefined
-  onSave?: Hook<SaveEvent> | undefined
-  onUpload?: Hook<UploadEvent> | undefined
+  /** @deprecated Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSave?: Hook<SaveEvent> | undefined
+  /** @deprecated Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onUpload?: Hook<UploadEvent> | undefined
   uploads?: UploadOptions | undefined
 
 [.] Commit

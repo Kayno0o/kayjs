@@ -7,9 +7,32 @@ ai [./pg] createConversationTable	1.108.0	deprecated-store-names	Use `createAiTa
 ai [./pg] pgConversations	1.108.0	deprecated-store-names	Use `pgAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 ai [./sqlite] sqliteConversations	1.108.0	deprecated-store-names	Use `sqliteAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 ai [./test] aiTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
+ai [.] AiOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] AiOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] AiOptions.onToolCall	1.108	deprecated-hook-names	Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] AskHooks.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] AskHooks.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] AskHooks.onToolCall	1.108	deprecated-hook-names	Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] AskOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] AskOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] AskOptions.onToolCall	1.108	deprecated-hook-names	Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] CallOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] CallOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] DescribeImageOptions.language	1.108	deprecated-ai-language	Written `locale`; `deprecated-ai-language` rewrites it. Removed in 1.108.
+ai [.] DescribeImageOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] DescribeImageOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] EmbedOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] EmbedOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] SpeakOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] SpeakOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] StructuredAskOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] StructuredAskOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] StructuredAskOptions.onToolCall	1.108	deprecated-hook-names	Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] TranscribeOptions.language	1.108	deprecated-ai-language	Written `locale`, which takes a BCP 47 tag; `deprecated-ai-language` rewrites it. Removed in 1.108.
+ai [.] TranscribeOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+ai [.] TranscribeOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 auth [./test] authTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
+auth [.] AuthOptions.onSignUp	1.108	deprecated-hook-names	Written `afterSignUp`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 auth [.] LimitsOption.emailChangeAccount	1.108	deprecated-auth-rate-limits	`emailChange.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
 auth [.] LimitsOption.emailCodeAccount	1.108	deprecated-auth-rate-limits	`emailCode.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
 auth [.] LimitsOption.forgotAccount	1.108	deprecated-auth-rate-limits	`forgot.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
@@ -23,11 +46,16 @@ auth [.] LimitsOption.resendAccount	1.108	deprecated-auth-rate-limits	`resend.ac
 auth [.] LimitsOption.signInAccount	1.108	deprecated-auth-rate-limits	`signIn.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
 auth [.] LimitsOption.signInAccountAll	1.108	deprecated-auth-rate-limits	`signIn.accountAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
 auth [.] LimitsOption.twoFactorAccount	1.108	deprecated-auth-rate-limits	`twoFactor.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] OwnOptions.onSignUp	1.108	deprecated-hook-names	Written `afterSignUp`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 cms [./pg] PgLoaderOptions	1.108.0	deprecated-store-names	Use `PgCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 cms [./pg] pgLoader	1.108.0	deprecated-store-names	Use `pgCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 cms [./sqlite] SqliteLoaderOptions	1.108.0	deprecated-store-names	Use `SqliteCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 cms [./sqlite] sqliteLoader	1.108.0	deprecated-store-names	Use `sqliteCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 cms [./test] cmsTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
+cms [.] CmsOptions.onSave	1.108	deprecated-hook-names	Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+cms [.] CmsOptions.onUpload	1.108	deprecated-hook-names	Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+cms [.] CollectionSettings.onSave	1.108	deprecated-hook-names	Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+cms [.] CollectionSettings.onUpload	1.108	deprecated-hook-names	Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 kay [./compiler] CompileResult.why	2.0.0	-	Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. Removed in 2.0.0. No lint: a field of the compile result that tools read, nothing in an app's source.
 kay [./mount] Mounted	1.108.0	deprecated-import-path	Import `Mounted` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./mount] mount	1.108.0	deprecated-import-path	Import `mount` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
@@ -68,6 +96,15 @@ kay [.] TrackedCall.onSuccess	1.108.0	deprecated-source-readers	Write `onData`, 
 kay [.] onBeforeNavigate	1.108.0	deprecated-navigation-hooks	Call `navigation.onBeforeNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it.
 kay [.] onNavigate	1.108.0	deprecated-navigation-hooks	Call `navigation.onNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it.
 mail [./test] mailTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
+mail [.] ContactOptions.onSend	1.108	deprecated-hook-names	Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+mail [.] ListOptions.onBroadcast	1.108	deprecated-hook-names	Written `afterBroadcast`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+mail [.] ListOptions.onConfirm	1.108	deprecated-hook-names	Written `afterConfirm`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+mail [.] ListOptions.onSubscribe	1.108	deprecated-hook-names	Written `afterSubscribe`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+mail [.] ListOptions.onUnsubscribe	1.108	deprecated-hook-names	Written `afterUnsubscribe`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+mail [.] MailExtensionOptions.onSend	1.108	deprecated-hook-names	Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+mail [.] MailExtensionOptions.onSuppress	1.108	deprecated-hook-names	Written `afterSuppress`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+mail [.] MailerOptions.onSend	1.108	deprecated-hook-names	Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+mail [.] MailerOptions.onSuppress	1.108	deprecated-hook-names	Written `afterSuppress`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ui [./lib/index] InfiniteList.rows	1.108.0	-	Write `data()`. Removed in 1.108.0. No lint: `infiniteList()` comes from kayjs-ui, whose bindings `kay check` does not follow.
 ui [./lib/index] PaletteLink.external	2.0.0	-	Use `newTab: true`, which wins when both are given. Removed in 2.0.0. No lint: the prop is set on an object a command or a data function builds, as often as on a tag.
 ui [./lib/index] SparkTone	2.0.0	-	Use `Tone`, where `neutral` is the quiet grey `muted` was. Removed in 2.0.0. No lint: a type alias an app imports by name, which editors strike through.

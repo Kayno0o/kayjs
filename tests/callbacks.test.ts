@@ -242,7 +242,7 @@ describe('the docs write the signatures the code has', () => {
 
   const SERVER_HOOKS = new Set(['onError', 'onSend', 'onSave'])
   // Positional by design: the `ai({ ... })` hooks (`Hook<AiToolCall>`) and the cms `CustomFieldProps.onChange(next)` setter, not component events.
-  const POSITIONAL = new Set(['docs/src/content/docs/libraries/kayjs-ai.md:onToolCall', 'packages/ai/llms/hooks.md:onToolCall', 'packages/cms/llms/fields.md:onChange'])
+  const POSITIONAL = new Set(['packages/cms/llms/fields.md:onChange'])
   const SIGNATURE = /`(on[A-Z]\w*)\(([^`]*)\)`/g
   const DOCS = ['docs/src/content/ui/*.md', 'docs/src/content/docs/**/*.md', 'llms/*.md', 'packages/*/llms/*.md', 'packages/*/llms.txt', 'llms.txt']
 
@@ -285,5 +285,40 @@ describe('the docs write the signatures the code has', () => {
     }
 
     expect(broken).toEqual([])
+  })
+})
+
+// The server libraries' hooks, read from their API snapshots: one observing a step is `after<Verb>` and one that may veto or change it `before<Verb>`, so an `on<Name>` member left on an exported type is deprecated or one of these.
+const SERVER_ON = new Map([
+  ['onError', 'the error channel every library shares'],
+  ['onEvent', 'auth\'s stream of events, not a step'],
+  ['onRestart', 'a reader of streamed deltas told the text starts over, not a hook'],
+  ['onAccent', 'a palette colour'],
+  ['onDanger', 'a palette colour'],
+])
+
+describe('server hooks', () => {
+  test('observe as after<Verb>, with only the listed on<Name> members left', async () => {
+    const found: string[] = []
+
+    for (const library of ['auth', 'mail', 'cms', 'ai']) {
+      // The export each member line belongs to: a component's props follow the component rule.
+      let owner = ''
+
+      for (const line of (await Bun.file(join(ROOT, `api/${library}.txt`)).text()).split('\n')) {
+        if (!line.startsWith(' ')) {
+          owner = line
+
+          continue
+        }
+
+        const name = (/^\s+(?:readonly )?(on[A-Z]\w*)\??:/).exec(line)?.[1]
+
+        if (name !== undefined && !SERVER_ON.has(name) && !owner.includes('.kay]') && !owner.startsWith('component') && !owner.startsWith('}') && !(/Props\b/).test(owner))
+          found.push(`${library}: ${name} in ${owner.slice(0, 80)}`)
+      }
+    }
+
+    expect(found).toEqual([])
   })
 })
