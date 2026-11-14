@@ -179,7 +179,7 @@ export abstract class TemplateWriter {
   }
 
   // The class text the element is written with, merged from its shorthand, its `class` and its parts.
-  private classesOf(element: ElementNode, classAttribute: Attribute | undefined, parts: string[]): ElementPlan['classes'] {
+  private classesOf(element: ElementNode, classAttribute: NamedAttribute | undefined, parts: string[]): ElementPlan['classes'] {
     if (parts.length > 0)
       return { text: this.staticClass(element, classAttribute?.kind === 'expression' ? undefined : classAttribute).trim(), expression: classAttribute?.kind === 'expression' ? classAttribute.expression : undefined, parts }
 

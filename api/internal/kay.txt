@@ -593,7 +593,7 @@ function rawData(value: unknown): string
 function rawTyped(type: unknown, value: unknown): string
 
 [./html] refillOptions
-function refillOptions(posted: string | undefined, markup: string, value?: (() => unknown) | undefined): string
+function refillOptions(posted: string | undefined, markup: string, value?: (() => unknown) | undefined, initial?: string | undefined): string
 
 [./html] reportRenderFailure
 function reportRenderFailure(error: unknown): void
@@ -682,6 +682,12 @@ function formDescribed(element: Element, target: unknown, field: string, id: str
 
 [./internal] formError
 function formError(target: unknown, field: string): string | undefined
+
+[./internal] formInitial
+function formInitial(values: unknown, name: string): string | undefined
+
+[./internal] formInitialChecked
+function formInitialChecked(values: unknown, name: string, value?: number | string | undefined): boolean
 
 [./internal] formInvalid
 function formInvalid(target: unknown, name: string): "true" | undefined
