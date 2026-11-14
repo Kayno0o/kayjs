@@ -48,6 +48,7 @@ Every old form below works until 1.108, `kay check` reports it as a `deprecated-
 - `cms({ roles })` no longer needs a guard, and `can` no longer needs `roles`; with kayjs-auth and no `access`, the holders of the roles listed are let in, where the screens stayed closed before.
 - A production server reads the forge from `CMS_URL` (`forgejo://TOKEN@git.example.com/owner/repo`, `github://TOKEN@owner/repo`, `gitlab://TOKEN@group/project`); `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN`, `CMS_BRANCH` and `CMS_HOST` still work without it, and `kay env` lists `CMS_URL`.
 - The no-guard error and warning name `cms({ access })`, as do the `cms.*` message defaults that named `role` or `guard`.
+
 ### Every guard option is `guards`, and a feature with none is closed
 
 `deprecated-guard-option` (`kay check --fix`) renames `guard` to `guards` in `vitals()` and in the `jobs` and `images` of kay.config.ts, and writes `requireGuards` as `guards: { default }`; the old forms work until 1.108.

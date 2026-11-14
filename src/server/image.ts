@@ -59,7 +59,7 @@ export interface ImageRouteOptions {
   limits?: ImageLimits | undefined
   // The security headers, which the route's answers carry themselves.
   security?: Record<string, string> | undefined
-  // `images.resolve`, giving an absolute path, run after `images.guard` in the request's locale, as `actions` set it.
+  // `images.resolve`, giving an absolute path, run after `images.guards` in the request's locale, as `actions` set it.
   resolve?: { find: (src: string, ctx: GuardContext) => Promise<string | undefined>, guard?: Guard | undefined, actions: ActionOptions } | undefined
 }
 
@@ -658,13 +658,13 @@ export async function builtVariant(url: URL, clientDir: string, aspects?: readon
   }
 }
 
-// The file `images.resolve` gives for a `src`, once `images.guard` let the request through, or the answer of the one that stopped it.
+// The file `images.resolve` gives for a `src`, once `images.guards` let the request through, or the answer of the one that stopped it.
 async function resolvedSource(src: string, context: { request: Request }, { find, guard, actions }: NonNullable<ImageRouteOptions['resolve']>): Promise<Response | { source: { path: string, immutable: false, private: true }, passed: GuardedRequest } | undefined> {
   let path: string | undefined
   const lookup: LoadedGuard = { file: 'images.resolve', special: {}, check: async (ctx) => {
     path = await find(src, ctx)
   } }
-  const guards = guard ? [{ file: 'images.guard', special: {}, check: guard }, lookup] : [lookup]
+  const guards = guard ? [{ file: 'images.guards', special: {}, check: guard }, lookup] : [lookup]
   const passed = await inLocale(context.request, actions, async () => passGuards(guards, context, {}, actions))
 
   if (passed instanceof Response)

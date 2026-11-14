@@ -264,7 +264,7 @@ function guardNotes(guards: GuardFile[] | { file: string }[], open: boolean | un
   if (open)
     return ['open']
 
-  return guards.length === 0 && required !== false ? ['403: no guard under requireGuards'] : []
+  return guards.length === 0 && required !== false ? ['403: no guard under guards.default'] : []
 }
 
 async function serverOf(file: string) {

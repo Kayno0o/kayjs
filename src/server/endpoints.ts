@@ -392,7 +392,7 @@ export async function exportedEndpoints(root: string, endpoints: Endpoint[], req
         throw new KayError('export-guard', 'a guard covers it, and only a server can run one per request')
 
       if ((required === true || required === 'routes') && endpoint.open !== true)
-        throw new KayError('export-guard', 'requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it')
+        throw new KayError('export-guard', 'guards.default is closed and no guard covers it; set `guards: false` in `export const page` to export it')
 
       const module = await importModule<{ GET?: unknown }>(endpoint.file)
 

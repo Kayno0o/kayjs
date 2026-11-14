@@ -637,7 +637,7 @@ describe('kay build --static', () => {
       const { code, errors } = await exportSite(elsewhere, fixture)
 
       expect(code).toBe(1)
-      expect(errors).toContain('src/routes/index.kay: requireGuards is on and no guard covers it; set `guards: false` in its `page` to export it')
+      expect(errors).toContain('src/routes/index.kay: guards.default is closed and no guard covers it; set `guards: false` in its `page` to export it')
       expect(errors).not.toContain('src/routes/about.kay:')
     }
     finally {

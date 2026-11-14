@@ -600,7 +600,7 @@ function refuseServerOnly(route: Route, module: Record<string, unknown>, require
     throw new KayError('export-guard', 'kay: a guard covers it, and only a server can run one per request')
 
   if (required !== false && route.open !== true)
-    throw new KayError('export-guard', 'kay: requireGuards is on and no guard covers it; set `guards: false` in its `page` to export it')
+    throw new KayError('export-guard', 'kay: guards.default is closed and no guard covers it; set `guards: false` in its `page` to export it')
 
   const action = Object.keys(module).find(name => isAction(module[name]))
 
