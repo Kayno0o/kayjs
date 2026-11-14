@@ -32,6 +32,16 @@ describe('deprecated-images-keys', () => {
     expect(text['kay.config.ts']).toBe('export default { images: { remote: { maxSize: \'10mb\', timeout: \'30s\' }, ttl: \'7d\', formats: { avif: false, quality: 70 }, limits: { variants: 10, queue: false } } }\n')
   })
 
+  it('keeps a comment that repeats a moved key\'s text, and cuts the key itself when none is in the way', async () => {
+    const { text } = await fixed({
+      'a/kay.config.ts': 'export default { images: { remoteTimeout: \'5s\', ttl: \'1d\', /* remoteMaxSize: \'1mb\' */ remoteMaxSize: \'1mb\' } }\n',
+      'b/kay.config.ts': 'export default { images: { remoteTimeout: \'5s\', ttl: \'1d\', remoteMaxSize: \'1mb\' } } // remoteMaxSize: \'1mb\'\n',
+    })
+
+    expect(text['a/kay.config.ts']).toContain('/* remoteMaxSize: \'1mb\' */ remoteMaxSize: \'1mb\'')
+    expect(text['b/kay.config.ts']).toBe('export default { images: { remote: { timeout: \'5s\', maxSize: \'1mb\' }, ttl: \'1d\' } } // remoteMaxSize: \'1mb\'\n')
+  })
+
   it('reports with no fix where the group is already written or a key is shorthand', async () => {
     const { found, text } = await fixed({
       'kay.config.ts': 'export default { images: { remote: { hosts: [] }, remoteMaxSize: \'10mb\' } }\n',

@@ -69,10 +69,16 @@ export function regrouped(object: NodeOfType<'ObjectExpression'>, text: string, 
     deleted.push([properties[lastKept]!.end, properties.at(-1)!.end])
 
   for (const [start, end] of deleted) {
-    let rest = text.slice(start, end)
+    // What lies in the span besides the removed properties, cut out by their own offsets.
+    let rest = ''
+    let at = start
 
-    for (const index of gone)
-      rest = rest.replace(text.slice(properties[index]!.start, properties[index]!.end), '')
+    for (const { start: from, end: to } of gone.map(index => properties[index]!).filter(property => property.start >= start && property.end <= end).sort((a, b) => a.start - b.start)) {
+      rest += text.slice(at, from)
+      at = to
+    }
+
+    rest += text.slice(at, end)
 
     // A comment between the properties would be lost with them.
     if (!PUNCTUATION.test(rest))

@@ -112,6 +112,17 @@ describe('config values checked once at load', () => {
     expect(fine).toMatchObject({ lang: 'en', trailingSlash: 'always' })
   })
 
+  it('refuses a list a function returned that is no list, as the same value written out', async () => {
+    const written = await load('export default { security: { hosts: \'example.com\' } } as never\n')
+    const loaded = await load('export default { security: { hosts: async () => \'example.com\' } } as never\n')
+    const fine = await load('export default { security: { hosts: async () => [\'example.com\'] } }\n')
+
+    expect(written).toMatchObject({ code: 'config-invalid' })
+    expect(loaded).toMatchObject({ code: 'config-invalid' })
+    expect(String(loaded)).toBe(String(written))
+    expect(fine).toMatchObject({ security: { hosts: ['example.com'] } })
+  })
+
   it('checks an extension\'s config the same way', async () => {
     const error = await load('export default { extensions: [{ name: \'lib\', config: { lang: 5 } }] } as never\n')
 

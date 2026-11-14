@@ -1,4 +1,4 @@
-import type { InternalConfig, KayConfig } from '../config'
+import type { ConfigInput, InternalConfig, KayConfig } from '../config'
 import type { Project } from '../project'
 import type { ClientBuild } from './client'
 import type { GuardRequirement } from './guard-requirement'
@@ -38,7 +38,7 @@ import { setupPages } from './setup'
 import { projectSource } from './source'
 
 // Options given here win over the project's `kay.config.ts`.
-export interface PagesOptions extends KayConfig {
+export interface PagesOptions extends ConfigInput {
   // Project root: island ids and `.kay/` output are relative to it. Defaults to the working directory.
   root?: string | undefined
   // Shows thrown errors with their stack. Defaults to on when NODE_ENV is development.
@@ -47,8 +47,11 @@ export interface PagesOptions extends KayConfig {
   prebuilt?: boolean | undefined
 }
 
+// The options with their lists loaded, as the server reads them.
+export type LoadedPagesOptions = KayConfig & Pick<PagesOptions, 'root' | 'dev' | 'prebuilt'>
+
 // The options once the project is loaded: what the caller gave and what kay added, `publicEnv` among it.
-export type ServedOptions = PagesOptions & InternalConfig
+export type ServedOptions = LoadedPagesOptions & InternalConfig
 
 // The routes with their guards loaded.
 async function servedRoutes(routes: Route[], pages: ServedRoute[], required: GuardRequirement): Promise<ServedRoute[]> {
@@ -60,7 +63,7 @@ async function servedRoutes(routes: Route[], pages: ServedRoute[], required: Gua
 }
 
 // What the server's options refuse by themselves, before the project is read.
-function refuseOptions(options: PagesOptions): void {
+function refuseOptions(options: LoadedPagesOptions): void {
   if (options.health !== false)
     healthTimeoutMs(options.health)
 

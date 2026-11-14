@@ -117,7 +117,11 @@ async function importConfig(root: string, fresh = false): Promise<KayConfig> {
 
   checkedConfig(config)
 
-  return resolveConfig(config)
+  const resolved = await resolveConfig(config)
+
+  refuseInvalidValues(resolved, CONFIG_FILE)
+
+  return resolved
 }
 
 const MODULE_DIRECTORY = /^.*\/node_modules\//
@@ -148,6 +152,14 @@ async function importedConfig(file: string, fresh: boolean): Promise<{ default?:
   }
 }
 
+// Each value of the wrong kind, a list a function gave included once it is loaded.
+function refuseInvalidValues(config: object, where: string): void {
+  const invalid = invalidConfigValues(config)
+
+  if (invalid.length > 0)
+    throw new KayError('config-invalid', `kay: ${where} has ${invalid.length === 1 ? 'a value' : 'values'} of the wrong kind: ${invalid.join('; ')}`)
+}
+
 // The keys `kay check` and `kay env` read in their own way, refused when they are not the shape they take.
 function checkedConfig(config: ConfigInput & InternalConfig, where = CONFIG_FILE): void {
   const { checks, env, publicEnv } = config
@@ -167,10 +179,7 @@ function checkedConfig(config: ConfigInput & InternalConfig, where = CONFIG_FILE
   if (unknown.length > 0)
     throw new KayError('config-invalid', `kay: ${where} has ${unknown.length === 1 ? 'an option' : 'options'} kay does not know: ${unknown.join('; ')}`)
 
-  const invalid = invalidConfigValues(config)
-
-  if (invalid.length > 0)
-    throw new KayError('config-invalid', `kay: ${where} has ${invalid.length === 1 ? 'a value' : 'values'} of the wrong kind: ${invalid.join('; ')}`)
+  refuseInvalidValues(config, where)
 
   if (checks !== undefined && !Array.isArray(checks))
     throw new KayError('config-invalid', `kay: \`checks\` in ${where} is a list of functions, not ${typeof checks}`)
@@ -317,9 +326,9 @@ function withSiteUrl<Config extends KayConfig>(config: Config): Config {
 }
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.
-export async function withConfig<Options extends KayConfig>(root: string, options: Options): Promise<KayConfig & Options> {
+export async function withConfig<Options extends ConfigInput>(root: string, options: Options): Promise<KayConfig & Omit<Options, keyof ConfigInput>> {
   // The options are resolved as the file is, so a code call may pass a list's function or an old key as `kay.config.ts` may.
-  const given = await resolveConfig(options) as Options
+  const given = await resolveConfig(options) as KayConfig & Omit<Options, keyof ConfigInput>
 
   return withTailwind(root, withPublicFields(root, withAppContext(root, mergeConfig(withLibraryMessages(root, await importConfig(root)), given))))
 }

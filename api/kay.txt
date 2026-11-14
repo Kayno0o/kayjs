@@ -3292,7 +3292,7 @@ type PageHook = (page: RenderedPage) => string | Promise<string>
 function pages(options?: PagesOptions): Promise<KayPlugin>
 
 [./server] PagesOptions
-interface PagesOptions extends KayConfig
+interface PagesOptions extends ConfigInput
   actions?: ActionsConfig | undefined
   base?: string | undefined
   beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
@@ -3300,7 +3300,7 @@ interface PagesOptions extends KayConfig
   checks?: ProjectCheck[] | undefined
   client?: ClientConfig | undefined
   contentConfig?: string | undefined
-  cors?: CorsOptions | undefined
+  cors?: ConfigCors | undefined
   dev?: boolean | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
@@ -3311,8 +3311,8 @@ interface PagesOptions extends KayConfig
   guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
   health?: HealthConfig | boolean | undefined
-  i18n?: I18nConfig | undefined
-  images?: ImagesConfig | undefined
+  i18n?: Over<I18nConfig, { paths?: Loadable<Record<string, Record<string, string>>> | undefined; }> | undefined
+  images?: ImagesInput | undefined
   jobs?: JobsConfig | undefined
   lang?: string | undefined
   librarySettings?: Record<string, string> | undefined
@@ -3334,17 +3334,17 @@ interface PagesOptions extends KayConfig
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
   preview?: PreviewConfig | boolean | undefined
-  proxy?: ProxyConfig | boolean | number | undefined
+  proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; }> | boolean | number | undefined
   publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
-  redirects?: Redirects | undefined
+  redirects?: Loadable<Redirects> | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
-  robots?: RobotsConfig | boolean | undefined
+  robots?: Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined; allow?: Loadable<string[]> | undefined; }> | boolean | undefined
   root?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   search?: boolean | undefined
   secret?: string | string[] | undefined
-  security?: SecurityConfig | boolean | undefined
+  security?: Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined; }> | boolean | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   site?: string | undefined
@@ -4345,7 +4345,7 @@ interface TestOptions extends PagesOptions
   checks?: ProjectCheck[] | undefined
   client?: ClientConfig | undefined
   contentConfig?: string | undefined
-  cors?: CorsOptions | undefined
+  cors?: ConfigCors | undefined
   dev?: boolean | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
@@ -4357,8 +4357,8 @@ interface TestOptions extends PagesOptions
   head?: HeadTag[] | undefined
   headers?: Record<string, string> | undefined
   health?: HealthConfig | boolean | undefined
-  i18n?: I18nConfig | undefined
-  images?: ImagesConfig | undefined
+  i18n?: Over<I18nConfig, { paths?: Loadable<Record<string, Record<string, string>>> | undefined; }> | undefined
+  images?: ImagesInput | undefined
   islands?: boolean | undefined
   jobs?: JobsConfig | undefined
   lang?: string | undefined
@@ -4384,18 +4384,18 @@ interface TestOptions extends PagesOptions
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
   preview?: PreviewConfig | boolean | undefined
-  proxy?: ProxyConfig | boolean | number | undefined
+  proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; }> | boolean | number | undefined
   proxyKey?: string | undefined
   publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
-  redirects?: Redirects | undefined
+  redirects?: Loadable<Redirects> | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
-  robots?: RobotsConfig | boolean | undefined
+  robots?: Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined; allow?: Loadable<string[]> | undefined; }> | boolean | undefined
   root?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   search?: boolean | undefined
   secret?: string | string[] | undefined
-  security?: SecurityConfig | boolean | undefined
+  security?: Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined; }> | boolean | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   site?: string | undefined

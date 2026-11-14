@@ -9,7 +9,8 @@ const NEEDLE = /\bmaxAge\b/
 const FROM_SERVER = (source: string) => source === 'kay/server' || source === '@kayjs/kay/server'
 // The calls whose options hold how long something lives, with the position of the options.
 const CALLS: Record<string, { method: string, argument: number }> = { signed: { method: 'sign', argument: 2 }, files: { method: 'url', argument: 1 } }
-// The option bags that hold how long a challenge or a stamp stays good.
+const FROM_KAY = (source: string) => source === 'kay' || source === '@kayjs/kay'
+// The option bags of `protect` that hold how long a challenge or a stamp stays good.
 const BAGS = new Set(['proofOfWork', 'minTime'])
 
 type Property = Extract<NodeOfType<'ObjectExpression'>['properties'][number], { type: 'Property' }>
@@ -22,6 +23,7 @@ export async function ttlNames(root: string, options: CheckOptions): Promise<Che
 
   return scan(root, options, 'deprecated-ttl-names', NEEDLE, ({ parsed, report }) => {
     for (const { ast, base } of parsed) {
+      const actions = importsOf(ast, FROM_KAY, 'action')
       const bound = Object.entries(CALLS).map(([name, call]) => ({ ...call, locals: importsOf(ast, FROM_SERVER, name).locals }))
       const reportIn = (object: NodeOfType<'ObjectExpression'>, of: string): void => {
         const properties = object.properties.filter((property): property is Property => property.type === 'Property')
@@ -47,8 +49,22 @@ export async function ttlNames(root: string, options: CheckOptions): Promise<Che
             reportIn(written, `\`${name}.${property}()\``)
         }
 
-        if (node.type === 'Property' && !node.computed && BAGS.has(keyName(node) ?? '') && node.value.type === 'ObjectExpression')
-          reportIn(node.value, `\`${keyName(node)!}\``)
+        const calledAction = node.type === 'CallExpression' && (node.callee.type === 'Identifier' ? actions.locals.has(node.callee.name) : node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.object.type === 'Identifier' && actions.namespaces.has(node.callee.object.name) && node.callee.property.type === 'Identifier' && node.callee.property.name === 'action')
+
+        if (node.type !== 'CallExpression' || !calledAction)
+          return
+
+        for (const argument of node.arguments) {
+          const protect = argument.type === 'ObjectExpression' ? argument.properties.find((property): property is Property => property.type === 'Property' && !property.computed && keyName(property) === 'protect') : undefined
+
+          if (protect?.value.type !== 'ObjectExpression')
+            continue
+
+          for (const bag of protect.value.properties) {
+            if (bag.type === 'Property' && !bag.computed && BAGS.has(keyName(bag) ?? '') && bag.value.type === 'ObjectExpression')
+              reportIn(bag.value, `\`${keyName(bag)!}\``)
+          }
+        }
       })
     }
   })

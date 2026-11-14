@@ -12,6 +12,7 @@ import { styledClassNames } from '../src/build/class-rules'
 import { buildClient } from '../src/build/client'
 import { parse } from '../src/build/supports'
 import { warnServerClasses } from '../src/build/warn-classes'
+import { resolveConfig } from '../src/config-resolve'
 import { modeOf, PRODUCTION, resolveProject } from '../src/project'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { servePages } from '../src/server/app'
@@ -92,7 +93,7 @@ async function copyOfFixture(): Promise<string> {
 // The heads a server writes are kept per `styles` map, so each server gets a map of its own.
 async function serve(options: PagesOptions & { dev?: boolean } = {}, built = client): Promise<App> {
   const mode = modeOf({ dev: options.dev ?? false, prebuilt: options.dev !== true })
-  const config = { dirs: { routes: 'src/routes' }, serve: { compress: false }, ...options }
+  const config = await resolveConfig({ dirs: { routes: 'src/routes' }, serve: { compress: false }, ...options })
 
   return servePages(resolveProject(root, config, mode), () => ({ ...built, styles: new Map(built.styles), inlineStyles: undefined, inlineSizes: undefined, pageStyles: undefined }))
 }

@@ -1,4 +1,4 @@
-import type { KayConfig } from '../config'
+import type { ConfigInput, KayConfig } from '../config'
 import type { Mode, Project } from '../project'
 import type { ApiModule } from './api-modules'
 import type { Bundle } from './bundle'
@@ -13,6 +13,7 @@ import { outputDir, testWorker } from '../build/assets'
 import { KayError } from '../compiler/errors'
 import { jobFiles, pluginFiles } from '../config-extensions'
 import { mergeConfig, withConfig } from '../config-loader'
+import { resolveConfig } from '../config-resolve'
 import { cacheDir, clientOptionsOf, modeOf, PRODUCTION } from '../project'
 import { kayLog } from '../runtime/log'
 import { bundled } from './bundle'
@@ -28,7 +29,7 @@ export interface ProjectSource {
   mode: (options: { dev?: boolean | undefined, prebuilt?: boolean | undefined }) => Mode
   // An executable serves the project it was built from, wherever it runs.
   root: (fallback: string) => string
-  config: <Options extends KayConfig>(root: string, options: Options) => Promise<KayConfig & Options>
+  config: <Options extends ConfigInput>(root: string, options: Options) => Promise<KayConfig & Omit<Options, keyof ConfigInput>>
   client: (project: Project) => Promise<ClientBuild>
   // Lets the `.kay` modules it imports compile as they load, or load as the build at `built` recorded them when it holds a record.
   prepare: (root: string, settings?: Record<string, string>, built?: string) => Promise<void>
@@ -117,9 +118,8 @@ export function embeddedSource(bundle: Bundle): ProjectSource {
     mode: () => PRODUCTION,
     root: () => bundle.root,
     // The root, routes and public files it was built with win over the options.
-    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     config: async (_, options) => {
-      const merged = mergeConfig(publicConfig, options)
+      const merged = mergeConfig(publicConfig, await resolveConfig(options) as KayConfig & Omit<typeof options, keyof ConfigInput>)
 
       return { ...merged, root: bundle.root, dirs: { ...merged.dirs, public: bundle.publicDir } }
     },

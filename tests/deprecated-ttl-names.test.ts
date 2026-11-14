@@ -25,16 +25,16 @@ async function fixed(files: Record<string, string>): Promise<{ text: Record<stri
 describe('deprecated-ttl-names', () => {
   it('renames maxAge to ttl on signed.sign, files.url and the protect bags', async () => {
     const { found, text } = await fixed({
-      'src/a.ts': 'import { files, signed } from \'kay/server\'\n\nsigned.sign(\'a\', \'b\', { maxAge: \'1h\' })\nfiles.url(\'private/x.png\', { maxAge: \'1d\' })\nexport const protect = { minTime: { after: \'3s\', maxAge: \'1h\' }, proofOfWork: { maxAge }, }\n',
+      'src/a.ts': 'import { action } from \'kay\'\nimport { files, signed } from \'kay/server\'\n\nsigned.sign(\'a\', \'b\', { maxAge: \'1h\' })\nfiles.url(\'private/x.png\', { maxAge: \'1d\' })\nexport const send = action(() => 1, { protect: { minTime: { after: \'3s\', maxAge: \'1h\' }, proofOfWork: { maxAge } } })\n',
     })
 
     expect(found).toHaveLength(4)
-    expect(text['src/a.ts']).toBe('import { files, signed } from \'kay/server\'\n\nsigned.sign(\'a\', \'b\', { ttl: \'1h\' })\nfiles.url(\'private/x.png\', { ttl: \'1d\' })\nexport const protect = { minTime: { after: \'3s\', ttl: \'1h\' }, proofOfWork: { ttl: maxAge }, }\n')
+    expect(text['src/a.ts']).toBe('import { action } from \'kay\'\nimport { files, signed } from \'kay/server\'\n\nsigned.sign(\'a\', \'b\', { ttl: \'1h\' })\nfiles.url(\'private/x.png\', { ttl: \'1d\' })\nexport const send = action(() => 1, { protect: { minTime: { after: \'3s\', ttl: \'1h\' }, proofOfWork: { ttl: maxAge } } })\n')
   })
 
   it('leaves the HTTP and cookie maxAge, other receivers and a ttl alone, and reports a clash with no fix', async () => {
     const { found, text } = await fixed({
-      'src/a.ts': 'import { signed } from \'kay/server\'\n\nsigned.sign(\'a\', \'b\', { ttl: \'1h\' })\nother.url(\'x\', { maxAge: 1 })\nctx.cookies.set(\'a\', \'b\', { maxAge: 60 })\nexport const cors = { origins: [], maxAge: \'1h\' }\n',
+      'src/a.ts': 'import { signed } from \'kay/server\'\n\nsigned.sign(\'a\', \'b\', { ttl: \'1h\' })\nother.url(\'x\', { maxAge: 1 })\nctx.cookies.set(\'a\', \'b\', { maxAge: 60 })\nexport const cors = { origins: [], maxAge: \'1h\' }\nexport const other = { protect: { minTime: { maxAge: 1 } } }\nexport const again = { minTime: { maxAge: 1 }, proofOfWork: { maxAge: 1 } }\n',
       'src/b.ts': 'import { signed } from \'kay/server\'\n\nsigned.sign(\'a\', \'b\', { ttl: \'1h\', maxAge: \'2h\' })\n',
     })
 
