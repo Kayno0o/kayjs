@@ -37,6 +37,8 @@ export const helper = 'a string no plugin'
 
 await Bun.write(join(root, 'src/jobs/_private.ts'), `import { schedule } from 'kay/server'\n\nexport const never = schedule({ every: '1m' }, () => { throw new Error('mounted') })\n`)
 await Bun.write(join(root, 'src/jobs/deep/nested.ts'), `import { schedule } from 'kay/server'\n\nexport const deep = schedule({ every: '5m' }, () => undefined)\n`)
+// A job another file re-exports is mounted once too.
+await Bun.write(join(root, 'src/jobs/more.ts'), 'export { tick as everyMinute } from \'./mail\'\n')
 await Bun.write(join(root, 'src/jobs/readme.md'), '# not a job\n')
 await Bun.write(join(root, 'src/jobs/mail.test.ts'), 'throw new Error(\'a test file is mounted\')\n')
 
@@ -48,7 +50,7 @@ afterAll(async () => {
 
 describe('src/jobs', () => {
   it('lists the files of nested folders in order, leaving out a name starting with _ and what is no TypeScript', () => {
-    expect(jobFiles(root)).toEqual(['deep/nested.ts', 'mail.ts'])
+    expect(jobFiles(root)).toEqual(['deep/nested.ts', 'mail.ts', 'more.ts'])
   })
 
   it('mounts each queue, workflow, schedule and background job a file exports', async () => {
@@ -63,7 +65,7 @@ describe('src/jobs', () => {
     expect(mail.ticks).toEqual([{ run: { schedule: 'every 1m', boot: false }, signal: true }])
   })
 
-  it('mounts a job exported by name and as the default once', async () => {
+  it('mounts a job exported by name, as the default and from another file once', async () => {
     const mail = await import(resolve(root, 'src/jobs/mail.ts')) as { ticks: unknown[] }
 
     expect(await site.runSchedule('1m')).toBe(1)

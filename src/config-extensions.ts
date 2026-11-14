@@ -70,12 +70,13 @@ export function extensionApps(extensions: KayExtension[] | undefined, root: stri
 // The server plugins the extensions carry, in their order, those given as a function built now.
 export async function extensionServers(extensions: KayExtension[] | undefined, root: string, exporting = false): Promise<{ name: string, server: AnyElysia }[]> {
   const appOf = extensionApps(extensions, root, exporting)
+  const jobs = new Set<unknown>()
 
   return Promise.all((extensions ?? []).flatMap((extension) => {
     const { name, server, serverModule } = extension
 
     if (serverModule !== undefined)
-      return [(async () => ({ name, server: await serverFromModule(name, serverModule, root) }))()]
+      return [(async () => ({ name, server: await serverFromModule(name, serverModule, root, jobs) }))()]
 
     return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server(await appOf(extension)) : server }))()]
   }))
@@ -168,9 +169,8 @@ export function extensionServerModules(root: string, extensions: KayExtension[] 
   return (extensions ?? []).flatMap(({ serverModule }) => serverModule === undefined ? [] : [resolve(root, serverModule.path)])
 }
 
-// The jobs a module exports by name as one plugin. A job is a plugin, which an app that exported it twice (`export default` beside its name) mounts once, and anything else the file exports is its own.
-function jobsOf(loaded: Record<string, unknown>): AnyElysia {
-  const mounted = new Set<unknown>()
+// The jobs a module exports by name as one plugin. A job is a plugin, which an app that exported it twice (`export default` beside its name, or from another file of `src/jobs`) mounts once, and anything else the file exports is its own.
+function jobsOf(loaded: Record<string, unknown>, mounted: Set<unknown>): AnyElysia {
   const server = new Elysia()
 
   for (const [name, value] of Object.entries(loaded)) {
@@ -185,12 +185,12 @@ function jobsOf(loaded: Record<string, unknown>): AnyElysia {
 }
 
 // The plugin a module exports, what a function it exports builds, or the `plugin` of an object it exports; an executable reads it from the copy it holds, keyed by where the build found the file.
-async function serverFromModule(name: string, { path, export: exported = 'default', prepare }: NonNullable<KayExtension['serverModule']>, root: string): Promise<AnyElysia> {
+async function serverFromModule(name: string, { path, export: exported = 'default', prepare }: NonNullable<KayExtension['serverModule']>, root: string, jobs: Set<unknown>): Promise<AnyElysia> {
   const file = resolve(bundled()?.root ?? root, path)
   const loaded = await importModule<Record<string, unknown>>(file)
 
   if (exported === JOBS_EXPORT)
-    return jobsOf(loaded)
+    return jobsOf(loaded, jobs)
 
   const value = loaded[exported]
 
