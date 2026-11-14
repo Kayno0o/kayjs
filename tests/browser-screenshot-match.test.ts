@@ -22,6 +22,18 @@ function picture(colour: number[], width = 4, height = 4): Uint8Array {
 }
 
 describe('matchScreenshot', () => {
+  // The baselines these write are scratch, so they run as on a laptop under CI too; the CI rule has its own test below.
+  const ci = process.env.CI
+
+  beforeAll(() => {
+    delete process.env.CI
+  })
+
+  afterAll(() => {
+    if (ci !== undefined)
+      process.env.CI = ci
+  })
+
   it('reads the test file off a stack, and fails with none', () => {
     expect(callingTestFile(new Error('x').stack)).toBe(import.meta.path)
     expect(() => callingTestFile('Error\n    at run (/app/src/index.ts:1:1)')).toThrow('no `*.test.ts` file')
