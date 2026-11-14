@@ -10,17 +10,18 @@ let dir = ''
 let delay = 0
 let walked = 0
 let lastWalk: Bun.Subprocess | undefined
-// How long the next read of HEAD takes to answer, in seconds, after reading it.
-let lateHead = 0
+// Whether the next read of HEAD is held: it reads HEAD at once, writes `<held>.read`, and answers once the test writes `<held>.open`.
+let holdHead = false
+const held = () => join(dir, '.git', 'held-head')
 const spawn = Bun.spawn
 const spawned = spyOn(Bun, 'spawn').mockImplementation(((command: string[], ...rest: unknown[]) => {
   const walk = command[0] === 'git' && command.includes('log') && command.includes('-z')
   const head = command[0] === 'git' && command.includes('rev-parse')
   let run = walk && delay > 0 ? ['sh', '-c', 'sleep "$0" >/dev/null && exec "$@"', String(delay), ...command] : command
 
-  if (head && lateHead > 0) {
-    run = ['sh', '-c', 'out=$("$@") && sleep "$0" >/dev/null && echo "$out"', String(lateHead), ...command]
-    lateHead = 0
+  if (head && holdHead) {
+    run = ['sh', '-c', 'out=$("$@") && : > "$0.read" && while [ ! -e "$0.open" ]; do sleep 0.02; done && echo "$out"', held(), ...command]
+    holdHead = false
   }
 
   const started = (spawn as (...args: unknown[]) => Bun.Subprocess)(run, ...rest)
@@ -140,14 +141,17 @@ it('waits for a slow git when the list is sorted by the dates', async () => {
 it('keeps the walk of the newest commit when a read of HEAD started before it answers after it', async () => {
   await commit('content/h.md', 'Ada')
   walks()
-  lateHead = 0.6
+  holdHead = true
 
   const late = readEdits(['content/h.md'])
 
-  await Bun.sleep(250)
+  while (!await Bun.file(`${held()}.read`).exists())
+    await Bun.sleep(10)
+
   await commit('content/h.md', 'Grace')
 
   expect((await readEdits(['content/h.md'])).get('content/h.md')).toMatchObject({ author: 'Grace' })
+  await writeFile(`${held()}.open`, '')
   await late
   expect((await readEdits(['content/h.md'])).get('content/h.md')).toMatchObject({ author: 'Grace' })
   expect(walks()).toBe(1)

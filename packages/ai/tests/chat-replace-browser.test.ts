@@ -261,7 +261,10 @@ it('gives the focus back to the edit button on Cancel, on Escape in the field an
 it('does not close the launcher panel when Escape cancels an edit', async () => {
   await using page = await site.open('/launching-editable')
 
+  // The launcher hydrates when the browser is idle, which a loaded machine puts off: a click before it opens nothing.
+  await page.waitUntil(() => (document.querySelector('.kai-launcher')?.closest('[data-component]') as unknown as { _$k?: boolean } | null)?._$k === true)
   await page.click('.kai-launcher-button')
+  await page.waitFor('.kai-launcher-panel:not([hidden])')
   await page.waitUntil(() => [...document.querySelectorAll('[data-hydrate=visible]')].every(island => '_$k' in island))
   await send(page, 'one', 'fresh roles=u last=one files=0')
   await page.click(EDIT)
