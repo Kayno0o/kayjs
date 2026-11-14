@@ -17,7 +17,7 @@ async function load() {
   return all.map(note => ({ ...note, read: done.includes(note.key) }))
 }
 
-function onRead(id: string | undefined) {
+function onRead({ id }: { id: string | undefined }) {
   log = [...log(), String(id)]
   read = id === undefined ? all.map(note => note.key) : [...read(), id]
 }
