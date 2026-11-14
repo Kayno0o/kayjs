@@ -101,7 +101,7 @@ async function copy(row: EntryRow): Promise<void> {
 
 // Goes to the same list sorted the way the header asks, from its first page.
 async function sortBy(next: SortState): Promise<void> {
-  await navigate({ query: { sort: next.key, dir: next.direction, page: null } })
+  await navigate.query({ sort: next.key, dir: next.direction, page: null })
 }
 
 // The bulk actions the layout keeps; the table lets rows be ticked only when it has one.

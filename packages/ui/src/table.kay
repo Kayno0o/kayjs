@@ -6,7 +6,7 @@ import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import type { RowsSource } from './source'
 import type { Column, FilterField, RowFilter, RowKey, RowKeyValue, SortState } from './table'
-import { effect, memo, onCleanup, onMount, persisted, recipe, signal, uid, withQuery } from 'kay'
+import { effect, memo, onCleanup, onMount, queryParam, recipe, signal, uid, withQuery } from 'kay'
 import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
@@ -255,9 +255,9 @@ const columns = memo(() => given.map(column => resolvedColumn(column, sortable))
 // A Table drawn as plain markup has no script to sort with, so it keeps its sort in the URL under `sort` unless `sortParam` names another, and its headers link to it.
 // kay-allow once-read-prop: the sort's param is chosen when the table is made
 const sortKey = uses('sortParam') ? sortParam ?? (plain && sortable ? 'sort' : undefined) : undefined
-const keptKey = sortKey === undefined ? undefined : persisted.query(sortKey, '')
+const keptKey = sortKey === undefined ? undefined : queryParam(sortKey, { default: '' })
 const directionParam = sortKey === undefined ? undefined : sortKey === 'sort' ? 'direction' : `${sortKey}Direction`
-const keptDirection = directionParam === undefined ? undefined : persisted.query(directionParam, '')
+const keptDirection = directionParam === undefined ? undefined : queryParam(directionParam, { default: '' })
 const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())
 const current = signal(restored ?? sort)
 let following = restored === undefined

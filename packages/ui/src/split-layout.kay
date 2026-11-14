@@ -37,7 +37,7 @@ const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOp
 }>()
 
 // 0 stands for no width kept yet.
-const kept = listWidthKey ? persisted<number>(listWidthKey, 0) : undefined
+const kept = listWidthKey ? persisted.cookie<number>(listWidthKey, 0) : undefined
 const listWidth = signal(clampWidth(untrack(() => kept?.()) || WIDTH.default))
 const narrow = mediaQuery(NARROW)
 let sidebarPane: HTMLElement | undefined

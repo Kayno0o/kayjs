@@ -164,7 +164,7 @@ const room = signal({ width: 0, height: 0, right: 0, bottom: 0 })
 const reached = signal<number>()
 const launching = signal<HTMLElement>()
 // 0 stands for no size kept yet.
-const kept = sizeKey === undefined ? undefined : persisted<number>(sizeKey, 0)
+const kept = sizeKey === undefined ? undefined : persisted.cookie<number>(sizeKey, 0)
 let body: HTMLElement | undefined
 const dragging = signal(false)
 let panel: HTMLDialogElement | undefined
@@ -385,7 +385,7 @@ effect(() => {
 })
 
 // A browser with `closedby` closes a non-modal panel on Escape, stacked with the layers above it. Without it the panel listens itself, and leaves an Escape that belongs to a modal dialog or an open popover.
-listen(document, 'keydown', event => {
+listen(() => document, 'keydown', event => {
   if (event.key !== 'Escape' || modal || !isOpen() || event.defaultPrevented || event.isComposing || docked() || 'closedBy' in HTMLDialogElement.prototype)
     return
 

@@ -1,7 +1,7 @@
 --- <Value extends string>
 import type { JSX, Snippet } from 'kay'
 import type { NavItem } from './nav-item'
-import { effect, persisted, recipe, signal, uid, untrack } from 'kay'
+import { effect, queryParam, recipe, signal, uid, untrack } from 'kay'
 import { stepIndex } from './cycle'
 import { loadOptions } from './options-source'
 import type { OptionsSource } from './options-source'
@@ -82,7 +82,7 @@ const tabs = source.options
 const id = uid()
 // Held as a string: a signal cannot take a type parameter that might be a function.
 const shown = signal<string>(value ?? '')
-const kept = param === undefined ? undefined : persisted.query(param, paramDefault ?? '')
+const kept = param === undefined ? undefined : queryParam(param, { default: paramDefault ?? '' })
 const opened = signal<readonly string[]>([])
 let list: HTMLElement | undefined
 

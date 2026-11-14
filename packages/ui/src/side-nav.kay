@@ -85,7 +85,7 @@ const { id, links, groups, link, heading, header, footer, current, label, collap
 }>()
 
 const navId = id ?? uid()
-const kept = collapsedKey === undefined ? undefined : persisted<boolean>(collapsedKey, false)
+const kept = collapsedKey === undefined ? undefined : persisted.cookie<boolean>(collapsedKey, false)
 const own = signal(false)
 const shown = signal(false)
 

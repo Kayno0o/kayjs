@@ -1,6 +1,6 @@
 import { navigate } from 'kay'
 
-// The change handler of a control that holds a query param: the app's own `onChange` first, which can refuse the change by answering false, then `navigate({ query })` setting the param and keeping the others.
+// The change handler of a control that holds a query param: the app's own `onChange` first, which can refuse the change by answering false, then `navigate.query()` setting the param and keeping the others.
 // The default, an empty value and none leave the param out, so the page's plain address stays plain.
 export function paramChange<Value extends string | number | null, Option = never>(param: string | undefined, paramDefault: string | number | undefined, onChange: ((value: Value, option: Option) => unknown) | undefined): ((value: Value, option: Option) => unknown) | undefined {
   if (param === undefined)
@@ -10,6 +10,6 @@ export function paramChange<Value extends string | number | null, Option = never
     if (onChange && await onChange(value, option) === false)
       return false
 
-    return navigate({ query: { [param]: paramDefault !== undefined && String(value) === String(paramDefault) ? null : value } })
+    return navigate.query({ [param]: paramDefault !== undefined && String(value) === String(paramDefault) ? null : value })
   }
 }

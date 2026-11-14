@@ -1,4 +1,4 @@
-import { effect, memo, persisted, untrack } from 'kay'
+import { effect, memo, queryParam, untrack } from 'kay'
 import { currentPage, pageCount } from './pagination'
 
 export interface PagingInput<Row> {
@@ -18,8 +18,8 @@ export interface PagingInput<Row> {
 export function paging<Row>(input: PagingInput<Row>) {
   // Whether the table pages is decided when it is made.
   const size = untrack(input.pageSize)
-  const keptPage = size === undefined ? undefined : persisted.query(input.pageParam(), '', { history: 'push' })
-  const keptSize = size === undefined ? undefined : persisted.query(input.limitParam(), '')
+  const keptPage = size === undefined ? undefined : queryParam(input.pageParam(), { default: '', history: 'push' })
+  const keptSize = size === undefined ? undefined : queryParam(input.limitParam(), { default: '' })
   const pageNow = () => input.page() ?? (Number(keptPage?.()) || 1)
 
   const sizeNow = () => {

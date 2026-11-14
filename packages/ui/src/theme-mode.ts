@@ -10,7 +10,7 @@ export const THEME_COOKIE = 'theme'
 
 // The visitor's choice, kept in a cookie so the server renders with it. A value outside the three modes reads as `system`.
 export function themeMode(cookie = THEME_COOKIE) {
-  return persisted<ThemeMode>(cookie, 'system', { values: THEME_MODES })
+  return persisted.cookie<ThemeMode>(cookie, 'system', { values: THEME_MODES })
 }
 
 // The scheme the page is in, `light` or `dark`, for `html(data-theme={scheme()})` in a layout: the visitor's choice from the first render, so the page never paints the other one first.
