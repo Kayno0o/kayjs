@@ -30,7 +30,8 @@ beforeAll(async () => {
   greeting = join(root, 'src/greeting.ts')
   await Bun.write(join(root, 'src/logo.png'), Bun.file(join(import.meta.dir, 'fixtures/site/src/logo.png')))
   await Bun.write(join(root, 'src/echo.ts'), 'onmessage = event => postMessage(event.data)\n')
-  await Bun.write(join(root, 'src/routes/index.kay'), ISLAND.replace('./greeting', '../greeting'))
+  await Bun.write(join(root, 'src/components/island.kay'), ISLAND.replace('./greeting', '../greeting'))
+  await Bun.write(join(root, 'src/routes/index.kay'), '---\nimport Island from \'../components/island.kay\'\n---\nIsland\n')
 })
 
 describe('testSite builds the islands', () => {

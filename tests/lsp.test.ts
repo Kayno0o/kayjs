@@ -484,11 +484,13 @@ describe('kay lsp', () => {
   })
 
   it('reports a bind: on a prop not typed Bindable at the attribute', async () => {
-    await editor.open('site/src/routes/about.kay')
+    await Bun.write(join(workspace, 'site/src/components/about.kay'), 'p x\n')
+    await editor.open('site/src/components/about.kay')
 
-    const diagnostics = await editor.change('site/src/routes/about.kay', '---\nimport List from \'../components/list.kay\'\nimport { signal } from \'kay\'\nconst items = signal([1])\n---\nList(bind:items={items} show={String})\n', 5)
+    const diagnostics = await editor.change('site/src/components/about.kay', '---\nimport List from \'../components/list.kay\'\nimport { signal } from \'kay\'\nconst items = signal([1])\n---\nList(bind:items={items} show={String})\n', 5)
 
     expect(brief(diagnostics).map(d => [d.start.line, d.code])).toEqual([[5, 2345], [5, 2345]])
+    await rm(join(workspace, 'site/src/components/about.kay'))
   })
 
   it('shows the signature of the call under the cursor, an action call sending an object on its typed input', async () => {
@@ -507,7 +509,7 @@ describe('kay lsp', () => {
   })
 
   it('reports what kay check does, at its level and worded as it words it, and nothing a `// kay-allow` comment allows', async () => {
-    const page = 'site/src/routes/lints.kay'
+    const page = 'site/src/components/lints.kay'
     const source = [
       '---',
       'import { signal } from \'kay\'',
@@ -552,7 +554,7 @@ function applyEdits(text: string, edits: TextEdit[]): string {
 describe('kay lsp imports', () => {
   let editor: Editor
   let dir: string
-  const page = 'src/routes/index.kay'
+  const page = 'src/components/index.kay'
 
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), 'kay-imports-'))

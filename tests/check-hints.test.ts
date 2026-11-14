@@ -19,7 +19,7 @@ async function report(page: string, extra: Record<string, string> = {}): Promise
   const root = await scratchDir('hints-')
 
   try {
-    await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, 'src/routes/index.kay': page, ...extra }).map(async ([path, content]) => Bun.write(join(root, path), content)))
+    await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, 'src/components/index.kay': page, ...extra }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
     return (await turn(async () => checkProject(root))).map(d => ({ line: d.line, code: d.code, message: d.message, help: d.help, column: (d as { column?: number }).column }))
   }

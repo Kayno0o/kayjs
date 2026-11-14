@@ -1,0 +1,16 @@
+---
+import { signal } from 'kay'
+import ByName from '../components/by-name.kay'
+import ByProps from '../components/by-props.kay'
+import ByRest from '../components/by-rest.kay'
+
+const named = signal(false)
+const viaProps = signal(false)
+const viaRest = signal(true)
+---
+ByName(bind:open={named})
+p.named {named() ? 'yes' : 'no'}
+ByProps(bind:open={viaProps})
+p.props {viaProps() ? 'yes' : 'no'}
+ByRest(label="rest" bind:open={viaRest})
+p.rest {viaRest() ? 'yes' : 'no'}

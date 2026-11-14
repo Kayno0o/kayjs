@@ -376,7 +376,7 @@ describe('control flow', () => {
     expect(writes(`---\nconst rows = [1, 2]\n---\n${body}`, 'src/routes/_layout.kay')).toEqual([])
     expect(writes(`---\nconst rows = [1, 2]\n---\n${body}`, 'src/routes/_404.kay')).toEqual([])
     expect(writes(`---\nconst { rows } = props<{ rows: number[] }>()\n---\n${body}`, 'src/comp.kay')).toEqual(['`row` is read-only here', '`i` is read-only here'])
-    expect(writes(`---\nconst rows = [1, 2]\n---\nbutton(onClick={() => {}}) x\n${body}`, 'src/routes/index.kay', { page: true })).toEqual(['`row` is read-only here', '`i` is read-only here'])
+    expect(writes(`---\nconst rows = [1, 2]\n---\nbutton(onClick={() => {}}) x\n${body}`, 'src/components/part.kay')).toEqual(['`row` is read-only here', '`i` is read-only here'])
   })
 })
 

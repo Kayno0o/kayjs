@@ -176,8 +176,11 @@ describe('kay explain', () => {
   it('explains a lint with an example it reports and the same written right, indented as code, and every lint\'s examples hold', () => {
     // One the types find, or one found in kay.config.ts or the rendered pages, is proved by `kay check`'s and `kay build`'s own tests.
     for (const [code, lint] of Object.entries(LINTS).filter(([, lint]) => !('typed' in lint) && !('site' in lint))) {
-      expect(lints(lint.wrong).map(d => d.code)).toContain(code)
-      expect(lints(lint.right).map(d => d.code)).not.toContain(code)
+      // A page lint reads the example as the page of a route.
+      const options = code === 'deprecated-page-island' ? { page: true } : {}
+
+      expect(lints(lint.wrong, options).map(d => d.code)).toContain(code)
+      expect(lints(lint.right, options).map(d => d.code)).not.toContain(code)
     }
 
     expect(explainLint('constant-signal')).toBe([

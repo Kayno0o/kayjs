@@ -335,7 +335,8 @@ describe('kay build --static', () => {
 
     try {
       await Bun.write(config, (await Bun.file(config).text()).replace('  site: ', '  seo: { name: \'Repo\', titleTemplate: \'%s | Repo\' },\n  site: '))
-      await Bun.write(join(fixture, 'src/routes/titled.kay'), '---\nimport { signal } from \'kay\'\n\nconst room = signal(\'Lobby\')\n---\nhead\n  title {room()}\nh1 Titled\nbutton(onClick={() => room.set(\'Next\')}) Rename\n')
+      await Bun.write(join(fixture, 'src/components/titled.kay'), '---\nimport { signal } from \'kay\'\n\nconst room = signal(\'Lobby\')\n---\nhead\n  title {room()}\nh1 Titled\nbutton(onClick={() => room.set(\'Next\')}) Rename\n')
+      await Bun.write(join(fixture, 'src/routes/titled.kay'), '---\nimport Titled from \'../components/titled.kay\'\n---\nTitled\n')
 
       const { code, errors } = await exportSite(elsewhere, fixture)
 

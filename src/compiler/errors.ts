@@ -138,6 +138,11 @@ export const ERRORS = {
     summary: 'A page, layout or special page with a `--- client` fence: they render on the server.',
     fix: { file: 'llms/islands.md', heading: 'Islands' },
   },
+  'server-import-in-island': {
+    group: 'compile',
+    summary: 'A page whose template reads a name imported only in its `--- server` fence, where the page hydrates (a handler makes it an island): the browser runs the template without that fence, so the read throws and every island of the page stays inert. Reported by the type check, at the read; the fix, offered, imports it in the script fence too.',
+    fix: { file: 'llms/components.md', heading: 'File layout' },
+  },
   'static-pin': {
     group: 'compile',
     summary: 'A component pinned static, with a `--- static` fence line, that something makes an island: an `on*`, `bind:` or `ref`, a browser value of `kay`, a live value, or a function or a block taking parameters it passes to a component. The error stands at that thing.',

@@ -1,8 +1,4 @@
 ---
-import Toaster from '@kayjs/ui/toaster.kay'
-import { toast } from '@kayjs/ui'
+import ToastAView from '../components/toast-a-view.kay'
 ---
-h1 Toast a
-button#saved(type="button" onClick={() => toast.success('Saved')}) Save
-a#next(href="/toast-b") Next
-Toaster
+ToastAView

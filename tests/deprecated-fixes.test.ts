@@ -28,7 +28,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
 }
 
 // Every deprecated lint has a `safe` fix, which `kay upgrade` applies, that turns its `wrong` example into its `right` one (#2843). A lint whose old form no fix can rewrite without risk goes here with the reason, and `kay upgrade` leaves it to `llms/upgrading.md`: none today.
-const NO_SAFE_FIX: Partial<Record<Name, string>> = {}
+const NO_SAFE_FIX: Partial<Record<Name, string>> = { 'deprecated-page-island': 'moving what needs the browser into a component is a new file and a new import, not an edit in place' }
 
 // Where a lint's `wrong` example lives: the file its first comment names, a `.kay` file when it opens with a fence, a module otherwise.
 function placed(source: string): { path: string, text: string } {
@@ -47,7 +47,7 @@ describe('every deprecated lint has a safe fix', () => {
   it('lists each lint\'s check, so a new one cannot go without', () => {
     const compiled = names.filter(name => !(name in SITE))
 
-    expect(compiled.sort()).toEqual(['deprecated-if-alias', 'deprecated-script-fence', 'deprecated-ui-props'])
+    expect(compiled.sort()).toEqual(['deprecated-if-alias', 'deprecated-page-island', 'deprecated-script-fence', 'deprecated-ui-props'])
     expect(Object.keys(NO_SAFE_FIX).filter(name => !names.includes(name as Name))).toEqual([])
   })
 

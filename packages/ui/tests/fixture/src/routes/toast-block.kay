@@ -1,10 +1,4 @@
 ---
-import Toaster from '@kayjs/ui/toaster.kay'
-import { toast } from '@kayjs/ui'
+import ToastBlockView from '../components/toast-block-view.kay'
 ---
-h1 Toast block
-button#saved(type="button" onClick={() => toast.success('Saved')}) Save
-Toaster
-  @toast(item, dismiss)
-    b#custom {item.message}
-    button#custom-close(type="button" onClick={dismiss}) Close
+ToastBlockView

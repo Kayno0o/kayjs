@@ -1,0 +1,39 @@
+---
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
+import Select from '@kayjs/ui/select.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
+import Textarea from '@kayjs/ui/textarea.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
+---
+main
+  form#row.flex.items-end.gap-3
+    FormField(label="Search" size="sm")
+      TextInput#search(name="q")
+    FormField(label="Status" size="sm")
+      Select#status(name="status" value="" options={[{ value: 'ok', label: 'OK' }]} emptyOption="Any")
+    Button#filter(type="submit" label="Filter")
+    Button#filter-xs(type="submit" label="Filter" size="xs")
+    Button#filter-inline(type="button" label="Reset" variant="inline")
+  div.flex.items-end.gap-3
+    Button#alone(type="submit" label="Filter")
+  div.flex.items-end.gap-3
+    FormField(label="Search")
+      TextInput#plain-search(name="plain")
+    Button#beside-plain(type="submit" label="Filter")
+  div.flex.items-end.gap-3
+    div
+      FormField(label="Search" size="sm")
+        TextInput#wrapped-search(name="wrapped")
+    div
+      Button#wrapped(type="submit" label="Filter")
+  div.flex.items-end.gap-3
+    Textarea#note(name="note" rows="3" aria-label="Note")
+    Button#beside-note(type="submit" label="Filter")
+  div.flex.items-end.gap-3
+    MultiSelect#tags(label="Tags" options={[{ value: 'a', label: 'A' }]})
+    Button#beside-tags(type="submit" label="Filter")
+  div.flex.items-end.gap-3
+    Toggle(label="On" onChange={() => undefined})
+    Button#beside-toggle(type="submit" label="Filter")

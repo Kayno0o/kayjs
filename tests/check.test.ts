@@ -367,7 +367,7 @@ describe.concurrent('kay check, edge cases', () => {
   })
 
   it('types a signal the template reads by calling it as its value', async () => {
-    const root = await scratchProject({ 'src/routes/index.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count = count() + 1}) {count().toFixed(1)} {count().nope}\n' })
+    const root = await scratchProject({ 'src/components/index.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count = count() + 1}) {count().toFixed(1)} {count().nope}\n' })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([[6, 'TS2339', 'Property \'nope\' does not exist on type \'number\'.']])
@@ -380,7 +380,7 @@ describe.concurrent('kay check, edge cases', () => {
   it('reports an assignment to a constant of unknown origin holding no signal at its name, and a value the signal cannot hold', async () => {
     const theme = 'import { memo, signal } from \'kay\'\n\nexport function makeCounter() {\n  return signal(0)\n}\nexport function makeMemo() {\n  return memo(() => 1)\n}\nexport function makeCount() {\n  return 1\n}\nexport function makeParams() {\n  return new URLSearchParams()\n}\n'
     const page = '---\nimport { makeCounter, makeCount, makeMemo, makeParams } from \'../theme\'\n\nconst counter = makeCounter()\nconst doubled = makeMemo()\nconst n = makeCount()\nconst params = makeParams()\n---\nbutton(onClick={() => { counter += 1; counter = \'x\'; doubled = 2; n = 3; params = makeParams() }}) {counter()} {doubled()}\n'
-    const root = await scratchProject({ 'src/theme.ts': theme, 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/theme.ts': theme, 'src/components/index.kay': page })
     const line = page.split('\n')[8]!
     const written = 'only a signal is written by assigning its name: a memo through the signals it derives from, and a plain value declared with `let`'
 
@@ -986,7 +986,7 @@ describe.concurrent('kay check, edge cases', () => {
       'button(onClick={bump}) {box.count()} {held()} {local()}',
       '',
     ].join('\n')
-    const root = await scratchProject({ 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/components/index.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([])
@@ -1031,7 +1031,7 @@ describe.concurrent('kay check, edge cases', () => {
   it('reads by calling it a signal a module exports as `export const`, and writes it by assigning', async () => {
     const root = await scratchProject({
       'src/accent.ts': 'import { memo, signal } from \'kay\'\n\nexport const accent = signal(\'red\')\nexport const loud = memo(() => accent().toUpperCase())\n',
-      'src/routes/index.kay': '---\nimport { accent, loud } from \'../accent\'\n---\np {accent()}\nif accent() === \'red\'\n  span on\np {accent().toUpperCase()} {loud().length}\nbutton(onClick={() => accent = \'blue\'}) blue\nbutton(onClick={() => accent += \'!\'}) more\n',
+      'src/components/index.kay': '---\nimport { accent, loud } from \'../accent\'\n---\np {accent()}\nif accent() === \'red\'\n  span on\np {accent().toUpperCase()} {loud().length}\nbutton(onClick={() => accent = \'blue\'}) blue\nbutton(onClick={() => accent += \'!\'}) more\n',
     })
 
     try {
@@ -1155,7 +1155,7 @@ describe.concurrent('kay check, edge cases', () => {
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/shared.ts': 'import { signal } from \'kay\'\n\nexport const shared = signal(1)\n', 'src/lib.ts': lib, 'src/components/Toggle.kay': toggle, 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/shared.ts': 'import { signal } from \'kay\'\n\nexport const shared = signal(1)\n', 'src/lib.ts': lib, 'src/components/Toggle.kay': toggle, 'src/components/index.kay': page })
 
     try {
       expect((await check(root, {})).map(d => [basename(d.file), d.line, d.code])).toEqual([10, 11, 12, 13, 15, 16, 19, 19].map(line => ['index.kay', line, 'uncalled-signal']))
@@ -1217,7 +1217,7 @@ describe.concurrent('kay check, edge cases', () => {
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/box.ts': box, 'src/components/index.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[26, 'TS2345'], [27, 'TS2345'], [28, 'TS2345'], [29, 'TS2322'], [30, 'TS2345'], [34, 'TS2345']])
@@ -1262,7 +1262,7 @@ describe.concurrent('kay check, edge cases', () => {
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/box.ts': box, 'src/components/index.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[17, 'TS2322'], [17, 'TS2345']])
@@ -1328,7 +1328,7 @@ describe.concurrent('kay check, edge cases', () => {
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/box.ts': box, 'src/components/index.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[28, 'TS2540'], [29, 'TS2540'], [30, 'TS2540'], [31, 'TS2542'], [32, 'TS2542'], [33, 'TS2540'], [34, 'TS2540'], [35, 'TS2540']])
@@ -1369,7 +1369,7 @@ describe.concurrent('kay check, edge cases', () => {
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/box.ts': box, 'src/components/index.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([])
@@ -1402,7 +1402,7 @@ describe.concurrent('kay check, edge cases', () => {
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/box.ts': box, 'src/components/index.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.column, d.code])).toEqual([[5, 7, 'TS2540'], [6, 7, 'TS2540'], [7, 7, 'TS2540'], [8, 9, 'TS2540'], [9, 7, 'TS2540'], [10, 12, 'TS2542'], [11, 7, 'TS2540']])
@@ -1475,7 +1475,7 @@ describe.concurrent('kay check, edge cases', () => {
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/box.ts': box, 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/box.ts': box, 'src/components/index.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([])
@@ -1513,7 +1513,7 @@ describe.concurrent('kay check, edge cases', () => {
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/Toggle.kay': toggle, 'src/Plain.kay': plain, 'src/Loose.kay': '---\nconst { open } = props<{ open: unknown }>()\n---\nspan {String(open)}\n', 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/Toggle.kay': toggle, 'src/Plain.kay': plain, 'src/Loose.kay': '---\nconst { open } = props<{ open: unknown }>()\n---\nspan {String(open)}\n', 'src/components/index.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[14, 'TS2322'], [14, 'TS2345'], [15, 'TS2322'], [15, 'TS2339'], [16, 'TS2349'], [16, 'TS2339'], [17, 'TS2345'], [18, 'TS2322'], [18, 'TS2345'], [20, 'TS2345'], [20, 'TS2345']])
@@ -1524,7 +1524,7 @@ describe.concurrent('kay check, edge cases', () => {
   })
 
   it('takes a ref that returns whatever its expression gives', async () => {
-    const root = await scratchProject({ 'src/routes/index.kay': '---\nlet list: HTMLElement | undefined\nconst all: HTMLElement[] = []\n---\nol(ref={el => list = el}) a\np(ref={el => all.push(el)}) b\ndiv(ref={el => () => el.remove()}) {String(list)}\n' })
+    const root = await scratchProject({ 'src/components/index.kay': '---\nlet list: HTMLElement | undefined\nconst all: HTMLElement[] = []\n---\nol(ref={el => list = el}) a\np(ref={el => all.push(el)}) b\ndiv(ref={el => () => el.remove()}) {String(list)}\n' })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([])
@@ -1560,7 +1560,7 @@ describe.concurrent('kay check, edge cases', () => {
       'input(type="radio" value="free" aria-label="Free" bind:group={maybe})',
       '',
     ].join('\n')
-    const root = await scratchProject({ 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/components/index.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[17, 'TS2345'], [18, 'TS2322'], [18, 'TS2345'], [19, 'TS2345'], [20, 'TS2345']])
@@ -1583,7 +1583,7 @@ describe.concurrent('kay check, edge cases', () => {
       'button(onClick={() => size = 2}) b',
       '',
     ].join('\n')
-    const root = await scratchProject({ 'src/routes/index.kay': page })
+    const root = await scratchProject({ 'src/components/index.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[6, 'TS2322'], [8, 'TS2339']])
@@ -3383,7 +3383,7 @@ describe.concurrent('kay check, a redirect source is served', () => {
   const unserved = (found: Awaited<ReturnType<typeof check>>) => found.map(d => [basename(d.file), d.line, d.message.match(/serves ([^"\s]+)/)?.[1]]).filter(row => row[2] !== undefined).sort((a, b) => key(a).localeCompare(key(b)))
   const sorted = (rows: Row[]) => rows.toSorted((a, b) => key(a).localeCompare(key(b)))
   const files = {
-    'src/routes/index.kay': [
+    'src/components/index.kay': [
       '---',
       'import { navigate } from \'kay\'',
       '',
@@ -3548,7 +3548,8 @@ describe.concurrent('kay check, URLs written out besides links', () => {
       '',
     ].join('\n')
     const root = await scratchProject({
-      'src/routes/index.kay': page,
+      'src/components/index.kay': page,
+      'src/routes/index.kay': 'p home\n',
       'src/routes/posts/[id=integer].kay': 'p post\n',
       'src/routes/tags/[name=slug].kay': 'p tag\n',
       'src/routes/files/[id=uuid].kay': 'p file\n',
@@ -3868,7 +3869,7 @@ describe.concurrent('kay check, unused code', () => {
       'button(onClick={() => picked = \'v\'}) Go',
       '',
     ].join('\n')
-    const root = await scratchProject({ 'src/routes/index.kay': page, 'src/levels.ts': 'export enum Level { Low, High, Max }\n' })
+    const root = await scratchProject({ 'src/components/index.kay': page, 'src/levels.ts': 'export enum Level { Low, High, Max }\n' })
 
     try {
       const found = (await check(root)).filter(d => d.code === 'incomplete-match')
@@ -4202,14 +4203,14 @@ describe.concurrent('kay check, unused code', () => {
   it('reports a form removed in 1.69 and 1.70 as a type error or an unknown option, never as a deprecation', async () => {
     const root = await scratchProject({
       'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ bodyLimit: \'1mb\' })\n',
-      'src/routes/index.kay': '---\nimport { every } from \'kay\'\n\nevery(1000, () => {})\n---\np Hi\n',
+      'src/components/index.kay': '---\nimport { every } from \'kay\'\n\nevery(1000, () => {})\n---\np Hi\n',
       'src/lib.ts': 'import { optionMs } from \'kay/library\'\n\nexport const wait = optionMs(3000, \'wait\')\n',
     })
 
     try {
       const found = (await check(root)).map(d => [d.file.slice(root.length + 1), d.line, d.code])
 
-      expect(found).toEqual([['src/routes/index.kay', 4, 'TS2345'], ['kay.config.ts', 3, 'TS2353'], ['src/lib.ts', 3, 'TS2345']])
+      expect(found).toEqual([['src/components/index.kay', 4, 'TS2345'], ['kay.config.ts', 3, 'TS2353'], ['src/lib.ts', 3, 'TS2345']])
     }
     finally {
       await rm(root, { recursive: true, force: true })

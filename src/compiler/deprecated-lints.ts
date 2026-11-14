@@ -71,6 +71,14 @@ export const DEPRECATED_LINTS = {
     wrong: 'import { testSite } from \'kay/test\'\nimport { mailTest } from \'@kayjs/mail/test\'\n\nconst site = await testSite()\nconst mail = mailTest(site)\n\nawait site.refusal(subscribe, { email: \'\' })',
     right: 'import { testSite } from \'kay/test\'\nimport { test as mailTest } from \'@kayjs/mail/test\'\n\nconst site = await testSite()\nconst mail = mailTest(site)\n\nawait site.expectRefused(subscribe, { email: \'\' })',
   },
+  'deprecated-page-island': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: 'A page without a `--- server` fence that is an island, since 1.105: an `on*`, `bind:` or `ref` in it, a browser value of `kay` such as `signal`, or a live or persisted import. A page renders once on the server and is never an island, so what needs the browser belongs in a component the page renders. It still works as an island until 1.108, which refuses it. Found in the pages of the project, at the thing that makes the page an island. It has no fix: moving the code into a component is not an edit that is safe to apply.',
+    wrong: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) {count()}',
+    right: '---\nimport Counter from \'../components/counter.kay\'\n---\nCounter',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

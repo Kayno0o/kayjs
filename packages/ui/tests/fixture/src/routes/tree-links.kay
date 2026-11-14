@@ -1,12 +1,4 @@
 ---
-import { navigate } from 'kay'
-import type { TreeNode } from '@kayjs/ui'
-import TreeView from '@kayjs/ui/tree-view.kay'
-
-const nodes: TreeNode[] = [
-  { key: 'group', label: 'Group', children: [{ key: 'here', label: 'Here', href: '/tree-links', menu: [{ label: 'Rename', onSelect: () => undefined }] }, { key: 'other', label: 'Other', href: '/tree-links?view=b' }] },
-]
+import TreeLinksView from '../components/tree-links-view.kay'
 ---
-main
-  TreeView#links(nodes={nodes} label="Links")
-  button#go(type="button" onClick={() => navigate({ query: { view: 'b' } })}) Other view
+TreeLinksView

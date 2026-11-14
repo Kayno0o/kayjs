@@ -1,16 +1,6 @@
 ---
-import { followLog, signal } from 'kay'
-
-const lines = signal(Array.from({ length: 40 }, (_, index) => index + 1))
-let list: HTMLElement | undefined
-
-const log = followLog(() => list)
+import IndexView from '../components/index-view.kay'
 ---
 head
   title Log
-button.append(type="button" onClick={() => lines = [...lines(), lines()[lines().length - 1]! + 1]}) append
-button.prepend(type="button" onClick={() => lines = [lines()[0]! - 1, ...lines()]}) prepend
-button.send(type="button" onClick={() => { log.toBottom(); lines = [...lines(), lines()[lines().length - 1]! + 1] }}) send
-ol.list(ref={element => list = element} style="height: 200px; overflow-y: auto; margin: 0; padding: 0; list-style: none; overflow-anchor: none")
-  for line of lines()
-    li(style="min-height: 20px") {line}
+IndexView

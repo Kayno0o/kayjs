@@ -1,8 +1,4 @@
 ---
-import ConfirmDelete from '@kayjs/ui/confirm-delete.kay'
+import ConfirmWordsView from '../components/confirm-words-view.kay'
 ---
-main
-  div#plain
-    ConfirmDelete(message="Delete this?" failureLabel="Could not delete" onConfirm={async () => undefined})
-  div#given
-    ConfirmDelete(message="Delete that?" failureLabel="Could not delete" onConfirm={async () => undefined} cancelLabel="Never mind")
+ConfirmWordsView

@@ -1,8 +1,4 @@
 ---
-import { signal } from 'kay'
-
-const count = signal(0)
+import SwapBView from '../../components/swap-b-view.kay'
 ---
-h1#title Page b
-// An island, so the page ships kay's script and a link to the other one swaps in place.
-button#count(type="button" onClick={() => count = count() + 1}) {count()}
+SwapBView

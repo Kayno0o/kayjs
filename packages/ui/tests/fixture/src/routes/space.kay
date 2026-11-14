@@ -1,29 +1,7 @@
 ---
-import Button from '@kayjs/ui/button.kay'
-import Checkbox from '@kayjs/ui/checkbox.kay'
-import ChipGroup from '@kayjs/ui/chip-group.kay'
-import FileDrop from '@kayjs/ui/file-drop.kay'
-import IconButton from '@kayjs/ui/icon-button.kay'
-import MultiSelect from '@kayjs/ui/multi-select.kay'
-import Segmented from '@kayjs/ui/segmented.kay'
-import Select from '@kayjs/ui/select.kay'
+import SpaceView from '../components/space-view.kay'
 import '../space.css'
-
-const kinds = [{ value: 'post', label: 'Post' }, { value: 'page', label: 'Page' }]
 ---
-//- The space skin over the controls it redraws, for the browser test to read and axe to check.
 head
   title Space skin
-main.starfield.flex.flex-col.items-start.gap-4.p-8
-  h1 Space skin
-  Checkbox#ticked(label="Ticked" checked)
-  Checkbox#plain(label="Plain")
-  Select#kind(value="post" options={kinds} aria-label="Kind")
-  MultiSelect(label="Planets" options={kinds} value={['post']})
-  Button#key(label="Key")
-  IconButton#icon-key(icon="close" label="Close")
-  Segmented#segmented(label="Kind" options={kinds} value="post")
-  ChipGroup#chips(label="Kinds" options={kinds} value={['post']})
-  FileDrop#drop(aria-label="Files" onFiles={() => undefined})
-    @content(zone)
-      | {zone.dragging() ? 'Release' : 'Drop files'}
+SpaceView

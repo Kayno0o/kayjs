@@ -138,7 +138,7 @@ Collapsible(title="Details")
 
 A function or a class instance cannot be sent. A static component passing one to an island is the error `island-prop`: write `--- island` on it.
 
-A page or a layout cannot become an island, so `kay check` reports it there. Move that part to a component.
+A page should not become an island. A handler, a `bind:`, a `ref`, a signal or a live or persisted value in a page that has no `--- server` fence still makes it one through 1.107, and `kay check` warns about it (`deprecated-page-island`); 1.108 refuses it. Move that part to a component and render it from the page.
 
 ## When to hydrate
 

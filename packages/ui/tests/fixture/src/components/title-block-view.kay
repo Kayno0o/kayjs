@@ -1,0 +1,8 @@
+---
+import SidePanel from '@kayjs/ui/side-panel.kay'
+---
+main
+  SidePanel#named(open={true} modal={false} closeHref="/list" onOpenChange={() => undefined})
+    @title
+      em Venus
+    p Body

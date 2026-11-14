@@ -1,7 +1,4 @@
 ---
-import { persisted } from 'kay'
-
-const scheme = persisted<'system' | 'light' | 'dark'>('scheme', 'system', { values: ['system', 'light', 'dark'] })
+import ThemeView from '../components/theme-view.kay'
 ---
-main(data-theme={scheme()})
-  p.scheme {scheme()}
+ThemeView

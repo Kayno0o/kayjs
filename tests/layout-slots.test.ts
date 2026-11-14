@@ -197,7 +197,7 @@ describe('what kay check reports of a block', () => {
   })
 
   it('refuses a block in a file that is an island', () => {
-    const source = '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\n@a\n  p y\nbutton(onClick={() => n.set(1)}) {n()}\n'
+    const source = '--- server\nconst x = 1\n--- script\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\n@a\n  p y\nbutton(onClick={() => n.set(1)}) {n()}{x}\n'
 
     expect(compileKay(source, 'src/routes/page.kay', { page: true }).diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`@a` cannot sit in a page that is an island'])
   })

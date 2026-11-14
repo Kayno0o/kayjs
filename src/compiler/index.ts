@@ -28,6 +28,7 @@ import { findRewrites } from './rewrite'
 import { scopeAttribute } from './scoped-style'
 import { analyzeScript, analyzeServer } from './script'
 import { serialAwaits } from './serial-awaits'
+import { serverImportReads } from './server-imports'
 import { STATUS_PAGE_FILES } from './status-pages'
 import { outerReads, templateWords } from './template-reads'
 import { ISLAND_TWIN } from './twin'
@@ -188,6 +189,14 @@ function staticPin(span: Span, cause: IslandCause): Diagnostic {
   return { ...span, code: 'static-pin', message: `This component is pinned \`--- static\`, and is an island: ${describeCause(cause)}`, note: 'it needs the browser, so it hydrates there', help: 'take that out of the component, or pin it `--- island`' }
 }
 
+// A page without a server fence that is an island for a handler, a `kay` value or a live or persisted import: a page renders once, so a component should hold what needs the browser. It works until 1.108.
+function deprecatedPageIsland(page: boolean, route: boolean, client: boolean, check: boolean | undefined, raw: IslandCause | undefined, cause: IslandCause | undefined): Diagnostic[] {
+  if (!page || route || client || check !== true || raw === undefined || cause === undefined)
+    return []
+
+  return [{ ...raw.span, code: 'deprecated-page-island', checkOnly: true, message: `A page is never an island since 1.105, and this one is for ${describeCause(cause)}`, note: 'a page renders once on the server, so nothing in it should run in the browser', help: 'move what needs the browser into a component of its own and render it from the page' }]
+}
+
 // What the server fence declares for the template: its data and its exports, which the script reads as declared rather than as kay values to import.
 function serverNames(server: ServerAnalysis | undefined): string[] | undefined {
   return server && [...server.data.map(data => data.name), ...server.exportNames]
@@ -328,6 +337,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     ...coded(server ? separatePageSettings(source, server) : [], 'page-settings-invalid'),
     ...validate(file, script, server, generateOptions),
     ...coded(unparsed ? [] : found.diagnostics, 'signal-misuse'),
+    ...deprecatedPageIsland(pageFile, routeFile, client, options.check, rawCause, cause),
     ...coded(pin?.kind === 'static' && cause !== undefined && rawCause !== undefined && !routeFile && island !== undefined ? [staticPin(rawCause.span, { ...cause, interactive: undefined })] : [], 'static-pin'),
   ]
 
@@ -341,7 +351,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const serverData = server?.data.map(data => data.name) ?? []
 
   if (checked && !client)
-    diagnostics.push(...coded(browserReads(file, island !== undefined, serverData, routeFile), 'browser-only-read'))
+    diagnostics.push(...coded(browserReads(file, island !== undefined, serverData, routeFile), 'browser-only-read'), ...coded(serverImportReads(file, script, server, island !== undefined), 'server-import-in-island'))
 
   if (checked)
     diagnostics.push(...unownedEffects(file, serverData))

@@ -1,22 +1,4 @@
 ---
-import Button from '@kayjs/ui/button.kay'
-import IconButton from '@kayjs/ui/icon-button.kay'
-import Toaster from '@kayjs/ui/toaster.kay'
-import { toast } from '@kayjs/ui'
-
-const stack = () => {
-  toast.info('One', { description: 'Detail', duration: false })
-  toast.info('Two', { duration: false })
-  toast.info('Three', { duration: false, action: { label: 'Open', href: '/shell' } })
-}
-
-const later = () => toast.promise(new Promise<string>(resolve => setTimeout(resolve, 80, 'ok')), { loading: 'Working', success: value => `Done ${value}`, error: 'Failed' })
+import ToastRichView from '../components/toast-rich-view.kay'
 ---
-h1 Toast rich
-button#stack(type="button" onClick={stack}) Stack
-button#later(type="button" onClick={later}) Later
-Toaster(position="top-center" limit={2})
-button#linked(type="button" onClick={() => toast.error('Moved', { description: 'See it', action: { label: 'See', href: '/shell', run: () => { document.body.dataset.ran = 'yes' } } })}) Linked
-Button#go(href="/shell" label="Go" onClick={() => { document.body.dataset.clicked = 'go' }})
-Button#held(href="/shell" label="Held" onClick={event => { event.preventDefault(); document.body.dataset.clicked = 'held' }})
-IconButton#icon(href="/shell" icon="close" label="Icon" onClick={event => { event.preventDefault(); document.body.dataset.clicked = 'icon' }})
+ToastRichView

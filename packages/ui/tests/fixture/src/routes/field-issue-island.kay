@@ -1,15 +1,4 @@
 ---
-import { signal } from 'kay'
-import FormField from '@kayjs/ui/form-field.kay'
-
-// An issue the server renders and the island later clears.
-const issue = signal<string | undefined>('Too short')
+import FieldIssueIslandView from '../components/field-issue-island-view.kay'
 ---
-main
-  form
-    FormField#single(label="Name" issue={issue()})
-      input(name="name")
-    FormField#grouped(label="Access" group issue={issue()})
-      input(name="access" type="checkbox")
-      input(name="access" type="checkbox")
-  button#clear(type="button" onClick={() => issue = undefined}) Clear
+FieldIssueIslandView

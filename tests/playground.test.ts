@@ -104,11 +104,11 @@ describe('the playground\'s compiler', () => {
 })
 
 describe('the playground\'s sample', () => {
-  it('type-checks as a page of an app', async () => {
+  it('type-checks as a component of an app', async () => {
     const root = await fixtureCopy('app')
 
     try {
-      await Bun.write(join(root, 'src/routes/sample.kay'), SAMPLE)
+      await Bun.write(join(root, 'src/components/sample.kay'), SAMPLE)
       expect((await check(root)).filter(diagnostic => diagnostic.file?.endsWith('sample.kay')).map(diagnostic => diagnostic.message)).toEqual([])
     }
     finally {
