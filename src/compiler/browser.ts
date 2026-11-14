@@ -2,6 +2,7 @@ import type { Diagnostic, Fix, KayFile, Span } from './ast'
 import type { Node, NodeOfType, Program } from './estree'
 import type { Path } from './scope'
 import { visitNodes } from './ast'
+import { wordEdit } from './deprecated-island'
 import { isPlainProperty, parseProgram } from './estree'
 import { TS_EXPRESSIONS, viaGlobalThis } from './estree-shapes'
 import { browserGlobals } from './host'
@@ -38,14 +39,13 @@ const EVENT_HANDLER = /^on[A-Z]/
 const RENDER_CALLS = new Set(['memo', 'untrack', 'batch'])
 const ARRAY_CALLBACKS = new Set(['map', 'flatMap', 'filter', 'find', 'findIndex', 'findLast', 'findLastIndex', 'some', 'every', 'reduce', 'reduceRight', 'forEach', 'sort', 'toSorted'])
 const FENCE_OPENING = '---'
-const SCRIPT_LABEL = /[ \t]+script\b/y
 const AWAIT = /\bawait\b/
 const TYPEOF_GLOBAL = /\btypeof\s+(?:globalThis\.)?([a-z_$][\w$]*)/gi
 // What may render differently on the server and in the browser, worth a scope analysis in an island.
 const VARYING_HINT = /\b(?:Date|Math|toLocale\w*|Intl)\b/
 const LOCALE_METHODS = new Set(['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString'])
 const MOVED = 'read it in `effect` or `onMount`, or on the server and pass it as a prop'
-const BROWSER_ONLY_HELP = 'read it in `effect` or `onMount`, or render the component in the browser only with `--- client`'
+const BROWSER_ONLY_HELP = 'read it in `effect` or `onMount`, or render the component in the browser only with `island({ render: \'client\' })`'
 const MISMATCH = 'what the island renders from it will not match the server\'s markup when it hydrates'
 const CLOCK = { reason: 'reads the clock, which has moved on by the time the island hydrates', remedy: MOVED }
 const RANDOM = { reason: 'gives another number in the browser', remedy: MOVED }
@@ -64,7 +64,7 @@ interface Varying {
 
 // Browser-only globals the component reads while it renders, which throws on the server, and `typeof` checks of them, which render differently there and break hydration.
 // Rendering covers the script's top level, the template's values, `memo` and array callbacks, and the script's functions those call; handlers, refs, effects and other callbacks run in the browser only.
-// `serverNames` are what the `--- server` fence hands the template; a route file renders on the server, so it is offered no `--- client`.
+// `serverNames` are what the `--- server` fence hands the template; a route file renders on the server, so it is offered no `island({ render: 'client' })`.
 export function browserReads(file: KayFile, island: boolean, serverNames: string[], routeFile: boolean): Diagnostic[] {
   const names = browserGlobals()
   const { source } = file
@@ -451,18 +451,19 @@ function onlyTouchesGlobal(expression: Node, name: string): boolean {
   return at.type === 'Identifier' && at.name === name
 }
 
-// `---` or `--- script` becomes `--- client`; a file without a script gets an empty one.
+// `island({ render: 'client' })` is written first in the script; a file without a script gets one.
 function clientFix(file: KayFile): Fix[] {
-  const title = 'Render the component in the browser only with `--- client`'
+  const title = 'Render the component in the browser only with `island({ render: \'client\' })`'
 
   if (!file.script)
-    return [{ title, edits: [{ start: 0, end: 0, text: `${FENCE_OPENING} client\n${FENCE_OPENING}\n` }] }]
+    return [{ title, edits: [{ start: 0, end: 0, text: `${FENCE_OPENING}\nisland({ render: 'client' })\n${FENCE_OPENING}\n` }] }]
 
-  const opening = file.source.lastIndexOf(FENCE_OPENING, file.script.start - 1) + FENCE_OPENING.length
+  // A call that declares more is edited by hand.
+  if (file.island !== undefined)
+    return []
 
-  SCRIPT_LABEL.lastIndex = opening
+  const call = { start: file.script.start, end: file.script.start, text: 'island({ render: \'client\' })\n' }
 
-  const end = file.pin?.end ?? (SCRIPT_LABEL.test(file.source) ? SCRIPT_LABEL.lastIndex : opening)
-
-  return [{ title, edits: [{ start: opening, end, text: ' client' }] }]
+  // The fence's own pin word goes: it would win over the call.
+  return [{ title, edits: file.pin === undefined || file.scriptLine === undefined ? [call] : [wordEdit(file.scriptLine, file.pin.end, file.source.slice(0, file.scriptLine.start)), call] }]
 }

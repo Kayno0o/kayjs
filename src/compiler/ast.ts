@@ -1,5 +1,6 @@
 import type { UiEntry } from '../runtime/ui'
 import type { FieldContent, FormInfo } from './form-info'
+import type { IslandDeclaration } from './island-declaration'
 import { actionOf, componentAction } from './form-action'
 import { formTargets, initialHelpers } from './form-info'
 import { childBlocks, someNode, visitNodes, walkNodes } from './template-walk'
@@ -228,10 +229,11 @@ export function sectionOf(element: ElementNode, source: string): Extract<Attribu
   return attribute?.kind === 'boolean' || attribute?.kind === 'expression' ? attribute : undefined
 }
 
-// `Card(server)` renders per request inside a prerendered page, `Card(server="defer")` once the browser fetches it on approach.
+// `Card(server)` renders per request inside a prerendered page, `Card(server defer)` or `Card(defer)` once the browser fetches it on approach (`server="defer"` before 1.105).
 export const SERVER_ISLAND_ATTRIBUTE = 'server'
+export const SERVER_ISLAND_DEFER = 'defer'
 export const SERVER_ISLAND_MODES = new Set(['defer'])
-// Beside `server="defer"`, the text of a link to the page with the island in place, for a browser without JavaScript.
+// Beside `defer`, the text of a link to the page with the island in place, for a browser without JavaScript.
 export const SERVER_ISLAND_NOSCRIPT = 'noscript'
 // The block under a deferred server island call, or at the root of the component, shown once the island failed for good.
 export const SERVER_ISLAND_FAILED = 'failed'
@@ -243,6 +245,8 @@ export interface ServerIslandMark {
   // Undefined for a value no mode answers to.
   mode: 'inline' | 'defer' | undefined
   noscript: NamedAttribute | undefined
+  // The bare `defer` written beside a `server` attribute, which is no prop either.
+  defer?: NamedAttribute | undefined
 }
 
 // The mark making a component call a server island, with how it renders.
@@ -251,7 +255,10 @@ export function serverIslandOf(element: ElementNode, source: string): ServerIsla
     return undefined
 
   const named = (name: string) => element.attributes.find((candidate): candidate is NamedAttribute => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === name)
-  const attribute = named(SERVER_ISLAND_ATTRIBUTE)
+  const server = named(SERVER_ISLAND_ATTRIBUTE)
+  // Only a bare `defer` is the mark: a value is a prop of the component.
+  const defer = [named(SERVER_ISLAND_DEFER)].find(candidate => candidate?.kind === 'boolean')
+  const attribute = server ?? defer
 
   if (!attribute)
     return undefined
@@ -259,7 +266,7 @@ export function serverIslandOf(element: ElementNode, source: string): ServerIsla
   const noscript = named(SERVER_ISLAND_NOSCRIPT)
 
   if (attribute.kind === 'boolean')
-    return { attribute, mode: 'inline', noscript }
+    return { attribute, mode: defer === undefined ? 'inline' : 'defer', noscript, defer: attribute === defer ? undefined : defer }
 
   return { attribute, mode: attribute.kind === 'static' && SERVER_ISLAND_MODES.has(attribute.text) ? attribute.text as 'defer' : undefined, noscript }
 }
@@ -277,7 +284,9 @@ export function marksServerIsland(element: ElementNode, name: string, source: st
   if (name === SERVER_ISLAND_ATTRIBUTE)
     return element.component
 
-  return name === SERVER_ISLAND_NOSCRIPT && serverIslandOf(element, source) !== undefined
+  const mark = serverIslandOf(element, source)
+
+  return mark !== undefined && (name === SERVER_ISLAND_NOSCRIPT || (name === SERVER_ISLAND_DEFER && (mark.defer !== undefined || mark.attribute.kind === 'boolean')))
 }
 
 // A key naming the loop's index, as `for row, i of rows key={i}` writes it: rows are matched by their position.
@@ -586,6 +595,8 @@ export interface KayFile {
   client?: Span | undefined
   // The `island` or `static` of `--- island` and `--- static`: the author pins the component's role, and the compiler holds it to the pin.
   pin?: (Span & { kind: 'island' | 'static' }) | undefined
+  // The `island({ ... })` the script opens with, which sets `client` or `pin` as the fence lines do.
+  island?: IslandDeclaration | undefined
   // The line opening the script fence, `--- script` or `---`.
   scriptLine?: Span | undefined
   // Where the template begins, past the fences.

@@ -32,9 +32,9 @@ function staticUse(interactive: Readonly<Record<string, boolean>>): string {
 function causeText(cause: IslandCause): string {
   switch (cause.kind) {
     case 'client':
-      return 'a `--- client` fence'
+      return cause.name === 'island()' ? 'an `island({ render: \'client\' })` declaration' : 'a `--- client` fence'
     case 'island':
-      return 'a `--- island` fence'
+      return cause.name === 'island()' ? 'an `island()` declaration' : 'a `--- island` fence'
     case 'attribute':
       return `\`${cause.name}\`, line ${cause.line}`
     case 'value':
@@ -48,8 +48,8 @@ function causeText(cause: IslandCause): string {
 
 // What the cause is, in a few words.
 export const CAUSE_KINDS: Record<IslandCauseKind, string> = {
-  client: 'a `--- client` fence: the component renders in the browser only',
-  island: 'a `--- island` fence: the author pinned the component as an island',
+  client: 'an `island({ render: \'client\' })` declaration (or a `--- client` fence): the component renders in the browser only',
+  island: 'an `island()` declaration (or a `--- island` fence): the author declared the component an island',
   attribute: 'an `on*`, `bind:` or `ref` attribute: the browser handles it',
   value: 'a `kay` value of the browser, such as `signal` or `effect`, that its script uses',
   live: 'a live value its script imports: the browser follows it',
@@ -57,4 +57,4 @@ export const CAUSE_KINDS: Record<IslandCauseKind, string> = {
 }
 
 // The rule, as `kay explain island` says it.
-export const ISLAND_RULE = 'A component is an island when it needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script, a live or persisted value it imports, or a `--- client` or `--- island` fence; what an island renders is part of it. A static component that passes an island a function or a block taking parameters is an `island-prop` error, and is made an island by `--- island`. A component whose `export const island` lists `interactive` props is an island only in a use that turns one on: any other use renders as markup with no script.'
+export const ISLAND_RULE = 'A component is an island when it needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script, a live or persisted value it imports, or an `island()` declaration (the `--- client` and `--- island` fences before it); what an island renders is part of it. A static component that passes an island a function or a block taking parameters is an `island-prop` error, and is made an island by `island()`. A component whose `island({ interactive })` lists `interactive` props is an island only in a use that turns one on: any other use renders as markup with no script.'

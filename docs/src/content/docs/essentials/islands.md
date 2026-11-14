@@ -14,7 +14,7 @@ const count = signal(0)
 button(onClick={() => count++}) Clicked {count()} times
 ```
 
-A component is an island when its own code needs the browser: an `on*` handler, a `bind:` or a `ref` in its template, a browser value of `kay` such as `signal` in its script, a `live` or `persisted` value it imports from one of your modules (even through a re-export), or a `--- island` or `--- client` fence line. The compiler decides it from the file and its imports, and nothing a component passes makes it one.
+A component is an island when its own code needs the browser: an `on*` handler, a `bind:` or a `ref` in its template, a browser value of `kay` such as `signal` in its script, a `live` or `persisted` value it imports from one of your modules (even through a re-export), or a `island()` declaration. The compiler decides it from the file and its imports, and nothing a component passes makes it one.
 
 The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `byteCount`, `composing`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `escapeHtml`, `formErrors`, `isEmail`, `localPath`, `postedChecked`, `postedValue`, `postedValues`, `publicEnv`, `recipe`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` keep a component static.
 
@@ -87,11 +87,11 @@ listen(() => window, 'online', refresh, { signal: abort.signal })
 
 `kay check` reads what a component passes an island from its types. A value typed as a function, a symbol, a class instance or an object holding a function (a `Column` with a `sortValue`), or a block with parameters, cannot be sent to the browser: it is the error `island-prop` at that prop, naming the field.
 
-`--- island` is the fix, applied by `kay check --fix` where the value is always a function and offered where its type is a union holding one, as the component may be static on some pages. A page, a layout or a special page is never an island: pass the island data, or go through a component of its own. When the check was skipped, rendering throws an `IslandPropsError` naming the prop and the same fix.
+`island()` is the fix, applied by `kay check --fix` where the value is always a function and offered where its type is a union holding one, as the component may be static on some pages. A page, a layout or a special page is never an island: pass the island data, or go through a component of its own. When the check was skipped, rendering throws an `IslandPropsError` naming the prop and the same fix.
 
-Write `--- island` in place of `---` to say it is meant. The component is then an island on every page that renders it, whatever it passes. A generic one reads `--- island <T extends Row>`.
+Write `island()` first in the script to say it is meant. The component is then an island on every page that renders it, whatever it passes. It was the `--- island` fence line, which `kay upgrade` rewrites and which works until 1.108.
 
-Write `--- static` to say it is not. If anything in the component would make it an island, an `onClick` or a `signal`, `kay check` and `kay build` stop with the error `static-pin` at that line, naming what it is. A function it hands an island is `island-prop`. A pin does not change what a page, a layout or a special page is: they are never islands, and `--- island` on one is reported as `island-marker`.
+Write `island({ render: 'static' })` to say it is not. If anything in the component would make it an island, an `onClick` or a `signal`, `kay check` and `kay build` stop with the error `static-pin` at that line, naming what it is. A function it hands an island is `island-prop`. A pin does not change what a page, a layout or a special page is: they are never islands, and `island()` on one is reported as `island-marker`.
 
 
 The editor shows a lens on the first line of a component saying whether it is an island and why. A click on it shows the line that decides it.
@@ -136,7 +136,7 @@ Collapsible(title="Details")
   Counter
 ```
 
-A function or a class instance cannot be sent. A static component passing one to an island is the error `island-prop`: write `--- island` on it.
+A function or a class instance cannot be sent. A static component passing one to an island is the error `island-prop`: declare `island()` on it.
 
 A page should not become an island. A handler, a `bind:`, a `ref`, a signal or a live or persisted value in a page that has no `--- server` fence still makes it one through 1.107, and `kay check` warns about it (`deprecated-page-island`); 1.108 refuses it. Move that part to a component and render it from the page.
 
@@ -152,9 +152,9 @@ Comments(postId={post.id} hydrate="visible")
 
 `hydrate="interaction"` waits until the visitor first touches, clicks into or types in the island, and the click that follows is replayed once it hydrated. `hydrate="media(max-width: 40rem)"` waits until the media query matches: at once if it does, later if it starts to. An island that shows nothing at first, with every child hidden, still hydrates once the space around it nears the viewport.
 
-A component that wants one of these wherever it is used exports `island` from its `--- module` fence, `export const island = { persist: true, hydrate: 'idle' } as const`, and the `hydrate` and `persist` a parent writes win over it. Only that form is read: `kay check` reports `export { island }` and an `island` export on a component that is no island.
+A component that wants one of these wherever it is used declares it first in its script, `island({ persist: true, hydrate: 'idle' })`, and the `hydrate` and `persist` a parent writes win over it. The call is read as written, so `kay check` reports a value it cannot read, a second call, and one on a component that cannot be an island. It was `export const island = { ... }` in a `--- module` fence, which `kay upgrade` rewrites and which works until 1.108.
 
-A component can also say which props make a use of it an island: `export const island = { interactive: { selectable: false, pageSize: false } } as const`, each prop with whether it is on when a use leaves it out. A page that uses it with none of them on, and passes no function, gets plain markup and ships no script for it.
+A component can also say which props make a use of it an island: `island({ interactive: { selectable: false, pageSize: false } })`, each prop with whether it is on when a use leaves it out. A page that uses it with none of them on, and passes no function, gets plain markup and ships no script for it.
 
 A use inside another island is part of that island as before, and an island inside the plain markup stays an island of its own. `kay explain island` lists the props of a component that has them.
 
@@ -162,7 +162,7 @@ A use inside another island is part of that island as before, and an island insi
 
 A click on an island that is still loading is replayed once it hydrates, so the visitor loses nothing.
 
-A visitor who asks for less data (`Save-Data: on` or `prefers-reduced-data`) gets islands that wait by themselves. One with no `hydrate` hydrates at once when it is in view, and once it scrolls near when it is not. Write `hydrate="load"` on an island that must work at once, a form included. `hydrate="idle"`, `hydrate="visible"` and `hydrate="client"` go as written. A deferred server island is fetched only when it nears the viewport. `saveData: false` in the config turns this off.
+A visitor who asks for less data (`Save-Data: on` or `prefers-reduced-data`) gets islands that wait by themselves. One with no `hydrate` hydrates at once when it is in view, and once it scrolls near when it is not. Write `hydrate="load"` on an island that must work at once, a form included. `hydrate="idle"` and `hydrate="visible"` go as written, and so does `render="client"`. A deferred server island is fetched only when it nears the viewport. `saveData: false` in the config turns this off.
 
 <ReadMore href="/llms/islands">How many events an island keeps while it loads, and when it drops them.</ReadMore>
 
@@ -445,10 +445,12 @@ p Window is {width()}px wide
 
 `kay check` reports a read of one of them while the component renders, and `kay check --fix` moves a call such as `localStorage.setItem(...)` into `effect` for you. It also reports a module of your app that reads one as it loads when a page imports it (the `browser-global-at-load` lint). A server render that still fails on one names the global, the component and the line reading it, in development and in production logs.
 
-A component that cannot render on the server at all, such as one wrapping a map library, starts its script fence with `--- client`. It renders in the browser only.
+A component that cannot render on the server at all, such as one wrapping a map library, declares `island({ render: 'client' })`. It renders in the browser only. It was the `--- client` fence line, which `kay upgrade` rewrites and which works until 1.108.
 
 ```kay
---- client
+---
+island({ render: 'client' })
+
 import { onMount } from 'kay'
 import { drawMap } from './map'
 
@@ -459,12 +461,14 @@ onMount(() => drawMap(center))
 .map
 ```
 
-The server sends an empty slot for it, which shifts the layout when the map appears. Give it a fallback to show in the meantime: an `@fallback` block at the root of the component's template for every use, or one written under a use, `Map(center={center} hydrate="client")`, for that use alone. The browser replaces it when the island renders.
+The server sends an empty slot for it, which shifts the layout when the map appears. Give it a fallback to show in the meantime: an `@fallback` block at the root of the component's template for every use, or one written under a use, `Map(center={center} render="client")`, for that use alone (it was `hydrate="client"`). The browser replaces it when the island renders.
 
 A component's own fallback is static markup: it cannot read the script's values, but it can use the script's imports, and `kay check` reports a value or prop it reads.
 
 ```kay
---- client
+---
+island({ render: 'client' })
+
 import { onMount } from 'kay'
 import { drawMap } from './map'
 

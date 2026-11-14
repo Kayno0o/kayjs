@@ -14,6 +14,7 @@ const slice = (source: string, span: { start: number, end: number }) => source.s
 const pins = (source: string, filename = part, options = {}) => compileKay(source, filename, { check: true, ...options }).diagnostics.filter(diagnostic => diagnostic.code === 'static-pin')
 const apply = (source: string, diagnostic: Diagnostic) => diagnostic.fixes![0]!.edits.toSorted((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
 
+const allowed = { 'deprecated-island-fence': 'allow' } as const
 const handler = 'button(onClick={() => 1}) b\n'
 const passing = '---\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n'
 
@@ -88,18 +89,18 @@ describe('--- island', () => {
   it('does not say anything of a component that is an island already', () => {
     const redundant = `--- island\n${'const a = 1\n---\n'}${handler}`
 
-    expect(compileKay(redundant, part, { check: true }).diagnostics).toEqual([])
+    expect(compileKay(redundant, part, { check: true, lints: allowed }).diagnostics).toEqual([])
   })
 })
 
 describe('--- static', () => {
   it('leaves a component with nothing to make it an island as it is', () => {
     const source = '--- static\nimport { uid } from \'kay\'\nconst id = uid()\n---\np(id={id}) a\n'
-    const compiled = compileKay(source, part, { check: true })
+    const compiled = compileKay(source, part, { check: true, lints: allowed })
 
     expect(compiled.island).toBeUndefined()
     expect(compiled.diagnostics).toEqual([])
-    expect(compileKay('--- static\nconst a = 1\n---\np {a}\n', 'src/routes/_layout.kay', { check: true }).diagnostics).toEqual([])
+    expect(compileKay('--- static\nconst a = 1\n---\np {a}\n', 'src/routes/_layout.kay', { check: true, lints: allowed }).diagnostics).toEqual([])
   })
 
   it('is an error at the handler that makes it an island, in every output', () => {
@@ -295,10 +296,10 @@ describe('beside the pin', () => {
   it('writes the browser-only fix over the pin label, not beside it', () => {
     for (const word of ['island', 'static']) {
       const source = `--- ${word}\nconst w = window.innerWidth\n---\np {w}\n`
-      const fix = compileKay(source, part, { check: true }).diagnostics.flatMap(diagnostic => diagnostic.fixes ?? []).find(candidate => candidate.title.includes('--- client'))
+      const fix = compileKay(source, part, { check: true }).diagnostics.flatMap(diagnostic => diagnostic.fixes ?? []).find(candidate => candidate.title.includes('render: \'client\''))
 
       expect(fix).toBeDefined()
-      expect(apply(source, { fixes: [fix!] } as Diagnostic)).toBe('--- client\nconst w = window.innerWidth\n---\np {w}\n')
+      expect(apply(source, { fixes: [fix!] } as Diagnostic)).toBe('---\nisland({ render: \'client\' })\nconst w = window.innerWidth\n---\np {w}\n')
     }
   })
 

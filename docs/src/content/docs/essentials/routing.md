@@ -130,7 +130,7 @@ export const page = { prerender: true, cache: '1h' }
 ---
 ```
 
-`prerender`, `keep` and `cache` are covered under [Prerendering](#prerendering). `layouts: false` drops the layouts above the page.
+`prerender`, `keep` and `cache` are covered under [Prerendering](#prerendering). `layouts: false` drops the layouts above the page. `keep`, `reload`, `layouts` and `guards` are plain booleans: the value a setting has when it is left out is the default, and writing it says so.
 
 `query` is covered in [Data loading](/essentials/data-loading), and `seo` (`title`, `description`, `image`, `canonical`, `noindex`, `sitemap`, `lastmod`, `search`, `feed`) in [Head and SEO](/essentials/head-and-seo). `rateLimit` limits how often one client may load the page, see [Rate limits](/guides/security#rate-limit-a-page-or-an-endpoint). `kay check` types the object, so an unknown key is an error.
 
@@ -262,27 +262,27 @@ const token = issueToken()
 ---
 Hero
 ContactForm(server token={token})
-Reviews(server="defer")
+Reviews(server defer)
 ```
 
-`server` renders the island into the page before it is sent. `server="defer"` sends the page as prerendered, and the browser fetches the island as it nears the screen.
+`server` renders the island into the page before it is sent. `server defer` (or `defer` alone, which was written `server="defer"`) sends the page as prerendered, and the browser fetches the island as it nears the screen.
 
 When a form posts back to the same page, or a link leads to a page rendering the same island with the same placeholder, the island stays on screen while its new copy is fetched, so the page does not jump.
 
 A deferred island shows nothing useful without JavaScript. Add `noscript` with the text of a link, and a visitor without JavaScript gets a link to the page with every island in place.
 
 ```kay
-ContactForm(server="defer" noscript="Show the contact form")
+ContactForm(server defer noscript="Show the contact form")
 ```
 
-Leave it off when the island's content is reachable without it. `noscript` goes only with `server="defer"`.
+Leave it off when the island's content is reachable without it. `noscript` goes only with `server defer`.
 
 A fetch that gets no answer in 10 seconds, or fails with a server error, is asked again after 1 and then 3 seconds, waiting for the tab to be visible and the network to be up. If it is lost, the island keeps its inert copy and gets a `data-kay-failed` attribute you can style.
 
 To tell the visitor, write an `@failed` block under the use. It sits hidden beside the inert copy, and shows once the island is lost; a control inside it with `data-kay-retry` asks again, with no script of your own:
 
 ```kay
-ContactForm(server="defer")
+ContactForm(server defer)
   @failed
     p The form did not load.
     button(type="button" data-kay-retry) Try again

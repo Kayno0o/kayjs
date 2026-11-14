@@ -135,7 +135,7 @@ export const ERRORS = {
   },
   'client-route-fence': {
     group: 'compile',
-    summary: 'A page, layout or special page with a `--- client` fence: they render on the server.',
+    summary: 'A page, layout or special page declaring `island({ render: \'client\' })` or with a `--- client` fence: they render on the server.',
     fix: { file: 'llms/islands.md', heading: 'Islands' },
   },
   'server-import-in-island': {
@@ -145,7 +145,7 @@ export const ERRORS = {
   },
   'static-pin': {
     group: 'compile',
-    summary: 'A component pinned static, with a `--- static` fence line, that something makes an island: an `on*`, `bind:` or `ref`, a browser value of `kay`, a live value, or a function or a block taking parameters it passes to a component. The error stands at that thing.',
+    summary: 'A component pinned static, with `island({ render: \'static\' })`, that something makes an island: an `on*`, `bind:` or `ref`, a browser value of `kay`, a live value, or a function or a block taking parameters it passes to a component. The error stands at that thing.',
     fix: { file: 'llms/islands.md', heading: 'Islands' },
   },
   'browser-only-read': {

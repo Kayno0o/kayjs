@@ -70,6 +70,22 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) {count()}',
     right: '---\nimport Counter from \'../components/counter.kay\'\n---\nCounter',
   },
+  'deprecated-island-fence': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: 'The `--- island`, `--- static` and `--- client` fence lines, and `export const island = { ... }` in a `--- module` fence, since 1.105: a component declares what it says of its role with `island({ render, hydrate, persist, interactive })` first in its script, as it declares its props with `props<T>()`. `render` is `\'island\'` (the default), `\'client\'` (`--- client`) or `\'static\'` (`--- static`). The old forms work until 1.108. The fix writes `---` for the fence line and the call at the top of the script, with the properties of the exported `island` in it and the `--- module` fence dropped when nothing else is in it; a component with no script fence line is reported with no fix.',
+    wrong: '--- island\nconst { label } = props<{ label: string }>()\n---\nbutton {label}',
+    right: '---\nisland()\nconst { label } = props<{ label: string }>()\n---\nbutton {label}',
+  },
+  'deprecated-island-attributes': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: '`hydrate="client"` and `server="defer"` on a component call, `render="client"` and `server defer` since 1.105: `hydrate` says only when an island hydrates (`load`, `idle`, `visible`, `interaction`, `media(...)`), `render="client"` that a use renders in the browser only, and a deferred server island is the bare `defer` beside `server` (`defer` alone means both). The old spellings work until 1.108. The fix writes the new one.',
+    wrong: '---\nimport Chart from \'./chart.kay\'\nimport Card from \'./card.kay\'\n---\nChart(hydrate="client")\nCard(server="defer")',
+    right: '---\nimport Chart from \'./chart.kay\'\nimport Card from \'./card.kay\'\n---\nChart(render="client")\nCard(server defer)',
+  },
   'deprecated-mail-form': {
     level: 'warn',
     group: 'deprecated',

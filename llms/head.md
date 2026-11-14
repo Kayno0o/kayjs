@@ -167,7 +167,7 @@ h1 {todo.title}
 - Two islands on a page both setting a title: the one last in the page shows, as the server renders it, hydrated or not and whichever hydrated last; a change in the others leaves it. An island rendered in the browser alone is not counted.
 - A `try` block that throws on the server takes back what its components set in the head, an island's title included, so the page never serves a title or tag from a block it replaced with `catch`.
 - A title reads `undefined` for a missing value, so write `?? ''` where it may be missing.
-- An island rendered in the browser alone (`hydrate="client"`) has no server render to take the template from, so it sets its title as written.
+- An island rendered in the browser alone (`render="client"`) has no server render to take the template from, so it sets its title as written.
 - An island kept across navigation (`persist`) shows the next page's title at a swap, as its layout's would, and sets its own again when a signal it reads changes.
 - Navigating to another page shows that page's own title, and coming back shows the island's again once it hydrates; a page with no island title is as the server served it.
 - Only a site with such an island ships the code for it, a few hundred bytes.

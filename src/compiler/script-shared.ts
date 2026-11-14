@@ -1,6 +1,7 @@
 import type { Comment, Node, Program, Statement, TSInterfaceDeclaration, TSTypeAliasDeclaration } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
 import type { NodeOfType } from './estree'
+import type { IslandDeclaration } from './island-declaration'
 import { isPlainProperty } from './estree'
 
 export const WHITESPACE = /\s/
@@ -60,6 +61,8 @@ export interface ScriptAnalysis {
   reactive: boolean
   body: Span[]
   props?: PropsDeclaration
+  // The `island({ ... })` of the script, which the generated code replaces with what it asks of the parents.
+  island?: IslandDeclaration | undefined
   // The name of the `const card = recipe({ ... })` of the script, which moves to module level so the props type can take its type: the component takes its variant props from it.
   recipe?: string | undefined
   recipeSpan?: Span | undefined

@@ -235,7 +235,7 @@ Kay's `tsconfig.json` turns on `noUncheckedIndexedAccess`, so `cells[index]` is 
 
 - **A universal `load`** (`+page.ts`). A kay load runs on the server only. The browser asks for data through an [API route](/guides/api-routes) and `resource`.
 - **Layout data passed to pages.** See [Loading data](#loading-data) for what to do instead.
-- **`ssr = false` and `csr = false`.** A page is always rendered on the server, and a page with no island ships no component code. A component that cannot render on the server starts its script with `--- client`.
+- **`ssr = false` and `csr = false`.** A page is always rendered on the server, and a page with no island ships no component code. A component that cannot render on the server declares `island({ render: 'client' })`.
 - **Adapters.** kay runs on Bun alone. `kay build --compile` makes one executable and `kay build --static` makes plain files, see [Deployment](/guides/deployment).
 - **Svelte components.** They do not run in `.kay`. Rewrite each as a `.kay` component.
 - **`use:` actions.** Use a `ref` or an `onMount` instead. Transitions are the `transition="fade"` attribute, played by CSS classes, see the [islands reference](/llms/islands).

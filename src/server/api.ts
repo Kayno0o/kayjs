@@ -803,7 +803,7 @@ export interface ApiOptions {
   // At most `max` requests to any route of the module from one client, or from whatever `key` names, every `window`; past that they answer 429 with `Retry-After`. Counted after the module's guards.
   rateLimit?: RateLimit | RateLimit[] | undefined
   // Runs none of the guards above the module, as a page's `guards: false` does; read from the `api({ guards: false })` call as written.
-  guards?: false | undefined
+  guards?: boolean | undefined
 }
 
 // What a route of an `api()` module reads besides the app's locals: the values the `_guard.ts` files above it handed on, and `ctx.once`.

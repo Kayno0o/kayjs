@@ -48,7 +48,7 @@ const data = [
   'export const unknownValue: unknown = 1',
   'export const mixed = { label: \'a\', onPick: () => 1 }',
 ].join('\n')
-const component = (script: string, template: string, fence = '---') => `${fence}\nimport Island from './island.kay'\n${script}\n---\n${template}\n`
+const component = (script: string, template: string, declaration = '') => `---\n${declaration === '' ? '' : `${declaration}\n`}import Island from './island.kay'\n${script}\n---\n${template}\n`
 
 function files(extra: Record<string, string> = {}) {
   return {
@@ -71,9 +71,9 @@ function files(extra: Record<string, string> = {}) {
     'src/components/spread.kay': component('const spread = props<{ onSelect: () => void, label: string }>()', 'Island({...spread})'),
     'src/components/fields.kay': component('import { mixed } from \'../data\'', 'Island(v={mixed})'),
     // Islands already, or pinned.
-    'src/components/fenced.kay': component('function pick() {}', 'Island(v={pick})', '--- island'),
-    'src/components/pinned.kay': component('function pick() {}', 'Island(v={pick})', '--- static'),
-    'src/components/inside.kay': '--- client\nimport Island from \'./island.kay\'\nfunction pick() {}\n---\nIsland(v={pick})\n',
+    'src/components/fenced.kay': component('function pick() {}', 'Island(v={pick})', 'island()'),
+    'src/components/pinned.kay': component('function pick() {}', 'Island(v={pick})', 'island({ render: \'static\' })'),
+    'src/components/inside.kay': '---\nisland({ render: \'client\' })\nimport Island from \'./island.kay\'\nfunction pick() {}\n---\nIsland(v={pick})\n',
     'src/routes/index.kay': '--- server\nimport Island from \'../components/island.kay\'\n\nconst format = (value: string) => value\n---\nIsland(v={format})\n',
     'src/routes/_layout.kay': '---\nimport Island from \'../components/island.kay\'\n---\nIsland(v={() => 1})\nslot\n',
     ...extra,
@@ -95,7 +95,7 @@ describe('island-prop, decided by the types of what is passed', () => {
         ['components/inline.kay', 'island-prop', 5],
         ['components/instance.kay', 'island-prop', 5],
         ['components/member.kay', 'island-prop', 5],
-        ['components/pinned.kay', 'island-prop', 5],
+        ['components/pinned.kay', 'island-prop', 6],
         ['components/script.kay', 'island-prop', 5],
         ['components/spread.kay', 'island-prop', 5],
         ['components/union.kay', 'island-prop', 5],
@@ -120,22 +120,22 @@ describe('island-prop, decided by the types of what is passed', () => {
     }
   })
 
-  it('offers `--- island` and never applies it: it turns a static component into an island', async () => {
+  it('offers `island()` and never applies it: it turns a static component into an island', async () => {
     const root = await project(files())
 
     try {
       const found = reported(await check(root))
       const fix = (name: string) => found.find(diagnostic => diagnostic.file.endsWith(`/${name}`))!.fixes!.map(({ safe, edits }) => [safe, edits])
 
-      expect(fix('callback.kay')).toEqual([[false, [{ start: 0, end: 3, text: '--- island' }]]])
-      expect(fix('script.kay')).toEqual([[false, [{ start: 0, end: 3, text: '--- island' }]]])
+      expect(fix('callback.kay')).toEqual([[false, [{ start: 4, end: 4, text: 'island()\n' }]]])
+      expect(fix('script.kay')).toEqual([[false, [{ start: 4, end: 4, text: 'island()\n' }]]])
       expect(fix('block.kay')[0]![0]).toBe(false)
       expect(fix('union.kay')[0]![0]).toBe(false)
       expect(fix('fields.kay')[0]![0]).toBe(false)
       expect(fix('instance.kay')[0]![0]).toBe(false)
       expect(fix('spread.kay')[0]![0]).toBe(false)
-      // An explicit `--- static` is the author's decision, and the fix is not applied for any other either.
-      expect(fix('pinned.kay')).toEqual([[false, [{ start: 4, end: 10, text: 'island' }]]])
+      // An explicit `island({ render: 'static' })` is the author's decision, and the fix is not applied for any other either.
+      expect(fix('pinned.kay')).toEqual([[false, [{ start: 4, end: 32, text: 'island()' }]]])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -153,7 +153,7 @@ describe('island-prop, decided by the types of what is passed', () => {
       await applySafeFixes(root, await check(root))
 
       expect(await Bun.file(join(root, 'src/components/callback.kay')).text()).toStartWith('---\nimport Island')
-      expect(await Bun.file(join(root, 'src/components/pinned.kay')).text()).toStartWith('--- static\nimport Island')
+      expect(await Bun.file(join(root, 'src/components/pinned.kay')).text()).toStartWith('---\nisland({ render: \'static\' })')
       expect(lints(await check(root), root)).toEqual(before)
     }
     finally {
@@ -162,16 +162,15 @@ describe('island-prop, decided by the types of what is passed', () => {
   })
 })
 
-describe('the fence line island-prop writes', () => {
+describe('the declaration island-prop writes', () => {
   const fence = (source: string) => islandFence(parseKay(source))
   const written = (source: string) => apply(source, { fixes: [fence(source)!] })
 
-  it('replaces `---` or `--- script`, keeping type parameters, and opens a fence for a template with none', () => {
-    expect(written('---\nconst a = 1\n---\np {a}\n')).toBe('--- island\nconst a = 1\n---\np {a}\n')
-    expect(written('--- script\nconst a = 1\n---\np {a}\n')).toBe('--- island\nconst a = 1\n---\np {a}\n')
-    expect(written('--- <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')).toBe('--- island <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
-    expect(written('p hi\n')).toBe('--- island\n---\np hi\n')
-    expect(written('--- static\nconst a = 1\n---\np {a}\n')).toBe('--- island\nconst a = 1\n---\np {a}\n')
+  it('writes `island()` first in the script, opening a fence for a template with none', () => {
+    expect(written('---\nconst a = 1\n---\np {a}\n')).toBe('---\nisland()\nconst a = 1\n---\np {a}\n')
+    expect(written('--- <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')).toBe('--- <T extends string>\nisland()\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
+    expect(written('p hi\n')).toBe('---\nisland()\n---\np hi\n')
+    expect(written('---\nisland({ render: \'static\' })\nconst a = 1\n---\np {a}\n')).toBe('---\nisland()\nconst a = 1\n---\np {a}\n')
   })
 
   it('opens a script fence before a `--- module` or `--- style` one, which then compiles as an island', () => {
@@ -179,23 +178,23 @@ describe('the fence line island-prop writes', () => {
       const source = `${other}\np hi\n`
       const rewritten = written(source)
 
-      expect(rewritten).toBe(`--- island\n---\n${source}`)
+      expect(rewritten).toBe(`---\nisland()\n---\n${source}`)
       expect(compileKay(rewritten, 'src/components/part.kay', { check: true }).diagnostics).toEqual([])
       expect(compileKay(rewritten, 'src/components/part.kay', { check: true }).island).toBeDefined()
     }
   })
 
   it('writes nothing for an island already or a component that renders on the server only', () => {
-    for (const source of ['--- island\n---\np\n', '--- client\n---\np\n', '--- server\nconst a = 1\n---\np {a}\n'])
+    for (const source of ['---\nisland()\n---\np\n', '---\nisland({ render: \'client\' })\n---\np\n', '--- server\nconst a = 1\n---\np {a}\n'])
       expect(fence(source)).toBeUndefined()
   })
 })
 
-describe('--- static, and a component with no pin, both left to the types', () => {
+describe('island({ render: \'static\' }), and a component with no pin, both left to the types', () => {
   const passing = (fence: string) => `${fence}\nimport Picker from './picker.kay'\nfunction shout() {}\n---\nPicker(format={shout})\n`
 
   it('stays static whatever it passes: the role is none and the render is no island', () => {
-    for (const pinned of [passing('---'), passing('--- static')]) {
+    for (const pinned of [passing('---'), passing('---\nisland({ render: \'static\' })')]) {
       expect(browserRole(pinned, 'src/components/part.kay')).toBeUndefined()
 
       const compiled = compileKay(pinned, 'src/components/part.kay', { output: 'html', hydratable: true })
@@ -206,18 +205,18 @@ describe('--- static, and a component with no pin, both left to the types', () =
   })
 
   it('types what it passes an island as a static component, pinned or not', () => {
-    expect(compileKay(passing('--- static'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker)')
+    expect(compileKay(passing('island({ render: \'static\' })'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker)')
     expect(compileKay(passing('---'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker)')
-    expect(compileKay('--- static\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker)')
+    expect(compileKay('---\nisland({ render: \'static\' })\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker)')
     expect(compileKay('---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker)')
   })
 })
 
-describe('--- static, passing what cannot be sent as data', () => {
+describe('island({ render: \'static\' }), passing what cannot be sent as data', () => {
   it('compiles: only the types know whether the component it passes it to is an island', () => {
-    const local = '--- static\nimport Table from \'./table.kay\'\nfunction shout() {}\n---\nTable(format={shout})\n'
-    const literal = '--- static\nimport Table from \'./table.kay\'\n---\nTable(format={() => 1})\n'
-    const block = '--- static\nimport Table from \'./table.kay\'\n---\nTable\n  @row(item)\n    p {item}\n'
+    const local = '---\nisland({ render: \'static\' })\nimport Table from \'./table.kay\'\nfunction shout() {}\n---\nTable(format={shout})\n'
+    const literal = '---\nisland({ render: \'static\' })\nimport Table from \'./table.kay\'\n---\nTable(format={() => 1})\n'
+    const block = '---\nisland({ render: \'static\' })\nimport Table from \'./table.kay\'\n---\nTable\n  @row(item)\n    p {item}\n'
 
     for (const source of [local, literal, block])
       expect(compileKay(source, 'src/components/part.kay', { output: 'html' }).diagnostics).toEqual([])
@@ -227,8 +226,8 @@ describe('--- static, passing what cannot be sent as data', () => {
     const root = await project({
       'src/components/island.kay': island,
       'src/components/table.kay': '---\nconst { format } = props<{ format: (n: number) => string }>()\n---\np {format(1)}\n',
-      'src/components/pinned.kay': component('function pick() {}', 'Island(v={pick})', '--- static'),
-      'src/components/listing.kay': '--- static\nimport Table from \'./table.kay\'\nfunction shout(n: number) { return String(n) }\n---\nTable(format={shout})\n',
+      'src/components/pinned.kay': component('function pick() {}', 'Island(v={pick})', 'island({ render: \'static\' })'),
+      'src/components/listing.kay': '---\nisland({ render: \'static\' })\nimport Table from \'./table.kay\'\nfunction shout(n: number) { return String(n) }\n---\nTable(format={shout})\n',
       'src/routes/index.kay': '---\nimport Pinned from \'../components/pinned.kay\'\nimport Listing from \'../components/listing.kay\'\n---\nPinned\nListing\n',
     })
 
@@ -281,7 +280,7 @@ describe('IslandPropsError', () => {
     const Picker = makeIsland<{ format: () => number }>('src/picker.kay', () => 'p')
 
     expect(() => child(Picker({ format: () => 1 }))).toThrow(IslandPropsError)
-    expect(() => child(Picker({ format: () => 1 }))).toThrow('write `--- island` in the component passing it')
+    expect(() => child(Picker({ format: () => 1 }))).toThrow('write `island()` in the component passing it')
     expect(() => child(Picker({ format: Symbol('x') as never }))).toThrow('`island-prop`')
   })
 })

@@ -165,7 +165,7 @@ describe('client-only islands', () => {
       }
     })()
 
-    expect(browserOnlyHint(error, mapStack(error!.stack!))).toBe(`\`window\` exists only in the browser, and rendering ${relative(process.cwd(), join(dir, 'bad.kay'))}:3:15 on the server read it: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`--- client\``)
+    expect(browserOnlyHint(error, mapStack(error!.stack!))).toBe(`\`window\` exists only in the browser, and rendering ${relative(process.cwd(), join(dir, 'bad.kay'))}:3:15 on the server read it: read it in \`effect\` or \`onMount\`, or render the component in the browser only with \`island({ render: 'client' })\``)
     expect(browserOnlyHint(new ReferenceError('missing is not defined'), '')).toBeUndefined()
   })
 
@@ -290,7 +290,7 @@ describe('browser-only globals read while rendering', () => {
   // Each fix as the source it leaves, its edits applied from the last.
   const fixed = (source: string, edits: { start: number, end: number, text: string }[]) => edits.toSorted((a, b) => b.start - a.start).reduce((text, change) => text.slice(0, change.start) + change.text + text.slice(change.end), source)
   const reads = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true, lints: { 'constant-signal': 'allow', 'deprecated-script-fence': 'allow' } }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message, fixes: diagnostic.fixes?.map(fix => fixed(source, fix.edits)) }))
-  const client = (source: string) => source.replace('---', '--- client')
+  const client = (source: string) => source.replace('---\n', '---\nisland({ render: \'client\' })\n')
 
   it('reports one read by the script, a function the template calls, a memo or the template itself, each with its fixes', () => {
     const source = '---\nimport { memo, signal } from \'kay\'\n\nconst width = signal(window.innerWidth)\nlocalStorage.setItem(\'seen\', \'1\')\nconst title = () => document.title\nconst ratio = memo(() => devicePixelRatio)\n---\np {title()} {ratio()} {width()}\nfor item of [1] key={item}\n  span {sessionStorage.length}\n'
@@ -338,7 +338,7 @@ describe('browser-only globals read while rendering', () => {
   it('turns a `--- script` fence into `--- client`', () => {
     const source = '--- script\nconst title = document.title\n---\np {title}\n'
 
-    expect(reads(source)).toEqual([{ text: 'document', message: '`document` exists only in the browser', fixes: [source.replace('--- script', '--- client')] }])
+    expect(reads(source)).toEqual([{ text: 'document', message: '`document` exists only in the browser', fixes: [source.replace('--- script', '--- script\nisland({ render: \'client\' })')] }])
   })
 
   it('leaves handlers, refs, effects and other callbacks alone, as globals Bun has, shadowed names and types', () => {
@@ -375,11 +375,11 @@ describe('browser-only globals read while rendering', () => {
 
     expect(reads(island)).toEqual([{ text: 'window', message: '`typeof window` differs between the server and the browser', fixes: [client(island)] }])
     expect(reads(page)).toEqual([])
-    expect(compileKay(island, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => [diagnostic.note, diagnostic.help])).toEqual([['what the island renders from it will not match the server\'s markup when it hydrates', 'read it in `effect` or `onMount`, or render the component in the browser only with `--- client`']])
+    expect(compileKay(island, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => [diagnostic.note, diagnostic.help])).toEqual([['what the island renders from it will not match the server\'s markup when it hydrates', 'read it in `effect` or `onMount`, or render the component in the browser only with `island({ render: \'client\' })`']])
   })
 
   it('refuses `--- client` on a layout or a page with a server fence', () => {
-    expect(compileKay('--- client\n---\nslot\n', join(process.cwd(), '_layout.kay')).diagnostics.map(diagnostic => [diagnostic.message, diagnostic.note])).toEqual([['A page, layout or special page cannot be `--- client`', 'it renders on the server']])
+    expect(compileKay('--- client\n---\nslot\n', join(process.cwd(), '_layout.kay')).diagnostics.map(diagnostic => [diagnostic.message, diagnostic.note])).toEqual([['A page, layout or special page cannot render in the browser only', 'it renders on the server']])
     expect(compileKay('--- server\nconst a = 1\n---\n--- client\n---\np {a}\n', join(process.cwd(), 'page.kay')).diagnostics).toHaveLength(1)
   })
 
@@ -401,8 +401,8 @@ describe('browser-only globals read while rendering', () => {
   })
 
   it('adds a script fence to a component without one, and reports nothing in a `--- client` one', () => {
-    expect(reads('p {window.location.href}\n')).toEqual([{ text: 'window', message: '`window` exists only in the browser', fixes: ['--- client\n---\np {window.location.href}\n'] }])
-    expect(reads('--- client\nconst width = window.innerWidth\n---\np {width}\n')).toEqual([])
+    expect(reads('p {window.location.href}\n')).toEqual([{ text: 'window', message: '`window` exists only in the browser', fixes: ['---\nisland({ render: \'client\' })\n---\np {window.location.href}\n'] }])
+    expect(reads('---\nisland({ render: \'client\' })\nconst width = window.innerWidth\n---\np {width}\n')).toEqual([])
   })
 })
 

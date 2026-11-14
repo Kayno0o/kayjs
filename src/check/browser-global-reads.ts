@@ -13,7 +13,7 @@ import { analyzeScript } from '../compiler/script'
 const MODULE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 const DECLARATION_FILE = /\.d\.[cm]?ts$/
 const OUTSIDE = /^(?:node:|bun:|kay(?:\/|$))/
-const HELP = 'read it inside a function, or after a `typeof window !== \'undefined\'` check, or render the component importing it in the browser only with `--- client`; `// kay-allow browser-global-at-load` allows a deliberate read'
+const HELP = 'read it inside a function, or after a `typeof window !== \'undefined\'` check, or render the component importing it in the browser only with `island({ render: \'client\' })`; `// kay-allow browser-global-at-load` allows a deliberate read'
 
 // What a file imports as it loads: its static imports, a dynamic `import()` running later and reading nothing as the module loads.
 function staticImports(file: string, source: string): string[] {
@@ -35,7 +35,7 @@ export interface LoadTimeBrowserRead {
 
 // A module of the project that touches a browser-only global as it loads and that a server render imports: a page, a layout or a component they render, which is not `--- client`, and the modules they pull in. It throws on the server the first time the page is rendered, as the module is evaluated.
 // A read inside a function is left out, as only a call decides whether it runs, and so is one a `typeof` or a `try` guards.
-// Reported at the read, naming the first component reaching the module. What the server never renders is left out: a component used only with `hydrate="client"`, and an island the build demotes to the browser for a package it imports, asked as the build asks.
+// Reported at the read, naming the first component reaching the module. What the server never renders is left out: a component used only with `render="client"`, and an island the build demotes to the browser for a package it imports, asked as the build asks.
 export async function browserGlobalAtLoad(root: string, components: Map<string, string>, routes: string, cacheDir?: string): Promise<LoadTimeBrowserRead[]> {
   const names = browserGlobals()
 
@@ -94,14 +94,14 @@ export async function browserGlobalAtLoad(root: string, components: Map<string, 
   return found
 }
 
-// The specifiers a component imports only to use them with `hydrate="client"`, which the server never renders.
+// The specifiers a component imports only to use them with `render="client"`, which the server never renders.
 function clientOnlyImports(source: string): Set<string> {
   const file = parseKay(source)
   const uses = new Map<string, boolean>()
 
   visitNodes(file.template, (node) => {
     if (node.kind === 'element' && node.component) {
-      const client = node.attributes.some(attribute => attribute.kind === 'static' && source.slice(attribute.name.start, attribute.name.end) === 'hydrate' && attribute.text === 'client')
+      const client = node.attributes.some(attribute => attribute.kind === 'static' && ['hydrate', 'render'].includes(source.slice(attribute.name.start, attribute.name.end)) && attribute.text === 'client')
 
       uses.set(node.name, (uses.get(node.name) ?? true) && client)
     }

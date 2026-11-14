@@ -671,7 +671,7 @@ describe('fences', () => {
     ]
 
     for (const [source, broken] of components) {
-      const { tsx, map, diagnostics } = compileKay(source, 'test.kay', { check: true })
+      const { tsx, map, diagnostics } = compileKay(source, 'test.kay', { check: true, lints: { 'deprecated-island-fence': 'allow' } })
       const lines = source.split('\n')
       const fenceLines = lines.slice(0, lines.findLastIndex(line => line.startsWith('---'))).filter(line => !line.startsWith('---'))
 

@@ -2,6 +2,7 @@ import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic,
 import { scanClassName } from './class-name'
 import { strayElse } from './else-problem'
 import { ifAlias } from './if-alias'
+import { rolesOf } from './island-declaration'
 import { Scanner } from './scanner'
 
 // `--- server`, `--- client`, `--- island`, `--- static`, `--- script`, `--- module`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
@@ -94,8 +95,7 @@ export function parseKay(source: string): KayFile {
   const diagnostics: Diagnostic[] = []
   const fences: Partial<Record<'script' | 'server' | 'module' | 'style', Span>> = {}
   let typeParameters: Span | undefined
-  let client: Span | undefined
-  let pin: KayFile['pin']
+  let fenceWord: (Span & { word: string }) | undefined
   let scriptLine: Span | undefined
   let templateStart = 0
   let unclosedServer: Diagnostic | undefined
@@ -157,13 +157,12 @@ export function parseKay(source: string): KayFile {
 
       scriptLine = { start: fence.index, end: bodyStart - 1 }
 
-      if (fence[2] === 'client')
-        client = { start: fence.indices![2]![0], end: fence.indices![2]![1] }
-
-      if (fence[2] === 'island' || fence[2] === 'static')
-        pin = { kind: fence[2], start: fence.indices![2]![0], end: fence.indices![2]![1] }
+      if (fence[2] !== undefined)
+        fenceWord = { word: fence[2], start: fence.indices![2]![0], end: fence.indices![2]![1] }
     }
   }
+
+  const { island, client, pin } = rolesOf(source, fences.script, fenceWord)
 
   const parser = new TemplateParser(source, templateStart, diagnostics)
   const template = parser.parseTemplate()
@@ -171,7 +170,7 @@ export function parseKay(source: string): KayFile {
   if (bareClosing)
     explainSecondFence(source, bareClosing, diagnostics)
 
-  return { source, script: fences.script, server: fences.server, serverFence, module: fences.module, style: fences.style, typeParameters, client, pin, scriptLine, templateStart, template, diagnostics, unclosedServer }
+  return { source, script: fences.script, server: fences.server, serverFence, module: fences.module, style: fences.style, typeParameters, client, pin, island, scriptLine, templateStart, template, diagnostics, unclosedServer }
 }
 
 // A bare `---` in the template after a named fence closed by a bare `---`: the first bare line closed that fence, so the author meant the second fence as the script, which takes `--- script` once a named fence is there.

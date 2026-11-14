@@ -140,10 +140,10 @@ describe('kay explain island', () => {
     expect(one.stdout).toContain('rule: A component is an island when')
     expect(JSON.parse(plain.stdout)).toMatchObject({ file: 'src/components/plain.kay', role: 'static' })
     expect((JSON.parse(all.stdout) as { islands: unknown[] }).islands).toEqual([
-      { file: 'src/components/button.kay', role: 'island', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 1 }) },
-      { file: 'src/components/wrap.kay', role: 'island', cause: expect.objectContaining({ kind: 'island', name: '--- island', line: 1 }) },
-      { file: 'src/routes/_layout.kay', role: 'island', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 2 }) },
-      { file: 'src/routes/server.kay', role: 'island', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 4 }) },
+      { file: 'src/components/button.kay', role: 'island', how: 'inferred', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 1 }) },
+      { file: 'src/components/wrap.kay', role: 'island', how: 'inferred', cause: expect.objectContaining({ kind: 'island', name: '--- island', line: 1 }) },
+      { file: 'src/routes/_layout.kay', role: 'island', how: 'inferred', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 2 }) },
+      { file: 'src/routes/server.kay', role: 'island', how: 'inferred', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 4 }) },
     ])
   })
 
@@ -158,6 +158,24 @@ describe('kay explain island', () => {
     expect(JSON.parse(pinned.stdout)).toMatchObject({ file: 'src/components/wrap.kay', role: 'island', cause: { kind: 'island', name: '--- island', line: 1, description: 'a `--- island` fence' } })
     expect(JSON.parse(layout.stdout)).toMatchObject({ role: 'island', cause: { kind: 'attribute', name: 'onClick', line: 2 } })
     expect(server.stdout).toContain('src/routes/server.kay: an island')
+  })
+
+  it('says what an island() declaration settled and what the code did', async () => {
+    const root = await project({
+      'src/components/declared.kay': '---\nisland({ render: \'client\', hydrate: \'idle\', persist: true })\n---\np Map\n',
+      'src/components/empty.kay': '---\nisland()\n---\np Static markup\n',
+    })
+    const [declared, empty, inferred] = await Promise.all([
+      kay(['explain', 'island', 'src/components/declared.kay'], root),
+      kay(['explain', 'island', 'src/components/empty.kay', '--format', 'json'], root),
+      kay(['explain', 'island', 'src/components/button.kay'], root),
+    ])
+
+    expect(declared.stdout).toContain('declared: island({ render: \'client\', hydrate: \'idle\', persist: true })')
+    expect(declared.stdout).toContain('decided: by its island() declaration')
+    expect(JSON.parse(empty.stdout)).toMatchObject({ role: 'island', how: 'declared', declared: 'island()' })
+    expect(inferred.stdout).toContain('decided: inferred from its code')
+    expect(inferred.stdout).not.toContain('declared:')
   })
 
   it('reports the error of a file that does not compile instead of a role', async () => {

@@ -314,8 +314,8 @@ describe('server islands', () => {
     expect(html).toContain('KayServerIsland(Card, { "title": "a", get "other"() { return ')
     expect(html).toContain('}, "defer", undefined, () => ')
     expect(html).not.toContain('"failed"')
-    expect(messages('Card(server)\n  @failed\n    p No luck')).toContain('`@failed` only goes with `server="defer"`')
-    expect(messages('Card(server="defer")\n  @failed\n    p No luck')).toEqual([])
+    expect(messages('Card(server)\n  @failed\n    p No luck')).toContain('`@failed` only goes with `server defer`')
+    expect(messages('Card(server defer)\n  @failed\n    p No luck')).toEqual([])
     expect(messages('Card\n  @failed\n    p No luck')).toEqual([])
   })
 
@@ -445,8 +445,8 @@ describe('server islands', () => {
     const messages = (call: string) => compileKay(`---\nimport Card from './card.kay'\n---\n${call}\n`, 'src/routes/index.kay', { check: true }).diagnostics.map(diagnostic => diagnostic.message)
 
     expect(dom).not.toContain('More')
-    expect(messages('Card(server="later")')).toContain('`server` takes no value, or "defer"')
-    expect(messages('Card(server noscript="More")')).toContain('`noscript` only goes with `server="defer"`')
+    expect(messages('Card(server="later")')).toContain('`server` takes no value')
+    expect(messages('Card(server noscript="More")')).toContain('`noscript` only goes with `server defer`')
     expect(messages('Card(server="defer" noscript)')).toContain('`noscript` takes the text of its link')
   })
 })

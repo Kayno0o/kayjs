@@ -233,16 +233,17 @@ export default (value: string) =>
 | Key | Value | Detailed in |
 | --- | --- | --- |
 | `prerender` | `true`, `false`, a list of params, a function returning one, a content collection or `paginate()` | [Prerendering](prerendering.md#prerendering) |
-| `keep` | `true` to say the build is to keep the page prerendered on its own, `unkept-page` naming what stops it | [Prerendering](prerendering.md#prerendering) |
+| `keep` | a boolean: `true` says the build is to keep the page prerendered on its own, `unkept-page` naming what stops it | [Prerendering](prerendering.md#prerendering) |
 | `cache` | `'1h'`, `{ browser, shared, swr }`, `'private'` or `false`: how long a prerendered page is kept before it renders again, and the `cache-control` it sends everyone (`ttl` and `cacheControl` before 1.105) | [Prerendering](prerendering.md#prerendering) |
 | `seo` | `{ title, description, image, canonical, noindex, sitemap, lastmod, search, feed }`: the head of the page and what the sitemap and the site search read of it (the five last were keys of `page` before 1.105) | [Head and SEO](head.md), [Sitemap](sitemap-search-fonts.md#sitemap-and-robotstxt) |
-| `layouts` | `false` only, to drop the layouts above | this section |
+| `layouts` | a boolean: `false` drops the layouts above | this section |
 | `query` | a schema `ctx.query` is read against | `ctx.query`, below |
-| `guards` | `false` only, to run none of the `_guard.ts` files above; on a layout, above its actions alone | [Server](server.md) |
+| `guards` | a boolean: `false` runs none of the `_guard.ts` files above; on a layout, above its actions alone | [Server](server.md) |
 | `rateLimit` | `{ max, window, key? }` or a list, counted per page after its guards, 429 with `Retry-After` past it; `false` lifts a layout's | [Rate limits](rate-limits.md) |
 | `security` | `{ csp, headers }` added to the site's security headers for the page's responses | [Production](proxy-and-security.md#security-headers) |
-| `reload` | `true` to load the page fully from any link or form, past the page swap | [Islands](islands.md) |
+| `reload` | a boolean: `true` loads the page fully from any link or form, past the page swap | [Islands](islands.md) |
 
+- The four flags (`keep`, `layouts`, `guards`, `reload`) are plain booleans, `true` or `false` as written, and the one a page leaves out is off for `keep` and `reload` and on for `layouts` and `guards`: `guards: true` says what the default does. `kay check` reports a `guards` or `layouts` that is not a literal. An endpoint's and an `api()` module's `guards` is the same boolean.
 - A page or a layout whose `page` has `layouts: false` among its keys is wrapped by none of the layouts above it.
 - `export const page = { layouts: false }` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header.
 

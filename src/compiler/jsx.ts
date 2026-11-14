@@ -695,7 +695,7 @@ export class JsxTemplate {
         continue
       }
 
-      if (attribute === serverIsland?.attribute)
+      if (attribute === serverIsland?.attribute || attribute === serverIsland?.defer)
         continue
 
       // Not a prop: what it reads is checked on its own.

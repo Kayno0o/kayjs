@@ -44,7 +44,7 @@ An imported image gets WebP variants at several widths. Each also comes as AVIF,
 
 A visitor who asks for less data gets a lighter site with no setting. Browsers sending `Save-Data: on` receive the next image width down, no font preloads or speculation rules, and fonts shown only once cached. Pages vary on `Save-Data`, so caches keep both copies. In a browser with `prefers-reduced-data` or a saving connection, links are not prefetched.
 
-Islands wait too: one hydrates once it scrolls near, and the page preloads none of their code, except for islands written `hydrate="load"` or `hydrate="client"`, which still go at once.
+Islands wait too: one hydrates once it scrolls near, and the page preloads none of their code, except for islands written `hydrate="load"` or `render="client"`, which still go at once.
 
 `saveData: false` turns all of this off.
 

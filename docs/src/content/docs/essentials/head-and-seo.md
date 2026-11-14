@@ -54,7 +54,7 @@ The title goes through `seo.titleTemplate`, as on the server. `title(raw)` skips
 
 Following a link shows the next page's own title. Going back shows the island's title again once it hydrates.
 
-<ReadMore href="/llms/head">Two islands setting a title, `hydrate="client"` and `persist` islands, and a `try` block that throws.</ReadMore>
+<ReadMore href="/llms/head">Two islands setting a title, `render="client"` and `persist` islands, and a `try` block that throws.</ReadMore>
 
 ## Attributes on `<html>`
 

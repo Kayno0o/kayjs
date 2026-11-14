@@ -56,7 +56,7 @@ describe('the module fence', () => {
   })
 
   it('refuses props, a default export, a second fence and a client component in it', () => {
-    const messages = (source: string) => compileKay(source, 'part.kay', { check: true }).diagnostics.map(diagnostic => diagnostic.message)
+    const messages = (source: string) => compileKay(source, 'part.kay', { check: true, lints: { 'deprecated-island-fence': 'allow' } }).diagnostics.map(diagnostic => diagnostic.message)
 
     expect(messages('--- module\nconst { a } = props<{ a: string }>()\n---\np x\n')).toEqual([expect.stringContaining('declares no props')])
     expect(messages('--- module\nexport default 1\n---\np x\n')).toEqual([expect.stringContaining('default export')])

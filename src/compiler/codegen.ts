@@ -15,7 +15,7 @@ import { addIslandShorthandTitle, addShorthandChecks, addShorthandGroup, hasShor
 import { emitHeadTag, emitHeadText } from './head-tags'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
-import { exportsIslandOptions, islandMessages } from './island-arguments'
+import { asksOf, exportsIslandOptions, islandMessages } from './island-arguments'
 import { constDeclaration } from './items'
 import { JsxTemplate } from './jsx'
 import { planLoads } from './load-plan'
@@ -623,7 +623,7 @@ class ModuleShell {
   private islandTail(src: string): string {
     const html = this.options.output === 'html'
 
-    return islandMessages(src, this.options.client, html ? this.options.lives : undefined, html ? this.options.cause : undefined, false, html && exportsIslandOptions(this.script), this.file.wrapsButtons === true)
+    return islandMessages(src, this.options.client, html ? this.options.lives : undefined, html ? this.options.cause : undefined, false, html && exportsIslandOptions(this.script) && asksOf(this.script), this.file.wrapsButtons === true)
   }
 
   private get wrapped(): boolean {
@@ -1022,10 +1022,10 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
 // The first thing that makes a component interactive, so an island: an `on*`, `bind:` or `ref` attribute, a `kay` value of the script, a `--- client` fence or a `--- island` one.
 export function islandCause(file: KayFile, script: ScriptAnalysis): IslandCause | undefined {
   if (file.client !== undefined)
-    return { kind: 'client', name: '--- client', span: file.client, line: lineOf(file.source, file.client.start) }
+    return { kind: 'client', name: file.island === undefined ? '--- client' : 'island()', span: file.client, line: lineOf(file.source, file.client.start) }
 
   if (file.pin?.kind === 'island')
-    return { kind: 'island', name: '--- island', span: file.pin, line: lineOf(file.source, file.pin.start) }
+    return { kind: 'island', name: file.island === undefined ? '--- island' : 'island()', span: file.pin, line: lineOf(file.source, file.pin.start) }
 
   let cause: IslandCause | undefined
 

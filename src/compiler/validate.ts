@@ -557,7 +557,7 @@ class Validator {
 
       const name = this.text(attribute.name)
 
-      if (element.component && (this.options.island !== undefined || this.options.insideIsland) && ISLAND_OPTIONS.has(name))
+      if (element.component && (this.options.island !== undefined || this.options.insideIsland) && (ISLAND_OPTIONS.has(name) || (name === 'render' && attribute.kind === 'static' && attribute.text === 'client')))
         this.error('attribute-ineffective', attribute.name, `\`${name}\` has no effect inside an island`, { note: 'an island hydrates and lives on as a whole' })
 
       if (element.component && name === 'hydrate' && attribute.kind === 'static' && attribute.text.startsWith('media(') && !MEDIA_HYDRATE.test(attribute.text))
@@ -584,16 +584,16 @@ class Validator {
       this.error('server-island-invalid', attribute.name, SERVER_IN_ISLAND, { note: 'an island renders in the browser too, as a whole' })
     }
     else if (mode === undefined) {
-      this.error('server-island-invalid', attribute.name, '`server` takes no value, or "defer"', { help: '`server` renders it per request inside the prerendered page, `server="defer"` once the browser fetches it on approach' })
+      this.error('server-island-invalid', attribute.name, '`server` takes no value', { help: '`server` renders it per request inside the prerendered page, `server defer` once the browser fetches it on approach' })
     }
     else if (noscript && mode !== 'defer') {
-      this.error('server-island-invalid', noscript.name, '`noscript` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it needs no JavaScript' })
+      this.error('server-island-invalid', noscript.name, '`noscript` only goes with `server defer`', { note: 'an inline server island arrives with the page, so it needs no JavaScript' })
     }
     else if (noscript?.kind === 'boolean') {
       this.error('server-island-invalid', noscript.name, '`noscript` takes the text of its link', { help: 'such as `noscript="Show the contact form"`' })
     }
     else if (mode !== 'defer' && failed) {
-      this.error('server-island-invalid', failed.name, '`@failed` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it cannot fail to load' })
+      this.error('server-island-invalid', failed.name, '`@failed` only goes with `server defer`', { note: 'an inline server island arrives with the page, so it cannot fail to load' })
     }
     else if (failed) {
       visitNodes(failed.children, (node) => {

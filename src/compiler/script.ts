@@ -1,5 +1,6 @@
 import type { Span } from './ast'
 import type { ImportBinding, ScriptAnalysis } from './script-shared'
+import { isIslandCall, islandDeclaration } from './island-declaration'
 import { needsBrowser } from './kay-exports'
 import { propsDeclaration, reportMisplacedProps } from './script-props'
 import { isExport } from './script-server'
@@ -70,8 +71,14 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
 
   const repeated: Span[] = []
 
+  analysis.island = islandDeclaration(ast, shift, analysis.diagnostics)
+
   for (const { statement, span, gap } of split.statements) {
     analysis.body.push(...gap)
+
+    // The declaration is read from the program, and what the component runs has no call of it.
+    if (isIslandCall(statement))
+      continue
 
     const props = propsDeclaration(statement, ast.body, shift, analysis.diagnostics)
 

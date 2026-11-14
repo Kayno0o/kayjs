@@ -104,7 +104,7 @@ Card(title="Todos")
 
 A prop taking markup is typed `Snippet` from `kay`: `Snippet` for the children and a block with no parameters, `Snippet<[Item, number]>` for markup the component calls with values, once per row for instance. `@name(a, b)`, a local `snippet` passed as `name={feature}` and `slot name(a, b)` all use it, a fill with other parameters, or a `@name` written without the parameters the prop is called with, is a `kay check` error (the second names the parameters to write), and `slot name` on a prop that is no `Snippet` is reported at the name.
 
-No function reaches the browser, so a static component passing one to an island is the `island-prop` error, fixed with `--- island`, and a layout or a page with a `--- server` fence cannot pass one.
+No function reaches the browser, so a static component passing one to an island is the `island-prop` error, fixed with `island()`, and a layout or a page with a `--- server` fence cannot pass one.
 
 A static component that only islands render is part of them, so it can.
 

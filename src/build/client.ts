@@ -382,7 +382,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
       why.set(compiled.island, { cause: compiled.cause })
     }
     else if (file === editor) {
-      throw new KayError('inert-editor', `kay: the editor ${relative(root, file)} runs nothing in the browser, where an editor edits the page: give it a script reading signals, or a \`--- client\` fence`)
+      throw new KayError('inert-editor', `kay: the editor ${relative(root, file)} runs nothing in the browser, where an editor edits the page: give it a script reading signals, or \`island({ render: 'client' })\``)
     }
 
     for (const name of compiled.classes)

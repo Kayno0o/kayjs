@@ -30,14 +30,20 @@ export function islandExport(script: ScriptAnalysis): { form: 'const' | 'listed'
 export function ignoredIslandExport(script: ScriptAnalysis, isIsland: boolean): Diagnostic[] {
   const asked = islandExport(script)
 
+  if (asked !== undefined && script.island !== undefined)
+    return [{ ...asked.span, code: 'fence-invalid', message: 'The component declares `island()` already, so its `island` export is not read', help: 'move what it says into the `island()` call and drop the export' }]
+
   if (asked?.form === 'listed')
     return [{ ...asked.span, code: 'fence-invalid', message: 'Only `export const island = { hydrate, persist, interactive }` is read as what the component asks of its parents', help: 'write it as that declaration' }]
 
-  return asked && !isIsland ? [{ ...asked.span, code: 'fence-invalid', message: 'This component is no island, so nothing reads its `island` export', help: 'write `--- island`, or drop the export' }] : []
+  return asked && !isIsland ? [{ ...asked.span, code: 'fence-invalid', message: 'This component is no island, so nothing reads its `island` export', help: 'write `island()`, or drop the export' }] : []
 }
 
 // The `hydrate` the exported `island` asks for, when it is written as a string.
 export function exportedHydrate(script: ScriptAnalysis): string | undefined {
+  if (script.island !== undefined)
+    return script.island.hydrate
+
   for (const statement of script.moduleFence?.ast.body ?? []) {
     const declaration = statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'VariableDeclaration' ? statement.declaration.declarations.find(each => each.id.type === 'Identifier' && each.id.name === 'island') : undefined
     const init = declaration?.init?.type === 'TSAsExpression' ? declaration.init.expression : declaration?.init
@@ -52,6 +58,9 @@ export function exportedHydrate(script: ScriptAnalysis): string | undefined {
 
 // The `interactive` of the exported `island`, `{ prop: whether it is on when a use leaves it out }`, read where it is written as an object of booleans.
 export function interactiveProps(script: ScriptAnalysis): Record<string, boolean> | undefined {
+  if (script.island !== undefined)
+    return script.island.interactive
+
   for (const statement of script.moduleFence?.ast.body ?? []) {
     const declaration = statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'VariableDeclaration' ? statement.declaration.declarations.find(each => each.id.type === 'Identifier' && each.id.name === 'island') : undefined
     const init = declaration?.init?.type === 'TSAsExpression' ? declaration.init.expression : declaration?.init
@@ -94,16 +103,21 @@ export function malformedInteractive(script: ScriptAnalysis): Diagnostic[] {
 
 // Whether the `--- module` fence has `export const island = { hydrate, persist }`: what the component asks of every parent that uses it.
 export function exportsIslandOptions(script: ScriptAnalysis): boolean {
-  return islandExport(script)?.form === 'const'
+  return script.island === undefined ? islandExport(script)?.form === 'const' : script.island.asks !== undefined
+}
+
+// What the generated module hands `island()` of what the component asks of its parents: the `island` its `--- module` fence exports, or the object its `island()` call says.
+export function asksOf(script: ScriptAnalysis): string {
+  return script.island?.asks ?? 'island'
 }
 
 // The message keys an island's source names, as the third argument to `island()`, with the flag of a lone button's form when it writes one, or nothing for an island naming none; the live values it imports go last.
 // Under `kay dev` the cause goes last, as the `data-why` the dev tool shows. A component exporting `island` passes it last of all.
-export function islandMessages(source: string, client = false, lives: string[] = [], cause?: string, fallback = false, options = false, wrapsButtons = false): string {
+export function islandMessages(source: string, client = false, lives: string[] = [], cause?: string, fallback = false, options: string | false = false, wrapsButtons = false): string {
   const keys = wrapsButtons ? [...messageKeys(source), BUTTON_FORM_KEY] : messageKeys(source)
 
-  if (options)
-    return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}], ${cause === undefined ? 'undefined' : JSON.stringify(cause)}, ${fallback ? 'KayFallback' : 'undefined'}, island`
+  if (options !== false)
+    return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}], ${cause === undefined ? 'undefined' : JSON.stringify(cause)}, ${fallback ? 'KayFallback' : 'undefined'}, ${options}`
 
   if (fallback)
     return `, ${JSON.stringify(keys)}, true, undefined, [${lives.join(', ')}], ${cause === undefined ? 'undefined' : JSON.stringify(cause)}, KayFallback`

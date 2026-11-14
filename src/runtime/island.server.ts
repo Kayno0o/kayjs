@@ -139,6 +139,14 @@ function isWaiting(when: string | undefined, id: string): boolean {
   return when === 'idle' || when === 'visible' || when === 'interaction' || when?.startsWith('media(') === true
 }
 
+// What a use passes besides the component's own props: when it hydrates, whether it persists, `render="client"` and the fallback, taken out so the component is not handed them.
+function ownProps<P extends object>(props: P & IslandOptions, renderClient: boolean, browserOnly: boolean): P {
+  if (!('hydrate' in props || 'persist' in props || renderClient || USE_FALLBACK in props))
+    return props
+
+  return omit(props, 'hydrate', 'persist', ...renderClient ? ['render'] : [], USE_FALLBACK, ...browserOnly && USE_FALLBACK in props ? ['fallback'] : []) as P
+}
+
 // On the server an interactive component renders inside a `<slot>` the browser hydrates, its props serialized for the client.
 // A client-only one, `client` or rendered with `hydrate="client"`, holds only its fallback in the slot, the use's `@fallback` block else the component's own, until the browser renders into it, and inside another island renders nothing.
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
@@ -148,9 +156,10 @@ export function island<P extends object>(id: string, component: ((props: P) => J
   const render = (props: P & IslandOptions) => {
     const when = props.hydrate ?? asks?.hydrate
     const persist = persistKey(props.persist ?? asks?.persist, id)
-    const browserOnly = client || when === 'client'
+    const renderClient = props.render === 'client'
+    const browserOnly = client || when === 'client' || renderClient
     const waits = isWaiting(when, id)
-    const own = 'hydrate' in props || 'persist' in props || USE_FALLBACK in props ? omit(props, 'hydrate', 'persist', USE_FALLBACK, ...browserOnly && USE_FALLBACK in props ? ['fallback'] : []) as P : props
+    const own = ownProps(props, renderClient, browserOnly)
 
     // A use asking for nothing the browser does renders as markup, with no island and no script for the page.
     if (staysPlain(depth, client, lives, props, asks))
@@ -232,7 +241,7 @@ function staysPlain(depth: number, client: boolean, lives: readonly unknown[], p
     return false
 
   for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(props))) {
-    if (key === 'hydrate' || key === 'persist' || key === USE_FALLBACK)
+    if (key === 'hydrate' || key === 'persist' || (key === 'render' && (props as { render?: unknown }).render === 'client') || key === USE_FALLBACK)
       return false
 
     // What an island would refuse to send, or send for the browser to finish (a promise), keeps the use an island.
@@ -368,7 +377,7 @@ function serializeProps(what: string, props: object, slots: [string, string][]):
       const reason = refusedAction(value)
 
       if (reason !== undefined || !isAction(value))
-        throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop is ${reason ?? `a ${typeof value}`} and cannot reach the browser; ${reason === undefined ? 'write `--- island` in the component passing it (a page or a layout passes it through a component of its own), which then renders as an island and sends its own props in its place, or pass the island data (`kay check` reports it as `island-prop`)' : 'pass it from a component of its own, which then renders as an island in its place'}`)
+        throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop is ${reason ?? `a ${typeof value}`} and cannot reach the browser; ${reason === undefined ? 'write `island()` in the component passing it (a page or a layout passes it through a component of its own), which then renders as an island and sends its own props in its place, or pass the island data (`kay check` reports it as `island-prop`)' : 'pass it from a component of its own, which then renders as an island in its place'}`)
 
       if (rendered)
         rendered.actions ??= `${what}, so it renders as an island: its \`${key}\` prop is an action`

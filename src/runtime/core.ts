@@ -438,8 +438,8 @@ export type EndpointContext<Params extends Record<string, unknown> = Record<stri
 export interface EndpointSettings {
   // A static export writes the file's `GET` once: `true` for a path without params, else the params of each page to write, as a list or a function returning one.
   prerender?: boolean | object
-  // `false` serves the file with no guard, where `requireGuards` would refuse it.
-  guards?: false
+  // `false` serves the file with no guard, where `requireGuards` would refuse it; `true`, the default, says nothing.
+  guards?: boolean
   // The search params `ctx.query` is read against; a query it refuses answers 400.
   query?: Schema
   // At most `max` requests from one client, or from whatever `key` names, every `window`, counted across the file's methods after its guards; past that it answers 429 with `Retry-After`.
@@ -484,17 +484,18 @@ export interface PageSettings {
   // `kay build` renders the page once: `true` for a route without params, else the params of each page to render, as a list, a function returning one, a content collection or a `paginate()` list.
   prerender?: boolean | object
   // `true` says the page is to be kept prerendered by `kay build` on its own, as a page reading nothing from a request is: when the build cannot show it does, the `unkept-page` lint names what stops it.
-  keep?: true
+  // `false`, the default, says nothing.
+  keep?: boolean
   // How the prerendered page is cached. `'1h'`: the server renders it again in the background once it is older, and a public page answers `cache-control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600` so a CDN keeps it that long. `{ browser, shared, swr }` sets each part of the header, `shared` also being how long the page is served before it renders again. `'private'` sends `private`, `false` the default `public, max-age=0, must-revalidate`. A page behind a guard, or rendered for one visitor, is `private` whatever this says; a layout's applies to every page under it, the innermost winning.
   cache?: PageCache
   /** @deprecated Write `cache: '1h'`. Removed in 1.108.0; `deprecated-page-cache` rewrites it. */
   ttl?: Duration
   /** @deprecated Write `cache: { browser, shared, swr }`, or `cache: false`. Removed in 1.108.0; `deprecated-page-cache` rewrites `false`. */
   cacheControl?: string | false
-  // `false` renders the page, or the layouts below this one, without the layouts above.
-  layouts?: false
-  // `false` runs none of the `_guard.ts` files above the page, nor above its actions or a layout's: a sign-in page under a guard asking for a session.
-  guards?: false
+  // `false` renders the page, or the layouts below this one, without the layouts above; `true`, the default, says nothing.
+  layouts?: boolean
+  // `false` runs none of the `_guard.ts` files above the page, nor above its actions or a layout's: a sign-in page under a guard asking for a session; `true`, the default, says nothing.
+  guards?: boolean
   // At most `max` requests from one client, or from whatever `key` names, every `window`, counted after the guards for each page apart (a layout's applies to every page under it, the innermost that sets one winning, `false` lifting it); past that it answers 429 with `Retry-After` through the nearest `_429.kay` or `_error.kay`. A page with one is counted on every request, a prerendered copy included.
   rateLimit?: RateLimit | RateLimit[] | false | undefined
   // The longest the page may take to answer, in place of `serve.timeout`: a string such as '30s', or `false` for none. Past it the page answers 504 through the nearest `_error.kay`; the innermost layout or page that sets it wins.
@@ -514,7 +515,8 @@ export interface PageSettings {
   // What the page's responses send over the site's security headers; a layout's applies to every page under it, the inner one merged over the outer.
   security?: PageSecurity
   // `true` loads the page fully from any link or form of the site, past the page swap: a page whose scripts expect a fresh document.
-  reload?: true
+  // `false`, the default, says nothing.
+  reload?: boolean
   /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
   search?: PageSearch | ((params: Record<string, string>) => PageSearch | undefined | Promise<PageSearch | undefined>)
 }

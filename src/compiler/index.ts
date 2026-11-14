@@ -13,6 +13,7 @@ import { actionOf, drawIcons, elementsIn, INTERACTIVE_ATTRIBUTE, SERVER_IN_ISLAN
 import { browserReads } from './browser'
 import { wrapActionButtons } from './button-forms'
 import { generate, isInteractive, islandCause, lineOf } from './codegen'
+import { deprecatedIslandAttributes, deprecatedIslandForms } from './deprecated-island'
 import { deprecatedPageSettings } from './deprecated-page'
 import { spelledOutScriptFence } from './deprecated-script-fence'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
@@ -188,7 +189,7 @@ function realCause(cause: IslandCause | undefined, expansion: Expansion | undefi
 
 // A component pinned static that something makes an island: the error stands at that thing, so the author sees it.
 function staticPin(span: Span, cause: IslandCause): Diagnostic {
-  return { ...span, code: 'static-pin', message: `This component is pinned \`--- static\`, and is an island: ${describeCause(cause)}`, note: 'it needs the browser, so it hydrates there', help: 'take that out of the component, or pin it `--- island`' }
+  return { ...span, code: 'static-pin', message: `This component is declared \`island({ render: 'static' })\`, and is an island: ${describeCause(cause)}`, note: 'it needs the browser, so it hydrates there', help: 'take that out of the component, or declare it `island()`' }
 }
 
 // A page without a server fence that is an island for a handler, a `kay` value or a live or persisted import: a page renders once, so a component should hold what needs the browser. It works until 1.108.
@@ -369,21 +370,21 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...spelledOutScriptFence(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script, island !== undefined), ...malformedInteractive(script))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...spelledOutScriptFence(file), ...deprecatedIslandForms(file, script), ...deprecatedIslandAttributes(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script, island !== undefined), ...malformedInteractive(script))
   }
 
   if (checked && pin !== undefined)
     diagnostics.push(...markerMismatch(pin, pageFile))
 
   if (file.client && file.module)
-    diagnostics.push({ ...file.client, code: 'fence-invalid', message: 'A `--- client` component has no `--- module` fence', note: 'the server loads only its live imports, so its exports would be missing there', help: 'put the shared values in a `.ts` module' })
+    diagnostics.push({ ...file.client, code: 'fence-invalid', message: 'A component rendering in the browser only has no `--- module` fence', note: 'the server loads only its live imports, so its exports would be missing there', help: 'put the shared values in a `.ts` module' })
 
   if (file.server && options.component === true && !basename(filename).startsWith('_')) {
     diagnostics.push({ ...file.serverFence!, code: 'fence-invalid', message: 'A component has no `--- server` fence', note: 'only a page or a layout runs on the server for each request, and a component would take its values as required props', help: 'compute the value in the page or layout and pass it as a prop, or read it in an action' })
   }
 
   if (file.client && pageFile)
-    diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
+    diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot render in the browser only', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `island({ render: \'client\' })`' })
 
   const shorthands = diagnostics.some(diagnostic => (diagnostic.fixes?.length ?? 0) > 0) ? [...elementsIn(file.template)].flatMap(element => element.attributes.filter((attribute): attribute is Shorthand => attribute.kind === 'expression' && attribute.shorthand !== undefined)) : []
   const facts = templateFacts(file)

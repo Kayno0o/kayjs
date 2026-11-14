@@ -363,7 +363,7 @@ export const LINTS = {
   'server-only-import': {
     level: 'deny',
     group: 'islands',
-    summary: 'A name only the server\'s `kay/cache` has, `invalidatePage` or `sqliteCache`, imported by what runs in the browser, an island\'s script or a `--- client` fence: the browser entry has `cached` and `invalidate` alone, so the build fails there.',
+    summary: 'A name only the server\'s `kay/cache` has, `invalidatePage` or `sqliteCache`, imported by what runs in the browser, an island\'s script or a browser-only component: the browser entry has `cached` and `invalidate` alone, so the build fails there.',
     wrong: '---\nimport { signal } from \'kay\'\nimport { sqliteCache } from \'kay/cache\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
     right: '---\nimport { signal } from \'kay\'\nimport { invalidate } from \'kay/cache\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
   },
@@ -437,17 +437,17 @@ export const LINTS = {
   'island-marker': {
     level: 'deny',
     group: 'islands',
-    summary: 'A `--- island` fence line on a page, a layout or a special page: they render on the server and are never islands. Move what needs the browser to a component of its own.',
-    wrong: '--- server\nconst title = \'Home\'\n--- island\n---\nh1 {title}',
+    summary: 'An `island()` declaration (or a `--- island` fence line) on a page, a layout or a special page: they render on the server and are never islands. Move what needs the browser to a component of its own.',
+    wrong: '--- server\nconst title = \'Home\'\n--- script\nisland()\n---\nh1 {title}',
     right: '--- server\nconst title = \'Home\'\n---\nh1 {title}',
   },
   'island-prop': {
     level: 'deny',
     group: 'islands',
     typed: true,
-    summary: 'A component that is not an island passing one a value its type says cannot be sent: a function (a callback, a signal), a block taking parameters, a symbol, or an object holding either, such as a `Column` with a `sortValue` function. An island is sent its props serialized into the page, so only data crosses; an action, a Date or a Map does. The types decide, so a value typed `any` or `unknown` is not reported, nor a call returning data. The fix writes `--- island` on the component, applied by `kay check --fix` where the value is always a function and offered, not applied, where its type is a union holding one; a page or a layout is never an island, so it passes the island data or goes through a component of its own. Rendering throws an `IslandPropsError` for the same value, naming the fix.',
+    summary: 'A component that is not an island passing one a value its type says cannot be sent: a function (a callback, a signal), a block taking parameters, a symbol, or an object holding either, such as a `Column` with a `sortValue` function. An island is sent its props serialized into the page, so only data crosses; an action, a Date or a Map does. The types decide, so a value typed `any` or `unknown` is not reported, nor a call returning data. The fix writes `island()` in the component, applied by `kay check --fix` where the value is always a function and offered, not applied, where its type is a union holding one; a page or a layout is never an island, so it passes the island data or goes through a component of its own. Rendering throws an `IslandPropsError` for the same value, naming the fix.',
     wrong: '---\nimport Picker from \'./picker.kay\'\n\nconst { format } = props<{ format: (value: string) => string }>()\n---\nPicker(format={format})',
-    right: '--- island\nimport Picker from \'./picker.kay\'\n\nconst { format } = props<{ format: (value: string) => string }>()\n---\nPicker(format={format})',
+    right: '---\nisland()\nimport Picker from \'./picker.kay\'\n\nconst { format } = props<{ format: (value: string) => string }>()\n---\nPicker(format={format})',
   },
   'hydration-mismatch': {
     level: 'deny',
@@ -995,7 +995,7 @@ function unsendable(message: string, prop: string | undefined): TypeLint {
     code: 'island-prop',
     message: `${holds}, and an island is sent its props as data`,
     note: 'an island\'s props are serialized into the page: plain objects, arrays, Dates, Maps, Sets, bigints, URLs, RegExps and actions, but no functions, symbols or class instances',
-    help: 'write `--- island` in place of `---` on this component, so it is an island itself, or pass the island data',
+    help: 'write `island()` at the top of this component\'s script, so it is an island itself, or pass the island data',
     always,
   }
 }

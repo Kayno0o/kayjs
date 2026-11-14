@@ -4,10 +4,12 @@
 
 ### Render a component in the browser only
 
-`--- client` for one that cannot render on the server, such as one wrapping a map library:
+`island({ render: 'client' })` for one that cannot render on the server, such as one wrapping a map library:
 
 ```kay
---- client
+---
+island({ render: 'client' })
+
 import { onMount } from 'kay'
 import { drawMap } from './map'
 
@@ -28,15 +30,15 @@ onMount(() => drawMap(center))
 - An island importing a package that throws on a browser-only global as it loads renders in the browser only, with nothing to write.
 - Each package is imported once, in a Bun process of its own, and the answer is kept per package version in `.kay/cache`.
 - The server never loads such a package: an island's server module carries none of its script.
-- A component whose script fence is `--- client` always renders in the browser only, and is an island even without state.
-- Pages, layouts and special pages render on the server, so they cannot be `--- client`.
-- `hydrate="client"` renders one use of an island in the browser only: `Map(center={center} hydrate="client")`.
+- A component declaring `island({ render: 'client' })` always renders in the browser only, and is an island even without state. It was the `--- client` fence line, which `kay upgrade` rewrites (`deprecated-island-fence`) and which works until 1.108.
+- Pages, layouts and special pages render on the server, so they cannot declare it.
+- `render="client"` renders one use of an island in the browser only: `Map(center={center} render="client")`. It was `hydrate="client"` (`deprecated-island-attributes`): `hydrate` says only when an island hydrates.
 
 ### Fallback while the browser renders
 
 - A map or an editor that renders late shifts the layout and flashes. A fallback is the markup the server sends in the island's slot, which the browser replaces when the island renders.
-- A use writes it as an `@fallback` block: `Map(center={center} hydrate="client")` with an `@fallback` block under it holding the skeleton (`.map-skeleton` say). It reaches only that use, and is not a prop of the component: the `fallback` prop or slot a client-only component declares itself is untouched, but an `@fallback` block under such a use is the island's fallback and is not passed on to it.
-- A `--- client` component declares its own for every use with an `@fallback` block at the root of its template, beside the markup it renders. A use's block wins over it.
+- A use writes it as an `@fallback` block: `Map(center={center} render="client")` with an `@fallback` block under it holding the skeleton (`.map-skeleton` say). It reaches only that use, and is not a prop of the component: the `fallback` prop or slot a client-only component declares itself is untouched, but an `@fallback` block under such a use is the island's fallback and is not passed on to it.
+- A component declaring `render: 'client'` declares its own for every use with an `@fallback` block at the root of its template, beside the markup it renders. A use's block wins over it.
 - A component's own fallback renders on the server without the script, so it is static markup: it reads no prop or `const` of the script (`kay check` names one it reads), and takes the place the island fills. It may use the script's imports, a `Spinner` or an icon.
 - The fallback is for the first paint: give it the island's size, so nothing moves when the island replaces it. An island inside another one renders nothing on the server, as before.
 
@@ -46,10 +48,10 @@ onMount(() => drawMap(center))
 - `fetch`, `URL`, `WebSocket`, `crypto` and `navigator` exist on the server too and are never reported.
 - `kay check` and the editor report a browser-only global read while the component renders: at the script's top level, in a `memo` or an array callback such as `.map`, in a function of the script the render calls, or in a template value.
 - Handlers, refs, `effect`, `onMount`, the target of `listen(() => window, 'keydown', ...)` and other callbacks run in the browser only and report nothing.
-- The editor offers two fixes: wrap the statement in `effect`, offered for a statement that is a plain call or assignment, since a declaration would take its name out of reach, or turn the fence into `--- client`.
+- The editor offers two fixes: wrap the statement in `effect`, offered for a statement that is a plain call or assignment, since a declaration would take its name out of reach, or declare `island({ render: 'client' })`.
 - `kay check --fix` and the editor's fix-all apply the `effect` wrap, with its `effect` import, alone where it is safe: a call on the global or an assignment to a member of it (`localStorage.setItem(...)`, `document.title = ...`, `document.body.classList.add(...)`), which leaves nothing for the rest of the script to read. A call of a function of the script, an assignment to a local, an `await` and a declaration are offered in the editor and left for you to decide, as later code may rely on them running with the script. The wrap moves the arguments into the effect too, so a signal read there makes it run again when it changes.
 - `typeof window` while an island renders is reported too: it is `'undefined'` on the server, so the island would render something else in the browser than the markup it hydrates.
-- A module of the app that a page, a layout or a component imports (not a `--- client` one) and that reads such a global as it loads is the `browser-global-at-load` lint, reported by `kay check` and the build at the read, naming the component reaching it: the server throws as it evaluates the module. Only what the server renders counts: not a component a `--- client` component alone renders, one used only with `hydrate="client"`, or an island the build demotes to the browser for a package it imports. A read inside a function, under a `typeof` check of `window` or of any browser name, in a `try` with a `catch`, or after an early `return` on one passes, as does a dynamic `import()`; a package is left to the probe above, and a name read through `globalThis` (`globalThis.window.innerWidth`) counts like the bare one. `// kay-allow browser-global-at-load` allows a deliberate read.
+- A module of the app that a page, a layout or a component imports (not one rendering in the browser only) and that reads such a global as it loads is the `browser-global-at-load` lint, reported by `kay check` and the build at the read, naming the component reaching it: the server throws as it evaluates the module. Only what the server renders counts: not a component a browser-only component alone renders, one used only with `render="client"`, or an island the build demotes to the browser for a package it imports. A read inside a function, under a `typeof` check of `window` or of any browser name, in a `try` with a `catch`, or after an early `return` on one passes, as does a dynamic `import()`; a package is left to the probe above, and a name read through `globalThis` (`globalThis.window.innerWidth`) counts like the bare one. `// kay-allow browser-global-at-load` allows a deliberate read.
 - A global reached through a package, or called from a function of a module as the page renders, is not seen by the check; a server render failing on one fails with the global, the `.kay` line reading it and the same two fixes in the error's message, in development and in production alike. The log and `onError` get that message (the `stack` keeps the original `... is not defined` text), and the visitor sees the development error page, or `Internal Server Error` in production.
 - An island reading the clock (`Date.now()`, `new Date()`), `Math.random()`, or a `toLocale*String` or `Intl` format given no locale (no `timeZone` for dates) while it renders is the `hydration-mismatch` lint: the server and the browser compute it apart. It is a lint like any other, so a deliberate read (a copyright year, an id overwritten in `onMount`) is allowed with `// kay-allow hydration-mismatch` on or above its line, `kay-allow-file` or `lints: { 'hydration-mismatch': 'warn' }`. A coarse read such as `new Date().getFullYear()` is reported too, as the year differs between the server's time zone and the visitor's for hours around New Year.
 

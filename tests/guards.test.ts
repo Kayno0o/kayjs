@@ -415,6 +415,7 @@ describe('falseKeys', () => {
 
   it.each([
     ['the keys of the page object set to false, quoted or not, none nested in a value or a comment', 'export const page = {\n  \'layouts\': false, guards: false,\n  sitemap: { guards: false },\n  // noindex: false\n}\n', undefined, ['layouts', 'guards']],
+    ['no flag written `true`, which says what the default does', 'export const page = { guards: true, layouts: true, keep: true, reload: true }\n', undefined, []],
     ['no key set to an expression starting like false', 'export const page = { guards: falsey }\n', undefined, []],
     ['no key of an object that is not the page', 'const other = { guards: false }\n', undefined, []],
     ['the keys of an api object', 'export default api({ cors: { origins: [] }, guards: false })\n', API_OBJECT, ['guards']],

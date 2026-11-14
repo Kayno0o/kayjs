@@ -46,7 +46,7 @@ const TAG_NAME = /^[\w$.:-]+$/
 const UNDECLARED_PROP = /^Type '[\s\S]*?' is not assignable to type '([\s\S]*)'\.\n\s*Property '([\w$-]+)' does not exist on type '[\s\S]*'\.?$/
 const PROP_MEMBER = /^\s*([\w$]+)\??:([\s\S]*)$/
 const COMPONENT_CALL = /^([A-Z][\w$.]*)\(/
-const ISLAND_OPTIONS = new Set(['hydrate', 'persist', 'fallback'])
+const ISLAND_OPTIONS = new Set(['hydrate', 'persist', 'render', 'fallback'])
 const BLOCK_TYPE = /^(?:\([^)]*\) => )?Element$/
 const NAME_ESCAPES = /[$.]/g
 const NAME_CHAR = /[\w:$-]/

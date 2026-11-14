@@ -90,7 +90,7 @@ function blockName(message: string, source: string, span: Span | undefined): str
   return written !== undefined && PLAIN_NAME.test(written) && message.includes('kayAlways: true') && !message.includes('kayPath') ? written : undefined
 }
 
-// What an island-prop lint offers: `--- island` on the component. It is offered and never applied by `--fix`, as it turns a static component into an island that ships its code to the browser.
+// What an island-prop lint offers: `island()` in the component's script. It is offered and never applied by `--fix`, as it turns a static component into an island that ships its code to the browser.
 function unsendableFix(lint: NonNullable<ReturnType<typeof typeLint>>, shadow: ShadowFile): Pick<Diagnosed, 'fixes' | 'help'> | undefined {
   if (lint.code !== 'island-prop')
     return undefined
@@ -99,7 +99,7 @@ function unsendableFix(lint: NonNullable<ReturnType<typeof typeLint>>, shadow: S
   const route = file.server !== undefined || ROUTE_FILES.has(basename(shadow.file))
 
   if (route)
-    return { help: 'a page, a layout or a special page is never an island: pass the island data, or go through a component of its own written `--- island`' }
+    return { help: 'a page, a layout or a special page is never an island: pass the island data, or go through a component of its own that declares `island()`' }
 
   const fix = islandFence(file)
 

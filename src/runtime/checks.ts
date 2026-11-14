@@ -47,6 +47,8 @@ export interface IslandBrand { readonly [ISLAND]: true }
 // What a static parent passes an island besides its props: when it hydrates, and whether it lives on across navigations, `persist` keeping it by its component, `persist="key"` by a key of its own.
 // `fallback` is the markup a client-only use shows on the server until the browser renders the island, written as an `@fallback` block: it reaches the island under a key of kay's own, so a component's `fallback` prop of another kind is its own.
 export interface IslandOptions {
+  // `'client'` renders the use in the browser only, as `island({ render: 'client' })` does for every use.
+  render?: 'client' | undefined
   hydrate?: HydrateWhen | undefined
   persist?: boolean | string | undefined
   fallback?: JSX.Element | undefined
@@ -304,11 +306,11 @@ type FunctionPaths<T, Seen = never, Depth extends unknown[] = [], Prefix extends
                   : never
 
 // Why an island is refused a value; `kay check` reports it as a lint with its own text.
-type Unsendable = 'An island is sent its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; the component passing one is an island itself with `--- island`'
+type Unsendable = 'An island is sent its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; the component passing one is an island itself with `island()`'
 
 type Callable = (...args: never[]) => unknown
 
-// `kayAlways` marks a value that is a function whatever else the type allows, which `--- island` always fixes.
+// `kayAlways` marks a value that is a function whatever else the type allows, which `island()` always fixes.
 type NotSerializable<Value> = [FunctionPaths<Value>] extends [never]
   ? { kayLint: 'island-prop', kayError: Unsendable }
   : [Value] extends [Callable]

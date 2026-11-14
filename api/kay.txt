@@ -356,7 +356,7 @@ type EndpointContext<Params extends Record<string, unknown> = Record<string, str
 [.] EndpointSettings
 interface EndpointSettings
   cors?: CorsOptions | false | undefined
-  guards?: false
+  guards?: boolean
   maxSize?: ByteSize | undefined
   prerender?: boolean | object
   query?: Schema
@@ -538,6 +538,7 @@ interface IslandOptions
   fallback?: Element
   hydrate?: HydrateWhen | undefined
   persist?: boolean | string | undefined
+  render?: "client" | undefined
 
 [.] IslandProp
 type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value> : unknown
@@ -835,15 +836,15 @@ interface PageSettings
   cache?: PageCache
   /** @deprecated Write `cache: { browser, shared, swr }`, or `cache: false`. Removed in 1.108.0; `deprecated-page-cache` rewrites `false`. */ cacheControl?: false | string
   /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ feed?: false | object | readonly object[]
-  guards?: false
-  keep?: true
+  guards?: boolean
+  keep?: boolean
   /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ lastmod?: ((params: Record<string, string>) => Lastmod | Promise<Lastmod | undefined> | undefined) | Lastmod
-  layouts?: false
+  layouts?: boolean
   /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ noindex?: boolean
   prerender?: boolean | object
   query?: Schema
   rateLimit?: RateLimit | RateLimit[] | false | undefined
-  reload?: true
+  reload?: boolean
   /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ search?: ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined) | PageSearch
   security?: PageSecurity
   seo?: PageSeo
@@ -2631,7 +2632,7 @@ interface ApiModule
 [./server] ApiOptions
 interface ApiOptions
   cors?: CorsOptions | false | undefined
-  guards?: false | undefined
+  guards?: boolean | undefined
   maxSize?: (() => ByteSize) | ByteSize | undefined
   rateLimit?: RateLimit | RateLimit[] | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined

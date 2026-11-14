@@ -9,6 +9,7 @@ import { importedSignals } from '../build/signals'
 import { compileKay } from '../compiler'
 import { formatDiagnostic } from '../compiler/frame'
 import { CAUSE_KINDS, describeCause, ISLAND_RULE } from '../compiler/island-cause'
+import { parseKay } from '../compiler/parser'
 import { loadConfigWithin } from '../config-loader'
 import { printDocument, printFailure, projectRoot } from './command'
 
@@ -17,12 +18,33 @@ type Role = 'island' | 'static'
 interface Explained {
   file: string
   role: Role
+  // `declared` when the component's `island()` call decided the role, `inferred` when its code did.
+  how?: 'declared' | 'inferred'
+  // The settings of the component's `island()` call, as it writes them.
+  declared?: string
   cause?: { kind: string, name: string, line: number, description: string, meaning: string, interactive?: Readonly<Record<string, boolean>> | undefined } | undefined
 }
 
 const ROLE_WORDS: Record<Role, string> = {
   island: 'an island: it renders on the server and hydrates in the browser',
   static: 'static: it ships no JavaScript',
+}
+
+// The settings of an `island()` call, written as the call is.
+function declaredCall(source: string): string | undefined {
+  const declaration = parseKay(source).island
+
+  if (declaration === undefined)
+    return undefined
+
+  const settings = [
+    declaration.render === 'island' ? undefined : `render: '${declaration.render}'`,
+    declaration.hydrate === undefined ? undefined : `hydrate: '${declaration.hydrate}'`,
+    declaration.persist === undefined ? undefined : `persist: ${JSON.stringify(declaration.persist)}`,
+    declaration.interactive === undefined ? undefined : `interactive: ${JSON.stringify(declaration.interactive)}`,
+  ].filter(setting => setting !== undefined)
+
+  return settings.length === 0 ? 'island()' : `island({ ${settings.join(', ')} })`
 }
 
 function shown(cause: IslandCause) {
@@ -45,7 +67,9 @@ async function explained(root: string, files: string[], pages: readonly string[]
       continue
     }
 
-    found.push({ file: relative(root, file), role: island === undefined ? 'static' : 'island', ...cause && { cause: shown(cause) } })
+    const declared = declaredCall(source)
+
+    found.push({ file: relative(root, file), role: island === undefined ? 'static' : 'island', ...cause && { how: cause.name === 'island()' ? 'declared' : 'inferred', cause: shown(cause) }, ...declared !== undefined && { declared } })
   }
 
   return { found, broken }
@@ -54,7 +78,8 @@ async function explained(root: string, files: string[], pages: readonly string[]
 function lines(entry: Explained): string[] {
   return [
     `${entry.file}: ${ROLE_WORDS[entry.role]}`,
-    ...entry.cause === undefined ? [] : [`  cause: ${entry.cause.description}`, `  meaning: ${entry.cause.meaning}`, ...entry.cause.interactive === undefined ? [] : [`  interactive props: ${Object.entries(entry.cause.interactive).map(([name, on]) => on ? `${name} (on unless false)` : name).join(', ')}`]],
+    ...entry.declared === undefined ? [] : [`  declared: ${entry.declared}`],
+    ...entry.cause === undefined ? [] : [`  decided: ${entry.how === 'declared' ? 'by its island() declaration' : 'inferred from its code'}`, `  cause: ${entry.cause.description}`, `  meaning: ${entry.cause.meaning}`, ...entry.cause.interactive === undefined ? [] : [`  interactive props: ${Object.entries(entry.cause.interactive).map(([name, on]) => on ? `${name} (on unless false)` : name).join(', ')}`]],
   ]
 }
 
