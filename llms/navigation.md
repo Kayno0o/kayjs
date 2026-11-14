@@ -50,6 +50,8 @@ form(ref={element => form = element} onSubmit={event => event.preventDefault()})
   input(aria-label="Title")
 ```
 
+A handler of your own on Enter in a text field starts with `if (composing(event)) return` (`composing` from `kay`): the Enter that confirms an IME candidate, which Safari sends with `keyCode` 229 after `isComposing` is already false, is not yours to act on. `shortcut` and the `.enter` modifier already skip it.
+
 ## Reference
 
 ### Navigation

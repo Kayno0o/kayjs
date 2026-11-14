@@ -3,7 +3,7 @@ import type { FieldSize } from './field-look'
 import { FIELD_ICON, FIELD_ICON_PAD, fieldInvalid, fieldSize, keepInvalid, LABEL_TEXT } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import type { ComboboxOption, ComboboxOptions } from './combobox'
-import { effect, postedValue, recipe, signal, uid, untrack } from 'kay'
+import { composing, effect, postedValue, recipe, signal, uid, untrack } from 'kay'
 import { afterPause, isRemote, searchOptions } from './options-source'
 import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
 import { defaultKept, fieldRef, onFormReset } from './form-reset'
@@ -270,6 +270,9 @@ function move(step: 1 | -1) {
 
 // The arrows move through the options with focus staying in the input, as the combobox pattern has it; Enter picks the active one, Escape closes the list and a second Escape clears the text.
 function keyDown(event: KeyboardEvent) {
+  if (composing(event))
+    return
+
   if (event.altKey && event.key === 'ArrowDown') {
     event.preventDefault()
     opened = true

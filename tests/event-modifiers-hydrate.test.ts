@@ -82,6 +82,7 @@ describe('event modifiers on a hydrated island', () => {
     press(' ')
     press('Enter')
     press('Enter', { isComposing: true })
+    press('Enter', { keyCode: 229 })
 
     const submit = new Event('submit', { bubbles: true, cancelable: true })
 

@@ -1,7 +1,7 @@
 ---
 import type { JSX, SearchHit, Snippet } from 'kay'
 import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
-import { effect, memo, onCleanup, recipe, searchResults, shortcut, signal, uid } from 'kay'
+import { composing, effect, memo, onCleanup, recipe, searchResults, shortcut, signal, uid } from 'kay'
 import { stepIndex } from './cycle'
 import { startRef } from './form-reset'
 import Icon from './icon.kay'
@@ -244,6 +244,9 @@ function act(action: PaletteAction) {
 }
 
 function keyDown(event: KeyboardEvent) {
+  if (composing(event))
+    return
+
   const count = rows().length
 
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {

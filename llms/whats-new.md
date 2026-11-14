@@ -15,6 +15,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `cms({ access })` is the one option for who may edit: a kayjs-auth role or list of them, `{ password }`, or a function returning the person, inferred from kayjs-auth and `roles` when left out; `roles` and `can` stand alone. See [the cms options](../packages/cms/llms/options.md).
 - `CMS_URL` names the forge a production server commits to, `forgejo://TOKEN@git.example.com/owner/repo`, `github://TOKEN@owner/repo` or `gitlab://TOKEN@group/project`, as `MAIL_URL` does for mail. See [setup](../packages/cms/llms/setup.md).
 - A cms collection sets its own `uploads`, `fourEyes` and hooks beside the global ones, `history: { revisions: false }` turns the revisions off alone, and `pageLink: { button: false }` keeps the Edit this page hint with no button. See [options](../packages/cms/llms/options.md).
+- Enter that confirms an input-method (IME) candidate no longer picks, runs or adds: kayjs-ui's combobox, command palette and markdown editor, kayjs-cms's tag field and kayjs-ai's chat edit, rename and message fields ignore it, as does the `.enter` event modifier (Safari's closing Enter included), and `composing(event)` from `kay` is that check for a handler of your own ([keyboard shortcuts](navigation.md)).
 
 ## 1.104.3
 

@@ -129,6 +129,11 @@ export function shortcut(keys: string | (() => string | null | undefined), handl
   }), options.signal)
 }
 
+// Whether a key press belongs to an IME composition: one inside it, or the Enter that closes it, which Safari sends with `keyCode` 229 after `isComposing` has already turned false. A handler acting on Enter in a text field returns early on it.
+export function composing(event: KeyboardEvent): boolean {
+  return event.isComposing || event.keyCode === 229
+}
+
 // Listens for the shortcut on `target` until the computation it runs in is cleaned up.
 function bind(parsed: Parsed, target: EventTarget, scope: Element | undefined, handler: (event: KeyboardEvent) => void, options: ShortcutOptions): void {
   // AltGr is reported as Ctrl+Alt on Windows and Linux, so a symbol typed with it counts as no modifier, a real Ctrl held with it included.
@@ -137,7 +142,7 @@ function bind(parsed: Parsed, target: EventTarget, scope: Element | undefined, h
   const listener = (event: Event): void => {
     const press = event as KeyboardEvent
 
-    if (press.defaultPrevented || press.isComposing || press.keyCode === 229 || (press.repeat && !options.repeat))
+    if (press.defaultPrevented || composing(press) || (press.repeat && !options.repeat))
       return
 
     const altGr = altGrSymbol && press.getModifierState?.('AltGraph') === true

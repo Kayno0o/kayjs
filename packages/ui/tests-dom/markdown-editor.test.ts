@@ -438,3 +438,18 @@ describe('MarkdownEditor onChange from the toolbar', () => {
     expect(committed).toEqual(['**word**'])
   })
 })
+
+describe('MarkdownEditor IME composition', () => {
+  test('Enter that ends one continues no list, a plain Enter still does', async () => {
+    const state = await editor('- milk')
+
+    state.area.setSelectionRange(6, 6)
+
+    for (const init of [{ isComposing: true }, { keyCode: 229 }])
+      expect(press(state.area, 'Enter', init).defaultPrevented).toBe(false)
+
+    expect(state.value).toBe('- milk')
+    expect(press(state.area, 'Enter').defaultPrevented).toBe(true)
+    expect(state.value).toBe('- milk\n- ')
+  })
+})

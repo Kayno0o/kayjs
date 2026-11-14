@@ -16,7 +16,7 @@ button(onClick={() => count++}) Clicked {count()} times
 
 A component is an island when its own code needs the browser: an `on*` handler, a `bind:` or a `ref` in its template, a browser value of `kay` such as `signal` in its script, a `live` or `persisted` value it imports from one of your modules (even through a re-export), or a `--- island` or `--- client` fence line. The compiler decides it from the file and its imports, and nothing a component passes makes it one.
 
-The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `byteCount`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `escapeHtml`, `formErrors`, `isEmail`, `localPath`, `postedChecked`, `postedValue`, `postedValues`, `publicEnv`, `recipe`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` keep a component static.
+The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `byteCount`, `composing`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `escapeHtml`, `formErrors`, `isEmail`, `localPath`, `postedChecked`, `postedValue`, `postedValues`, `publicEnv`, `recipe`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` keep a component static.
 
 A namespace or default import of `kay` or `kay/i18n` (`import * as i18n from 'kay/i18n'`) always makes an island, so import the names you use instead.
 
@@ -519,6 +519,8 @@ form(ref={element => form = element} onSubmit={event => event.preventDefault()})
 Without `on` the shortcut binds the whole page. It cancels the browser's own action for the key and does nothing on the server.
 
 A shortcut with `mod`, `ctrl`, `meta` or `alt` also fires in a text field. A bare key such as `/` fires there only with `{ inputs: true }`. Of two bindings on one key, the innermost wins.
+
+A handler of your own on Enter in a text field starts with `if (composing(event)) return`, with `composing` from `kay`. The Enter that confirms a candidate of an input method (Japanese, Chinese, Korean) is not a submit: Safari sends it with `keyCode` 229 after `isComposing` is already false, and `composing` catches both. `shortcut` and the `.enter` event modifier already skip it.
 
 <ReadMore href="/llms/navigation">Which keys fire in a text field, how Shift and AltGr match, and the other options of `shortcut`.</ReadMore>
 

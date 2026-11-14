@@ -459,8 +459,8 @@ describe('elements', () => {
     const dom = (attributes: string, tag = 'button') => compileKay(`${ISLAND}${tag}(${attributes}) x\n`, 'test.kay', { output: 'dom' }).tsx
 
     expect(dom('onClick|self={f}')).toContain('(kayEvent) => { if (kayEvent.target !== kayEvent.currentTarget) return; return (f)?.(kayEvent) }')
-    expect(dom('onKeyDown|enter={f}', 'input')).toContain('(kayEvent) => { if (kayEvent.isComposing || !["Enter"].includes(kayEvent.key)) return; return (f)?.(kayEvent) }')
-    expect(dom('onKeyDown|enter|space|preventDefault={f}', 'input')).toContain('if (kayEvent.isComposing || !["Enter"," "].includes(kayEvent.key)) return; kayEvent.preventDefault();')
+    expect(dom('onKeyDown|enter={f}', 'input')).toContain('(kayEvent) => { if (kayEvent.isComposing || kayEvent.keyCode === 229 || !["Enter"].includes(kayEvent.key)) return; return (f)?.(kayEvent) }')
+    expect(dom('onKeyDown|enter|space|preventDefault={f}', 'input')).toContain('if (kayEvent.isComposing || kayEvent.keyCode === 229 || !["Enter"," "].includes(kayEvent.key)) return; kayEvent.preventDefault();')
     expect(dom('onKeyUp|up|pagedown={f}', 'input')).toContain('["ArrowUp","PageDown"]')
     expect(dom('onClick|once={f}')).toContain('(() => { let kayDone = false; return (kayEvent) => { if (kayDone) return; kayDone = true; return (f)?.(kayEvent) } })()')
     expect(dom('onClick|once|self={f}')).toContain('if (kayDone) return; if (kayEvent.target !== kayEvent.currentTarget) return; kayDone = true; return')

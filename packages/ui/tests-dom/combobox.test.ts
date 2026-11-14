@@ -555,3 +555,25 @@ test('starts on a numeric value, zero included, posting its string', async () =>
 
   expect(root.querySelector<HTMLInputElement>('input[type="hidden"][name="planet"]')?.value).toBe('0')
 })
+
+test('Enter that ends an IME composition picks and adopts nothing, a plain Enter still does', async () => {
+  const { input } = await combobox()
+
+  type(input, 'ea')
+  await settle()
+
+  key(input, 'ArrowDown')
+  await settle()
+
+  for (const init of [{ isComposing: true }, { keyCode: 229 }]) {
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init }))
+    await settle()
+  }
+
+  expect([input.value, changes]).toEqual(['ea', []])
+
+  key(input, 'Enter')
+  await settle()
+
+  expect(changes).toEqual(['earth'])
+})

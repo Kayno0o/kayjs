@@ -2,7 +2,7 @@
 import type { JSX, SafeHtml, Snippet } from 'kay'
 import type { TextEdit, ToolbarAction, ToolbarTools } from './markdown-edit'
 import { readDataTransferEntries } from '@kaynooo/utils/browser/clipboard'
-import { effect, onMount, recipe, signal, uid, untrack } from 'kay'
+import { composing, effect, onMount, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import { controlledValue } from './controlled-value'
 import { fieldInvalid, keepInvalid } from './field-look'
@@ -254,7 +254,7 @@ function edit(next: TextEdit | null, event: Event): void {
 function keyDown(event: KeyboardEvent) {
   const field = event.currentTarget as HTMLTextAreaElement
 
-  if (event.defaultPrevented || event.isComposing)
+  if (event.defaultPrevented || composing(event))
     return
 
   const left = leaving

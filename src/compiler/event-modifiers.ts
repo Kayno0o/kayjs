@@ -79,7 +79,7 @@ function addModifiedHandler(b: CodeBuilder, expression: Span, modifiers: string[
     else if (KEYS.has(modifier)) {
       // The keys are checked together, where the first of them is written.
       if (!keyed)
-        body.push(`if (kayEvent.isComposing || !${JSON.stringify(keys)}.includes(kayEvent.key)) return;`)
+        body.push(`if (kayEvent.isComposing || kayEvent.keyCode === 229 || !${JSON.stringify(keys)}.includes(kayEvent.key)) return;`)
 
       keyed = true
     }

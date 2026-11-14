@@ -247,6 +247,9 @@ interface CardPageContext<Params extends Record<string, unknown> = Record<string
 [.] Component
 type Component<Props = object> = (props: Props) => JSX.Element
 
+[.] composing
+function composing(event: KeyboardEvent): boolean
+
 [.] Connection
 interface Connection<T> extends Source<ConnectionStatus>
   close: () => void

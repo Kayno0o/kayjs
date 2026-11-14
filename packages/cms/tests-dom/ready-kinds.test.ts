@@ -157,3 +157,22 @@ test('a nested field the layout places is edited at its dotted path, the group k
   await type(field('address.city').querySelector<HTMLInputElement>('input')!, 'Paris')
   expect((await save()).address).toEqual({ street: 'Rue 1', city: 'Paris' })
 })
+
+test('an Enter or comma that ends an IME composition adds no tag, a plain one still does', async () => {
+  const { field, type } = await open({ labels: [] })
+  const box = field('labels').querySelector<HTMLInputElement>('input')!
+  const chips = () => [...field('labels').querySelectorAll('.kcms-tag')].map(chip => chip.textContent?.trim())
+  const press = async (key: string, init: KeyboardEventInit = {}) => {
+    box.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }))
+    await settle()
+  }
+
+  await type(box, 'にほん')
+  await press('Enter', { isComposing: true })
+  await press('Enter', { keyCode: 229 })
+  await press(',', { isComposing: true })
+  expect(chips()).toEqual([])
+
+  await press('Enter')
+  expect(chips()).toEqual(['にほん'])
+})

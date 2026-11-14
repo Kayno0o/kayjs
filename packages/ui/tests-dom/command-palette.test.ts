@@ -501,3 +501,24 @@ describe('CommandPalette with search', () => {
     expect(dialog.open).toBe(false)
   })
 })
+
+describe('IME composition', () => {
+  test('Enter that ends one runs nothing, a plain Enter still runs the entry', async () => {
+    const { dialog, input } = await palette()
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'new moon')
+    press(input()!, 'Enter', { isComposing: true })
+    press(input()!, 'Enter', { keyCode: 229 })
+    await settle()
+
+    expect(seen.actions).toEqual([])
+    expect(dialog.open).toBe(true)
+
+    press(input()!, 'Enter')
+    await settle()
+
+    expect(seen.actions).toEqual(['new-moon'])
+  })
+})

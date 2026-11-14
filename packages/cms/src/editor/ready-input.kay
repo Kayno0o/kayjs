@@ -5,7 +5,7 @@ import FormField from '@kayjs/ui/form-field.kay'
 import IconButton from '@kayjs/ui/icon-button.kay'
 import IconPicker from '@kayjs/ui/icon-picker.kay'
 import TextInput from '@kayjs/ui/text-input.kay'
-import { call, signal, trustHtml } from 'kay'
+import { call, composing, signal, trustHtml } from 'kay'
 import { wording } from 'kay/words'
 import iconsApi from '../api/icons'
 import './fields.css'
@@ -36,6 +36,9 @@ function removeTag(at: number): void {
 }
 
 function tagKey(event: KeyboardEvent): void {
+  if (composing(event))
+    return
+
   if (event.key === 'Enter' || event.key === ',') {
     event.preventDefault()
     addTags(typing())

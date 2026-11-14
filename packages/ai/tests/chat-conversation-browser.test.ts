@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { afterAll, afterEach, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { fakeAi } from '../src'
+import { composedEnters } from './composed-enters'
 import { testing } from './fixture/src/testing'
 
 const site = await testSite({ root: join(import.meta.dir, 'fixture'), browser: true })
@@ -28,6 +29,7 @@ async function named(page: Page) {
 async function send(page: Page, text: string, answer: string) {
   fakeAi.reply(counted)
   await page.fill('.kai-chat-form textarea', text)
+  expect(await composedEnters(page, '.kai-chat-form textarea')).toBe(false)
   await page.click('.kai-chat-form .kai-chat-send')
   await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: answer })
 }
@@ -74,6 +76,8 @@ it('lists the conversations, follows a link of the list, renames one and deletes
 
   await page.click('.kai-chat-conversation[data-current] button[aria-label^="Rename the conversation"]')
   await page.fill('.kai-chat-conversation[data-current] input', 'Trains')
+  expect(await composedEnters(page, '.kai-chat-conversation[data-current] input')).toBe(false)
+  expect(await page.count('.kai-chat-conversation[data-current] input')).toBe(1)
   await page.press('Enter')
   await page.waitFor('.kai-chat-conversation[data-current] .kai-chat-conversation-link', { text: 'Trains' })
 

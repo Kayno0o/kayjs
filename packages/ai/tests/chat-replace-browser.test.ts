@@ -3,6 +3,7 @@ import { afterAll, afterEach, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { scratchDir } from '../../../tests/scratch'
 import { fakeAi } from '../src'
+import { composedEnters } from './composed-enters'
 import { testing } from './fixture/src/testing'
 
 const site = await testSite({ root: join(import.meta.dir, 'fixture'), browser: true })
@@ -63,6 +64,8 @@ it('resends an edited message with every later turn gone, the action reading how
   await send(page, 'two', 'fresh roles=uau last=two files=0')
   await page.click(`.kai-chat-turn[data-role=user] ${EDIT}`)
   await page.fill('.kai-chat-turn[data-editing] textarea', 'uno')
+  expect(await composedEnters(page, '.kai-chat-turn[data-editing] textarea')).toBe(false)
+  expect(await page.count('.kai-chat-turn[data-editing]')).toBe(1)
   await page.click('.kai-chat-save')
   await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'edit:4 roles=u last=uno files=0' })
 
