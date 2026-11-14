@@ -884,6 +884,19 @@ describe('theme.css', () => {
     expect(skin).not.toContain('@utility starfield')
   })
 
+  test('builds the starfield once for an app importing both its stylesheet and the space skin', async () => {
+    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
+    const both = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n@import './src/starfield.css';\n@import './src/skins/space.css';\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (id, base) => {
+      const path = id === 'tailwindcss/theme.css' ? tailwind : `${ROOT}${id.replace('./', '').replace('../starfield.css', 'src/starfield.css')}`
+
+      return { path, base, content: await Bun.file(path).text() }
+    } })
+    const css = both.build(['starfield'])
+
+    expect(css.split('.starfield {').length - 1).toBe(1)
+    expect(css.split('--color-star: light-dark(').length - 1).toBe(1)
+  })
+
   test('lets an app\'s plain class beat the space skin, and gives its starfield a ground and a fixed ::before layer and its checkbox a hover', async () => {
     const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)

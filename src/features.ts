@@ -4,7 +4,7 @@ import type { Feature } from './template-shared'
 export const FEATURES: Record<Feature, { description: string, needs: readonly Feature[], packages?: readonly string[], brings?: readonly Feature[], templated?: true }> = {
   server: { description: 'an Elysia server, run in production as one executable; off, a static site built to dist', needs: [] },
   starter: { description: 'a header, a 404 page, and a home page greeting from the server with a counter island', needs: [] },
-  tailwind: { description: 'Tailwind over orbit\'s near-black palette, with a starfield behind the page', needs: [] },
+  tailwind: { description: 'Tailwind over orbit\'s near-black palette, and with `ui` a starfield behind the page', needs: [] },
   accents: { description: 'an accent picker in the header, kept in a cookie', needs: ['starter', 'tailwind'] },
   eslint: { description: 'ESLint through @kaynooo/eslint, .kay fences and template expressions included', needs: [] },
   tests: { description: 'kay test through kay/test, with a first test', needs: [] },

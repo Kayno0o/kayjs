@@ -1,5 +1,7 @@
 import type { Feature } from '../src/new'
 import { describe, expect, it } from 'bun:test'
+import { dirname, resolve } from 'node:path'
+import { compile } from 'tailwindcss'
 import { PRESETS, projectFiles } from '../src/new'
 
 // What the starter scaffolds: the look of orbit's apps, over kayjs-ui's space skin.
@@ -31,6 +33,24 @@ describe('the starter', () => {
       expect(Object.keys(manifest.dependencies)).toContain('@kayjs/ui')
       expect(Object.keys(manifest.devDependencies)).toEqual(expect.arrayContaining(['@fontsource-variable/space-grotesk', '@fontsource-variable/jetbrains-mono']))
     }
+  })
+
+  it('paints the starfield on the body through the utility of kayjs-ui, as built CSS', async () => {
+    const files = await projectFiles('/x/app', new Set<Feature>(PRESETS.app.features), '^1.0.0')
+    const root = new URL('..', import.meta.url).pathname
+    const compiler = await compile(files['src/app.css']!, {
+      base: root,
+      loadStylesheet: async (id, base) => {
+        const path = id === 'tailwindcss' ? Bun.resolveSync('tailwindcss/index.css', root) : id.startsWith('.') ? resolve(base, id) : Bun.resolveSync(id, root)
+
+        return { path, base: dirname(path), content: await Bun.file(path).text() }
+      },
+    })
+    const css = compiler.build([])
+
+    expect(css).toMatch(/body \{[^}]*isolation: isolate/)
+    expect(css).toMatch(/body \{[\s\S]*?&::before \{[^}]*position: fixed/)
+    expect(css).toContain('var(--color-star')
   })
 
   // `text-base` is also the 1rem font size, so a colour named like a size paints text that colour (#3294).

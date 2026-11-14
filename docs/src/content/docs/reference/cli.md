@@ -88,7 +88,7 @@ Every project gets an `AGENTS.md` for coding agents, a `CLAUDE.md` that imports 
 | --- | --- | --- |
 | `server` | An Elysia server, run in production as one executable; without it, a static site built to `dist` | server, app |
 | `starter` | A header, a skip link, a 404 page, and a home page greeting from the server with a counter island | server, site, app |
-| `tailwind` | Tailwind over orbit's near-black palette, with a starfield behind the page and a hairline on every box; without it, the markup carries no classes | server, site, app |
+| `tailwind` | Tailwind over orbit's near-black palette, with a hairline on every box, and a starfield behind the page when `ui` is on; without it, the markup carries no classes | server, site, app |
 | `ui` | kayjs-ui: its space skin, Space Grotesk and JetBrains Mono, `ui()` in `kay.config.ts`, and the header drawn with `AppHeader`; needs `tailwind` | server, site, app |
 | `accents` | An accent picker in the header, twelve accents kept in a cookie; needs `starter` and `tailwind` | none |
 | `eslint` | ESLint through `@kaynooo/eslint`, `.kay` fences and template expressions included | server, site, app |
