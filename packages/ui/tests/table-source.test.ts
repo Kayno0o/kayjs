@@ -22,12 +22,12 @@ test('a Table takes rows or a list, and fails kay check with neither or both', a
 
   for (const item of CASES) {
     await Bun.write(join(dir, `src/components/source-${item.name}.kay`), `---
-    ${item.feed ? 'island()\nimport { infiniteList } from \'@kayjs/ui\'\n' : ''}import Table from '@kayjs/ui/table.kay'
+${item.feed ? 'island()\nimport { infiniteList } from \'@kayjs/ui\'\n' : ''}import Table from '@kayjs/ui/table.kay'
 
-    ${item.feed ? 'const feed = infiniteList([{ id: 1 }], { limit: 1, load: () => [] })' : ''}
-    ---
-    Table(columns={[{ key: 'id', header: 'Id' }]} rowKey="id" ${item.props})
-    `)
+${item.feed ? 'const feed = infiniteList([{ id: 1 }], { limit: 1, load: () => [] })' : ''}
+---
+Table(columns={[{ key: 'id', header: 'Id' }]} rowKey="id" ${item.props})
+`)
   }
 
   const run = Bun.spawn([process.execPath, CLI, 'check'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
