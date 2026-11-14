@@ -874,7 +874,7 @@ class ModuleShell {
 
     // A default runs the first time an `undefined` prop is read, then keeps its value like a destructuring default; it is typed as the prop, so a function or an object literal in it gets its type from the props type.
     for (const [index, binding] of props.bindings.entries()) {
-      if (!binding.fallback)
+      if (!binding.fallback || (binding.literal !== undefined && this.options.check !== true))
         continue
 
       const name = defaultName(index)

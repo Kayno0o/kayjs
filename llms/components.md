@@ -159,7 +159,7 @@ ul
 
 - Props are declared once, at the top level, with the `props<T>()` macro.
 - Destructure one level deep and read nested fields as `todo.title`. `const all = props<T>()` also works and reads as `all.todo`.
-- Defaults go in the destructuring. A default applies only to an `undefined` prop (`null` stays `null`), and runs only then, once per component, the first time the prop is read.
+- Defaults go in the destructuring. A default applies only to an `undefined` prop (`null` stays `null`), and runs only then, once per component, the first time the prop is read (a literal one is written at each read instead, as it has no identity to keep).
 - Props stay reactive: the compiler turns each destructured name into a live read. A read at the top of the script, outside a function, `memo` or `effect`, runs once, so `const last = items.length - 1` keeps the first length: write `const last = () => items.length - 1` and read `last()`.
 - Props are read-only.
 - To require children or a block a template only passes on with `slot`, type it and destructure nothing: `const {} = props<{ children: Snippet }>()`, as a destructured name nothing reads is `unread-name`.

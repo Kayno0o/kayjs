@@ -76,10 +76,27 @@ export function propsDeclaration(statement: Statement, body: Statement[], shift:
     const previous = properties[index - 1]
     const removal = next ? { start: shift(property).start, end: shift(next).start } : previous && { start: shift(previous).end, end: shift(property).end }
 
-    declaration.bindings.push({ local: shift(local), key, fallback: value.type === 'AssignmentPattern' ? shift(value.right) : undefined, removal, bindable: bindable.has(key) })
+    declaration.bindings.push({ local: shift(local), key, fallback: value.type === 'AssignmentPattern' ? shift(value.right) : undefined, literal: value.type === 'AssignmentPattern' ? literalSource(value.right) : undefined, removal, bindable: bindable.has(key) })
   }
 
   return declaration
+}
+
+// A default with no identity and nothing to run: its text is as short as a read of its holder.
+function literalSource(node: Node): string | undefined {
+  if (node.type === 'Literal')
+    return 'regex' in node || 'bigint' in node ? undefined : node.raw ?? undefined
+
+  if (node.type === 'UnaryExpression' && node.operator === '-' && node.argument.type === 'Literal' && typeof node.argument.value === 'number')
+    return `-${node.argument.raw}`
+
+  if (node.type === 'TemplateLiteral' && node.expressions.length === 0) {
+    const cooked = node.quasis[0]?.value.cooked
+
+    return typeof cooked === 'string' ? JSON.stringify(cooked) : undefined
+  }
+
+  return undefined
 }
 
 function kayImports(body: Statement[], wanted: Set<string>): Map<string, string> {

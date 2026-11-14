@@ -320,7 +320,7 @@ export function propRead(binding: PropsBinding, index: number, local: string, ch
 
   const text = quoted ? `${PROPS}[${JSON.stringify(binding.key)}]` : `${PROPS}.${binding.key}`
 
-  return { before: `(${access.before}`, replace: access.replace, after: `${access.after ?? ''} !== undefined ? ${text} : ${defaultName(index)}())` }
+  return { before: `(${access.before}`, replace: access.replace, after: `${access.after ?? ''} !== undefined ? ${text} : ${binding.literal ?? `${defaultName(index)}()`})` }
 }
 
 // A prop with a default reads without `undefined`, which `typeof __props.size` would keep.

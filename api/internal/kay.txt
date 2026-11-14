@@ -327,6 +327,9 @@ function omit(props: object, ...keys: string[]): Record<string, unknown>
 [./dom] outside
 function outside<T>(element: Element, href: T, ownRel?: boolean): T
 
+[./dom] part
+function part(render: () => unknown): Unit | null
+
 [./dom] partClass
 function partClass(props: unknown, part: string): unknown
 

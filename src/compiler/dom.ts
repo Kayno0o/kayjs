@@ -14,7 +14,7 @@ import { addGroupChecked, checksMarkup, groupValue, staticAttributeText } from '
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attribute', 'branches', 'checkedMarkup', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'listenSubmitWith', 'listenWith', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attribute', 'branches', 'checkedMarkup', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'listenSubmitWith', 'listenWith', 'markers', 'memo', 'merge', 'omit', 'outside', 'part', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
 // The helpers in modules of their own, as their runtimes weigh on a page whose islands use none of them: the module of each is only loaded by a page with an island that compiles to it.
 const APART = [['kay/dom-loop', ['loop', 'rowKey']], ['kay/dom-await', ['awaited']], ['kay/dom-try', ['attempt']], ['kay/dom-spread', ['dynamic', 'spread']], ['kay/dom-image', ['image']], ['kay/pending', ['pendingCall']]] as const
 
@@ -68,6 +68,8 @@ export class DomTemplate extends TemplateWriter {
       this.b.add('null')
     else if (items.length === 1 && only.kind === 'element')
       this.element(only.node)
+    else if (items.length === 1 && only.kind === 'component')
+      this.part(only.node)
     else
       this.fragment(nodes)
   }
@@ -76,6 +78,15 @@ export class DomTemplate extends TemplateWriter {
   // `navigates`: the script calls `navigate()`, which puts the locale prefix on a path as a link does through the same module.
   declarations(navigates: boolean): string {
     return `${this.templates.map((html, index) => `const KayT${index} = KayTemplate(${JSON.stringify(html)})\n`).join('')}${this.writesLinks || navigates ? 'import \'kay/i18n-links\'\n' : ''}`
+  }
+
+  // One component between its markers: the claim and the render of a fragment holding it, in one call.
+  private part(node: ElementNode): void {
+    this.b.wrap(node, () => {
+      this.b.add(`${helperName('part')}(() => `)
+      this.component(node)
+      this.b.add(')')
+    })
   }
 
   private fragment(nodes: Node[]): void {

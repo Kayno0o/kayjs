@@ -15,6 +15,8 @@ export interface PropsBinding {
   local: Span
   key: string
   fallback?: Span | undefined
+  // The default's source when it is a string, number, boolean or null, which a read writes in place of a holder.
+  literal?: string | undefined
   // What leaves the destructuring without it, separator included, when another name stays.
   removal?: Span | undefined
   // Typed `Bindable<T>`: read as a plain value, and written by assigning it, which a parent's `bind:` takes.

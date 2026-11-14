@@ -269,22 +269,18 @@ export function fragment(build: (parent: Node) => void): Unit | null {
 
     const last = claim.next ? claim.next.previousSibling : parent.lastChild
 
-    if (!first || !last || first === claim.next)
-      return null
-
-    return first === last ? first : new Range(first, last)
+    return unitBetween(first === claim.next ? null : first, last)
   }
 
   const holder = document.createDocumentFragment()
 
   build(holder)
 
-  const { firstChild, lastChild } = holder
+  return unitBetween(holder.firstChild, holder.lastChild)
+}
 
-  if (!firstChild || !lastChild)
-    return null
-
-  return firstChild === lastChild ? firstChild : new Range(firstChild, lastChild)
+function unitBetween(first: Node | null, last: Node | null): Unit | null {
+  return first === last ? first : first && last && new Range(first, last)
 }
 
 // An element of a block, already claimed when hydrating.
@@ -318,6 +314,11 @@ export function errorParagraph(message: string | undefined, id: string, classes:
     element.textContent = message
 
   return element
+}
+
+// A block holding one component: a fragment of its markers and an `insert` that renders once.
+export function part(render: () => unknown): Unit | null {
+  return fragment(parent => insert(null, ...markers(parent), render, false))
 }
 
 // The markers around a dynamic part of a block.
@@ -382,10 +383,8 @@ export class Region {
       return
     }
 
-    const parent = this.parent
-
     while (this.start.nextSibling && this.start.nextSibling !== this.end)
-      parent.removeChild(this.start.nextSibling)
+      this.parent.removeChild(this.start.nextSibling)
   }
 }
 

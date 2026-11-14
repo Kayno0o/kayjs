@@ -174,10 +174,40 @@ describe('props', () => {
   it('applies defaults where the prop is read and handles renames, quoted keys and the rest', () => {
     const code = tsx('---\nconst { size = \'md\', label: text, \'aria-label\': aria, ...rest } = props<{ size?: string, label: string, \'aria-label\'?: string, id?: string }>()\n---\nbutton(aria-label={aria} {...rest}) {size} {text}')
 
-    expect(code).toContain('const __default_0 = (): Exclude<(typeof __props)["size"], undefined> => (__default_0_made ??= { value: (\'md\') }).value;')
+    expect(code).not.toContain('__default_0')
     expect(code).toContain('const rest = KayOmit(__props, "size", "label", "aria-label");')
     expect(code).toContain('aria-label={__props["aria-label"]}')
-    expect(code).toContain('{(__props.size !== undefined ? __props.size : __default_0())} {__props.label}')
+    expect(code).toContain('{(__props.size !== undefined ? __props.size : \'md\')} {__props.label}')
+  })
+
+  it('writes a literal default where the prop is read, and keeps a holder only for what has an identity or runs', () => {
+    const source = '---\nconst { size = \'md\', n = -1, ok = true, none = null, text = `a`, list = [1], run = `a${1}` } = props<{ size?: string, n?: number, ok?: boolean, none?: null, text?: string, list?: number[], run?: string }>()\n---\np {size} {n} {ok} {none} {text} {list} {run}'
+
+    for (const output of ['dom', 'html'] as const) {
+      const code = compileKay(source, 'test.kay', { output }).tsx
+
+      expect(code).toContain('__props.size : \'md\')')
+      expect(code).toContain('__props.n : -1)')
+      expect(code).toContain('__props.ok : true)')
+      expect(code).toContain('__props.none : null)')
+      expect(code).toContain('__props.text : "a")')
+      expect(code).toContain(`__props.list : ${defaultName(5)}())`)
+      expect(code).toContain(`__props.run : ${defaultName(6)}())`)
+      expect(code).not.toContain(defaultName(0))
+      expect(code).not.toContain(defaultName(4))
+      expect(code).toContain(`${defaultName(5)}_made`)
+    }
+
+    // Type checking keeps every holder, as it types the default through it.
+    expect(compileKay(source, 'test.kay', { check: true }).tsx).toContain(`${defaultName(0)}_made`)
+  })
+
+  it('compiles a block holding one component to one call, the markers of a fragment holding it', () => {
+    const dom = compileKay('if ok\n  Child(a={1})\nelse\n  p x', 'test.kay', { output: 'dom' }).tsx
+
+    expect(dom).toContain('() => KayPart(() => KayComponent(Child, { get "a"() { return (1) } }))')
+    expect(dom).not.toContain('KayFragment((KayP1)')
+    expect(compileKay('if ok\n  Child\n  p x', 'test.kay', { output: 'dom' }).tsx).toContain('KayFragment((KayP1)')
   })
 
   it('rejects writes to props and misplaced props() calls', () => {
