@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { IMAGE_ROUTE } from '../src/runtime/image'
 import { imageLimits } from '../src/server/config-limits'
 import { limiter } from '../src/server/limit'
+import { memoryRates } from '../src/server/protection'
 import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
 
@@ -36,6 +37,25 @@ describe('the image route limits', () => {
     expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0)
     expect((await app.handle(variant(10))).status).toBe(200)
     expect((await app.handle(variant(20))).status).toBe(200)
+  })
+
+  it('counts in the limit\'s own store and tells onLimit of the request it refused', async () => {
+    const rates = memoryRates()
+    const store = { hit: (key: string, window: number, weight?: number) => rates.hit(key, window, weight) }
+    const counted = new Set<string>()
+    const counting = { hit: (key: string, window: number, weight?: number) => {
+      counted.add(key)
+
+      return store.hit(key, window, weight)
+    } }
+    const told: { name: string, wait: number }[] = []
+    const app = await site({ rateLimit: { max: 1, window: '1m', store: counting, onLimit: ({ name, wait }: { name: string, wait: number }) => told.push({ name, wait }) }, maxVariants: false })
+
+    expect((await app.handle(variant(60))).status).toBe(200)
+    expect((await app.handle(variant(65))).status).toBe(429)
+    expect(counted.size).toBe(1)
+    expect(told).toHaveLength(1)
+    expect(told[0]!.name).toBe('image-encodes')
   })
 
   it('counts the client behind a trusted proxy by its forwarded address', async () => {

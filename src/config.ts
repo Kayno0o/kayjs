@@ -283,7 +283,7 @@ export interface LiveConfig {
   // How many live connections one client address holds at once, 20 by default: a few tabs, not a flood. One more answers 429.
   connections?: number | undefined
   // How many openings a client address may make in a window, `{ max: 120, window: '1m' }` by default, the shape of every rate limit in kay, or `false` for no limit.
-  rateLimit?: Pick<RateLimit, 'max' | 'window'> | false | undefined
+  rateLimit?: Omit<RateLimit, 'key'> | false | undefined
 }
 
 export interface JobsConfig {
@@ -454,7 +454,7 @@ export interface ImagesConfig {
   // How long the image route waits for a remote host, redirects included, a string such as `'30s'`; 10 seconds by default. A slower host answers 502.
   remoteTimeout?: Duration | undefined
   // The most variants one client may have the image route encode in a window, counted by its address (the forwarded one behind a trusted `proxy`); a variant already made is never counted. Past it the route answers 429 with `Retry-After`. `{ max: 120, window: '1m' }` by default, `false` for no limit.
-  rateLimit?: Pick<RateLimit, 'max' | 'window'> | false | undefined
+  rateLimit?: Omit<RateLimit, 'key'> | false | undefined
   // The most variants the route keeps cached of one source image, so a client varying width, quality, crop and format cannot fill the cache without bound. Past it the oldest cached variant of that image is removed to make room, and one asked for again is encoded again, within `rateLimit`. Counted from the files on disk. 256 by default, `false` for no limit.
   maxVariants?: number | false | undefined
   // The most encodes waiting for one of the four being drawn; past it the route answers 503 with `Retry-After` rather than queue more. 128 by default, `false` for no limit.

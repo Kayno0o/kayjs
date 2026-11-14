@@ -102,7 +102,7 @@ The object `rateLimit()` returns is a limit: give it to `protect: { rateLimit: v
 
 ### In the libraries
 
-- Every limit is one `RateLimit` (from `kay`, `kay/server` and `kay/library`): `{ max, window, store?, key? }`. Every `rateLimit` option takes one or a list of them, each counted apart, and `false` lifts a default one. kayjs-auth and kayjs-ai count under keys of their own and take no `key`.
+- Every limit is one `RateLimit` (from `kay`, `kay/server` and `kay/library`): `{ max, window, store?, key?, onLimit? }`. Every `rateLimit` option takes one or a list of them, each counted apart, and `false` lifts a default one. kayjs-auth, kayjs-ai, `basicAuth` and kay's own routes (`images`, `mcp`, `live`) count under keys or the address of their own and take no `key`; a `key` there is refused at boot, a `store` and an `onLimit` are taken.
 - kayjs-ai takes `ai({ rateLimit, budget, key })` and `ask(messages, { key })`, see [Limits and the token budget](../packages/ai/llms/limits.md).
 - kayjs-auth takes `authCore({ rateLimit: { signIn: { max, window } } })`, one entry per kind of attempt, each a limit or a list of them, see [Limits](../packages/auth/llms/hardening-and-testing.md#limits).
 - kayjs-mail's contact form takes the action's `protection: { rateLimit }` ([Contact form](../packages/mail/llms/contact-form-and-testing.md)); `smtp({ rateLimit: { max: 5, window: '1s' } })` caps the mails sent (one window, in memory: no list, `store` or `key`), and `MAIL_RATE_LIMIT=5/1s` sets it from the environment.

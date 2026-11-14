@@ -1,8 +1,9 @@
+import type { RateLimit } from '../runtime/action'
 import type { Guard } from '../runtime/core'
-import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { clientAddress, limiter, rateKey } from './protection'
+import { refused } from './rate-refusal'
 import { sameText } from './seal'
 
 export interface BasicAuthOptions {
@@ -12,11 +13,11 @@ export interface BasicAuthOptions {
   password: string | undefined
   // Named in the browser's sign-in dialog, `Restricted` by default; printable ASCII.
   realm?: string | undefined
-  // The wrong credentials a client may send, `max` every `window`, 10 every 5 minutes by default; past that it gets 429 with `Retry-After`, a right password included until the window closes. Counted per client address, in the app's `store.rates`; `false` turns it off.
-  rateLimit?: { max: number, window: Duration } | false | undefined
+  // The wrong credentials a client may send, `max` every `window`, 10 every 5 minutes by default; past that it gets 429 with `Retry-After`, a right password included until the window closes. Counted per client address, in the app's `store.rates` unless the limit names a `store`, and `onLimit` is told of each guess refused; `false` turns it off.
+  rateLimit?: Omit<RateLimit, 'key'> | false | undefined
 }
 
-const FAILURES = { max: 10, window: '5m' } as const
+const FAILURES: Omit<RateLimit, 'key'> = { max: 10, window: '5m' }
 
 const SCHEME = /^basic +(\S+) *$/i
 const BASE64 = /^[A-Z0-9+/]+={0,2}$/i
@@ -59,7 +60,7 @@ export function basicAuth(options: BasicAuthOptions): Guard {
   const challenge = `Basic realm="${realm.replace(/["\\]/g, '\\$&')}", charset="UTF-8"`
   const configured = user !== undefined && user !== '' && password !== undefined && password !== ''
   let warned = false
-  const failures = rateLimit === false ? undefined : limiter({ ...rateLimit, name: `basicAuth:${realm}` })
+  const failures = rateLimit === false ? undefined : limiter({ max: rateLimit.max, window: rateLimit.window, store: rateLimit.store, name: `basicAuth:${realm}` })
 
   return async ({ request, headers, deny }) => {
     const refuse = (): never => {
@@ -99,7 +100,14 @@ export function basicAuth(options: BasicAuthOptions): Guard {
     if (wrong) {
       const window = await failures.hit(client)
 
-      return window.count > failures.max ? tooMany(window) : refuse()
+      if (window.count > failures.max) {
+        if (rateLimit !== false)
+          refused(`basicAuth:${realm}`, rateLimit, { key: client, wait: Math.max(1, Math.ceil((window.resetAt - Date.now()) / 1000)), request })
+
+        return tooMany(window)
+      }
+
+      return refuse()
     }
 
     const window = await failures.peek(client)

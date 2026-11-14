@@ -6,7 +6,7 @@ import { JSON_FILE, writeAtomically } from '../build/files'
 import { ipVersion, PrivateAddressError, resolveHost } from './address'
 import { FETCH_TIMEOUT_MS, MAX_REMOTE_BYTES } from './config-limits'
 import { pinnedGet } from './fetch-public'
-import { overLimit } from './protection'
+import { overLimit } from './over-limit'
 import { sha256 } from './sha256'
 
 export type { Resolver } from './address'

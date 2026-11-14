@@ -12,7 +12,8 @@ import { BASE_PATH, routerPath } from './base'
 import { declined } from './consent-cookie'
 import { isCrossSite } from './cross-site'
 import { readCapped } from './errors'
-import { clientAddress, overLimit } from './protection'
+import { overLimit } from './over-limit'
+import { clientAddress } from './protection'
 import { askedPath } from './rewrite'
 
 // A visit is a URL, a title and a few short words: past this it is no visit.

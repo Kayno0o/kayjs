@@ -1,4 +1,4 @@
-import { overLimit } from './protection'
+import { overLimit } from './over-limit'
 
 const MINUTE_MS = 60_000
 // What all clients together may send one of kay's report routes a minute, so a flood from many addresses cannot fill the log and `onError`.

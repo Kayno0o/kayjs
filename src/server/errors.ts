@@ -2,7 +2,8 @@ import type { Elysia } from 'elysia'
 import type { ObserveConfig } from '../config'
 import { overCeiling } from './ceiling'
 import { isCrossSite } from './cross-site'
-import { clientAddress, overLimit } from './protection'
+import { overLimit } from './over-limit'
+import { clientAddress } from './protection'
 import { reportServerError } from './report'
 
 // Where the browser sends the errors islands meet.

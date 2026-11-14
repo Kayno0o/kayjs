@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { basicAuth } from '../src/server/basic-auth'
+import { memoryRates } from '../src/server/protection'
 import { Denied, stoppers } from '../src/server/signals'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -28,6 +29,28 @@ async function attempt(guard: ReturnType<typeof basicAuth>, authorization: strin
 }
 
 const guard = basicAuth({ user: 'owntracks', password: 'p@ss:word', realm: 'voyager' })
+
+describe('basicAuth rate limit options', () => {
+  it('counts in the limit\'s own store and tells onLimit of each guess past it', async () => {
+    const rates = memoryRates()
+    const store = { hit: (key: string, window: number, weight?: number) => rates.hit(key, window, weight) }
+    const counted = new Set<string>()
+    const counting = { hit: (key: string, window: number, weight?: number) => {
+      counted.add(key)
+
+      return store.hit(key, window, weight)
+    } }
+    const told: string[] = []
+    const limited = basicAuth({ user: 'a', password: 'b', realm: 'own', rateLimit: { max: 1, window: '1m', store: counting, onLimit: ({ name }) => {
+      told.push(name)
+    } } })
+
+    expect(await attempt(limited, encode('a:wrong'))).toEqual({ status: 401, challenge: expect.any(String) })
+    expect((await attempt(limited, encode('a:wrong')) as { status: number }).status).toBe(429)
+    expect(counted.size).toBe(1)
+    expect(told).toEqual(['basicAuth:own'])
+  })
+})
 
 describe('basicAuth', () => {
   it('lets the right credentials through', async () => {

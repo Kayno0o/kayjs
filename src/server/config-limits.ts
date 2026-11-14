@@ -68,13 +68,13 @@ const MINUTE_MS = 60_000
 export const MAX_CONNECTIONS = 20
 
 // A rate limit as the server counts it: `max` requests in `windowMs`.
-export interface RateWindowMs {
+export interface RateWindowMs extends Pick<RateLimit, 'store' | 'onLimit'> {
   max: number
   windowMs: number
 }
 
-// A `rateLimit` option of the config: `{ max, window }`, or `false` for none. Left out, `fallback` a minute.
-export function rateLimitOf(what: string, rateLimit: Pick<RateLimit, 'max' | 'window'> | false | undefined, fallback: number): RateWindowMs | undefined {
+// A `rateLimit` option of the config: a `RateLimit` without `key` (kay's own routes count the client's address), or `false` for none. Left out, `fallback` a minute.
+export function rateLimitOf(what: string, rateLimit: Omit<RateLimit, 'key'> | false | undefined, fallback: number): RateWindowMs | undefined {
   if (rateLimit === false)
     return undefined
 
@@ -86,7 +86,21 @@ export function rateLimitOf(what: string, rateLimit: Pick<RateLimit, 'max' | 'wi
   if (!Number.isSafeInteger(max) || max < 1)
     throw new KayError('config-invalid', `kay: ${what}.rateLimit.max is ${String(max)}; it takes a whole number from 1, or false for no limit`)
 
-  return { max, windowMs: rateLimit === undefined ? MINUTE_MS : optionMs(rateLimit.window, `${what}.rateLimit.window`) }
+  if ((rateLimit as RateLimit | undefined)?.key !== undefined)
+    throw new KayError('config-invalid', `kay: ${what}.rateLimit.key is set; kay's own routes count the client's address, so leave it out`)
+
+  if (rateLimit?.store !== undefined && typeof rateLimit.store.hit !== 'function')
+    throw new KayError('config-invalid', `kay: ${what}.rateLimit.store has no hit(key, window) method; give it a RateStore`)
+
+  if (rateLimit?.onLimit !== undefined && typeof rateLimit.onLimit !== 'function')
+    throw new KayError('config-invalid', `kay: ${what}.rateLimit.onLimit is not a function; give it a function of the refusal`)
+
+  return {
+    max,
+    windowMs: rateLimit === undefined ? MINUTE_MS : optionMs(rateLimit.window, `${what}.rateLimit.window`),
+    ...(rateLimit?.store === undefined ? {} : { store: rateLimit.store }),
+    ...(rateLimit?.onLimit === undefined ? {} : { onLimit: rateLimit.onLimit }),
+  }
 }
 
 // `live` from kay.config.ts with its defaults, each limit a whole number from 1.

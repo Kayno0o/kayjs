@@ -3,7 +3,8 @@ import type { ImageLimits } from './config-limits'
 import { readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { drawing } from './image-format'
-import { clientAddress, overLimit } from './protection'
+import { overLimitOf } from './over-limit'
+import { clientAddress } from './protection'
 
 export interface EncodeRefusal {
   body: string
@@ -62,7 +63,7 @@ export function encodeGate(limits: ImageLimits, dir: string, forgotten: { clear:
       if (limits.queue !== undefined && drawing.waiting >= limits.queue)
         return { body: 'Too many images are being drawn; try again shortly', status: 503, wait: QUEUE_RETRY_SECONDS }
 
-      const wait = limits.rate === undefined ? undefined : await overLimit(ENCODE_RATE, clientAddress(request, server), limits.rate.max, limits.rate.windowMs)
+      const wait = limits.rate === undefined ? undefined : await overLimitOf(ENCODE_RATE, clientAddress(request, server), limits.rate, request)
 
       if (wait !== undefined)
         return { body: 'Too many new image variants; try again later', status: 429, wait }

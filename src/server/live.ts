@@ -16,8 +16,9 @@ import { liveLimits } from './config-limits'
 import { isCrossSite } from './cross-site'
 import { readCapped } from './errors'
 import { eventStream, StreamRefusedError } from './event-stream'
+import { overLimitOf } from './over-limit'
 import { presenceEntry } from './presence'
-import { clientAddress, overLimit } from './protection'
+import { clientAddress } from './protection'
 import { jobsEntry } from './queue-live'
 import { recordOf, requestRecord } from './request-record'
 import { userOf } from './request-user'
@@ -540,7 +541,7 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
     if (Number(request.headers.get('content-length') ?? 0) > MAX_REQUEST_BYTES)
       return new Response(null, { status: 413 })
 
-    if (rate !== undefined && await overLimit(LIMIT, clientAddress(request, server), rate.max, rate.windowMs) !== undefined)
+    if (rate !== undefined && await overLimitOf(LIMIT, clientAddress(request, server), rate, request) !== undefined)
       return new Response(null, { status: 429 })
 
     const text = await readCapped(request, MAX_REQUEST_BYTES)

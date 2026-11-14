@@ -826,19 +826,6 @@ async function withinLimit<Result>(work: Promise<Result>): Promise<Result> {
   }
 }
 
-// Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes.
-const overLimiters = new Map<string, Limiter>()
-
-export async function overLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
-  const id = `${name}\n${max}\n${windowMs}`
-  let counting = overLimiters.get(id)
-
-  if (!counting)
-    overLimiters.set(id, counting = makeLimiter({ name, max, ms: windowMs }))
-
-  return counting.enforce(rateKey(client))
-}
-
 // The refusal of a route over its limit whose caller reads the answer, an API module's or the MCP endpoint's: kay's beacons answer theirs with no body, as their other refusals.
 export function tooManyRequests(wait: number): Response {
   return new Response(`Too many requests; try again in ${wait} s`, { status: 429, headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': String(wait) } })

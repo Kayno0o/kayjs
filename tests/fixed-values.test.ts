@@ -166,6 +166,16 @@ describe('mcp rate limit', () => {
     expect(mcpRateLimit({ rateLimit: false })).toBeUndefined()
     expect(() => mcpRateLimit({ rateLimit: { max: 1.5, window: '1m' } })).toThrow('mcp.rateLimit.max is 1.5')
   })
+
+  it('takes the store and onLimit of a RateLimit, and refuses a key, which kay\'s own routes have no use for', () => {
+    const store = { hit: () => ({ count: 1, resetAt: 0 }) }
+    const onLimit = () => undefined
+
+    expect(mcpRateLimit({ rateLimit: { max: 5, window: '10s', store, onLimit } })).toEqual({ max: 5, windowMs: 10_000, store, onLimit })
+    expect(() => mcpRateLimit({ rateLimit: { max: 5, window: '10s', key: () => 'x' } as never })).toThrow('mcp.rateLimit.key is set')
+    expect(() => mcpRateLimit({ rateLimit: { max: 5, window: '10s', store: {} as never } })).toThrow('mcp.rateLimit.store has no hit')
+    expect(() => mcpRateLimit({ rateLimit: { max: 5, window: '10s', onLimit: 3 as never } })).toThrow('mcp.rateLimit.onLimit is not a function')
+  })
 })
 
 describe('live limits', () => {
