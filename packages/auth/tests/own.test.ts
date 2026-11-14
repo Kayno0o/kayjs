@@ -293,7 +293,47 @@ describe('the store', () => {
       process.env.NODE_ENV = 'test'
     }
 
-    expect(existsSync(join(root, 'data/auth.sqlite'))).toBe(true)
+    expect(existsSync(join(root, 'data/app.sqlite'))).toBe(true)
+  })
+
+  test('leaves the other tables of data/app.sqlite, the file every default shares, alone', async () => {
+    mkdirSync(join(root, 'data'))
+
+    const db = new Database(join(root, 'data/app.sqlite'))
+
+    db.run('CREATE TABLE kay_sessions_other (id text PRIMARY KEY)')
+    db.close()
+    process.env.NODE_ENV = 'development'
+
+    try {
+      await registerOn({})
+    }
+    finally {
+      process.env.NODE_ENV = 'test'
+    }
+
+    const after = new Database(join(root, 'data/app.sqlite'), { readonly: true })
+    const names = after.query('SELECT name FROM sqlite_master WHERE type = \'table\'').all().map(row => (row as { name: string }).name)
+
+    after.close()
+    expect(names).toContain('kay_users')
+    expect(names).toContain('kay_sessions_other')
+  })
+
+  test.each(['data/auth.sqlite', 'data/auth.db'])('keeps reading %s when it exists, so an upgrade loses no user', async (legacy) => {
+    mkdirSync(join(root, 'data'))
+    writeFileSync(join(root, legacy), '')
+    process.env.NODE_ENV = 'development'
+
+    try {
+      await registerOn({})
+    }
+    finally {
+      process.env.NODE_ENV = 'test'
+    }
+
+    expect(existsSync(join(root, 'data/app.sqlite'))).toBe(false)
+    expect(new Database(join(root, legacy), { readonly: true }).query('SELECT COUNT(*) AS n FROM kay_users').get()).toEqual({ n: 1 })
   })
 
   describe('inferred from the app\'s store', () => {

@@ -93,7 +93,7 @@ The tab lists only what the running server serves. The CSP reports route shows w
 
 ## Data
 
-The Data tab shows the rows of your databases, Postgres or SQLite. It reads the Postgres database `DATABASE_URL` points to, so an app on pg-orm needs no setup, and the SQLite files your app opened or keeps in `data/` (`data/auth.db` of the `app` preset, the files of mail, cms and ai). With more than one, a select above the tables switches between them. An app with none has no Data tab.
+The Data tab shows the rows of your databases, Postgres or SQLite. It reads the Postgres database `DATABASE_URL` points to, so an app on pg-orm needs no setup, and the SQLite files your app opened or keeps in `data/` (`data/app.sqlite`, where kay and its libraries keep their data). With more than one, a select above the tables switches between them. An app with none has no Data tab.
 
 Pick a table to read its rows, 50 at a time, in the order of its primary key. Long values are cut and a binary column shows its first bytes and its size, so a big table stays light in the browser. `NULL` is shown apart from the text "NULL".
 

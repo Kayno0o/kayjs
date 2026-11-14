@@ -107,7 +107,7 @@ The image has no curl, so `./server --health` checks the health route and exits 
 
 Its compose also requires `SITE_URL`, which `.env.example` lists. Without an https `SITE_URL` production sends no HSTS and writes no canonical URLs.
 
-If you keep SQLite files, bind-mount a folder the `nobody` user can write. The `app` preset does. Its `compose.prod.yaml` mounts `./data-prod` (git and docker ignore it, and it is apart from the `data` of development) at `/app/data`; create it before the first start with `mkdir -p data-prod && sudo chown 65534 data-prod`, as a missing folder refuses the start. kayjs-auth keeps its users in `data/auth.sqlite` there, so they survive a deploy. The Postgres preset keeps them in the database instead.
+If you keep SQLite files, bind-mount a folder the `nobody` user can write. The `app` preset does. Its `compose.prod.yaml` mounts `./data-prod` (git and docker ignore it, and it is apart from the `data` of development) at `/app/data`; create it before the first start with `mkdir -p data-prod && sudo chown 65534 data-prod`, as a missing folder refuses the start. kayjs-auth keeps its users in `data/app.sqlite` there, so they survive a deploy. The Postgres preset keeps them in the database instead.
 
 ### Database roles
 
@@ -208,7 +208,7 @@ Name `sqliteData` or `pgData` in `store` for them to live in the store's databas
 
 A store you name in `kay.config.ts` is used as it is. A worker hears what another one wrote within about half a second (a Postgres store tells the others at once), not always at once.
 
-The Postgres store calls `pg_notify` with every write, so a Postgres-compatible server that lacks it fails the writes: use a real Postgres, or stores of your own. A store built in memory, such as `memorySessions()`, splits per worker, and the first worker logs a warning naming it. Sessions travel in their cookie, and jobs keep `data/jobs.sqlite`. Every worker runs the queue and the schedules, and each job runs once.
+The Postgres store calls `pg_notify` with every write, so a Postgres-compatible server that lacks it fails the writes: use a real Postgres, or stores of your own. A store built in memory, such as `memorySessions()`, splits per worker, and the first worker logs a warning naming it. Sessions travel in their cookie, and jobs keep `data/app.sqlite`. Every worker runs the queue and the schedules, and each job runs once.
 
 The process you start only supervises. A SIGTERM or Ctrl-C reaches every worker, and each one drains as a single server does. A worker that crashes is started again after a short wait, and if they keep dying at boot the whole group stops with exit code 1. Each worker takes about as much memory as one server, so count that before choosing the number. Set `KAY_SECRET` as you would for several replicas.
 

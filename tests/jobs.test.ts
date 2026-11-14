@@ -1890,7 +1890,7 @@ describe('queue', () => {
       setSystemTime(Date.now() + 61_000)
       expect(await drainQueues()).toBe(1)
       expect(runs).toEqual(['now', 'soon'])
-      expect(await Bun.file('data/jobs.sqlite').exists()).toBe(false)
+      expect(await Bun.file('data/app.sqlite').exists()).toBe(false)
     }
     finally {
       setSystemTime()

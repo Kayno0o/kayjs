@@ -323,7 +323,7 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
   const runner = await runnerOf(dir, host)
 
   // kayjs-auth's SQLite file holds users that Postgres would leave behind.
-  const authFile = ['data/auth.sqlite', 'data/auth.db'].find(file => existsSync(join(dir, file)))
+  const authFile = ['data/app.sqlite', 'data/auth.sqlite', 'data/auth.db'].find(file => existsSync(join(dir, file)))
 
   if (core.includes('postgres') && current.has('auth') && authFile !== undefined)
     conflicts.push(`${authFile} holds the users postgres would leave behind: move them to Postgres, or delete the file to start with none, then run this again`)

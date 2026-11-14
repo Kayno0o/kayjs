@@ -1,12 +1,11 @@
 import type { Duration } from 'kay'
 import type { ConversationStore } from './conversation-store'
-import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { logFrom } from 'kay'
-import { appDatabase, appStore, configError, durationSeconds } from 'kay/library'
+import { APP_SQLITE_FILE, appDatabase, appStore, configError, defaultSqliteFile, durationSeconds } from 'kay/library'
 import { personalData } from 'kay/server'
 import { pgConversations } from './conversation-pg'
-import { CONVERSATIONS_FILE, sqliteConversations } from './conversation-store'
+import { LEGACY_CONVERSATIONS_FILE, sqliteConversations } from './conversation-store'
 
 interface Held {
   store: ConversationStore | undefined
@@ -111,14 +110,15 @@ function defaultStore(held: Held): ConversationStore {
 
   const testing = process.env.NODE_ENV === 'test'
   const database = testing ? undefined : appDatabase()
-  const followed = database !== undefined && !existsSync(CONVERSATIONS_FILE) ? database : undefined
-  const file = followed?.kind === 'sqlite' ? followed.path : CONVERSATIONS_FILE
+  const own = defaultSqliteFile([LEGACY_CONVERSATIONS_FILE])
+  const followed = database !== undefined && own === APP_SQLITE_FILE ? database : undefined
+  const file = followed?.kind === 'sqlite' ? followed.path : own
 
   if (process.env.NODE_ENV === 'production' && !warned && followed === undefined) {
     warned = true
     log.warn(database === undefined
-      ? `the conversations are kept in ${CONVERSATIONS_FILE}, a SQLite file: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts, or give \`ai({ conversations })\` a store, for a database that outlives a deploy`
-      : `the conversations are kept in ${CONVERSATIONS_FILE}, which exists, though the app's store names a database: to use that database, move the conversations into it (or delete the file when it holds none)`)
+      ? `the conversations are kept in ${own}, a SQLite file: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts, or give \`ai({ store })\` a store, for a database that outlives a deploy`
+      : `the conversations are kept in ${own}, which exists, though the app's store names a database: to use that database, move the conversations into it (or delete the file when it holds none)`)
   }
 
   held.app = app

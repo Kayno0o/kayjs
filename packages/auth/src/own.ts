@@ -7,11 +7,10 @@ import type { ProviderOptions } from './oauth/providers'
 import type { AuthPagesConfig, AuthPagesOptions, UserMaker } from './pages'
 import type { AuthStore } from './store'
 import type { OwnTest } from './test'
-import { existsSync } from 'node:fs'
 import { normalize, resolve } from 'node:path'
 import process from 'node:process'
 import { s } from 'kay'
-import { appStore, configError } from 'kay/library'
+import { APP_SQLITE_FILE, appStore, configError, defaultSqliteFile } from 'kay/library'
 import { session } from 'kay/server'
 import { log } from './log'
 import { memoryAuth } from './memoryStore'
@@ -155,9 +154,8 @@ function foreignTables(names: readonly string[]): RegExp {
   return new RegExp(`^(?!(?:${names.join('|')})$)`)
 }
 
-const OWN_FILE = 'data/auth.sqlite'
-// What the file was called before 1.88 gave every default data file the `.sqlite` extension: an app whose users are in it keeps it.
-const LEGACY_OWN_FILE = 'data/auth.db'
+// The files the users were kept in before every default shared `data/app.sqlite` (`data/auth.db` before 1.88 gave the data files their extension): an app whose users are in one keeps it.
+const LEGACY_OWN_FILES = ['data/auth.db', 'data/auth.sqlite']
 const warned = new Set<string>()
 
 async function storeOf(store: StoreOption | undefined, root: string, shared: string | undefined, exporting: boolean | undefined): Promise<AuthStore> {
@@ -175,9 +173,9 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
     return memoryAuth()
 
   // The database of the app's own `store` when it names one, so `sqliteData` or `pgData(url)` in kay.config.ts is the only place to say where the data lives.
-  // An app whose users are already in `data/auth.db` keeps them there, so an upgrade loses no one.
-  const file = existsSync(resolve(root, LEGACY_OWN_FILE)) ? LEGACY_OWN_FILE : OWN_FILE
-  const kept = given === undefined && shared !== undefined && existsSync(resolve(root, file))
+  // An app whose users are already in `data/auth.sqlite` or `data/auth.db` keeps them there, so an upgrade loses no one.
+  const file = defaultSqliteFile(LEGACY_OWN_FILES, root)
+  const kept = given === undefined && shared !== undefined && file !== APP_SQLITE_FILE
   const url = kept ? undefined : given ?? shared
 
   if (kept && !warned.has(root)) {
@@ -196,9 +194,13 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
     throw configError('auth', 'store', 'the store of auth() is a pg-orm database, and @kaynooo/pg-orm is not installed: install it, or give `store` an AuthStore', { cause: error })
   }
 
-  const db = new orm.Database({ url: underRoot(url ?? `sqlite://${file}`, root), tables: [...pg.authTables] })
+  const target = underRoot(url ?? `sqlite://${file}`, root)
+  const db = new orm.Database({ url: target, tables: [...pg.authTables] })
 
-  await db.sync(!kept && url !== undefined && shared !== undefined && sameDatabase(url, shared, root) ? { ignoreTables: [foreignTables(pg.authTables.map(table => table.name))] } : undefined)
+  // The app's database and `data/app.sqlite` hold tables that are not kayjs-auth's, which the sync must leave alone.
+  const shares = !kept && ((url !== undefined && shared !== undefined && sameDatabase(url, shared, root)) || sameDatabase(target, `sqlite://${APP_SQLITE_FILE}`, root))
+
+  await db.sync(shares ? { ignoreTables: [foreignTables(pg.authTables.map(table => table.name))] } : undefined)
 
   return pg.pgAuth(db)
 }
@@ -288,7 +290,7 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
   const mailer = await emailOf(email, app)
 
   if (store === undefined && app.database === undefined && process.env.NODE_ENV === 'production' && databaseUrlFromEnv() === undefined) {
-    const file = existsSync(resolve(app.root, LEGACY_OWN_FILE)) ? LEGACY_OWN_FILE : OWN_FILE
+    const file = defaultSqliteFile(LEGACY_OWN_FILES, app.root)
 
     log.warn(appStore()?.sql === undefined
       ? `auth() keeps its users in ${file}, a SQLite file: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts, AUTH_DATABASE_URL, or auth's \`store\`, for a database that outlives a deploy`

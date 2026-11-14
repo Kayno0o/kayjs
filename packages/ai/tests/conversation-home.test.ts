@@ -127,7 +127,7 @@ describe('the default store on the app\'s Postgres connection', () => {
       conversationStore()
       conversationStore()
       expect(lines).toHaveLength(1)
-      expect(lines[0]).toContain('data/ai-conversations.sqlite')
+      expect(lines[0]).toContain('data/app.sqlite')
       useConversations(undefined)
     }
     finally {

@@ -2,7 +2,7 @@ import type { Database } from 'bun:sqlite'
 import type { ConversationRow } from './conversation-title'
 import type { Source, Thinking } from './types'
 import { existsSync } from 'node:fs'
-import { openSqlite } from 'kay/library'
+import { defaultSqliteFile, openSqlite } from 'kay/library'
 
 // A tool call a reply made and what the model was told of it, as the next ask replays them.
 export interface StoredCall {
@@ -76,7 +76,8 @@ export interface OwnedConversation extends StoredConversation {
   scope: string
 }
 
-export const CONVERSATIONS_FILE = 'data/ai-conversations.sqlite'
+// Where conversations were kept before every default shared `data/app.sqlite`: an app that has the file keeps reading it.
+export const LEGACY_CONVERSATIONS_FILE = 'data/ai-conversations.sqlite'
 // What one owner keeps under one action: the least recently updated conversation goes past it, and the oldest turns of a conversation past its own.
 export const MOST_CONVERSATIONS = 200
 export const MOST_TURNS = 500
@@ -130,7 +131,7 @@ export function turnsOf(text: string): StoredTurn[] {
 }
 
 // The conversations in one SQLite file, which the processes of the machine opening it share; the file is readable by the server's user alone.
-export function sqliteConversations(path: string = CONVERSATIONS_FILE): ConversationStore {
+export function sqliteConversations(path: string = defaultSqliteFile([LEGACY_CONVERSATIONS_FILE])): ConversationStore {
   let opened: ReturnType<typeof open> | undefined
 
   // Opened by the first query, so building or checking an app makes no file.

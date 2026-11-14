@@ -4,7 +4,7 @@ import type { SuppressionStore } from './suppressions'
 import { openSqlite } from 'kay/library'
 import { suppressionsIn } from './suppressions'
 
-// Where the production server keeps its mailing lists, next to the job store.
+// Where the mailing lists were kept before every default shared `data/app.sqlite`: an app that has the file keeps reading it.
 export const LIST_FILE = 'data/mail-list.sqlite'
 
 export interface Subscriber {

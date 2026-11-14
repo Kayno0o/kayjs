@@ -1,24 +1,21 @@
 import type { SQL } from 'bun'
 import type { ContentLoader, LoadedEntry } from 'kay/content'
 import type { Subscription } from 'kay/library'
-import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { ContentChangedError, contentKey } from 'kay/content'
-import { appDatabase, configError, delayAfter, durationSeconds, invalidateLocally, LISTENED_IDLE_MS, onKeysInvalidated, outsideRequest, pollClock } from 'kay/library'
+import { APP_SQLITE_FILE, appDatabase, configError, defaultSqliteFile, delayAfter, durationSeconds, invalidateLocally, LISTENED_IDLE_MS, onKeysInvalidated, outsideRequest, pollClock } from 'kay/library'
 import { log } from '../log'
 
-// Where a SQLite loader keeps its table when the app's store names no SQLite file.
-const CONTENT_FILE = 'data/content.sqlite'
-// What the file was called before 1.88 gave every default data file the `.sqlite` extension: an app whose entries are in it keeps it.
-const LEGACY_CONTENT_FILE = 'data/content.db'
+// The files entries were kept in before every default shared `data/app.sqlite` (`data/content.db` before 1.88 gave the data files their extension): an app whose entries are in one keeps it.
+const LEGACY_CONTENT_FILES = ['data/content.db', 'data/content.sqlite']
 let warned = false
 
-// The SQLite file of a loader given none: the file of the app's `store` (`sqliteData`), else `data/content.sqlite`; a `data/content.db` or `data/content.sqlite` that exists keeps being read so an app upgrading loses no entry. Production warns once when the entries go to a local file the store does not name.
+// The SQLite file of a loader given none: the file of the app's `store` (`sqliteData`), else `data/app.sqlite`; a `data/content.sqlite` or `data/content.db` that exists keeps being read so an app upgrading loses no entry. Production warns once when the entries go to a local file the store does not name.
 export function contentFile(): string {
   const database = appDatabase()
-  const file = existsSync(LEGACY_CONTENT_FILE) ? LEGACY_CONTENT_FILE : CONTENT_FILE
+  const file = defaultSqliteFile(LEGACY_CONTENT_FILES)
 
-  if (database?.kind === 'sqlite' && !existsSync(file))
+  if (database?.kind === 'sqlite' && file === APP_SQLITE_FILE)
     return database.path
 
   // Under `bun test` a loader with no database of its own keeps its entries in memory, as the other libraries do, so a test site writes no file into the working directory.

@@ -7,7 +7,7 @@ import type { SuppressionStore } from './suppressions'
 import type { Address, Mail, MailMessage } from './types'
 import process from 'node:process'
 import { s } from 'kay'
-import { configError, dispatch, durationSeconds, escapeHtml, keyedDigest, normalizeAddress, trackDetached } from 'kay/library'
+import { configError, defaultSqliteFile, dispatch, durationSeconds, escapeHtml, keyedDigest, normalizeAddress, trackDetached } from 'kay/library'
 import { siteOrigin } from 'kay/seo'
 import { rateLimit, renderLocale, renderToString, retryLater } from 'kay/server'
 import { wording } from 'kay/words'
@@ -286,7 +286,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     if (options.store !== undefined && options.file !== undefined)
       throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): give a store or a file, not both`)
 
-    const file = () => options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : defaultFile() ?? LIST_FILE)
+    const file = () => options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : defaultFile() ?? defaultSqliteFile([LIST_FILE]))
     const chosen = () => options.store ?? (options.file === undefined ? defaultStore() : undefined)
     const lists = {
       get: (): ListStore => {

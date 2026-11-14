@@ -1,5 +1,8 @@
 import type { SQL } from 'bun'
 import type { AppStore } from './app-store'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import process from 'node:process'
 import { appStore } from './app-store'
 
 // The database the app's `store` keeps its data in, which a library keeping tables of its own defaults to: a SQLite file by its absolute path, or Postgres by the connection `pgData` works through (so a library opens no pool of its own), else the url the store names. Nothing when the store names none (a store built by hand) or the app has no store.
@@ -29,4 +32,12 @@ export function databaseOf(store: AppStore | undefined): AppDatabase | undefined
   const file = sqlitePath(url)
 
   return file === undefined ? { kind: 'pg', source: url } : { kind: 'sqlite', path: file }
+}
+
+// The one SQLite file kay and its libraries keep their data in when the app's `store` names no database.
+export const APP_SQLITE_FILE = 'data/app.sqlite'
+
+// `data/app.sqlite`, or the first of `legacy` (the file a feature used before it shared this one) that exists under `root`, so an app upgrading keeps reading what it wrote.
+export function defaultSqliteFile(legacy: readonly string[] = [], root: string = process.cwd()): string {
+  return legacy.find(file => existsSync(join(root, file))) ?? APP_SQLITE_FILE
 }

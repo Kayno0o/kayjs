@@ -829,6 +829,9 @@ interface AnswerIssue
   message: string
   path: string
 
+[./library] APP_SQLITE_FILE
+const APP_SQLITE_FILE: "data/app.sqlite"
+
 [./library] appDatabase
 function appDatabase(): AppDatabase | undefined
 
@@ -923,6 +926,9 @@ function decide<E extends object, C extends object>(source: string, hooks: reado
     retryAfter?: number | undefined;
   };
 }>
+
+[./library] defaultSqliteFile
+function defaultSqliteFile(legacy?: readonly string[], root?: string): string
 
 [./library] defineContext
 function defineContext<Values extends object>(load: (request: Request) => Promise<Values> | Values): ContextDefinition<Values>

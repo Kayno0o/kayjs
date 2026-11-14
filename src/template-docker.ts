@@ -159,7 +159,7 @@ FROM ${RUNTIME_IMAGE}
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/server ./server
-# Sessions are kept in data/sessions.sqlite unless a store is given, and kayjs-auth's SQLite file is written there too: a folder the unprivileged user can write, which the SQLite compose mounts data-prod on.
+# Sessions are kept in data/app.sqlite unless a store is given, and kayjs-auth's SQLite file is written there too: a folder the unprivileged user can write, which the SQLite compose mounts data-prod on.
 RUN mkdir data && chown nobody data
 ENV NODE_ENV=production PORT=3000
 EXPOSE 3000

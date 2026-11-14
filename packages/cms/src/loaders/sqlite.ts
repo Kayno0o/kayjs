@@ -8,7 +8,7 @@ import { contentFile, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEn
 export type { CmsSeedEntry, LoaderOptions }
 
 export interface SqliteLoaderOptions extends LoaderOptions {
-  // The database file, created with its folder when missing, or a `bun:sqlite` `Database` the app opened. The file of the app's `store: sqliteData(path)` when left out, else `data/content.sqlite`.
+  // The database file, created with its folder when missing, or a `bun:sqlite` `Database` the app opened. The file of the app's `store: sqliteData(path)` when left out, else `data/app.sqlite`.
   database?: string | Database | undefined
 }
 

@@ -12,6 +12,7 @@ import { sessionEvents } from '../runtime/counters'
 import { wholeSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
+import { defaultSqliteFile } from './app-database'
 import { appStore } from './app-store'
 import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
@@ -64,7 +65,7 @@ export interface SessionOptions {
   domain?: string | undefined
   // Whether the browser sends the cookie along a request another site starts, a link followed or a form posted from there: `'lax'` by default sends it on a link's navigation and not on a post; `'strict'` on neither, so a visitor following a link from elsewhere arrives signed out; `'none'` on all, for a site embedded in another's page, and always `Secure`, which browsers ask of it.
   sameSite?: SameSite | undefined
-  // Keeps the data server-side, the cookie carrying only an id: the app's `store.sessions` in kay.config.ts by default, else a SQLite file `data/sessions.sqlite` as jobs keep `data/jobs.sqlite` (memory under `bun test`). `false` keeps the data sealed in the cookie instead, about 3.5 KB at most and never revocable by the session itself, for a host with no disk of its own.
+  // Keeps the data server-side, the cookie carrying only an id: the app's `store.sessions` in kay.config.ts by default, else the SQLite file `data/app.sqlite` that kay and its libraries share (`data/sessions.sqlite` where it exists; memory under `bun test`). `false` keeps the data sealed in the cookie instead, about 3.5 KB at most and never revocable by the session itself, for a host with no disk of its own.
   store?: SessionStore | false | undefined
   // Told after a visitor's session first holds data (stored, when it has a store). `id` is the stored session's id, undefined for one kept in the cookie. A throw is reported with source `session.onCreate` and never fails the request.
   onCreate?: Hook<SessionEvent> | undefined
@@ -140,25 +141,28 @@ export function acceptCookieData(): void {
 
 // The store of a `session()` with neither its own nor the app's, made on first use.
 let defaultSessions: SessionStore | undefined
-const DEFAULT_SESSIONS_PATH = 'data/sessions.sqlite'
+// Where sessions were kept before every default shared `data/app.sqlite`: an app that has the file keeps reading it.
+const LEGACY_SESSIONS_PATH = 'data/sessions.sqlite'
 
 // The file a session() with no store keeps its sessions in, opened as the server starts in production: a folder that cannot be written is an error that names the way out, not a 500 on every request.
 function openDefaultSessions(): SessionStore {
   if (defaultSessions !== undefined)
     return defaultSessions
 
+  const path = defaultSqliteFile([LEGACY_SESSIONS_PATH])
+
   try {
-    defaultSessions = sqliteSessions(DEFAULT_SESSIONS_PATH)
+    defaultSessions = sqliteSessions(path)
   }
   catch (error) {
-    throw new KayError('config-invalid', `kay: sessions are kept in ${DEFAULT_SESSIONS_PATH} when no store is given, and that file cannot be opened (${error instanceof Error ? error.message : String(error)}); make \`data/\` writable, give \`session({ store })\` or the app's \`store.sessions\` a shared store, or set \`store: false\` to keep them in the cookie`)
+    throw new KayError('config-invalid', `kay: sessions are kept in ${path} when no store is given, and that file cannot be opened (${error instanceof Error ? error.message : String(error)}); make \`data/\` writable, give \`session({ store })\` or the app's \`store.sessions\` a shared store, or set \`store: false\` to keep them in the cookie`)
   }
 
   // Once per server: the workers of a `kay start` cluster share the file, and worker 0 speaks for them.
   const worker = process.env[WORKER_INDEX]
 
   if (process.env.NODE_ENV === 'production' && (worker === undefined || worker === '0'))
-    kayLog('info', `sessions are kept in ${DEFAULT_SESSIONS_PATH}, a file of this machine, which fits one server; for several, give \`store.sessions\` a shared store, or set \`store: false\` to keep them in the cookie`)
+    kayLog('info', `sessions are kept in ${path}, a file of this machine, which fits one server; for several, give \`store.sessions\` a shared store, or set \`store: false\` to keep them in the cookie`)
 
   return defaultSessions
 }

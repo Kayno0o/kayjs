@@ -16,6 +16,7 @@ import { countQueueRun } from '../runtime/counters'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog, logFrom } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
+import { defaultSqliteFile } from './app-database'
 import { appStore } from './app-store'
 import { cappedError, MAX_TIMER_MS } from './config-limits'
 import { stopGraceMs, STOPPED } from './drain'
@@ -102,7 +103,7 @@ export interface JobStore extends StoreBase {
 }
 
 export interface QueueOptions<Payload> {
-  // `sqliteJobs('data/jobs.sqlite')` unless given, in memory under `bun test`.
+  // `sqliteJobs('data/app.sqlite')` unless given (`data/jobs.sqlite` where it exists), in memory under `bun test`.
   store?: JobStore | undefined
   // Runs in all, the first included, before a job is kept as failed. 5 by default.
   attempts?: number | undefined
@@ -191,7 +192,6 @@ const COMPLETE_RETRY_MS = 100
 
 // The longest an idle queue waits between looks unless `idlePoll` says otherwise: a job another process enqueued waits this at worst, unless the store notifies (`pgJobs` does, through LISTEN) and then only a lost notification does.
 const DEFAULT_IDLE_POLL = '10s'
-const DEFAULT_PATH = 'data/jobs.sqlite'
 
 // Thrown from a handler for a failure no retry can mend: the job is kept as failed at once, whatever attempts are left.
 export class GiveUpError extends KayError {
@@ -462,7 +462,7 @@ export { memoryJobs }
 
 // What a queue or a locked schedule names no store of its own uses, opened on first use.
 export function defaultJobStore(): JobStore {
-  return appStore()?.jobs ?? (defaultStore ??= process.env.NODE_ENV === 'test' ? memoryJobs() : sqliteJobs(DEFAULT_PATH))
+  return appStore()?.jobs ?? (defaultStore ??= process.env.NODE_ENV === 'test' ? memoryJobs() : sqliteJobs(defaultSqliteFile(['data/jobs.sqlite'])))
 }
 
 // A queue of jobs the server runs in the background, each surviving a restart: `enqueue` from an action, `app.use(queue)` in the server to run them.

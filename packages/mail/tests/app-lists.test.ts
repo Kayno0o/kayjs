@@ -19,10 +19,10 @@ const host = { configured: () => true, render: async () => {
 }, deliver: async () => undefined }
 
 describe('where the lists live by default', () => {
-  it('is the SQLite file of the app\'s store, its Postgres connection, or data/mail-list.sqlite when the app names none', async () => {
+  it('is the SQLite file of the app\'s store, its Postgres connection, or data/app.sqlite when the app names none', async () => {
     const root = await scratchDir('mail-home')
 
-    expect(listsHome(root)).toMatchObject({ file: LIST_FILE, local: true })
+    expect(listsHome(root)).toMatchObject({ file: 'data/app.sqlite', local: true })
 
     setupStore({ database: 'sqlite:///srv/app/data/app.sqlite' })
     expect(listsHome(root)).toMatchObject({ file: '/srv/app/data/app.sqlite', local: false })
@@ -113,7 +113,7 @@ describe('a mailer\'s lists on the app\'s store', () => {
       })
 
       expect(warned).toHaveLength(1)
-      expect(warned[0]![1]).toContain('data/mail-list.sqlite')
+      expect(warned[0]![1]).toContain('data/app.sqlite')
     }
     finally {
       if (mode === undefined)

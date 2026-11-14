@@ -1,9 +1,8 @@
 import type { SQL } from 'bun'
 
 import type { ListStore } from './list-store'
-import { existsSync } from 'node:fs'
 import process from 'node:process'
-import { appDatabase, appStore } from 'kay/library'
+import { APP_SQLITE_FILE, appDatabase, appStore, defaultSqliteFile } from 'kay/library'
 import { pgLists } from './list-pg'
 import { LIST_FILE } from './list-store'
 import { log } from './log'
@@ -21,17 +20,18 @@ const pgBySql = new WeakMap<SQL, ListStore>()
 let warned = false
 let last: { store: unknown, root: string, old: boolean, home: ListsHome } | undefined
 
-// Where the lists and suppressions of a mailer with no store of its own live: the database of the app's `store` (the Postgres connection of `pgData`, or the SQLite file of `sqliteData`), else `data/mail-list.sqlite`.
+// Where the lists and suppressions of a mailer with no store of its own live: the database of the app's `store` (the Postgres connection of `pgData`, or the SQLite file of `sqliteData`), else `data/app.sqlite`.
 // A `data/mail-list.sqlite` that exists keeps being read, so an app upgrading loses no subscriber. Worked out again when the store setup, that file's existence or the closing of the Postgres store changes.
 export function listsHome(root: string = process.cwd()): ListsHome {
   const store = appStore()
-  const old = existsSync(`${root}/${LIST_FILE}`)
+  const own = defaultSqliteFile([LIST_FILE], root)
+  const old = own !== APP_SQLITE_FILE
 
   if (last !== undefined && last.store === store && last.root === root && last.old === old && last.home.store?.closed !== true)
     return last.home
 
   const database = appDatabase()
-  let home: ListsHome = { file: LIST_FILE, local: true }
+  let home: ListsHome = { file: own, local: true }
 
   if (database !== undefined && !old) {
     if (database.kind === 'sqlite') {
@@ -69,6 +69,6 @@ export function warnLocalLists(home: ListsHome): void {
   const database = appDatabase()
 
   log.warn(database === undefined
-    ? `the mailing lists are kept in ${LIST_FILE}, a SQLite file: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts, or give the mailer a \`listStore\`, for a database that outlives a deploy`
-    : `the mailing lists are kept in ${LIST_FILE}, which exists, though the app's store names a database: to use that database, move the subscribers into it (or delete the file when it holds none)`)
+    ? `the mailing lists are kept in ${home.file}, a SQLite file: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts, or give the mailer a \`store\`, for a database that outlives a deploy`
+    : `the mailing lists are kept in ${home.file}, which exists, though the app's store names a database: to use that database, move the subscribers into it (or delete the file when it holds none)`)
 }

@@ -210,7 +210,7 @@ ${script}`)
       return { cwd, out: run.stdout.toString(), err: run.stderr.toString(), code: run.exitCode }
     }
 
-    it('keeps its sessions in data/sessions.sqlite in production, revoking one wherever its cookie is, and says the file is this machine\'s', async () => {
+    it('keeps its sessions in data/app.sqlite in production, revoking one wherever its cookie is, and says the file is this machine\'s', async () => {
       const { out, code } = await inProduction('', `
 const url = (path: string) => \`https://localhost\${path}\`
 const first = await app.handle(new Request(url('/set')))
@@ -218,13 +218,24 @@ const cookie = first.headers.get('set-cookie')!.split(';')[0]!
 const ask = async (path: string) => (await app.handle(new Request(url(path), { headers: { cookie } }))).text()
 const before = await ask('/peek')
 await ask('/out')
-console.log(JSON.stringify({ before, after: await ask('/peek'), file: existsSync('data/sessions.sqlite') }))
+console.log(JSON.stringify({ before, after: await ask('/peek'), file: existsSync('data/app.sqlite'), legacy: existsSync('data/sessions.sqlite') }))
 process.exit(0)`)
 
       expect(code).toBe(0)
-      expect(JSON.parse(out.trim().split('\n').at(-1)!)).toEqual({ before: '1', after: 'none', file: true })
+      expect(JSON.parse(out.trim().split('\n').at(-1)!)).toEqual({ before: '1', after: 'none', file: true, legacy: false })
       expect(out).toContain('a file of this machine')
       expect(out).toContain('store: false')
+    })
+
+    it('keeps reading data/sessions.sqlite where it exists, so an upgrade loses no session', async () => {
+      const { out, code } = await inProduction('await Bun.write(\'data/sessions.sqlite\', \'\')', `
+await app.handle(new Request('https://localhost/set'))
+console.log(JSON.stringify({ app: existsSync('data/app.sqlite') }))
+process.exit(0)`)
+
+      expect(code).toBe(0)
+      expect(JSON.parse(out.trim().split('\n').at(-1)!)).toEqual({ app: false })
+      expect(out).toContain('data/sessions.sqlite')
     })
 
     it('logs the file line from worker 0 of a cluster only', async () => {
@@ -245,7 +256,7 @@ catch (error) {
 }
 process.exit(0)`)
 
-      expect(out).toContain('data/sessions.sqlite')
+      expect(out).toContain('data/app.sqlite')
       expect(out).toContain('store: false')
     })
   })
