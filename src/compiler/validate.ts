@@ -7,8 +7,8 @@ import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
+import { componentBindProblem } from './bound-props'
 import { deprecatedAiLabels } from './deprecated-ai-labels'
-import { unusableChange } from './bound-props'
 import { deprecatedUiProps, libraryComponents } from './deprecated-ui-props'
 import { modifierProblems } from './event-modifiers'
 import { kayCtxImport } from './script-shared'
@@ -33,7 +33,7 @@ const MEMBER_START = /[\s{;,]/
 const TYPE_OPENERS = '{[(<'
 const TYPE_CLOSERS = '}])>'
 // The name a `bind:` on a component writes: a signal, a prop of the component, or a member of one.
-const BOUND_NAME = /^\s*[A-Z_$][\w$]*(?:\s*\.\s*[A-Z_$][\w$]*)*\s*$/i
+
 // Utilities of the base breakpoint that give a box its ratio and its sizes: a variant (`sm:`) leaves the base without one.
 const ASPECT_CLASS = /^!?aspect-(?!auto!?$)\S/
 const WIDTH_CLASS = /^!?(?:w|size)-(?!auto!?$)\S/
@@ -688,20 +688,11 @@ class Validator {
       this.error('attribute-invalid', attribute.modifiers!, message, { help })
   }
 
-  // `bind:open={open}` on a component hands it the signal `open` or a `Bindable` prop of the component, named whole or as a member of one.
   private componentBind(element: ElementNode, attribute: Extract<NamedAttribute, { kind: 'expression' }>, name: string): void {
-    const expression = this.text(attribute.expression)
-    const unusable = name.length > 5 ? unusableChange(element, this.src, name.slice(5)) : undefined
-    const [root, ...members] = expression.split('.')
+    const problem = componentBindProblem(element, attribute, name, this.src, this.restName)
 
-    if (name === 'bind:')
-      this.error('bind-misuse', attribute.name, '`bind:` names the prop it binds', { help: '`bind:open={open}`' })
-    else if (this.restName !== undefined && members.length > 0 && root!.trim() === this.restName)
-      this.error('bind-misuse', attribute.expression, `\`${expression.trim()}\` is a value, so \`${name}\` has nothing to write`, { help: `spread \`...${this.restName}\` to hand the prop on, or name the prop` })
-    else if (unusable)
-      this.error('bind-misuse', unusable.name, `\`${name}\` calls the \`${this.text(unusable.name)}\` written beside it after its own write, so that one must be a single plain expression`, { help: 'write one `onXChange={handler}`, with no modifier' })
-    else if (!BOUND_NAME.test(expression))
-      this.error('bind-misuse', attribute.expression, `\`${name}\` needs a signal or a \`Bindable\` prop`, { help: 'name the signal, or the prop of this component, that it writes' })
+    if (problem)
+      this.error('bind-misuse', problem.at, problem.message, { help: problem.help })
   }
 
   // `onclick` and `on:click` attach nothing, and the component would not become an island either.

@@ -1,7 +1,9 @@
-import type { Attribute, ElementNode, NamedAttribute } from './ast'
+import type { Attribute, ElementNode, NamedAttribute, Span } from './ast'
 import type { CodeBuilder } from './mapping'
 
 type ExpressionAttribute = Extract<NamedAttribute, { kind: 'expression' }>
+
+const BOUND_NAME = /^\s*[A-Z_$][\w$]*(?:\s*\.\s*[A-Z_$][\w$]*)*\s*$/i
 
 // The callback a bound prop reports its changes through: `open` and `onOpenChange`.
 function changeName(prop: string): string {
@@ -14,6 +16,24 @@ export function unusableChange(element: ElementNode, source: string, prop: strin
   const changes = element.attributes.filter((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === name)
 
   return changes.find(change => changes.length > 1 || change.kind !== 'expression' || change.modifiers !== undefined)
+}
+
+// What is wrong with `bind:open={open}` on a component, which hands it the signal `open` or a `Bindable` prop of the component, named whole or as a member of one.
+export function componentBindProblem(element: ElementNode, attribute: ExpressionAttribute, name: string, source: string, restName: string | undefined): { at: Span, message: string, help: string } | undefined {
+  const expression = source.slice(attribute.expression.start, attribute.expression.end)
+  const unusable = name.length > 5 ? unusableChange(element, source, name.slice(5)) : undefined
+  const [root, ...members] = expression.split('.')
+
+  if (name === 'bind:')
+    return { at: attribute.name, message: '`bind:` names the prop it binds', help: '`bind:open={open}`' }
+
+  if (restName !== undefined && members.length > 0 && root!.trim() === restName)
+    return { at: attribute.expression, message: `\`${expression.trim()}\` is a value, so \`${name}\` has nothing to write`, help: `spread \`...${restName}\` to hand the prop on, or name the prop` }
+
+  if (unusable)
+    return { at: unusable.name, message: `\`${name}\` calls the \`${source.slice(unusable.name.start, unusable.name.end)}\` written beside it after its own write, so that one must be a single plain expression`, help: 'write one `onXChange={handler}`, with no modifier' }
+
+  return BOUND_NAME.test(expression) ? undefined : { at: attribute.expression, message: `\`${name}\` needs a signal or a \`Bindable\` prop`, help: 'name the signal, or the prop of this component, that it writes' }
 }
 
 // The callback written beside a `bind:` of the prop, an expression with no modifier, which the bind calls after its own write.
