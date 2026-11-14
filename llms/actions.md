@@ -207,8 +207,12 @@ form(action={add})
 ### Fill a form from a record
 
 - `form(action={save} values={todo})` starts every field the form names from the record's property of the same name, so an edit form writes each field once: a text or a number fills `input` and `textarea`, a `Date` fills `type="date"` (`2026-03-04`) and `datetime-local`, a boolean ticks a checkbox, a list ticks the checkboxes whose `value` it holds, a text or a number ticks the radio or picks the `option` it equals, and a `null`, a missing property or a function leaves the field as written.
-- A control's own `value` stays the fallback for a field the record lacks, and a refused post's values win over the record, so a visitor's edits and blanks survive the refusal.
-- The record is read where the form renders, on the server and in an island alike.
+- A refused post's values win over the record, so a visitor's edits and blanks survive the refusal.
+- An `input` or checkbox that writes its own `value` or `checked` keeps it over the record; a `select` and a `textarea` take the record over their own `selected` option or text.
+- A `Date` at midnight UTC fills a date field as `YYYY-MM-DD`, any other as the UTC `YYYY-MM-DDTHH:mm` of `datetime-local`.
+- A hidden, password, file or disabled field, a `select multiple`, a field with a spread or a `bind:` on its value is left as written.
+- `values` is written into each field it fills, so give it a plain variable or property, not a call.
+- A `Form(action={save} values={todo})` component fills the fields written in its content on the server only.
 
 ### Refused posts
 

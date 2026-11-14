@@ -145,7 +145,7 @@ form(action={save} values={todo})
 
 A text or a number fills an `input` or a `textarea`, and a `Date` fills a date field. A boolean ticks a checkbox, a list ticks the checkboxes whose `value` it holds, and a text or a number ticks the radio button or picks the option it equals. A property that is missing, `null` or a function leaves the field as you wrote it.
 
-A field's own `value` is the fallback for a property the record lacks. When a post is refused, the page shows what the visitor sent, not the record, so their edits survive.
+An `input` that writes its own `value` keeps it. Hidden, password, file and disabled fields are left as written. Give `values` a variable or a property rather than a function call, since each field reads it. When a post is refused, the page shows what the visitor sent, not the record, so their edits survive.
 
 ## Showing errors
 

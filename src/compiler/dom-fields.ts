@@ -28,7 +28,7 @@ export function fieldBindings<Node>(b: CodeBuilder, src: string, node: Node, ele
 
 // Whether the template sets what the field shows itself, which the record its form fills it from leaves alone.
 function writesValue(plan: ElementPlan, fill: NonNullable<FormField['fill']>, hasChildren: boolean): boolean {
-  const named = (property: string) => plan.attributes.some(attribute => attribute.kind === 'binding' || ('name' in attribute && attribute.name === property))
+  const named = (property: string) => plan.attributes.some(attribute => (attribute.kind === 'binding' && attribute.binding.kind === 'bind') || ('name' in attribute && attribute.name === property))
 
   switch (fill) {
     case 'checked':

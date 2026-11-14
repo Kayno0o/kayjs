@@ -10,7 +10,6 @@ const { save } = await import(join(import.meta.dir, 'fixtures/form-once/src/rout
 const { rename } = await import(join(import.meta.dir, 'fixtures/form-once/src/routes/island.kay')) as { rename: Action<Record<string, string | boolean>, unknown> }
 const path = browserPath()
 const mounted = await testSite({ root: 'tests/fixtures/form-once', islands: false, base: '/blog', trailingSlash: 'always' })
-const { save: mountedSave } = await import(join(import.meta.dir, 'fixtures/form-once/src/routes/index.kay')) as { save: Action<Record<string, string | boolean | string[]>, unknown> }
 
 describe('a form given the record its fields start from', () => {
   it('fills the fields and shows a refused post under a base path', async () => {
@@ -19,7 +18,7 @@ describe('a form given the record its fields start from', () => {
     expect(html).toContain('value="Buy milk"')
     expect(html).toContain('<option value="m" selected>Medium</option>')
 
-    const refused = await mounted.submit(mountedSave, { title: 'ab', size: 's', kind: '1' }, { from: '/blog/' })
+    const refused = await mounted.submit(save, { title: 'ab', size: 's', kind: '1' }, { from: '/blog/' })
 
     expect(refused.status).toBe(422)
     expect(refused.html).toContain('value="ab" aria-invalid="true"')
@@ -66,6 +65,13 @@ describe('a form given the record its fields start from', () => {
 
     expect(server).toContain('KayFormInitial((todo), "title")')
     expect(server).toContain('KayFormInitialChecked((todo), "done", undefined)')
+    expect(browser).toContain('KayFormInitial((todo), "title")')
+    expect(browser).toContain('KayFormInitialChecked((todo), "done", undefined)')
+  })
+
+  it('fills a field in the browser that carries a handler or a ref', () => {
+    const browser = compileKay('script\n  const log = () => {}\nform(action={save} values={todo})\n  input(field="title" onInput={log})\n  input(field="done" type="checkbox" onChange={log})\n', 'page.kay', { output: 'dom' }).tsx
+
     expect(browser).toContain('KayFormInitial((todo), "title")')
     expect(browser).toContain('KayFormInitialChecked((todo), "done", undefined)')
   })

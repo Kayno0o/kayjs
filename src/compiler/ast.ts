@@ -1,5 +1,5 @@
 import type { UiEntry } from '../runtime/ui'
-import type { FieldContent, FormInfo } from './form-info'
+import type { FormInfo } from './form-info'
 import { formTargets, initialHelpers } from './form-info'
 
 // Offsets index into the whole .kay source, so every node maps back to the file the user wrote.
@@ -565,8 +565,6 @@ export interface TemplateFacts {
   formInfos: Map<Node, FormInfo>
   // The helpers the fields filled from a form's record call.
   initial: ('formInitial' | 'formInitialChecked')[]
-  // The field a component around a node names for it: `FormField(field="title")` around a bare `input`.
-  inherited: Map<Node, FieldContent>
   // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.
   functions: Map<number, boolean>
   // How the template names each prop the script types `Bindable<T>`, to its key, which only the script tells: set where the code is generated.
@@ -774,8 +772,8 @@ function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
 }
 
 function factsOf(file: KayFile): TemplateFacts {
-  const { targets, loose, infos, inherited } = formTargets(file.template, file.source)
-  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: targets, loose, formInfos: infos, initial: initialHelpers(infos), inherited, functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
+  const { targets, loose, infos } = formTargets(file.template, file.source)
+  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: targets, loose, formInfos: infos, initial: initialHelpers(infos), functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
   const text = (span: Span) => file.source.slice(span.start, span.end)
 
   visitNodes(file.template, (node) => {
