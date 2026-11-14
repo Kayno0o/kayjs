@@ -3,10 +3,10 @@ import type { FieldContent, FormInfo } from './form-info'
 import type { IslandDeclaration } from './island-declaration'
 import { actionOf, componentAction } from './form-action'
 import { formTargets, initialHelpers } from './form-info'
-import { childBlocks, someNode, visitNodes, walkNodes } from './template-walk'
+import { childBlocks, visitNodes, walkNodes } from './template-walk'
 
 export { actionOf, componentAction } from './form-action'
-export { childBlocks, someNode, visitNodes, walkNodes } from './template-walk'
+export { childBlocks, nameDestructuredRows, someNode, visitNodes, walkNodes } from './template-walk'
 
 // Offsets index into the whole .kay source, so every node maps back to the file the user wrote.
 export interface Span {
@@ -291,31 +291,6 @@ export function keyedByPosition(node: ForNode, source: string): node is ForNode 
   const index = node.index && source.slice(node.index.start, node.index.end)
 
   return index !== undefined && index !== '' && node.key !== undefined && source.slice(node.key.start, node.key.end).trim() === index
-}
-
-const PATTERN_ITEM = /^[{[]/
-
-// The file with each loop whose item is a pattern (`for [key, value] of entries`, `for { id, name } of rows`) given a row name of its own, the pattern then declared by a `const` leading its block: the loop's row is an accessor in a browser, which a parameter pattern cannot destructure.
-export function nameDestructuredRows(file: KayFile): KayFile {
-  const isPattern = (node: Node): node is ForNode => node.kind === 'for' && PATTERN_ITEM.test(file.source.slice(node.item.start, node.item.end))
-
-  if (!someNode(file.template, isPattern))
-    return file
-
-  const template = structuredClone(file.template)
-
-  visitNodes(template, (node) => {
-    if (!isPattern(node))
-      return
-
-    const row = `KayRow${node.item.start}`
-    const at = { start: node.item.start, end: node.item.start }
-
-    node.row = row
-    node.children.unshift({ kind: 'const', ...node.item, pattern: node.item, value: at, row })
-  })
-
-  return { ...file, template }
 }
 
 // Every element of a template, nested ones included, in source order.

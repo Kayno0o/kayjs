@@ -2,6 +2,12 @@
 
 What each release before 1.104.3 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased (continued)
+
+- A page's `page` takes `seo: { title, description, image, canonical, noindex, sitemap, lastmod, search, feed }` and `cache: '1h' | { browser, shared, swr } | 'private' | false`, `head(title=... description=... image=... canonical=... noindex)` takes the same shorthand in a template, and `seo.noindex` in kay.config.ts keeps a whole site out of search engines: see [Head and site metadata](head.md) and [A CDN in front of prerendered pages](cdn-caching.md); `ttl`, `cacheControl` and the top-level `noindex`, `sitemap`, `lastmod`, `search` and `feed` are deprecated (`deprecated-page-seo`, `deprecated-page-cache`).
+- `form(action={save} values={todo})` fills every field from a record, text, numbers, dates, checkboxes, radios and selects, and a refused post's values still win ([forms](actions.md#fill-a-form-from-a-record)).
+- `form(action={save} values={todo})` fills every field from a record, text, numbers, dates, checkboxes, radios and selects, a date by its field's type, and a refused post's values still win in the form that posted ([forms](actions.md#fill-a-form-from-a-record)).
+
 ## 1.104.0
 
 - The 1.100 deprecations are gone: the `id` of a kayjs-ui TreeNode and the `id`, `title` and `url` of a Bell item (now `key`, `label` and `href`, with `nodeKey()` removed), `pageSize` of `infiniteList` (`limit`), `cmsSignInAs`, `cmsSignInWith` and `cmsSignOut` (`cmsTest(site)`), and `count` of `CollectionInfo` (`total`): [Upgrading](upgrading.md).

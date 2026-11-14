@@ -1,4 +1,4 @@
-import type { Node } from './ast'
+import type { ForNode, KayFile, Node } from './ast'
 
 // The node lists right under a node, in source order. Every template walker reaches nested nodes through this one switch, so a new kind of node fails to type-check here until it says what it holds.
 export function childBlocks(node: Node): Node[][] {
@@ -44,4 +44,29 @@ export function walkNodes<C>(nodes: readonly Node[], context: C, each: (node: No
 // Whether `found` holds for a node of the template, nested ones included.
 export function someNode(nodes: readonly Node[], found: (node: Node) => boolean): boolean {
   return nodes.some(node => found(node) || childBlocks(node).some(block => someNode(block, found)))
+}
+
+const PATTERN_ITEM = /^[{[]/
+
+// The file with each loop whose item is a pattern (`for [key, value] of entries`, `for { id, name } of rows`) given a row name of its own, the pattern then declared by a `const` leading its block: the loop's row is an accessor in a browser, which a parameter pattern cannot destructure.
+export function nameDestructuredRows(file: KayFile): KayFile {
+  const isPattern = (node: Node): node is ForNode => node.kind === 'for' && PATTERN_ITEM.test(file.source.slice(node.item.start, node.item.end))
+
+  if (!someNode(file.template, isPattern))
+    return file
+
+  const template = structuredClone(file.template)
+
+  visitNodes(template, (node) => {
+    if (!isPattern(node))
+      return
+
+    const row = `KayRow${node.item.start}`
+    const at = { start: node.item.start, end: node.item.start }
+
+    node.row = row
+    node.children.unshift({ kind: 'const', ...node.item, pattern: node.item, value: at, row })
+  })
+
+  return { ...file, template }
 }

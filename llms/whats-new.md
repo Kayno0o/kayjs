@@ -29,9 +29,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Libraries name their stores one way: `ai({ store })`, `mailer({ store })`, `auth({ store })`, `pg<Lib>(db)` and `sqlite<Lib>(path)` on each `/pg` and `/sqlite` entry and `<lib>Tables` for an app's own `ignoreTables`; without a `store`, kay and the libraries share one SQLite file, `data/app.sqlite`, and still read the file of the old name where it exists ([stores](stores.md), [upgrading](upgrading.md)). The old names work until 1.108 and `kay check` fixes them as `deprecated-store-names`.
 - `formatDuration('125m')` takes a `Duration` and `formatBytes('1.5kb')` a `ByteSize`, as every other length and size of kay is written; a number of milliseconds for `formatDuration` is deprecated (`deprecated-format-duration`): see [Locales](locales.md).
 - An `img` takes `aspect`, `quality`, `sizes` and `placeholder={false}` as attributes, `img(src={hero} aspect="1/1")`, where it spread `image()`: see [Images](images.md); `no-placeholder` and the spread are deprecated (`deprecated-image-options`).
-- A page's `page` takes `seo: { title, description, image, canonical, noindex, sitemap, lastmod, search, feed }` and `cache: '1h' | { browser, shared, swr } | 'private' | false`, `head(title=... description=... image=... canonical=... noindex)` takes the same shorthand in a template, and `seo.noindex` in kay.config.ts keeps a whole site out of search engines: see [Head and site metadata](head.md) and [A CDN in front of prerendered pages](cdn-caching.md); `ttl`, `cacheControl` and the top-level `noindex`, `sitemap`, `lastmod`, `search` and `feed` are deprecated (`deprecated-page-seo`, `deprecated-page-cache`).
-- `form(action={save} values={todo})` fills every field from a record, text, numbers, dates, checkboxes, radios and selects, and a refused post's values still win ([forms](actions.md#fill-a-form-from-a-record)).
-- `form(action={save} values={todo})` fills every field from a record, text, numbers, dates, checkboxes, radios and selects, a date by its field's type, and a refused post's values still win in the form that posted ([forms](actions.md#fill-a-form-from-a-record)).
+
+The rest of this release is in [What's new, older releases](whats-new-archive.md).
 
 ## 1.104.3
 
