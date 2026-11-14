@@ -321,7 +321,7 @@ async function verify(): Promise<string> {
     }
 
     if (readers.size > 0)
-      await step('tests reading the changed files', [BUN, 'run', 'test', ...readers, WORKERS], '.', TESTS_LOCK)
+      await sharded('tests reading the changed files', [BUN, 'run', 'test', ...readers, WORKERS])
   }
 
   for (const name of libraries) {
