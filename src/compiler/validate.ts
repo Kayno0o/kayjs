@@ -12,6 +12,7 @@ import { deprecatedAiLabels } from './deprecated-ai-labels'
 import { deprecatedImage } from './deprecated-image'
 import { deprecatedUiProps, libraryComponents } from './deprecated-ui-props'
 import { modifierProblems } from './event-modifiers'
+import { shorthandProblems } from './head-shorthand'
 import { kayCtxImport } from './script-shared'
 import { AttributeFixes, FIELD_NAME, PART_NAME, PART_NAME_LIST } from './validate-fixes'
 
@@ -308,8 +309,9 @@ class Validator {
 
       if (head)
         this.error('head-invalid', node.tag, 'A template has one `head` block', { related: [{ ...head.tag, label: 'the first one' }] })
-      else if (node.attributes.length > 0 || node.classes.length > 0 || node.id)
-        this.error('head-invalid', node, 'A `head` block takes no attributes')
+
+      for (const problem of shorthandProblems(node, span => this.text(span)))
+        this.error('head-invalid', ...problem)
 
       head ??= node
     }

@@ -11,7 +11,7 @@ A page with params lists them with `sitemap`, which takes what `prerender` takes
 import { findPost, listPosts } from '../../data'
 
 export const page = {
-  sitemap: async () => (await listPosts()).map(post => ({ slug: post.slug })),
+  seo: { sitemap: async () => (await listPosts()).map(post => ({ slug: post.slug })) },
 }
 
 const post = await findPost(ctx.params.slug) ?? ctx.notFound()
@@ -79,16 +79,16 @@ The text shows in a fallback sized to the font until it loads, so the layout doe
 
 A project with a `site` serves `/sitemap.xml` and `/robots.txt`, which allows every crawler and points at the sitemap; a file of the same name in `public/` replaces either. The sitemap lists:
 
-- every page without params, unless its `page` sets `sitemap: false` or `noindex: true`;
-- for a page with params, the ones its `sitemap` key lists, else the ones its `prerender` key lists, else none. `sitemap` takes what `prerender` takes: `true`, `false`, a content collection, a list of params or a function returning one;
-- a page behind a guard only when its `sitemap` key lists it.
+- every page without params, unless its `page` sets `seo: { sitemap: false }` or `seo: { noindex: true }`;
+- for a page with params, the ones its `seo.sitemap` key lists, else the ones its `prerender` key lists, else none. `sitemap` takes what `prerender` takes: `true`, `false`, a content collection, a list of params or a function returning one;
+- a page behind a guard only when its `seo.sitemap` key lists it.
 
 ```kay
 --- server
 import { findPost, listPosts } from '../../data'
 
 export const page = {
-  sitemap: async () => (await listPosts()).map(post => ({ slug: post.slug })),
+  seo: { sitemap: async () => (await listPosts()).map(post => ({ slug: post.slug })) },
 }
 
 const post = await findPost(ctx.params.slug) ?? ctx.notFound()
@@ -96,7 +96,7 @@ const post = await findPost(ctx.params.slug) ?? ctx.notFound()
 h1 {post.title}
 ```
 
-`lastmod` in the same `page` adds a `<lastmod>` to each URL the page lists: a `Date` (written as ISO), a date string such as `'2026-05-06'` (written as it is), or a function of the params of the URL returning one or nothing, async too: `lastmod: async ({ slug }) => (await findPost(slug)).updatedAt`. Every locale's copy of a URL carries it; a `null` or `undefined` lists the URL with none, and so does any other value, a day that does not exist or a date and time naming no zone included, or a function that throws: that URL goes out without it, and the first such error of a page is logged and handed to `onError` (`page-settings-invalid` for a value that is no date). Only the page's own `lastmod` is read, never a layout's. A page listing a collection whose `modified` option names a date field takes that field as the `lastmod` of each entry's URL unless the page sets one. `robots: { disallow: ['/'] }` drops the default `Allow: /`, which would tie with it.
+`seo.lastmod` in the same `page` adds a `<lastmod>` to each URL the page lists: a `Date` (written as ISO), a date string such as `'2026-05-06'` (written as it is), or a function of the params of the URL returning one or nothing, async too: `seo: { lastmod: async ({ slug }) => (await findPost(slug)).updatedAt }`. Every locale's copy of a URL carries it; a `null` or `undefined` lists the URL with none, and so does any other value, a day that does not exist or a date and time naming no zone included, or a function that throws: that URL goes out without it, and the first such error of a page is logged and handed to `onError` (`page-settings-invalid` for a value that is no date). Only the page's own `lastmod` is read, never a layout's. A page listing a collection whose `modified` option names a date field takes that field as the `lastmod` of each entry's URL unless the page sets one. `robots: { disallow: ['/'] }` drops the default `Allow: /`, which would tie with it.
 
 In production the sitemap is built on the first request and kept for an hour (`sitemap: { ttl }` in kay.config.ts sets it), a minute when a `lastmod` was left out, so it is rebuilt once the database answers; development builds it per request. An `invalidate()` of a key or collection its build read, such as a collection's after a CMS save, or a `publishAt` date passing, drops it, so the next request builds it afresh; an unrelated key leaves it. It is served with an `ETag` and `cache-control: public, max-age=0, must-revalidate`, so a CDN revalidates it and holds no copy past a save, the 304 costing nothing between saves.
 

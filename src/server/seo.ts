@@ -157,6 +157,9 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
     if (image !== undefined && imageAlt !== undefined)
       tags.push(meta('property', 'og:image:alt', imageAlt))
 
+    if (seo.noindex === true)
+      tags.push(meta('name', 'robots', 'noindex'))
+
     if (seo.twitter !== undefined)
       tags.push(meta('name', 'twitter:site', seo.twitter))
 

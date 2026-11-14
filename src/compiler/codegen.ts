@@ -11,6 +11,8 @@ import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } 
 import { actionUrl } from '../runtime/action'
 import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, slotNames, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
+import { addIslandShorthandTitle, addShorthandTags, hasShorthandTitle, shorthandExpressions } from './head-shorthand'
+import { emitHeadTag, emitHeadText } from './head-tags'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
 import { exportsIslandOptions, islandMessages } from './island-arguments'
@@ -266,7 +268,7 @@ class ModuleShell {
     const { head, hoisted, template } = this.splitHead(this.file.template)
     const errors = this.runs ? errorMessages(template, this.src) : undefined
 
-    this.imports(head !== undefined, errors, this.titleTag(head) !== undefined)
+    this.imports(head !== undefined, errors, this.titleTag(head) !== undefined || hasShorthandTitle(head, span => this.text(span)))
 
     if (this.fence)
       this.emitLoad(this.fence)
@@ -959,6 +961,9 @@ class ModuleShell {
     const tags = head.children.filter((child): child is ElementNode => headTagProblem(child) === undefined)
 
     if (this.mode === 'check') {
+      for (const span of shorthandExpressions(head))
+        b.add('void (').addSource(span).add(');\n')
+
       b.add('void (<>')
       this.jsx.emitChildren(tags)
       b.add('</>);\n')
@@ -967,8 +972,9 @@ class ModuleShell {
     }
 
     b.add(this.mode === 'html' ? 'KayHead([' : 'KayUseHead([')
+    addShorthandTags(b, head, span => this.text(span), this.kind === 'island')
     for (const tag of tags) {
-      this.emitHeadTag(tag)
+      emitHeadTag(b, tag, span => this.text(span), this.kind === 'island')
       b.add(', ')
     }
     b.add(']);\n')
@@ -979,11 +985,14 @@ class ModuleShell {
     const { b } = this
     const title = this.titleTag(head)
 
-    if (!title)
+    if (!title) {
+      addIslandShorthandTitle(b, head, span => this.text(span), helperName('pageTitle'))
+
       return
+    }
 
     b.add(`${helperName('pageTitle')}(() => `)
-    b.wrap(title, () => this.emitHeadText(title))
+    b.wrap(title, () => emitHeadText(b, title))
     const raw = title.attributes.find(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'raw')
 
     b.add(', ')
@@ -998,70 +1007,6 @@ class ModuleShell {
 
   private titleTag(head: ElementNode | undefined): ElementNode | undefined {
     return head?.children.findLast((child): child is ElementNode => child.kind === 'element' && child.name === 'title' && headTagProblem(child) === undefined)
-  }
-
-  // The tag `head()` takes: `{ tag: 'meta', props: { name: 'description', content: (description) } }`.
-  private emitHeadTag(element: ElementNode) {
-    const { b } = this
-
-    b.wrap(element, () => {
-      b.add(`{ tag: ${JSON.stringify(element.name)}, props: { `)
-
-      // The server tells the browser how to wrap the title this island goes on setting.
-      if (element.name === 'title' && this.kind === 'island')
-        b.add('"island": true, ')
-
-      if (element.classes.length > 0)
-        b.add(`"class": ${JSON.stringify(element.classes.map(span => this.text(span)).join(' '))}, `)
-
-      if (element.id)
-        b.add(`"id": ${JSON.stringify(this.text(element.id))}, `)
-
-      for (const attribute of element.attributes) {
-        if (attribute.kind === 'spread') {
-          b.add('...(').addSource(attribute.expression).add('), ')
-
-          continue
-        }
-
-        b.add(`${JSON.stringify(this.text(attribute.name))}: `)
-
-        if (attribute.kind === 'static')
-          b.add(JSON.stringify(attribute.text))
-        else if (attribute.kind === 'expression')
-          b.add('(').addSource(attribute.expression).add(')')
-        else
-          b.add('true')
-
-        b.add(', ')
-      }
-
-      if (element.children.some(child => child.kind === 'text')) {
-        b.add('"children": ')
-        this.emitHeadText(element)
-      }
-
-      b.add(' } }')
-    })
-  }
-
-  // The text lines of a head tag as one string expression.
-  private emitHeadText(element: ElementNode) {
-    const { b } = this
-    const lines = element.children.filter(child => child.kind === 'text')
-
-    b.add('""')
-    for (const [index, line] of lines.entries()) {
-      if (index > 0)
-        b.add(' + "\\n"')
-
-      for (const part of line.parts) {
-        if (part.kind === 'expression')
-          b.add(' + (').addSource(part.expression).add(')')
-        else if (part.kind === 'chunk')
-          b.add(` + ${JSON.stringify(part.text)}`)
-      }
-    }
   }
 
   private text(span: Span): string {

@@ -98,7 +98,7 @@ Set `search: { weight: 0.5 }` to make a page's words count half as much, so its 
 
 ```kay
 --- server
-export const page = { prerender: true, search: { weight: 0.5 } }
+export const page = { prerender: true, seo: { search: { weight: 0.5 } } }
 ---
 h1 Changelog
 ```

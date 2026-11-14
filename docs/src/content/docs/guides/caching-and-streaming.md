@@ -112,13 +112,13 @@ In the browser, `kay/cache` has `cached`, `cache`, `cacheTag` and `invalidate` o
 
 ## Page cache
 
-A page that is the same for everyone is rendered once with `prerender: true` in its `page` object. Add `ttl: '1h'` to rebuild it in the background.
+A page that is the same for everyone is rendered once with `prerender: true` in its `page` object. Add `cache: '1h'` to rebuild it in the background.
 
-A public page with a `ttl` also answers `cache-control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600`, so a CDN in front keeps it for that hour and serves it a little longer while the server renders it again. The browser still asks each time.
+A public page with a `cache` of one duration also answers `cache-control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600`, so a CDN in front keeps it for that hour and serves it a little longer while the server renders it again. The browser still asks each time.
 
 A page behind a guard, one rendered for a single visitor and the lighter copy sent to a visitor saving data never get a shared header.
 
-Add `cacheControl: 'public, max-age=300'` to send other text, or `cacheControl: false` to keep `public, max-age=0, must-revalidate`. A static export writes the same header for each such page to `_headers`. See [Routing](/essentials/routing#prerendering).
+Write `cache: { browser: '5m', shared: '1h', swr: '10m' }` to set each part of the header, `cache: 'private'` to keep the page out of shared caches, or `cache: false` to keep `public, max-age=0, must-revalidate`. A static export writes the same header for each such page to `_headers`. See [Routing](/essentials/routing#prerendering).
 
 After a change, `invalidate('posts')`, `posts.invalidate()` of a `cache()` function, `tag.invalidate()` or `news.invalidate()` refreshes the prerendered pages that read that value or collection. Use `invalidatePage(path => path.startsWith('/news'))` from `kay/cache` for a page no data explains.
 

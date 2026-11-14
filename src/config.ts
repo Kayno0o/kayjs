@@ -244,6 +244,8 @@ export interface SeoConfig {
   image?: Localized | undefined
   // What the card image shows, for `og:image:alt` and `twitter:image:alt`.
   imageAlt?: Localized | undefined
+  // Keeps every page out of search engines, `<meta name="robots" content="noindex">`, for a staging site; a page or layout may set its own `robots`.
+  noindex?: boolean | undefined
   // The site's Twitter handle, `@site`.
   twitter?: string | undefined
   // `og:locale`, such as `fr_FR`.

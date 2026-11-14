@@ -36,7 +36,7 @@ Every option is optional. The tables give each option's default. The full refere
 | Option | Effect |
 | --- | --- |
 | `site` | The public origin, for canonical links, the sitemap and social URLs. `SITE_URL` when left out, and under `kay dev` `http://localhost:<port>` when that is unset too; a `site` written here wins over both. See [Head and SEO](/essentials/head-and-seo) |
-| `seo` | What every page's head starts from: `name`, `titleTemplate`, `description`, `image`, `imageAlt`, `locale` (`og:locale`), `themeColor`, `twitter`, `jsonLd`. See [Head and SEO](/essentials/head-and-seo) |
+| `seo` | What every page's head starts from: `name`, `titleTemplate`, `description`, `image`, `imageAlt`, `noindex`, `locale` (`og:locale`), `themeColor`, `twitter`, `jsonLd`. See [Head and SEO](/essentials/head-and-seo) |
 | `sitemap` | `{ ttl }`, how long the sitemap is kept before it is built again, `'1h'` by default. |
 | `robots` | Paths `/robots.txt` disallows or allows, `{ disallow: ['/admin'] }`, listed for every locale; `false` serves none. See [Head and SEO](/essentials/head-and-seo#sitemap-and-robotstxt) |
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |

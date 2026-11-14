@@ -560,8 +560,8 @@ describe('page settings', () => {
   })
 
   it.each([
-    ['on its line', '--- server\nexport const page = { noindex: true }\nexport const layouts = false\n---\np x', '--- server\nexport const page = { noindex: true, layouts: false }\n---\np x'],
-    ['one key a line', '--- server\nexport const layouts = false\nexport const page = {\n  noindex: true,\n}\n---\np x', '--- server\nexport const page = {\n  noindex: true,\n  layouts: false,\n}\n---\np x'],
+    ['on its line', '--- server\nexport const page = { prerender: true }\nexport const layouts = false\n---\np x', '--- server\nexport const page = { prerender: true, layouts: false }\n---\np x'],
+    ['one key a line', '--- server\nexport const layouts = false\nexport const page = {\n  prerender: true,\n}\n---\np x', '--- server\nexport const page = {\n  prerender: true,\n  layouts: false,\n}\n---\np x'],
     ['to an empty one', '--- server\nexport const page = {}\nexport const layouts = false\n---\np x', '--- server\nexport const page = { layouts: false }\n---\np x'],
   ])('adds to the page export there is, %s', (_name, source, expected) => {
     expect(fixed(source)).toEqual([expected])

@@ -25,7 +25,7 @@ h1 {post.title}
 
 ```kay
 --- server
-export const page = { prerender: true, ttl: '1h' }
+export const page = { prerender: true, cache: '1h' }
 ---
 h1 Blog
 ```
@@ -86,7 +86,7 @@ h1 {post.title}
 
 #### Revalidating
 
-- `ttl: '1h'` beside `prerender` in `page` keeps a prerendered page fresh: once it is older than that, a string such as `'1h'`, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does.
+- `cache: '1h'` beside `prerender` in `page` (`ttl` before 1.105) keeps a prerendered page fresh: once it is older than that, a string such as `'1h'`, the next request still gets it as it is, and starts rendering it again in the background, the way `kay build` does.
 - It also tells a CDN in front how long to keep the page: [a CDN in front](cdn-caching.md).
 - Every request after that render lands gets the new page, with a new ETag and compressed copies.
 - One render runs at a time per path.

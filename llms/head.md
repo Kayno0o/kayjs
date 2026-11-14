@@ -18,6 +18,24 @@ head
 h1 {todo.title}
 ```
 
+### Set the head without a block
+
+Where a value is no tag of its own, `head` takes `title`, `description`, `image`, `canonical` and `noindex` as attributes, and the `seo` group of `page` and `seo` in kay.config.ts say the same things once for a page or the site. A tag of a `head` block replaces the attribute, and a page's replaces its layout's:
+
+```kay
+--- server
+export const page = { seo: { title: 'About', description: 'Who we are', image: '/about.png' } }
+---
+h1 About
+```
+
+```kay
+head(title={todo.title} description="A todo" noindex={todo.done})
+h1 {todo.title}
+```
+
+`seo` takes a string, or a record of one string per locale on a site with `i18n`, for `title`, `description` and `image`. Anything else is a raw `meta` or `link` in the block.
+
 ### Follow live state in the page title
 
 An island's `head` block holds a `title` and nothing else, and the title follows what it reads, wrapped in `seo.titleTemplate` as on the server:
@@ -91,16 +109,29 @@ h1 Services
 
 ### Keep a page out of search engines
 
-`noindex: true` in the `page` object adds a robots meta and leaves the page out of the sitemap:
+`seo: { noindex: true }` in the `page` object adds a robots meta and leaves the page out of the sitemap, `head(noindex)` only the meta:
 
 ```kay
 --- server
-export const page = { noindex: true }
+export const page = { seo: { noindex: true } }
 ---
 h1 Legal notice
 ```
 
-In a layout's `page` it covers every page under it, the sitemap and the search index too; a page's own `noindex: false` takes it back.
+In a layout's `page` it covers every page under it, the sitemap and the search index too; a page's own `noindex: false` takes it back. `seo.noindex` in kay.config.ts does it for the whole site, as a staging site wants.
+
+### Cache a prerendered page
+
+`cache` in the `page` object: `'1h'` renders the page again in the background once it is that old and has a shared cache keep it as long, `{ browser, shared, swr }` sets each part of the `cache-control` header, `'private'` sends `private` and `false` the default `public, max-age=0, must-revalidate`:
+
+```kay
+--- server
+export const page = { prerender: true, cache: { browser: '5m', shared: '1h', swr: '10m' } }
+---
+h1 News
+```
+
+A layout's `cache` covers every page under it, the innermost winning. A page behind a guard, or rendered for one visitor, is `private` whatever it says.
 
 ## Reference
 
@@ -205,7 +236,8 @@ export default defineConfig({
 - `siteUrl` throws on the server when `site` is not set, prerendered pages included, and in the browser reads the page's own origin.
 - `siteUrl()` is the home page's, and `siteOrigin()` from `kay/seo` the origin alone, `https://example.com`, without `base`.
 - The site is the one the last `pages()` or build of the process read, one site per process.
-- `noindex: true` in the `page` object a page's server fence exports asks search engines to leave it out, `<meta name="robots" content="noindex">` in its head, a `robots` tag of its own still winning.
-- `noindex: true` also leaves the page out of the sitemap, as legal pages often are.
+- `seo: { noindex: true }` in the `page` object a page's server fence exports asks search engines to leave it out, `<meta name="robots" content="noindex">` in its head, a `robots` tag of its own still winning.
+- `seo.noindex` also leaves the page out of the sitemap, as legal pages often are.
+- `seo` of `page` also takes `sitemap`, `lastmod`, `search` and `feed`, which were top-level keys of `page` before 1.105 (`deprecated-page-seo`), and `ttl` and `cacheControl` are `cache` (`deprecated-page-cache`).
 - Without `site` and `seo`, a page's head holds only the tags it and its layouts set.
 - `kay build` reads the prerendered pages against one another and warns of shared titles and descriptions, a title over 60 characters, an orphan page, a canonical link or redirect leading to a redirect or a missing page and alternates that do not point back: the `seo` lints in [Lints](lints.md#seo-lints).

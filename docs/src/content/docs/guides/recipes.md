@@ -309,7 +309,7 @@ A post is its own page, listed in the sitemap by the same collection, `src/route
 --- server
 import { posts } from '../../content.config'
 
-export const page = { prerender: posts, sitemap: posts }
+export const page = { prerender: posts, seo: { sitemap: posts } }
 
 const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = post

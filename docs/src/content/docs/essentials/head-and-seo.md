@@ -18,6 +18,24 @@ head
 h1 {post.title}
 ```
 
+When the title and description are plain values, `head` takes them as attributes, with `image`, `canonical` and `noindex`, and a tag in the block still replaces the attribute:
+
+```kay
+head(title={post.title} description={post.summary})
+h1 {post.title}
+```
+
+A page with nothing request-specific to say writes the same in its `page` object, the `seo` group, with no `head` block at all. A record per locale takes the place of a string on a site with `i18n`:
+
+```kay
+--- server
+export const page = { seo: { title: 'About', description: 'Who we are', image: '/about.png' } }
+---
+h1 About
+```
+
+A layout's `seo` applies to every page under it, and the page's own replaces it. Anything else in the head, a `link`, a `script`, an Open Graph tag of its own, is a raw tag in the block.
+
 ## A title that follows live state
 
 An island can have a `head` block too, holding a `title` and no other tag. The title follows what the island reads, so a page named after a room or a count in progress shows it.
@@ -195,7 +213,7 @@ The sitemap lists every page without params. A page with params lists its own UR
 import { listPosts } from '../../data'
 
 export const page = {
-  sitemap: async () => (await listPosts()).map(post => ({ slug: post.slug })),
+  seo: { sitemap: async () => (await listPosts()).map(post => ({ slug: post.slug })) },
 }
 ---
 ```
@@ -207,8 +225,10 @@ export const page = {
 import { findPost, listPosts } from '../../data'
 
 export const page = {
-  sitemap: async () => (await listPosts()).map(post => ({ slug: post.slug })),
-  lastmod: async ({ slug }) => (await findPost(slug))?.updatedAt,
+  seo: {
+    sitemap: async () => (await listPosts()).map(post => ({ slug: post.slug })),
+    lastmod: async ({ slug }) => (await findPost(slug))?.updatedAt,
+  },
 }
 ---
 ```
@@ -221,7 +241,7 @@ The sitemap is rebuilt when something it read changes, such as a collection a CM
 
 A sitemap may hold 50,000 URLs and 50 MB. Past that, `/sitemap.xml` becomes an index and kay writes the URLs into `/sitemap-1.xml`, `/sitemap-2.xml` and so on, each within the limits. `robots.txt` still points at `/sitemap.xml`, and a static export writes every part. You change nothing.
 
-`noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap. In a layout it does the same for every page under it, and a page's own `noindex: false` takes it back. A layout takes `search` and `ttl` the same way.
+`seo: { noindex: true }` in a page's `page` object keeps a page out of search engines and the sitemap. In a layout it does the same for every page under it, and a page's own `noindex: false` takes it back. A layout takes `search` and `cache` the same way. `head(noindex)` adds the robots tag alone, and `seo.noindex` in `kay.config.ts` does it for the whole site.
 
 Add rules to the robots file with `robots` in `kay.config.ts`:
 

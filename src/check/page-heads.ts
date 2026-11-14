@@ -12,6 +12,8 @@ import { cardImageSizes } from '../server/seo'
 import { decode, DESCRIPTION_LENGTH, isPublicSite, lintReporter, NOINDEX, TITLE_LENGTH } from './seo'
 
 // A value a head tag gives, with its text when the template writes it as a string; an expression is present, its value unknown.
+const LITERAL_TEXT = /^(['"])([^'"\\]*)\1$/
+
 interface Given {
   text: string | undefined
 }
@@ -50,7 +52,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
   const titleTemplate = localizedText(options.seo?.titleTemplate, undefined, defaultLocale)
   const siteImage = localizedText(options.seo?.image, undefined, defaultLocale)
   const siteDescriptions = localizedTexts(options.seo?.description)
-  const sources = new Map<string, { file: KayFile, prerender: string | undefined, noindex: string | undefined, sitemap: boolean }>()
+  const sources = new Map<string, { file: KayFile, prerender: string | undefined, noindex: string | undefined, sitemap: boolean, seo: HeadFacts }>()
   const read = async (path: string) => {
     let known = sources.get(path)
 
@@ -64,7 +66,15 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
         return value === undefined ? undefined : source.slice(value.start, value.end).trim()
       }
 
-      known = { file, prerender: text('prerender'), noindex: text('noindex'), sitemap: settings?.has('sitemap') === true }
+      // What `page.seo` gives the head, which the page's own `head` block replaces.
+      const seo = (name: string): Given | undefined => {
+        const value = text(`seo.${name}`)
+
+        return value === undefined ? undefined : { text: LITERAL_TEXT.exec(value)?.[2] }
+      }
+      const title = seo('title')
+
+      known = { file, prerender: text('prerender'), noindex: text('noindex'), sitemap: settings?.has('sitemap') === true, seo: { imageWidth: false, unknownMeta: false, title: title && { ...title, wrapped: true }, description: seo('description'), image: seo('image') } }
       sources.set(path, known)
     }
 
@@ -93,7 +103,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
       const source = await read(file)
 
       noindex ??= source.noindex
-      chain.push({ file, facts: headFacts(source.file) })
+      chain.push({ file, facts: merge([headFacts(source.file), source.seo]) })
     }
 
     const facts = merge(chain.map(entry => entry.facts))
@@ -169,6 +179,13 @@ function merge(chain: HeadFacts[]): HeadFacts {
 
 function headFacts(file: KayFile): HeadFacts {
   const facts: HeadFacts = { imageWidth: false, unknownMeta: false }
+  const head = file.template.find(isHead)
+  const shorthand = (name: string): Given | undefined => {
+    const found = head?.attributes.find(entry => entry.kind !== 'spread' && file.source.slice(entry.name.start, entry.name.end) === name)
+
+    return found === undefined ? undefined : { text: found.kind === 'static' ? decode(found.text).trim() : undefined }
+  }
+  const title = shorthand('title')
   const visit = (nodes: readonly Node[], conditional: boolean) => {
     for (const node of nodes) {
       if (node.kind === 'element' && node.name === 'title' && !node.component)
@@ -185,6 +202,11 @@ function headFacts(file: KayFile): HeadFacts {
     if (isHead(node))
       visit(node.children, false)
   }
+
+  // The attributes of `head(...)` give what a tag of the block leaves out.
+  facts.title ??= title && { ...title, wrapped: true }
+  facts.description ??= shorthand('description')
+  facts.image ??= shorthand('image')
 
   return facts
 }

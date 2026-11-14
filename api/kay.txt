@@ -779,6 +779,9 @@ function onNavigate(fn: (event: NavigateEvent) => unknown): () => void
 [.] optimistic
 function optimistic(change: () => void): { undo: () => void; keep: () => void; }
 
+[.] PageCache
+type PageCache = Duration | 'private' | false | { browser?: Duration, shared?: Duration, swr?: Duration }
+
 [.] PageContext
 interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>, Guarded extends object = object> extends RequestContext<Params, Guarded>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
@@ -815,24 +818,38 @@ interface PageSecurity
   csp?: Record<string, false | string[]> | false
   headers?: Record<string, false | string>
 
+[.] PageSeo
+interface PageSeo
+  canonical?: string
+  description?: Localized
+  feed?: false | object | readonly object[]
+  image?: Localized
+  lastmod?: ((params: Record<string, string>) => Lastmod | Promise<Lastmod | undefined> | undefined) | Lastmod
+  noindex?: boolean
+  search?: ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined) | PageSearch
+  sitemap?: boolean | object
+  title?: Localized
+
 [.] PageSettings
 interface PageSettings
-  cacheControl?: false | string
-  feed?: false | object | readonly object[]
+  cache?: PageCache
+  /** @deprecated Write `cache: { browser, shared, swr }`, or `cache: false`. Removed in 1.108.0; `deprecated-page-cache` rewrites `false`. */ cacheControl?: false | string
+  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ feed?: false | object | readonly object[]
   guards?: false
   keep?: true
-  lastmod?: ((params: Record<string, string>) => Lastmod | Promise<Lastmod | undefined> | undefined) | Lastmod
+  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ lastmod?: ((params: Record<string, string>) => Lastmod | Promise<Lastmod | undefined> | undefined) | Lastmod
   layouts?: false
-  noindex?: boolean
+  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ noindex?: boolean
   prerender?: boolean | object
   query?: Schema
   rateLimit?: RateLimit | RateLimit[] | false | undefined
   reload?: true
-  search?: ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined) | PageSearch
+  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ search?: ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined) | PageSearch
   security?: PageSecurity
-  sitemap?: boolean | object
+  seo?: PageSeo
+  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ sitemap?: boolean | object
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false
-  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+  /** @deprecated Write `cache: '1h'`. Removed in 1.108.0; `deprecated-page-cache` rewrites it. */ ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] pageVisible
 function pageVisible(fallback?: boolean): () => boolean

@@ -222,6 +222,22 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { formatDuration } from \'kay/i18n\'\n---\np {formatDuration(7_500_000)}',
     right: '---\nimport { formatDuration } from \'kay/i18n\'\n---\np {formatDuration(\'7500000ms\')}',
   },
+  'deprecated-page-seo': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: '`noindex`, `sitemap`, `lastmod`, `search` or `feed` at the top level of `page`, the `seo` group since 1.105: `seo: { title, description, image, canonical, noindex, sitemap, lastmod, search, feed }` holds what search engines, social cards and the sitemap read of a page, as `head(title=... description=...)` and `seo` in kay.config.ts do. The old form works until 1.108. The fix moves the settings into a new `seo`; a page that has one already keeps them for you to move.',
+    wrong: '--- server\nexport const page = { noindex: true }\n---\np Legal',
+    right: '--- server\nexport const page = { seo: { noindex: true } }\n---\np Legal',
+  },
+  'deprecated-page-cache': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: '`ttl` or `cacheControl` in `page`, `cache` since 1.105: `cache: \'1h\'` keeps a prerendered page that long and has a shared cache keep it as long, `cache: { browser, shared, swr }` sets each part of the header, `\'private\'` and `false` send `private` and the default. The old form works until 1.108. The fix renames a lone `ttl`, or a lone `cacheControl: false`; the two together, or a header written out, are left for you to write as `cache`.',
+    wrong: '--- server\nexport const page = { prerender: true, ttl: \'1h\' }\n---\np Hello',
+    right: '--- server\nexport const page = { prerender: true, cache: \'1h\' }\n---\np Hello',
+  },
   'deprecated-image-options': {
     level: 'warn',
     group: 'deprecated',

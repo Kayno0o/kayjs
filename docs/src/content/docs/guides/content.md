@@ -369,7 +369,7 @@ export const posts = collection('content/posts', {
 
 `content: true` puts each entry's whole body in the feed, with its links written out in full. An item can also carry `categories`, an `image` and `updated`, which `modified` sets by default. `format` takes `'rss'`, `'atom'` or `'json'` (JSON Feed), or a list to serve several from one collection: the first at `path`, the others beside it with the extension replaced, `/blog/rss.json`.
 
-Every page showing an entry of the collection links its feed in its head, one `link rel="alternate"` per format. A list page adds the same links with `export const page = { feed: posts }`, and `feed: false` leaves them out.
+Every page showing an entry of the collection links its feed in its head, one `link rel="alternate"` per format. A list page adds the same links with `export const page = { seo: { feed: posts } }`, and `feed: false` leaves them out.
 
 Add `format: 'atom'` for an Atom feed. `limit` is how many of the newest items it holds, 20 by default. `description` and `author` fill the feed's header, and Atom needs an author, so it uses the title when you set none. Return `undefined` from `item` to leave an entry out. Item links and guids are written as `trailingSlash` writes the page's address, so they match its canonical URL.
 

@@ -277,7 +277,7 @@ import { posts } from '../../content.config'
 
 const blog = paginate(posts, 10)
 
-export const page = { prerender: blog, feed: posts }
+export const page = { prerender: blog, seo: { feed: posts } }
 
 const list = await blog.page(ctx.params.page) ?? ctx.notFound()
 ---

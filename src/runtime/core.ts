@@ -6,6 +6,7 @@ import type { ByteSize } from './byte-size'
 import type { Deferred, Locals, Redirect, Register, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
+import type { Localized } from './localized'
 import type { PlainValue, SignalOptions } from './reactive'
 import type { Schema, Static } from './schema'
 import { durationMs } from './duration'
@@ -484,9 +485,11 @@ export interface PageSettings {
   prerender?: boolean | object
   // `true` says the page is to be kept prerendered by `kay build` on its own, as a page reading nothing from a request is: when the build cannot show it does, the `unkept-page` lint names what stops it.
   keep?: true
-  // How long a prerendered page is served before it renders again, `'1h'`: the server renders it again in the background once it is older, and a public page answers `cache-control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600` so a CDN keeps it that long (never one behind a guard, or rendered for one visitor).
+  // How the prerendered page is cached. `'1h'`: the server renders it again in the background once it is older, and a public page answers `cache-control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600` so a CDN keeps it that long. `{ browser, shared, swr }` sets each part of the header, `shared` also being how long the page is served before it renders again. `'private'` sends `private`, `false` the default `public, max-age=0, must-revalidate`. A page behind a guard, or rendered for one visitor, is `private` whatever this says; a layout's applies to every page under it, the innermost winning.
+  cache?: PageCache
+  /** @deprecated Write `cache: '1h'`. Removed in 1.108.0; `deprecated-page-cache` rewrites it. */
   ttl?: Duration
-  // What the prerendered page sends as `cache-control` to everyone, in place of the one `ttl` derives or `public, max-age=0, must-revalidate`; `false` sends the default whatever the `ttl`. A page behind a guard, or rendered for one visitor, is `private` whatever this says.
+  /** @deprecated Write `cache: { browser, shared, swr }`, or `cache: false`. Removed in 1.108.0; `deprecated-page-cache` rewrites `false`. */
   cacheControl?: string | false
   // `false` renders the page, or the layouts below this one, without the layouts above.
   layouts?: false
@@ -498,23 +501,50 @@ export interface PageSettings {
   timeout?: Duration | false
   // The schema `ctx.query` is read against; a query it refuses answers 400.
   query?: Schema
+  // What search engines, the sitemap and social networks read of the page: the `title`, `description`, `image` and `canonical` of its head, written once here instead of in a `head` block when they do not depend on the request, and `noindex`, `sitemap`, `lastmod`, `search` and `feed` beside them. A layout's applies to every page under it, the innermost setting winning.
+  seo?: PageSeo
+  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
+  sitemap?: boolean | object
+  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
+  lastmod?: Lastmod | ((params: Record<string, string>) => Lastmod | undefined | Promise<Lastmod | undefined>)
+  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
+  feed?: false | object | readonly object[]
+  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
+  noindex?: boolean
+  // What the page's responses send over the site's security headers; a layout's applies to every page under it, the inner one merged over the outer.
+  security?: PageSecurity
+  // `true` loads the page fully from any link or form of the site, past the page swap: a page whose scripts expect a fresh document.
+  reload?: true
+  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
+  search?: PageSearch | ((params: Record<string, string>) => PageSearch | undefined | Promise<PageSearch | undefined>)
+}
+
+export type PageSearch = false | { weight?: number }
+
+// How a prerendered page is cached: for as long as `'1h'` says, for the browser, a shared cache and the stale-while-revalidate window apart, `'private'` or not at all.
+export type PageCache = Duration | 'private' | false | { browser?: Duration, shared?: Duration, swr?: Duration }
+
+// The head a page sets without a `head` block, and what the sitemap and the search index read of it. Each text is a string, or a record of one string per locale on a site with `i18n`.
+export interface PageSeo {
+  // The page's title, wrapped in `seo.titleTemplate` as a `head` block's is.
+  title?: Localized
+  // The page's description, `meta name="description"`.
+  description?: Localized
+  // The page's social card, `og:image`: a URL or a path such as an imported asset's.
+  image?: Localized
+  // The page's canonical URL, a path of the site or an absolute URL, in place of the one kay writes from `site`.
+  canonical?: string
+  // Keeps the page out of search engines and the sitemap, `<meta name="robots" content="noindex">`.
+  noindex?: boolean
   // The pages of the route the sitemap lists, as `prerender` takes them; `false` leaves it out.
   sitemap?: boolean | object
   // When the page last changed, for the sitemap's `lastmod`: a `Date`, a date string such as '2026-05-06', or a function of the params of each URL the sitemap lists, returning one or nothing.
   lastmod?: Lastmod | ((params: Record<string, string>) => Lastmod | undefined | Promise<Lastmod | undefined>)
   // The collections whose feed the page's head links to, `link rel="alternate"`, beside the feed of the collection the page shows an entry of, which every such page links to already; `false` leaves the links out.
   feed?: false | object | readonly object[]
-  // Keeps the page out of search engines and the sitemap.
-  noindex?: boolean
-  // What the page's responses send over the site's security headers; a layout's applies to every page under it, the inner one merged over the outer.
-  security?: PageSecurity
-  // `true` loads the page fully from any link or form of the site, past the page swap: a page whose scripts expect a fresh document.
-  reload?: true
   // With `search` on in kay.config.ts, `false` leaves the page out of the index, and `weight` multiplies what its words count, 1 by default; a function of the params of each page weighs them apart, returning one or nothing.
   search?: PageSearch | ((params: Record<string, string>) => PageSearch | undefined | Promise<PageSearch | undefined>)
 }
-
-export type PageSearch = false | { weight?: number }
 
 export type Lastmod = Date | string | number
 

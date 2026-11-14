@@ -156,6 +156,9 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   return analysis
 }
 
+// The settings of `page.seo` the checks and the sitemap read where `page` once held them.
+const SEO_SETTINGS = new Set(['noindex', 'sitemap', 'lastmod', 'search', 'feed'])
+
 // Reads `export const page` as written, and the settings exported under their own names, as they were before `page`.
 function pageSettings(ast: Program, statement: Statement, declaration: NodeOfType<'VariableDeclaration'>, span: Span, shift: (node: Node) => Span, text: TextOf, analysis: ServerAnalysis): void {
   for (const declarator of declaration.declarations) {
@@ -177,6 +180,7 @@ function pageSettings(ast: Program, statement: Statement, declaration: NodeOfTyp
       }
 
       const settings = new Map<string, PageSetting>()
+      let seo: typeof object | undefined
 
       for (const property of object.properties) {
         const key = isPlainProperty(property) && !property.computed ? keyName(property.key) : undefined
@@ -192,6 +196,23 @@ function pageSettings(ast: Program, statement: Statement, declaration: NodeOfTyp
           analysis.diagnostics.push({ ...shift(property.value), ...unreadSettingReport(key) })
 
         settings.set(key, { key: shift(property.key), value: shift(property.value) })
+
+        // What `seo` holds of the settings read below, beside those written at the top level before 1.105.
+        if (key === 'seo' && property.value.type === 'ObjectExpression')
+          seo = property.value
+      }
+
+      for (const inner of seo?.properties ?? []) {
+        const innerKey = isPlainProperty(inner) && !inner.computed ? keyName(inner.key) : undefined
+
+        if (inner.type !== 'Property' || innerKey === undefined)
+          continue
+
+        // The top-level key of the setting, for those the sitemap and the checks read where `page` once held them; the others as `seo.title` and so on.
+        const registered = SEO_SETTINGS.has(innerKey) ? innerKey : `seo.${innerKey}`
+
+        if (!settings.has(registered))
+          settings.set(registered, { key: shift(inner.key), value: shift(inner.value) })
       }
 
       analysis.page = { init: shift(declarator.init), object: shift(object), settings }

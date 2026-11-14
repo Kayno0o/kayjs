@@ -39,6 +39,7 @@ import { DEFAULT_LANG, invalidKeys, messagesScript } from './i18n'
 import { followsCaches, liveScript, noteStreams } from './live'
 import { newTabRule } from './new-tab'
 import { INSTALL_OFFER, registerScript } from './offline'
+import { seoTags } from './page-seo'
 import { chainSetting } from './page-settings'
 import { noteEditedEntries, noteProbedEntries } from './preview'
 import { requestId } from './protection'
@@ -329,6 +330,14 @@ export function renderDocument(files: string[], modules: PageModule[], data: Rec
   return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.observe?.onError), () => documentOf(files, modules, data, client, rendering, options, rules, entry), () => rendering.headers.append('vary', 'cookie'), rules)
 }
 
+// Registers what a module's `page.seo` says of its head, when it says anything.
+function registerSeo(module: PageModule): void {
+  const tags = seoTags(module)
+
+  if (tags.length > 0)
+    setHead(tags)
+}
+
 // The page inside its layouts, each through `component`, so what a layout provides reaches its page.
 // A layout's named slot is read off its page: reading one renders the page first, once, which hands the layout the blocks it wrote.
 export function viewOf(modules: PageModule[], data: Record<string, unknown>[], entry?: HeadTag[]): () => unknown {
@@ -342,6 +351,8 @@ export function viewOf(modules: PageModule[], data: Record<string, unknown>[], e
 
     if (entry !== undefined)
       setHead(entry)
+
+    registerSeo(modules[page]!)
 
     return component(modules[page]!.default, data[page]!)
   }
@@ -375,6 +386,7 @@ export function viewOf(modules: PageModule[], data: Record<string, unknown>[], e
       }
 
       chain.at = index
+      registerSeo(modules[index]!)
 
       return component(modules[index]!.default, props)
     }

@@ -14,7 +14,7 @@ const I18N_BAG = bag(I18N, ({ locales, defaultLocale }, path, out) => {
   if (Array.isArray(locales) && typeof defaultLocale === 'string' && !locales.includes(defaultLocale))
     out.push(`\`${path}.defaultLocale\` is ${JSON.stringify(defaultLocale)}, expected one of its locales: ${locales.map(locale => JSON.stringify(locale)).join(', ')}`)
 })
-const SEO: Record<keyof SeoConfig, Rule> = { name: localized, titleTemplate: localized, description: localized, image: localized, imageAlt: localized, twitter: str, locale: localized, themeColor: either(str, bag({ light: str, dark: str })), jsonLd: list(obj) }
+const SEO: Record<keyof SeoConfig, Rule> = { name: localized, titleTemplate: localized, description: localized, image: localized, imageAlt: localized, noindex: bool, twitter: str, locale: localized, themeColor: either(str, bag({ light: str, dark: str })), jsonLd: list(obj) }
 const DIRS: Record<keyof DirsConfig, Rule> = { routes: str, api: str, public: str }
 const LIMITS: Record<keyof LimitsConfig, Rule> = { body: bytes, byPath: map(bytes) }
 const SERVE: Record<keyof ServeConfig, Rule> = { apiPrefix: str, compress: bool, compressionDictionary: bool, shutdownTimeout: duration, timeout: either(duration, lit(false)) }

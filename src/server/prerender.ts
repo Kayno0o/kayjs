@@ -32,7 +32,7 @@ import { LIVE_MARK, withoutCacheScripts } from './live'
 import { pageFlags } from './page-flags'
 import { keptStop, limitedPage } from './page-limits'
 import { readsOf } from './page-reads'
-import { chainSetting, chainTtl, pagePrerender, pageSetting, routedCollections } from './page-settings'
+import { chainCache, chainSetting, pagePrerender, pageSetting, routedCollections } from './page-settings'
 import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
 import { keptScan } from './pure-page'
@@ -192,10 +192,10 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const reserved = new Map<string, string>()
 
     const module = await import(route.file) as Record<string, unknown>
-    // A layout's `ttl`, `cacheControl`, `noindex` and `search` apply to every page under it, the innermost setting winning.
+    // A layout's `cache`, `noindex` and `search` apply to every page under it, the innermost setting winning.
     const chain = [...await Promise.all(route.layouts.map(async layout => import(layout) as Promise<object>)), module]
-    const revalidate = revalidatePeriod(file, chainTtl(chain))
-    const cacheControl = sharedCacheControl(file, revalidate, chainSetting(chain, 'cacheControl'))
+    const revalidate = revalidatePeriod(file, chainCache(chain).ttl)
+    const cacheControl = sharedCacheControl(file, revalidate, chainCache(chain).cacheControl)
 
     if (keptStop(file, revalidate, chain, auto, skip))
       return []

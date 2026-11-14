@@ -35,7 +35,7 @@
 | `duplicate-title` | warn | seo | A prerendered page with the title of another of the same locale. |
 | `long-description` | warn | seo | A description over 160 characters, which search results cut: `seo.description`, reported in kay.config.ts by `kay check` and `kay build`, or a prerendered page's own, reported at the page by `kay build`. |
 | `unsized-share-image` | warn | seo | A prerendered page whose `og:image` has no `og:image:width`, kay reading no size off it. |
-| `noindex-in-sitemap` | warn | seo | A prerendered page whose head says `noindex` while the sitemap lists it; `noindex: true` in `page` does both. |
+| `noindex-in-sitemap` | warn | seo | A prerendered page whose head says `noindex` while the sitemap lists it; `seo: { noindex: true }` in `page` does both. |
 | `long-title` | warn | seo | A prerendered page whose title runs over 60 characters, which search results cut, `seo.titleTemplate` included (`kay check` measures it through the default locale's template, a `raw` title without). |
 | `duplicate-description` | warn | seo | A prerendered page with the description of another of the same locale; the `seo.description` every page inherits is left alone. |
 | `orphan-page` | warn | seo | A prerendered page no other page links to and the sitemap does not list, reported by `kay build` alone, on a site with `site` set whose own pages are all prerendered: a page of the app rendered per request may link to anything, while the pages a library mounts (kayjs-auth's sign-in, kayjs-cms) link within the library and do not turn it off. The home page, a locale's root, `noindex` pages and guarded pages are left out. |
