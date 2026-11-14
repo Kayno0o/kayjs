@@ -342,7 +342,7 @@ describe('placeholder on a page', () => {
     const remote = `http://127.0.0.1:${host.port}/photos/a.png`
 
     try {
-      const app = await open({ images: { dirs: { '/uploads/': uploads }, remote: [`http://127.0.0.1:${host.port}/photos/`], resolve: () => resolve(dir, 'src/photo.png') } })
+      const app = await open({ images: { dirs: { '/uploads/': uploads }, remote: [`http://127.0.0.1:${host.port}/photos/`], resolve: () => resolve(dir, 'src/photo.png'), guards: false } })
       const ask = async (src: string) => app.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent(src)}&w=64`))
 
       expect(image(remote, { width: 64, height: 48 }).style).toBeUndefined()

@@ -355,7 +355,7 @@ export const ERRORS = {
   },
   'export-guard': {
     group: 'export',
-    summary: 'A page or endpoint a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request.',
+    summary: 'A page or endpoint a guard covers, or that `guards.default` closed leaves with no guard: only a server runs one per request.',
     fix: { file: 'llms/guards.md', heading: 'Guards' },
   },
   'export-action': {

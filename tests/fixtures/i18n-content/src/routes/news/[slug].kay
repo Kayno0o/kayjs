@@ -1,7 +1,7 @@
 --- server
 import { news } from '../../content.config'
 
-export const page = { sitemap: news }
+export const page = { seo: { sitemap: news } }
 
 const entry = await news.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = entry

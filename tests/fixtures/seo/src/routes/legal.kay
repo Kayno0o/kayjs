@@ -1,4 +1,4 @@
 --- server
-export const page = { noindex: true }
+export const page = { seo: { noindex: true } }
 ---
 h1 Legal

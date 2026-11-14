@@ -2,6 +2,6 @@
 import { ctx } from 'kay'
 import { partners } from '../../partners'
 
-export const page = { sitemap: partners }
+export const page = { seo: { sitemap: partners } }
 ---
 p {ctx.params.slug}

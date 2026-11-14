@@ -1,4 +1,4 @@
 --- server
-export const page = { sitemap: true }
+export const page = { seo: { sitemap: true } }
 ---
 h1 Members

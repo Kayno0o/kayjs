@@ -1,5 +1,5 @@
 --- server
-export const page = { noindex: true, search: false }
+export const page = { seo: { noindex: true, search: false } }
 ---
 section
   slot

@@ -18,8 +18,8 @@ export const ROUTE_LINTS = {
     level: 'deny',
     group: 'security',
     site: true,
-    summary: 'On a site that guards a route of its own, or with `requireGuards`, a page, a layout with actions, an endpoint or an API module of the app that no `_guard.ts` covers and that does not set `guards: false`: the server answers it 403.',
-    wrong: '// a site with a _guard.ts, or requireGuards: true\n// src/routes/pricing.kay, with no _guard.ts above it',
+    summary: 'On a site that guards a route of its own, or with `guards: { default: \'closed\' }`, a page, a layout with actions, an endpoint or an API module of the app that no `_guard.ts` covers and that does not set `guards: false`: the server answers it 403.',
+    wrong: '// a site with a _guard.ts, or guards: { default: \'closed\' }\n// src/routes/pricing.kay, with no _guard.ts above it',
     right: '--- server\nexport const page = { guards: false }\n---\nh1 Pricing',
   },
   'endpoint-export': {

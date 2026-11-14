@@ -1,7 +1,7 @@
 --- server
 import { deep } from '../../content.config'
 
-export const page = { sitemap: deep }
+export const page = { seo: { sitemap: deep } }
 
 const note = await deep.get(ctx.params.path) ?? ctx.notFound()
 ---
