@@ -6,7 +6,7 @@ import type { ConnectionStatus, LoadStatus } from './live'
 import { ActionError, ActionRedirectError } from './action-error'
 import { withFields } from './action-form'
 import { networkFailures, refusedAt, superseding } from './action-marks'
-import { refreshed, refreshedIn } from './action-navigate'
+import { refreshed, refreshedIn, refreshedUnlessFollowed } from './action-navigate'
 import { onStreamEnd, SETTLED } from './action-owner'
 import { ACTION } from './action-shared'
 import { actionFailed, apiErrorOf, messageOf } from './api-error'
@@ -261,7 +261,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
 
       if (scope === undefined || scope === true) {
         if (navigation.hooks)
-          void refreshed()
+          void (scope === true ? refreshed() : refreshedUnlessFollowed(caller.invalidated))
       }
       else {
         const asked = [scope].flat()

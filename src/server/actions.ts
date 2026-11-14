@@ -45,6 +45,7 @@ import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
 import { handlerTiming } from './handler-timing'
 import { requestLocale, stateFor } from './i18n'
+import { gatheringInvalidated, invalidatedHeader } from './live'
 import { answeringRequest } from './log'
 import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal, requestId } from './protection'
 import { sharedContext } from './render'
@@ -622,7 +623,8 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // An async iterable is taken as it is, as awaiting one that is also a thenable, a model's reply, would read it to its end before it could stream.
     const handlerStart = options.serverTiming === true ? performance.now() : undefined
-    const returned = action.handler(context.body, ctx)
+    const invalidated = new Set<string>()
+    const returned = gatheringInvalidated(invalidated, () => action.handler(context.body, ctx))
     const result = isAsyncIterable(returned) ? returned : await returned
 
     if (handlerStart !== undefined)
@@ -644,6 +646,8 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     await countGoneThrough(action, request, context.server, options)
     await tellSuccess(lists, run, answer)
+
+    invalidatedHeader(invalidated, headers, isCall(request))
 
     return streams ? streamed(request, jar, headers, answer as AsyncIterable<unknown>, status, options) : succeeded(action, request, jar, headers, answer, status, options.base)
   }

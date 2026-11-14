@@ -6,6 +6,8 @@ export const REDIRECT_HEADER = 'x-kay-redirect'
 export const NAVIGATE_HEADER = 'x-kay-navigate'
 // Marks a failure: a called action's body as the encoded `{ errors, data }`, which a denial or an error answered as text is not, or the page a refused form post renders in answer.
 export const FAILURE_HEADER = 'x-kay-failure'
+// The followed cached keys a called action's handler invalidated, as JSON: the page shows them through its live connection, so the call leaves the page alone unless it reads something else (`refresh: true` refreshes it anyway).
+export const INVALIDATED_HEADER = 'x-kay-invalidated'
 // Names the page an action is called, or a form posted, from, which its params, its locale and where a form post goes back to are read off: a `Referer` the app's `referrer-policy` may cut.
 export const PAGE_HEADER = 'x-kay-page'
 // Names the page loads a refresh asks the server to send again, by the bindings of the page's fence, comma separated; the server runs every load all the same and leaves the elements reading none of them as placeholders. Without it the page renders whole.

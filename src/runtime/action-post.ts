@@ -9,7 +9,7 @@ import { withBase } from './base'
 import { skew } from './build'
 import { withKeepalive } from './keepalive'
 import { prefetched } from './navigation'
-import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
+import { FAILURE_HEADER, INVALIDATED_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { decodeServerValue } from './wire'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
@@ -79,6 +79,11 @@ export async function post<Output>(url: string, input: unknown, onProgress: (sen
 
   first = false
   void skew(response)
+
+  const invalidated = response.headers.get(INVALIDATED_HEADER)
+
+  if (invalidated !== null)
+    caller.invalidated = JSON.parse(invalidated) as string[]
 
   return readActionResponse(response, url, left, caller, async () => {
     const again = await answered()

@@ -105,6 +105,11 @@ export function followCaches(): void {
   follow()
 }
 
+// Whether the page shown, or a resource, follows one of these keys, whose invalidation it then shows through the connection.
+export function follows(keys: readonly string[]): boolean {
+  return keys.some(key => rendered.has(key) || islands.has(key) || [...routes.values()].some(route => route.reads.has(key)))
+}
+
 // Follows the keys a route's answer carried the proof of for a resource, or lets go of them when `header` is null: called after each answer, which replaces the last, and when the resource is gone.
 export function followRoute(owner: object, header: string | null, refetch: () => unknown): void {
   if (header === null) {

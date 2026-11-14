@@ -10,6 +10,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 A call to another host with `fetch` that no `site.fetchStub` answers now fails a test once `testSite()` made a site: stub it, or give `testSite({ outgoing: 'allow' })`. Calls to loopback (a `fakeService`) are unaffected. The clock `site.advance` moved goes back to real time after each test, not only after the file.
 
+### An action's call leaves a followed page to its live connection
+
+A call whose handler invalidated a cached key the page or a `resource()` follows no longer loads the page again, as the connection already shows what read the key. A page that also reads data nothing invalidated (a plain query) and relied on that reload passes `{ refresh: true }` on the call, or invalidates a `cacheTag()` that page reads. `kay check` cannot recognise it, so no lint rewrites it.
+
 ### Island sources read and report the same way
 
 every source (`resource`, `stream`, `socket`, `local`, a `track()` handle) has `data()`, `status()`, `pending()`, `error()` and `retry()`, and `onData({ value })` and `onError`. `value()`, `last()`, `rows()`, `unsynced()`, `syncStatus()`, `onSuccess`, `onSync` and an action's `succeeded()` work through 1.107, and `kay check` warns with `deprecated-source-readers` and `kay upgrade` rewrites them.

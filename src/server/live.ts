@@ -11,6 +11,7 @@ import { kayLog } from '../runtime/log'
 import { PRESENCE_LIVE_ID } from '../runtime/presence'
 import { JOBS_LIVE_ID } from '../runtime/queue-jobs'
 import { currentServerScope } from '../runtime/reactive'
+import { INVALIDATED_HEADER } from '../runtime/swap'
 import { decodeServerValue, encodeValue, unsendable } from '../runtime/wire'
 import { liveLimits } from './config-limits'
 import { isCrossSite } from './cross-site'
@@ -300,6 +301,23 @@ export function followsCaches(): boolean {
   return (cacheReads.getStore()?.at.size ?? 0) > 0
 }
 
+// The followed keys the invalidations of a run dropped, which an action's call answers with.
+const invalidating = new AsyncLocalStorage<Set<string>>()
+
+// Runs `run`, gathering into `keys` the followed keys it invalidates.
+export function gatheringInvalidated<T>(keys: Set<string>, run: () => T): T {
+  return invalidating.run(keys, run)
+}
+
+// The most followed keys an answer names; an action invalidating more leaves the page to refresh as before.
+const MAX_INVALIDATED = 20
+
+// Names the keys a call's handler invalidated on its answer, for the page to tell whether its live connection shows them.
+export function invalidatedHeader(keys: ReadonlySet<string>, headers: Headers, called: boolean): void {
+  if (called && keys.size > 0 && keys.size <= MAX_INVALIDATED)
+    headers.set(INVALIDATED_HEADER, JSON.stringify([...keys]))
+}
+
 // An invalidation, this process's or another's, tells the pages following what it dropped: each key gets the time, which only grows and is never before a read another process dated with a clock ahead of this one.
 onKeysInvalidated((matches) => {
   const slot = liveSlot(CACHE_LIVE_ID)
@@ -308,11 +326,13 @@ onKeysInvalidated((matches) => {
     return []
 
   const at = stampNow()
+  const into = invalidating.getStore()
 
   for (const key of stamped) {
     if (matches(key)) {
       lastStamp = at
       stamps.set(key, at)
+      into?.add(key)
     }
   }
 

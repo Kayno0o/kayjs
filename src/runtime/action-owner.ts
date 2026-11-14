@@ -10,6 +10,8 @@ export interface Caller {
   arrivals: number | undefined
   // Set by a call that streams: runs when a stream that failed is called again and starts being read, so the call counts as running again and settles with the new run.
   retried?: (stream: ActionStream<unknown> & Settles) => void
+  // The followed cached keys the handler invalidated, which the page shows through its live connection: set from the answer.
+  invalidated?: string[]
 }
 
 // Where the stream a streaming action answered a call with takes a callback, handed how it ended once it did.

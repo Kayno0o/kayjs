@@ -253,6 +253,8 @@ button(onClick={add}) Add
 
 `initial` is a value you already have. The resource is `ready` with it on the server and in the browser and asks nothing until `refresh()`. `revalidate` asks again quietly, keeping the value and the `ready` status, when the tab gets the focus back (`'focus'`), when the network returns (`'reconnect'`) or every so often (`'30s'`). It stops with the component.
 
+`stale: '30s'` counts an answer as fresh for that long: a focus or a reconnect inside the window asks nothing, so a tab switched back and forth asks the route once per window, while an interval, `refresh()` and an invalidation ask regardless. Resources reading the same route and arguments share one request and one value, so identical reads in flight are one.
+
 To send data, call a route from an event handler. See [API routes](/guides/api-routes#calling-a-route-from-an-event-handler).
 
 ### Reading anything else

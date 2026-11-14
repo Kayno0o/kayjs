@@ -183,6 +183,43 @@ describe('what a call does once it succeeded', () => {
     }
   })
 
+  it('leaves the page to its live connection when the handler invalidated a key it follows, unless refresh: true', async () => {
+    serve(() => new Response(stringify(1), { headers: { 'x-kay-invalidated': '["posts"]' } }))
+
+    const navigate = await import('../src/runtime/navigate-api')
+    const cache = await import('../src/runtime/live-cache')
+    const page = spyOn(navigate, 'refresh').mockImplementation(async () => undefined)
+    const followed = spyOn(cache, 'follows')
+
+    mocks.push(page, followed)
+
+    const { navigation } = await import('../src/runtime/navigation')
+    const hooks = navigation.hooks
+
+    navigation.hooks = { hydrate: () => undefined, dispose: () => undefined }
+
+    try {
+      followed.mockReturnValue(true)
+      await stub()({})
+      await settle()
+      expect(followed).toHaveBeenCalledWith(['posts'])
+      expect(page).not.toHaveBeenCalled()
+      await stub()({}, { refresh: true })
+      await settle()
+      expect(page).toHaveBeenCalledTimes(1)
+      followed.mockReturnValue(false)
+      await stub()({})
+      await settle()
+      expect(page).toHaveBeenCalledTimes(2)
+    }
+    finally {
+      if (hooks)
+        navigation.hooks = hooks
+      else
+        delete navigation.hooks
+    }
+  })
+
   it('leaves a call being superseded by a later one without a refresh of the resources it named', async () => {
     const server = gated()
 

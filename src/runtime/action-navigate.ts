@@ -30,6 +30,20 @@ export async function refreshed(loads?: readonly string[]): Promise<void> {
     reload()
 }
 
+// The refresh of a call whose handler invalidated cached keys: left out when the page, or a resource, follows one, as its live connection shows them; the page loads again as for any call when the code that tells is unavailable.
+export async function refreshedUnlessFollowed(keys: readonly string[] | undefined): Promise<void> {
+  const [navigations, visits] = [navigation.navigations, navigation.visits]
+
+  try {
+    if (keys !== undefined && (await import('./live-cache')).follows(keys))
+      return
+  }
+  catch {}
+
+  if (navigation.navigations === navigations && navigation.visits === visits)
+    await refreshed()
+}
+
 // What a call limited its refresh to, `refresh()`ed together; one that throws or fails is that source's to show.
 export async function refreshedIn(sources: readonly Refreshable[]): Promise<void> {
   await Promise.allSettled(sources.map(async (source) => {

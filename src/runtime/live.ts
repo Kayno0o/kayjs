@@ -12,6 +12,7 @@ import { durationSeconds } from './duration'
 import { withKeepalive } from './keepalive'
 import { listenerSet } from './listener-set'
 import { serverResource } from './live-resource.server'
+import { revalidating } from './live-revalidate'
 import { pageData } from './page-data'
 import { effect, isHydrating, onCleanup, onMount, ownSignal, untrack } from './reactive'
 import { parseEvents, SENDABLE_ID } from './sse'
@@ -21,7 +22,6 @@ import { decodeServerValue } from './wire'
 declare const KAY_BROWSER: true | undefined
 
 // A timer waits 2^31 - 1 ms at most.
-const MAX_TIMER = 2_147_483_647
 
 // Type only: what each value an event stream sends is.
 declare const EVENTS: unique symbol
@@ -599,6 +599,8 @@ export interface ResourceExtras<T> {
   seed?: boolean | undefined
   // Asks the route again quietly, the value kept and the status still `ready`, and stops with the component.
   revalidate?: Revalidation | readonly Revalidation[] | undefined
+  // How long an answer counts as fresh: the `focus` and `reconnect` revalidations leave it be until it is this old, so a tab switched back and forth asks the route once per window. An interval ignores it, `refresh()` and an invalidation ask regardless.
+  stale?: Duration | undefined
   // Called with `{ value }` each time the route answers, a quiet reload and `mutate()` included, not for `initial` or the value the server rendered.
   onData?: ((event: { value: T }) => void) | undefined
   // Called with `{ error }` each time a request fails, not for a quiet reload that keeps the value it has.
@@ -683,6 +685,8 @@ class Entry {
   error: ApiError | undefined = undefined
   busy: boolean
   asked: Read | undefined = undefined
+  // When a value was last written, in ms, which a `stale` window counts from.
+  answeredAt = 0
   gone = false
   private current: AbortController | undefined
   private followed = false
@@ -723,6 +727,7 @@ class Entry {
         return
 
       this.value = answer
+      this.answeredAt = Date.now()
       this.rev++
       this.error = undefined
       this.status = 'ready'
@@ -747,6 +752,7 @@ class Entry {
     this.current?.abort()
     this.current = undefined
     this.value = value
+    this.answeredAt = Date.now()
     this.rev++
     this.error = undefined
     this.status = 'ready'
@@ -754,8 +760,8 @@ class Entry {
     this.publish()
   }
 
-  revalidate(): void {
-    if (!this.busy && this.asked !== undefined && !this.gone)
+  revalidate(staleMs = 0): void {
+    if (!this.busy && this.asked !== undefined && !this.gone && Date.now() - this.answeredAt >= staleMs)
       void this.load(this.asked, 'quiet')
   }
 
@@ -797,37 +803,6 @@ function seedOf(key: string): Seed | undefined {
   }
 
   return undefined
-}
-
-// Asks again each time the browser says so, until the owner is gone: the tab getting the focus back, the network returning, or an interval while the tab shows.
-function revalidating(when: Revalidation | readonly Revalidation[], run: () => void): void {
-  for (const trigger of typeof when === 'string' ? [when] : when) {
-    if (trigger === 'focus') {
-      const shown = () => {
-        if (!document.hidden)
-          run()
-      }
-
-      window.addEventListener('focus', run)
-      document.addEventListener('visibilitychange', shown)
-      onCleanup(() => {
-        window.removeEventListener('focus', run)
-        document.removeEventListener('visibilitychange', shown)
-      })
-    }
-    else if (trigger === 'reconnect') {
-      window.addEventListener('online', run)
-      onCleanup(() => window.removeEventListener('online', run))
-    }
-    else {
-      const timer = setInterval(() => {
-        if (!document.hidden)
-          run()
-      }, Math.min(durationSeconds(trigger, 'the revalidate of resource()') * 1000, MAX_TIMER))
-
-      onCleanup(() => clearInterval(timer))
-    }
-  }
 }
 
 // Reads a GET route of a module under `src/api` from an island, typed from the route. Options given as a function are read reactively: the route is asked again when a signal they read changes, and an answer a newer request overtook is dropped.
@@ -989,8 +964,11 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
       void next.load(read, 'first')
   })
 
-  if (first?.revalidate !== undefined)
-    revalidating(first.revalidate, () => entry?.revalidate())
+  if (first?.revalidate !== undefined) {
+    const staleMs = first.stale === undefined ? 0 : durationSeconds(first.stale, 'the stale of resource()') * 1000
+
+    revalidating(first.revalidate, event => entry?.revalidate(event ? staleMs : 0))
+  }
 
   onCleanup(() => {
     gone = true

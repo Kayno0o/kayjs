@@ -569,4 +569,39 @@ describe('resource() in the browser', () => {
     expect(answers).toBe(stopped)
     expect([...listeners.values()].reduce((sum, set) => sum + set.size, 0)).toBe(0)
   })
+
+  it('leaves a fresh answer be on focus and reconnect for its stale window, and asks again past it', async () => {
+    const [found, dispose] = root(done => [read(fake, '/r', { revalidate: ['focus', 'reconnect', '20ms'], stale: '80ms' }), done] as const)
+
+    await until(() => found.status() === 'ready')
+
+    const before = answers
+
+    emit('focus')
+    emit('online')
+    await Bun.sleep(10)
+    expect(answers).toBe(before)
+    // The interval asks whatever the window says.
+    await until(() => answers > before)
+
+    const timed = answers
+
+    dispose()
+    await Bun.sleep(10)
+    expect(answers).toBe(timed)
+  })
+
+  it('asks on focus once the stale window passed', async () => {
+    const [found, dispose] = root(done => [read(fake, '/r', { revalidate: 'focus', stale: '30ms' }), done] as const)
+
+    await until(() => found.status() === 'ready')
+    emit('focus')
+
+    const before = answers
+
+    await Bun.sleep(50)
+    emit('focus')
+    await until(() => answers > before)
+    dispose()
+  })
 })
