@@ -29,14 +29,14 @@ function moved(property: Property, old: string, part: string, base: number): Edi
 async function mailerStores(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   return scan(root, options, LINT, NEEDLE, ({ parsed, report }) => {
     for (const { ast, base } of parsed) {
-      const { locals, namespaces } = importsOf(ast, FROM_MAIL, 'mailer')
+      const bound = ['mailer', 'mail'].map(name => ({ name, ...importsOf(ast, FROM_MAIL, name) })).filter(one => one.locals.size > 0 || one.namespaces.size > 0)
 
-      if (locals.size === 0 && namespaces.size === 0)
+      if (bound.length === 0)
         continue
 
-      const isMailer = (callee: Node): boolean => callee.type === 'Identifier'
+      const isMailer = (callee: Node): boolean => bound.some(({ name, locals, namespaces }) => callee.type === 'Identifier'
         ? locals.has(callee.name)
-        : callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && namespaces.has(callee.object.name) && callee.property.type === 'Identifier' && callee.property.name === 'mailer'
+        : callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && namespaces.has(callee.object.name) && callee.property.type === 'Identifier' && callee.property.name === name)
 
       walk(ast, (node) => {
         const argument = node.type === 'CallExpression' && isMailer(node.callee) ? node.arguments[0] : undefined

@@ -45,7 +45,7 @@ describe('deprecated-store-names', () => {
   it('renames the conversations option of ai(), and moves a lone listStore or suppressionStore of mailer() under store', async () => {
     const script = [
       'import { ai } from \'@kayjs/ai\'',
-      'import { mailer } from \'@kayjs/mail\'',
+      'import { mail, mailer } from \'@kayjs/mail\'',
       '',
       'export const a = ai({ conversations: mine })',
       'export const b = mailer({ listStore: lists, from: \'a@b.c\' })',
@@ -53,17 +53,19 @@ describe('deprecated-store-names', () => {
       'export const d = mailer({ listStore: lists, suppressionStore: bounces })',
       'export const e = mailer({ store: { lists }, listStore: lists })',
       'export const f = ai({ store: mine })',
+      'export const g = mail({ listStore: lists })',
       '',
     ].join('\n')
     const root = await project({ 'src/calls.ts': script, 'src/other.ts': 'export const x = { listStore: 1, conversations: 2 }\n' })
     const found = await storeNames(root, {})
 
-    expect(found).toHaveLength(6)
-    expect(found.filter(one => one.fixes?.[0]?.safe === true)).toHaveLength(3)
+    expect(found).toHaveLength(7)
+    expect(found.filter(one => one.fixes?.[0]?.safe === true)).toHaveLength(4)
     await applySafeFixes(root, found)
     expect(await Bun.file(join(root, 'src/calls.ts')).text()).toBe(script
       .replace('{ conversations: mine }', '{ store: mine }')
       .replace('{ listStore: lists, from', '{ store: { lists: lists }, from')
+      .replace('mail({ listStore: lists })', 'mail({ store: { lists: lists } })')
       .replace('{ suppressionStore })', '{ store: { suppressions: suppressionStore } })'))
     expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe('export const x = { listStore: 1, conversations: 2 }\n')
   })

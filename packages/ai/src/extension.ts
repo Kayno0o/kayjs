@@ -30,6 +30,9 @@ const KNOWN_OPTIONS: Record<keyof AiOptions, true> = { rateLimit: true, budget: 
 export function ai(options: AiOptions = {}): KayExtension {
   checkOptionKeys('ai()', options, KNOWN_OPTIONS)
 
+  if (options.store !== undefined && options.conversations !== undefined)
+    throw configError('ai', 'store', 'ai() takes `store`, which replaces `conversations`: give one')
+
   configureLimits(options)
   configureHooks(options)
   configureResilience(options)
@@ -39,9 +42,6 @@ export function ai(options: AiOptions = {}): KayExtension {
 
   if (imageAlt)
     startDrafting()
-
-  if (options.store !== undefined && options.conversations !== undefined)
-    throw configError('ai', 'store', 'ai() takes `store`, which replaces `conversations`: give one')
 
   useConversations(options.store ?? options.conversations, options.conversationAge)
   registerConversationData()
