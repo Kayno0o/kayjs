@@ -72,35 +72,8 @@ function moduleStateAt(file: string, source: string, read: KeptSource, unchanged
   return later === undefined ? undefined : real(later)
 }
 
-// Whether a `persisted` call keeps its value in the browser's own storage: `persisted.local()` or `persisted.session()`, or the deprecated call whose options are a literal with no spread and every `storage` in it `'local'`; anything else may be a cookie or the query.
-function savesLocally(args: Node[], member: string | undefined): boolean {
-  if (member !== undefined)
-    return member === 'local' || member === 'session'
-
-  const options = args[2]
-
-  // A spread before the options moves them to a place the scan cannot tell.
-  if (options?.type !== 'ObjectExpression' || args.some(arg => arg.type === 'SpreadElement'))
-    return false
-
-  let local = false
-
-  for (const property of options.properties) {
-    // A key the scan cannot read as `storage` or as another name: a spread, a computed one, or `storage` written in quotes.
-    if (property.type === 'SpreadElement' || property.computed || (property.key.type === 'Literal' && property.key.value === 'storage'))
-      return false
-
-    if (property.key.type !== 'Identifier' || property.key.name !== 'storage')
-      continue
-
-    if (property.kind !== 'init' || property.method || property.value.type !== 'Literal' || property.value.value !== 'local')
-      return false
-
-    local = true
-  }
-
-  return local
-}
+// Whether a `persisted` call keeps its value in the browser's own storage, `persisted.local()` or `persisted.session()`, where a cookie is the server's to read.
+const savesLocally = (_args: Node[], member: string | undefined): boolean => member === 'local' || member === 'session'
 
 // Whether the arguments of a `collection` call start with a folder as a plain string, not a loader.
 function startsWithFolder(args: Node[], member: string | undefined): boolean {

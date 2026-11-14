@@ -4,7 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { pages } from './shared-pages'
 
 const ROUTES = 'tests/fixtures/bare/src/routes'
-const DEX = `import { api, s } from 'kay/server'
+const DEX = `import { s } from 'kay'
+import { api } from 'kay/server'
 
 export default api()
   .get('/dex/:number', ({ params }) => ({ number: params.number, kind: typeof params.number }), { params: s.Object({ number: s.Integer({ minimum: 1 }) }) })

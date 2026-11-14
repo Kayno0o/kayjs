@@ -16,7 +16,7 @@ onMount(() => {
     void start()
 })
 
-listen(window, 'keydown', () => {
+listen(() => window, 'keydown', () => {
   if (mode === 'window')
     void start()
 })

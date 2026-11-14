@@ -3,4 +3,4 @@ import { navigate, withQuery } from 'kay'
 ---
 a.next(href={withQuery({ page: 2 })}) Next
 a.clear(href={withQuery({ sort: null })}) Clear
-button.sorted(onClick={() => navigate({ query: { sort: 'name' } })}) Sort
+button.sorted(onClick={() => navigate.query({ sort: 'name' })}) Sort

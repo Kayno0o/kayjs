@@ -53,18 +53,21 @@ function connect(): NonNullable<typeof signals> {
 
 // Where the swap to another page stands, as values that follow it for as long as the island lives: `navigation.status()` is `'loading'` while the next page is fetched, `'swapping'` while it is put in place and `'idle'` otherwise, `pending()` whether one is under way, `to()` the URL being navigated to and `error()` an `ApiError` (status 0, as no answer came) for why the last swap gave up and let the browser load the page in full, until the next navigation starts.
 // A refresh, a post that stays on its page and the server read `'idle'`.
+// `navigation.onBeforeNavigate(fn)` and `navigation.onNavigate(fn)` are its hooks, taking one object and returning what removes the listener, as the hooks of every other source do.
 // kept: free
 export const navigation = {
   status: (): NavigationState => connect().status(),
   pending: (): boolean => connect().status() !== 'idle',
   to: (): URL | undefined => connect().to(),
   error: (): ApiError | undefined => connect().error(),
+  onBeforeNavigate: beforeNavigate,
+  onNavigate: afterNavigate,
 }
 
-// Asks `fn` with `{ url, from }` before a link of the app, `navigate()` or going back or forward leaves the page, for as long as the island lives: returning `false` (or a promise of it) keeps the page, where a handler that throws is logged and lets the visit go on.
+// `navigation.onBeforeNavigate`: asks `fn` with `{ url, from }` before a link of the app, `navigate()` or going back or forward leaves the page, for as long as the island lives: returning `false` (or a promise of it) keeps the page, where a handler that throws is logged and lets the visit go on.
 // Under `guardLeave` the handlers answer first. Returns what removes it before the island ends.
 // kept: free
-export function onBeforeNavigate(fn: (event: BeforeNavigate) => boolean | void | Promise<boolean | void>): () => void {
+function beforeNavigate(fn: (event: BeforeNavigate) => boolean | void | Promise<boolean | void>): () => void {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return () => undefined
 
@@ -108,9 +111,9 @@ async function logged<A, T>(fn: (argument: A) => T, argument: A): Promise<Awaite
   }
 }
 
-// Calls `fn` with `{ url }`, the address of each page a swap shows, once it is in place and its islands are hydrating, for as long as the island lives: the `kay:navigate` event, which a full load does not fire either. Returns what removes it before the island ends.
+// `navigation.onNavigate`: calls `fn` with `{ url }`, the address of each page a swap shows, once it is in place and its islands are hydrating, for as long as the island lives: the `kay:navigate` event, which a full load does not fire either. Returns what removes it before the island ends.
 // kept: free
-export function onNavigate(fn: (event: NavigateEvent) => unknown): () => void {
+function afterNavigate(fn: (event: NavigateEvent) => unknown): () => void {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return () => undefined
 
@@ -121,4 +124,16 @@ export function onNavigate(fn: (event: NavigateEvent) => unknown): () => void {
   onCleanup(stop)
 
   return stop
+}
+
+// kept: free
+/** @deprecated Call `navigation.onBeforeNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it. */
+export function onBeforeNavigate(fn: (event: BeforeNavigate) => boolean | void | Promise<boolean | void>): () => void {
+  return beforeNavigate(fn)
+}
+
+// kept: free
+/** @deprecated Call `navigation.onNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it. */
+export function onNavigate(fn: (event: NavigateEvent) => unknown): () => void {
+  return afterNavigate(fn)
 }

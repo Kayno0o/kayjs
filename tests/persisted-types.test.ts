@@ -1,10 +1,10 @@
 import type { Signal } from '../src/runtime'
 import { expect, it } from 'bun:test'
-import { persisted } from '../src/runtime'
+import { persisted, queryParam } from '../src/runtime'
 
 it('types a persisted signal as the union of the values it names, and refuses a default outside them', () => {
   const theme: Signal<'light' | 'dark'> = persisted('theme', 'light', { values: ['light', 'dark'] })
-  const size: Signal<1 | 2 | 3> = persisted('size', 2, { values: [1, 2, 3], storage: 'local' })
+  const size: Signal<1 | 2 | 3> = persisted.local('size', 2, { values: [1, 2, 3] })
   const kept: Signal<'a' | 'b'> = persisted('kept', 'b', { values: ['a', 'b'], maxAge: '30d' })
   const named = persisted<'light' | 'dark'>('named', 'dark', { values: ['light', 'dark'] })
 
@@ -14,13 +14,13 @@ it('types a persisted signal as the union of the values it names, and refuses a 
   // @ts-expect-error a value the signal is set to must be one of the values
   theme.set('blue')
 
-  const tab: Signal<'site' | 'logs'> = persisted('tab', 'site', { storage: 'query', values: ['site', 'logs'] })
+  const tab: Signal<'site' | 'logs'> = persisted.query('tab', 'site', { values: ['site', 'logs'] })
 
   // @ts-expect-error the default of a query param must be one of the values
-  persisted('outside', 'blue', { storage: 'query', values: ['site', 'logs'] })
+  persisted.query('outside', 'blue', { values: ['site', 'logs'] })
 
   // @ts-expect-error local storage keeps no time
-  persisted('local', 'a', { values: ['a', 'b'], storage: 'local', maxAge: '30d' })
+  persisted.local('local', 'a', { values: ['a', 'b'], maxAge: '30d' })
 
   expect([theme, size, kept, named, tab]).toHaveLength(5)
 })
@@ -61,7 +61,23 @@ it('types each entry of persisted by its own options', () => {
 it('leaves a persisted signal without values typed from its default, or from the type given', () => {
   const free: Signal<string> = persisted('free', 'x')
   const given = persisted<'a' | 'b'>('given', 'a')
-  const count: Signal<number> = persisted('count', 0, { storage: 'local' })
+  const count: Signal<number> = persisted.local('count', 0)
 
   expect([free, given, count]).toHaveLength(3)
+})
+
+it('types queryParam by its default and its values', () => {
+  const open: Signal<string | undefined> = queryParam('open')
+  const found: Signal<string> = queryParam('q', { default: '' })
+  const page = queryParam<number>('page', { default: 1 })
+  const tab: Signal<'site' | 'logs'> = queryParam('tab', { default: 'site', values: ['site', 'logs'], history: 'push' })
+  const maybe: Signal<'a' | 'b' | undefined> = queryParam('maybe', { values: ['a', 'b'] })
+
+  // @ts-expect-error the default must be one of the values
+  queryParam('outside', { default: 'blue', values: ['site', 'logs'] })
+
+  // @ts-expect-error a value the signal is set to must be one of the values
+  tab.set('blue')
+
+  expect([open, found, page, tab, maybe]).toHaveLength(5)
 })

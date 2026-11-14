@@ -9,4 +9,4 @@ async function act() {
 }
 ---
 button.act(type="button" onClick={act}) Act
-button.tab(type="button" onClick={() => navigate({ query: { view: 'tab' } })}) Tab
+button.tab(type="button" onClick={() => navigate.query({ view: 'tab' })}) Tab

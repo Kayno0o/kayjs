@@ -1,6 +1,6 @@
 ---
 import type { Action } from 'kay'
-import { effect, navigate, navigation, onBeforeNavigate, onNavigate, refresh, signal } from 'kay'
+import { effect, navigate, navigation, refresh, signal } from 'kay'
 
 const { away } = props<{ away?: Action<Record<string, never>, unknown> }>()
 const blocking = signal(false)
@@ -15,14 +15,14 @@ effect(() => {
   if (error)
     log.push(`error ${error.status} ${error.message}`)
 })
-onBeforeNavigate(({ url, from }) => {
+navigation.onBeforeNavigate(({ url, from }) => {
   log.push(`before ${from.pathname} ${url.pathname}`)
   // Kept across a full load, which the log is not.
   sessionStorage.setItem('kayBefore', `${sessionStorage.getItem('kayBefore') ?? ''}${url.pathname};`)
 
   return !blocking()
 })
-onNavigate(({ url }) => log.push(`navigate ${url.pathname}`))
+navigation.onNavigate(({ url }) => log.push(`navigate ${url.pathname}`))
 
 async function go(to: string) {
   log.push(`resolved ${await navigate(to)}`)

@@ -1,4 +1,5 @@
-import { api, s } from 'kay/server'
+import { s } from 'kay'
+import { api } from 'kay/server'
 
 export default api()
   .post('/', () => ({ ok: true }), { body: s.Object({ title: s.String({ minLength: 3 }), tags: s.Optional(s.Array(s.String(), { maxItems: 1 })) }) })

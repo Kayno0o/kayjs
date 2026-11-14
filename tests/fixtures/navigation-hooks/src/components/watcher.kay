@@ -1,9 +1,9 @@
 ---
-import { navigate, onBeforeNavigate } from 'kay'
+import { navigate, navigation } from 'kay'
 import * as kay from 'kay'
 import { goSecond } from './go'
 
-onBeforeNavigate(({ url }) => {
+navigation.onBeforeNavigate(({ url }) => {
   sessionStorage.setItem('asked', `${sessionStorage.getItem('asked') ?? ''}${url.pathname};`)
 })
 ---

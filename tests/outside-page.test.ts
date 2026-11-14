@@ -19,7 +19,7 @@ onCleanup(onGone)
 button(onClick={() => count++}) Clicked {count()}
 `
 
-const ENTRY = `import { mount } from 'kay/mount'
+const ENTRY = `import { mount } from 'kay'
 import Counter from './counter.kay'
 
 export { mount }

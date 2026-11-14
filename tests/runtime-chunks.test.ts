@@ -276,10 +276,10 @@ describe('a runtime module half of the islands use', () => {
 
 describe('direct imports of the runtime', () => {
   it('point each name of `kay` at the module holding it, keep an alias, and drop what is only a type', async () => {
-    const code = await directImports('import { ActionError, signal, type Signal, effect as run } from \'kay\'\nimport { registerImage } from "kay/internal"\nimport { template } from \'kay/dom\'\nimport * as all from \'kay\'\n')
+    const code = await directImports('import { ActionError, signal, type Signal, batch as run } from \'kay\'\nimport { registerImage } from "kay/internal"\nimport { template } from \'kay/dom\'\nimport * as all from \'kay\'\n')
     const lines = code.split('\n')
 
-    expect(lines[0]).toMatch(/^import \{ ActionError \} from ".*\/runtime\/action\.ts"; import \{ signal \} from ".*\/runtime\/core\.ts"; import \{ effect as run \} from ".*\/runtime\/reactive\.ts";$/)
+    expect(lines[0]).toMatch(/^import \{ ActionError \} from ".*\/runtime\/action\.ts"; import \{ signal \} from ".*\/runtime\/core\.ts"; import \{ batch as run \} from ".*\/runtime\/reactive\.ts";$/)
     expect(lines[0]).not.toContain('Signal')
     expect(lines[1]).toMatch(/^import \{ registerImage \} from ".*\/runtime\/image\.ts";$/)
     // Not a barrel, and a namespace import takes the whole module.
@@ -340,7 +340,7 @@ describe('direct imports of the runtime', () => {
     await Bun.write(join(root, 'src/own.ts'), 'import { signal } from \'kay\'\nexport const own = signal\n')
     await Bun.write(join(root, 'src/both.ts'), 'import { own } from \'./own\'\nimport { vendored } from \'vendored\'\nexport { own, vendored }\n')
     await Bun.write(join(root, 'node_modules/vendored/package.json'), '{"name":"vendored","main":"index.ts"}')
-    await Bun.write(join(root, 'node_modules/vendored/index.ts'), 'import { effect } from \'kay\'\nexport const vendored = effect\n')
+    await Bun.write(join(root, 'node_modules/vendored/index.ts'), 'import { batch } from \'kay\'\nexport const vendored = batch\n')
 
     const bundled = async (entry: string) => {
       const build = await Bun.build({ entrypoints: [join(root, entry)], target: 'bun', plugins: [kayPlugin({ root, direct: true }, [])] })

@@ -28,7 +28,7 @@ export function addressChanged(): void {
 
 // The path of the current page with `changes` merged into its query, to link to it with one filter or sort changed: `a(href={withQuery({ page: 2, filter: null })})`.
 // A null, undefined or empty value drops the param, the others keep their place and the hash is left out; the path is the site's own, under the mount point and in the locale of the page as any link of it is.
-// In an island it follows the address: the link is built again after each `navigate({ query })`, swap and traversal.
+// In an island it follows the address: the link is built again after each `navigate.query()`, swap and traversal.
 // A page rendered once at build time has no request to read the query of, so it throws there.
 // kept: request
 export function withQuery(changes: QueryChanges): string {

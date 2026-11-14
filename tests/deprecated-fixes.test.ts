@@ -7,7 +7,7 @@ import { aiLanguage } from '../src/check/ai-language'
 
 import { applySafeFixes } from '../src/check/fixes'
 import { localState } from '../src/check/local-state'
-import { persistedStorage } from '../src/check/persisted-storage'
+import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
 import { testHelpers } from '../src/check/test-helpers'
@@ -23,7 +23,12 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-ai-language': aiLanguage,
   'deprecated-local-state': localState,
 
-  'deprecated-persisted-storage': persistedStorage,
+  'deprecated-persisted-call': persistedCall,
+  'deprecated-persisted-query': persistedQuery,
+  'deprecated-navigate-query': navigateQuery,
+  'deprecated-navigation-hooks': navigationHooks,
+  'deprecated-listen-target': listenTarget,
+  'deprecated-import-path': movedImports,
   'deprecated-schema-type': schemaType,
   'deprecated-test-helpers': testHelpers,
   'deprecated-package-names': async (root, options) => renamedPackages(root, options.lints),

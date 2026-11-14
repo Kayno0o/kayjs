@@ -29,16 +29,24 @@ export function mergeQuery(params: URLSearchParams, changes: QueryChanges): void
   }
 }
 
-// The current page with `query` merged into its own, keeping the scroll and the focus as `refresh()` does: a filter or a sort picked in place.
-// Both forms resolve to `false` when a leave guard was declined, so the page stayed, and `true` otherwise.
+// `navigate(href, options)` goes to a page as following a link does: one of the app's swapped in place, under the site's mount point as a link is, another site's loaded. A literal path is checked as a link's is.
+// `navigate.query(changes, options)` goes to the current page with `changes` merged into its query, keeping the scroll and the focus as `refresh()` does: a filter or a sort picked in place.
+// Both resolve to `false` when a leave guard was declined, so the page stayed, and `true` otherwise.
 // kept: free
-export async function navigate(to: { query: QueryChanges }, options?: NavigateOptions): Promise<boolean>
-// Goes to a page as following a link does: one of the app's swapped in place, under the site's mount point as a link is, another site's loaded. A literal path is checked as a link's is.
-// Last, so a path no page serves is reported against it.
-export async function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions): Promise<boolean>
-export async function navigate(to: string | { query: QueryChanges }, options: NavigateOptions = {}): Promise<boolean> {
+interface Navigate {
+  /** @deprecated Call `navigate.query(changes)`, so one name does one job. Removed in 1.108.0; `deprecated-navigate-query` rewrites it. */
+  (to: { query: QueryChanges }, options?: NavigateOptions): Promise<boolean>
+  // Last, so a path no page serves is reported against it.
+  <const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions): Promise<boolean>
+  query: (changes: QueryChanges, options?: NavigateOptions) => Promise<boolean>
+}
+
+async function visit(to: string | { query: QueryChanges }, options: NavigateOptions = {}): Promise<boolean> {
   return navigateTo(typeof to === 'string' && navigation.localize ? navigation.localize(to) : to, options, true)
 }
+
+// kept: free
+export const navigate: Navigate = /* @__PURE__ */ Object.assign(visit, { query: async (changes: QueryChanges, options: NavigateOptions = {}) => navigateTo({ query: changes }, options, true) })
 
 // `navigate()`, with `hooked` off for a redirect an action's call asks for, which `onBeforeNavigate` cannot refuse as the action already ran: the leave guards still ask. That redirect is the server's final location, already under the base, so it is not put under it again.
 export async function navigateTo(to: string | { query: QueryChanges }, options: NavigateOptions, hooked: boolean): Promise<boolean> {

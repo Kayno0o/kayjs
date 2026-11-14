@@ -36,6 +36,33 @@ export function signal<T>(value?: PlainValue<T>, options?: SignalOptions<T | und
 
 const MAX_TIMER = 2_147_483_647
 
+// What every effect of the island takes: its `signal` stops it when aborted, as it stops `every`, `watch` and `listen`.
+export interface EffectOptions {
+  // Stops it when aborted; one aborted already starts nothing.
+  signal?: AbortSignal | undefined
+}
+
+// Starts `start` as an effect of the island, which `signal` ends when it aborts.
+function started(api: string, named: (...args: never[]) => unknown, start: () => void, signal: AbortSignal | undefined): void {
+  if (signal)
+    lasting(api, named, start, signal)
+  else
+    start()
+}
+
+// Runs `fn` once the render is done, then again whenever what it read changes; never on the server. A function `fn` returns runs as its cleanup, as one passed to `onCleanup` does.
+// It stops with the island or block it was made in, or when `options.signal` aborts.
+// kept: free
+export function effect(fn: () => void, options?: EffectOptions): void {
+  started('effect', fn, () => createEffect(fn, 'effect'), options?.signal)
+}
+
+// `effect` that reads nothing it tracks and runs once, after the component's markup is in place: `effect(() => untrack(fn))`.
+// kept: free
+export function onMount(fn: () => void, options?: EffectOptions): void {
+  started('onMount', fn, () => createEffect(() => untrack(fn), 'onMount', fn), options?.signal)
+}
+
 export interface EveryOptions {
   // Read as an effect reads: the timer starts as it turns true and stops as it turns false.
   while?: (() => boolean) | undefined
@@ -135,16 +162,16 @@ export function watch<T>(source: () => T, run: (next: T, previous: T | undefined
 // `source`'s value once it has stopped changing for `delay`, starting with its value now: `watch(debounced(typed, '300ms'), lookUp)` looks a name up as the user pauses.
 // The pending timer goes with the island; while the server renders, the value stays the one `source` gave first.
 // kept: free
-export function debounced<T>(source: () => T, delay: Duration): Memo<T> {
+export function debounced<T>(source: () => T, delay: Duration, options?: EffectOptions): Memo<T> {
   const wait = durationMs(delay)
   const [settled, write] = createSignal(untrack(source))
 
-  createEffect(() => {
+  started('debounced', source, () => createEffect(() => {
     const next = source()
     const timer = setTimeout(write, wait, next)
 
     onCleanup(() => clearTimeout(timer))
-  }, 'debounced', source)
+  }, 'debounced', source), options?.signal)
 
   return settled
 }
@@ -152,12 +179,12 @@ export function debounced<T>(source: () => T, delay: Duration): Memo<T> {
 // `source`'s value at most once per `delay`: the first change shows at once, and a change inside the wait shows when it ends, with the last value `source` took: `watch(throttled(scrollTop, '200ms'), save)` saves a scroll position while it moves, not on every pixel.
 // The pending timer goes with the island; while the server renders, the value stays the one `source` gave first.
 // kept: free
-export function throttled<T>(source: () => T, delay: Duration): Memo<T> {
+export function throttled<T>(source: () => T, delay: Duration, options?: EffectOptions): Memo<T> {
   const wait = durationMs(delay)
   const [settled, write] = createSignal(untrack(source))
   let last = Number.NEGATIVE_INFINITY
 
-  createEffect(() => {
+  started('throttled', source, () => createEffect(() => {
     const next = source()
 
     // The effect's first run, and a value back to the one shown, change nothing and use none of the wait.
@@ -176,7 +203,7 @@ export function throttled<T>(source: () => T, delay: Duration): Memo<T> {
     const timer = setTimeout(show, left)
 
     onCleanup(() => clearTimeout(timer))
-  }, 'throttled', source)
+  }, 'throttled', source), options?.signal)
 
   return settled
 }
@@ -185,7 +212,7 @@ export function throttled<T>(source: () => T, delay: Duration): Memo<T> {
 type EventMapOf<T> = T extends Window ? WindowEventMap : T extends Document ? DocumentEventMap : T extends HTMLElement ? HTMLElementEventMap : T extends MediaQueryList ? MediaQueryListEventMap : Record<string, Event>
 
 // Listens to `type` events on `target`, `window` or `document` for instance, while the island lives; nothing listens while the server renders.
-// In a `.kay` file the compiler hands `target` over as a function, so `listen(window, ...)` never reads `window` on the server; a `.ts` module writes `listen(() => window, ...)`. A target read from a signal listens to its new value as it changes.
+// `target` is a function returning it, `listen(() => window, ...)`, so `window` is never read on the server and a signal or a `ref` it reads is followed: its new value listens as it changes. In a `.kay` file the compiler still wraps a target given as a value, which `deprecated-listen-target` reports.
 // Returns what stops it before the island ends, which the `signal` of its options does too.
 // The handler runs under the owner `listen` was called in, so a stream it starts closes with that island or block.
 // kept: free

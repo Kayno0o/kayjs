@@ -289,7 +289,7 @@ function createContext<T>(fallback: T): Context<T>
 const ctx: object
 
 [.] debounced
-function debounced<T>(source: () => T, delay: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`): Memo<T>
+function debounced<T>(source: () => T, delay: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, options?: EffectOptions | undefined): Memo<T>
 
 [.] defer
 function defer<T>(value: PromiseLike<T> | T): Deferred<T>
@@ -327,7 +327,11 @@ function durationMs(value: `${number}d` | `${number}h` | `${number}m` | `${numbe
 function editing(): boolean
 
 [.] effect
-function effect(fn: () => void): void
+function effect(fn: () => void, options?: EffectOptions | undefined): void
+
+[.] EffectOptions
+interface EffectOptions
+  signal?: AbortSignal | undefined
 
 [.] elementSize
 function elementSize(): ElementSize
@@ -734,7 +738,14 @@ interface NavigateOptions
   transition?: boolean | undefined
 
 [.] navigation
-const navigation: { status: () => NavigationState; pending: () => boolean; to: () => URL | undefined; error: () => ApiError<unknown> | undefined; }
+const navigation: {
+  status: () => NavigationState;
+  pending: () => boolean;
+  to: () => URL | undefined;
+  error: () => ApiError<unknown> | undefined;
+  onBeforeNavigate: (fn: (event: BeforeNavigate) => Promise<boolean | void> | boolean | void) => () => void;
+  onNavigate: (fn: (event: NavigateEvent) => unknown) => () => void;
+}
 
 [.] NavigationState
 type NavigationState = 'idle' | 'loading' | 'swapping'
@@ -743,6 +754,7 @@ type NavigationState = 'idle' | 'loading' | 'swapping'
 type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions<Answer<Success<Output>>>) => Promise<Answer<Success<Output>>>)
 
 [.] onBeforeNavigate
+/** @deprecated Call `navigation.onBeforeNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it. */
 function onBeforeNavigate(fn: (event: BeforeNavigate) => Promise<boolean | void> | boolean | void): () => void
 
 [.] Once
@@ -755,9 +767,10 @@ function onCleanup(fn: () => void): void
 function online(fallback?: boolean): () => boolean
 
 [.] onMount
-function onMount(fn: () => void): void
+function onMount(fn: () => void, options?: EffectOptions | undefined): void
 
 [.] onNavigate
+/** @deprecated Call `navigation.onNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it. */
 function onNavigate(fn: (event: NavigateEvent) => unknown): () => void
 
 [.] optimistic
@@ -825,38 +838,13 @@ function pageVisible(fallback?: boolean): () => boolean
 type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
 
 [.] persisted
-function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, "maxAge" | "sync" | "values"> & QueryHistoryOptions & {
-  storage: "query";
-}): Signal<T>
-function persisted<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, "maxAge" | "sync"> & QueryHistoryOptions & {
-  storage: "query";
-  values: readonly T[];
-}): Signal<T>
-function persisted<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: (Omit<PersistedOptions<T>, "maxAge"> & {
-  storage: "local";
-  values: readonly T[];
-}) | (PersistedOptions<T> & {
-  storage?: "cookie" | undefined;
-  values: readonly T[];
-})): Signal<T>
-function persisted<T>(name: string, value: PlainValue<T>, options?: (Omit<PersistedOptions<T>, "maxAge" | "values"> & {
-  storage: "local";
-}) | (Omit<PersistedOptions<T>, "values"> & {
-  storage?: "cookie" | undefined;
-}) | undefined): Signal<T>
+function persisted<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: PersistedCookieOptions<T> & { values: readonly T[]; }): Signal<T>
+function persisted<T>(name: string, value: PlainValue<T>, options?: Omit<PersistedCookieOptions<T>, "values"> | undefined): Signal<T>
 
 [.] PersistedCookieOptions
 interface PersistedCookieOptions<T> extends KeptOptions<T>
   equals?: Equals<T> | undefined
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  sync?: boolean | undefined
-  values?: readonly T[] | undefined
-
-[.] PersistedOptions
-interface PersistedOptions<T> extends SignalOptions<T>
-  equals?: Equals<T> | undefined
-  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  /** @deprecated Call `persisted.local()` or `persisted.query()`; the cookie, the default, is `persisted()`. Removed in 1.104.0; `deprecated-persisted-storage` rewrites it. */ storage?: PersistStorage | undefined
   sync?: boolean | undefined
   values?: readonly T[] | undefined
 
@@ -978,7 +966,16 @@ interface QueryHistoryOptions
 type QueryOf<Spec> = Spec extends Schema ? Static<Spec> : never
 
 [.] queryParam
+function queryParam<boolean | const T extends string | number>(name: string, options: QueryParamOptions<T> & { default: NoInfer<T>; values: readonly T[]; }): Signal<T>
+function queryParam<boolean | const T extends string | number>(name: string, options: QueryParamOptions<T> & { values: readonly T[]; }): Signal<T | undefined>
+function queryParam<T = string>(name: string, options: QueryParamOptions<NoInfer<T>> & { default: NoInfer<PlainValue<T>>; values?: undefined; }): Signal<T>
 function queryParam<T = string | undefined>(name: string, options?: QueryHistoryOptions | undefined): Signal<T>
+
+[.] QueryParamOptions
+interface QueryParamOptions<T> extends QueryHistoryOptions
+  default?: Exclude<T, (...args: never[]) => unknown> | undefined
+  history?: "push" | "replace" | undefined
+  values?: readonly T[] | undefined
 
 [.] QueuedJob
 interface QueuedJob<Payload = unknown, Progress = unknown>
@@ -1407,7 +1404,7 @@ type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Fin
 type TemplateContext = TemplateValues extends { values: infer Values extends object } ? Values : object
 
 [.] throttled
-function throttled<T>(source: () => T, delay: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`): Memo<T>
+function throttled<T>(source: () => T, delay: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, options?: EffectOptions | undefined): Memo<T>
 
 [.] TrackedApi
 interface TrackedApi<Module, Path> extends Source<LoadStatus>
@@ -2522,12 +2519,12 @@ function markdownLoaded(): boolean
 function markdownReady(): Promise<void>
 
 [./mount] mount
+/** @deprecated Import `mount` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
 function mount<P extends object>(component: (props: P) => unknown, element: Element, ...[props]: PropsOf<P>): Mounted<P>
 
 [./mount] Mounted
-interface Mounted<P extends object>
-  dispose: () => void
-  update: (props: P) => void
+/** @deprecated Import `Mounted` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
+type Mounted<P extends object> = MountedIn<P>
 
 [./params] integer
 function integer(value: string): number | undefined
@@ -3389,12 +3386,8 @@ function rateKey(address: string): string
 function rateLimit(name: string, limit: RateLimit): RateLimiter
 
 [./server] RateLimit
-interface RateLimit
-  key?: RateKey | undefined
-  max: number
-  onLimit?: ((refusal: RateLimitRefusal) => Promise<void> | void) | undefined
-  store?: RateStore | undefined
-  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+/** @deprecated Import `RateLimit` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
+type RateLimit = RateLimitIn
 
 [./server] RateLimiter
 interface RateLimiter extends RateLimit
@@ -3407,11 +3400,8 @@ interface RateLimiter extends RateLimit
   window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [./server] RateLimitRefusal
-interface RateLimitRefusal
-  key: string
-  name: string
-  request?: Request | undefined
-  wait: number
+/** @deprecated Import `RateLimitRefusal` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
+type RateLimitRefusal = RateLimitRefusalIn
 
 [./server] RenderedPage
 interface RenderedPage
@@ -3523,6 +3513,7 @@ interface Route
   special: SpecialPages
 
 [./server] s
+/** @deprecated Import `s` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
 const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
   String: (property?: ElysiaStringOptions | undefined) => TString;
   Numeric: (property?: NumberOptions | undefined) => TNumber;
@@ -3726,6 +3717,7 @@ interface SignOptions
 const SNIFFED_BYTES: 4096
 
 [./server] sqliteCache
+/** @deprecated Import `sqliteCache` from `kay/cache`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
 function sqliteCache(path: string): SyncCacheStore
 
 [./server] sqliteData

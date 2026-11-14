@@ -1,2 +1,10 @@
+<<<<<<< HEAD
 mail [./subscribe-form.kay] default
 mail [.] registeredMailer
+
+||||||| parent of 1bdc528 (feat(runtime): one API for query params, persisted state, navigation and effects)
+
+=======
+kay [.] PersistedOptions
+
+>>>>>>> 1bdc528 (feat(runtime): one API for query params, persisted state, navigation and effects)

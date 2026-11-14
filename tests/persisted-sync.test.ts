@@ -48,8 +48,8 @@ describe('persisted signals of one name in a page', () => {
     expect(second).toBe(first)
     first.set('night')
     expect(second()).toBe('night')
-    expect(persisted('theme-shared', 'light', { storage: 'local' })).not.toBe(first)
-    expect(persisted('theme-shared', 'light', { storage: 'local' })).toBe(persisted('theme-shared', 'x', { storage: 'local' }))
+    expect(persisted.local('theme-shared', 'light')).not.toBe(first)
+    expect(persisted.local('theme-shared', 'light')).toBe(persisted.local('theme-shared', 'x'))
   })
 
   it('keeps a signal alone with sync: false', () => {
@@ -66,7 +66,7 @@ describe('persisted signals of one name in a page', () => {
   })
 
   it('follows the storage event for local, a removed key reading the default and a clear too', () => {
-    const draft = persisted('draft', 'none', { storage: 'local', values: ['none', 'one', 'two'] })
+    const draft = persisted.local('draft', 'none', { values: ['none', 'one', 'two'] })
 
     storageEvent({ key: 'draft', newValue: encodeValue('one') })
     expect(draft()).toBe('one')
@@ -95,12 +95,12 @@ describe('persisted signals of one name in a page', () => {
     expect(persisted.session('entries', 'b')).toBe(session)
     expect(persisted.cookie('entries', 'b')).toBe(cookie)
     expect(persisted('entries', 'b')).toBe(cookie)
-    expect(persisted('entries', 'b', { storage: 'local' })).toBe(local)
+    expect(persisted.local('entries', 'b')).toBe(local)
   })
 
   it('keeps the deprecated storage option on the entry it names', () => {
-    expect(persisted('entries', 'a', { storage: 'query' })).not.toBe(persisted.cookie('entries', 'a'))
-    expect(persisted('entries', 'a', { storage: 'local' })).toBe(persisted.local('entries', 'a'))
+    expect(persisted.query('entries', 'a')).not.toBe(persisted.cookie('entries', 'a'))
+    expect(persisted.local('entries', 'a')).toBe(persisted.local('entries', 'a'))
   })
 
   it('keeps and reads a value in sessionStorage, localStorage staying empty', () => {
@@ -139,7 +139,7 @@ describe('persisted signals of one name in a page', () => {
   })
 
   it('ignores the storage event of another storage area', () => {
-    const area = persisted('area', 'a', { storage: 'local' })
+    const area = persisted.local('area', 'a')
 
     window.dispatchEvent(new StorageEvent('storage', { storageArea: sessionStorage, key: 'area', newValue: encodeValue('b') }))
     expect(area()).toBe('a')
@@ -198,7 +198,7 @@ describe('persisted signals without a channel, or before hydration', () => {
   })
 
   it('applies a storage event that arrives before the signal is first read', () => {
-    const early = persisted('early', 'none', { storage: 'local' })
+    const early = persisted.local('early', 'none')
 
     window.dispatchEvent(new StorageEvent('storage', { storageArea: localStorage, key: 'early', newValue: encodeValue('set') }))
     expect(early()).toBe('set')

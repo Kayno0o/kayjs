@@ -1,4 +1,5 @@
-import { api, s } from 'kay/server'
+import { s } from 'kay'
+import { api } from 'kay/server'
 
 export default api()
   .onError(({ code }) => code === 'VALIDATION' ? { mine: true } : undefined)

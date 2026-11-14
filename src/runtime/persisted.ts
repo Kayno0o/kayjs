@@ -28,22 +28,10 @@ export interface PersistedStorageOptions<T> extends KeptOptions<T> {
   sync?: boolean | undefined
 }
 
-// `persisted.query()`: the value lives in the URL, as `queryParam(name)` does, the value given standing for the param left out, after the default of a `query` schema naming it.
+// `persisted.query()`, which is `queryParam(name, { default })` since 1.105: the value lives in the URL, the value given standing for the param left out, after the default of a `query` schema naming it.
 export interface PersistedQueryOptions<T> extends KeptOptions<T> {
   // `replace`, the default, takes the current entry's place, throttled; `push` adds an entry, written at once, which Back and Forward step through and the signal follows.
   history?: 'push' | 'replace' | undefined
-}
-
-// The options of `persisted()` before each storage had its own entry, `storage` choosing which of the three above applied.
-export interface PersistedOptions<T> extends SignalOptions<T> {
-  /** @deprecated Call `persisted.local()` or `persisted.query()`; the cookie, the default, is `persisted()`. Removed in 1.104.0; `deprecated-persisted-storage` rewrites it. */
-  storage?: PersistStorage | undefined
-  // How long a cookie is kept after the last write, a year by default: `'30d'`. Only the cookie takes one; `local` and `query` keep no time.
-  maxAge?: Duration | undefined
-  // The values the signal may hold, the default among them: a kept value outside them, stale or edited by hand, reads as the default, on the server and in the browser. Compared as `===`, so for text, numbers and booleans.
-  values?: readonly T[] | undefined
-  // Every call naming the same cookie or localStorage key in a page gets one signal, and a value another tab writes reaches it (the `storage` event for `local`, a BroadcastChannel for a cookie); `false` keeps this call's signal alone, deaf to the others. Not for `query`.
-  sync?: boolean | undefined
 }
 
 // The signals of a page by storage and name, so islands persisting one name hold one value.
@@ -55,19 +43,7 @@ export interface QueryHistoryOptions {
   history?: 'push' | 'replace' | undefined
 }
 
-// A signal whose value is kept across pages and visits in a cookie named `name`, which the server reads too; `persisted.local()`, `persisted.session()` and `persisted.query()` keep it in localStorage, sessionStorage and the URL.
-// A string unless `T` says otherwise.
-function persistedCall<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, 'maxAge' | 'values' | 'sync'> & QueryHistoryOptions & { storage: 'query' }): Signal<T>
-// `values` types the signal as their union, and the default must be one of them.
-function persistedCall<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, 'maxAge' | 'sync'> & QueryHistoryOptions & { storage: 'query', values: readonly T[] }): Signal<T>
-function persistedCall<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: PersistedOptions<T> & { storage?: 'cookie' | undefined, values: readonly T[] } | Omit<PersistedOptions<T>, 'maxAge'> & { storage: 'local', values: readonly T[] }): Signal<T>
-function persistedCall<T>(name: string, value: PlainValue<T>, options?: Omit<PersistedOptions<T>, 'values'> & { storage?: 'cookie' | undefined } | Omit<PersistedOptions<T>, 'maxAge' | 'values'> & { storage: 'local' }): Signal<T>
-
-function persistedCall<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T> & QueryHistoryOptions): Signal<T> {
-  return keptSignal(options?.storage ?? 'cookie', name, value, options)
-}
-
-// `persisted.cookie` is `persisted()` itself, the cookie being the default: both are listed so every storage has an entry.
+// A signal kept in a cookie named `name`, which the server reads too, so a page renders with it from the first paint.
 function cookie<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: PersistedCookieOptions<T> & { values: readonly T[] }): Signal<T>
 function cookie<T>(name: string, value: PlainValue<T>, options?: Omit<PersistedCookieOptions<T>, 'values'>): Signal<T>
 
@@ -97,17 +73,30 @@ function query<T = string>(name: string, value: NoInfer<PlainValue<T>>, options?
 function query<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: PersistedQueryOptions<T> & { values: readonly T[] }): Signal<T>
 
 function query<T>(name: string, value: PlainValue<T>, options?: PersistedQueryOptions<T>): Signal<T> {
-  return keptSignal('query', name, value, options)
+  return queryParamOf<T>(name, { default: value, values: options?.values, history: options?.history }, options)
 }
 
-// kept: local, it reads the request's cookie, so it is free only where every call is `persisted.local()` or `persisted.session()`, kept in the browser's storage and read once the page has hydrated; `storage: 'local'` of the deprecated form says the same.
-// The entries are attached in a pure call, so a page that never reads `persisted` drops it with every storage's code.
-export const persisted: typeof persistedCall & { cookie: typeof cookie, local: typeof local, session: typeof session, query: typeof query } = /* @__PURE__ */ Object.assign(persistedCall, { cookie, local, session, query })
+// `persisted(name, value, options)` is `persisted.cookie(...)`: the cookie is what a bare call kept, and a call names its storage since 1.105.
+interface Persisted {
+  /** @deprecated Call `persisted.cookie()`, so the storage is named; `persisted.local()`, `persisted.session()` and `queryParam()` keep a value elsewhere. Removed in 1.108.0; `deprecated-persisted-call` rewrites it. */
+  <const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: PersistedCookieOptions<T> & { values: readonly T[] }): Signal<T>
+  /** @deprecated Call `persisted.cookie()`, so the storage is named; `persisted.local()`, `persisted.session()` and `queryParam()` keep a value elsewhere. Removed in 1.108.0; `deprecated-persisted-call` rewrites it. */
+  <T>(name: string, value: PlainValue<T>, options?: Omit<PersistedCookieOptions<T>, 'values'>): Signal<T>
+  cookie: typeof cookie
+  local: typeof local
+  session: typeof session
+  /** @deprecated Call `queryParam(name, { default })`, the one signal of a query param. Removed in 1.108.0; `deprecated-persisted-query` rewrites it. */
+  query: typeof query
+}
 
-function keptSignal<T>(storage: PersistStorage, name: string, value: PlainValue<T>, options: (PersistedOptions<T> & QueryHistoryOptions) | undefined): Signal<T> {
+// kept: local, it reads the request's cookie, so it is free only where every call is `persisted.local()` or `persisted.session()`, kept in the browser's storage and read once the page has hydrated.
+// The entries are attached in a pure call, so a page that never reads `persisted` drops it with every storage's code.
+export const persisted: Persisted = /* @__PURE__ */ Object.assign((name: string, value: unknown, options?: PersistedCookieOptions<unknown>) => cookie(name, value as never, options), { cookie, local, session, query })
+
+function keptSignal<T>(storage: Exclude<PersistStorage, 'query'>, name: string, value: PlainValue<T>, options: PersistedCookieOptions<T> | undefined): Signal<T> {
   const id = `${storage}:${name}`
   // The server renders each request apart, so only a browser shares: the first call's default and options stand.
-  const shared = storage !== 'query' && options?.sync !== false && typeof document !== 'undefined'
+  const shared = options?.sync !== false && typeof document !== 'undefined'
   const known = shared ? sharedSignals.get(id) : undefined
 
   if (known) {
@@ -118,8 +107,7 @@ function keptSignal<T>(storage: PersistStorage, name: string, value: PlainValue<
   }
 
   const [own, write] = createSignal<T>(value, options)
-  // The same as `queryParam(name)`, `value` standing for the param left out.
-  const kept = storage === 'query' ? keepParam(name, own, write, value as T, options?.values, options?.history) : keepValue(name, storage, own, write, options?.maxAge, options?.values, options?.sync, value as T)
+  const kept = keepValue(name, storage, own, write, options?.maxAge, options?.values, options?.sync, value as T)
   const made = withSetter(kept.read, (next) => {
     write(next)
     kept.save(untrack(own))
@@ -131,16 +119,33 @@ function keptSignal<T>(storage: PersistStorage, name: string, value: PlainValue<
   return made
 }
 
+// What `queryParam` takes besides a signal's own options.
+export interface QueryParamOptions<T> extends QueryHistoryOptions {
+  // What the param reads when it is left out, after the default of a `query` schema naming it, and what a write of it leaves out of the URL.
+  default?: PlainValue<T> | undefined
+  // The values the param may hold, the default among them: a text outside them reads as the param left out.
+  values?: readonly T[] | undefined
+}
+
 // A signal holding the page's query param `name`, read as the `query` schemas of the page and its layouts read it, so `queryParam<number>('page')` holds a number; the schema's default when the param is left out or refused, which writing leaves out of the URL.
-// Without a schema naming the param, its text, as `persisted.query(name, '')` keeps it.
+// Without a schema naming the param its text, a string unless `T` says otherwise: the URL holds text.
+// `default` is what the param reads when left out, after the schema's own, so `queryParam('q', { default: '' })` is never undefined; `values` types it as their union.
 // kept: request
 // `queryParam('tab', { history: 'push' })` adds a history entry for each write instead of taking the current one's place.
-export function queryParam<T = string | undefined>(name: string, options?: QueryHistoryOptions): Signal<T> {
-  const [own, write] = createSignal<T>(undefined as T)
-  const kept = keepParam(name, own, write, undefined, undefined, options?.history)
+export function queryParam<const T extends string | number | boolean>(name: string, options: QueryParamOptions<T> & { default: NoInfer<T>, values: readonly T[] }): Signal<T>
+export function queryParam<const T extends string | number | boolean>(name: string, options: QueryParamOptions<T> & { values: readonly T[] }): Signal<T | undefined>
+export function queryParam<T = string>(name: string, options: QueryParamOptions<NoInfer<T>> & { default: NoInfer<PlainValue<T>>, values?: undefined }): Signal<T>
+export function queryParam<T = string | undefined>(name: string, options?: QueryHistoryOptions): Signal<T>
+export function queryParam<T>(name: string, options?: QueryParamOptions<T>): Signal<T> {
+  return queryParamOf<T>(name, options)
+}
+
+function queryParamOf<T>(name: string, options: QueryParamOptions<T> | undefined, own?: SignalOptions<T>): Signal<T> {
+  const [read, write] = createSignal<T>(options?.default as PlainValue<T>, own)
+  const kept = keepParam(name, read, write, options?.default as T | undefined, options?.values, options?.history)
 
   return withSetter(kept.read, (next) => {
     write(next)
-    kept.save(untrack(own))
+    kept.save(untrack(read))
   })
 }

@@ -955,8 +955,8 @@ describe('what kay exports to a page that is kept', () => {
 
   it('keeps a page reading a persisted signal kept in localStorage, and not one kept in a cookie or the query', async () => {
     const root = await project({
-      'src/routes/local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\np {theme()}\n',
-      'src/routes/typed.kay': '--- server\n---\n---\nimport { persisted as keep } from \'kay\'\n\nconst open = keep<boolean>(\'open\', false, { storage: \'local\' })\n---\np {open()}\n',
+      'src/routes/local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.local(\'theme\', \'light\')\n---\np {theme()}\n',
+      'src/routes/typed.kay': '--- server\n---\n---\nimport { persisted as keep } from \'kay\'\n\nconst open = keep.local<boolean>(\'open\', false)\n---\np {open()}\n',
       'src/routes/in-module.kay': '---\nimport { theme } from \'../theme\'\n---\np {theme()}\n',
       'src/routes/entry-local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.local(\'theme\', \'light\')\nconst step = persisted.session(\'step\', \'one\', { values: [\'one\', \'two\'] })\n---\np {theme()}{step()}\n',
       'src/routes/entry-aliased.kay': '--- server\n---\n---\nimport { persisted as keep } from \'kay\'\n\nconst open = keep.local<boolean>(\'open\', false)\n---\np {open()}\n',
@@ -965,20 +965,10 @@ describe('what kay exports to a page that is kept', () => {
       'src/routes/entry-mixed.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst a = persisted.local(\'a\', \'1\')\nconst b = persisted.query(\'b\', \'1\')\n---\np {a()}{b()}\n',
       'src/routes/entry-passed.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst make = persisted.local\nconst a = make(\'a\', \'1\')\n---\np {a()}\n',
       'src/routes/cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
-      'src/routes/query.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst page = persisted(\'page\', \'1\', { storage: \'query\' })\n---\np {page()}\n',
-      'src/routes/mixed.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', \'1\', { storage: \'local\' })\nconst b = persisted(\'b\', \'1\')\n---\np {a()}{b()}\n',
-      'src/routes/passed.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst make = persisted\nconst a = make(\'a\', \'1\', { storage: \'local\' })\n---\np {a()}\n',
-      'src/routes/spread.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst more = { storage: \'cookie\' as const }\nconst a = persisted(\'a\', \'1\', { storage: \'local\', ...more })\n---\np {a()}\n',
-      'src/routes/in-value.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', { storage: \'local\' })\n---\np {a()}\n',
-      'src/routes/spread-args.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst args = [\'a\'] as const\nconst a = persisted(...args, \'1\', { storage: \'local\' })\n---\np {a()}\n',
-      'src/routes/commented.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', \'1\', /* { storage: \'local\' } */)\n---\np {a()}\n',
-      'src/routes/parens.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'(\', \'1\', { storage: \'cookie\' })\nconst b = \'storage: "local"\'\n---\np {a()}\n',
-      'src/routes/computed.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', \'1\', { storage: \'local\', [\'storage\']: \'cookie\' })\n---\np {a()}\n',
-      'src/routes/quoted.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', \'1\', { storage: \'local\', "storage": \'cookie\' })\n---\np {a()}\n',
       'src/routes/through-barrel.kay': '---\nimport { cookie } from \'../barrel\'\n---\np {cookie()}\n',
       'src/barrel.ts': 'export * from \'./cookie\'\n',
       'src/cookie.ts': 'import { persisted } from \'kay\'\n\nexport const cookie = persisted(\'c\', \'1\')\n',
-      'src/theme.ts': 'import { persisted } from \'kay\'\n\nexport const theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n',
+      'src/theme.ts': 'import { persisted } from \'kay\'\n\nexport const theme = persisted.local(\'theme\', \'light\')\n',
     })
 
     roots.push(root)
@@ -988,7 +978,7 @@ describe('what kay exports to a page that is kept', () => {
     for (const page of ['local', 'typed', 'in-module', 'entry-local', 'entry-aliased'])
       expect(await at(`src/routes/${page}.kay`)).toBeUndefined()
 
-    for (const page of ['entry-cookie', 'entry-query', 'entry-mixed', 'entry-passed', 'cookie', 'query', 'mixed', 'passed', 'spread', 'spread-args', 'in-value', 'commented', 'parens', 'computed', 'quoted'])
+    for (const page of ['entry-cookie', 'entry-query', 'entry-mixed', 'entry-passed', 'cookie'])
       expect(await at(`src/routes/${page}.kay`)).toMatchObject({ why: expect.stringMatching(/^imports `persisted(?: as keep)?` from `kay`, which a request or the clock can change$/) })
 
     expect(await at('src/routes/through-barrel.kay')).toMatchObject({ file: join(root, 'src/cookie.ts') })
@@ -997,7 +987,7 @@ describe('what kay exports to a page that is kept', () => {
   it('judges a value of kay a page reads, in its script, template or markdown, by what it is', async () => {
     const root = await project({
       'src/routes/free.kay': '---\nimport { signal, uid } from \'kay\'\n\nconst id = uid()\nconst count = signal(1)\n---\np {id} {count()}\n',
-      'src/routes/local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\np {theme()}\n',
+      'src/routes/local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.local(\'theme\', \'light\')\n---\np {theme()}\n',
       'src/routes/cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
       'src/routes/server.kay': '--- server\nimport { publicEnv } from \'kay\'\n\nconst origin = publicEnv.SITE\n---\np {origin}\n',
       'src/routes/declared.kay': '---\nconst live = 1\n---\np {live}\n',
@@ -1121,7 +1111,7 @@ describe('what kay exports to a page that is kept', () => {
     const root = await project({
       'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\' })\n',
       'src/routes/index.kay': '---\nimport { shape } from \'../shape\'\n---\np {typeof shape}\n',
-      'src/routes/local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\np {theme()}\n',
+      'src/routes/local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.local(\'theme\', \'light\')\n---\np {theme()}\n',
       'src/routes/cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
       'src/shape.ts': 'import { s } from \'kay\'\n\nexport const shape = s.Object({ id: s.Number() })\n',
     })

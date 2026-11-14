@@ -1,4 +1,5 @@
-import { api, s } from 'kay/server'
+import { s } from 'kay'
+import { api } from 'kay/server'
 import { wording } from 'kay/words'
 
 // A validator that is no TypeBox schema, as Standard Schema libraries are: dotted paths, its own messages.

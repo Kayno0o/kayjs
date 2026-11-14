@@ -47,8 +47,8 @@ import { largePublicImages } from './large-images'
 import { localState } from './local-state'
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
+import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
 import { unreadOpenSettings } from './open-settings'
-import { persistedStorage } from './persisted-storage'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
 import { schemaType } from './schema-type'
@@ -160,7 +160,12 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => localState(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
 
-  async ({ root, options }) => persistedStorage(root, options),
+  async ({ root, options }) => persistedCall(root, options),
+  async ({ root, options }) => persistedQuery(root, options),
+  async ({ root, options }) => navigateQuery(root, options),
+  async ({ root, options }) => navigationHooks(root, options),
+  async ({ root, options }) => listenTarget(root, options),
+  async ({ root, options }) => movedImports(root, options),
 
   async ({ root, options }) => schemaType(root, options),
   async ({ root, options }) => aiLanguage(root, options),
