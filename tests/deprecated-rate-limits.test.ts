@@ -76,11 +76,57 @@ describe('deprecated-auth-rate-limits', () => {
 })
 
 describe('deprecated-auth-rate-limits comments', () => {
-  it('reports without a fix an object holding a comment', async () => {
+  it('keeps a comment beside the key it moves', async () => {
     const root = await project({ 'src/a.ts': 'import { authCore } from \'@kayjs/auth\'\n\nexport const auth = authCore({ rateLimit: { /* keep */ signInAccount: { max: 2, window: \'1h\' } } } as never)\n' })
     const found = await authRateLimits(root, {})
 
     expect(found).toHaveLength(1)
-    expect(found[0]!.fixes).toBeUndefined()
+    await applySafeFixes(root, found)
+    expect(await Bun.file(join(root, 'src/a.ts')).text()).toContain('{ /* keep */ signIn: { account: { max: 2, window: \'1h\' } } }')
+  })
+})
+
+describe('deprecated-auth-rate-limits layout and call shapes', () => {
+  it('rewrites only the keys it moves: the order, the layout and the comments between the others stay', async () => {
+    const before = [
+      'import { authCore } from \'@kayjs/auth\'',
+      '',
+      'export const auth = authCore({',
+      '  rateLimit: {',
+      '    // sign-up is rare',
+      '    register: { max: 3, window: \'1h\' },',
+      '    signInAccount: { max: 2, window: \'1h\' },',
+      '    // the address',
+      '    signIn: { max: 20, window: \'15m\' },',
+      '    link: { max: 9, window: \'1h\' },',
+      '  },',
+      '} as never)',
+      '',
+    ].join('\n')
+
+    const root = await project({ 'src/a.ts': before })
+    const found = await authRateLimits(root, {})
+
+    await applySafeFixes(root, found)
+
+    expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe(before
+      .replace('    signInAccount: { max: 2, window: \'1h\' },', '    signIn: { account: { max: 2, window: \'1h\' }, ip: { max: 20, window: \'15m\' } },')
+      .replace('    signIn: { max: 20, window: \'15m\' },\n', ''))
+  })
+
+  it('reads authCore through a namespace import, satisfies and a .kay fence', async () => {
+    const root = await project({
+      'src/ns.ts': 'import * as kauth from \'@kayjs/auth\'\n\nexport const a = kauth.authCore({ rateLimit: { forgotAccount: { max: 1, window: \'1d\' } } })\n',
+      'src/sat.ts': 'import { auth } from \'@kayjs/auth\'\n\nexport const a = auth({ rateLimit: { inviteAddress: { max: 1, window: \'1d\' } } } satisfies object)\n',
+      'src/routes/page.kay': '--- server\nimport { authCore } from \'@kayjs/auth\'\n\nconst a = authCore({ rateLimit: { oauthToken: { max: 1, window: \'1m\' } } } as never)\n---\np x\n',
+    })
+
+    const found = await authRateLimits(root, {})
+
+    expect(found).toHaveLength(3)
+    await applySafeFixes(root, found)
+    expect(await Bun.file(join(root, 'src/ns.ts')).text()).toContain('rateLimit: { forgot: { account: { max: 1, window: \'1d\' } } }')
+    expect(await Bun.file(join(root, 'src/sat.ts')).text()).toContain('rateLimit: { invite: { address: { max: 1, window: \'1d\' } } }')
+    expect(await Bun.file(join(root, 'src/routes/page.kay')).text()).toContain('rateLimit: { oauth: { token: { max: 1, window: \'1m\' } } }')
   })
 })

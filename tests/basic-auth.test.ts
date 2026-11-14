@@ -299,6 +299,20 @@ describe('basicAuth failures', () => {
   })
 })
 
+describe('basicAuth onLimit', () => {
+  it('hears of the guess past the limit and of the right password met after it', async () => {
+    const told: number[] = []
+    const limited = basicAuth({ user: 'a', password: 'b', realm: 'twice', rateLimit: { max: 1, window: '1m', store: memoryRates(), onLimit: ({ wait }) => {
+      told.push(wait)
+    } } })
+
+    await attempt(limited, encode('a:wrong'))
+    expect((await attempt(limited, encode('a:wrong')) as { status: number }).status).toBe(429)
+    expect((await attempt(limited, encode('a:b')) as { status: number }).status).toBe(429)
+    expect(told).toHaveLength(2)
+  })
+})
+
 describe('basicAuth rate limit validation', () => {
   it('refuses a key, a bad store and a bad max at boot', () => {
     expect(() => basicAuth({ user: 'a', password: 'b', rateLimit: { max: 1, window: '1m', key: () => 'x' } as never })).toThrow('rateLimit.key')

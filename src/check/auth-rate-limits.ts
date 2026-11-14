@@ -1,5 +1,6 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { Node, NodeOfType } from '../compiler/estree'
+import type { Edit } from './renamed-exports'
 import { lintLevel } from '../compiler/lints'
 import { keyName } from '../compiler/object-literal'
 import { renamePackages } from '../package-names'
@@ -9,7 +10,7 @@ import { scan } from './renamed-exports'
 const NEEDLE = /\brateLimit\b/
 const FROM_AUTH = (source: string) => renamePackages(source) === '@kayjs/auth'
 const CALLS = ['auth', 'authCore']
-const PUNCTUATION = /^[\s,{}]*$/
+const PUNCTUATION = /^[\s,]*$/
 const HELP = 'group the limit under its feature, `signIn: { ip, account }`'
 
 type Property = Extract<NodeOfType<'ObjectExpression'>['properties'][number], { type: 'Property' }>
@@ -76,7 +77,7 @@ export async function authRateLimits(root: string, options: CheckOptions): Promi
         const fixed = regrouped(limits.value, text)
 
         for (const [index, property] of old.entries())
-          report(base + property.start, base + property.end, `\`${nameOf(property)}\` of kayjs-auth's \`rateLimit\` is grouped by feature since 1.105`, HELP, index === 0 && fixed !== undefined ? [{ start: base + limits.value.start, end: base + limits.value.end, text: fixed }] : null)
+          report(base + property.start, base + property.end, `\`${nameOf(property)}\` of kayjs-auth's \`rateLimit\` is grouped by feature since 1.105`, HELP, index === 0 && fixed !== undefined ? fixed.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end })) : null)
       })
     }
   })
@@ -97,58 +98,83 @@ function isOld(property: Property): boolean {
   return Object.hasOwn(GROUPS, name) && (property.value.type === 'ArrayExpression' || (property.value.type === 'ObjectExpression' && property.value.properties.some(inner => inner.type === 'Property' && nameOf(inner) === 'max')))
 }
 
-// The object written grouped, or undefined where it cannot be done without reading what a value is.
-function regrouped(object: NodeOfType<'ObjectExpression'>, text: string): string | undefined {
-  const entries = new Map<string, string | Map<string, string>>()
-  let rest = text.slice(object.start, object.end)
+// Where an old property goes, as its feature and part.
+function movedTo(name: string, property: Property): [string, string] | undefined {
+  if (Object.hasOwn(FLAT, name))
+    return FLAT[name]
 
-  for (const property of object.properties)
-    rest = rest.replace(text.slice(property.start, property.end), '')
+  return isOld(property) ? [name, GROUPS[name]![0]!] : undefined
+}
 
-  // A comment between the properties would be lost.
-  if (!PUNCTUATION.test(rest))
-    return undefined
+// The edits that group the old keys, leaving every other property, its comments and the object's layout as written: the first old property of a feature becomes `feature: { part: value }` holding all of its parts, the others are removed. Undefined where that cannot be done without reading what a value is: a spread, a computed or shorthand key, a part named twice, a feature written both ways, or a comment that a removal would take.
+function regrouped(object: NodeOfType<'ObjectExpression'>, text: string): Edit[] | undefined {
+  const properties: Property[] = []
 
   for (const property of object.properties) {
-    if (property.type !== 'Property' || property.computed || property.shorthand || property.method || property.kind !== 'init')
+    if (property.type !== 'Property' || property.computed || property.method || property.kind !== 'init')
       return undefined
 
-    const name = nameOf(property)
-    const value = text.slice(property.value.start, property.value.end)
-    const put = (feature: string, part: string, source: string): boolean => {
-      const held = entries.get(feature)
-
-      if (typeof held === 'string' || held?.has(part))
-        return false
-
-      entries.set(feature, (held ?? new Map<string, string>()).set(part, source))
-
-      return true
-    }
-
-    if (Object.hasOwn(FLAT, name)) {
-      const [feature, part] = FLAT[name]!
-
-      if (!put(feature, part, value))
-        return undefined
-    }
-    else if (Object.hasOwn(GROUPS, name) && property.value.type === 'ObjectExpression' && !property.value.properties.some(inner => inner.type === 'Property' && nameOf(inner) === 'max')) {
-      for (const inner of property.value.properties) {
-        if (inner.type !== 'Property' || inner.computed || inner.shorthand || inner.method || !put(name, nameOf(inner), text.slice(inner.value.start, inner.value.end)))
-          return undefined
-      }
-    }
-    else if (Object.hasOwn(GROUPS, name) && (property.value.type === 'ArrayExpression' || property.value.type === 'ObjectExpression')) {
-      if (!put(name, GROUPS[name]![0]!, value))
-        return undefined
-    }
-    else if (entries.has(name)) {
-      return undefined
-    }
-    else {
-      entries.set(name, value)
-    }
+    properties.push(property)
   }
 
-  return `{ ${[...entries].map(([name, held]) => `${name}: ${typeof held === 'string' ? held : `{ ${[...held].map(([part, value]) => `${part}: ${value}`).join(', ')} }`}`).join(', ')} }`
+  const features = new Map<string, { first: number, parts: Map<string, string> }>()
+  const kept = new Set<string>()
+  const moved = new Set<number>()
+
+  for (const [index, property] of properties.entries()) {
+    const name = nameOf(property)
+    const target = movedTo(name, property)
+
+    if (target === undefined) {
+      kept.add(name)
+
+      continue
+    }
+
+    const [feature, part] = target
+    const held = features.get(feature) ?? { first: index, parts: new Map<string, string>() }
+
+    if (property.shorthand || held.parts.has(part))
+      return undefined
+
+    held.parts.set(part, text.slice(property.value.start, property.value.end))
+    features.set(feature, held)
+    moved.add(index)
+  }
+
+  if ([...features.keys()].some(feature => kept.has(feature)))
+    return undefined
+
+  const firsts = new Set([...features.values()].map(({ first }) => first))
+  const gone = [...moved].filter(index => !firsts.has(index))
+  const lastKept = properties.findLastIndex((_, index) => !gone.includes(index))
+  const edits: Edit[] = []
+  const deleted: [number, number][] = []
+
+  for (const [feature, { first, parts }] of features) {
+    const property = properties[first]!
+
+    edits.push({ start: property.start, end: property.end, text: `${feature}: { ${[...parts].map(([part, value]) => `${part}: ${value}`).join(', ')} }` })
+  }
+
+  for (const index of gone.filter(index => index < lastKept))
+    deleted.push([properties[index]!.start, properties[index + 1]!.start])
+
+  if (gone.some(index => index > lastKept))
+    deleted.push([properties[lastKept]!.end, properties.at(-1)!.end])
+
+  for (const [start, end] of deleted) {
+    let rest = text.slice(start, end)
+
+    for (const index of gone)
+      rest = rest.replace(text.slice(properties[index]!.start, properties[index]!.end), '')
+
+    // A comment between the properties would be lost with them.
+    if (!PUNCTUATION.test(rest))
+      return undefined
+
+    edits.push({ start, end, text: '' })
+  }
+
+  return edits
 }
