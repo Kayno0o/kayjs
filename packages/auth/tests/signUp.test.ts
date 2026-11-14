@@ -8,7 +8,7 @@ const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-li
 function setup(options: Parameters<typeof testApp>[0] = {}) {
   const signUps: User[] = []
   const app = testApp({
-    onSignUp: ({ user }) => {
+    afterSignUp: ({ user }) => {
       signUps.push(user)
     },
     ...options,

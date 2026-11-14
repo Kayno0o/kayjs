@@ -189,11 +189,11 @@ describe('registering an address that is held', () => {
 })
 
 describe('registering under requireVerified', () => {
-  test('does not wait on onSignUp or on the erase of a replaced unverified account, held address or free', async () => {
+  test('does not wait on afterSignUp or on the erase of a replaced unverified account, held address or free', async () => {
     const slow = gate()
     let armed = false
     const ran: string[] = []
-    const app = testApp({ site: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, onSignUp: async ({ user }) => {
+    const app = testApp({ site: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, afterSignUp: async ({ user }) => {
       if (armed) {
         await slow.closed
         ran.push(`signed-up:${user.email}`)

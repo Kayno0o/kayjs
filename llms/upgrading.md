@@ -49,6 +49,16 @@ Every old form below works until 1.108, `kay check` reports it as a `deprecated-
 - A production server reads the forge from `CMS_URL` (`forgejo://TOKEN@git.example.com/owner/repo`, `github://TOKEN@owner/repo`, `gitlab://TOKEN@group/project`); `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN`, `CMS_BRANCH` and `CMS_HOST` still work without it, and `kay env` lists `CMS_URL`.
 - The no-guard error and warning name `cms({ access })`, as do the `cms.*` message defaults that named `role` or `guard`.
 
+### Server hooks that observe are `after<Verb>`
+
+`deprecated-hook-names` finds the old names in the options of the call, in each collection of `cms({ collections })` and in the `hooks` of kayjs-auth's `src/auth.ts`: run `kay upgrade`. The old names work until 1.108, and the new one wins when both are written. `before<Verb>` (may refuse or change) and `onError`, `onEvent` and a queue's `onStart`, `onSuccess`, `onRetry` keep their names. Every hook already took one object with `context`.
+
+- kayjs-auth: `onSignUp` is `afterSignUp`; its error source is `auth.afterSignUp`.
+- kayjs-mail: `onSend` and `onSuppress` of `mailer()`, `onSend` of `contactForm()` are `afterSend` and `afterSuppress`; a list's `onSubscribe`, `onConfirm`, `onUnsubscribe` and `onBroadcast` are `afterSubscribe`, `afterConfirm`, `afterUnsubscribe` and `afterBroadcast`. Sources follow (`mail.afterSend`, `mail.list.afterSubscribe`).
+- kayjs-cms: `onSave` and `onUpload` of `cms()` and of a collection are `afterSave` and `afterUpload` (sources `cms.afterSave`, `cms.afterUpload`).
+- kayjs-ai: `onStep` and `onToolCall` are `afterStep` and `afterToolCall`, and `onSuccess` is `afterRequest`, beside `beforeRequest`, in `ai()` and in the options of `ask`, `speak`, `embed`, `transcribe` and `describeImage` (sources `ai.afterStep`, `ai.afterToolCall`, `ai.afterRequest`).
+- A test or a log reading a hook's `source` from `observe.onError` reads the new name.
+
 ### Every guard option is `guards`, and a feature with none is closed
 
 `deprecated-guard-option` (`kay check --fix`) renames `guard` to `guards` in `vitals()` and in the `jobs` and `images` of kay.config.ts, and writes `requireGuards` as `guards: { default }`; the old forms work until 1.108.

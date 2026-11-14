@@ -193,6 +193,15 @@ export const DEPRECATED_LINTS = {
     wrong: '// kay.config.ts\nimport { cms } from \'@kayjs/cms\'\n\nexport default { extensions: [cms({ role: \'editor\', uploads: [\'image/*\'] })] }',
     right: '// kay.config.ts\nimport { cms } from \'@kayjs/cms\'\n\nexport default { extensions: [cms({ access: \'editor\', uploads: { types: [\'image/*\'] } })] }',
   },
+  'deprecated-hook-names': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'A server hook of the libraries that observes, written `on<Verb>` before 1.105 and `after<Verb>` since, beside `before<Verb>` that may refuse or change: kayjs-auth\'s `onSignUp` (`afterSignUp`), kayjs-mail\'s `onSend` and `onSuppress` (`afterSend`, `afterSuppress`, also `contactForm()`\'s `onSend`) and a list\'s `onSubscribe`, `onConfirm`, `onUnsubscribe` and `onBroadcast`, kayjs-cms\'s `onSave` and `onUpload` (`afterSave`, `afterUpload`, also per collection) and kayjs-ai\'s `onStep`, `onToolCall` and `onSuccess` (`afterStep`, `afterToolCall`, `afterRequest`). `onError` and `onEvent` keep their names. The old names work until 1.108 and the new one wins when both are written. Found in the options object written in a call of `auth`, `authCore`, `mail`, `mailer`, `contactForm`, `cms`, `ai`, `ask`, `speak`, `embed`, `transcribe` or `describeImage` imported from its library, in a `.list()` call of a file importing kayjs-mail, in each collection of `cms({ collections })` and in the `hooks` object of kayjs-auth\'s `src/auth.ts`. The fix renames the key, a bare `{ onSave }` becoming `afterSave: onSave`; an object that spreads another or writes the new name already is reported with no fix.',
+    wrong: '// kay.config.ts\nimport { cms } from \'@kayjs/cms\'\n\nexport default { extensions: [cms({ onSave: purge })] }',
+    right: '// kay.config.ts\nimport { cms } from \'@kayjs/cms\'\n\nexport default { extensions: [cms({ afterSave: purge })] }',
+  },
   'deprecated-job-handler': {
     level: 'warn',
     group: 'deprecated',

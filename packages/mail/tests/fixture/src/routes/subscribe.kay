@@ -6,7 +6,7 @@ import Counted from '../mails/counted-confirm.kay'
 export const subscribe = action(...mail.list().form())
 export const subscribeStrict = action(...mail.list('strict', { protection: { rateLimit: { max: 2, window: '10m' } } }).form())
 export const subscribeFlood = action(...mail.list('flood', { protection: { rateLimit: { max: 1000, window: '10m' } } }).form())
-export const subscribeHooked = action(...mail.list('hooked', { onSubscribe: hear('subscribe'), onConfirm: hear('confirm'), onUnsubscribe: hear('unsubscribe'), onBroadcast: hear('broadcast') }).form())
+export const subscribeHooked = action(...mail.list('hooked', { afterSubscribe: hear('subscribe'), afterConfirm: hear('confirm'), afterUnsubscribe: hear('unsubscribe'), afterBroadcast: hear('broadcast') }).form())
 export const subscribeCounted = action(...mail.list('counted', { view: Counted }).form())
 ---
 form(action={subscribe} novalidate)

@@ -68,7 +68,7 @@ describe('retry', () => {
     const provider = scripted(call => call === 1 ? down() : says('ok'))
     const errors: unknown[] = []
     const stepped: Step[] = []
-    const reply = ask('hi', { provider, retry: FAST, onError: error => errors.push(error), onStep: step => stepped.push(step) })
+    const reply = ask('hi', { provider, retry: FAST, onError: error => errors.push(error), afterStep: step => stepped.push(step) })
 
     expect(await reply).toBe('ok')
     expect(provider.calls).toHaveLength(2)

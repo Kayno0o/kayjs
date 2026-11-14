@@ -933,13 +933,13 @@ describe('a new entry saved by a role that may not publish, through the entries 
   })
 })
 
-describe('cms({ onSave })', () => {
+describe('cms({ afterSave })', () => {
   const author = { name: 'Ada', email: 'ada@example.com' }
   let events: unknown[]
 
   beforeEach(() => {
     events = []
-    configure({ onSave: (event) => {
+    configure({ afterSave: (event) => {
       events.push(event)
     }, files: { save: async () => ({ sha: 'abc' }) } })
   })
@@ -975,7 +975,7 @@ describe('cms({ onSave })', () => {
     expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: '' } })).toHaveProperty('issues')
     expect(events).toEqual([])
 
-    configure({ onSave: () => {
+    configure({ afterSave: () => {
       throw new Error('hook down')
     }, files: { save: async () => ({ sha: 'abc' }) } })
     expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } })).toHaveProperty('saved', true)

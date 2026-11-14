@@ -222,11 +222,11 @@ describe('order', () => {
   })
 })
 
-describe('onSave', () => {
+describe('afterSave', () => {
   test('is told the entry as written and the one stored before, a delete the one it removed', async () => {
     const heard: SaveEvent[] = []
 
-    configure({ beforeSave: ({ data }) => ({ data: { ...data, updatedBy: 'hook' } }), onSave: (event) => {
+    configure({ beforeSave: ({ data }) => ({ data: { ...data, updatedBy: 'hook' } }), afterSave: (event) => {
       heard.push(event)
     } })
     await saveEntry({ collection: 'notes', slug: 'one', data: { title: 'One' } }, { create: true })
@@ -271,7 +271,7 @@ describe('uploads', () => {
   test('beforeUpload renames and replaces the bytes, the result held to the rules again', async () => {
     const heard: unknown[] = []
 
-    configure({ beforeUpload: ({ name }) => ({ name: `site-${name}`, bytes: new Uint8Array([...PNG, 0]) }), onUpload: (event) => {
+    configure({ beforeUpload: ({ name }) => ({ name: `site-${name}`, bytes: new Uint8Array([...PNG, 0]) }), afterUpload: (event) => {
       heard.push(event)
     } })
 
@@ -290,15 +290,15 @@ describe('uploads', () => {
     expect((await send('b.png')).status).toBe(415)
   })
 
-  test('onUpload is told after the file is stored, the activity log keeps the upload, and a throw leaves the upload', async () => {
+  test('afterUpload is told after the file is stored, the activity log keeps the upload, and a throw leaves the upload', async () => {
     const failure = new Error('cdn down')
 
-    configure({ onUpload: () => {
+    configure({ afterUpload: () => {
       throw failure
     } })
     expect((await send('a.png')).status).toBe(200)
     expect(Object.keys(await mediaIndex())).toHaveLength(1)
-    expect(logged).toContainEqual(['error', 'cms.onUpload failed', failure, undefined, 'kay'])
+    expect(logged).toContainEqual(['error', 'cms.afterUpload failed', failure, undefined, 'kay'])
     expect((await activityOf('notes')).map(event => [event.verb, event.slug.startsWith('cms-media/')])).toEqual([['upload', true]])
   })
 

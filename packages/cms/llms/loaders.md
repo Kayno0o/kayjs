@@ -60,13 +60,13 @@ The order of one write: the role checks of `roles` and `can` (in the API's guard
 
 ### After a save
 
-`cms({ onSave })` runs after each save, publish, duplicate, move, restore and deletion went through, in the process that handled it: `onSave: async ({ collection, slug, locale, verb, author, commit, data, previous, context }) => { await purgeCdn(`/${collection}/${slug}`) }`. `verb` is `add`, `update`, `publish`, `unpublish`, `move` (one call per entry of a reorder), `duplicate`, `restore`, `rename` (`slug` is the new one, `from` the old) or `delete`; `commit` is what a folder entry's saver made; `data` and `body` are the entry as written, `beforeSave`'s changes included (none for a `delete` and a `move`), and `previous` the entry as it was stored (none for a new one and a `move`). A throw is reported with source `cms.onSave` and never undoes the save, and the editor waits for the hook, so keep it short: past 10 s the save answers anyway and the late hook is reported.
+`cms({ afterSave })` runs after each save, publish, duplicate, move, restore and deletion went through, in the process that handled it: `afterSave: async ({ collection, slug, locale, verb, author, commit, data, previous, context }) => { await purgeCdn(`/${collection}/${slug}`) }`. `verb` is `add`, `update`, `publish`, `unpublish`, `move` (one call per entry of a reorder), `duplicate`, `restore`, `rename` (`slug` is the new one, `from` the old) or `delete`; `commit` is what a folder entry's saver made; `data` and `body` are the entry as written, `beforeSave`'s changes included (none for a `delete` and a `move`), and `previous` the entry as it was stored (none for a new one and a `move`). A throw is reported with source `cms.afterSave` and never undoes the save, and the editor waits for the hook, so keep it short: past 10 s the save answers anyway and the late hook is reported.
 
 What is refreshed before the hook runs, with nothing to call:
 
 - The collection's entries, and every prerendered or cached page that read them, rendered again on its next request (add `prerender: true` to a page over a loader).
 - The sitemap, built again on its next request, not up to an hour later.
-- Not the search index: `search: true` indexes the pages `kay build` renders, so a saved or new entry is searchable after the next build. A site needing it sooner builds on a schedule or from `onSave`.
+- Not the search index: `search: true` indexes the pages `kay build` renders, so a saved or new entry is searchable after the next build. A site needing it sooner builds on a schedule or from `afterSave`.
 
 ## Reference
 

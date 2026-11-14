@@ -8,9 +8,10 @@ import { authRateLimits } from '../src/check/auth-rate-limits'
 import { cmsOptions } from '../src/check/cms-options'
 import { configSwitches } from '../src/check/config-switches'
 import { applySafeFixes } from '../src/check/fixes'
-
 import { formatDurationNumbers } from '../src/check/format-duration'
+
 import { guardOptions } from '../src/check/guard-options'
+import { hookNames } from '../src/check/hook-names'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
 import { localState } from '../src/check/local-state'
 import { mailApi } from '../src/check/mail-api'
@@ -47,6 +48,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-schema-type': schemaType,
   'deprecated-test-helpers': testHelpers,
   'deprecated-cms-options': cmsOptions,
+  'deprecated-hook-names': hookNames,
   'deprecated-store-names': storeNames,
   'deprecated-format-duration': formatDurationNumbers,
   'deprecated-guard-option': guardOptions,

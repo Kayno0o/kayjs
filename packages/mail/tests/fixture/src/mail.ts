@@ -14,7 +14,7 @@ export function hear(name: string) {
   }
 }
 
-export const mail = mailer({ from: 'Fixture <hello@fixture.test>', locale: 'fr', onSuppress: hear('suppress'), inbound: (reply) => {
+export const mail = mailer({ from: 'Fixture <hello@fixture.test>', locale: 'fr', afterSuppress: hear('suppress'), inbound: (reply) => {
   replies.push(reply)
 } })
 

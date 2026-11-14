@@ -162,7 +162,7 @@ describe('found by convention', () => {
     const elsewhere = mkdtempSync(join(tmpdir(), 'kayjs-auth-cwd-'))
 
     mkdirSync(join(root, 'src'))
-    writeFileSync(join(root, 'src/auth.ts'), 'export const hooks = { onSignUp: ({ user }) => { globalThis.signedUpAt = user.email } }\n')
+    writeFileSync(join(root, 'src/auth.ts'), 'export const hooks = { afterSignUp: ({ user }) => { globalThis.signedUpAt = user.email } }\n')
 
     try {
       process.chdir(elsewhere)
@@ -185,7 +185,7 @@ describe('found by convention', () => {
 
   test('src/auth.ts exporting hooks and src/mail.ts exporting mail are read when the app has them', async () => {
     mkdirSync(join(root, 'src'))
-    writeFileSync(join(root, 'src/auth.ts'), 'export const hooks = { onSignUp: ({ user }) => { globalThis.signedUp = user.email } }\n')
+    writeFileSync(join(root, 'src/auth.ts'), 'export const hooks = { afterSignUp: ({ user }) => { globalThis.signedUp = user.email } }\n')
     writeFileSync(join(root, 'src/mail.ts'), 'export const mail = { enqueue: async mail => { globalThis.mails.push(mail) } }\n')
 
     const sent: AuthMailMessage[] = []
@@ -212,7 +212,7 @@ describe('found by convention', () => {
     writeFileSync(join(root, 'src/auth.ts'), 'export const other = 1\n')
 
     const called: string[] = []
-    const { register } = await served({ email: false, onSignUp: ({ user }) => void called.push(user.email!) })
+    const { register } = await served({ email: false, afterSignUp: ({ user }) => void called.push(user.email!) })
 
     await register()
 
@@ -224,7 +224,7 @@ describe('found by convention', () => {
     writeFileSync(join(root, 'src/mail.ts'), 'export const mail = { enqueue: async () => { throw new Error("sent") } }\n')
 
     const called: string[] = []
-    const { register } = await served({ email: false, hooks: async () => ({ hooks: { onSignUp: ({ user }) => void called.push(user.email!) } }) })
+    const { register } = await served({ email: false, hooks: async () => ({ hooks: { afterSignUp: ({ user }) => void called.push(user.email!) } }) })
 
     await register()
 

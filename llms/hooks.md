@@ -34,10 +34,10 @@ import { decide, dispatch, refuse } from 'kay/library'
 
 interface NotesOptions {
   beforeSave?: BeforeHook<{ text: string }, { text: string }> | undefined
-  onSave?: Hook<{ text: string }> | undefined
+  afterSave?: Hook<{ text: string }> | undefined
 }
 
-export function notes({ beforeSave, onSave }: NotesOptions) {
+export function notes({ beforeSave, afterSave }: NotesOptions) {
   return async (input: { text: string }) => {
     const answer = await decide('notes.beforeSave', [beforeSave], input)
 
@@ -46,7 +46,7 @@ export function notes({ beforeSave, onSave }: NotesOptions) {
 
     const saved = { ...input, ...answer.change }
 
-    await dispatch('notes.onSave', [onSave], saved)
+    await dispatch('notes.afterSave', [afterSave], saved)
 
     return saved
   }
@@ -61,22 +61,22 @@ export function notes({ beforeSave, onSave }: NotesOptions) {
 
 ### What ships
 
-This release ships the helpers (`dispatch()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `observe.onError` of `kay.config.ts`. `dispatch()` was `notify()` before 1.92, which now names only the inbox of `kay/server`. kayjs-auth's, kayjs-ai's, kayjs-mail's and kayjs-cms's hooks follow it (`onEvent`, `beforeDelete`, `onSignUp`, [below](#kayjs-auth); `beforeRequest`, `onSuccess`, `onError`, [kayjs-ai](#kayjs-ai); `beforeSend`, `onSend`, [kayjs-mail](#kayjs-mail); `beforeSave`, `onSave`, `beforeUpload`, `onUpload`, [kayjs-cms](#kayjs-cms)); kayjs-ui's callbacks follow it ([below](#kayjs-ui)); the other hooks that exist today keep their names; queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.
+This release ships the helpers (`dispatch()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `observe.onError` of `kay.config.ts`. `dispatch()` was `notify()` before 1.92, which now names only the inbox of `kay/server`. kayjs-auth's, kayjs-ai's, kayjs-mail's and kayjs-cms's hooks follow it (`onEvent`, `beforeDelete`, `afterSignUp`, [below](#kayjs-auth); `beforeRequest`, `afterRequest`, `onError`, [kayjs-ai](#kayjs-ai); `beforeSend`, `afterSend`, [kayjs-mail](#kayjs-mail); `beforeSave`, `afterSave`, `beforeUpload`, `afterUpload`, [kayjs-cms](#kayjs-cms)); kayjs-ui's callbacks follow it ([below](#kayjs-ui)); the other hooks that exist today keep their names; queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.
 
 ### The rule
 
-- `onX` runs after X happened and only observes: what it returns is ignored. X is the verb of the transition in its base form, as the DOM names events: `onSave`, `onSend`, `onDelete`, `onSubscribe`. Never a participle (`onSaved`, `onSent`, `onFailed`).
+- `afterX` runs after X happened and only observes: what it returns is ignored. X is the verb of the transition in its base form: `afterSave`, `afterSend`, `afterDelete`, `afterSubscribe`. Never a participle (`afterSaved`). Before 1.105 it was `onX`, which the old names keep working as until 1.108 (`deprecated-hook-names`); `onX` is now the name of a component's callback and of a lifecycle (below).
 - `beforeX` runs before X and is the only hook that changes or refuses it.
-- Anything with a start and an outcome (a job, a schedule run, a workflow run, an ask, an action) uses `onStart`, `onSuccess` and `onError`, plus steps of its own (`onStep`, `onToolCall`, `onRetry`). It is `onError`, never `onFail` or `onFailed`.
+- Anything with a start and an outcome (a job, a schedule run, a workflow run, an ask, an action) uses `onStart`, `onSuccess` and `onError`, plus steps of its own (`onRetry`; kayjs-ai's `afterStep` and `afterToolCall` observe the ask). It is `onError`, never `onFail` or `onFailed`.
 - One object argument: the transition's fields plus `context`. A hook gets `{ user, context }`, not `(user, context)`.
 - Hooks are flat keys in the options of the factory that owns the transition (`auth({ onEvent })`), never a `hooks: {}` bag. App-wide hooks go in `kay.config.ts`.
 - A library with many audit-style transitions may add one catch-all `onEvent({ event, ...fields, context })`, `event` in kebab case, beside the per-transition hooks.
 - Not hooks: resolvers (`allow`, `authorize`, `locate`, `exportData`, `profileFields`) compute a value the library needs, are awaited and let their errors propagate; a controlled-state pair keeps `on<Prop>Change` (`open` and `onOpenChange`).
 - A function that registers a hook is `on` plus the hook's name: `navigation.onBeforeNavigate(fn)` registers `beforeNavigate`. Browser hooks follow the same rule, and are never a security boundary: the server checks again.
 
-### Errors in `onX`
+### Errors in `afterX`
 
-An `onX` hook run by `dispatch()` is awaited for up to 10 s, then left running. A throw, or a hook that finishes late, is logged and handed to the app's `onError({ error, request, source })` with `source` naming the hook (`'cms.onSave'`); it never undoes or fails the transition. In the browser a hook that throws is logged and the transition goes on.
+An `afterX` or `onError` hook run by `dispatch()` is awaited for up to 10 s, then left running. A throw, or a hook that finishes late, is logged and handed to the app's `onError({ error, request, source })` with `source` naming the hook (`'cms.afterSave'`); it never undoes or fails the transition. In the browser a hook that throws is logged and the transition goes on.
 
 `detached` hooks (streaming paths, timing-sensitive paths) run off the response's path: not awaited, the same logging.
 
@@ -131,27 +131,27 @@ A library extends it with what it knows. `hookContext()` builds it from the requ
 
 ### kayjs-auth
 
-- `auth({ onEvent, beforeDelete, onSignUp })`, flat keys or the `hooks` of `src/auth.ts`, each told its fields and `context: AuthHookContext`, kay's `HookContext` plus `actor: User | null` (the admin or manager who acted, else `null`).
+- `auth({ onEvent, beforeDelete, afterSignUp })`, flat keys or the `hooks` of `src/auth.ts`, each told its fields and `context: AuthHookContext`, kay's `HookContext` plus `actor: User | null` (the admin or manager who acted, else `null`).
 - `onEvent({ event, user, context, ...fields })` is the catch-all of the account's audit events (source `auth.onEvent`).
 - `beforeDelete({ user, context })` runs before an account is erased, by the user, an admin or the prune; `false` or `refuse()` keeps it, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }` (source `auth.beforeDelete` for a throw, which refuses with 500).
-- `onSignUp({ user, profile, context })` is observed: a throw is reported with source `auth.onSignUp` and the sign-up stands. It used to fail the call after the user was written.
+- `afterSignUp({ user, profile, context })` is observed: a throw is reported with source `auth.afterSignUp` and the sign-up stands. It used to fail the call after the user was written.
 
 ### kayjs-ai
 
-- `ai({ beforeRequest, onStep, onToolCall, onSuccess, onError })` and the same keys in `ask(prompt, { ... })`, each told its fields and `context: HookContext` ([details](../packages/ai/llms/hooks.md)). `beforeRequest` may change the request, refuse with `false` or throw (an `AiError` or `refuse()`), and fails closed; the others only observe, are not waited for, and a throw is reported with source `ai.onStep`, `ai.onToolCall`, `ai.onSuccess` or `ai.onError`.
+- `ai({ beforeRequest, afterStep, afterToolCall, afterRequest, onError })` and the same keys in `ask(prompt, { ... })`, each told its fields and `context: HookContext` ([details](../packages/ai/llms/hooks.md)). `beforeRequest` may change the request, refuse with `false` or throw (an `AiError` or `refuse()`), and fails closed; the others only observe, are not waited for, and a throw is reported with source `ai.afterStep`, `ai.afterToolCall`, `ai.afterRequest` or `ai.onError`.
 - `onError({ error, context })` is told an object, where it was told the error before 1.92 (a `kay upgrade` fix wraps the parameter).
 - A hook given to `ask()` adds to the one of `ai()` of the same name, `ai()`'s first, instead of replacing it.
 
 ### kayjs-mail
 
-- `mailer({ beforeSend, onSend, onError, onSuppress })` and, on `mail.list(name, { ... })`, `onSubscribe`, `onConfirm`, `onUnsubscribe` and `onBroadcast`; `contactForm(mail, { onSend, to })` ([details](../packages/mail/llms/writing-and-sending.md#hooks)). Sources are `mail.<hook>`, `mail.list.<hook>` and `mail.contact.onSend`.
-- `beforeSend({ mail })` runs once per mail before it is sent, queued or mailed to a list subscriber; it may change the mail, or refuse it with `false` or `refuse()`, which `send()` and `enqueue()` throw. The others observe: `onSend({ mail, delivery })` once after the transport took the mail (the queue and lists too), `onError({ mail, error })` once when a send fails or the queue gives a mail up, `onSuppress({ address, reason, source })` for a bounce, a complaint or `mail.suppress()`.
+- `mailer({ beforeSend, afterSend, onError, afterSuppress })` and, on `mail.list(name, { ... })`, `afterSubscribe`, `afterConfirm`, `afterUnsubscribe` and `afterBroadcast`; `contactForm(mail, { afterSend, to })` ([details](../packages/mail/llms/writing-and-sending.md#hooks)). Sources are `mail.<hook>`, `mail.list.<hook>` and `mail.contact.afterSend`.
+- `beforeSend({ mail })` runs once per mail before it is sent, queued or mailed to a list subscriber; it may change the mail, or refuse it with `false` or `refuse()`, which `send()` and `enqueue()` throw. The others observe: `afterSend({ mail, delivery })` once after the transport took the mail (the queue and lists too), `onError({ mail, error })` once when a send fails or the queue gives a mail up, `afterSuppress({ address, reason, source })` for a bounce, a complaint or `mail.suppress()`.
 
 ### kayjs-cms
 
-- `cms({ beforeSave, onSave, beforeUpload, onUpload })` ([details](../packages/cms/llms/loaders.md#before-a-save), [uploads](../packages/cms/llms/uploads.md#hooks)), each told its fields and `context: HookContext`.
+- `cms({ beforeSave, afterSave, beforeUpload, afterUpload })` ([details](../packages/cms/llms/loaders.md#before-a-save), [uploads](../packages/cms/llms/uploads.md#hooks)), each told its fields and `context: HookContext`.
 - `beforeSave({ collection, slug, locale, verb, data, body, previous, author, from })` runs before every write of an entry but a reorder (`add`, `update`, `publish`, `unpublish`, `duplicate`, `restore`, `delete`, `rename`), after `roles`, `can` and `fourEyes` and before the schema and the version check. It may return `{ data, body }`, refuse with `false` or `refuse()` (shown in the entry form, `error.status` 422 or 403 to the API), and fails closed (500) on any other throw, source `cms.beforeSave`.
-- `beforeUpload({ collection, name, type, size, bytes, author })` may return `{ bytes, name, type }` or refuse, the route answering the refusal's status; the result is checked against `uploads` again. `onUpload({ collection, key, path, name, type, size, author })` and `onSave` (which also gets `data`, `body` and `previous`) observe, a throw being reported with source `cms.onUpload` or `cms.onSave`.
+- `beforeUpload({ collection, name, type, size, bytes, author })` may return `{ bytes, name, type }` or refuse, the route answering the refusal's status; the result is checked against `uploads` again. `afterUpload({ collection, key, path, name, type, size, author })` and `afterSave` (which also gets `data`, `body` and `previous`) observe, a throw being reported with source `cms.afterUpload` or `cms.afterSave`.
 
 ### kayjs-ui
 

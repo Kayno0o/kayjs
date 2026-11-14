@@ -66,12 +66,20 @@ export interface ListOptions {
   // The page explaining what is done with the address, a path or a URL: the confirmation mail and the subscribe form of this list link it, so an app declares it once.
   privacy?: string | undefined
   // Told when an address signs up through the form of this list, once its confirmation is mailed; not for one asking again while pending, nor one confirmed already. A throw is reported and the sign-up stands.
+  afterSubscribe?: Hook<ListEvent> | undefined
+  /** @deprecated `afterSubscribe`, since 1.105; the old name works until 1.108. */
   onSubscribe?: Hook<ListEvent> | undefined
   // Told when the address confirms, once. Needs a store with `find`, as `sqliteLists` and `pgLists` have.
+  afterConfirm?: Hook<ListEvent> | undefined
+  /** @deprecated `afterConfirm`, since 1.105; the old name works until 1.108. */
   onConfirm?: Hook<ListEvent> | undefined
   // Told when the address leaves the list by its unsubscribe link or `list.unsubscribe()`, once. A removal by `mail.erase()`, a bounce or a complaint tells nothing. The link needs a store with `find`.
+  afterUnsubscribe?: Hook<ListEvent> | undefined
+  /** @deprecated `afterUnsubscribe`, since 1.105; the old name works until 1.108. */
   onUnsubscribe?: Hook<ListEvent> | undefined
   // Told once when a broadcast has been handed to every subscriber, with how many mails went and how many were given up.
+  afterBroadcast?: Hook<BroadcastEvent> | undefined
+  /** @deprecated `afterBroadcast`, since 1.105; the old name works until 1.108. */
   onBroadcast?: Hook<BroadcastEvent> | undefined
 }
 
@@ -81,13 +89,18 @@ export interface ListEvent {
   email: string
 }
 
-// What `onBroadcast` is told: the broadcast `send()` answered, with its progress.
+// What `afterBroadcast` is told: the broadcast `send()` answered, with its progress.
 export interface BroadcastEvent extends Pick<BroadcastProgress, 'sent' | 'failed' | 'unsure'> {
   list: string
   id: string
 }
 
-const LIST_HOOKS = ['onSubscribe', 'onConfirm', 'onUnsubscribe', 'onBroadcast'] as const
+// The `on` names of 1.104 still work until 1.108, beside the `after` ones.
+function afterNames(given: ListOptions): ListOptions {
+  return { ...given, afterSubscribe: given.afterSubscribe ?? given.onSubscribe, afterConfirm: given.afterConfirm ?? given.onConfirm, afterUnsubscribe: given.afterUnsubscribe ?? given.onUnsubscribe, afterBroadcast: given.afterBroadcast ?? given.onBroadcast }
+}
+
+const LIST_HOOKS = ['afterSubscribe', 'onSubscribe', 'afterConfirm', 'onConfirm', 'afterUnsubscribe', 'onUnsubscribe', 'afterBroadcast', 'onBroadcast'] as const
 
 // The mail sent to a list: a message without recipients, which are the list's.
 export type ListMessage<P extends object = object> = MailMessage<P> extends infer M ? M extends unknown ? Omit<M, 'to' | 'cc' | 'bcc' | 'unsubscribe' | 'attachments'> : never : never
@@ -426,7 +439,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
           // Off the response path, so the answer takes the same time for a new address as for a known one.
           if (subscriber.status === 'pending' && subscriber.createdAt === asked)
-            await dispatch('mail.list.onSubscribe', [options.onSubscribe], { list: name, email }, { detached: true })
+            await dispatch('mail.list.afterSubscribe', [options.afterSubscribe], { list: name, email }, { detached: true })
 
           return undefined
         }
@@ -503,7 +516,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         if (email === undefined || !await lists.get().removeEmail(name, email))
           return false
 
-        await dispatch('mail.list.onUnsubscribe', [options.onUnsubscribe], { list: name, email })
+        await dispatch('mail.list.afterUnsubscribe', [options.afterUnsubscribe], { list: name, email })
 
         return true
       },
@@ -589,7 +602,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
     const { sent, failed, unsure } = await lists.progress(stored)
 
-    await dispatch('mail.list.onBroadcast', [entry.hooks.onBroadcast], { list: name, id, sent, failed, unsure })
+    await dispatch('mail.list.afterBroadcast', [entry.hooks.afterBroadcast], { list: name, id, sent, failed, unsure })
   }
 
   return {
@@ -597,7 +610,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       let entry = entries.get(name)
 
       if (!entry) {
-        entries.set(name, entry = make(name, options))
+        entries.set(name, entry = make(name, afterNames(options)))
         sweeper.start()
         host.activate()
       }
@@ -669,7 +682,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         const confirmed = await store.confirm(checked.claims.list, checked.claims.id, undefined, checked.claims.issuedAt)
 
         if (confirmed && before?.status === 'pending')
-          await dispatch('mail.list.onConfirm', [entries.get(checked.claims.list)?.hooks.onConfirm], { list: checked.claims.list, email: before.email })
+          await dispatch('mail.list.afterConfirm', [entries.get(checked.claims.list)?.hooks.afterConfirm], { list: checked.claims.list, email: before.email })
 
         return { kind: confirmed ? 'confirmed' : 'invalid', locale: checked.claims.locale }
       }
@@ -695,7 +708,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         const before = await store.find?.(checked.claims.list, checked.claims.id)
 
         if (await store.remove(checked.claims.list, checked.claims.id) && before !== undefined)
-          await dispatch('mail.list.onUnsubscribe', [entries.get(checked.claims.list)?.hooks.onUnsubscribe], { list: checked.claims.list, email: before.email })
+          await dispatch('mail.list.afterUnsubscribe', [entries.get(checked.claims.list)?.hooks.afterUnsubscribe], { list: checked.claims.list, email: before.email })
       }
       catch (error) {
         log.error('an unsubscribe link could not be applied to the store of its list', error)

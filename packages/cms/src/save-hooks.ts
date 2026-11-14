@@ -21,7 +21,7 @@ export async function previousOf(ref: EntryRef): Promise<EntryState | undefined>
 
 // Whether a hook wants the stored entry, which costs a read.
 export function hooked(collection: string): boolean {
-  return [...hooksOf('beforeSave', collection), ...hooksOf('onSave', collection)].some(hook => hook !== undefined)
+  return [...hooksOf('beforeSave', collection), ...hooksOf('afterSave', collection)].some(hook => hook !== undefined)
 }
 
 // A hook's refusal as the issues of an entry: its field errors by path, else its message for the entry as a whole.
@@ -50,7 +50,7 @@ export async function askBeforeSave(event: BeforeSaveEvent): Promise<{ change: P
   return answer
 }
 
-// Tells `cms({ onSave })`: a throw or a hook still running past ten seconds is reported with source `cms.onSave` and never undoes the save.
+// Tells `cms({ afterSave })`: a throw or a hook still running past ten seconds is reported with source `cms.afterSave` and never undoes the save.
 export async function tellOnSave(event: SaveEvent): Promise<void> {
-  await dispatch('cms.onSave', hooksOf('onSave', event.collection), event)
+  await dispatch('cms.afterSave', hooksOf('afterSave', event.collection), event)
 }

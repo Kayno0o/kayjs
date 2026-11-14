@@ -77,14 +77,14 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
             calls[at] = piece.tool
 
           version++
-          tell('onToolCall', hooks.onToolCall, snapshot(piece.tool), context)
+          tell('afterToolCall', hooks.afterToolCall, snapshot(piece.tool), context)
         }
         else if ('finish' in piece) {
           reason = piece.finish
         }
         else if ('step' in piece) {
           steps.push(piece.step)
-          tell('onStep', hooks.onStep, piece.step, context)
+          tell('afterStep', hooks.afterStep, piece.step, context)
         }
 
         notify()
@@ -115,7 +115,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       else {
         const { inputTokens, outputTokens } = total
 
-        tell('onSuccess', hooks.onSuccess, { text: deltas.join(''), usage: inputTokens !== undefined && outputTokens !== undefined ? { ...total, inputTokens, outputTokens } : undefined, steps: [...steps], finish: reason, stopped: controller.signal.aborted }, context)
+        tell('afterRequest', hooks.afterRequest, { text: deltas.join(''), usage: inputTokens !== undefined && outputTokens !== undefined ? { ...total, inputTokens, outputTokens } : undefined, steps: [...steps], finish: reason, stopped: controller.signal.aborted }, context)
       }
     }
   }

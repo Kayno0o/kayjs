@@ -722,18 +722,18 @@ The order for one write is: the roles and `can`, `fourEyes` for an approval, `be
 
 ### After a save
 
-`cms({ onSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate`, `rename` or `delete`), the author and, for a folder entry, the commit. A `rename` gives the new slug, and `from` is the old one. It also gets the entry as written (`data`, and `body`) and the one stored before (`previous`).
+`cms({ afterSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate`, `rename` or `delete`), the author and, for a folder entry, the commit. A `rename` gives the new slug, and `from` is the old one. It also gets the entry as written (`data`, and `body`) and the one stored before (`previous`).
 
 ```ts
 cms({
   guard,
-  onSave: async ({ collection, slug }) => {
+  afterSave: async ({ collection, slug }) => {
     await purgeCdn(`/${collection}/${slug}`)
   },
 })
 ```
 
-It runs in the server that handled the save, before the editor gets the answer, so keep it short. If it throws, the error is reported with the source `cms.onSave` and the save stays. A hook still running after 10 seconds is reported and the save answers without it.
+It runs in the server that handled the save, before the editor gets the answer, so keep it short. If it throws, the error is reported with the source `cms.afterSave` and the save stays. A hook still running after 10 seconds is reported and the save answers without it.
 
 ### Before and after an upload
 
@@ -746,13 +746,13 @@ cms({
     if (await infected(bytes))
       refuse('The file was refused by the scanner', { status: 451 })
   },
-  onUpload: async ({ key, path }) => {
+  afterUpload: async ({ key, path }) => {
     await purgeCdn(path)
   },
 })
 ```
 
-A refusal answers the upload with its status (403 for `false`) and stores nothing. `cms({ onUpload })` runs after the file is stored with `{ collection, key, path, name, type, size, author }`; a throw is reported with the source `cms.onUpload` and the file stays. The activity log lists each upload as `Uploaded`.
+A refusal answers the upload with its status (403 for `false`) and stores nothing. `cms({ afterUpload })` runs after the file is stored with `{ collection, key, path, name, type, size, author }`; a throw is reported with the source `cms.afterUpload` and the file stays. The activity log lists each upload as `Uploaded`.
 
 ## Where files are saved
 

@@ -36,17 +36,17 @@ afterEach(() => {
 test('reports a hook that throws with its source, and the save stands', async () => {
   const failure = new Error('hook down')
 
-  configure({ onSave: () => {
+  configure({ afterSave: () => {
     throw failure
   } })
   expect(await saveEntry(entry)).toHaveProperty('saved', true)
-  expect(logged).toContainEqual(['error', 'cms.onSave failed', failure, undefined, 'kay'])
+  expect(logged).toContainEqual(['error', 'cms.afterSave failed', failure, undefined, 'kay'])
 })
 
 test('reports a hook that rejects, and the save stands', async () => {
   const failure = new Error('webhook refused')
 
-  configure({ onSave: async () => Promise.reject(failure) })
+  configure({ afterSave: async () => Promise.reject(failure) })
   expect(await saveEntry(entry)).toHaveProperty('saved', true)
-  expect(logged).toContainEqual(['error', 'cms.onSave failed', failure, undefined, 'kay'])
+  expect(logged).toContainEqual(['error', 'cms.afterSave failed', failure, undefined, 'kay'])
 })

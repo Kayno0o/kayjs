@@ -250,22 +250,22 @@ export const mail = mailer({
 
 ### Hooks
 
-The mailer takes the [hooks](/guides/hooks) `beforeSend`, `onSend`, `onError` and `onSuppress`, each given one object with a `context`:
+The mailer takes the [hooks](/guides/hooks) `beforeSend`, `afterSend`, `onError` and `afterSuppress`, each given one object with a `context`:
 
 ```ts
 export const mail = mailer({
   beforeSend: ({ mail }) => (mail.to.some(isTestAddress) ? false : { headers: { ...mail.headers, 'X-App': 'shop' } }),
-  onSend: async ({ mail, delivery }) => saveDelivery(mail.subject, delivery.messageId),
+  afterSend: async ({ mail, delivery }) => saveDelivery(mail.subject, delivery.messageId),
   onError: ({ mail, error }) => alert(mail.subject, error),
-  onSuppress: ({ address, reason }) => flagUser(address, reason),
+  afterSuppress: ({ address, reason }) => flagUser(address, reason),
 })
 ```
 
 `beforeSend` runs once per mail before it is sent, queued or mailed to a list subscriber. It returns the fields to change, `false` to refuse the mail, or throws `refuse()`. A refused `send` or `enqueue` throws that refusal, which an action answers as it answers `ctx.fail`, and nothing goes out.
 
-`onSend` runs once after the server took the mail, from `send`, the queue and a list alike, and `onError` once when a send fails or the queue gives a mail up. Neither is told for a mail whose recipients were all suppressed or for a queued retry, and a hook that throws is logged and never fails the send. A queued mail has no request, so `context.request` is undefined.
+`afterSend` runs once after the server took the mail, from `send`, the queue and a list alike, and `onError` once when a send fails or the queue gives a mail up. Neither is told for a mail whose recipients were all suppressed or for a queued retry, and a hook that throws is logged and never fails the send. A queued mail has no request, so `context.request` is undefined.
 
-`onSuppress` runs when a bounce or complaint, from a provider or a mail server, or `mail.suppress()`, stops an address, with the `source` that reported it.
+`afterSuppress` runs when a bounce or complaint, from a provider or a mail server, or `mail.suppress()`, stops an address, with the `source` that reported it.
 
 ### Other transports
 
@@ -319,7 +319,7 @@ The action checks a one-line `name`, an `email` and a `message` of at most 5000 
 
 Use `labels` to rename a field in the mail. Use `subject` and `view` to replace the subject and the mail's component, which gets `ContactMailProps`, with the site's origin as `site`.
 
-`to` can be a function of the input, to route a message by a `topic` field. `onSend({ input, id })` runs once the mail is queued, to save the message in your database. A throw there is logged and the visitor still sees success. A `beforeSend` of the mailer that refuses the mail makes the form answer that refusal.
+`to` can be a function of the input, to route a message by a `topic` field. `afterSend({ input, id })` runs once the mail is queued, to save the message in your database. A throw there is logged and the visitor still sees success. A `beforeSend` of the mailer that refuses the mail makes the form answer that refusal.
 
 ### Spam protection
 
@@ -362,7 +362,7 @@ The form shows a line saying what the address is used for. The form links the `p
 
 The page the form was on and the id of the notice are kept with the confirmation date as the proof of consent.
 
-A list takes the hooks `onSubscribe`, `onConfirm` and `onUnsubscribe`, each given `{ list, email }`, and `onBroadcast`, given `{ list, id, sent, failed, unsure }` once a broadcast has gone to every subscriber, to add a confirmed subscriber to a CRM say. `onSubscribe` is told once for a new address, `onUnsubscribe` for the link and `list.unsubscribe()` but not `mail.erase()`. A hook that throws is logged and changes nothing.
+A list takes the hooks `afterSubscribe`, `afterConfirm` and `afterUnsubscribe`, each given `{ list, email }`, and `afterBroadcast`, given `{ list, id, sent, failed, unsure }` once a broadcast has gone to every subscriber, to add a confirmed subscriber to a CRM say. `afterSubscribe` is told once for a new address, `afterUnsubscribe` for the link and `list.unsubscribe()` but not `mail.erase()`. A hook that throws is logged and changes nothing.
 
 Every visitor sees the same answer, whether the address is new, waiting, already listed or refused, so the form tells nothing about who subscribed. A confirmed address is mailed nothing.
 
@@ -414,7 +414,7 @@ Suppressions are kept with the mailing lists, or in your app's database (else `d
 
 A store's `suppressed` answers `StoredSuppression` rows with `suppressedAt` in milliseconds.
 
-The mailer's `onSuppress({ address, reason, source })` is told each time, to flag the user whose address bounced.
+The mailer's `afterSuppress({ address, reason, source })` is told each time, to flag the user whose address bounced.
 
 Mail servers also answer a failed delivery with a report mail (a DSN). Pipe those, and the replies to your mails, to `POST /_kay/mail/inbound` with `Authorization: Bearer` and `MAIL_EVENTS_INBOUND`. A report suppresses the recipients it names, but only when it returns a mail your app sent to that address, which needs `KAY_SECRET`. Any other message goes to the function you give the mailer:
 

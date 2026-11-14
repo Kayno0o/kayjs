@@ -97,10 +97,14 @@ export interface MailerOptions {
   // Runs once per mail before it is sent, queued or mailed to a list subscriber, with the rendered mail: return the fields to change (`{ headers: { ...mail.headers, 'X-App': 'kay' } }`) or `false`, or throw `refuse()`, to refuse it. A refused `send` or `enqueue` throws that refusal and nothing goes out; any other throw refuses with a 500 after it is reported.
   beforeSend?: BeforeHook<{ mail: Mail }, Mail> | undefined
   // Told once after a mail was handed to the transport, from `send`, from the queue and from a list: not for a mail whose recipients were all suppressed. A throw is reported and never fails the send. Mails of the queue are told outside any request, so `context.request` is undefined.
+  afterSend?: Hook<{ mail: Mail, delivery: Delivery }> | undefined
+  /** @deprecated `afterSend`, since 1.105; the old name works until 1.108. */
   onSend?: Hook<{ mail: Mail, delivery: Delivery }> | undefined
   // Told once when `send` fails, and when the queue gives a mail up after its last attempt (`queue.onError` is told right after, with the job's own fields). A queued mail is told as the queue holds it, so a `queue.redact` that drops its body leaves it out here too.
   onError?: Hook<{ mail: Mail, error: Error }> | undefined
   // Told when an address stops being mailed: a bounce or complaint reported by a provider or a mail server (`source` names it), or `mail.suppress()` (`source` is `manual`).
+  afterSuppress?: Hook<{ address: string, reason: SuppressionReason, source: string }> | undefined
+  /** @deprecated `afterSuppress`, since 1.105; the old name works until 1.108. */
   onSuppress?: Hook<{ address: string, reason: SuppressionReason, source: string }> | undefined
   // Lets a server lacking `MAIL_URL` or a sender boot anyway, each send then throwing `MailNotConfiguredError`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
@@ -468,7 +472,7 @@ export async function enqueue<P extends object>(message: MailMessage<P>, options
   return runningOrThrow().enqueue(message, options)
 }
 
-const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, url: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, store: true, listStore: true, suppressionStore: true, events: true, inbound: true, beforeSend: true, onSend: true, onError: true, onSuppress: true, optional: true }
+const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, url: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, store: true, listStore: true, suppressionStore: true, events: true, inbound: true, beforeSend: true, afterSend: true, onSend: true, onError: true, afterSuppress: true, onSuppress: true, optional: true }
 
 // Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; its `mail.auth` and `mail.contact` messages come with the package (`kay.messages`).
 // `mail({ from, locale, ...})` takes the options of `mailer()` and builds it as `pages()` does, with no module, and `mail()` alone uses the `mail` a `src/mail.ts` exports when the app has one. `module` or `server` are for a mailer written by the app elsewhere, loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
@@ -543,7 +547,7 @@ function checkMailerOptions(options: MailerOptions): void {
       checkKey(options.smtp.dkim.privateKey, 'mailer({ smtp: { dkim } })\'s privateKey')
   }
 
-  for (const name of ['beforeSend', 'onSend', 'onError', 'onSuppress'] as const) {
+  for (const name of ['beforeSend', 'afterSend', 'onSend', 'onError', 'afterSuppress', 'onSuppress'] as const) {
     if (options[name] !== undefined && typeof options[name] !== 'function')
       throw configError('mail', name, `mailer({ ${name} }) is a function`)
   }
@@ -677,7 +681,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   }
 
   const sent = async (mail: Mail, delivery: Delivery): Promise<Delivery> => {
-    await dispatch('mail.onSend', [options.onSend], { mail, delivery })
+    await dispatch('mail.afterSend', [options.afterSend ?? options.onSend], { mail, delivery })
 
     return delivery
   }
@@ -728,12 +732,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   suppressions.lists = lists
 
-  // Stops mailing the address and tells onSuppress; whether it was an address.
+  // Stops mailing the address and tells afterSuppress; whether it was an address.
   const suppress = async (address: string, reason: SuppressionReason, source: string): Promise<boolean> => {
     if (!await lists.suppress(address, reason, source))
       return false
 
-    await dispatch('mail.onSuppress', [options.onSuppress], { address: normalizeAddress(address)!, reason, source })
+    await dispatch('mail.afterSuppress', [options.afterSuppress ?? options.onSuppress], { address: normalizeAddress(address)!, reason, source })
 
     return true
   }

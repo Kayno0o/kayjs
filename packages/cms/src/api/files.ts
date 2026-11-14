@@ -77,7 +77,7 @@ export default api({ maxSize: uploadMaxSize })
     const path = files.url(key)
 
     await recordActivity({ collection: params.collection, slug: key, verb: 'upload', author })
-    await dispatch('cms.onUpload', hooksOf('onUpload', params.collection), { collection: params.collection, key, path, name: file.name, type: file.type, size: file.size, ...author !== undefined && { author } })
+    await dispatch('cms.afterUpload', hooksOf('afterUpload', params.collection), { collection: params.collection, key, path, name: file.name, type: file.type, size: file.size, ...author !== undefined && { author } })
 
     return { path, ...sizeOfPath(path) }
   }, { body: s.Object({ file: s.File() }) })

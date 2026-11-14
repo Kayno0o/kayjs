@@ -357,7 +357,7 @@ export interface RequestHookChange {
   system?: string | undefined
 }
 
-// What `onSuccess` is given once a reply ended: its text, the tokens (undefined when the provider gave none), one entry per request, why it stopped, and whether it was stopped (by `reply.stop()`, an aborted request or a reader that left) rather than ending on its own.
+// What `afterRequest` is given once a reply ended: its text, the tokens (undefined when the provider gave none), one entry per request, why it stopped, and whether it was stopped (by `reply.stop()`, an aborted request or a reader that left) rather than ending on its own.
 export interface FinishHookCall {
   text: string
   usage: Usage | undefined
@@ -376,10 +376,16 @@ export interface AskHooks {
   // Called before the provider is asked, after the input-length check, and before the limits count the ask: may return the `messages` and `system` to send instead (redact, add context), return `false` to refuse the ask, or throw an `AiError` (or `refuse()`, or any error) to refuse it, which fails the reply with it and calls `onError`.
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   // Called after each request of the reply to the provider, a tool loop making one per round.
+  afterStep?: Hook<Step> | undefined
+  /** @deprecated `afterStep`, since 1.105; the old name works until 1.108. */
   onStep?: Hook<Step> | undefined
   // Called as each tool call starts (`running`) and again as it ends (`done` or `failed`).
+  afterToolCall?: Hook<AiToolCall> | undefined
+  /** @deprecated `afterToolCall`, since 1.105; the old name works until 1.108. */
   onToolCall?: Hook<AiToolCall> | undefined
   // Called once the reply ended, finished, cut short or stopped (`stopped`).
+  afterRequest?: Hook<FinishHookCall> | undefined
+  /** @deprecated `afterRequest`, since 1.105; the old name works until 1.108. */
   onSuccess?: Hook<FinishHookCall> | undefined
   // Called when the reply fails, with the error its readers get, and for each failed request that was retried or fell back.
   onError?: Hook<ErrorHookCall> | undefined
@@ -411,7 +417,7 @@ export interface Resilience {
 }
 
 // What every call to a model takes, `ask`, `describeImage`, `transcribe`, `speak` and `embed` alike: which model on which provider, what stops it, how long it may take, how a failure is asked again or falls back, and the hooks that watch it. The hooks of `ai()` run for each of them, before the call's own.
-export interface CallOptions extends Resilience, Pick<AskHooks, 'onStep' | 'onSuccess' | 'onError'> {
+export interface CallOptions extends Resilience, Pick<AskHooks, 'afterStep' | 'onStep' | 'afterRequest' | 'onSuccess' | 'onError'> {
   // The model for this call: its id, or a name from `ai({ models })`; `ai({ default })` or `AI_MODEL` when left out of an ask, the environment's own variable for the others.
   model?: string | undefined
   // Calls this provider instead of the one the environment names, such as `openai({ baseUrl })`; under `bun test` the fake answers in its place.

@@ -145,11 +145,11 @@ describe('beforeDelete', () => {
   })
 })
 
-describe('onSignUp', () => {
+describe('afterSignUp', () => {
   test('is told the user and the context, and a throw is reported while the registration, guest and sign-in stand', async () => {
     const contexts: AuthHookContext[] = []
     const { browser, store } = testApp({
-      onSignUp: ({ context }) => {
+      afterSignUp: ({ context }) => {
         contexts.push(context)
 
         throw new Error('app down')
@@ -164,7 +164,21 @@ describe('onSignUp', () => {
     expect(await guest.call('signInAsGuest')).toMatchObject({ ok: true })
     expect(contexts).toHaveLength(2)
     expect(contexts[0]).toMatchObject({ actor: null })
-    expect(logged).toContainEqual(['error', 'auth.onSignUp failed', expect.objectContaining({ message: 'app down' }), undefined, 'kay'])
+    expect(logged).toContainEqual(['error', 'auth.afterSignUp failed', expect.objectContaining({ message: 'app down' }), undefined, 'kay'])
     expect((await store.users.list({ offset: 0, limit: 10 })).total).toBe(2)
+  })
+})
+
+describe('onSignUp, the name before 1.105', () => {
+  test('still runs, and afterSignUp wins when both are written', async () => {
+    const heard: string[] = []
+    const { browser } = testApp({ onSignUp: () => void heard.push('old') })
+
+    await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
+
+    const both = testApp({ onSignUp: () => void heard.push('old both'), afterSignUp: () => void heard.push('new') })
+
+    await both.browser().call('password.register', { email: 'bob@example.com', password: PASSWORD })
+    expect(heard).toEqual(['old', 'new'])
   })
 })

@@ -144,9 +144,13 @@ export type CmsAccess = string | readonly string[] | PasswordAccess | MemberAcce
 export interface CollectionSettings {
   uploads?: UploadOptions | undefined
   fourEyes?: boolean | undefined
+  afterSave?: Hook<SaveEvent> | undefined
+  /** @deprecated `afterSave`, since 1.105; the old name works until 1.108. */
   onSave?: Hook<SaveEvent> | undefined
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
+  afterUpload?: Hook<UploadEvent> | undefined
+  /** @deprecated `afterUpload`, since 1.105; the old name works until 1.108. */
   onUpload?: Hook<UploadEvent> | undefined
 }
 
@@ -190,12 +194,16 @@ export interface CmsOptions {
   // `true` refuses an approval by the person who sent the draft for review, so another person reads it: the Approve button is disabled with the reason, and the server refuses it. Off by default, a reviewer may approve what they sent.
   fourEyes?: boolean | undefined
   // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. It is told the entry's `data` and `previous` too. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is reported with source `cms.onSave` and never undoes the save.
+  afterSave?: Hook<SaveEvent> | undefined
+  /** @deprecated `afterSave`, since 1.105; the old name works until 1.108. */
   onSave?: Hook<SaveEvent> | undefined
   // Runs before every save, publish, unpublish, duplicate, restore, deletion and rename, after the role and `can` checks (and `fourEyes` for an approval) and before the entry is checked against its schema, so what it changes is checked. Returns nothing, `{ data, body }` to write instead, `false` or throws `refuse(message, { errors })` to refuse: the entry form shows it as it shows a schema refusal, the API answers `error.status` 403 or 422. A throw of any other kind refuses with 500 and is reported with source `cms.beforeSave`.
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
   // Runs on each file an editor sends, once its size and type are accepted, to scan it, resize it or rename it: returns nothing, `{ bytes, name, type }` to store that instead (checked against `uploads` and `maxSize` again), or refuses as `beforeSave` does, with the status as the answer.
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
   // Runs after a file is stored: a CDN purge, a media record. A throw is reported with source `cms.onUpload` and the upload stands.
+  afterUpload?: Hook<UploadEvent> | undefined
+  /** @deprecated `afterUpload`, since 1.105; the old name works until 1.108. */
   onUpload?: Hook<UploadEvent> | undefined
   // What a loaded collection keeps beside its entries, on by default for a loader with a `sibling` (SQLite and Postgres): the last `revisions` saves of each entry, 50 by default, which an editor lists, compares and restores, `false` for none, and the entries deleted, kept for `trash`, `'30d'` by default, `false` for none. `maxAge` is how old a revision or an activity event may get before it is dropped, `'365d'` by default, `false` for no limit. `false` turns all three off, and `collections: { name: { history: false } }` for one collection.
   history?: false | { revisions?: number | false | undefined, trash?: Duration | false | undefined, maxAge?: Duration | false | undefined } | undefined
@@ -222,10 +230,10 @@ export interface CmsSettings {
   rawHtml: ReadonlySet<string>
   author: CmsOptions['author']
   member: CmsOptions['member']
-  onSave: CmsOptions['onSave']
+  afterSave: CmsOptions['afterSave']
   beforeSave: CmsOptions['beforeSave']
   beforeUpload: CmsOptions['beforeUpload']
-  onUpload: CmsOptions['onUpload']
+  afterUpload: CmsOptions['afterUpload']
   // Whether the person who sent a draft for review may not approve it.
   fourEyes: boolean
   // Whether editors' browsers get the hint cookie and the "Edit this page" link.
@@ -339,7 +347,7 @@ function accessOf({ access, guard, role, member, roles }: Pick<CmsOptions, 'acce
   return { guard: roleGuard(access), member }
 }
 
-export function configure({ prefix = '/admin', access, guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member: givenMember, onSave, beforeSave, beforeUpload, onUpload, collections, pageLink, roles, can, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', access, guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member: givenMember, onSave, afterSave = onSave, beforeSave, beforeUpload, onUpload, afterUpload = onUpload, collections, pageLink, roles, can, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw configError('cms', 'pageSize', `\`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
@@ -351,7 +359,7 @@ export function configure({ prefix = '/admin', access, guard: own, role, files =
   const { guard, member } = accessOf({ access, guard: own, role, member: givenMember, roles })
   const tracked = trackPasswords(guard)
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, beforeSave, beforeUpload, onUpload, fourEyes, pageLink: pageLink !== false, pageButton: typeof pageLink !== 'object' || pageLink.button !== false, collection: asConfigError(() => checkedCollections(collections)), roles: asConfigError(() => checkRoles(roles)), can, layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, afterSave, beforeSave, beforeUpload, afterUpload, fourEyes, pageLink: pageLink !== false, pageButton: typeof pageLink !== 'object' || pageLink.button !== false, collection: asConfigError(() => checkedCollections(collections)), roles: asConfigError(() => checkRoles(roles)), can, layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }
 
   return current
 }
@@ -391,7 +399,7 @@ export function largestUpload(): number {
 }
 
 // The hooks of a transition in a collection: the cms's own, then the collection's.
-export function hooksOf<Name extends 'onSave' | 'beforeSave' | 'beforeUpload' | 'onUpload'>(name: Name, collection: string | undefined): (CmsOptions[Name] | undefined)[] {
+export function hooksOf<Name extends 'afterSave' | 'beforeSave' | 'beforeUpload' | 'afterUpload'>(name: Name, collection: string | undefined): (CmsOptions[Name] | undefined)[] {
   return [settings()[name], collection === undefined ? undefined : settings().collection.get(collection)?.[name]] as (CmsOptions[Name] | undefined)[]
 }
 

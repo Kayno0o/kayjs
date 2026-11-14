@@ -10,10 +10,10 @@ Kay and its libraries let you react to what they do with callbacks called hooks.
 
 This release ships the helpers libraries build hooks with, `refuse()`, and the `source` that `onError` receives. These libraries follow the rule:
 
-- kayjs-auth: `onEvent`, `beforeDelete` and `onSignUp`, which get a `context` with the `actor`.
-- kayjs-ai: `beforeRequest`, `onSuccess` and `onError`.
-- kayjs-mail: `beforeSend`, `onSend`, `onError` and `onSuppress`, and the hooks of a list.
-- kayjs-cms: `onSave`, which already followed it, and the new `beforeSave`, `beforeUpload` and `onUpload`.
+- kayjs-auth: `onEvent`, `beforeDelete` and `afterSignUp`, which get a `context` with the `actor`.
+- kayjs-ai: `beforeRequest`, `afterStep`, `afterToolCall`, `afterRequest` and `onError`.
+- kayjs-mail: `beforeSend`, `afterSend`, `onError` and `afterSuppress`, and the hooks of a list.
+- kayjs-cms: `beforeSave`, `afterSave`, `beforeUpload` and `afterUpload`.
 - kayjs-ui, in its components: `onSave`, `onSend`, `onEnd` and `onError`.
 
 The other hooks keep their names for now.
@@ -22,9 +22,9 @@ Queues, workflows and schedules already follow the rule. Later releases rename t
 
 ## Names
 
-- `onX` runs after X happened. It only watches: whatever it returns is ignored. X is the verb in its base form, as in the browser: `onSave`, `onSend`, `onDelete`. Never `onSaved` or `onSent`.
+- `afterX` runs after X happened. It only watches: whatever it returns is ignored. X is the verb in its base form: `afterSave`, `afterSend`, `afterDelete`. Never `afterSaved`. Before 1.105 these were `onX`, which still works until 1.108; `kay upgrade` renames them.
 - `beforeX` runs before X. It is the only kind of hook that can change X or stop it.
-- Something that starts and then succeeds or fails, such as a job, a schedule run, a workflow run or a question to an AI model, has `onStart`, `onSuccess` and `onError`. Some add steps of their own, such as `onRetry` or `onToolCall`. The failure hook is always `onError`, never `onFail` or `onFailed`.
+- Something that starts and then succeeds or fails, such as a job, a schedule run, a workflow run or a question to an AI model, has `onStart`, `onSuccess` and `onError`. Some add steps of their own, such as `onRetry`. The failure hook is always `onError`, never `onFail` or `onFailed`.
 - A library that has many audit-style events may also offer one `onEvent` that gets them all, with the event's name in kebab case.
 
 Options that work out a value the library needs, such as `allow`, `authorize` or `locate`, are not hooks. They are awaited, and an error they throw is not swallowed. A pair like `open` and `onOpenChange` is the state of a component, not a hook.
@@ -73,7 +73,7 @@ Every action gets the same treatment from `actions`: `beforeRun`, `onSuccess` an
 
 ## When an `onX` hook throws
 
-The transition has already happened, so the error never undoes it. The error is logged and handed to the `observe.onError` of `kay.config.ts` with a `source` naming the hook, such as `cms.onSave`. Kay waits up to 10 seconds for a hook, then leaves it running, reports that it was late, and goes on. All the `onX` hooks of one transition run in order, even when one throws.
+The transition has already happened, so the error never undoes it. The error is logged and handed to the `observe.onError` of `kay.config.ts` with a `source` naming the hook, such as `cms.afterSave`. Kay waits up to 10 seconds for a hook, then leaves it running, reports that it was late, and goes on. All the `onX` hooks of one transition run in order, even when one throws.
 
 Hooks that must not slow an answer, such as the ones of a streamed reply, run detached: kay does not wait for them at all.
 

@@ -26,7 +26,7 @@ return new Response(audio)
 
 ### Options every call takes
 
-`transcribe`, `speak`, `embed` and `describeImage` take what `ask` does: `provider`, `model`, `signal`, `timeout`, `retry`, `fallback` and the hooks `onStep`, `onSuccess` and `onError` (`CallOptions`: [Asking](asking.md#options-every-call-takes)). A transient failure (`unavailable`, `rate-limited`, `timeout`, `network`) is asked again once, as an ask is, and `ai({ retry, fallback, onSuccess, ... })` apply to them. Their `timeout` is the limit of the whole call, 2 minutes by default, a single duration (`'30s'`), or `{ connect, idle }` which add up. A hook's `onSuccess` is given the transcript as `text` for `transcribe` and an empty one for the others, with one step per request.
+`transcribe`, `speak`, `embed` and `describeImage` take what `ask` does: `provider`, `model`, `signal`, `timeout`, `retry`, `fallback` and the hooks `afterStep`, `afterRequest` and `onError` (`CallOptions`: [Asking](asking.md#options-every-call-takes)). A transient failure (`unavailable`, `rate-limited`, `timeout`, `network`) is asked again once, as an ask is, and `ai({ retry, fallback, afterRequest, ... })` apply to them. Their `timeout` is the limit of the whole call, 2 minutes by default, a single duration (`'30s'`), or `{ connect, idle }` which add up. A hook's `afterRequest` is given the transcript as `text` for `transcribe` and an empty one for the others, with one step per request.
 
 ### Embed texts, store and search them
 
@@ -94,7 +94,7 @@ p Help
 
 The model is told to answer only from the passages and to say it does not know when they do not answer, and with nothing found (`maxDistance` cut every row) it is told so and no source is cited. A passage is wrapped as data: a stored text or title cannot close its block nor open another, and the model is told never to follow instructions inside one. Keep `maxDistance` and `k` for the model's context: `ground` sends every text it is given whole, and `maxInputChars` does not count the `system`.
 
-Entries are embedded on save by the trait's declaration alone, with no call of yours: `insertMany`, `insert` and an `update` changing the source text embed in the same write, an unchanged one not at all. A kayjs-cms collection is not a pg-orm table, so its entries are not: keep a passage table of your own (an entry's `title`, `slug` and `text`) and write it from `cms({ onSave })` with an upsert, the trait embedding what changed (kayjs-cms's loaders page, After a save).
+Entries are embedded on save by the trait's declaration alone, with no call of yours: `insertMany`, `insert` and an `update` changing the source text embed in the same write, an unchanged one not at all. A kayjs-cms collection is not a pg-orm table, so its entries are not: keep a passage table of your own (an entry's `title`, `slug` and `text`) and write it from `cms({ afterSave })` with an upsert, the trait embedding what changed (kayjs-cms's loaders page, After a save).
 
 Under `bun test` the fake embeds the question and the texts, so a test ranks passages with no server: `model.last().system` holds what the model was given.
 

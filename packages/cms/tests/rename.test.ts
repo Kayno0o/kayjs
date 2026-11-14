@@ -227,10 +227,10 @@ describe('renaming a folder entry', () => {
     expect(await redirects()).toEqual([['/rn-blog/b', '/rn-blog/a']])
   })
 
-  test('tells onSave the rename with the slug it had', async () => {
+  test('tells afterSave the rename with the slug it had', async () => {
     const events: unknown[] = []
 
-    configure({ files: workingTree(), onSave: event => void events.push(event) })
+    configure({ files: workingTree(), afterSave: event => void events.push(event) })
     await make('posts', 'a')
     await renameEntry({ collection: 'posts', slug: 'a' }, 'b')
 
@@ -344,10 +344,10 @@ describe('renaming an entry other entries refer to', () => {
     expect(await dataOf('books', 'two')).toMatchObject({ author: 'lovelace' })
   })
 
-  test('tells onSave each entry it pointed, as an update', async () => {
+  test('tells afterSave each entry it pointed, as an update', async () => {
     const events: { collection: string, slug: string, verb: string }[] = []
 
-    configure({ files: workingTree(), onSave: event => void events.push(event) })
+    configure({ files: workingTree(), afterSave: event => void events.push(event) })
     await make('authors', 'ada', { title: 'Ada' })
     await make('books', 'engine', { title: 'Engine', author: 'ada' })
     events.length = 0

@@ -73,9 +73,11 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
   // Whether visitors make their own accounts, by registering, as a guest or with a provider account no user has linked: on by default, `false` closes it. Then registering and `signInAsGuest` answer `{ ok: false, error: { code: 'off' } }`, users come from `auth.admin.createUser` alone, and the prebuilt pages offer no registering. `true` is not accepted, it is the default.
   signUp?: false | undefined
-  // Called once a new user exists, to create the app's own records for them. It gets one object: `user`, the provider's `profile` for a sign-up by a provider account, and `context`. A throw is logged and reported to the app's `onError` with source `auth.onSignUp`, and never fails the sign-up.
+  // Called once a new user exists, to create the app's own records for them. It gets one object: `user`, the provider's `profile` for a sign-up by a provider account, and `context`. A throw is logged and reported to the app's `onError` with source `auth.afterSignUp`, and never fails the sign-up.
+  afterSignUp?: ((event: { user: User, profile: Profile | undefined, context: AuthHookContext }) => unknown) | undefined
+  /** @deprecated `afterSignUp`, since 1.105; the old name works until 1.108. */
   onSignUp?: ((event: { user: User, profile: Profile | undefined, context: AuthHookContext }) => unknown) | undefined
-  // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link.
+  // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `afterSignUp`, and a link.
   // What the app keeps on each user, an object schema such as `s.Object({ avatar: s.Optional(s.String()) })`: `auth.user()` returns it typed as `data`, `profileFields` fills it, and a store keeps it as JSON.
   user?: (Schema & { static: UserData }) | undefined
   // Called on every provider sign-in, the first and a link included, with `{ user, profile }`: the user as the app has them and the provider's profile. It runs before any second factor. What it returns is laid over `user().data`, only the fields `user` declares, and kept when the result fits the schema; return nothing to keep what is there, such as an avatar.

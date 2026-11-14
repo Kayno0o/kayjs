@@ -159,22 +159,22 @@ With `mail()` listed in `kay.config.ts` and no `src/mail.ts`, the action reads `
 
 ### Hooks
 
-`mailer({ beforeSend, onSend, onError, onSuppress })` follow kay's [hook convention](../../../llms/hooks.md), each told one object with `context: HookContext`:
+`mailer({ beforeSend, afterSend, onError, afterSuppress })` follow kay's [hook convention](../../../llms/hooks.md), each told one object with `context: HookContext`:
 
 ```ts
 export const mail = mailer({
   beforeSend: ({ mail }) => (mail.to.some(isTestAddress) ? false : { headers: { ...mail.headers, 'X-App': 'shop' } }),
-  onSend: async ({ mail, delivery }) => db.insert(deliveries).values({ subject: mail.subject, messageId: delivery.messageId }),
+  afterSend: async ({ mail, delivery }) => db.insert(deliveries).values({ subject: mail.subject, messageId: delivery.messageId }),
   onError: ({ mail, error }) => alert(mail.subject, error),
-  onSuppress: ({ address, reason, source }) => flagUser(address, reason),
+  afterSuppress: ({ address, reason, source }) => flagUser(address, reason),
 })
 ```
 
 - `beforeSend({ mail })` runs once per mail, before it is sent, queued or mailed to a list subscriber, with the rendered `Mail`. It returns the fields to change (`headers` replaces the whole record, so spread it), `false`, or throws `refuse(message, { status })`. A refused `send()` or `enqueue()` throws that refusal (403 by default; an action answers it as `ctx.fail`, a contact form too), and nothing is sent or queued. Any other throw refuses with a 500 after it is reported. A refused list mail counts as a delivery that failed. It runs before the queue, so a queued retry does not run it again.
-- `onSend({ mail, delivery })` runs once after the transport took the mail, for `send()`, the queue and a list alike, with the mail as sent (suppressed recipients removed). It is not told for a mail whose recipients were all suppressed, nor for each retry. A queued mail is told outside any request, so `context.request` is undefined.
+- `afterSend({ mail, delivery })` runs once after the transport took the mail, for `send()`, the queue and a list alike, with the mail as sent (suppressed recipients removed). It is not told for a mail whose recipients were all suppressed, nor for each retry. A queued mail is told outside any request, so `context.request` is undefined.
 - `onError({ mail, error })` runs once when `send()` fails and when the queue gives a mail up after its last attempt; `queue.onError` still gets the job's own fields right after. A refusal by `beforeSend` and a mail a list could not send to one subscriber are not told to it.
-- `onSuppress({ address, reason, source })` runs when an address stops being mailed: a provider's or mail server's bounce or complaint (`source` names it) or `mail.suppress()` (`manual`). The address is the normalised one.
-- An observer that throws is reported with source `mail.onSend`, `mail.onError` or `mail.onSuppress` and never fails the send. `mail()` takes the same keys.
+- `afterSuppress({ address, reason, source })` runs when an address stops being mailed: a provider's or mail server's bounce or complaint (`source` names it) or `mail.suppress()` (`manual`). The address is the normalised one.
+- An observer that throws is reported with source `mail.afterSend`, `mail.onError` or `mail.afterSuppress` and never fails the send. `mail()` takes the same keys.
 
 ## Reference
 

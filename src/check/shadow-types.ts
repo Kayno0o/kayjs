@@ -45,7 +45,9 @@ import { formatDurationNumbers } from './format-duration'
 
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { guardOptions } from './guard-options'
+
 import { unguardedRoutes, unguardedTools } from './guards'
+import { hookNames } from './hook-names'
 
 import { islandOnlyComponents } from './island-only'
 
@@ -179,6 +181,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
 
   async ({ root, options }) => schemaType(root, options),
   async ({ root, options }) => aiLanguage(root, options),
+  async ({ root, options }) => hookNames(root, options),
   async ({ root, options }) => mailApi(root, options),
   async ({ root, options }) => testHelpers(root, options),
   async ({ root, options }) => cmsOptions(root, options),

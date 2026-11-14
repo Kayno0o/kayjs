@@ -128,10 +128,10 @@ describe('beforeSend', () => {
   })
 })
 
-describe('onSend', () => {
+describe('afterSend', () => {
   it('is told the mail and its delivery once, for a send and for a queued mail', async () => {
     const told: { subject: string, response: string | undefined }[] = []
-    const app = mailer({ from: 'a@example.com', queue: queued(), onSend: ({ mail, delivery }) => void told.push({ subject: mail.subject, response: delivery.response }) })
+    const app = mailer({ from: 'a@example.com', queue: queued(), afterSend: ({ mail, delivery }) => void told.push({ subject: mail.subject, response: delivery.response }) })
 
     await app.send({ to: 'a@example.com', subject: 'direct', text: 'x' })
     await app.enqueue({ to: 'a@example.com', subject: 'queued', text: 'x' })
@@ -148,7 +148,7 @@ describe('onSend', () => {
         throw new Error('try again')
 
       return { accepted: [String(mail.to[0])], rejected: [] }
-    } }, onSend: ({ mail }) => void told.push(mail.subject), onError: ({ mail }) => void told.push(`error:${mail.subject}`) })
+    } }, afterSend: ({ mail }) => void told.push(mail.subject), onError: ({ mail }) => void told.push(`error:${mail.subject}`) })
 
     await app.enqueue({ to: 'a@example.com', subject: 'retried', text: 'x' })
     await drainUntil(app, () => told.length > 0)
@@ -157,7 +157,7 @@ describe('onSend', () => {
   })
 
   it('does not fail the send when it throws', async () => {
-    const app = mailer({ from: 'a@example.com', onSend: () => {
+    const app = mailer({ from: 'a@example.com', afterSend: () => {
       throw new Error('crm down')
     } })
 
@@ -167,7 +167,7 @@ describe('onSend', () => {
 
   it('is not told for a mail whose recipients are all suppressed', async () => {
     const told: string[] = []
-    const app = mailer({ from: 'a@example.com', onSend: ({ mail }) => void told.push(mail.subject) })
+    const app = mailer({ from: 'a@example.com', afterSend: ({ mail }) => void told.push(mail.subject) })
     const address = fresh()
 
     await app.suppress(address)
@@ -211,7 +211,7 @@ describe('onError', () => {
   })
 })
 
-describe('onSuppress', () => {
+describe('afterSuppress', () => {
   it('is told the address, reason and source of a bounce from a provider', async () => {
     const address = fresh()
     const body = JSON.stringify({ RecordType: 'Bounce', MessageStream: 'outbound', Type: 'HardBounce', TypeCode: 1, Name: 'Hard bounce', Email: address, From: 'hello@fixture.test', Inactive: true, CanActivate: false })
@@ -231,7 +231,7 @@ describe('onSuppress', () => {
   })
 
   it('does not fail the route when it throws', async () => {
-    const app = mailer({ from: 'a@example.com', onSuppress: () => {
+    const app = mailer({ from: 'a@example.com', afterSuppress: () => {
       throw new Error('crm down')
     } })
 
@@ -281,7 +281,7 @@ describe('the list hooks', () => {
     const email = fresh()
     const file = join(await scratchDir('hooks-'), 'list.sqlite')
     const app = mailer({ from: 'a@example.com' })
-    const list = app.list('loud', { file, onUnsubscribe: () => {
+    const list = app.list('loud', { file, afterUnsubscribe: () => {
       throw new Error('crm down')
     } })
     const lists = sqliteLists(file)
@@ -296,7 +296,7 @@ describe('the list hooks', () => {
     const file = join(await scratchDir('hooks-'), 'list.sqlite')
     const told: unknown[] = []
     const app = mailer({ from: 'a@example.com' })
-    const list = app.list('news', { file, pace: { batch: 2, every: '50ms' }, onBroadcast: event => void told.push(event) })
+    const list = app.list('news', { file, pace: { batch: 2, every: '50ms' }, afterBroadcast: event => void told.push(event) })
     const lists = sqliteLists(file)
 
     for (const index of [0, 1, 2]) {
@@ -331,11 +331,11 @@ describe('a contact form', () => {
     expect(outbox.to('help@example.com')).toHaveLength(0)
   })
 
-  it('tells onSend the input and the queued id once the mail is queued, and survives a throwing one', async () => {
+  it('tells afterSend the input and the queued id once the mail is queued, and survives a throwing one', async () => {
     const told: Record<string, unknown>[] = []
     const app = mailer({ from: 'a@example.com', queue: queued() })
-    const [, handler] = contactForm(app, { to: 'team@example.com', onSend: event => void told.push(event) })
-    const [, throwing] = contactForm(app, { to: 'team@example.com', onSend: () => {
+    const [, handler] = contactForm(app, { to: 'team@example.com', afterSend: event => void told.push(event) })
+    const [, throwing] = contactForm(app, { to: 'team@example.com', afterSend: () => {
       throw new Error('crm down')
     } })
 
@@ -348,14 +348,41 @@ describe('a contact form', () => {
     expect(await app.drain()).toBe(2)
   })
 
-  it('answers the refusal of a beforeSend as the form\'s own failure, queues nothing and tells no onSend', async () => {
+  it('answers the refusal of a beforeSend as the form\'s own failure, queues nothing and tells no afterSend', async () => {
     const told: unknown[] = []
     const app = mailer({ from: 'a@example.com', queue: queued(), beforeSend: () => false })
-    const [, handler] = contactForm(app, { to: 'team@example.com', onSend: event => void told.push(event) })
+    const [, handler] = contactForm(app, { to: 'team@example.com', afterSend: event => void told.push(event) })
     const error = await caught(handler(input, ctx))
 
     expect(statusOf(error)).toBe(403)
     expect(told).toHaveLength(0)
     expect(await app.drain()).toBe(0)
+  })
+})
+
+describe('onSend and onSuppress, the names before 1.105', () => {
+  it('still tell, and the after name wins when both are written', async () => {
+    const told: string[] = []
+    const old = mailer({ from: 'a@example.com', onSend: () => void told.push('old'), onSuppress: () => void told.push('old suppress') })
+    const both = mailer({ from: 'a@example.com', onSend: () => void told.push('old both'), afterSend: () => void told.push('new') })
+
+    await old.send({ to: 'a@example.com', subject: 's', text: 'x' })
+    await old.suppress('b@example.com')
+    await both.send({ to: 'a@example.com', subject: 's', text: 'x' })
+    expect(told).toEqual(['old', 'old suppress', 'new'])
+  })
+
+  it('a list tells its on hooks of before 1.105', async () => {
+    const email = fresh()
+    const file = join(await scratchDir('hooks-'), 'list.sqlite')
+    const told: string[] = []
+    const list = mailer({ from: 'a@example.com' }).list('old', { file, onUnsubscribe: ({ email: who }) => void told.push(who) })
+    const lists = sqliteLists(file)
+
+    lists.confirm('old', lists.ask('old', email, 'old-1', 'en', 1000).id, 2000)
+    lists.close()
+
+    expect(await list.unsubscribe(email)).toBe(true)
+    expect(told).toEqual([email])
   })
 })

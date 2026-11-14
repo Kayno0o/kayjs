@@ -94,7 +94,7 @@ describe('every call takes the options of an ask', () => {
     expect(other.seen).toHaveLength(1)
   })
 
-  it('tells onStep, onError and onSuccess, a retried request included', async () => {
+  it('tells afterStep, onError and afterRequest, a retried request included', async () => {
     const provider = flaky('hooked', call => call === 1 ? down() : undefined)
     const steps: Step[] = []
     const errors: unknown[] = []
@@ -103,9 +103,9 @@ describe('every call takes the options of an ask', () => {
     await transcribe(recording, {
       provider,
       retry: FAST,
-      onStep: (step) => { steps.push(step) },
+      afterStep: (step) => { steps.push(step) },
       onError: ({ error }) => { errors.push(error) },
-      onSuccess: ({ text, steps: all }) => { done.push({ text, steps: all.length }) },
+      afterRequest: ({ text, steps: all }) => { done.push({ text, steps: all.length }) },
     })
 
     await Bun.sleep(5)
@@ -117,10 +117,10 @@ describe('every call takes the options of an ask', () => {
   it('runs the hooks of ai() for these calls too', async () => {
     const seen: string[] = []
 
-    ai({ onSuccess: () => {
+    ai({ afterRequest: () => {
       seen.push('ai')
     } })
-    await speak('hi', { provider: flaky('set', () => undefined), onSuccess: () => {
+    await speak('hi', { provider: flaky('set', () => undefined), afterRequest: () => {
       seen.push('call')
     } })
     await Bun.sleep(5)
@@ -163,7 +163,7 @@ describe('every call takes the options of an ask', () => {
     const done: string[] = []
 
     fakeAi.reply({ data: { alt: 'a cat' } })
-    expect(await describeImage(PNG, { onSuccess: () => {
+    expect(await describeImage(PNG, { afterRequest: () => {
       done.push('ok')
     } })).toBe('a cat')
     await Bun.sleep(5)

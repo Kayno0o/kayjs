@@ -60,7 +60,7 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
       discord: { provider: discordProvider(), clientId: 'discord-id', clientSecret: 'discord-secret', keepTokens: true },
       github: { provider: githubProvider(), clientId: 'github-id', clientSecret: 'github-secret' },
     },
-    onSignUp: ({ user, profile }) => {
+    afterSignUp: ({ user, profile }) => {
       signUps.push({ user, profile })
     },
     ...options,

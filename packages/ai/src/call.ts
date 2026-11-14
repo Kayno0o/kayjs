@@ -78,7 +78,7 @@ export function setUp<C extends Call>(call: C, options: CallOptions) {
       const result = await method({ ...request, model: target.model, timeout: whole } as Shapes[C]['request'], signal)
 
       steps.push(step(undefined))
-      tell('onStep', hooks.onStep, steps.at(-1)!, await hooks.context)
+      tell('afterStep', hooks.afterStep, steps.at(-1)!, await hooks.context)
 
       return result
     }
@@ -87,7 +87,7 @@ export function setUp<C extends Call>(call: C, options: CallOptions) {
 
       if (error instanceof AiError && TRANSIENT.has(error.kind)) {
         steps.push(step(error.kind))
-        tell('onStep', hooks.onStep, steps.at(-1)!, await hooks.context)
+        tell('afterStep', hooks.afterStep, steps.at(-1)!, await hooks.context)
       }
 
       throw error
@@ -108,7 +108,7 @@ export function setUp<C extends Call>(call: C, options: CallOptions) {
           const result = await attempt(target, request, made)
           const done: FinishHookCall = { text: text(call, result), usage: undefined, steps, finish: 'stop', stopped: false }
 
-          tell('onSuccess', hooks.onSuccess, done, await hooks.context)
+          tell('afterRequest', hooks.afterRequest, done, await hooks.context)
 
           return result
         }

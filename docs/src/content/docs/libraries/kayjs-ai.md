@@ -298,7 +298,7 @@ ai({
 
 `attempts` counts the requests made to each model, the first included, and `retry: false` turns it off. Once a model kept failing, `fallback` models are asked in turn, on the same provider unless one is named.
 
-`await reply.steps` lists every request, the failed ones too, with the `provider`, `model` and `attempt` of each and the error kind in `failed`. `onStep` and `onError` run for each of them.
+`await reply.steps` lists every request, the failed ones too, with the `provider`, `model` and `attempt` of each and the error kind in `failed`. `afterStep` and `onError` run for each of them.
 
 Under `bun test` the fake ignores the `retry` and `fallback` of `ai()`: it is retried only when the ask names `retry`, and falls back only on a `fallback` the ask gives. Script `fakeAi.fail(error)` then `fakeAi.reply('ok')` to test a failure followed by a success.
 
@@ -656,7 +656,7 @@ const found = await db.repo(Passage).read.nearest(await embed(question, { dimens
 return ask(messages, ground(found, row => ({ title: row.title, href: `/help/${row.slug}`, text: row.text }), { system: 'You are the help desk of Acme.' })).progress()
 ```
 
-With nothing found, the model is told so and says it does not know. The `embedding()` trait embeds a row when it is inserted or its text changes, so saving a row needs no more code than the trait's declaration. A kayjs-cms entry is not a pg-orm row: keep a table of your own and write it from `cms({ onSave })`.
+With nothing found, the model is told so and says it does not know. The `embedding()` trait embeds a row when it is inserted or its text changes, so saving a row needs no more code than the trait's declaration. A kayjs-cms entry is not a pg-orm row: keep a table of your own and write it from `cms({ afterSave })`.
 
 Under `bun test` the fake answers all three. Embeddings are stable vectors built from the words, so texts that share words come out near each other.
 
@@ -664,13 +664,13 @@ Under `bun test` the fake answers all three. Embeddings are stable vectors built
 
 ## Hooks around every ask
 
-To log asks with their usage, redact or moderate what leaves, bill a tenant or trace tool calls, set hooks once in `ai({ ... })` instead of wrapping `ask`: `beforeRequest({ messages, system, model, options, context })` before the provider is called, `onStep(step)` after each request, `onToolCall(call)` as each tool starts and ends, `onSuccess({ text, usage, steps, finish, stopped, context })` once the reply ends, and `onError({ error, context })` when it fails.
+To log asks with their usage, redact or moderate what leaves, bill a tenant or trace tool calls, set hooks once in `ai({ ... })` instead of wrapping `ask`: `beforeRequest({ messages, system, model, options, context })` before the provider is called, `afterStep(step)` after each request, `afterToolCall(call)` as each tool starts and ends, `afterRequest({ text, usage, steps, finish, stopped, context })` once the reply ends, and `onError({ error, context })` when it fails.
 
 Each gets the `context` of the request being answered.
 
 `beforeRequest` may return `{ messages, system }` to send those instead, return `false`, or throw an `AiError` to refuse the ask before anything is sent or counted. The others only notify: a throw in one is logged and the reply goes on.
 
-The same names in `ask(..., { onSuccess })` run after the one of `ai()` for that ask, they do not replace it. The hooks of `ai()` skip the fake that answers in tests, so a test does not write a bill, while a hook given to the ask itself runs.
+The same names in `ask(..., { afterRequest })` run after the one of `ai()` for that ask, they do not replace it. The hooks of `ai()` skip the fake that answers in tests, so a test does not write a bill, while a hook given to the ask itself runs.
 
 <ReadMore href="/llms/kayjs-ai-hooks">What each hook gets, and when it runs.</ReadMore>
 

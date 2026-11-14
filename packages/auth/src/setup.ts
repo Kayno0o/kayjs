@@ -70,9 +70,11 @@ function hooked<Args extends unknown[], Result>(hook: ((...args: never[]) => Res
   return hook && ((...args: Args) => hook(event(...args) as never))
 }
 
-// `onSignUp` as the flows call it: told through `dispatch`, so a throw is reported and never fails the sign-up that happened.
-function signUpHook(hook: AuthOptions<AuthSessionData, string>['onSignUp']): Core['onSignUp'] {
-  return hook && (async (user, profile) => dispatch('auth.onSignUp', [hook as never], { user, profile }, { context: await authContext() }))
+// `afterSignUp` as the flows call it: told through `dispatch`, so a throw is reported and never fails the sign-up that happened.
+function signUpHook({ afterSignUp: hook = undefined, onSignUp }: Pick<AuthOptions<AuthSessionData, string>, 'afterSignUp' | 'onSignUp'>): Core['onSignUp'] {
+  hook ??= onSignUp
+
+  return hook && (async (user, profile) => dispatch('auth.afterSignUp', [hook as never], { user, profile }, { context: await authContext() }))
 }
 
 // `beforeDelete` as the erase asks it: a refusal answers the failure of kind `refused`, carrying the status and message the hook gave.
@@ -329,7 +331,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     access: access as unknown as Access<string>,
     ...admin !== undefined && { admin: async user => access.authorize(user, admin, 'write', {}) },
     guard: guardOptions => guardOf(core, guardOptions),
-    onSignUp: signUpHook(options.onSignUp),
+    onSignUp: signUpHook(options),
     onProviderProfile: hooked(options.profileFields, (user, profile) => ({ user, profile })),
     userData: options.user && userDataRules(options.user),
     beforeDelete: deleteHook(options.beforeDelete),

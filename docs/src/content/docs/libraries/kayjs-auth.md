@@ -43,7 +43,7 @@ export default defineConfig({
 - To use your app's pg-orm database, give `store: async () => pgAuth((await import('./src/db')).db)`; `store` also takes `{ url }` or a store.
 - Mail goes through `mail.enqueue` of `src/mail.ts` when it exports `mail` (kayjs-mail, themed when `mail()` is in `kay.config.ts`). `email: false` sends none, and an `email` of your own replaces it.
 - `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from the environment, and `kay env` lists them. The presets are github, discord, google, microsoft, gitlab, linkedin, facebook, twitch, slack and x (`X_CLIENT_ID`, `X_CLIENT_SECRET`). An object adds `label`, `scopes` or `keepTokens`, and `clientId` and `clientSecret` skip the environment.
-- Hooks such as `onSignUp` and `beforeDelete` are options too, and win over the file. Hooks that need your database go in an optional `src/auth.ts` that exports `hooks` (`satisfies AuthHooks`), which kay finds by itself, or in `hooks: () => import('./src/auth')`. An executable from `kay build --compile` carries both files, and `kay dev` reloads them when you edit, add or remove one.
+- Hooks such as `afterSignUp` and `beforeDelete` are options too, and win over the file. Hooks that need your database go in an optional `src/auth.ts` that exports `hooks` (`satisfies AuthHooks`), which kay finds by itself, or in `hooks: () => import('./src/auth')`. An executable from `kay build --compile` carries both files, and `kay dev` reloads them when you edit, add or remove one.
 - The prebuilt pages are on under `prefix` (`/auth`), and `home` (`/`) is where sign-ins and sign-outs go. `pages: false` leaves them out.
 
 Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yours at a page's path, such as `src/routes/auth/sign-in.kay`, replaces that page.
@@ -165,7 +165,7 @@ The patch is all or nothing: one field the schema refuses, or a result over 16 K
 
 `user().providers` holds the id each linked provider gave the user, such as `user.providers.discord?.id`.
 
-It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `profileFields`, `beforeDelete`, `exportData`, `admin`, `onEvent`). Guards, gates, `authorize`, the admin's lists and results such as `password.register` give a `BareUser`, which has no `providers`, so they cost no query.
+It is read for `user()` and `requireUser()` and for the hooks (`afterSignUp`, `profileFields`, `beforeDelete`, `exportData`, `admin`, `onEvent`). Guards, gates, `authorize`, the admin's lists and results such as `password.register` give a `BareUser`, which has no `providers`, so they cost no query.
 
 `user()` returns provider ids, so a route that sends `await auth.user()` whole to the client now sends them too: pick the fields to show.
 
@@ -309,7 +309,7 @@ The page a visitor asked for survives registering, the mailed verification and r
 
 With a mailer, it signs no one in until the address is verified. It answers a held address as a free one and mails its holder instead.
 
-To keep the time the same too, your `onSignUp` hook, and the `beforeDelete` of an unverified account that a new registration replaces, run after the response is sent. `password.register` may return before they have finished.
+To keep the time the same too, your `afterSignUp` hook, and the `beforeDelete` of an unverified account that a new registration replaces, run after the response is sent. `password.register` may return before they have finished.
 
 Set `email: { requireVerified: false }` to sign in at once. It answers `'taken'` for a held address, which tells anyone which addresses have an account.
 
