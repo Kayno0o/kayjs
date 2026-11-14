@@ -65,7 +65,7 @@ form(part="root" {...rest} action={action} novalidate)
   // Only an island renders the form with a callback, which this passes on; the cast keeps `kay check` from reading the form as a static component handing an island a function.
   if onSend || onError
     FormOutcome(action={action} whenSent={onSend as never} whenRefused={onError as never})
-  if action.succeeded()
+  if action.status() === 'ready'
     if sent
       | {sent}
     else

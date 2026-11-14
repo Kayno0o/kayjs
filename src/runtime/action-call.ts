@@ -2,7 +2,7 @@ import type { Caller } from './action-owner'
 import type { Action, ActionStream, CallOptions, CallQueue, Outcome, TrackedCall } from './action-shared'
 import type { TrackHooks } from './call-result'
 import type { Duration } from './duration'
-import type { ConnectionStatus } from './live'
+import type { ConnectionStatus, LoadStatus } from './live'
 import { ActionError, ActionRedirectError } from './action-error'
 import { withFields } from './action-form'
 import { networkFailures, refusedAt, superseding } from './action-marks'
@@ -167,6 +167,20 @@ export function reviveActions(): void {
 }
 
 // The post a page with islands was rendered in answer to, read again once a swap brings another page.
+function succeededOf(found: Outcome | undefined): { data: unknown } | undefined {
+  return found?.succeeded ? { data: found.data } : undefined
+}
+
+function statusOf(inFlight: number, found: Outcome | undefined, failed: object | undefined): LoadStatus {
+  if (inFlight > 0)
+    return 'loading'
+
+  if (found?.succeeded)
+    return 'ready'
+
+  return failed === undefined ? 'idle' : 'failed'
+}
+
 function pageOutcome(): Outcome | undefined {
   return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeServerValue, true)[0]
 }
@@ -405,11 +419,9 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       settled: read(async () => idle.wait(flying())),
       progress: read(progress),
       failed: read(failed),
-      succeeded: read(() => {
-        const found = outcome()
-
-        return found?.succeeded ? { data: found.data } : undefined
-      }),
+      succeeded: read(() => succeededOf(outcome())),
+      data: read(() => outcome()?.succeeded ? outcome()?.data : undefined),
+      status: read(() => statusOf(inFlight(), outcome(), failed())),
       error: read((field = '') => failed()?.errors[field]),
       validate: read(async (form: HTMLFormElement, field?: string) => {
         const { fieldMessages } = await import('./validate')

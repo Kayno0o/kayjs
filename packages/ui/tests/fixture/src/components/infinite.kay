@@ -18,6 +18,6 @@ const feed = infiniteList(first, { limit: size, key: row => row.id, load: ({ off
 
 expose?.(feed)
 ---
-for row of feed.rows() key={row.id}
+for row of feed.data() key={row.id}
   p.row {row.id}
 LoadMore(list={feed} loadingLabel={loadingLabel} failureLabel={failureLabel} retryLabel={retryLabel} button={button})

@@ -13,12 +13,12 @@ import { formatDurationNumbers } from '../src/check/format-duration'
 import { guardOptions } from '../src/check/guard-options'
 import { hookNames } from '../src/check/hook-names'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
-import { localState } from '../src/check/local-state'
 import { mailApi } from '../src/check/mail-api'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
 import { rateEnforce } from '../src/check/rate-enforce'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
+import { sourceReaders } from '../src/check/source-readers'
 import { storeNames } from '../src/check/store-names'
 import { testHelpers } from '../src/check/test-helpers'
 
@@ -37,7 +37,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-schedule-call': scheduleCalls,
   'deprecated-job-options': jobOptions,
   'deprecated-disk-files': diskFilesCalls,
-  'deprecated-local-state': localState,
+  'deprecated-source-readers': sourceReaders,
 
   'deprecated-persisted-call': persistedCall,
   'deprecated-persisted-query': persistedQuery,

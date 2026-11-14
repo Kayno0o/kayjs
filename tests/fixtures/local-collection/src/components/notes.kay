@@ -18,9 +18,9 @@ const notes = local({
   remove: drop,
   version,
   onIssue: () => issued++,
-  onSync: ({ rows }) => {
+  onData: ({ value }) => {
     synced++
-    kept = rows.map(row => row.title).join(',')
+    kept = value.map(row => row.title).join(',')
   },
   conflict: theirs ? () => undefined : both ? ({ mine, theirs: held }) => ({ ...held, title: `${mine?.title}+${held.title}` }) : undefined,
 })
@@ -32,17 +32,15 @@ notes.onIssue(() => {
 })
 const stopLate = notes.onIssue(() => late++)
 ---
-p.status {notes.syncStatus()}
-p.pending {notes.unsynced()}
-// kay-allow deprecated-local-state
-p.oldstatus {notes.status()}
-// kay-allow deprecated-local-state
-p.oldpending {notes.pending()}
+p.status {notes.sync.status()}
+p.pending {notes.sync.queued()}
+p.loadstatus {notes.status()}
+p.loadpending {String(notes.pending())}
 p.error {notes.error()?.message ?? ''}
 p.errorstatus {notes.error()?.status ?? ''}
 p.hooks {issued()} {synced()} {errored()} {late()} {kept()}
 ul
-  for note of notes.rows()
+  for note of notes.data()
     li.note(data-id={note.id}) {note.title} {note.rev}
 ul
   for issue of notes.issues()

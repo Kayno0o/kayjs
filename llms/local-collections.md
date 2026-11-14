@@ -33,14 +33,14 @@ import todosApi from '../api/todos'
 
 const todos = local({ key: 'id', read: async signal => call(todosApi, '/', { signal }), put: save, remove })
 ---
-p {todos.unsynced()} waiting for the server, {todos.syncStatus()}
+p {todos.sync.queued()} waiting for the server, {todos.sync.status()}
 ul
-  for todo of todos.rows()
+  for todo of todos.data()
     li {todo.title}
 button(onClick={() => todos.put({ id: crypto.randomUUID(), title: 'New', rev: 0 })}) Add
 ```
 
-`todos.put(row)` and `todos.remove(key)` change `todos.rows()` at once and resolve when the browser holds the change. Nothing else is declared: the row type is the `put` action's input.
+`todos.put(row)` and `todos.remove(key)` change `todos.data()` at once and resolve when the browser holds the change. Nothing else is declared: the row type is the `put` action's input.
 
 ### Decide a conflict
 
@@ -61,10 +61,10 @@ for issue of todos.issues()
 
 ### What a collection is
 
-- `local({ key, read, put, remove?, version?, conflict?, onSync?, onIssue?, onError? })` returns `rows()`, `get(key)`, `put(row)`, `remove(key)`, `unsynced()`, `syncStatus()`, `error()`, `retry()`, `issues()`, `dismiss(id)`, `sync()`, `clear()` and the hooks `onSync`, `onIssue` and `onError` as methods. `rows()`, `unsynced()`, `syncStatus()`, `error()` and `issues()` are reactive; the rows come in key order. `pending()` (the count `unsynced()` reads) and `status()` (`syncStatus()` with `'pending'` for `'unsynced'`) work until 2.0, which gives them the meaning they have on every source, a boolean and `idle|loading|ready|failed`; `deprecated-local-state` flags them.
+- `local({ key, read, put, remove?, version?, conflict?, onData?, onIssue?, onError? })` returns `data()`, `status()`, `pending()`, `error()`, `retry()`, `get(key)`, `put(row)`, `remove(key)`, `issues()`, `dismiss(id)`, `sync`, `clear()` and the hooks `onData`, `onIssue` and `onError` as methods. `data()`, `status()`, `pending()`, `error()`, `sync.status()`, `sync.queued()` and `issues()` are reactive; the rows come in key order. `data()`, `status()`, `pending()`, `error()`, `retry()`, `onData` and `onError` are what every source has ([Island sources](island-sources.md)): `status()` is `loading` until the browser's copy is read, then `ready`, or `failed` while `error()` is set, and `pending()` is true while it loads. What is a collection's own, its sync with the server, is under `sync`: `sync()` sends the queue and reads the server's rows again, `sync.status()` says where it stands and `sync.queued()` counts the writes the server has not taken. Before 1.105 `rows()`, `unsynced()`, `syncStatus()` and `onSync({ rows })` did these, and `pending()` and `status()` meant the count and the sync states; the first four work until 1.108 and `deprecated-source-readers` rewrites them.
 - `key` names the field identifying a row, a string or a number. `put` is an action taking the row, `remove` an action taking `{ [key]: value }`, and `read` a function giving the server's rows (`call` or `resource`'s route, or any promise): all three are the app's own, so their guards, schemas, rate limits and cross-site checks apply as to any call.
 - The collection is named by its `put` action's URL, so declare it once per action; two islands declaring it share one mirror.
-- On the server, and in a browser without IndexedDB, `local()` gives an empty collection: `syncStatus()` is `'loading'` on the server and `'unavailable'` where the browser keeps nothing, and a write there throws. Nothing loads on a page that does not import it.
+- On the server, and in a browser without IndexedDB, `local()` gives an empty collection: `sync.status()` is `'loading'` on the server and `'unavailable'` where the browser keeps nothing, and a write there throws. Nothing loads on a page that does not import it.
 
 ### The mirror
 
@@ -72,9 +72,9 @@ for issue of todos.issues()
 - A row crosses as island props do (Dates, Maps and Sets included) and holds no file.
 - `version: 2` forgets the rows held (they are read again) and keeps the queue; use it when the rows' shape changes. The database itself is versioned by kay.
 - Tabs share it: a change in one reaches the others through a `BroadcastChannel`, and a lock lets one tab or the worker send the queue at a time.
-- `syncStatus()` is `'loading'` until the mirror is read, `'synced'`, `'unsynced'` (writes wait for the server), `'offline'` (the last attempt found no connection, or the last read of the server failed, until one succeeds) or `'signed-out'` (the server answered 401 or sent the visitor to sign in: the queue waits, nothing is lost).
-- `error()` is an `ApiError` once a read of the server failed (status 0 for a `read` that threw or got no answer, the thrown `ApiError`'s own status otherwise) or the browser keeps no IndexedDB, kept until a read succeeds; a write waiting for the server is no error, `syncStatus()` says so and a refused one is in `issues()`. `retry()` reads the server and sends the queue now when the last read failed or the server could not be reached, and does nothing while signed out ([Island sources](island-sources.md)); `status()` and `pending()` keep their words until 2.0, `syncStatus()` and `unsynced()` are the ones to read.
-- The hooks are options and methods of the same names ([Island sources](island-sources.md#hooks)): `onSync({ rows })` after a read of the server was taken in or the queue was sent and the collection stands `synced`, `onIssue({ issue })` once for each new issue (not for those kept from an earlier visit), `onError({ error })` once for each failed read. `local({ ..., onIssue: ({ issue }) => toast.error(issue.message) })`.
+- `sync.status()` is `'loading'` until the mirror is read, `'synced'`, `'unsynced'` (writes wait for the server), `'offline'` (the last attempt found no connection, or the last read of the server failed, until one succeeds) or `'signed-out'` (the server answered 401 or sent the visitor to sign in: the queue waits, nothing is lost).
+- `error()` is an `ApiError` once a read of the server failed (status 0 for a `read` that threw or got no answer, the thrown `ApiError`'s own status otherwise) or the browser keeps no IndexedDB, kept until a read succeeds; a write waiting for the server is no error, `sync.status()` says so and a refused one is in `issues()`. `retry()` reads the server and sends the queue now when the last read failed or the server could not be reached, and does nothing while signed out ([Island sources](island-sources.md)).
+- The hooks are options and methods of the same names ([Island sources](island-sources.md#hooks)): `onData({ value })` (the rows held) after a read of the server was taken in or the queue was sent and the collection stands `synced`, `onIssue({ issue })` once for each new issue (not for those kept from an earlier visit), `onError({ error })` once for each failed read. `local({ ..., onIssue: ({ issue }) => toast.error(issue.message) })`.
 
 ### Sending writes
 

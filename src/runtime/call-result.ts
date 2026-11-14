@@ -1,5 +1,5 @@
 import type { ApiError, ErrorShape } from './api-error'
-import type { LoadStatus, Source } from './live'
+import type { LoadStatus, Reader } from './live'
 import { apiErrorOf } from './api-error'
 import { listenerSet } from './listener-set'
 import { ownSignal, untrack } from './reactive'
@@ -15,7 +15,9 @@ type Refusal = { ok: false } & ErrorShape
 // The callbacks a tracked call takes in its options, and as methods of the same names: `onX` after a transition, one object argument, `input` the first argument of the call. One that throws is logged and leaves the call alone.
 // `input` is `unknown`, so an action of any input still passes where another is expected, as `Action<never, unknown>` stands for any.
 export interface TrackHooks<Data> {
-  // A call succeeded; for a streaming action, once the stream is open.
+  // A call succeeded, `value` what it answered; for a streaming action, once the stream is open.
+  onData?: ((event: { value: Data, input: unknown }) => void) | undefined
+  /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   onSuccess?: ((event: { data: Data, input: unknown }) => void) | undefined
   // A call failed, for a refusal and for no answer alike (which still throws); not for an abort or a redirect.
   onError?: ((event: { error: ApiError, input: unknown }) => void) | undefined
@@ -50,12 +52,16 @@ export function trackCalls<Args extends unknown[]>(
   // An error that is no failure of the call, such as a redirect, which `status()`, `error()` and `retry()` leave alone (a retry would post a login or a checkout again).
   aside?: (error: unknown) => boolean,
   hooks?: TrackHooks<never>,
-): ((...args: Args) => Promise<CallResult<unknown, unknown>>) & Source<LoadStatus> & { settled: () => Promise<void> } & { onSuccess: (listener: (event: { data: unknown, input: unknown }) => void) => () => void, onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void } {
+): ((...args: Args) => Promise<CallResult<unknown, unknown>>) & Reader<unknown, LoadStatus> & { settled: () => Promise<void> } & { onSuccess: (listener: (event: { data: unknown, input: unknown }) => void) => () => void } {
   const successes = listenerSet<{ data: unknown, input: unknown }>()
+  const answers = listenerSet<{ value: unknown, input: unknown }>()
   const failures = listenerSet<{ error: ApiError, input: unknown }>()
 
   if (hooks?.onSuccess)
     successes.on(hooks.onSuccess as never)
+
+  if (hooks?.onData)
+    answers.on(hooks.onData as never)
 
   if (hooks?.onError)
     failures.on(hooks.onError)
@@ -63,6 +69,7 @@ export function trackCalls<Args extends unknown[]>(
   const [inFlight, setInFlight] = ownSignal(0)
   const [outcome, setOutcome] = ownSignal<LoadStatus>('idle')
   const [error, setError] = ownSignal<ApiError | undefined>(undefined)
+  const [answer, setAnswer] = ownSignal<unknown>(undefined, { equals: false })
   const idle = whenIdle()
   let failedWith: Args | undefined
   const shift = (by: number) => {
@@ -83,7 +90,11 @@ export function trackCalls<Args extends unknown[]>(
       streaming = holds?.(data, () => shift(-1), () => shift(1)) ?? false
       setOutcome('ready')
       setError(undefined)
-      tell = () => successes.emit({ data, input: args[0] })
+      setAnswer(data)
+      tell = () => {
+        answers.emit({ value: data, input: args[0] })
+        successes.emit({ data, input: args[0] })
+      }
 
       return { ok: true, data }
     }
@@ -116,6 +127,8 @@ export function trackCalls<Args extends unknown[]>(
     status: () => inFlight() > 0 ? 'loading' as const : outcome(),
     pending: () => inFlight() > 0,
     error,
+    data: answer,
+    onData: answers.on,
     onSuccess: successes.on,
     onError: failures.on,
     settled: async () => idle.wait(untrack(inFlight)),

@@ -149,7 +149,7 @@
     "complexity": 59
   },
   "src/runtime/action-call.ts": {
-    "max-lines-per-function": 188,
+    "max-lines-per-function": 187,
     "complexity": 54
   },
   "src/runtime/cache.ts": {
@@ -184,10 +184,10 @@
     "complexity": 46
   },
   "src/runtime/live.ts": {
-    "max-lines": 765
+    "max-lines": 764
   },
   "src/runtime/local.ts": {
-    "max-lines": 676
+    "max-lines": 631
   },
   "src/runtime/page-swap.ts": {
     "complexity": 51

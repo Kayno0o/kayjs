@@ -87,7 +87,7 @@ async function answerIn(answer: unknown): Promise<ConversationAnswer | undefined
   }
   catch {
     // A stream that broke off or was closed still answers with what it sent.
-    value = stream.last()
+    value = stream.data()
   }
 
   const text = typeof value === 'string' ? value : value?.text

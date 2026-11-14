@@ -569,3 +569,69 @@ describe('an action\'s stream hooks', () => {
     expect(closes).toEqual(['closed'])
   })
 })
+
+// Every source reads what it took in as `data()`, and tells it as `onData({ value })` (#3319); the old readers and hooks work beside.
+describe('data() and onData on every source', () => {
+  const answering = (...answers: Response[]) => spyOn(globalThis, 'fetch').mockImplementation((async () => answers.shift()!) as unknown as typeof fetch)
+
+  it('reads a socket\'s last message as data() and last(), under the one connection status', () => {
+    const { client, made } = sockets()
+
+    expect([client.data(), client.status()]).toEqual([undefined, 'connecting'])
+    made[0]!.open()
+    made[0]!.message('"hi"')
+    expect([client.data(), client.last(), client.status()]).toEqual(['hi', 'hi', 'open'])
+  })
+
+  it('reads a resource\'s answer as data() and value()', async () => {
+    globalThis.document = { querySelector: () => null } as unknown as Document
+
+    try {
+      const read = root(() => resource(async () => 7))
+
+      await eventually(() => expect(read.status()).toBe('ready'))
+      expect([read.data(), read.value()]).toEqual([7, 7])
+    }
+    finally {
+      Reflect.deleteProperty(globalThis, 'document')
+    }
+  })
+
+  it('reads the last success of a tracked call as data(), kept through a failure, and tells onData and onSuccess', async () => {
+    const stub = actionStub('/_kay/action/test/data') as unknown as import('../src/runtime').Action<{ id: number }, string>
+    const fetched = answering(new Response(stringify('first')), new Response(stringify({ errors: { '': 'Locked' } }), { status: 409, headers: { 'x-kay-failure': '1' } }), new Response(stringify('second')))
+    const seen: unknown[] = []
+
+    try {
+      const save = stub.track({ onData: ({ value: made, input }) => void seen.push(['option', made, input]) })
+
+      save.onData(({ value: made }) => seen.push(['method', made]))
+      save.onSuccess(({ data }) => seen.push(['old', data]))
+      expect(save.data()).toBeUndefined()
+      await save({ id: 1 })
+      expect(save.data()).toBe('first')
+      await save({ id: 2 })
+      expect([save.data(), save.status()]).toEqual(['first', 'failed'])
+      await save({ id: 3 })
+      expect(save.data()).toBe('second')
+      expect(seen).toEqual([['option', 'first', { id: 1 }], ['method', 'first'], ['old', 'first'], ['option', 'second', { id: 3 }], ['method', 'second'], ['old', 'second']])
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
+  it('reads an action\'s outcome as data() and status(), and succeeded() as it was', async () => {
+    const stub = actionStub('/_kay/action/test/outcome') as unknown as import('../src/runtime').Action<{ id: number }, string>
+    const fetched = answering(new Response(stringify('done')))
+
+    try {
+      expect([stub.data(), stub.status(), stub.succeeded()]).toEqual([undefined, 'idle', undefined])
+      await stub({ id: 1 })
+      expect([stub.data(), stub.status(), stub.succeeded()]).toEqual(['done', 'ready', { data: 'done' }])
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+})

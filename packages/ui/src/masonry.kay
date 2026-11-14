@@ -38,7 +38,7 @@ const keys = new WeakMap<Element, Key>()
 let root: HTMLElement | undefined
 let observer: ResizeObserver | undefined
 
-const all = () => list ? list.rows() : given ?? []
+const all = () => list ? list.data() : given ?? []
 const lanes = memo(() => laneCount(rootSize.width(), minWidth, gap))
 // Until the width is known, as on the server, the tiles stay in a plain grid of the same lanes.
 const layout = memo(() => rootSize.width() > 0 ? masonryLayout(all().map(item => heights().get(key(item))), lanes(), gap) : null)

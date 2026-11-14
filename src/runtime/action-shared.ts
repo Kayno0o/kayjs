@@ -6,7 +6,7 @@ import type { CallResult, TrackHooks } from './call-result'
 import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
-import type { Connection, LoadStatus, Source } from './live'
+import type { Connection, LoadStatus, Reader } from './live'
 import type { Schema, Static } from './schema'
 import type { MaybePromise, StoreBase } from './store-base'
 
@@ -370,7 +370,7 @@ export interface CallOptions<Output = unknown> {
 }
 
 // An action seen through the calls one island makes, so a row's button reads its own `pending()`.
-export interface TrackedCall<Input, Result> extends Source<LoadStatus> {
+export interface TrackedCall<Input, Result> extends Reader<Result extends { ok: true, data: infer Data } ? Data : never, LoadStatus> {
   (form: FormData, options?: CallOptions): Promise<Result>
   // Resolves with how the call went, any answer the server gave included; a failure that is no answer, such as a network error, an abort or a redirect, still throws. Last, as on `Action`, so a wrong field is named.
   (...call: object extends Input ? [input?: Input, options?: CallOptions] : [input: Input, options?: CallOptions]): Promise<Result>
@@ -378,7 +378,11 @@ export interface TrackedCall<Input, Result> extends Source<LoadStatus> {
   readonly pending: () => boolean
   // Resolves once no call made through this handle is in flight, whichever way they went; never rejects.
   readonly settled: () => Promise<void>
-  // Called with `{ data, input }` when a call succeeds (for a stream, once it is open), `input` what the call was given; returns what stops it. Hooks given to `track()` run first.
+  // What the last call that succeeded answered, kept while another runs or fails; undefined before the first.
+  readonly data: () => (Result extends { ok: true, data: infer Data } ? Data : never) | undefined
+  // Called with `{ value, input }` when a call succeeds (for a stream, once it is open), `input` what the call was given; returns what stops it. Hooks given to `track()` run first.
+  onData: (listener: (event: { value: Result extends { ok: true, data: infer Data } ? Data : never, input: unknown }) => void) => () => void
+  /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   onSuccess: (listener: (event: { data: Result extends { ok: true, data: infer Data } ? Data : never, input: unknown }) => void) => () => void
   // Called with `{ error, input }` when a call fails, a refusal or no answer (which still throws), not for an abort or a redirect; returns what stops it.
   onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
@@ -400,7 +404,12 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   readonly progress: () => number | undefined
   // How the form post the page renders for went, refused, as `failed()` reads it; in an island, how its last call went, read reactively.
   readonly failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
+  /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0. No lint: an action reached through an import is no name `kay check` can tie to `succeeded()`, and `succeeded()?.data` and `data()` differ for a handler that returns nothing. */
   readonly succeeded: () => FormSuccess<Final<Success<Output>>> | undefined
+  // What the last call, or the form post the page rendered for, returned; undefined before one succeeded and after a later one failed.
+  readonly data: () => Final<Success<Output>> | undefined
+  // `idle` before the first call, `loading` while one is in flight, then `ready` or `failed` by the last to settle, as on every source.
+  readonly status: () => LoadStatus
   // This action for a form to post with fixed fields, as hidden inputs would carry them: `form(action={move.with({ id, to: 2 })})`. They travel in the form's action URL, so the form needs no inputs for them and posts them with or without JavaScript.
   // eslint-disable-next-line ts/method-signature-style
   with(fields: Partial<Input>): Action<Input, Output, Honeypot>

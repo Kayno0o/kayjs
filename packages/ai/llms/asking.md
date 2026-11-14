@@ -68,7 +68,7 @@ export const reply = action(s.Object({ messages: chatMessages() }), ({ messages 
 p Chat
 ```
 
-In the island, `const stream = await reply({ messages })` resolves with an `ActionStream` whose `last()` is the text so far. Bound the history in the schema (`chatMessages({ maxItems, maxLength })` is the one Chat posts: [Chat](chat.md)) and rate limit the action: each call bills.
+In the island, `const stream = await reply({ messages })` resolves with an `ActionStream` whose `data()` is the text so far. Bound the history in the schema (`chatMessages({ maxItems, maxLength })` is the one Chat posts: [Chat](chat.md)) and rate limit the action: each call bills.
 
 ## Reference
 
@@ -117,7 +117,7 @@ The provider is `AI_BASE_URL` when set, else the one key set. Nothing is read at
 - A snapshot holds a string field as far as it has come (an enum or literal is typed `string` there, as `'sp'` comes before `'spam'`) and any other field once complete: a number, a boolean or an array item shows when it ends, a nested object or array as it stands. Every field of a snapshot is optional in its type, and the last one `for await` gives is the checked value. A snapshot is not checked against the schema, only the end is.
 - `reply.deltas()` gives the JSON text in pieces; when a step wrote text and then called tools that text is dropped, which `reply.deltas({ onRestart })` announces by calling `onRestart` before the first piece of the answer, so a reader that clears what it kept ends with the JSON answered (a snapshot reader just sees the text start over). `usage`, `finish`, `calls` and `stop()` are the reply's own; `progress()` is not offered. `stop()` ends the request, and `await` then fails with a `schema` error as the cut text is no whole object.
 - `tools`, `maxSteps`, `approval`, limits, the budget and `maxInputChars` work as without a schema; the schema counts for the tokens held against the budget. With tools, only the text of the step that answered is the object: a step that wrote text and then called tools drops it. The tools and the format go in one request; on the forced call, `kay_answer` is offered beside the tools.
-- An action returning the reply streams the snapshots to the island, whose `last()` is the object so far; an `async` handler returning it awaits it and answers the checked value, so it returns `.stream()` instead (`async-reply`). A plain form post or an MCP call gets the last snapshot.
+- An action returning the reply streams the snapshots to the island, whose `data()` is the object so far; an `async` handler returning it awaits it and answers the checked value, so it returns `.stream()` instead (`async-reply`). A plain form post or an MCP call gets the last snapshot.
 
 ### A reply that outlives the visitor
 

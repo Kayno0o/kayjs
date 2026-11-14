@@ -59,7 +59,7 @@ describe('infiniteList over an action', () => {
     await list.more()
 
     expect(calls).toEqual([{ input: { host: 'a', offset: 3, limit: 3 }, options: { refresh: false } }])
-    expect(list.rows()).toHaveLength(6)
+    expect(list.data()).toHaveLength(6)
   })
 
   test('a function input is the whole call, and undefined loads an empty page', async () => {
@@ -81,7 +81,7 @@ describe('infiniteList over an action', () => {
     await empty.sortBy({ key: 'id', direction: 'asc' })
 
     expect(calls).toHaveLength(2)
-    expect(empty.rows()).toEqual([])
+    expect(empty.data()).toEqual([])
     expect(empty.ended()).toBe(true)
   })
 
@@ -96,7 +96,7 @@ describe('infiniteList over an action', () => {
     await list.retry()
 
     expect(list.failed()).toBe(false)
-    expect(list.rows()).toHaveLength(6)
+    expect(list.data()).toHaveLength(6)
   })
 
   test('an action answering more than its rows needs rows to read them, which the types ask for', () => {

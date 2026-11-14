@@ -11,11 +11,8 @@ const { action, whenSent, whenRefused } = props<{
 }>()
 
 effect(() => {
-  const done = action.succeeded()
-
-  if (done) {
-    untrack(() => whenSent?.(done.data))
-  }
+  if (action.status() === 'ready')
+    untrack(() => whenSent?.(action.data()))
 })
 
 effect(() => {

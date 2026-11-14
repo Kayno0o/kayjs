@@ -61,7 +61,7 @@ const { items: given, list, caption, index = 0, onIndexChange, open = false, onO
   itemLabel?: string | undefined
 } & ({ items: Item[], list?: undefined } | { items?: undefined, list: InfiniteList<Item> })>()
 
-const all = () => list ? list.rows() : given ?? []
+const all = () => list ? list.data() : given ?? []
 
 const nothing = () => emptyLabel ?? wording('ui.mediaGallery.empty', 'No media.')
 const shown = signal(index)

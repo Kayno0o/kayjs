@@ -92,7 +92,7 @@ const invitations = open?.ok ? open.invitations : []
 const editable = (roles: string[]) => manages && roles.every(role => held.has(role))
 const grantable = settings.roles.filter(role => held.has(role))
 const refused = [rename, setRoles, removeMember, invite, revoke, leave, remove].map(form => form.failed()?.data?.error).find(error => error !== undefined)
-const invited = invite.succeeded()?.data
+const invited = invite.data()
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
 const label = (user: { email: string | null, username: string | null, id: string }) => user.username ?? user.email ?? user.id
 ---

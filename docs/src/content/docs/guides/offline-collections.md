@@ -16,18 +16,18 @@ import todosApi from '../api/todos'
 
 const todos = local({ key: 'id', read: async signal => call(todosApi, '/', { signal }), put: save, remove })
 ---
-p {todos.unsynced()} waiting for the server, {todos.syncStatus()}
+p {todos.sync.queued()} waiting for the server, {todos.sync.status()}
 ul
-  for todo of todos.rows()
+  for todo of todos.data()
     li {todo.title}
 button(onClick={() => todos.put({ id: crypto.randomUUID(), title: 'New', rev: 0 })}) Add
 ```
 
 `todos.put(row)` shows the row at once and keeps it in IndexedDB. `todos.remove(key)` does the same for a removal. The row type is the input of the `put` action, so nothing is typed twice.
 
-`todos.syncStatus()` reads `loading`, `synced`, `unsynced` (writes wait for the server), `offline`, `signed-out` or `unavailable`, and `todos.unsynced()` counts the writes waiting.
+`todos.sync.status()` reads `loading`, `synced`, `unsynced` (writes wait for the server), `offline`, `signed-out` or `unavailable`, and `todos.sync.queued()` counts the writes waiting. `todos.status()` and `todos.pending()` read as on every source: `loading` until the browser's copy is read, then `ready`, or `failed` while `todos.error()` is set.
 
-When a read of the server fails, `todos.error()` holds the `ApiError` until a read succeeds and `todos.retry()` tries again at once. `onSync`, `onIssue` and `onError` take a callback as options or as methods, for example `local({ ..., onIssue: ({ issue }) => toast.error(issue.message) })`. `pending()` and `status()` of earlier releases still work until 2.0; `kay upgrade` renames them.
+When a read of the server fails, `todos.error()` holds the `ApiError` until a read succeeds and `todos.retry()` tries again at once. `onData`, `onIssue` and `onError` take a callback as options or as methods, for example `local({ ..., onIssue: ({ issue }) => toast.error(issue.message) })`. `rows()`, `unsynced()`, `syncStatus()` and `onSync` of earlier releases work until 1.108; `kay upgrade` renames them.
 
 <ReadMore href="/llms/island-sources">`status()`, `error()`, `retry()` and the hooks are shared by every source an island reads.</ReadMore>
 

@@ -62,13 +62,13 @@ describe('infiniteList', () => {
     await list.more()
 
     expect(asked).toEqual([{ offset: 3, last: { id: 3 }, sort: undefined, filter: NONE }])
-    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(list.data().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
     expect(list.ended()).toBe(false)
 
     await list.more()
 
     expect(asked.at(-1)).toEqual({ offset: 6, last: { id: 6 }, sort: undefined, filter: NONE })
-    expect(list.rows()).toHaveLength(7)
+    expect(list.data()).toHaveLength(7)
     expect(list.ended()).toBe(true)
   })
 
@@ -82,7 +82,7 @@ describe('infiniteList', () => {
 
     expect(asked).toHaveLength(2)
     expect(list.ended()).toBe(true)
-    expect(list.rows()).toHaveLength(6)
+    expect(list.data()).toHaveLength(6)
   })
 
   test('a failure waits for a retry, which asks for the same page again and clears it', async () => {
@@ -106,7 +106,7 @@ describe('infiniteList', () => {
 
     expect(asked.map(at => at.offset)).toEqual([3, 3, 3])
     expect(list.failed()).toBe(false)
-    expect(list.rows()).toHaveLength(6)
+    expect(list.data()).toHaveLength(6)
   })
 
   test('is a Source: status loading, ready then failed, with the thrown ApiError as error() until a page lands', async () => {
@@ -145,12 +145,12 @@ describe('infiniteList', () => {
 
     await list.more()
 
-    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4])
+    expect(list.data().map(row => row.id)).toEqual([1, 2, 3, 4])
 
     await list.more()
 
     expect(asked.at(-1)?.offset).toBe(6)
-    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4, 7])
+    expect(list.data().map(row => row.id)).toEqual([1, 2, 3, 4, 7])
   })
 
   test('a page of nothing but duplicates moves the offset on rather than asking again for it', async () => {
@@ -171,7 +171,7 @@ describe('infiniteList', () => {
     await list.more()
 
     expect(asked.map(at => at.last?.id)).toEqual([3, 1])
-    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(list.data().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
   })
 
   test('calls load once while a page is on its way, whoever asks', async () => {
@@ -193,7 +193,7 @@ describe('infiniteList', () => {
 
     expect(calls).toBe(1)
     expect(list.pending()).toBe(false)
-    expect(list.rows()).toHaveLength(6)
+    expect(list.data()).toHaveLength(6)
   })
 
   test('sortBy starts over from offset 0 with the sort, the old rows staying until its first page lands', async () => {
@@ -201,15 +201,15 @@ describe('infiniteList', () => {
     const list = infiniteList(bans(1, 3), { limit: 3, key: ban => ban.id, load })
 
     await list.more()
-    expect(list.rows()).toHaveLength(6)
+    expect(list.data()).toHaveLength(6)
 
     const sorting = list.sortBy({ key: 'id', direction: 'desc' })
 
-    expect(list.rows()).toHaveLength(6)
+    expect(list.data()).toHaveLength(6)
     expect(list.pending()).toBe(true)
     await sorting
     expect(asked.at(-1)).toEqual({ offset: 0, last: undefined, sort: { key: 'id', direction: 'desc' }, filter: NONE })
-    expect(list.rows().map(ban => ban.id)).toEqual([13])
+    expect(list.data().map(ban => ban.id)).toEqual([13])
     expect(list.ended()).toBe(true)
   })
 
@@ -238,11 +238,11 @@ describe('infiniteList', () => {
 
     waiting[0]!(bans(100, 3))
     await stale
-    expect(list.rows().map(ban => ban.id)).toEqual([1, 2, 3])
+    expect(list.data().map(ban => ban.id)).toEqual([1, 2, 3])
 
     waiting[1]!(bans(50, 2))
     await fresh
-    expect(list.rows().map(ban => ban.id)).toEqual([50, 51])
+    expect(list.data().map(ban => ban.id)).toEqual([50, 51])
     expect(list.pending()).toBe(false)
   })
 
@@ -253,12 +253,12 @@ describe('infiniteList', () => {
 
     await list.sortBy(by)
     expect(list.failed()).toBe(true)
-    expect(list.rows().map(ban => ban.id)).toEqual([5, 6, 7])
+    expect(list.data().map(ban => ban.id)).toEqual([5, 6, 7])
     expect(list.sort()).toEqual(by)
 
     await list.retry()
     expect(asked.map(at => at.offset)).toEqual([0, 0])
-    expect(list.rows().map(ban => ban.id)).toEqual([1, 2])
+    expect(list.data().map(ban => ban.id)).toEqual([1, 2])
   })
 
   test('filterBy starts over from offset 0 with the filter, keeping the sort and leaving out what it does not name', async () => {
@@ -268,7 +268,7 @@ describe('infiniteList', () => {
 
     await list.filterBy({ text: 'x', fields: { origin: 'b' } })
     expect(asked.at(-1)).toEqual({ offset: 0, last: undefined, sort, filter: { text: 'x', fields: { origin: 'b' } } })
-    expect(list.rows().map(ban => ban.id)).toEqual([20])
+    expect(list.data().map(ban => ban.id)).toEqual([20])
     expect(list.filter()).toEqual({ text: 'x', fields: { origin: 'b' } })
 
     await list.filterBy({ text: 'y' })
@@ -283,7 +283,7 @@ describe('infiniteList', () => {
     await Promise.all([list.sortBy(sort), list.filterBy({ text: 'x' }), list.restart({ sort, filter: { text: 'x' } })])
 
     expect(asked).toEqual([{ offset: 0, last: undefined, sort, filter: { text: 'x', fields: {} } }])
-    expect(list.rows().map(ban => ban.id)).toEqual([20])
+    expect(list.data().map(ban => ban.id)).toEqual([20])
   })
 
   test('patch changes one loaded row by its key and leaves the others as they are', async () => {
@@ -293,13 +293,13 @@ describe('infiniteList', () => {
 
     await list.more()
 
-    const before = list.rows()
+    const before = list.data()
 
     expect(list.patch(5, { seen: true })).toBe(true)
-    expect(list.rows().map(row => row.seen)).toEqual([false, false, false, false, true, false])
-    expect(list.rows()[0]).toBe(before[0])
+    expect(list.data().map(row => row.seen)).toEqual([false, false, false, false, true, false])
+    expect(list.data()[0]).toBe(before[0])
     expect(list.patch(2, row => ({ ...row, id: 2, seen: !row.seen }))).toBe(true)
-    expect(list.rows()[1]?.seen).toBe(true)
+    expect(list.data()[1]?.seen).toBe(true)
   })
 
   test('patch answers false for an unknown row, an undefined change and a list with no key', () => {
@@ -310,7 +310,7 @@ describe('infiniteList', () => {
     expect(keyed.patch(9, {})).toBe(false)
     expect(keyed.patch(1, undefined)).toBe(false)
     expect(loose.patch(1, {})).toBe(false)
-    expect(keyed.rows()).toEqual(bans(1, 3))
+    expect(keyed.data()).toEqual(bans(1, 3))
   })
 
   test('a more in the tick a restart waits loads its first page once, in the new order', async () => {
@@ -321,7 +321,7 @@ describe('infiniteList', () => {
     await Promise.all([list.sortBy(sort), list.more()])
 
     expect(asked).toEqual([{ offset: 0, last: undefined, sort, filter: NONE }])
-    expect(list.rows().map(ban => ban.id)).toEqual([20, 21, 22])
+    expect(list.data().map(ban => ban.id)).toEqual([20, 21, 22])
   })
 
   test('patch moving a row to a new key lets a later page show the old key and drops one bringing the new', async () => {
@@ -332,7 +332,7 @@ describe('infiniteList', () => {
 
     await list.more()
 
-    expect(list.rows().map(ban => ban.id)).toEqual([9, 2, 3, 1, 4])
+    expect(list.data().map(ban => ban.id)).toEqual([9, 2, 3, 1, 4])
   })
 
   test('patch keeps the other rows of a later page as they were and the prototype of a merged row', async () => {
@@ -349,12 +349,12 @@ describe('infiniteList', () => {
 
     await list.more()
 
-    const before = list.rows()
+    const before = list.data()
 
     expect(list.patch(5, { seen: true })).toBe(true)
-    expect(list.rows()[4]).toBeInstanceOf(Planet)
-    expect([list.rows()[4]?.seen, list.rows()[4]?.label]).toEqual([true, 'planet 5'])
-    expect(list.rows().filter((_, at) => at !== 4).every((row, at) => row === before.filter((_, index) => index !== 4)[at])).toBe(true)
+    expect(list.data()[4]).toBeInstanceOf(Planet)
+    expect([list.data()[4]?.seen, list.data()[4]?.label]).toEqual([true, 'planet 5'])
+    expect(list.data().filter((_, at) => at !== 4).every((row, at) => row === before.filter((_, index) => index !== 4)[at])).toBe(true)
   })
 })
 
@@ -366,12 +366,12 @@ describe('infiniteList following its island', () => {
 
     flush()
     await list.more()
-    expect(list.rows()).toHaveLength(6)
+    expect(list.data()).toHaveLength(6)
 
     given.set(bans(10, 3))
     flush()
 
-    expect(list.rows().map(row => row.id)).toEqual([10, 11, 12])
+    expect(list.data().map(row => row.id)).toEqual([10, 11, 12])
     expect(list.ended()).toBe(false)
 
     await list.more()
@@ -390,14 +390,14 @@ describe('infiniteList following its island', () => {
     const list = infiniteList(bans(1, 3), { limit: 3, action, failure: 'no', input: (() => ({ repo: repo() })) as never })
 
     flush()
-    expect(list.rows()).toHaveLength(3)
+    expect(list.data()).toHaveLength(3)
 
     repo.set('b')
     flush()
     await new Promise(resolve => setTimeout(resolve, 0))
 
     expect(calls).toEqual([{ repo: 'b', offset: 0, limit: 3 }])
-    expect(list.rows().map(row => row.id)).toEqual([100, 101, 102])
+    expect(list.data().map(row => row.id)).toEqual([100, 101, 102])
   })
 
   test('rows changed before the effect first ran still replace the first ones', () => {
@@ -407,7 +407,7 @@ describe('infiniteList following its island', () => {
     given.set(bans(10, 3))
     flush()
 
-    expect(list.rows().map(row => row.id)).toEqual([10, 11, 12])
+    expect(list.data().map(row => row.id)).toEqual([10, 11, 12])
   })
 
   test('function rows returning a fresh but equal array each call keep the pages loaded before the effect first ran', async () => {
@@ -416,7 +416,7 @@ describe('infiniteList following its island', () => {
     await list.more()
     flush()
 
-    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(list.data().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
   })
 
   test('function rows that stay the same keep the loaded pages', async () => {
@@ -433,7 +433,7 @@ describe('infiniteList following its island', () => {
     other.set(1)
     flush()
 
-    expect(list.rows()).toHaveLength(6)
+    expect(list.data()).toHaveLength(6)
   })
 })
 
@@ -457,7 +457,7 @@ describe('reload', () => {
       { offset: 0, last: undefined, sort: undefined, filter: NONE },
       { offset: 3, last: { id: 2 }, sort: undefined, filter: NONE },
     ])
-    expect(list.rows().map(row => row.id)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(list.data().map(row => row.id)).toEqual([0, 1, 2, 3, 4, 5])
     expect(list.ended()).toBe(false)
 
     await list.more()
@@ -470,7 +470,7 @@ describe('reload', () => {
 
     await list.reload()
 
-    expect(list.rows().map(row => row.id)).toEqual([0, 1])
+    expect(list.data().map(row => row.id)).toEqual([0, 1])
     expect(list.ended()).toBe(true)
   })
 
@@ -481,7 +481,7 @@ describe('reload', () => {
     await list.reload()
     await list.reload()
 
-    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3])
+    expect(list.data().map(row => row.id)).toEqual([1, 2, 3])
     expect(list.failed()).toBe(false)
     expect(list.pending()).toBe(false)
 
@@ -504,7 +504,7 @@ describe('reload', () => {
     release(bans(0, 3))
     await reloading
 
-    expect(list.rows().map(row => row.id)).toEqual([50, 51, 52])
+    expect(list.data().map(row => row.id)).toEqual([50, 51, 52])
   })
 
   test('the rows given stand for the first ones, and duplicates are dropped by key', async () => {
@@ -514,7 +514,7 @@ describe('reload', () => {
     await list.reload(bans(1, 3))
 
     expect(asked).toEqual([{ offset: 3, last: { id: 3 }, sort: undefined, filter: NONE }])
-    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4, 5])
+    expect(list.data().map(row => row.id)).toEqual([1, 2, 3, 4, 5])
   })
 
   test('a list that ended loads on until a short page', async () => {
@@ -523,6 +523,6 @@ describe('reload', () => {
 
     await list.reload()
 
-    expect(list.rows()).toHaveLength(4)
+    expect(list.data()).toHaveLength(4)
   })
 })

@@ -44,7 +44,7 @@ const captcha = await captchaFor(auth, features.captcha, 'register')
 const refused = register.failed()?.data
 const fields = refused && 'fields' in refused ? refused.fields : {}
 const error = refusal(register.failed(), features.captcha)
-const verify = register.succeeded() !== undefined
+const verify = register.status() === 'ready'
 const landmark = ctx.locals.auth.features().pages?.main !== false
 const privacy = features.pages?.privacy
 const purpose = features.pages?.purpose

@@ -4,13 +4,15 @@ function action<Spec extends Schema, Output, const Honeypot extends string = nev
 
 [.] Action
 interface Action<Input, Output, Honeypot extends string = never>
+  data: () => Final<Exclude<Output, Failure<unknown>>> | undefined
   error: (field?: "" | Extract<keyof Input, string> | Honeypot | undefined) => string | undefined
   failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
   pending: () => boolean
   progress: () => number | undefined
   refused: (error: unknown) => error is ActionError<FailureData<Output>>
   settled: () => Promise<void>
-  succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
+  status: () => LoadStatus
+  /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0. No lint: an action reached through an import is no name `kay check` can tie to `succeeded()`, and `succeeded()?.data` and `data()` differ for a handler that returns nothing. */ succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
   track: (options?: ({
   queue?: CallQueue | undefined;
 } & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Input, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
@@ -251,11 +253,12 @@ type Component<Props = object> = (props: Props) => JSX.Element
 function composing(event: KeyboardEvent): boolean
 
 [.] Connection
-interface Connection<T> extends Source<ConnectionStatus>
+interface Connection<T> extends Reader<T, ConnectionStatus>
   close: () => void
+  data: () => T | undefined
   ended: () => Promise<T | undefined>
   error: () => ApiError<unknown> | undefined
-  last: () => T | undefined
+  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ last: () => T | undefined
   onClose: (listener: (event: { status: "closed" | "done" | "failed"; }) => void) => () => void
   onData: (listener: (event: { value: T; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
@@ -613,24 +616,26 @@ type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
 function local<Row extends object, const Key extends keyof Row & string>(options: LocalOptions<Row, Key>): Local<Row, Key>
 
 [.] Local
-interface Local<Row, Key extends keyof Row>
+interface Local<Row, Key extends keyof Row> extends Reader<readonly Row[], LoadStatus>
   clear: () => Promise<void>
+  data: () => readonly Row[]
   dismiss: (id: number) => Promise<void>
   error: () => ApiError<unknown> | undefined
   get: (key: Row[Key]) => Row | undefined
   issues: () => readonly LocalIssue<Row>[]
+  onData: (listener: (event: { value: readonly Row[]; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
   onIssue: (listener: (event: { issue: LocalIssue<Row>; }) => void) => () => void
-  onSync: (listener: (event: { rows: readonly Row[]; }) => void) => () => void
-  /** @deprecated The count of writes the server has not taken, which `unsynced()` reads; `pending()` is a boolean at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it. */ pending: () => number
+  /** @deprecated Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ onSync: (listener: (event: { rows: readonly Row[]; }) => void) => () => void
+  pending: () => boolean
   put: (row: Row) => Promise<void>
   remove: (key: Row[Key]) => Promise<void>
   retry: () => void
-  rows: () => readonly Row[]
-  /** @deprecated `syncStatus()` reads these states, `unsynced` for `pending`; `status()` is `idle|loading|ready|failed` at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it. */ status: () => LocalStatus
-  sync: () => Promise<void>
-  syncStatus: () => LocalSyncStatus
-  unsynced: () => number
+  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ rows: () => readonly Row[]
+  status: () => LoadStatus
+  sync: LocalSync
+  /** @deprecated Write `sync.status()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ syncStatus: () => LocalSyncStatus
+  /** @deprecated Write `sync.queued()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ unsynced: () => number
 
 [.] LocalConflict
 interface LocalConflict<Row>
@@ -641,9 +646,10 @@ interface LocalConflict<Row>
 
 [.] LocalHooks
 interface LocalHooks<Row>
+  onData?: ((event: { value: readonly Row[]; }) => void) | undefined
   onError?: ((event: { error: ApiError<unknown>; }) => void) | undefined
   onIssue?: ((event: { issue: LocalIssue<Row>; }) => void) | undefined
-  onSync?: ((event: { rows: readonly Row[]; }) => void) | undefined
+  /** @deprecated Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ onSync?: ((event: { rows: readonly Row[]; }) => void) | undefined
 
 [.] LocalIssue
 interface LocalIssue<Row>
@@ -664,9 +670,10 @@ interface LocalIssue<Row>
 interface LocalOptions<Row extends object, Key extends keyof Row & string> extends LocalHooks<Row>
   conflict?: ((conflict: LocalConflict<Row>) => Row | undefined) | undefined
   key: Key
+  onData?: ((event: { value: readonly Row[]; }) => void) | undefined
   onError?: ((event: { error: ApiError<unknown>; }) => void) | undefined
   onIssue?: ((event: { issue: LocalIssue<Row>; }) => void) | undefined
-  onSync?: ((event: { rows: readonly Row[]; }) => void) | undefined
+  /** @deprecated Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ onSync?: ((event: { rows: readonly Row[]; }) => void) | undefined
   put: Action<Row, unknown, never>
   read: (signal: AbortSignal) => Promise<readonly Row[]> | readonly Row[]
   remove?: Action<Pick<Row, Key>, unknown, never> | undefined
@@ -685,8 +692,10 @@ type Locals = (Register extends {
 [.] LocalsOf
 type LocalsOf<App extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'>> = App['~Singleton']['decorator'] & App['~Singleton']['derive'] & App['~Singleton']['resolve'] & App['~Ephemeral']['derive'] & App['~Ephemeral']['resolve'] & App['~Volatile']['derive'] & App['~Volatile']['resolve']
 
-[.] LocalStatus
-type LocalStatus = 'loading' | 'synced' | 'pending' | 'offline' | 'signed-out' | 'unavailable'
+[.] LocalSync
+interface LocalSync
+  queued: () => number
+  status: () => LocalSyncStatus
 
 [.] LocalSyncStatus
 type LocalSyncStatus = 'loading' | 'synced' | 'unsynced' | 'offline' | 'signed-out' | 'unavailable'
@@ -1053,6 +1062,16 @@ function reactiveMap<K, V>(entries?: Iterable<readonly [K, V]> | null | undefine
 [.] reactiveSet
 function reactiveSet<T>(values?: Iterable<T> | null | undefined): Set<T>
 
+[.] Reader
+interface Reader<T, S extends LoadStatus | ConnectionStatus = LoadStatus | ConnectionStatus> extends Source<S>
+  data: () => T | undefined
+  error: () => ApiError<unknown> | undefined
+  onData: (listener: (event: { value: T; }) => void) => () => void
+  onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
+  pending: () => boolean
+  retry: () => void
+  status: () => S
+
 [.] recipe
 function recipe<const Variants extends VariantTable = Record<never, never>>(config: RecipeConfig<Variants>): Recipe<Variants>
 
@@ -1131,7 +1150,8 @@ function resource<Module, const Path extends ResourcePath<Module>>(module: Modul
 function resource<T>(load: (signal: AbortSignal) => PromiseLike<T> | T, options?: ResourceExtras<Awaited<T>> | undefined): Resource<Awaited<T>>
 
 [.] Resource
-interface Resource<T> extends Source<ResourceState>
+interface Resource<T> extends Reader<T, LoadStatus>
+  data: () => T | undefined
   error: () => ApiError<unknown> | undefined
   mutate: (next: ((current: T | undefined) => T) | T, options?: undefined | { refresh?: boolean; }) => void
   onData: (listener: (event: { value: T; }) => void) => () => void
@@ -1139,8 +1159,8 @@ interface Resource<T> extends Source<ResourceState>
   pending: () => boolean
   refresh: () => void
   retry: () => void
-  status: () => ResourceState
-  value: () => T | undefined
+  status: () => LoadStatus
+  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ value: () => T | undefined
 
 [.] ResourcePath
 type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends {
@@ -1298,6 +1318,7 @@ interface Selection<Key>
 
 [.] ServerAction
 interface ServerAction<Spec extends Schema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Spec>>, Output, Honeypot>
+  data: () => Final<Exclude<Output, Failure<unknown>>> | undefined
   error: (field?: "" | Extract<keyof Sendable<Static<Spec>>, string> | Honeypot | undefined) => string | undefined
   failed: () => FormFailure<Sendable<Static<Spec>>, FailureData<Output>, Honeypot> | undefined
   handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>
@@ -1307,7 +1328,8 @@ interface ServerAction<Spec extends Schema, Output, Honeypot extends string = ne
   refused: (error: unknown) => error is ActionError<FailureData<Output>>
   schema: Spec
   settled: () => Promise<void>
-  succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
+  status: () => LoadStatus
+  /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0. No lint: an action reached through an import is no name `kay check` can tie to `succeeded()`, and `succeeded()?.data` and `data()` differ for a handler that returns nothing. */ succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
   track: (options?: ({
   queue?: CallQueue | undefined;
 } & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Sendable<Static<Spec>>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
@@ -1354,10 +1376,11 @@ type Snippet<Args extends unknown[] = []> = Args extends [] ? JSX.Element : (...
 function socket<Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path>>): SocketOf<Module, Path>
 
 [.] Socket
-interface Socket<Send, Receive> extends Source<SocketStatus>
+interface Socket<Send, Receive> extends Reader<Receive, ConnectionStatus>
   close: () => void
+  data: () => Receive | undefined
   error: () => ApiError<unknown> | undefined
-  last: () => Receive | undefined
+  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ last: () => Receive | undefined
   onClose: (listener: (event: { status: "closed" | "done" | "failed"; }) => void) => () => void
   onData: (listener: (event: { value: Receive; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
@@ -1365,13 +1388,14 @@ interface Socket<Send, Receive> extends Source<SocketStatus>
   pending: () => boolean
   retry: () => void
   send: (message: Send) => void
-  status: () => SocketStatus
+  status: () => ConnectionStatus
 
 [.] SocketPath
 type SocketPath<Module> = Extract<Nodes<RoutesOf<Module>>, { node: { subscribe: unknown } }>['path']
 
 [.] SocketStatus
-type SocketStatus = 'connecting' | 'open' | 'failed' | 'closed'
+/** @deprecated Write `ConnectionStatus`, which a socket shares with every connection. Removed in 1.108.0. No lint: a type, and a socket still never reads `idle`. */
+type SocketStatus = ConnectionStatus
 
 [.] Source
 interface Source<S extends LoadStatus | ConnectionStatus = LoadStatus | ConnectionStatus>
@@ -1395,9 +1419,10 @@ function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>, hooks?: Co
 [.] Stream
 interface Stream<T, Options = Record<never, never>> extends Connection<T>
   close: () => void
+  data: () => T | undefined
   ended: () => Promise<T | undefined>
   error: () => ApiError<unknown> | undefined
-  last: () => T | undefined
+  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ last: () => T | undefined
   onClose: (listener: (event: { status: "closed" | "done" | "failed"; }) => void) => () => void
   onData: (listener: (event: { value: T; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
@@ -1428,20 +1453,24 @@ type TemplateContext = TemplateValues extends { values: infer Values extends obj
 function throttled<T>(source: () => T, delay: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, options?: EffectOptions | undefined): Memo<T>
 
 [.] TrackedApi
-interface TrackedApi<Module, Path> extends Source<LoadStatus>
+interface TrackedApi<Module, Path> extends Reader<unknown, LoadStatus>
+  data: () => unknown
   error: () => ApiError<unknown> | undefined
+  onData: (listener: (event: { value: unknown; input: unknown; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; input: unknown; }) => void) => () => void
-  onSuccess: (listener: (event: { data: unknown; input: unknown; }) => void) => () => void
+  /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ onSuccess: (listener: (event: { data: unknown; input: unknown; }) => void) => () => void
   pending: () => boolean
   retry: () => void
   settled: () => Promise<void>
   status: () => LoadStatus
 
 [.] TrackedCall
-interface TrackedCall<Input, Result> extends Source<LoadStatus>
+interface TrackedCall<Input, Result> extends Reader<Result extends { ok: true, data: infer Data } ? Data : never, LoadStatus>
+  data: () => (Result extends { ok: true; data: infer Data; } ? Data : never) | undefined
   error: () => ApiError<unknown> | undefined
+  onData: (listener: (event: { value: Result extends { ok: true; data: infer Data; } ? Data : never; input: unknown; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; input: unknown; }) => void) => () => void
-  onSuccess: (listener: (event: { data: Result extends { ok: true; data: infer Data; } ? Data : never; input: unknown; }) => void) => () => void
+  /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ onSuccess: (listener: (event: { data: Result extends { ok: true; data: infer Data; } ? Data : never; input: unknown; }) => void) => () => void
   pending: () => boolean
   retry: () => void
   settled: () => Promise<void>
@@ -1449,8 +1478,9 @@ interface TrackedCall<Input, Result> extends Source<LoadStatus>
 
 [.] TrackHooks
 interface TrackHooks<Data>
+  onData?: ((event: { value: Data; input: unknown; }) => void) | undefined
   onError?: ((event: { error: ApiError<unknown>; input: unknown; }) => void) | undefined
-  onSuccess?: ((event: { data: Data; input: unknown; }) => void) | undefined
+  /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ onSuccess?: ((event: { data: Data; input: unknown; }) => void) | undefined
 
 [.] TransitionClasses
 interface TransitionClasses

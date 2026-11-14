@@ -1,5 +1,6 @@
-import type { Action } from './action'
 import type { ApiError } from './api-error'
+import type { LoadStatus } from './live'
+import type { Local, LocalIssue, LocalOptions, LocalSyncStatus } from './local-types'
 import { encodeCall } from './action'
 import { actionFailed, apiErrorOf, messageOf } from './api-error'
 import { withBase } from './base'
@@ -22,97 +23,6 @@ export function issueMessage(issue: Pick<LocalIssue<unknown>, 'kind' | 'status' 
     return issue.message
 
   return issue.kind === 'conflict' ? CONFLICT : messageOf({ status: issue.status ?? 0, errors: issue.errors ?? {}, data: issue.data }, actionFailed(issue.status ?? 0))
-}
-
-// What `status()` reads until 2.0, which gives it the meaning every source shares; `syncStatus()` reads the same states under `unsynced` for `pending`.
-export type LocalStatus = 'loading' | 'synced' | 'pending' | 'offline' | 'signed-out' | 'unavailable'
-
-// Where a collection stands against the server: `loading` until the browser's copy is read, `synced` when nothing is queued and the server is reachable, `unsynced` while writes wait, `offline` when the server cannot be reached, `signed-out` when it asked for a sign-in, `unavailable` where the browser keeps no IndexedDB.
-export type LocalSyncStatus = 'loading' | 'synced' | 'unsynced' | 'offline' | 'signed-out' | 'unavailable'
-
-// What the island sees of a write the server did not take as it was: refused (`rejected`, the row went back to what the server last gave) or met a newer row (`conflict`, `kept` is the row now shown, undefined when the server's own).
-export interface LocalIssue<Row> {
-  id: number
-  kind: 'rejected' | 'conflict'
-  key: string
-  op: 'put' | 'remove'
-  // The status the server refused with; 409 for a conflict, whose `data` is the server's row.
-  status?: number | undefined
-  // The text to show for the issue, as an `ApiError`'s message reads.
-  message: string
-  errors?: Record<string, string> | undefined
-  data?: unknown
-  mine?: Row | undefined
-  theirs?: Row | undefined
-  kept?: Row | undefined
-  createdAt: Date
-}
-
-export interface LocalConflict<Row> {
-  key: string
-  // The row as the server last gave it to this browser, undefined for a row made here.
-  base: Row | undefined
-  // The queued write's row, undefined when it was a removal.
-  mine: Row | undefined
-  // The server's row now, which its action answered `ctx.fail(409, row)` with.
-  theirs: Row
-}
-
-// The callbacks a collection takes in its options, and as methods of the same names: `onX` after a transition, one object argument. One that throws is logged and leaves the collection alone.
-export interface LocalHooks<Row> {
-  // A read of the server was taken in, or the queue was sent and the collection stands `synced`; `rows` are the rows held then.
-  onSync?: ((event: { rows: readonly Row[] }) => void) | undefined
-  // A write the server did not take as it was: once for each new issue (it is in `issues()` then), not for those kept from an earlier visit.
-  onIssue?: ((event: { issue: LocalIssue<Row> }) => void) | undefined
-  // The server could not be read, or the browser keeps no IndexedDB: once for each failure, as `error()` is set.
-  onError?: ((event: { error: ApiError }) => void) | undefined
-}
-
-export interface LocalOptions<Row extends object, Key extends keyof Row & string> extends LocalHooks<Row> {
-  // The field naming a row: a string or a number.
-  key: Key
-  // The server's rows, read while online: after loading, after the queue was sent and on `sync()`. The signal aborts when the read takes over 30 seconds, so pass it to the call (`call(api, '/', { signal })`).
-  read: (signal: AbortSignal) => Promise<readonly Row[]> | readonly Row[]
-  // The action a write of a row replays through, so its guards, schema and limits apply as to any call.
-  put: Action<Row, unknown>
-  remove?: Action<Pick<Row, Key>, unknown> | undefined
-  // Changing it forgets the rows held in the browser, which are read again; the queue is kept.
-  version?: number | undefined
-  // Chooses the row to keep when the server's action answered 409 with its own: the default takes the server's row and puts this write's changed fields on it. Undefined takes the server's row as it is.
-  conflict?: ((conflict: LocalConflict<Row>) => Row | undefined) | undefined
-}
-
-export interface Local<Row, Key extends keyof Row> {
-  // The rows held, in key order, reactive.
-  rows: () => readonly Row[]
-  get: (key: Row[Key]) => Row | undefined
-  // Both keep the change in the browser at once and resolve then; the server gets it when it can.
-  put: (row: Row) => Promise<void>
-  remove: (key: Row[Key]) => Promise<void>
-  // Writes the server has not taken yet.
-  unsynced: () => number
-  // Where the collection stands against the server.
-  syncStatus: () => LocalSyncStatus
-  // The last failure to read the server, or that the browser keeps no IndexedDB, kept until a read succeeds. A write waiting for the server is no error: it shows in `syncStatus()`, and a refused one in `issues()`.
-  error: () => ApiError | undefined
-  // Reads the server and sends the queue now, skipping the wait; does nothing unless the last read failed or the server could not be reached, nor while the server asks for a sign-in.
-  retry: () => void
-  // Called after a sync, with the rows held; returns what stops it.
-  onSync: (listener: (event: { rows: readonly Row[] }) => void) => () => void
-  // Called with each new issue; returns what stops it.
-  onIssue: (listener: (event: { issue: LocalIssue<Row> }) => void) => () => void
-  // Called when a read of the server failed; returns what stops it.
-  onError: (listener: (event: { error: ApiError }) => void) => () => void
-  /** @deprecated The count of writes the server has not taken, which `unsynced()` reads; `pending()` is a boolean at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it. */
-  pending: () => number
-  /** @deprecated `syncStatus()` reads these states, `unsynced` for `pending`; `status()` is `idle|loading|ready|failed` at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it. */
-  status: () => LocalStatus
-  issues: () => readonly LocalIssue<Row>[]
-  dismiss: (id: number) => Promise<void>
-  // Sends the queue and reads the server's rows again.
-  sync: () => Promise<void>
-  // Forgets this collection's rows, queue and issues in the browser.
-  clear: () => Promise<void>
 }
 
 interface RowRecord {
@@ -311,13 +221,20 @@ function merged<Row extends object>(base: Row | undefined, mine: Row | undefined
   return out as Row
 }
 
+function loadStatus(state: LocalSyncStatus, failed: boolean): LoadStatus {
+  if (state === 'loading')
+    return 'loading'
+
+  return state === 'unavailable' || failed ? 'failed' : 'ready'
+}
+
 function inert<Row, Key extends keyof Row>(): Local<Row, Key> {
   const refuse = async () => Promise.reject(new Error('kay: a local() collection is written in the browser only'))
   const nothing = async () => Promise.resolve()
 
   const stop = () => () => undefined
 
-  return { rows: () => [], get: () => undefined, put: refuse, remove: refuse, unsynced: () => 0, syncStatus: () => 'loading', error: () => undefined, retry: () => undefined, onSync: stop, onIssue: stop, onError: stop, pending: () => 0, status: () => 'loading', issues: () => [], dismiss: nothing, sync: nothing, clear: nothing }
+  return { data: () => [], rows: () => [], get: () => undefined, put: refuse, remove: refuse, unsynced: () => 0, syncStatus: () => 'loading', error: () => undefined, retry: () => undefined, onData: stop, onSync: stop, onIssue: stop, onError: stop, pending: () => true, status: () => 'loading', issues: () => [], dismiss: nothing, sync: Object.assign(nothing, { status: () => 'loading' as const, queued: () => 0 }), clear: nothing }
 }
 
 // A collection the island reads and writes at once, kept in IndexedDB so it works offline: a write is applied in the browser and queued, then replayed through the collection's action, once, when the server can be reached.
@@ -334,7 +251,8 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   private readonly problems = createSignal<LocalIssue<Row>[]>([])
   private readonly state = createSignal<LocalSyncStatus>('loading')
   private readonly failure = createSignal<ApiError | undefined>(undefined)
-  private readonly synced = listenerSet<{ rows: readonly Row[] }>()
+  // Tells `value` to `onData` and the same rows as `rows` to the deprecated `onSync`.
+  private readonly synced = listenerSet<{ value: readonly Row[], rows: readonly Row[] }>()
   private readonly raised = listenerSet<{ issue: LocalIssue<Row> }>()
   private readonly failed = listenerSet<{ error: ApiError }>()
   // The issues already told, by id; undefined until the first read, which tells none of those kept from an earlier visit.
@@ -358,6 +276,9 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   constructor(options: LocalOptions<Row, Key>) {
     this.options = options
     this.c = options.put.url
+
+    if (options.onData)
+      this.synced.on(options.onData)
 
     if (options.onSync)
       this.synced.on(options.onSync)
@@ -384,6 +305,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
   api(): Local<Row, Key> {
     return {
+      data: () => this.view[0]().list,
       rows: () => this.view[0]().list,
       get: key => this.view[0]().byKey.get(String(key)),
       put: async row => this.write('put', row),
@@ -392,18 +314,15 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       syncStatus: this.state[0],
       error: this.failure[0],
       retry: () => this.again(),
+      onData: this.synced.on,
       onSync: this.synced.on,
       onIssue: this.raised.on,
       onError: this.failed.on,
-      pending: this.count[0],
-      status: () => {
-        const state = this.state[0]()
-
-        return state === 'unsynced' ? 'pending' : state
-      },
+      pending: () => this.state[0]() === 'loading',
+      status: () => loadStatus(this.state[0](), this.failure[0]() !== undefined),
       issues: this.problems[0],
       dismiss: async id => this.dismiss(id),
-      sync: async () => this.sync(),
+      sync: Object.assign(async () => this.sync(), { status: this.state[0], queued: this.count[0] }),
       clear: async () => this.clear(),
     }
   }
@@ -632,8 +551,11 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     this.schedule()
 
-    if (moved && !this.ended && this.state[0]() === 'synced')
-      this.synced.emit({ rows: this.view[0]().list })
+    if (moved && !this.ended && this.state[0]() === 'synced') {
+      const rows = this.view[0]().list
+
+      this.synced.emit({ value: rows, rows })
+    }
   }
 
   // Reads the server and sends the queue at once, when the last read failed or the server could not be reached; signed out, it waits for the visitor to be back, as `schedule` drops a retry armed before the refusal.

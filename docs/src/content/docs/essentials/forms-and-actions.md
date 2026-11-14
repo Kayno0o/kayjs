@@ -262,7 +262,7 @@ Its text is shown with the same status, 500. If the function itself throws, or a
 
 `ctx.redirect()` in the handler sends the browser elsewhere. Write it as `return ctx.redirect()`, as in a guard. Under a `base` the path goes under it however the action was posted or called. A path to a page of your site is written as a visit to it is answered, in the locale of the page and with the `trailingSlash` spelling, so the browser takes one request to get there. A path to a file, an endpoint or another site stays as you wrote it.
 
-Without a redirect the post goes back to the page. There `add.succeeded()` holds what the handler returned, for that one render.
+Without a redirect the post goes back to the page. There `add.data()` holds what the handler returned, for that one render.
 
 The handler's `ctx` also has `url`, `notFound()` and `deny()`, as a page's does.
 
@@ -425,7 +425,7 @@ A string names a load of the page instead, the binding of a top-level `const car
 - A timeout, a 504 or a network failure after the post was sent needs a `when`, as the handler may have run. A redirect and an abort are never tried again, whatever `when` says.
 - Every try of a call sends the same `Idempotency-Key` header. The handler reads it from `ctx.request` to tell a repeat from a new call.
 - `timeout: '0s'` means no timeout, and text that is no duration throws.
-- `onStart`, `onSuccess`, `onError` and `onSettled` observe the call. Each gets one object (`{ input }`, `{ data }`, `{ error }` with an `ApiError`, `{ data, error }`). An abort and a redirect are no error, though `onSettled` runs for them with the failure. For a stream, `onSuccess` runs when the stream starts, not when it ends, and `latest` does not abort a stream that has started. A hook that throws is logged and never fails the call.
+- `onStart`, `onData`, `onError` and `onSettled` observe the call. Each gets one object (`{ input }`, `{ value }`, `{ error }` with an `ApiError`, `{ data, error }`). An abort and a redirect are no error, though `onSettled` runs for them with the failure. For a stream, `onData` runs when the stream starts, not when it ends, and `latest` does not abort a stream that has started. A hook that throws is logged and never fails the call.
 
 ```ts
 await save(card, { timeout: '8s', retry: 2, onError: ({ error }) => toast(error.message) })
@@ -491,7 +491,7 @@ import { reply } from '../routes/chat.kay'
 const answer = signal<ActionStream<string> | undefined>(undefined)
 ---
 button(onClick={async () => answer = await reply({ prompt: 'Hello' })}) Ask
-p {answer()?.last()}
+p {answer()?.data()}
 ```
 
 Yield the whole text so far, not just the new piece. Then `last()` is all the island needs.
@@ -512,7 +512,7 @@ An effect running again closes the stream it started. One started under no owner
 
 A bot caught by a `pretend` protection gets `undefined` back, not a stream, since the handler never ran.
 
-A form posted without JavaScript waits for the end and gets the last value, through `reply.succeeded()`. In a test, `site.call(reply, input)` gives every value.
+A form posted without JavaScript waits for the end and gets the last value, through `reply.data()`. In a test, `site.call(reply, input)` gives every value.
 
 ## Fixed fields
 
@@ -538,7 +538,7 @@ The values travel in the form's action URL. A visitor can change them as they co
 
 `add.track()` gives a handle for one component. Its `pending()` reads only the calls made through it, `status()` is `idle` before the first call, `error()` is the last failure as an `ApiError`, and `retry()` sends the call that failed again with the same arguments, as they were.
 
-A retry gives no result back; read `status()`, or add `onSuccess` and `onError` to the handle. Every source shares this shape: see [island sources](/llms/island-sources). A call resolves with how it went, instead of throwing when the server refuses it. [`call.track()`](/guides/api-routes) gives an API route's calls the same result.
+A retry gives no result back; read `status()`, or add `onData` and `onError` to the handle. Every source shares this shape: see [island sources](/llms/island-sources). A call resolves with how it went, instead of throwing when the server refuses it. [`call.track()`](/guides/api-routes) gives an API route's calls the same result.
 
 To wait for writes you did not await, `await add.settled()` resolves once no call to `add` is running, and `removing.settled()` once none made through the handle is. It resolves whichever way the calls went, and never throws. A call whose action redirects rejects with an `ActionRedirectError` carrying `location` once the browser has gone there (the swap has shown the page, or a full load has started), so it stops running, as it does when a leave guard keeps the visitor on the page.
 
@@ -567,7 +567,7 @@ Any answer other than success gives `{ ok: false, status, message, errors, data,
 
 A success gives `{ ok: true, data }`. A failure with no answer from the server, such as a lost connection, still throws.
 
-`add.failed()` and `add.succeeded()` read the outcome in a server fence, a template, a component and an island alike. Each gives `undefined` when there is none.
+`add.failed()` and `add.data()` read the outcome in a server fence, a template, a component and an island alike. Each gives `undefined` when there is none.
 
 ## File uploads
 

@@ -52,8 +52,8 @@ const source = resource(entriesApi, '/:collection/:slug', {
   seed: false,
 })
 // A single collection's entry is the collection: no slug under its title, its locale still shown. Until the collection is known its slug is taken for a single one's when it is `index`, the only slug a single entry has, so that slug never flashes.
-const isSingle = () => { const loaded = source.value(); return loaded === undefined ? entry.slug === SINGLE_SLUG : loaded.collection.single === true }
-const collectionName = () => collectionTitle({ name: entry.collection, title: source.value()?.collection.title })
+const isSingle = () => { const loaded = source.data(); return loaded === undefined ? entry.slug === SINGLE_SLUG : loaded.collection.single === true }
+const collectionName = () => collectionTitle({ name: entry.collection, title: source.data()?.collection.title })
 const subtitle = memo(() => isSingle() ? entry.locale : entry.locale === undefined ? collectionName() : `${collectionName()} (${entry.locale})`)
 // The page editor asks no author and is listed with no name. The server strips the names of the room it joins for an edit link's holder, who is only counted, and sends them to an editor the app's guard let in.
 const room = entryRoom(entry.collection, entry, { name: '', page: true })
@@ -64,23 +64,23 @@ const removed = signal(false)
 const stranded = signal<string>()
 let created = false
 const lastSave = signal<SavedState>()
-const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave = saved, rebuildFinished, { instances: serverInstances() })
+const onSaved = savedHandler(() => source.data()?.entry.url, saved => lastSave = saved, rebuildFinished, { instances: serverInstances() })
 onCleanup(onSaved.stop)
 // A click on the page types in the entry's text fields there while this form stands.
-onCleanup(registerInline(entryKey(entry), { collection: () => source.value()?.collection, failed: () => source.status() === 'failed', busy: () => saving() || removed() }))
+onCleanup(registerInline(entryKey(entry), { collection: () => source.data()?.collection, failed: () => source.status() === 'failed', busy: () => saving() || removed() }))
 // What the signed-in person's role may not do, which locks the fields it covers once the server has said.
 const can = resource(editorApi, '/can', { seed: false })
 // One scope for as long as the answer stands, so the fields render in the one the notices ask which fields are shown.
 const scope = memo(() => {
-  const answer = source.value()
+  const answer = source.data()
 
-  return answer && Object.defineProperty(formScope(drafts, entry, answer.collection), 'denied', { get: () => can.value()?.denied })
+  return answer && Object.defineProperty(formScope(drafts, entry, answer.collection), 'denied', { get: () => can.data()?.denied })
 })
 let box: HTMLElement | undefined
 let nav: HTMLElement | undefined
 
 effect(() => {
-  const answer = source.value()
+  const answer = source.data()
 
   // A file that does not parse opens empty, and saving writes the form over it.
   if (answer)
@@ -90,7 +90,7 @@ effect(() => {
 // The item of the form it is collapsed to, or all of it while none: a click on the page or an anchor collapses it, Show all fields or a refused save opens it again. A field keeps what was typed in it while hidden.
 const current = signal<string>()
 const anchors = memo(() => {
-  const answer = source.value()
+  const answer = source.data()
 
   return answer ? anchorsOf(fieldsOf(answer.collection.schema), answer.collection.body !== undefined, answer.collection.layout?.form) : []
 })
@@ -124,12 +124,12 @@ function reveal(path: string): void {
     const control = field?.querySelector<HTMLElement>('input, textarea, select')
 
     control?.focus()
-    placeCaret(control, entry, path, path === BODY_ID || fieldAtPath(fieldsOf(source.value()!.collection.schema), drafts.entry(entry)?.data, path)?.kind === 'markdown')
+    placeCaret(control, entry, path, path === BODY_ID || fieldAtPath(fieldsOf(source.data()!.collection.schema), drafts.entry(entry)?.data, path)?.kind === 'markdown')
   })
 }
 
 // The form is loaded once its entry has come, which the page's clicks wait for.
-const loaded = memo(() => source.value() !== undefined)
+const loaded = memo(() => source.data() !== undefined)
 
 // Typing in a field on the page collapses the form to it, which keeps the focus where it is.
 effect(() => {
@@ -181,7 +181,7 @@ async function save(): Promise<boolean> {
 
   try {
     // A single collection's seed is no entry yet: the first save writes it.
-    saved = await saveDraft(drafts, entry, { create: source.value()?.seeded === true && !created, onSaved: (outcome) => {
+    saved = await saveDraft(drafts, entry, { create: source.data()?.seeded === true && !created, onSaved: (outcome) => {
       created = true
       onSaved(outcome)
 
@@ -203,11 +203,11 @@ async function save(): Promise<boolean> {
 }
 
 // Publish and Unpublish change the draft flag alone: with edits not saved they refuse, saving nothing, and a refused save puts the flag back.
-const draftField = () => source.value()?.collection.draftField
+const draftField = () => source.data()?.collection.draftField
 const stages = createReview(entry, undefined, drafts)
 
 effect(() => {
-  const answer = source.value()
+  const answer = source.data()
 
   if (answer)
     stages.review.set(revived(answer.review))
@@ -226,7 +226,7 @@ async function setDraft(value: boolean): Promise<void> {
 
 // The entries referring to this one, read when the delete confirmation opens.
 const referrers = signal<string[]>([])
-const title = () => { const answer = source.value(); return answer ? entryTitle(answer.collection, answer.entry) : entry.slug }
+const title = () => { const answer = source.data(); return answer ? entryTitle(answer.collection, answer.entry) : entry.slug }
 
 async function askReferrers(): Promise<void> {
   referrers = []
@@ -241,11 +241,11 @@ async function remove(): Promise<void> {
   if (saving())
     return
 
-  const url = source.value()?.entry.url
+  const url = source.data()?.entry.url
   // Known before the delete, so a screens' address that cannot be read stops it rather than leaving a page that no longer exists.
-  const screen = url !== undefined && isShown(url) ? collectionPath(can.value()?.prefix ?? (await call(editorApi, '/can')).prefix, entry.collection) : undefined
+  const screen = url !== undefined && isShown(url) ? collectionPath(can.data()?.prefix ?? (await call(editorApi, '/can')).prefix, entry.collection) : undefined
 
-  if (!await deleteSaved(entry, drafts.version(entry) ?? source.value()?.entry.version))
+  if (!await deleteSaved(entry, drafts.version(entry) ?? source.data()?.entry.version))
     return
 
   drafts.reset(entry)
@@ -268,16 +268,16 @@ onCleanup(registerSaver(entry, { pending: () => unsaved() && !saving() && !remov
 PageSection.kcms-entry(title={isSingle() ? collectionName() : title()} level={3} subtitle={subtitle()} sticky aria-busy={saving()} ref={element => box = element})
   @actions
     .kcms-entry-actions
-      EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()} url={source.value()?.entry.url})
+      EntrySaveState(changed={drafts.changed(entry)} saving={saving()} saved={lastSave()} url={source.data()?.entry.url})
       ResetButton(disabled={saving() || removed() || !unsaved()} onReset={() => drafts.reset(entry)})
       Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || removed() || !unsaved()} onClick={save})
   // Under the head, which stays on one line on a phone.
-  if source.value() then answer
+  if source.data() then answer
     if draftField() !== undefined || (!isSingle() && !answer.seeded)
       .kcms-entry-more
-        EntryState(draftField={draftField()} draft={isDraft()} dirty={unsaved()} saving={saving() || removed()} denied={can.value()?.denied} title={title()} url={answer.entry.url} referrers={referrers()} deletable={!isSingle() && !answer.seeded} onPublish={() => setDraft(false)} onUnpublish={() => setDraft(true)} onRemove={remove} onAskReferrers={askReferrers})
+        EntryState(draftField={draftField()} draft={isDraft()} dirty={unsaved()} saving={saving() || removed()} denied={can.data()?.denied} title={title()} url={answer.entry.url} referrers={referrers()} deletable={!isSingle() && !answer.seeded} onPublish={() => setDraft(false)} onUnpublish={() => setDraft(true)} onRemove={remove} onAskReferrers={askReferrers})
         if answer.collection.review && !answer.seeded
-          EntryReview(review={stages.review()} draft={isDraft()} denied={can.value()?.denied} dirty={unsaved()} busy={saving() || removed() || stages.busy()} onSubmit={stages.submit} onApprove={stages.approve} onSendBack={stages.sendBack})
+          EntryReview(review={stages.review()} draft={isDraft()} denied={can.data()?.denied} dirty={unsaved()} busy={saving() || removed() || stages.busy()} onSubmit={stages.submit} onApprove={stages.approve} onSendBack={stages.sendBack})
   EntryPresence(room={room.room} member={room.member})
   if stages.review() then stage
     EntryReviewLog(review={stage} draft={isDraft()})
@@ -286,7 +286,7 @@ PageSection.kcms-entry(title={isSingle() ? collectionName() : title()} level={3}
       a(href={screen}) {wording('cms.entry.deletedLeave', 'Go to the collection')}
   else if source.status() === 'failed'
     Notice.kcms-entry-failure(tone="danger" size="sm" label={wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })})
-  else if source.value() then answer
+  else if source.data() then answer
     if answer.entry.problem then problem
       Notice.kcms-entry-failure(tone="danger" size="sm" label={wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })})
     if unmarked() !== ''

@@ -54,7 +54,6 @@ import { islandOnlyComponents } from './island-only'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 import { largePublicImages } from './large-images'
 
-import { localState } from './local-state'
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
@@ -65,6 +64,7 @@ import { removedUiTokens } from './removed-ui-tokens'
 import { schemaType } from './schema-type'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
+import { sourceReaders } from './source-readers'
 import { unusedStatusPages } from './status-pages'
 import { storeNames } from './store-names'
 import { testHelpers } from './test-helpers'
@@ -169,7 +169,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
-  async ({ root, options }) => localState(root, options),
+  async ({ root, options }) => sourceReaders(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
 
   async ({ root, options }) => persistedCall(root, options),

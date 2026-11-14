@@ -783,11 +783,12 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     expect(await page.count('li.issue')).toBe(50)
   }, 90_000)
 
-  it('reads the queue as unsynced() and syncStatus(), and the old pending() and status() as they were', async () => {
+  it('reads the queue as sync.queued() and sync.status(), and status() and pending() as every source does', async () => {
     const page = await opened()
 
-    expect(await page.text('p.oldstatus')).toBe('synced')
-    expect(await page.text('p.oldpending')).toBe('0')
+    expect(await page.text('p.status')).toBe('synced')
+    expect(await page.text('p.loadstatus')).toBe('ready')
+    expect(await page.text('p.loadpending')).toBe('false')
 
     await page.route('/_kay/action/*', async (request) => {
       await Bun.sleep(1500)
@@ -797,12 +798,12 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     await write(page, 'button.add', 'slow')
     await page.waitUntil(() => document.querySelector('.status')?.textContent === 'unsynced')
 
-    expect(await page.text('p.oldstatus')).toBe('pending')
+    expect(await page.text('p.loadstatus')).toBe('ready')
     expect(await page.text('p.pending')).toBe('1')
-    expect(await page.text('p.oldpending')).toBe('1')
+    expect(await page.text('p.loadpending')).toBe('false')
     await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
 
-    expect(await page.text('p.oldstatus')).toBe('offline')
+    expect(await page.text('p.loadstatus')).toBe('ready')
     expect(await page.text('p.error')).toBe('')
   }, 60_000)
 
@@ -817,6 +818,7 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
 
     expect(await page.text('p.error')).toBe('read broke')
     expect(await page.text('p.errorstatus')).toBe('0')
+    expect(await page.text('p.loadstatus')).toBe('failed')
 
     // A failed read is tried again after 5 s on its own, which a loaded run can reach before the count is read.
     const failures = Number((await hooks(page))[2])
@@ -843,6 +845,7 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced')
 
     expect(await page.text('p.error')).toBe('')
+    expect(await page.text('p.loadstatus')).toBe('ready')
     expect(await page.evaluate(() => (window as unknown as { mixed: boolean }).mixed)).toBe(false)
     expect((await hooks(page))[1]).not.toBe('0')
   }, 60_000)

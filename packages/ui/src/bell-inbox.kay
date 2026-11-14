@@ -60,13 +60,13 @@ const asked = load ? resource(async () => await load()) : undefined
 
 // Every item with `key`, `label` and `href`, filled from the inbox's `{ id, title, url }` for an item of the inbox.
 const items = memo((): readonly (Item & ReturnType<typeof bellItem>)[] => {
-  const listed: readonly (BellItem | InboxItem)[] = !custom ? inbox?.value()?.items ?? [] : typeof source === 'function' ? asked?.value() ?? [] : source ?? []
+  const listed: readonly (BellItem | InboxItem)[] = !custom ? inbox?.data()?.items ?? [] : typeof source === 'function' ? asked?.data() ?? [] : source ?? []
 
   return listed.map(note => bellItem(note) as Item & ReturnType<typeof bellItem>)
 })
 // A function source still on its first answer has nothing to say yet, so the list does not claim to be empty.
-const waiting = () => asked !== undefined && asked.value() === undefined && asked.error() === undefined
-const unread = () => custom ? unreadCount ?? items().filter(note => !note.read).length : inbox?.value()?.unread ?? 0
+const waiting = () => asked !== undefined && asked.data() === undefined && asked.error() === undefined
+const unread = () => custom ? unreadCount ?? items().filter(note => !note.read).length : inbox?.data()?.unread ?? 0
 const linked = (url: string | undefined) => url !== undefined && LINKED.test(url) ? url : undefined
 const name = () => unread() > 0 ? wording('ui.bell.unread', '{label}, {count} unread', { label, count: unread() }) : label
 
@@ -81,7 +81,7 @@ const announced = signal('')
 let known: Set<string> | undefined
 
 effect(() => {
-  if (typeof source === 'function' ? asked?.value() === undefined : inbox?.value() === undefined)
+  if (typeof source === 'function' ? asked?.data() === undefined : inbox?.data() === undefined)
     return
 
   const fresh = items().find(note => !note.read && known !== undefined && !known.has(note.key))

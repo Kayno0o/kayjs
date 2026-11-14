@@ -75,7 +75,7 @@ const messages = socket(chat, '/:room', { params: { room } })
 const text = signal('')
 ---
 p {messages.status()}
-p {messages.last()?.text}
+p {messages.data()?.text}
 input(bind:value={text})
 button(onClick={() => messages.send({ text: text() })}) Send
 ```

@@ -204,7 +204,7 @@ input(bind:value={search})
 if list.status() === 'loading'
   p Loading
 ul
-  for note of list.value() ?? [] key={note.text}
+  for note of list.data() ?? [] key={note.text}
     li {note.text}
 ```
 
@@ -320,7 +320,7 @@ const answer = stream(chat, '/answer', {
   body: { prompt: 'Hello' },
 })
 ---
-p {answer.last()}
+p {answer.data()}
 ```
 
 `last()` is the latest event, `onData(({ value }) => ...)` gets each one, and `status()` tells whether the stream is open, done or failed. A failed stream has its reason in `error()`, and `retry()` starts it again. `await answer.ended()` waits for the end and gives the last event, or throws the reason it failed.
@@ -340,7 +340,7 @@ const answer = stream(chat, '/answer', { method: 'post', start: false })
 input(value={prompt()} onInput={event => prompt = event.currentTarget.value})
 button(onClick={() => answer.start({ body: { prompt: prompt() } })}) Ask
 button(onClick={answer.close} disabled={answer.status() !== 'open'}) Stop
-p {answer.last()}
+p {answer.data()}
 ```
 
 `close()` aborts the request, and the route's source stops as it would if the browser went away.
@@ -393,7 +393,7 @@ const { room } = props<{ room: string }>()
 const messages = socket(chat, '/:room', { params: { room } })
 const text = signal('')
 ---
-p {messages.last()?.text}
+p {messages.data()?.text}
 input(bind:value={text})
 button(onClick={() => messages.send({ text: text() })}) Send
 ```

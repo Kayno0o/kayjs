@@ -65,7 +65,7 @@ form(action={subscribe})
 
 ### Show what a post returned
 
-The handler's result comes back on the next render of the page, once, through `createToken.succeeded()`:
+The handler's result comes back on the next render of the page, once, through `createToken.data()`:
 
 ```kay
 --- server
@@ -73,10 +73,10 @@ import { s, action } from 'kay'
 
 export const createToken = action(s.Object({ label: s.String({ maxLength: 80 }) }), async () => crypto.randomUUID())
 
-const done = createToken.succeeded()
+const done = createToken.data()
 ---
 if done
-  p Your token: {done.data}
+  p Your token: {done}
 form(action={createToken})
   input(field="label")
   button Create
@@ -254,15 +254,15 @@ form(action={add})
 
 ### Reading the outcome
 
-- `add.failed()`, `add.succeeded()` and `add.error('title')` read the outcome from any template, layout, component or island, and from the server fence.
+- `add.failed()`, `add.data()`, `add.status()` and `add.error('title')` read the outcome from any template, layout, component or island, and from the server fence.
 - `error()` without a field is the form-wide message, `errors['']`.
 - The field name is typed from the schema.
 - An island reads them in the browser too, as its server render did, but for `values`, which stay on the server, so no field the server cannot tell is a secret reaches the page's source: the fields hold what was sent.
 - Once the page shown called the action, they read how its last call went instead, reactively, a call clearing them as it starts: an island calling `add({ title })` catches the `ActionError` and `add.error('title')` shows the message, the field marked invalid.
-- `await add.validate(form, field?)` checks a form against the action's schema, writing what it refuses into `add.error(field)` and `add.failed()` in place of the last outcome (`succeeded()` too), for every field or `field` alone; it resolves whether it is accepted, posts nothing, and accepts a form with no schema on the page (a client-only island's). kayjs-ui's `Form`, `SaveForm` and `FormDialog` take `validate="submit" | "blur"`.
-- A post that succeeds goes back to the page with what the handler returned: `add.succeeded()` returns `{ data }`, typed from the action, or `undefined`, on that one render only.
+- `await add.validate(form, field?)` checks a form against the action's schema, writing what it refuses into `add.error(field)` and `add.failed()` in place of the last outcome (`data()` too), for every field or `field` alone; it resolves whether it is accepted, posts nothing, and accepts a form with no schema on the page (a client-only island's). kayjs-ui's `Form`, `SaveForm` and `FormDialog` take `validate="submit" | "blur"`.
+- A post that succeeds goes back to the page with what the handler returned: `add.data()` returns it, typed from the action, or `undefined`, on that one render only; `add.status()` is `ready` then. `succeeded()`, which wrapped it in `{ data }`, works until 1.108 and `kay check` rewrites it.
 - `data` travels in a cookie, sealed (AES-GCM under a key derived from [the app secret](environment.md#the-app-secret), else a key of the process, which a restart changes), so a secret shown once, such as a new API token, can be neither read nor altered in it.
-- Data too big for it, over about 3.5 KB sealed, is left out with a warning, and `succeeded()` returns `undefined`, as it does for a cookie that does not open, forged or sealed before a restart.
+- Data too big for it, over about 3.5 KB sealed, is left out with a warning, and `data()` returns `undefined`, as it does for a cookie that does not open, forged or sealed before a restart.
 - A prerendered page reads both too: the request carrying that cookie renders it afresh, see [Prerendering](prerendering.md#prerendering).
 - The cookie carrying `succeeded()` back is `HttpOnly`, `SameSite=Lax`, and `Secure` when the request came over https, `X-Forwarded-Proto` included, as is every request in production when `site` is https.
 

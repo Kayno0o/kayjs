@@ -64,7 +64,7 @@ const { slides: given, slide, list, index = 0, onIndexChange, loop = true, perVi
   empty?: Snippet | undefined
 } & ({ slides: readonly Slide[], list?: undefined } | { slides?: undefined, list: InfiniteList<Slide> })>()
 
-const all = () => list ? list.rows() : given ?? []
+const all = () => list ? list.data() : given ?? []
 
 const shown = signal(index)
 // Whether the pointer or the focus is on the carousel, or the carousel scrolled out of view, which holds the autoplay, as `every` does for a hidden tab.

@@ -26,6 +26,6 @@ const feed = infiniteList(rowsOf(0, first), {
   if table
     Table(columns={[{ key: 'name', header: 'Name' }]} list={feed} rowKey="id" virtual={virtual})
   else
-    for row of feed.rows() key={row.id}
+    for row of feed.data() key={row.id}
       p.row {row.name}
     LoadMore(list={feed})

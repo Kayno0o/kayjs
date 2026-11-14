@@ -109,7 +109,18 @@ export interface Source<S extends LoadStatus | ConnectionStatus = LoadStatus | C
   retry: () => void
 }
 
-export type SocketStatus = 'connecting' | 'open' | 'failed' | 'closed'
+/** @deprecated Write `ConnectionStatus`, which a socket shares with every connection. Removed in 1.108.0. No lint: a type, and a socket still never reads `idle`. */
+export type SocketStatus = ConnectionStatus
+
+// What every source an island reads shares, plus the value it read and the hooks that tell it: `list.data()`, `list.onData(({ value }) => ...)`, `list.onError(({ error }) => ...)`. Not `live()`, which is the value itself.
+export interface Reader<T, S extends LoadStatus | ConnectionStatus = LoadStatus | ConnectionStatus> extends Source<S> {
+  // What it read last, kept while it is read again; undefined before the first.
+  data: () => T | undefined
+  // Called with `{ value }` for every value it takes in, the shape every source hands its data in; returns what stops it.
+  onData: (listener: (event: { value: T }) => void) => () => void
+  // Called with `{ error }` each time it fails; returns what stops it.
+  onError: (listener: (event: { error: ApiError }) => void) => () => void
+}
 
 // The callbacks a socket or a stream takes in its options, and as methods of the same names: `onX` after a transition, one object argument. One that throws is logged and leaves the source alone.
 export interface ConnectionHooks<T> {
@@ -123,20 +134,14 @@ export interface ConnectionHooks<T> {
   onClose?: ((event: { status: 'done' | 'failed' | 'closed' }) => void) | undefined
 }
 
-export interface Socket<Send, Receive> extends Source<SocketStatus> {
+export interface Socket<Send, Receive> extends Reader<Receive, ConnectionStatus> {
   // Sent at once while open, otherwise once the connection opens.
   send: (message: Send) => void
-  // The last message received, read reactively; undefined before the first.
+  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   last: () => Receive | undefined
-  // `failed` when the server closed it with a code from 4000 to 4999, its `error().status` the code minus 4000; any other drop reconnects.
-  status: () => SocketStatus
 
-  // Called with `{ value }` for every message received, the shape every source hands its data in; returns what stops it.
-  onData: (listener: (event: { value: Receive }) => void) => () => void
   // Called each time the connection opens, a reconnect included, before what was queued goes: where a client joins its rooms again, or refetches what it missed (`reconnected` is true after the first open). Returns what stops it.
   onOpen: (listener: (event: { reconnected: boolean }) => void) => () => void
-  // Called with `{ error }` when it fails; returns what stops it.
-  onError: (listener: (event: { error: ApiError }) => void) => () => void
   // Called with `{ status }` when it ends, `failed` or `closed`, once; returns what stops it.
   onClose: (listener: (event: { status: 'done' | 'failed' | 'closed' }) => void) => () => void
   // Closes for good: no reconnecting after.
@@ -144,18 +149,12 @@ export interface Socket<Send, Receive> extends Source<SocketStatus> {
 }
 
 // What every stream of values an island reads shares: a `stream()`, and the stream a streaming action answers with.
-export interface Connection<T> extends Source<ConnectionStatus> {
-  // The last value received, read reactively; undefined before the first.
+export interface Connection<T> extends Reader<T, ConnectionStatus> {
+  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   last: () => T | undefined
-  // `idle` until a stream opened with `start: false` starts, `done` once it ran to its end, `failed` when it was refused or its source threw, `closed` once `close()` was called.
-  status: () => ConnectionStatus
 
-  // Called with `{ value }` for every value received, the shape every source hands its data in; returns what stops it.
-  onData: (listener: (event: { value: T }) => void) => () => void
   // Called each time the stream opens, a reconnect included (`reconnected` is true after the first open): where an island refetches what a drop may have lost, when the route sends no ids to resume from. A streaming action's answer is open before a listener can attach, so for it this runs after `retry()` only. Returns what stops it.
   onOpen: (listener: (event: { reconnected: boolean }) => void) => () => void
-  // Called with `{ error }` when it fails; returns what stops it.
-  onError: (listener: (event: { error: ApiError }) => void) => () => void
   // Called with `{ status }` once a run ends, `done`, `failed` or `closed`; returns what stops it.
   onClose: (listener: (event: { status: 'done' | 'failed' | 'closed' }) => void) => () => void
   close: () => void
@@ -260,8 +259,9 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined, 
       else if (!closed && queued.push(text) > MAX_QUEUED)
         queued.shift()
     },
+    data: link.last,
     last: link.last,
-    status: link.status as () => SocketStatus,
+    status: link.status,
     pending: link.pending,
     error: link.error,
     retry: () => {
@@ -417,6 +417,7 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
       link.restart()
       void read(run)
     },
+    data: link.last,
     last: link.last,
     status: link.status,
     pending: link.pending,
@@ -533,7 +534,7 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>, hooks?
   onMount(start)
   onCleanup(close)
 
-  return { last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), ...connectionHooks(link, opened.on, hooks), ended: ended(link), close, start }
+  return { data: link.last, last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), ...connectionHooks(link, opened.on, hooks), ended: ended(link), close, start }
 }
 
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page, or with `start: false` each time `start()` is called: each value typed as the route sends it, Dates, Maps and Sets included.
@@ -585,9 +586,6 @@ export function stream(module: unknown, path?: string | ConnectionHooks<unknown>
   return { ...reader, ...connectionHooks(link, reader.onOpen, options), ended: ended(link), start }
 }
 
-// What a resource's status can be: it starts loading, so never idle.
-type ResourceState = Exclude<LoadStatus, 'idle'>
-
 // When a resource asks its route again by itself: when the tab gets the focus back, when the network returns, or every so often while the tab shows.
 export type Revalidation = 'focus' | 'reconnect' | Duration
 
@@ -607,17 +605,9 @@ export interface ResourceExtras<T> {
   onError?: ((event: { error: ApiError }) => void) | undefined
 }
 
-export interface Resource<T> extends Source<ResourceState> {
-  // What the route last answered, kept while it is asked again; undefined before the first answer.
+export interface Resource<T> extends Reader<T, LoadStatus> {
+  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   value: () => T | undefined
-  // `loading` until the route answers, and again each time it is asked anew; `pending()` also reads a quiet reload that keeps `ready`.
-  status: () => ResourceState
-  // Why the last request failed as an `ApiError`, kept while the route is asked again until it answers. `retry()` asks again after a failure only.
-  error: () => ApiError | undefined
-  // Called with `{ value }` each time the route answers, as the `onData` option; returns what stops it.
-  onData: (listener: (event: { value: T }) => void) => () => void
-  // Called with `{ error }` each time a request fails, as the `onError` option; returns what stops it.
-  onError: (listener: (event: { error: ApiError }) => void) => () => void
   // Asks the route again with the same options, until the component that read it is gone, even when it is ready.
   refresh: () => void
   // Sets the value at once, for every resource sharing its key, and asks the route again to settle it: a request still in flight is dropped, so an older answer never overwrites it. `{ refresh: false }` keeps the value as set. Given a function, it gets the current value.
@@ -689,7 +679,7 @@ class Entry {
   value: unknown
   // Counts the values written, 0 before the first, so a Sink copies a value only once.
   rev: number
-  status: ResourceState
+  status: LoadStatus
   error: ApiError | undefined = undefined
   busy: boolean
   asked: Read | undefined = undefined
@@ -865,7 +855,7 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
     return serverResource(keyOf(first), route && first?.seed !== false ? urlOf(first) : undefined, first?.initial === undefined ? undefined : { value: first.initial })
 
   const [value, setValue] = ownSignal<unknown>(undefined, { equals: false })
-  const [status, setStatus] = ownSignal<ResourceState>('loading')
+  const [status, setStatus] = ownSignal<LoadStatus>('loading')
   const [error, setError] = ownSignal<ApiError | undefined>(undefined)
   const [busy, setBusy] = ownSignal(true)
   let entry: Entry | undefined
@@ -1009,6 +999,7 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
   })
 
   return {
+    data: value,
     value,
     status,
     pending: busy,
@@ -1090,11 +1081,15 @@ async function callApi<Module, const Path extends CallPath<Module>, const M exte
 }
 
 // A route handle over `call` with a pending count of its own: `const save = call.track(api, '/notes', { onError: ({ error }) => toast.error(error.message) })`, then `await save({ method: 'post', body })` resolves `{ ok, data }` or the route's refusal as `{ ok: false, status, errors, data }`, as an action's `track()` does, and `save.pending()` reads only its own calls. A call that got no answer (status 0) or was aborted still throws.
-export interface TrackedApi<Module, Path> extends Source<LoadStatus> {
+export interface TrackedApi<Module, Path> extends Reader<unknown, LoadStatus> {
   <const M extends CallMethod<NodeAt<Module, Path>> = never>(...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<CallResult<ApiAnswer<Module, Path, M>, unknown>>
   readonly pending: () => boolean
   readonly settled: () => Promise<void>
-  // Called with `{ data, input }` when a call succeeds, `input` the options it was given; returns what stops it. Hooks given to `call.track()` run first.
+  // What the last call that succeeded answered; undefined before the first.
+  readonly data: () => unknown
+  // Called with `{ value, input }` when a call succeeds, `input` the options it was given; returns what stops it. Hooks given to `call.track()` run first.
+  readonly onData: (listener: (event: { value: unknown, input: unknown }) => void) => () => void
+  /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   readonly onSuccess: (listener: (event: { data: unknown, input: unknown }) => void) => () => void
   // Called with `{ error, input }` when a call fails, a refusal or no answer (which still throws), not for an abort; returns what stops it.
   readonly onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void

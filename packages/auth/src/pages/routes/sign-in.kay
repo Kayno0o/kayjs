@@ -63,7 +63,7 @@ const oauthError = oauthFailure(ctx.url.searchParams.get('error'))
 const signInError = refusal(password.failed(), features.captcha)
 const mailError = refusal(magicLink.failed(), features.captcha)
 const codeError = emailCode.failed()?.data?.error
-const mailedTo = magicLink.succeeded()?.data
+const mailedTo = magicLink.data()
 const { askRemember, providerLinks } = rememberOf(features, redirect, provider => wording('auth.signIn.provider', 'Continue with {provider}', { provider }), features.providers)
 const codes = features.codes?.['magic-link'] ?? 'link'
 const landmark = ctx.locals.auth.features().pages?.main !== false

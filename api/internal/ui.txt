@@ -1461,6 +1461,7 @@ function infiniteList<Row, Target extends Action<never, unknown> = never>(given:
 
 [./lib/index] InfiniteList
 interface InfiniteList<Row> extends Source<LoadStatus>
+  data: () => Row[]
   ended: () => boolean
   error: () => ApiError<unknown> | undefined
   failed: () => boolean
@@ -1472,7 +1473,7 @@ interface InfiniteList<Row> extends Source<LoadStatus>
   reload: (rows?: Row[] | undefined) => Promise<void>
   restart: (change: { sort?: SortState | undefined; filter?: Partial<ListFilter>; }) => Promise<void>
   retry: () => Promise<void>
-  rows: () => Row[]
+  /** @deprecated Write `data()`. Removed in 1.108.0. No lint: `infiniteList()` comes from kayjs-ui, whose bindings `kay check` does not follow. */ rows: () => Row[]
   sort: () => SortState | undefined
   sortBy: (sort: SortState | undefined) => Promise<void>
   status: () => LoadStatus
@@ -1957,6 +1958,7 @@ function infiniteList<Row, Target extends Action<never, unknown> = never>(given:
 
 [./lib/infinite-list] InfiniteList
 interface InfiniteList<Row> extends Source<LoadStatus>
+  data: () => Row[]
   ended: () => boolean
   error: () => ApiError<unknown> | undefined
   failed: () => boolean
@@ -1968,7 +1970,7 @@ interface InfiniteList<Row> extends Source<LoadStatus>
   reload: (rows?: Row[] | undefined) => Promise<void>
   restart: (change: { sort?: SortState | undefined; filter?: Partial<ListFilter>; }) => Promise<void>
   retry: () => Promise<void>
-  rows: () => Row[]
+  /** @deprecated Write `data()`. Removed in 1.108.0. No lint: `infiniteList()` comes from kayjs-ui, whose bindings `kay check` does not follow. */ rows: () => Row[]
   sort: () => SortState | undefined
   sortBy: (sort: SortState | undefined) => Promise<void>
   status: () => LoadStatus
@@ -1986,9 +1988,10 @@ interface ListFilter
 
 [./lib/infinite-list] LoadMoreSource
 interface LoadMoreSource extends Source<LoadStatus>
+  data: () => readonly unknown[]
   ended: () => boolean
   more: () => unknown
-  rows: () => readonly unknown[]
+  /** @deprecated Write `data()`. Removed in 1.108.0. No lint: a list of your own is no call `kay check` knows. */ rows?: (() => readonly unknown[]) | undefined
 
 [./lib/infinite-list] LoadSource
 interface LoadSource<Row>

@@ -75,12 +75,12 @@ export const removePasskey = action(schemas.removePasskey, async (input, ctx) =>
 const auth = ctx.locals.auth
 const user = await auth.requireUser()
 const features = auth.features()
-const passwordSaved = changePassword.succeeded() !== undefined
+const passwordSaved = changePassword.status() === 'ready'
 const passwordRefused = changePassword.failed()?.data
-const setupUri = setUp.succeeded()?.data ?? enable.failed()?.values.uri
+const setupUri = setUp.data() ?? enable.failed()?.values.uri
 const setupKey = setupUri && new URL(setupUri).searchParams.get('secret')
 const twoFactorError = setUp.failed()?.data?.error ?? enable.failed()?.data?.error ?? regenerate.failed()?.data?.error ?? disable.failed()?.data?.error
-const recoveryCodes = enable.succeeded()?.data ?? regenerate.succeeded()?.data
+const recoveryCodes = enable.data() ?? regenerate.data()
 // Where a guard sent the user from to turn two-factor on: back there once it is on and its recovery codes were seen.
 const back = localPath(ctx.url.searchParams.get('redirect'), '')
 

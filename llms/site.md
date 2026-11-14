@@ -360,7 +360,7 @@ import { checkComment } from '../comment'
 import type { CommentErrors } from '../comment'
 
 const errors = signal<CommentErrors>(comment.failed()?.errors ?? {})
-const thanked = signal(comment.succeeded()?.data.name ?? '')
+const thanked = signal(comment.data()?.name ?? '')
 
 async function submit(event: SubmitEvent) {
   event.preventDefault()

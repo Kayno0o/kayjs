@@ -175,7 +175,7 @@ A server action is an `async` function marked `'use server'`. A kay action is ex
 | --- | --- |
 | `'use server'` function in a form | `export const add = action(schema, handler)` and `form(action={add})` |
 | `formData.get('title')` and manual checks | The schema, with `field="title"` checked against it by `kay check` |
-| `useActionState` | `add.error('title')`, `add.failed()`, `add.succeeded()` |
+| `useActionState` | `add.error('title')`, `add.failed()`, `add.data()` |
 | `useFormStatus` | `add.pending()` |
 | A returned error object | `return ctx.fail(409, { message })`, read as `add.failed()?.data` |
 | Calling the action from a client component | Import it from the page and call it, `await add({ title })` |

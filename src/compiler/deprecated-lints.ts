@@ -2,14 +2,14 @@ import type { Lint } from './lints'
 
 // The lints of the `deprecated` group, with the other lints in `LINTS`; each stays three minors from its `since`.
 export const DEPRECATED_LINTS = {
-  'deprecated-local-state': {
+  'deprecated-source-readers': {
     level: 'warn',
     group: 'deprecated',
-    since: '1.92',
+    since: '1.105',
     site: true,
-    summary: '`pending()` and `status()` of a `local()` collection, `unsynced()` and `syncStatus()` since 1.92: every other source reads `pending()` as a boolean and `status()` as `idle|loading|ready|failed`, so the count of writes waiting and the sync states took names of their own. The old names work until 2.0, which gives `pending()` and `status()` the meaning they have on every source, so this lint stays past the three minors of the others and a template rendering `{todos.pending()}` would read `true` then. Found in the TypeScript files and `.kay` files of the project, templates included, on a name bound once to a call of `local` from `kay`, as `kay check` reads no types: a collection reached through a property, a prop or another file is not found. The fix renames the method, and a `status()` compared with a string (`===`, `!==`, `==`, `!=` or a `switch`) reads `\'unsynced\'` for `\'pending\'`; a `status()` read in any other way is reported with no fix.',
-    wrong: '---\nimport { local } from \'kay\'\nimport { save } from \'./notes\'\n\nconst notes = local({ key: \'id\', read: () => [], put: save })\n---\np {notes.pending()} waiting',
-    right: '---\nimport { local } from \'kay\'\nimport { save } from \'./notes\'\n\nconst notes = local({ key: \'id\', read: () => [], put: save })\n---\np {notes.unsynced()} waiting',
+    summary: 'The readers and hooks of an island\'s sources before 1.105, which every source reads alike since: `data()` in place of `value()` (a `resource`), `last()` (a `stream` or `socket`) and `rows()` (a `local` collection), `onData` in place of `onSuccess` (a `track()` handle) and `onSync` (a collection), whose event hands `value` where they handed `data` and `rows`, an action\'s `data()` and `status()` in place of `succeeded()`, and a collection\'s `sync.queued()` and `sync.status()` in place of `unsynced()` and `syncStatus()`. The old names work until 1.108. Found in the TypeScript files and `.kay` files of the project, templates included, on a name bound once to a call of `resource`, `stream`, `socket` or `local` from `kay` or to a `.track()` call, as `kay check` reads no types: a source reached through a property, a prop or another file is not found; `succeeded()` is found on any receiver. The fix renames the member, and the `data` or `rows` of a hook\'s inline handler to `value`; `succeeded()?.data` becomes `data()` and `succeeded() !== undefined` becomes `status() === \'ready\'`. A `succeeded()` read in any other way, a handler that is no inline function and a shorthand hook are reported with no fix.',
+    wrong: '---\nimport { local, resource } from \'kay\'\nimport notesApi from \'../api/notes\'\nimport { save } from \'./notes\'\n\nconst list = resource(notesApi, \'/\')\nconst notes = local({ key: \'id\', read: () => [], put: save })\n---\np {list.value()?.length} on the server, {notes.rows().length} here, {notes.unsynced()} waiting',
+    right: '---\nimport { local, resource } from \'kay\'\nimport notesApi from \'../api/notes\'\nimport { save } from \'./notes\'\n\nconst list = resource(notesApi, \'/\')\nconst notes = local({ key: \'id\', read: () => [], put: save })\n---\np {list.data()?.length} on the server, {notes.data().length} here, {notes.sync.queued()} waiting',
   },
   'deprecated-ui-props': {
     level: 'warn',
@@ -329,7 +329,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.89', removedIn: '1.93' },
   { since: '1.90', removedIn: '1.94' },
   { since: '1.91', removedIn: '1.95' },
-  { since: '1.92' },
+  { since: '1.92', removedIn: '1.105' },
   { since: '1.96', removedIn: '1.100' },
   { since: '1.97', removedIn: '1.101' },
   { since: '1.98' },
