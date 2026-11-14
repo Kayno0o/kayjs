@@ -129,6 +129,24 @@ An action and an API route import `choice`. An island writes `import type { Choi
 
 <ReadMore href="/llms/schemas">Where a shared schema lives, and what an island may read of it.</ReadMore>
 
+## Filling a form from a record
+
+An edit form starts from something that already exists. Give the form the record as `values` and every field it names starts from the property of the same name, so each field is written once.
+
+```kay
+form(action={save} values={todo})
+  input(field="title")
+  input(field="done" type="checkbox")
+  textarea(field="note")
+  select(field="size")
+    option(value="s") Small
+    option(value="m") Medium
+```
+
+A text or a number fills an `input` or a `textarea`, and a `Date` fills a date field. A boolean ticks a checkbox, a list ticks the checkboxes whose `value` it holds, and a text or a number ticks the radio button or picks the option it equals. A property that is missing, `null` or a function leaves the field as you wrote it.
+
+A field's own `value` is the fallback for a property the record lacks. When a post is refused, the page shows what the visitor sent, not the record, so their edits survive.
+
 ## Showing errors
 
 A post the schema refuses renders the page again, and the fields keep what was sent. An `error` line shows the message of a field. A bare `error` shows the form-wide one.

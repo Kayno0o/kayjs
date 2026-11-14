@@ -9,8 +9,24 @@ const site = await testSite({ root: 'tests/fixtures/form-once', browser: true })
 const { save } = await import(join(import.meta.dir, 'fixtures/form-once/src/routes/index.kay')) as { save: Action<Record<string, string | boolean | string[]>, unknown> }
 const { rename } = await import(join(import.meta.dir, 'fixtures/form-once/src/routes/island.kay')) as { rename: Action<Record<string, string | boolean>, unknown> }
 const path = browserPath()
+const mounted = await testSite({ root: 'tests/fixtures/form-once', islands: false, base: '/blog', trailingSlash: 'always' })
+const { save: mountedSave } = await import(join(import.meta.dir, 'fixtures/form-once/src/routes/index.kay')) as { save: Action<Record<string, string | boolean | string[]>, unknown> }
 
 describe('a form given the record its fields start from', () => {
+  it('fills the fields and shows a refused post under a base path', async () => {
+    const { html } = await mounted.visit('/blog/')
+
+    expect(html).toContain('value="Buy milk"')
+    expect(html).toContain('<option value="m" selected>Medium</option>')
+
+    const refused = await mounted.submit(mountedSave, { title: 'ab', size: 's', kind: '1' }, { from: '/blog/' })
+
+    expect(refused.status).toBe(422)
+    expect(refused.html).toContain('value="ab" aria-invalid="true"')
+    expect(refused.html).not.toContain('Buy milk')
+    expect(refused.html).toContain('<option value="s" selected>Small</option>')
+  })
+
   it('fills every kind of field on a static page, the template\'s own value and a null left as written', async () => {
     const { html } = await site.visit('/')
 
