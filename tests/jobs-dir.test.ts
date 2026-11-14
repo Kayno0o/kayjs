@@ -38,6 +38,7 @@ export const helper = 'a string no plugin'
 await Bun.write(join(root, 'src/jobs/_private.ts'), `import { schedule } from 'kay/server'\n\nexport const never = schedule({ every: '1m' }, () => { throw new Error('mounted') })\n`)
 await Bun.write(join(root, 'src/jobs/deep/nested.ts'), `import { schedule } from 'kay/server'\n\nexport const deep = schedule({ every: '5m' }, () => undefined)\n`)
 await Bun.write(join(root, 'src/jobs/readme.md'), '# not a job\n')
+await Bun.write(join(root, 'src/jobs/mail.test.ts'), 'throw new Error(\'a test file is mounted\')\n')
 
 const site = await testSite({ root, islands: false })
 

@@ -118,7 +118,7 @@ See [Sessions and guards](/guides/sessions-and-guards).
 | Laravel | kay |
 | --- | --- |
 | A queued job | `queue` from `kay/server`, with retries |
-| `$schedule->daily()` | `schedule('@daily', job)` from `kay/server` |
+| `$schedule->daily()` | `schedule({ cron: '@daily' }, job)` from `kay/server` |
 | A long-running worker | `background(work)` from `kay/server` |
 | Mailables and Markdown mail | [kayjs-mail](/libraries/kayjs-mail): a mail is a `.kay` component, sent with `enqueue` or `send` |
 | `Storage::put()` | `files.put()` from `kay/server`, see [File storage](/guides/file-storage) |

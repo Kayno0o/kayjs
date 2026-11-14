@@ -107,6 +107,18 @@ export const c = queue('c', (payload, signal /* the run's */, job) => [payload, 
     expect(found.map(one => one.fixes)).toEqual([undefined, undefined])
   })
 
+  it('leaves a handler of the new shape alone, annotated or not, and one using the name the fix would add', async () => {
+    const { found, text } = await fixed(`${IMPORT}
+export const a = queue('a', (payload: string, ctx: JobContext) => [payload, ctx])
+export const b = schedule({ every: '1m' }, (run: ScheduleRun) => run)
+export const c = background(async (_input: undefined, ctx: JobContext) => ctx)
+export const d = background(async (signal) => _.debounce(signal))
+`, jobHandlers)
+
+    expect(found.map(one => one.fixes)).toEqual([undefined])
+    expect(text).toContain('background(async (signal) => _.debounce(signal))')
+  })
+
   it('leaves a function that is not imported from kay/server alone', async () => {
     const { found } = await fixed('import { queue } from \'./mine\'\n\nexport const a = queue(\'a\', (payload, signal) => [payload, signal])\n', jobHandlers)
 
@@ -166,6 +178,9 @@ export const e = diskFiles({ dir: 'x' })
 `, diskFilesCalls)
 
     expect(found).toHaveLength(3)
+    const other = await fixed(`${IMPORT}\nconst options = { dir: 'x' }\nexport const a = diskFiles(options)\nexport const b = diskFiles('x')\n`, diskFilesCalls)
+
+    expect(other.found).toHaveLength(1)
     expect(text).toBe(`${IMPORT}
 export const a = diskFiles({ dir: 'data/uploads' })
 export const b = diskFiles({ dir: dir, onWrite: audit, onDelete })

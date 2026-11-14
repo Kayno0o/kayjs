@@ -736,7 +736,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     told: async (hook, event) => dispatch(`mail.${hook}`, [({ onStart, onSuccess, onRetry, onError } as Record<typeof hook, Hook<QueueEvent> | undefined>)[hook]], event),
   }
 
-  agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, failedTtl: queueOptions.failedTtl, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
+  agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, failedTtl: queueOptions.failedTtl, lostAfter: queueOptions.timeout ?? queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
   MAILERS.set(via, new WeakRef(owner))
   FORGOTTEN.register(owner, via)
 
@@ -761,7 +761,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
   })
   // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped. Its worker starts with the first `mail.list()`, so a mailer with no list runs no more queue than before lists.
-  const listJobs = queue<QueuedRun>(`${name}-list`, async ({ via: queuedBy, ...run }, { signal }) => ownerOf(queuedBy).run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll }))
+  const listJobs = queue<QueuedRun>(`${name}-list`, async ({ via: queuedBy, ...run }, { signal }) => ownerOf(queuedBy).run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, timeout: queueOptions.timeout ?? queueOptions.lostAfter, enabled: queueOptions.enabled, idlePoll: queueOptions.idlePoll }))
   const plugin = new Elysia().use(jobs).use(listJobs)
 
   mountListRoutes(plugin, () => lists)

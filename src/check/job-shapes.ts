@@ -10,6 +10,7 @@ import { scan } from './renamed-exports'
 
 const FROM_SERVER = (source: string) => source === 'kay/server' || source === '@kayjs/kay/server'
 const JOBS = /\b(?:queue|workflow|schedule|background)\b/
+const UNDERSCORE = /(?<![\w$])_(?:input)?(?![\w$])/
 const SCHEDULE = /\bschedule\b/
 const LOST_AFTER = /\blostAfter\b/
 const DISK_FILES = /\bdiskFiles\b/
@@ -45,6 +46,16 @@ function plainName(param: Param | undefined, signal = false): param is NodeOfTyp
   return signal && annotation.type === 'TSTypeReference' && annotation.typeName.type === 'Identifier' && annotation.typeName.name === 'AbortSignal' && annotation.typeArguments == null
 }
 
+// Whether a parameter reads as the signal of the old shape: named like one, or annotated `AbortSignal`, and not a context.
+function signalLike(param: NodeOfType<'Identifier'>): boolean {
+  const annotation = param.typeAnnotation?.typeAnnotation
+
+  if (annotation == null)
+    return SIGNAL_NAME.test(param.name)
+
+  return annotation.type === 'TSTypeReference' && annotation.typeName.type === 'Identifier' && annotation.typeName.name === 'AbortSignal'
+}
+
 const binding = (name: string, key: string) => name === key ? key : `${key}: ${name}`
 
 // The handlers a call of one of the four hands over, where the handler is: a queue's or workflow's second argument, a background job's first, a schedule's jobs, the second argument, a list of them or the values of a table.
@@ -76,7 +87,7 @@ function handlersOf(call: CallNode, name: (typeof JOB_CALLS)[number]): FunctionN
 function queueEdits(fn: FunctionNode, base: number): Edit[] | null | undefined {
   const [, signal, job] = fn.params
 
-  if (signal === undefined || signal.type !== 'Identifier' || (fn.params.length < 3 && !SIGNAL_NAME.test(signal.name) && signal.typeAnnotation == null))
+  if (signal === undefined || signal.type !== 'Identifier' || (fn.params.length < 3 && !signalLike(signal)))
     return undefined
 
   if (fn.params.length > 3 || !plainName(signal, true) || (job !== undefined && !plainName(job)))
@@ -112,7 +123,7 @@ function workflowEdits(fn: FunctionNode, base: number): Edit[] | null | undefine
 function signalEdits(fn: FunctionNode, base: number, source: string): Edit[] | null | undefined {
   const [signal] = fn.params
 
-  if (fn.params.length !== 1 || signal?.type !== 'Identifier' || (!SIGNAL_NAME.test(signal.name) && signal.typeAnnotation == null))
+  if (fn.params.length !== 1 || signal?.type !== 'Identifier' || !signalLike(signal))
     return undefined
 
   if (!plainName(signal, true))
@@ -129,7 +140,10 @@ function editsOf(fn: FunctionNode, name: (typeof JOB_CALLS)[number], base: numbe
   if (name === 'queue')
     return queueEdits(fn, base)
 
-  return name === 'workflow' ? workflowEdits(fn, base) : signalEdits(fn, base, source)
+  const edits = name === 'workflow' ? workflowEdits(fn, base) : signalEdits(fn, base, source)
+
+  // The fix adds an unused parameter named `_` or `_input`, which would shadow one the body reads.
+  return edits && UNDERSCORE.test(source.slice(base + fn.body!.start, base + fn.body!.end)) ? null : edits
 }
 
 // The options written after a first argument, as the properties of the new object or, for any other expression, spread into it.
@@ -240,7 +254,10 @@ export async function diskFilesCalls(root: string, options: CheckOptions): Promi
           : callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && namespaces.has(callee.object.name) && callee.property.type === 'Identifier' && callee.property.name === 'diskFiles'
         const [dir, hooks] = node.arguments
 
-        if (!isDisk || dir!.type === 'ObjectExpression')
+        // A string is the old form; an object, or any other expression that may hold one, is the new.
+        const oldForm = node.arguments.length === 2 || dir!.type === 'TemplateLiteral' || (dir!.type === 'Literal' && typeof dir!.value === 'string')
+
+        if (!isDisk || !oldForm)
           return
 
         const spread = spreadOf(source, base, hooks)

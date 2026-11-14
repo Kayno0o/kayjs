@@ -13,6 +13,8 @@ import { bundled, importModule } from './server/bundle'
 // The directory of the app's own server plugins, whose files `pages()` uses before the extensions', in the order of their names.
 export const PLUGINS_DIR = 'src/plugins'
 const PLUGIN_FILE = /^[^_.][^.]*\.ts$/
+// A test or declaration file beside the jobs is no job.
+const NOT_A_JOB = /\.(?:test|spec|d)\.ts$/
 
 // The directory of the app's jobs: every queue, workflow, schedule and background job a file under it exports is mounted, with no default export and no `.use`.
 export const JOBS_DIR = 'src/jobs'
@@ -35,7 +37,7 @@ export function jobFiles(root: string): string[] {
 
   return readdirSync(dir, { recursive: true, encoding: 'utf8' })
     .map(name => name.split(sep).join('/'))
-    .filter(name => name.endsWith('.ts') && !name.endsWith('.d.ts') && !name.split('/').some(part => part.startsWith('_') || part.startsWith('.')) && statSync(join(dir, name)).isFile())
+    .filter(name => name.endsWith('.ts') && !NOT_A_JOB.test(name) && !name.split('/').some(part => part.startsWith('_') || part.startsWith('.')) && statSync(join(dir, name), { throwIfNoEntry: false })?.isFile() === true)
     .sort()
 }
 
