@@ -26,10 +26,12 @@ const look = recipe({
   },
 })
 
-const { label, name, issue, hint, required = false, group = false, size = 'md', actions, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { label, name: written, field, issue, hint, required = false, group = false, size = 'md', actions, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   label: string
   // The field the control posts as: the message its form's action refused it with shows here, inside a `form(action)`, a Form, a FormDialog or a SaveForm.
   name?: string | undefined
+  // `name`, and the control in it written bare, `input` with no `name`, takes it too, with the constraints and `aria-*` of the action's schema. Static text, inside a `form(action)`.
+  field?: string | undefined
   // A message of the page's own, shown beside the one the form's action gave `name`.
   issue?: string | undefined
   // What the control takes or what it does, under it and above any message.
@@ -40,6 +42,8 @@ const { label, name, issue, hint, required = false, group = false, size = 'md', 
   // Sits on the label's line, pushed right: a preset button, a unit, a count.
   actions?: Snippet
 }>()
+
+const name = written ?? field
 
 // The star alone is a convention a visitor may not know (RGAA 11.10), so the word follows it; a screen reader gets the control's own aria-required instead.
 const requiredWord = wording('ui.field.required', 'required')

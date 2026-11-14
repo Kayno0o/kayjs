@@ -30,8 +30,8 @@ const title = signal(post.title)
 Button(label="Rename" onClick={() => editing = true})
 FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" failureLabel="Could not rename" onSave={saved => title = saved.title} onOpenChange={() => editing = false})
   input(type="hidden" name="id" value={post.id})
-  FormField(label="Title" name="title" required)
-    input.kui-field-input(name="title" value={title()})
+  FormField(label="Title" field="title" required)
+    input.kui-field-input(value={title()})
 ```
 
 - `open` and `onOpenChange` are optional: with `open` given the app drives the dialog and learns of a close through `onOpenChange`; without it the dialog keeps its own state, a `@trigger(attributes)` block opening it (`button({...attributes})`), and `onOpenChange` still hears `true` and `false`. `failureLabel` defaults to `ui.formDialog.failure`.
@@ -53,8 +53,8 @@ The FormFields (and Checkboxes and Toggles) a static page hands Form, FormDialog
 
 ```kay
 Form(action={add} saved="Added.")
-  FormField(label="Title" name="title" required)
-    input(name="title")
+  FormField(label="Title" field="title" required)
+    input
   Button(type="submit" label="Add")
 ```
 
@@ -76,6 +76,7 @@ A form in steps keeps the step in the URL: `Steps(steps={[{ key: 'account', labe
 
 FormField also works outside a dialog, in a plain form posting to an action:
 
+- `field="title"` is `name` and names the control written bare in it: an `input` with no `name` or `field` takes `name="title"`, the constraints and `aria-*` of the action's schema and, in a form with `values`, the record's value. A control with a name of its own keeps it. Write static text.
 - `issue` shows a message of the page's own, such as `rename.failed()?.errors.title`.
 - `hint` explains the control, under it. `@actions` sits at the end of the label's line. `required` marks the label with a `*` hidden from screen readers, which read the control's own `required`.
 - The label holds only the label's text and the control, so the hint, the messages and the action stay out of the control's accessible name.

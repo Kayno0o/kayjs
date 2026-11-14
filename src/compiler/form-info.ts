@@ -1,10 +1,27 @@
-import type { Attribute, ElementNode, Node, Span } from './ast'
+import type { Attribute, ElementNode, NamedAttribute, Node, Span } from './ast'
+import { FIELD_ATTRIBUTE, FIELD_ELEMENTS } from './ast'
 import { actionOf, componentAction } from './form-action'
-import { walkNodes } from './template-walk'
+import { visitNodes, walkNodes } from './template-walk'
 
-// What a form holds besides its action: the record `values={todo}` fills its fields from.
+const WHITESPACE = /\s+/g
+const ID_UNSAFE = /[^\w-]+/g
+const NO_NAMES: ReadonlyMap<string, number> = new Map()
+
+// What a form holds besides its action: the record `values={todo}` fills its fields from, and the fields its `label(field=...)` lines name, each with the number of controls in the form that carry that name.
 export interface FormInfo {
   values: Span | undefined
+  labelled: ReadonlyMap<string, number>
+}
+
+// The id a `label(field="title")` points at and the control of that field takes, from the action of the form the two sit in: `save-title`.
+export function fieldIdOf(action: string, field: string): string {
+  return `${action.replace(WHITESPACE, '').replace(ID_UNSAFE, '-')}-${field.replace(ID_UNSAFE, '-')}`
+}
+
+// The name a component's `field="title"` gives the bare controls written in its content: a `FormField(field="title")` around an `input`.
+export interface FieldContent {
+  name: string
+  at: Extract<NamedAttribute, { kind: 'static' }>
 }
 
 // The `values={todo}` of a form posting to an action, or of a component given an `action`.
@@ -25,18 +42,80 @@ export function valuesCall(element: ElementNode, attribute: Attribute, source: s
   return attribute.kind === 'expression' && valuesOf(element, source) === attribute && CALL.test(source.slice(attribute.expression.start, attribute.expression.end))
 }
 
+// The static `field="title"` a component is given: the name its bare controls take.
+function fieldOfComponent(element: ElementNode, source: string): FieldContent | undefined {
+  if (!element.component)
+    return undefined
+
+  const attribute = element.attributes.find(candidate => candidate.kind === 'static' && source.slice(candidate.name.start, candidate.name.end) === FIELD_ATTRIBUTE)
+
+  return attribute?.kind === 'static' ? { name: attribute.text, at: attribute } : undefined
+}
+
+// The static `field="..."` or `name="..."` of an element.
+function writtenName(element: ElementNode, source: string, ...attributes: string[]): string | undefined {
+  const found = element.attributes.find(candidate => candidate.kind === 'static' && attributes.includes(source.slice(candidate.name.start, candidate.name.end)))
+
+  return found?.kind === 'static' ? found.text : undefined
+}
+
+// The fields a form's `label(field="...")` lines name, with how many controls of the form carry each name: the control of a field named once takes the id its label points to.
+function labelledFields(element: ElementNode, source: string): ReadonlyMap<string, number> {
+  const labels = new Set<string>()
+  const controls: string[] = []
+
+  visitNodes(element.children, (node) => {
+    if (node.kind !== 'element')
+      return
+
+    if (node.component) {
+      const name = writtenName(node, source, FIELD_ATTRIBUTE)
+
+      if (name !== undefined) {
+        visitNodes(node.children, (inner) => {
+          if (inner.kind === 'element' && isBareControl(inner, source))
+            controls.push(name)
+        })
+      }
+    }
+    else if (node.name === 'label') {
+      const name = writtenName(node, source, FIELD_ATTRIBUTE)
+
+      if (name !== undefined)
+        labels.add(name)
+    }
+    else if (FIELD_ELEMENTS.has(node.name)) {
+      const name = writtenName(node, source, 'name', FIELD_ATTRIBUTE)
+
+      if (name !== undefined)
+        controls.push(name)
+    }
+  })
+
+  return labels.size === 0 ? NO_NAMES : new Map([...labels].map(name => [name, controls.filter(control => control === name).length]))
+}
+
+// Whether a control writes neither `name` nor `field`, so the component around it may name it.
+export function isBareControl(element: ElementNode, source: string): boolean {
+  return !element.component && FIELD_ELEMENTS.has(element.name) && !element.attributes.some(attribute => attribute.kind === 'spread' || ['name', FIELD_ATTRIBUTE].includes(source.slice(attribute.name.start, attribute.name.end)))
+}
+
 // The action of the innermost `form(action={...})` each node sits in; a node outside every such form has none.
 // `loose` lists the nodes whose innermost form is a component given an `action` instead, whose input type `kay check` leaves alone and which an island does not wire.
-// `infos` holds what that form carries beside its action.
-export function formTargets(nodes: readonly Node[], source: string): { targets: Map<Node, Span>, loose: Set<Node>, infos: Map<Node, FormInfo> } {
+// `infos` holds what that form carries beside its action, and `inherited` the field a component around a node names for it.
+export function formTargets(nodes: readonly Node[], source: string): { targets: Map<Node, Span>, loose: Set<Node>, infos: Map<Node, FormInfo>, inherited: Map<Node, FieldContent> } {
   const targets = new Map<Node, Span>()
   const loose = new Set<Node>()
   const infos = new Map<Node, FormInfo>()
+  const inherited = new Map<Node, FieldContent>()
 
-  walkNodes<{ target: Span, loose: boolean, info: FormInfo } | undefined>(nodes, undefined, (node, found) => {
+  walkNodes<{ target: Span, loose: boolean, info: FormInfo, field: FieldContent | undefined } | undefined>(nodes, undefined, (node, found) => {
     if (found) {
       targets.set(node, found.target)
       infos.set(node, found.info)
+
+      if (found.field)
+        inherited.set(node, found.field)
 
       if (found.loose)
         loose.add(node)
@@ -47,10 +126,13 @@ export function formTargets(nodes: readonly Node[], source: string): { targets: 
 
     const form = actionOf(node, source) ?? componentAction(node, source)
 
-    return form ? { target: form.expression, loose: node.component, info: { values: valuesOf(node, source)?.expression } } : found
+    if (form)
+      return { target: form.expression, loose: node.component, info: { values: valuesOf(node, source)?.expression, labelled: labelledFields(node, source) }, field: undefined }
+
+    return found && node.component ? { ...found, field: fieldOfComponent(node, source) ?? found.field } : found
   })
 
-  return { targets, loose, infos }
+  return { targets, loose, infos, inherited }
 }
 
 // The helpers a template calls to fill its fields from the record of a form.

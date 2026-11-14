@@ -1,3 +1,4 @@
+import type { Reader } from './a11y-markup'
 import type { Diagnostic, ElementNode, KayFile, NamedAttribute, Node, SnippetNode } from './ast'
 import { elementHasContent, markupLints, reader } from './a11y-markup'
 import { ABSTRACT_ROLES, ARIA_ATTRIBUTES, ARIA_STATE_VALUES, closest, REQUIRED_STATES, ROLES, validAutocomplete } from './aria'
@@ -178,6 +179,42 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
   return [...elementLints(file), ...markupLints(file)]
 }
 
+// Whether an `aria-label` is ignored on an element: it has no role, or a role that takes no name.
+function isUnnameable({ attribute }: Reader, element: ElementNode): boolean {
+  if (!UNNAMEABLE.has(element.name))
+    return false
+
+  const role = attribute(element, 'role')
+
+  return role === undefined || (role.kind === 'static' && ROLELESS.test(role.text))
+}
+
+// Whether an element's markup gives a screen reader the tooltip's text without the keyboard: a name or a description, or the text itself as its only child.
+function speaksForTooltip(read: Reader, element: ElementNode): boolean {
+  const { attribute, has, text } = read
+
+  if (DESCRIBING.some(name => has(element, name) && !(name === 'aria-label' && isUnnameable(read, element))))
+    return true
+
+  const tooltip = attribute(element, 'data-tooltip')
+  const [only, ...rest] = element.children
+
+  if (!tooltip || tooltip.kind === 'boolean' || only?.kind !== 'text' || rest.length > 0)
+    return false
+
+  const parts = only.parts.filter(part => part.kind !== 'chunk' || part.text.trim() !== '')
+
+  if (parts.length !== 1)
+    return false
+
+  const [part] = parts
+
+  if (tooltip.kind === 'expression')
+    return part!.kind === 'expression' && text(part!.expression).trim() === text(tooltip.expression).trim()
+
+  return tooltip.kind === 'static' && part!.kind === 'chunk' && part!.text.trim() === tooltip.text.trim()
+}
+
 // What a page needs to be used without seeing it, read off the markup alone: a control with no label, a button or link with nothing to announce, a heading skipping a level.
 function elementLints(file: KayFile): Diagnostic[] {
   const { source } = file
@@ -224,38 +261,6 @@ function elementLints(file: KayFile): Diagnostic[] {
       return staticValue(element, 'type')?.toLowerCase() !== 'hidden'
 
     return FOCUSABLE.has(element.name)
-  }
-  // Whether an `aria-label` is ignored on an element: it has no role, or a role that takes no name.
-  const isUnnameable = (element: ElementNode) => {
-    if (!UNNAMEABLE.has(element.name))
-      return false
-
-    const role = attribute(element, 'role')
-
-    return role === undefined || (role.kind === 'static' && ROLELESS.test(role.text))
-  }
-  // Whether an element's markup gives a screen reader the tooltip's text without the keyboard: a name or a description, or the text itself as its only child.
-  const speaksForTooltip = (element: ElementNode) => {
-    if (DESCRIBING.some(name => has(element, name) && !(name === 'aria-label' && isUnnameable(element))))
-      return true
-
-    const tooltip = attribute(element, 'data-tooltip')
-    const [only, ...rest] = element.children
-
-    if (!tooltip || tooltip.kind === 'boolean' || only?.kind !== 'text' || rest.length > 0)
-      return false
-
-    const parts = only.parts.filter(part => part.kind !== 'chunk' || part.text.trim() !== '')
-
-    if (parts.length !== 1)
-      return false
-
-    const [part] = parts
-
-    if (tooltip.kind === 'expression')
-      return part!.kind === 'expression' && text(part!.expression).trim() === text(tooltip.expression).trim()
-
-    return tooltip.kind === 'static' && part!.kind === 'chunk' && part!.text.trim() === tooltip.text.trim()
   }
   // The edits writing a hand-made tooltip target as kayjs-ui's `Tooltip`, with the import it needs, or nothing when the file does not use the library or names something else `Tooltip`.
   const tooltipEdits = (element: ElementNode): { start: number, end: number, text: string }[] | undefined => {
@@ -430,6 +435,9 @@ function elementLints(file: KayFile): Diagnostic[] {
     if (element.name === 'label') {
       const target = staticValue(element, 'for')
 
+      // `label(field="title")` points at the control of that field in its form, as `for` points at an id; one with no `field` adds `field:undefined`, which no control asks for.
+      labelled.add(`field:${staticValue(element, 'field')}`)
+
       if (target !== undefined) {
         labelled.add(target)
         labels.push({ element, target })
@@ -470,8 +478,8 @@ function elementLints(file: KayFile): Diagnostic[] {
       }
     }
 
-    if (has(element, 'data-tooltip') && !focusable(element) && attribute(element, 'tabindex')?.kind !== 'expression' && !speaksForTooltip(element)) {
-      const generic = isUnnameable(element)
+    if (has(element, 'data-tooltip') && !focusable(element) && attribute(element, 'tabindex')?.kind !== 'expression' && !speaksForTooltip(read, element)) {
+      const generic = isUnnameable(read, element)
       const base = 'a tooltip shows as the pointer or the focus lands on its element, and the keyboard never lands on this one'
       const note = generic && has(element, 'aria-label') ? `${base}, and a screen reader ignores an \`aria-label\` on a role-less element` : base
       const help = `put it on a \`button\` or a link, give the element \`tabindex="0"\` (kayjs-ui's \`Tooltip\` does for text), say the same in ${generic ? '' : '`aria-label` or '}visible text, or write \`data-hint\` for text only the pointer adds, which kayjs-ui's \`TooltipHost\` shows`
@@ -629,7 +637,9 @@ function elementLints(file: KayFile): Diagnostic[] {
     const dynamicId = !control.id && named(control).some(attribute => attribute.kind === 'expression' && text(attribute.name) === 'id')
 
     // An id written as an expression may be the one a label points at.
-    if (dynamicId || (id !== undefined && labelled.has(id)))
+    const field = staticValue(control, 'field') ?? staticValue(control, 'name')
+
+    if (dynamicId || (id !== undefined && labelled.has(id)) || (field !== undefined && labelled.has(`field:${field}`)))
       continue
 
     lint(control, 'missing-label', `This \`${control.name}\` has no label`, { note: 'a screen reader announces a field by its label, and says nothing of what to type in one without', help: id === undefined ? 'wrap it in a `label`, or give it an id a `label(for="...")` points at' : `add \`label(for="${id}")\`, or name it with \`aria-label\`` })

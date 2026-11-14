@@ -288,14 +288,16 @@ ul
 ```kay
 form(action={comment})
   error
-  label(for="name") Name
-  input#name(field="name")
+  label(field="name") Name
+  input(field="name")
   error name
-  label(for="text") Comment
-  textarea#text(field="text")
+  label(field="text") Comment
+  textarea(field="text")
   error text
   button Send
 ```
+
+- `label(field="name")` writes the label's `for` and the id of the control of that field ([forms](actions.md#name-a-field-once)).
 
 - With kay's script, the form posts without a reload, checked first in the browser against the schema, each refused field showing the schema's `error` message in the browser's bubble.
 

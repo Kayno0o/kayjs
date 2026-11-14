@@ -1,5 +1,5 @@
 import type { UiEntry } from '../runtime/ui'
-import type { FormInfo } from './form-info'
+import type { FieldContent, FormInfo } from './form-info'
 import { actionOf, componentAction } from './form-action'
 import { formTargets, initialHelpers } from './form-info'
 import { childBlocks, someNode, visitNodes, walkNodes } from './template-walk'
@@ -343,21 +343,26 @@ export const UNCHECKED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', '
 // The input types whose role takes no `aria-required`, as the runtime's `UNREQUIRABLE_TYPES`.
 export const UNREQUIRABLE_TYPES = new Set(['radio', 'range', 'file', 'color'])
 
-// Only an element whose name and type are written out: the compiler then knows which field it is and how it shows its value.
-export function formFieldOf(element: ElementNode, source: string): FormField | undefined {
+// Only an element whose name and type are written out: the compiler then knows which field it is and how it shows its value; `inherited` is the name a component around a bare control gives it.
+export function formFieldOf(element: ElementNode, source: string, inherited?: string): FormField | undefined {
   if (element.component || !FIELD_ELEMENTS.has(element.name) || element.attributes.some(attribute => attribute.kind === 'spread'))
     return undefined
 
   const attributes = new Map((element.attributes as NamedAttribute[]).map(attribute => [source.slice(attribute.name.start, attribute.name.end), attribute]))
-  const name = attributes.get('name') ?? attributes.get(FIELD_ATTRIBUTE)
+  const written = attributes.get('name') ?? attributes.get(FIELD_ATTRIBUTE)
+  let name = inherited
+
+  if (written)
+    name = written.kind === 'static' ? written.text : undefined
+
   const type = attributes.get('type')
 
-  if (name?.kind !== 'static' || (type !== undefined && type.kind !== 'static'))
+  if (name === undefined || (type !== undefined && type.kind !== 'static'))
     return undefined
 
   const bound = [...attributes.keys()].some(attribute => attribute.startsWith('bind:'))
   const inputType = type?.text.toLowerCase() ?? 'text'
-  const field: FormField = { name: name.text, marked: !attributes.has('name'), invalid: !attributes.has('aria-invalid') && (element.name !== 'input' || !UNCHECKED_TYPES.has(inputType)) }
+  const field: FormField = { name, marked: !attributes.has('name'), invalid: !attributes.has('aria-invalid') && (element.name !== 'input' || !UNCHECKED_TYPES.has(inputType)) }
 
   // A disabled field posts nothing, so it would come back empty or unticked.
   if (bound || attributes.has('disabled'))
@@ -553,6 +558,8 @@ export interface TemplateFacts {
   formInfos: Map<Node, FormInfo>
   // The helpers the fields filled from a form's record call.
   initial: ('formInitial' | 'formInitialChecked' | 'formStart')[]
+  // The field a component around a node names for it: `FormField(field="title")` around a bare `input`.
+  inherited: Map<Node, FieldContent>
   // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.
   functions: Map<number, boolean>
   // How the template names each prop the script types `Bindable<T>`, to its key, which only the script tells: set where the code is generated.
@@ -714,8 +721,8 @@ function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
 }
 
 function factsOf(file: KayFile): TemplateFacts {
-  const { targets, loose, infos } = formTargets(file.template, file.source)
-  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: targets, loose, formInfos: infos, initial: initialHelpers(infos), functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
+  const { targets, loose, infos, inherited } = formTargets(file.template, file.source)
+  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: targets, loose, formInfos: infos, initial: initialHelpers(infos), inherited, functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
   const text = (span: Span) => file.source.slice(span.start, span.end)
 
   visitNodes(file.template, (node) => {

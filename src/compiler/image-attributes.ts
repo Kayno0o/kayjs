@@ -5,6 +5,22 @@ import { decodeEntities } from './expression'
 type WrittenAttribute = Extract<NamedAttribute, { kind: 'static' | 'expression' }>
 type Source = (span: Span) => string
 
+// An image loads lazily and decodes off the main thread unless the template says otherwise: a hero above the fold sets `loading="eager"` or `fetchpriority="high"`.
+export function imageDefaults(element: ElementNode, named: (name: string) => boolean): [string, string][] {
+  if (element.name !== 'img')
+    return []
+
+  const defaults: [string, string][] = []
+
+  if (!named('loading') && !named('fetchpriority'))
+    defaults.push(['loading', 'lazy'])
+
+  if (!named('decoding'))
+    defaults.push(['decoding', 'async'])
+
+  return defaults
+}
+
 export interface ImageOptionAttributes {
   aspect: WrittenAttribute | undefined
   quality: WrittenAttribute | undefined

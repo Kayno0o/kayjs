@@ -7,12 +7,13 @@ import type { BindingPlan, ElementShape } from './plan'
 import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
-import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
+import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
 import { addBoundWrites, calledByBinds, changeOf } from './bound-props'
 import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
-import { IMAGE_OPTIONS, imageOptions, NO_PLACEHOLDER, placeholderOff, writeImageArguments } from './image-attributes'
+import { IMAGE_OPTIONS, imageDefaults as imageDefaultsOf, imageOptions, NO_PLACEHOLDER, placeholderOff, writeImageArguments } from './image-attributes'
 import { contentOf } from './items'
+import { controlId, fieldAttribute, inheritedAttributes, inheritedField } from './markup-fields'
 import { PROPS } from './names'
 import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, shapeOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
 import { bindEvent } from './validate'
@@ -201,14 +202,15 @@ export abstract class TemplateWriter {
     const { target } = shape
     const classAttribute = this.classAttribute(element)
     const sizes = this.imageSizes(element)
-    const field = target && formFieldOf(element, this.src)
+    const inherited = inheritedField(element, this.src, this.facts)
+    const field = target && formFieldOf(element, this.src, inherited?.name)
     const fieldDescribed = target && field?.invalid ? describedByOf(element, this.src, errors, target, field.name) : undefined
     const described = field ? fieldDescribed : shape.action && describedByOf(element, this.src, errors, shape.action.expression, '')
     const plan: ElementPlan = {
       ...shape,
-      id: element.id ? this.source(element.id) : errors?.ids.get(element),
+      id: element.id ? this.source(element.id) : controlId(element, this.src, this.facts, inherited, errors),
       classes: undefined,
-      attributes: [],
+      attributes: inheritedAttributes(inherited),
       sizes,
       staticContent: undefined,
       valueText: undefined,
@@ -274,8 +276,10 @@ export abstract class TemplateWriter {
       else if (attribute.kind === 'static') {
         const text = decodeEntities(attribute.text)
 
-        if (attributeName === FIELD_ATTRIBUTE && FIELD_ELEMENTS.has(name)) {
-          add({ kind: 'text', name: 'name', text, bare: false })
+        const written = attributeName === FIELD_ATTRIBUTE ? fieldAttribute(element, this.src, this.facts, text) : undefined
+
+        if (written) {
+          add(written)
         }
         else if (attributeName === 'innerHTML') {
           plan.staticContent = attribute.text
@@ -334,18 +338,7 @@ export abstract class TemplateWriter {
 
   // An image loads lazily and decodes off the main thread unless the template says otherwise: a hero above the fold sets `loading="eager"` or `fetchpriority="high"`.
   protected imageDefaults(element: ElementNode): [string, string][] {
-    if (element.name !== 'img')
-      return []
-
-    const defaults: [string, string][] = []
-
-    if (!this.named(element, 'loading') && !this.named(element, 'fetchpriority'))
-      defaults.push(['loading', 'lazy'])
-
-    if (!this.named(element, 'decoding'))
-      defaults.push(['decoding', 'async'])
-
-    return defaults
+    return imageDefaultsOf(element, name => this.named(element, name))
   }
 
   // The image defaults as a props object leading an element's sources, so a spread carrying its own wins.

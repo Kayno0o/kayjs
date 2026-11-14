@@ -1,0 +1,15 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const bump = action(t.Object({ by: t.Optional(t.Numeric()) }), (input) => {
+  tally.count += input.by ?? 1
+})
+
+const tally = { count: 0 }
+---
+p.tally {tally.count}
+div.row
+  span.before before
+  button.one(action={bump}) Add one
+  button.two(action={bump.with({ by: 2 })}) Add two

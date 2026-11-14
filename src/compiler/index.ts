@@ -11,6 +11,7 @@ import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import { actionOf, drawIcons, elementsIn, INTERACTIVE_ATTRIBUTE, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
+import { wrapActionButtons } from './button-forms'
 import { generate, isInteractive, islandCause, lineOf } from './codegen'
 import { deprecatedPageSettings } from './deprecated-page'
 import { spelledOutScriptFence } from './deprecated-script-fence'
@@ -290,6 +291,8 @@ export function compileKay(original: string, filename: string, options: CompileO
   const script = analyzeScript(source, file.script, serverNames(server), file.module)
 
   const scope = file.style ? scopeAttribute(islandId(filename, options.root)) : options.scope
+
+  wrapActionButtons(file)
 
   if (scope !== undefined)
     scopeElements(file, scope)

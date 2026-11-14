@@ -153,6 +153,14 @@ In an island the record fills a field until the visitor changes it. If the recor
 
 When a post is refused, the page shows what the visitor sent, not the record, so their edits survive. A form an island builds in the browser writes no key of its own, so a refused post re-shows its refusal and values in every such form. Several forms can post to one action, one per row of a list. Each form with `values` names itself in a hidden field, so after a refusal only the form that posted shows its values again and the others keep their records.
 
+## Writing each name once
+
+A component given `field` names the bare control written inside it, so a field's name is written once. `FormField(label="Title" field="title")` around an `input` with no name gives that input `name="title"`, the constraints of the schema and the same `aria` attributes `input(field="title")` has.
+
+`label(field="title")` writes the label's `for` and the `id` of the control of that field in the form, so the two meet without an id of yours. It wants exactly one control of that field: for a group of radio buttons, write `for` and `id` yourself. Several forms posting to one action, such as one per row, would repeat the id, so write them by hand there too.
+
+`button(action={remove.with({ id })})` outside a form posts that action by itself. Kay wraps it in a form, so it works on a static page without JavaScript and, in an island, calls the action. Inside a form, the form's own button posts it, and an `action` on a button there is refused.
+
 ## Showing errors
 
 A post the schema refuses renders the page again, and the fields keep what was sent. An `error` line shows the message of a field. A bare `error` shows the form-wide one.

@@ -6,6 +6,7 @@ import { bindsOwnProp, failedBlockOf, handedParts, isSlot, partAttribute, server
 import { isFunctionAt, sentParts } from './expression'
 import { addConstValue, addKeyParameters, addRowItem, contentOf, rowKeying, slotValue } from './items'
 import { addMergedClass, addShorthandClass, quoteAttribute } from './jsx-class'
+import { addFieldName, addInheritedName, addWrittenField } from './jsx-field'
 import { DYNAMIC_TAG } from './mapping'
 import { addBindWrite, bindRead, helperName, RAW_ELEMENTS } from './markup'
 import { PROPS } from './names'
@@ -711,6 +712,9 @@ export class JsxTemplate {
         this.emitAttribute(element, attribute, shape)
     }
 
+    // A bare control in a component given `field` takes its name, checked against the action's input as `field` is.
+    addInheritedName(b, element, this.src, this.facts, this.options.check)
+
     if (merge.last)
       addMergedClass(b, element, merge, this.src)
 
@@ -735,6 +739,9 @@ export class JsxTemplate {
     if (attribute.kind === 'expression' && shape?.action && this.text(attribute.name) === 'values')
       return addValuesAttribute(b, this.options.check === true, shape.action.expression, attribute.expression)
 
+    if (attribute.kind !== 'spread' && addWrittenField(b, element, attribute, this.src, this.facts, this.options.check))
+      return true
+
     if (attribute.kind === 'spread' || element.component)
       return false
 
@@ -749,17 +756,7 @@ export class JsxTemplate {
       return true
     }
 
-    b.wrap(attribute.name, () => b.add('name'))
-
-    if (field.kind === 'plain') {
-      b.add(`=${JSON.stringify(field.text)}`)
-
-      return true
-    }
-
-    b.add('={KayField((').addSource(field.target).add('), ')
-    b.wrap(field.value, () => b.add(JSON.stringify(field.text)))
-    b.add(')}')
+    addFieldName(b, attribute.name, 'name', field.kind === 'typed' ? field : undefined, field.text)
 
     return true
   }

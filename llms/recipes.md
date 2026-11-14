@@ -102,11 +102,11 @@ const todo = await db.repo(Todo).read.findById(Number(ctx.params.id)) ?? ctx.not
 ---
 head
   title {todo.title}
-form(action={save.with({ id: todo.id })})
-  input(field="title" value={todo.title})
+form(action={save.with({ id: todo.id })} values={todo})
+  input(field="title")
   error title
   label
-    input(field="done" type="checkbox" checked={todo.done})
+    input(field="done" type="checkbox")
     | Done
   button Save
 ```

@@ -1,9 +1,10 @@
-import type { Attribute, Details, Diagnostic, ElementNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span } from './ast'
+import type { Attribute, Details, Diagnostic, ElementNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span, TemplateFacts } from './ast'
 import type { GenerateOptions } from './codegen'
 import type { ErrorName } from './errors'
 import type { LintName } from './lints'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
+import type { FieldProblem } from './validate-fields'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
@@ -15,7 +16,8 @@ import { modifierProblems } from './event-modifiers'
 import { valuesCall } from './form-info'
 import { shorthandProblems } from './head-shorthand'
 import { kayCtxImport } from './script-shared'
-import { AttributeFixes, FIELD_NAME, PART_NAME, PART_NAME_LIST } from './validate-fixes'
+import { buttonActionProblem, fieldProblem } from './validate-fields'
+import { AttributeFixes, PART_NAME, PART_NAME_LIST } from './validate-fixes'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
 
@@ -189,6 +191,7 @@ class Validator {
   private readonly src: string
   private readonly fixes: AttributeFixes
   private readonly forms: Map<Node, Span>
+  private readonly infos: TemplateFacts['formInfos']
   private foreign = false
   // The names bound to an imported PNG, JPEG, WebP, GIF or AVIF, whose size kay writes on the `img` showing them.
   private sizedImports = new Set<string>()
@@ -201,6 +204,7 @@ class Validator {
     this.src = file.source
     this.fixes = new AttributeFixes(file.source)
     this.forms = templateFacts(file).forms
+    this.infos = templateFacts(file).formInfos
   }
 
   run(script: ScriptAnalysis, server: ServerAnalysis | undefined): Diagnostic[] {
@@ -561,8 +565,8 @@ class Validator {
 
       if (attribute === serverIsland?.attribute)
         this.serverIsland(serverIsland, failedBlockOf(element, this.src))
-      else if (name === FIELD_ATTRIBUTE && !element.component && FIELD_ELEMENTS.has(element.name))
-        this.field(element, attribute)
+      else if (name === FIELD_ATTRIBUTE && !element.component && (FIELD_ELEMENTS.has(element.name) || element.name === 'label'))
+        this.misuse(attribute, fieldProblem(element, attribute, this.src, this.infos.get(element), this.fixes))
       else if (valuesCall(element, attribute, this.src))
         this.error('form-misuse', attribute.expression, 'A call in `values` runs once for every field of the form', { note: 'each field reads the record on its own', help: 'compute it once in the script, `const todo = load(id)`, and write `values={todo}`' })
       else
@@ -570,16 +574,9 @@ class Validator {
     }
   }
 
-  // `field` writes `name`, and the constraints of the action's schema, which only a form posting to one has.
-  private field(element: ElementNode, attribute: NamedAttribute): void {
-    const named = element.attributes.find((other): other is NamedAttribute => other.kind !== 'spread' && this.text(other.name) === 'name')
-
-    if (!this.forms.has(element))
-      this.error('form-misuse', attribute.name, '`field` names a field of a form posting to an action, so it sits inside one', { help: 'write `name` for a form posting elsewhere' })
-    else if (attribute.kind !== 'static')
-      this.error('form-misuse', attribute.name, '`field` takes the field\'s name as written text', { note: 'its constraints are read off the action\'s schema by that name', help: 'write `field="title"`, or `name={...}` for a name computed at render', ...this.fixes.writtenText(attribute, 'field', FIELD_NAME) })
-    else if (named)
-      this.error('form-misuse', attribute.name, 'A field has `field` or `name`, not both', { related: [{ ...named.name, label: 'named here' }], help: 'drop `name`: `field` writes it' })
+  private misuse(attribute: NamedAttribute, problem: FieldProblem | undefined): void {
+    if (problem)
+      this.error('form-misuse', attribute.name, problem.message, problem.details)
   }
 
   private serverIsland({ attribute, mode, noscript }: ServerIslandMark, failed: SlotNode | undefined): void {
@@ -624,6 +621,8 @@ class Validator {
   }
 
   private attribute(element: ElementNode, attribute: NamedAttribute, name: string): void {
+    this.misuse(attribute, buttonActionProblem(element, attribute, name))
+
     if (name === 'part' && (attribute.kind !== 'static' || !attribute.text.trim().split(WHITESPACE).every(part => PART_NAME.test(part))))
       this.error('part-invalid', attribute.name, '`part` names a part with a string: `part="head"`', { note: 'the `class` type of the component is built from the names at compile time', help: 'write a name of letters, digits and dashes', ...this.fixes.writtenText(attribute, 'part', PART_NAME_LIST) })
     else if (name === 'part' && attribute.kind === 'static')

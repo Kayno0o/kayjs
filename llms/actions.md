@@ -215,6 +215,12 @@ form(action={add})
 - Each field reads `values` on its own, so a call with arguments in it is a compile error (`form-misuse`): compute it once in the script and pass the name; a signal read, `todo()`, is fine, and any `(` followed by something else, a parenthesised group included, is refused. The key of a form is its place in the template and its count in the page, so a refusal finds it when the page renders the same forms again. A form an island builds in the browser writes no `kay_form` key, so a refused post re-shows its refusal and values in every such form.
 - A `Form(action={save} values={todo})` component fills the fields written in its content on the server only.
 
+### Name a field once
+
+- A component given `field="title"` inside a `form(action={save})` names the control written bare in its content: `FormField(label="Title" field="title")` around an `input` with no `name` or `field` gives the input `name="title"`, the schema's constraints and the `aria-*` of `input(field="title")`, the record's value and a refused post's. A control that writes its own `name` or `field`, a nested `form` and a component that is a form itself end it. The component declares `field` as a text prop (kayjs-ui's FormField does).
+- `label(field="name")` writes the label's `for` and the `id` of the one control of that field in the form, `<action>-<field>` (`save-name`), so `label(for="name")` and `input#name(field="name")` become two `field`. It is `form-misuse` when the form has no control of that field or several (a group of radios or boxes: write `for` and `id` yourself), when the label also writes `for`, or when the control writes its own `id`. Forms posting to one action, such as one per row, repeat the id: write `for` and `id` there.
+- `button(action={move.with({ id })})` outside a form posts that action: kay wraps it in a `form(action={...} style="display:contents")`, so a static page posts and an island calls it, with the `.with()` arguments. Inside a form it is `form-misuse`: the form's own button posts the form.
+
 ### Refused posts
 
 - `ctx.fail` returns the failure where `ctx.deny`, `ctx.notFound` and `ctx.redirect` throw, so write `return ctx.fail(status, data, errors)` (the same answer as `refuse(message, { errors, data })`, which throws): a statement without `return` does nothing, which `kay check` reports as `unreturned-fail` and `--fix` repairs.

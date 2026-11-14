@@ -1,0 +1,17 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const grow = action(t.Object({ by: t.Optional(t.Numeric()) }), (input) => {
+  total.count += input.by ?? 1
+})
+
+const total = { count: 0 }
+--- script
+import { signal } from 'kay'
+
+const clicks = signal(0)
+---
+p.total {total.count}
+button.local(type="button" onClick={() => clicks += 1}) {clicks()}
+button.grow(action={grow.with({ by: 5 })}) Grow

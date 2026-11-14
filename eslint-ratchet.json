@@ -85,7 +85,7 @@
     "complexity": 44
   },
   "src/compiler/a11y.ts": {
-    "max-lines-per-function": 398,
+    "max-lines-per-function": 379,
     "complexity": 115
   },
   "src/compiler/codegen.ts": {
@@ -105,13 +105,13 @@
     "complexity": 102
   },
   "src/compiler/jsx.ts": {
-    "max-lines": 681
+    "max-lines": 678
   },
   "src/compiler/lints.ts": {
     "max-lines": 960
   },
   "src/compiler/markup.ts": {
-    "max-lines": 608,
+    "max-lines": 604,
     "complexity": 69
   },
   "src/compiler/parser.ts": {

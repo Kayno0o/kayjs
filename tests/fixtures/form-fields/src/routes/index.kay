@@ -1,0 +1,30 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const edit = action(t.Object({
+  title: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
+  done: t.Optional(t.Boolean()),
+  size: t.String({ maxLength: 10 }),
+  note: t.Optional(t.String({ maxLength: 200 })),
+}), (_input, ctx) => ctx.fail(409, 'Taken'))
+
+const todo = { title: 'Buy milk', done: true, size: 'm', note: 'hello' }
+--- script
+import Wrap from '../components/wrap.kay'
+---
+form(action={edit} values={todo})
+  label(field="title") Name
+  Wrap(label="Title" field="title")
+    input
+  Wrap(label="Done" field="done")
+    input(type="checkbox")
+  Wrap(label="Size" field="size")
+    select
+      option(value="s") Small
+      option(value="m") Medium
+  label(field="note") Note
+  textarea(field="note")
+  Wrap(label="Own" field="title")
+    input(name="other")
+  button Save
