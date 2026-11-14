@@ -77,7 +77,7 @@ describe('every deprecated lint has a safe fix', () => {
   it('lists each lint\'s check, so a new one cannot go without', () => {
     const compiled = names.filter(name => !(name in SITE))
 
-    expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-if-alias', 'deprecated-mail-send', 'deprecated-page-island', 'deprecated-script-fence', 'deprecated-ui-props'])
+    expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-if-alias', 'deprecated-image-options', 'deprecated-mail-send', 'deprecated-page-cache', 'deprecated-page-island', 'deprecated-page-seo', 'deprecated-script-fence', 'deprecated-ui-props'])
     expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-if-alias', 'deprecated-image-options', 'deprecated-script-fence', 'deprecated-ui-props'])
     expect(compiled.sort()).toEqual(['deprecated-if-alias', 'deprecated-image-options', 'deprecated-page-cache', 'deprecated-page-seo', 'deprecated-script-fence', 'deprecated-ui-props'])
     expect(Object.keys(NO_SAFE_FIX).filter(name => !names.includes(name as Name))).toEqual([])
