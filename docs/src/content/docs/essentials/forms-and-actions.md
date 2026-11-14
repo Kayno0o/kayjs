@@ -425,7 +425,7 @@ A string names a load of the page instead, the binding of a top-level `const car
 - A timeout, a 504 or a network failure after the post was sent needs a `when`, as the handler may have run. A redirect and an abort are never tried again, whatever `when` says.
 - Every try of a call sends the same `Idempotency-Key` header. The handler reads it from `ctx.request` to tell a repeat from a new call.
 - `timeout: '0s'` means no timeout, and text that is no duration throws.
-- `onStart`, `onData`, `onError` and `onSettled` observe the call. Each gets one object (`{ input }`, `{ value }`, `{ error }` with an `ApiError`, `{ data, error }`). An abort and a redirect are no error, though `onSettled` runs for them with the failure. For a stream, `onData` runs when the stream starts, not when it ends, and `latest` does not abort a stream that has started. A hook that throws is logged and never fails the call.
+- `onStart`, `onSuccess`, `onError` and `onSettled` observe the call. Each gets one object (`{ input }`, `{ data }`, `{ error }` with an `ApiError`, `{ data, error }`). An abort and a redirect are no error, though `onSettled` runs for them with the failure. For a stream, `onSuccess` runs when the stream starts, not when it ends, and `latest` does not abort a stream that has started. A hook that throws is logged and never fails the call.
 
 ```ts
 await save(card, { timeout: '8s', retry: 2, onError: ({ error }) => toast(error.message) })

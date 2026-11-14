@@ -166,7 +166,6 @@ export function reviveActions(): void {
   serverWritten[ACTION_TYPE] = (url: string) => typeof url === 'string' && url.startsWith(ACTION_PREFIX) ? actionStub(url) : malformed(url, ACTION_TYPE)
 }
 
-// The post a page with islands was rendered in answer to, read again once a swap brings another page.
 function succeededOf(found: Outcome | undefined): { data: unknown } | undefined {
   return found?.succeeded ? { data: found.data } : undefined
 }
@@ -181,6 +180,7 @@ function statusOf(inFlight: number, found: Outcome | undefined, failed: object |
   return failed === undefined ? 'idle' : 'failed'
 }
 
+// The post a page with islands was rendered in answer to, read again once a swap brings another page.
 function pageOutcome(): Outcome | undefined {
   return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeServerValue, true)[0]
 }

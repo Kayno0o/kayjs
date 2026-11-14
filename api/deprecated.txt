@@ -42,7 +42,7 @@ kay [./server] schedule	1.108	deprecated-schedule-call	`schedule({ cron }, job)`
 kay [./server] sqliteCache	1.108.0	deprecated-import-path	Import `sqliteCache` from `kay/cache`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./test] TestSite.refusal	1.108.0	deprecated-test-helpers	`site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 kay [./test] TestSite.socketRefusal	1.108.0	deprecated-test-helpers	`site.socket.refused`, beside the `site.socket` it refuses. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
-kay [.] Action.succeeded	1.108.0	-	Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0. No lint: an action reached through an import is no name `kay check` can tie to `succeeded()`, and `succeeded()?.data` and `data()` differ for a handler that returns nothing.
+kay [.] Action.succeeded	1.108.0	deprecated-source-readers	Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] Connection.last	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] Local.onSync	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] Local.rows	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
@@ -58,7 +58,7 @@ kay [.] PageSettings.search	1.108.0	deprecated-page-seo	Write it in `seo`. Remov
 kay [.] PageSettings.sitemap	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
 kay [.] PageSettings.ttl	1.108.0	deprecated-page-cache	Write `cache: '1h'`. Removed in 1.108.0; `deprecated-page-cache` rewrites it.
 kay [.] Resource.value	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] ServerAction.succeeded	1.108.0	-	Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0. No lint: an action reached through an import is no name `kay check` can tie to `succeeded()`, and `succeeded()?.data` and `data()` differ for a handler that returns nothing.
+kay [.] ServerAction.succeeded	1.108.0	deprecated-source-readers	Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] Socket.last	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] SocketStatus	1.108.0	-	Write `ConnectionStatus`, which a socket shares with every connection. Removed in 1.108.0. No lint: a type, and a socket still never reads `idle`.
 kay [.] Stream.last	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.

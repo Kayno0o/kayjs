@@ -404,7 +404,7 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   readonly progress: () => number | undefined
   // How the form post the page renders for went, refused, as `failed()` reads it; in an island, how its last call went, read reactively.
   readonly failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
-  /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0. No lint: an action reached through an import is no name `kay check` can tie to `succeeded()`, and `succeeded()?.data` and `data()` differ for a handler that returns nothing. */
+  /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   readonly succeeded: () => FormSuccess<Final<Success<Output>>> | undefined
   // What the last call, or the form post the page rendered for, returned; undefined before one succeeded and after a later one failed.
   readonly data: () => Final<Success<Output>> | undefined

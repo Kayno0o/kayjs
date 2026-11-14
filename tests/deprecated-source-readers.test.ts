@@ -93,4 +93,18 @@ describe('deprecated-source-readers', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+  it('keeps a double negation true, reads a prototype name as no member and follows CRLF templates', async () => {
+    const script = `${HEAD}\nimport { make } from './actions'\nexport const a = () => !!make.succeeded()\nexport const b = () => [list.constructor, list.toString, feed.hasOwnProperty]\n`
+    const page = '---\r\nimport { make } from \'./actions\'\r\nimport { resource } from \'kay\'\r\nimport chat from \'./api/chat\'\r\n\r\nconst list = resource(chat, \'/\')\r\n---\r\nif make.succeeded()\r\n  p {list.value()}\r\n'
+    const { root } = await fixed({ 'src/script.ts': script, 'src/routes/page.kay': page })
+
+    try {
+      expect(await read(root, 'src/script.ts')).toContain('!(make.status() !== \'ready\')')
+      expect(await read(root, 'src/script.ts')).toContain('[list.constructor, list.toString, feed.hasOwnProperty]')
+      expect(await read(root, 'src/routes/page.kay')).toBe(page.replace('if make.succeeded()', 'if make.status() === \'ready\'').replace('list.value()', 'list.data()'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

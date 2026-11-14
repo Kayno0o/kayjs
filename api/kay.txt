@@ -12,7 +12,7 @@ interface Action<Input, Output, Honeypot extends string = never>
   refused: (error: unknown) => error is ActionError<FailureData<Output>>
   settled: () => Promise<void>
   status: () => LoadStatus
-  /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0. No lint: an action reached through an import is no name `kay check` can tie to `succeeded()`, and `succeeded()?.data` and `data()` differ for a handler that returns nothing. */ succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
+  /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
   track: (options?: ({
   queue?: CallQueue | undefined;
 } & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Input, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
@@ -1329,7 +1329,7 @@ interface ServerAction<Spec extends Schema, Output, Honeypot extends string = ne
   schema: Spec
   settled: () => Promise<void>
   status: () => LoadStatus
-  /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0. No lint: an action reached through an import is no name `kay check` can tie to `succeeded()`, and `succeeded()?.data` and `data()` differ for a handler that returns nothing. */ succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
+  /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */ succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
   track: (options?: ({
   queue?: CallQueue | undefined;
 } & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Sendable<Static<Spec>>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>

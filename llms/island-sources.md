@@ -8,7 +8,7 @@ Everything an island reads from the server, a `resource`, a `stream`, a `socket`
 
 Every source has `data()`, `status()`, `pending()`, `error()` and `retry()`, and tells them with `onData` and `onError` (the `Reader` type from `kay`; a `live()` value is the value itself and has no `data()`):
 
-- `data()` is what it read last, `undefined` before the first: a `resource`'s answer, a stream's or a socket's last value, a collection's rows, what the last call of a `track()` handle or an action succeeded with. It is kept while the source reads again or fails.
+- `data()` is what it read last, `undefined` before the first: a `resource`'s answer, a stream's or a socket's last value, a collection's rows, what the last call of a `track()` handle succeeded with, what an action's last call returned. It is kept while the source reads again or fails, but an action's `data()` is the outcome of its last call, so it is empty while a later call is in flight or after one failed.
 - `status()` says where it stands. A value read once is a `LoadStatus`: `idle`, `loading`, `ready` or `failed`, for a `resource`, a `track()` handle, an action and a `local` collection alike. A connection is a `ConnectionStatus`: `idle`, `connecting`, `open`, `done`, `failed` or `closed`, for a stream, a socket and a `live()` handle.
 - `pending()` is a boolean: whether it is loading or connecting, a quiet reload that keeps `ready` and the wait before a reconnect included.
 - `error()` is the last failure as an `ApiError`, kept until the next success. On the server `error()` is `undefined`, `pending()` false and `retry()` does nothing.

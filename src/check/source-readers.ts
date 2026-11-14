@@ -163,7 +163,9 @@ export async function sourceReaders(root: string, options: CheckOptions): Promis
             return false
 
           handled.add(base + call.start)
-          report(base + member.property.start, base + member.property.end, SUCCEEDED_STATE, `write \`status() ${negated ? '!==' : '==='} 'ready'\``, [{ ...spaceOf(whole), text: `${text.slice(member.object.start, member.object.end)}.status() ${negated ? '!==' : '==='} 'ready'` }])
+          const test = `${text.slice(member.object.start, member.object.end)}.status() ${negated ? '!==' : '==='} 'ready'`
+
+          report(base + member.property.start, base + member.property.end, SUCCEEDED_STATE, `write \`status() ${negated ? '!==' : '==='} 'ready'\``, [{ ...spaceOf(whole), text: text.slice(0, whole.start).trimEnd().endsWith('!') ? `(${test})` : test }])
 
           return true
         }
@@ -188,7 +190,7 @@ export async function sourceReaders(root: string, options: CheckOptions): Promis
         }
         else if (node.type === 'MemberExpression' && !node.computed && node.object.type === 'Identifier' && node.property.type === 'Identifier') {
           const kind = receivers.get(node.object.name)
-          const to = kind === undefined ? undefined : MEMBERS[kind][node.property.name]
+          const to = kind === undefined || !Object.hasOwn(MEMBERS[kind], node.property.name) ? undefined : MEMBERS[kind][node.property.name]
 
           if (kind !== undefined && to !== undefined)
             report(base + node.property.start, base + node.property.end, memberMessage(kind, node.property.name, to), `write \`${to}\``, [{ start: base + node.property.start, end: base + node.property.end, text: to }])
