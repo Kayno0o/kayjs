@@ -36,14 +36,14 @@ import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { aiLanguage } from './ai-language'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
-
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
+
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
-
 import { unguardedRoutes, unguardedTools } from './guards'
-import { islandOnlyComponents } from './island-only'
 
+import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
+
 import { localState } from './local-state'
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'

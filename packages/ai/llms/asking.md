@@ -101,7 +101,7 @@ The provider is `AI_BASE_URL` when set, else the one key set. Nothing is read at
 
 ### Options every call takes
 
-`ask`, `describeImage`, `transcribe`, `speak` and `embed` share one base, `CallOptions`: `provider`, `model`, `signal`, `timeout`, `retry`, `fallback`, and the hooks `onStep`, `onSuccess` and `onError`. An option reads the same on each, so a retry or a fallback written for an `ask` is written the same for an `embed` ([Speech and embeddings](speech-and-embeddings.md#options-every-call-takes)). `timeout` is `'30s'`, which sets the `connect` and the `idle` of an ask to it, or `{ connect, idle }`.
+`ask`, `describeImage`, `transcribe`, `speak` and `embed` share one base, `CallOptions`: `provider`, `model`, `signal`, `timeout`, `retry`, `fallback`, and the hooks `onStep`, `onSuccess` and `onError`. An option reads the same on each, so a retry or a fallback written for an `ask` is written the same for an `embed` ([Speech and embeddings](speech-and-embeddings.md#options-every-call-takes)). `timeout` is `'30s'`, or `{ connect, idle }`: an ask takes the duration for both its `connect` and its `idle`, while `transcribe`, `speak` and `embed` answer whole, so a duration is the whole call (`2m` when none is given) and an object's two add up. A real provider is asked again once after a transient failure for these calls as for an `ask`, so a billed `speak` or `embed` may be sent twice; `retry: false` (or `ai({ retry: false })`) turns it off. A provider of your own that names its `model` needs no `model` option.
 
 ### Fields kayjs-ai does not model
 
