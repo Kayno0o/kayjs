@@ -1,6 +1,7 @@
 import type { ClassTable } from '../runtime/class-table'
 import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode } from './ast'
 import type { ImageOptionAttributes } from './image-attributes'
+import type { FormInfo } from './form-info'
 import type { CodeBuilder } from './mapping'
 import type { BindingPlan, ElementShape } from './plan'
 import { resolveClasses } from '../runtime/class-table'
@@ -100,24 +101,6 @@ export interface StyleProp {
   expression: Span
 }
 
-// What `style` and `setStyle` take: the written `style` as an expression or text, then the `style:prop` pairs.
-export function addStyleArguments(b: CodeBuilder, attribute: Extract<PlannedAttribute, { kind: 'style' }>): void {
-  if (attribute.expression)
-    b.add('(').addSource(attribute.expression).add(')')
-  else
-    b.add(attribute.text === undefined ? 'undefined' : JSON.stringify(attribute.text))
-
-  if (attribute.props.length === 0)
-    return
-
-  b.add(', [')
-
-  for (const [index, { property, expression }] of attribute.props.entries())
-    b.add(`${index > 0 ? ', ' : ''}[${JSON.stringify(property)}, (`).addSource(expression).add(')]')
-
-  b.add(']')
-}
-
 // An attribute of an element without spreads, as both templates read it; a static text is decoded.
 export type PlannedAttribute = PlannedKind & { source: Attribute | undefined }
 
@@ -152,6 +135,8 @@ export interface ElementPlan extends ElementShape {
   selected: { expression: Span, bound: boolean } | undefined
   // The field the element is of the form it sits in.
   field: FormField | undefined
+  // The record that form fills its fields from.
+  values: Span | undefined
   // The `aria-describedby` a refused field or form takes.
   described: { id: string, own?: string } | undefined
 }
@@ -188,6 +173,28 @@ export abstract class TemplateWriter {
   // An attribute the props leave out.
   protected abstract skips(element: ElementNode, name: string): boolean
 
+  // What the form of a node carries, as this twin wires it.
+  protected formInfoOf(node: Node): FormInfo | undefined {
+    return !this.wiresLoose && this.facts.loose.has(node) ? undefined : this.facts.formInfos.get(node)
+  }
+
+  // The class text the element is written with, merged from its shorthand, its `class` and its parts.
+  private classesOf(element: ElementNode, classAttribute: Attribute | undefined, parts: string[]): ElementPlan['classes'] {
+    if (parts.length > 0)
+      return { text: this.staticClass(element, classAttribute?.kind === 'expression' ? undefined : classAttribute).trim(), expression: classAttribute?.kind === 'expression' ? classAttribute.expression : undefined, parts }
+
+    if (element.classes.length === 0)
+      return undefined
+
+    if (classAttribute?.kind === 'expression')
+      return { text: this.shorthand(element), expression: classAttribute.expression }
+
+    if (classAttribute?.kind === 'static' && this.mergesAtRuntime)
+      return { text: this.staticClass(element, classAttribute), pieces: this.staticParts(element, classAttribute) }
+
+    return { text: this.staticClass(element, classAttribute) }
+  }
+
   protected plan(element: ElementNode, errors: ErrorMessages | undefined): ElementPlan {
     const name = element.name
     const shape = shapeOf(element, this.src, this.formOf(element))
@@ -208,6 +215,7 @@ export abstract class TemplateWriter {
       content: undefined,
       selected: undefined,
       field,
+      values: field && this.formInfoOf(element)?.values,
       described,
     }
 
@@ -215,17 +223,7 @@ export abstract class TemplateWriter {
     const parts = partsOf(element, this.src, this.facts.parts)
     const partAttr = partAttribute(element, this.src)
 
-    if (parts.length > 0) {
-      plan.classes = { text: this.staticClass(element, classAttribute?.kind === 'expression' ? undefined : classAttribute).trim(), expression: classAttribute?.kind === 'expression' ? classAttribute.expression : undefined, parts }
-    }
-    else if (element.classes.length > 0) {
-      if (classAttribute?.kind === 'expression')
-        plan.classes = { text: this.shorthand(element), expression: classAttribute.expression }
-      else if (classAttribute?.kind === 'static' && this.mergesAtRuntime)
-        plan.classes = { text: this.staticClass(element, classAttribute), pieces: this.staticParts(element, classAttribute) }
-      else
-        plan.classes = { text: this.staticClass(element, classAttribute) }
-    }
+    plan.classes = this.classesOf(element, classAttribute, parts)
 
     const section = name === 'a' ? sectionOf(element, this.src) : undefined
 
@@ -245,6 +243,10 @@ export abstract class TemplateWriter {
 
         continue
       }
+
+      // Read by the fields of the form, and never written.
+      if (attribute.kind === 'expression' && shape.action && attributeName === 'values')
+        continue
 
       // Read below with the image's source, and never written.
       if (name === 'img' && (attributeName === NO_PLACEHOLDER || IMAGE_OPTIONS.has(attributeName)))
@@ -543,9 +545,12 @@ export abstract class TemplateWriter {
 
       if (calledByBind.has(attribute))
         continue
+      // Read by the fields of the form, and never written.
+      if (attribute.kind === 'expression' && name === 'values' && actionOf(element, this.src))
+        continue
 
       if (this.skips(element, name))
-        continue
+      continue
 
       namedEntry(attribute, name)
     }

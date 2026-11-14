@@ -5,12 +5,14 @@ import type { CodeBuilder } from './mapping'
 import type { BindingPlan, LinkPlan } from './plan'
 import { mayLeaveSite } from '../runtime/outside'
 import { marksServerIsland, modifiersOf } from './ast'
+import { fieldBindings } from './dom-fields'
 import { addHandler, listenerOptions } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
 import { addKeyParameters, addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
-import { addBindWrite, addStyleArguments, bindRead, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addBindWrite, bindRead, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 import { addGroupChecked, checksMarkup, groupValue, staticAttributeText } from './plan'
+import { addStyleArguments } from './style-arguments'
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
@@ -453,7 +455,7 @@ export class DomTemplate extends TemplateWriter {
     }
     else {
       const plan = this.plan(element, this.errors)
-      const { target, field, action, described, link } = plan
+      const { action, described, link } = plan
       const followed = element.pendingOf && this.formOf(element.pendingOf)
 
       // An island's block shows while a call of its form's action is in flight, however the handler made it.
@@ -569,12 +571,7 @@ export class DomTemplate extends TemplateWriter {
           own.push(variable => b.add(`KayEffect(() => KayFormDescribed(${variable(node)}, (`).addSource(action.expression).add(`), "", ${JSON.stringify(described.id)}));`))
       }
 
-      if (field?.invalid && target) {
-        own.push(variable => b.add(`KayEffect(() => KayFormMarked(${variable(node)}, (`).addSource(target).add(`), ${JSON.stringify(field.name)}));`))
-
-        if (described)
-          own.push(variable => b.add(`KayEffect(() => KayFormDescribed(${variable(node)}, (`).addSource(target).add(`), ${JSON.stringify(field.name)}, ${JSON.stringify(described.id)}));`))
-      }
+      own.push(...fieldBindings(b, this.src, node, element, plan, children.length > 0))
 
       // The template's own description stays as written, the effect adding and removing the message's id alone.
       if (described?.own !== undefined)

@@ -286,3 +286,13 @@ export function checkedContent(b: CodeBuilder, helper: string, src: string, ownM
     b.add(')')
   }
 }
+
+// The record a form's fields start from, in the type check's TSX: each field of the action's input it names is read, and what it holds is the form's alone.
+export function addValuesAttribute(b: CodeBuilder, check: boolean, action: Span, record: Span): true {
+  if (check)
+    b.add('{...KayFormValues((').addSource(action).add('), (').addSource(record).add('))}')
+  else
+    b.add('{...(void (').addSource(record).add('), {})}')
+
+  return true
+}

@@ -1,4 +1,6 @@
 import type { UiEntry } from '../runtime/ui'
+import type { FieldContent, FormInfo } from './form-info'
+import { formTargets, initialHelpers } from './form-info'
 
 // Offsets index into the whole .kay source, so every node maps back to the file the user wrote.
 export interface Span {
@@ -559,6 +561,12 @@ export interface TemplateFacts {
   forms: Map<Node, Span>
   // The nodes of `forms` whose form is a component given an `action`.
   loose: Set<Node>
+  // What the form each node sits in carries beside its action.
+  formInfos: Map<Node, FormInfo>
+  // The helpers the fields filled from a form's record call.
+  initial: ('formInitial' | 'formInitialChecked')[]
+  // The field a component around a node names for it: `FormField(field="title")` around a bare `input`.
+  inherited: Map<Node, FieldContent>
   // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.
   functions: Map<number, boolean>
   // How the template names each prop the script types `Bindable<T>`, to its key, which only the script tells: set where the code is generated.
@@ -659,36 +667,6 @@ export function walkNodes<C>(nodes: readonly Node[], context: C, each: (node: No
     for (const block of childBlocks(node))
       walkNodes(block, inner, each)
   }
-}
-
-// The action of the innermost `form(action={...})` each node sits in; a node outside every such form has none.
-// `loose` lists the nodes whose innermost form is a component given an `action` instead, whose input type `kay check` leaves alone and which an island does not wire.
-export function formTargets(nodes: readonly Node[], source: string): { targets: Map<Node, Span>, loose: Set<Node> } {
-  const targets = new Map<Node, Span>()
-  const loose = new Set<Node>()
-
-  walkNodes<{ target: Span, loose: boolean } | undefined>(nodes, undefined, (node, found) => {
-    if (found) {
-      targets.set(node, found.target)
-
-      if (found.loose)
-        loose.add(node)
-    }
-
-    if (node.kind !== 'element')
-      return found
-
-    const form = actionOf(node, source)
-
-    if (form)
-      return { target: form.expression, loose: false }
-
-    const component = componentAction(node, source)
-
-    return component ? { target: component.expression, loose: true } : found
-  })
-
-  return { targets, loose }
 }
 
 // Whether `found` holds for a node of the template, nested ones included.
@@ -796,8 +774,8 @@ function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
 }
 
 function factsOf(file: KayFile): TemplateFacts {
-  const { targets, loose } = formTargets(file.template, file.source)
-  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: targets, loose, functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
+  const { targets, loose, infos, inherited } = formTargets(file.template, file.source)
+  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: targets, loose, formInfos: infos, initial: initialHelpers(infos), inherited, functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
   const text = (span: Span) => file.source.slice(span.start, span.end)
 
   visitNodes(file.template, (node) => {

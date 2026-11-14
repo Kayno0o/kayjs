@@ -9,7 +9,7 @@ import { addMergedClass, addShorthandClass, quoteAttribute } from './jsx-class'
 import { DYNAMIC_TAG } from './mapping'
 import { addBindWrite, bindRead, helperName, RAW_ELEMENTS } from './markup'
 import { PROPS } from './names'
-import { bindingOf, checksMarkup, classMergeOf, fieldNameOf, shapeOf, staticAttributeText } from './plan'
+import { addValuesAttribute, bindingOf, checksMarkup, classMergeOf, fieldNameOf, shapeOf, staticAttributeText } from './plan'
 import { bindEvent, bindProblem } from './validate'
 
 // A subject holding a call, which TypeScript does not narrow in a `switch`.
@@ -732,6 +732,9 @@ export class JsxTemplate {
       return true
     }
 
+    if (attribute.kind === 'expression' && shape?.action && this.text(attribute.name) === 'values')
+      return addValuesAttribute(b, this.options.check === true, shape.action.expression, attribute.expression)
+
     if (attribute.kind === 'spread' || element.component)
       return false
 
@@ -914,11 +917,8 @@ export class JsxTemplate {
   private emitBind(element: ElementNode, attribute: Extract<Attribute, { kind: 'expression' }>, property: string) {
     const { b } = this
 
-    if (element.component) {
-      this.emitComponentBind(element, attribute, property)
-
-      return
-    }
+    if (element.component)
+      return void this.emitComponentBind(element, attribute, property)
 
     const inputType = staticAttributeText(element, 'type', this.src)
 

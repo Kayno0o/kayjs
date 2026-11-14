@@ -627,12 +627,15 @@ export function imageAttributes(src: unknown, sized: boolean, sizes?: unknown, p
   return markup
 }
 
-// A select a form posting to an action renders: the option a refused post chose, else what its own `value` selects, if it has one.
-export function refillOptions(posted: string | undefined, markup: string, value?: () => unknown): string {
+// A select a form posting to an action renders: the option a refused post chose, else what its own `value` selects, else the one its form's `values` hold.
+export function refillOptions(posted: string | undefined, markup: string, value?: () => unknown, initial?: string): string {
   if (posted !== undefined)
     return selectOptions(posted, markup, true)
 
-  return value ? selectOptions(value(), markup) : markup
+  if (value)
+    return selectOptions(value(), markup)
+
+  return initial === undefined ? markup : selectOptions(initial, markup, true)
 }
 
 // The constraints a `field` checks in the browser without JavaScript, read off the schema of the action its form posts to; those the template writes itself are left to it.

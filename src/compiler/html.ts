@@ -8,10 +8,12 @@ import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, failedBlockOf, marksServerIsland, sectionOf, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
 import { addFieldDescribed, addInvalidAttribute } from './field-described'
+import { addFilled, addInitial } from './html-initial'
 import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, fixedSource, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
-import { addStyleArguments, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
-import { addGroupChecked, BEHAVIOUR, checkedContent, describedValue, fieldAriaOf, groupValue, staticAttributeText } from './plan'
+import { addGroupChecked, BEHAVIOUR, checkedContent, describedValue, fieldAriaOf, groupValue } from './plan'
+import { addStyleArguments } from './style-arguments'
 
 // The attribute an image's `src` or a select's `selected` value is written as.
 const WRITTEN_AS = { image: 'src', selected: 'value' } as const
@@ -504,7 +506,7 @@ export class HtmlTemplate extends TemplateWriter {
     const children = contentOf(element)
     const read = (expression: Span, call: boolean) => () => void b.add('(').addSource(expression).add(call ? ')()' : ')')
     const plan = this.plan(element, this.options.errors)
-    const { target, field, action, described, link } = plan
+    const { target, field, values, action, described, link } = plan
     // What writes the content or the selected value: a bound one reads its signal.
     let content = checkedContent(this.b, helperName('checkedMarkup'), this.src, this.ownMarkup, plan.content, plan.content && read(plan.content.expression, plan.content.bound))
     const selected = plan.selected && read(plan.selected.expression, plan.selected.bound)
@@ -704,27 +706,8 @@ export class HtmlTemplate extends TemplateWriter {
         })
       }
 
-      if (filled) {
-        markup.dynamic(() => {
-          b.add(`${helperName('attribute')}(${JSON.stringify(filled)}, ${filled === 'value' ? 'KayFormValue' : 'KayFormChecked'}`)
-          fieldArguments()
-
-          // A radio button with no `value` posts `on`, as a checkbox does, but only the ticked one of its group.
-          if (filled === 'checked') {
-            b.add(', ')
-            checkboxValue ? checkboxValue() : b.add(this.isRadio(element) ? '"on"' : 'undefined')
-          }
-
-          b.add(')')
-
-          if (ownFill) {
-            b.add(' ?? ')
-            ownFill()
-          }
-
-          b.add(')')
-        })
-      }
+      if (filled)
+        markup.dynamic(() => addFilled(b, this.src, element, { filled, fieldArguments, own: ownFill, box: checkboxValue, values, name: field.name }))
 
       if (field.invalid) {
         refusing = fieldArguments
@@ -758,6 +741,8 @@ export class HtmlTemplate extends TemplateWriter {
           fieldArguments()
           b.add(') ?? ')
           own ? own() : b.add('undefined')
+
+          addInitial(b, this.src, values, field.name)
         }
       }
     }
@@ -818,6 +803,8 @@ export class HtmlTemplate extends TemplateWriter {
             own()
           }
 
+          addInitial(b, this.src, values, field.name, undefined, own ? ', ' : ', undefined, ')
+
           b.add(')')
         })
       }
@@ -825,7 +812,10 @@ export class HtmlTemplate extends TemplateWriter {
         markup.dynamic(() => {
           b.add('((value) => value === undefined ? ')
           this.markup(children, true)
-          b.add(` : ${helperName('child')}(value))(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}))`)
+          b.add(` : ${helperName('child')}(value))(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)})`)
+
+          addInitial(b, this.src, values, field.name)
+          b.add(')')
         })
       }
       else if (children.length > 0 && selected) {
@@ -1012,9 +1002,5 @@ export class HtmlTemplate extends TemplateWriter {
   // Handlers, refs and bindings only an island attaches; a component's other props all reach it.
   protected skips(element: ElementNode, name: string): boolean {
     return element.component ? marksServerIsland(element, name, this.src) : BEHAVIOUR.test(name)
-  }
-
-  private isRadio(element: ElementNode): boolean {
-    return staticAttributeText(element, 'type', this.src)?.toLowerCase() === 'radio'
   }
 }

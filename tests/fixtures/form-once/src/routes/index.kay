@@ -1,0 +1,34 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const save = action(t.Object({
+  title: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
+  done: t.Optional(t.Boolean()),
+  note: t.Optional(t.String({ maxLength: 200 })),
+  size: t.String({ maxLength: 10 }),
+  kind: t.String({ maxLength: 10 }),
+  tags: t.Optional(t.Array(t.String({ maxLength: 10 }))),
+  count: t.Optional(t.Numeric()),
+  due: t.Optional(t.String({ maxLength: 10 })),
+  nick: t.Optional(t.String({ maxLength: 20 })),
+}), (_input, ctx) => ctx.fail(409, 'Taken'))
+
+const todo = { title: 'Buy milk', done: true, note: 'two\nlines <b>', size: 'm', kind: 2, tags: ['a', 'c'], count: 3, due: new Date('2026-03-04T00:00:00Z'), nick: null }
+---
+form(action={save} values={todo})
+  input(field="title")
+  input(field="done" type="checkbox")
+  textarea(field="note")
+  select(field="size")
+    option(value="s") Small
+    option(value="m") Medium
+  input(field="kind" type="radio" value="1")
+  input(field="kind" type="radio" value="2")
+  input(field="tags" type="checkbox" value="a")
+  input(field="tags" type="checkbox" value="b")
+  input(field="tags" type="checkbox" value="c")
+  input(field="count" type="number")
+  input(field="due" type="date")
+  input(field="nick" value="anon")
+  button Save

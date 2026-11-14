@@ -98,6 +98,56 @@ export function formValue(target: unknown, name: string): string | undefined {
 // The actions of the forms being rendered, the innermost last, which a component inside one reads to show a refused post's values again.
 const enclosing: unknown[] = []
 
+// What a record, such as the `values={todo}` of a form, holds for the field `name`.
+function held(values: unknown, name: string): unknown {
+  const value = typeof values === 'object' && values !== null ? (values as Record<string, unknown>)[name] : undefined
+
+  return typeof value === 'function' ? undefined : value
+}
+
+const MIDNIGHT = 'T00:00:00.000Z'
+
+// The text a field starts with from the record its form fills it from: a text, a number or a date; undefined for a record without the field, `null`, a flag, a list or an object.
+export function formInitial(values: unknown, name: string): string | undefined {
+  // A refused post shows what it sent: a field it sent blank, which the body drops, stays blank rather than going back to the record.
+  const form = enclosing.at(-1)
+
+  if (isAction(form) && untrack((form as FormTarget).failed))
+    return undefined
+
+  const value = held(values, name)
+
+  if (typeof value === 'string')
+    return value
+
+  if (typeof value === 'number' || typeof value === 'bigint')
+    return String(value)
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const iso = value.toISOString()
+
+    return iso.endsWith(MIDNIGHT) ? iso.slice(0, 10) : iso.slice(0, 16)
+  }
+
+  return undefined
+}
+
+// Whether a checkbox or radio button named `name` starts ticked from the record its form fills it from, `value` being the one it posts when ticked: a flag ticks the box with none, a list the boxes whose value it holds, a text or a number the box it equals.
+export function formInitialChecked(values: unknown, name: string, value?: string | number): boolean {
+  const kept = held(values, name)
+
+  if (Array.isArray(kept))
+    return kept.map(String).includes(value === undefined ? 'on' : String(value))
+
+  if (typeof kept === 'boolean')
+    return kept
+
+  if (kept === undefined || kept === null)
+    return false
+
+  return value === undefined ? kept !== 0 && kept !== '' && kept !== 'false' : formInitial(values, name) === String(value)
+}
+
 // Renders a form's content with the form's action as the one `postedValue`, `postedChecked` and `formErrors` read.
 // `only` is for a component given an `action`: a value that is no action (a snippet, a toast's action object) leaves the form around it in place, where a form's plain URL shadows it.
 export function formScope<Result>(target: unknown, render: () => Result, only = false): Result {

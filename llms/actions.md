@@ -204,6 +204,12 @@ form(action={add})
 - The handler checks the same rules from a module both import, so the form holds without JavaScript too.
 - See [Forms](site.md#forms) for the whole form.
 
+### Fill a form from a record
+
+- `form(action={save} values={todo})` starts every field the form names from the record's property of the same name, so an edit form writes each field once: a text or a number fills `input` and `textarea`, a `Date` fills `type="date"` (`2026-03-04`) and `datetime-local`, a boolean ticks a checkbox, a list ticks the checkboxes whose `value` it holds, a text or a number ticks the radio or picks the `option` it equals, and a `null`, a missing property or a function leaves the field as written.
+- A control's own `value` stays the fallback for a field the record lacks, and a refused post's values win over the record, so a visitor's edits and blanks survive the refusal.
+- The record is read where the form renders, on the server and in an island alike.
+
 ### Refused posts
 
 - `ctx.fail` returns the failure where `ctx.deny`, `ctx.notFound` and `ctx.redirect` throw, so write `return ctx.fail(status, data, errors)` (the same answer as `refuse(message, { errors, data })`, which throws): a statement without `return` does nothing, which `kay check` reports as `unreturned-fail` and `--fix` repairs.

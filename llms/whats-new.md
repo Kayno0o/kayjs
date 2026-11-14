@@ -24,6 +24,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `formatDuration('125m')` takes a `Duration` and `formatBytes('1.5kb')` a `ByteSize`, as every other length and size of kay is written; a number of milliseconds for `formatDuration` is deprecated (`deprecated-format-duration`): see [Locales](locales.md).
 - An `img` takes `aspect`, `quality`, `sizes` and `placeholder={false}` as attributes, `img(src={hero} aspect="1/1")`, where it spread `image()`: see [Images](images.md); `no-placeholder` and the spread are deprecated (`deprecated-image-options`).
 - A page's `page` takes `seo: { title, description, image, canonical, noindex, sitemap, lastmod, search, feed }` and `cache: '1h' | { browser, shared, swr } | 'private' | false`, `head(title=... description=... image=... canonical=... noindex)` takes the same shorthand in a template, and `seo.noindex` in kay.config.ts keeps a whole site out of search engines: see [Head and site metadata](head.md) and [A CDN in front of prerendered pages](cdn-caching.md); `ttl`, `cacheControl` and the top-level `noindex`, `sitemap`, `lastmod`, `search` and `feed` are deprecated (`deprecated-page-seo`, `deprecated-page-cache`).
+- `form(action={save} values={todo})` fills every field from a record, text, numbers, dates, checkboxes, radios and selects, and a refused post's values still win ([forms](actions.md#fill-a-form-from-a-record)).
 
 ## 1.104.3
 
