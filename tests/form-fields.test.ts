@@ -119,6 +119,14 @@ describe('a label given a field', () => {
     expect(messages('label(field="title") T\n')).toContain('`field` on a label names a field of a form posting to an action, so it sits inside one')
   })
 
+  it('does not point at a control that keeps its own id', () => {
+    const own = 'A label\'s `field` points at the one control of that field, and this form has 0'
+
+    expect(messages('form(action={save})\n  label(field="title") T\n  FormField(field="title")\n    input#mine\n')).toContain(own)
+    expect(messages('form(action={save})\n  label(field="title") T\n  input(name="title" id="mine")\n')).toContain(own)
+    expect(messages('form(action={save})\n  label(field="title") T\n  FormField(field="title")\n    input\n')).not.toContain(own)
+  })
+
   it('silences missing-label in its own form only', () => {
     const codes = (template: string) => compile(template).diagnostics.map(diagnostic => diagnostic.code)
 

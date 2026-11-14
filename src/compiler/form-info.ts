@@ -84,12 +84,17 @@ function labelledFields(element: ElementNode, source: string): ReadonlyMap<strin
     else if (FIELD_ELEMENTS.has(node.name) && !node.attributes.some(attribute => attribute.kind === 'spread')) {
       const name = writtenName(node, source, 'name', FIELD_ATTRIBUTE)
 
-      if (name !== undefined)
+      // A control naming itself with `name` and keeping its own id is not the one the label points at; one with `field` has its own message.
+      if (name !== undefined && (writtenName(node, source, FIELD_ATTRIBUTE) !== undefined || !hasId(node, source)))
         controls.push(name)
     }
   })
 
   return labels.size === 0 ? NO_NAMES : new Map([...labels].map(name => [name, controls.filter(control => control === name).length]))
+}
+
+function hasId(element: ElementNode, source: string): boolean {
+  return element.id !== undefined || element.attributes.some(attribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'id')
 }
 
 // Whether a control writes neither `name` nor `field`, so the component around it may name it.
@@ -136,7 +141,7 @@ export function formTargets(nodes: readonly Node[], source: string): { targets: 
   for (const [node, content] of inherited) {
     const labelled = infos.get(node)?.labelled as Map<string, number> | undefined
 
-    if (node.kind === 'element' && isBareControl(node, source) && labelled?.has(content.name))
+    if (node.kind === 'element' && isBareControl(node, source) && !hasId(node, source) && labelled?.has(content.name))
       labelled.set(content.name, labelled.get(content.name)! + 1)
   }
 
