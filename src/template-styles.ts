@@ -134,7 +134,7 @@ export const ACCENTS = [${Object.keys(ACCENT_COLOURS).map(name => `'${name}'`).j
 export type Accent = (typeof ACCENTS)[number]
 
 // Kept in a cookie the server reads, so a page it renders shows the chosen accent from the first paint.
-export const accent = persisted<Accent>('accent', 'starlight')
+export const accent = persisted.cookie<Accent>('accent', 'starlight')
 
 // A cookie's value is not checked against the type, so anything but a known accent reads as the default.
 export function currentAccent(): Accent {
