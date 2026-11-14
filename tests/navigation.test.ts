@@ -1715,16 +1715,20 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
       try {
         const { promise: held, resolve: release } = Promise.withResolvers<void>()
+        // The second swap is held too, so a loaded machine cannot end it before its mark is read.
+        const { promise: heldTwo, resolve: releaseTwo } = Promise.withResolvers<void>()
         const pending = async () => own.evaluate(() => [...document.querySelectorAll('[data-pending]')].map(link => link.className))
 
-        await own.route(`${origin}/second`, async (request) => {
-          await held
+        for (const [path, gate] of [['/second', held], ['/watched-two', heldTwo]] as const) {
+          await own.route(`${origin}${path}`, async (request) => {
+            await gate
 
-          try {
-            await request.continue()
-          }
-          catch {}
-        })
+            try {
+              await request.continue()
+            }
+            catch {}
+          })
+        }
         expect(await pending()).toEqual([])
         await own.click('a.second')
         await own.waitUntil(() => document.documentElement.getAttribute('aria-busy') === 'true')
@@ -1732,6 +1736,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         // The next link takes the mark over.
         await own.click('a.two')
         expect(await pending()).toEqual(['two'])
+        releaseTwo()
         await own.waitFor('h1', { text: 'Watched two' })
         release()
         await settled(own)

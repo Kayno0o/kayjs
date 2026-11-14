@@ -19,8 +19,10 @@ import { solveWork } from '../src/runtime/work'
 import { inlineScriptHashes, requestId, shutdown, sqliteJobs } from '../src/server'
 import { servePages } from '../src/server/app'
 import { setupStore } from '../src/server/app-store'
+import { BUTTON_FORM_STYLE } from '../src/server/button-form-rule'
 import { readClient, readManifest } from '../src/server/client'
 import { compressTextStrongest } from '../src/server/compress'
+import { sourceHash } from '../src/server/csp'
 import { probeHealth } from '../src/server/lifecycle'
 import { answeringRequest, useLogger } from '../src/server/log'
 import { hookPrerendered } from '../src/server/page-hook'
@@ -347,7 +349,8 @@ describe('security headers', () => {
     expect(enforced.get('style-src')).toEqual(['\'self\'', '\'unsafe-inline\''])
     expect(enforced.get('report-uri')).toEqual(['/docs/_kay/csp'])
     expect(enforced.get('report-to')).toEqual(['csp'])
-    expect(trial.get('style-src')).toEqual(['\'self\'', expect.stringMatching(/^'sha256-[A-Za-z0-9+/]+=*'$/)])
+    // The new-tab rule, then the rule of a lone button's form.
+    expect(trial.get('style-src')).toEqual(['\'self\'', expect.stringMatching(/^'sha256-[A-Za-z0-9+/]+=*'$/), sourceHash(BUTTON_FORM_STYLE)])
     expect(trial.get('script-src')).toEqual(['\'self\'', ...inlineScriptHashes({ base: '/docs' })])
     expect(trial.get('report-to')).toEqual(['csp'])
 
