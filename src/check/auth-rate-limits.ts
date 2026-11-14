@@ -46,7 +46,7 @@ const FLAT: Record<string, [string, string]> = {
 }
 
 // The limits of kayjs-auth's `rateLimit` as 26 flat keys, grouped by feature since 1.105: `signIn: { ip, account, accountAll }`, `forgot: { ip, account }`, `invite: { sender, address }`, `oauth: { register, registerAll, document, token }`.
-// Found in the `rateLimit` object written in a call of `auth` or `authCore` imported from `@kayjs/auth`; the fix writes the whole object grouped, from the first report, and offers none where it spreads, holds a computed or shorthand key, or names a part twice.
+// Found in the `rateLimit` object written in a call of `auth` or `authCore` imported from `@kayjs/auth`; the fix, from the first report, rewrites only the keys it moves and offers none where the object spreads, holds a computed or shorthand key, names a part twice or writes a feature both ways.
 export async function authRateLimits(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-auth-rate-limits', options.lints) === 'allow')
     return []
