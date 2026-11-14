@@ -1,7 +1,7 @@
 {
   "name": "@kayjs/mail",
   "type": "module",
-  "version": "1.104.2",
+  "version": "1.104.3",
   "description": "Mail for kay apps: SMTP configured from typed env variables, mails written as .kay components, a development outbox page, a test outbox and queued sending",
   "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
