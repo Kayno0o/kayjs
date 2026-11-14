@@ -4,7 +4,7 @@ An LLM called from kay apps with no SDK and no streaming code: `ask()` over Anth
 
 ## Install
 
-kayjs-ai is published to npm as `@kayjs/ai`, beside kay, and to the Forgejo registry at git.kaynooo.fr under the same name.
+kayjs-ai is published to npm as `@kayjs/ai`, beside kay, and as a mirror to the Forgejo registry at git.kaynooo.fr.
 
 ```sh
 bun add @kayjs/ai

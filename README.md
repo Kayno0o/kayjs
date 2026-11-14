@@ -8,12 +8,7 @@ The full reference, written for people and coding agents alike, starts at [llms.
 
 ## Start a project
 
-kay is published as `@kayjs/kay` to npm, and to the Forgejo registry at git.kaynooo.fr. The other `@kaynooo` packages a project uses (pg-orm, eslint) live on that registry only, so tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml`, or `$XDG_CONFIG_HOME/.bunfig.toml` when that variable is set, as Bun then reads only that one:
-
-```toml
-[install.scopes]
-"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
-```
+kay is published as `@kayjs/kay` to npm, and to the Forgejo registry at git.kaynooo.fr as a mirror. Everything a project installs, pg-orm and eslint included, comes from npm, so Bun needs no setup:
 
 ```sh
 bunx -p @kayjs/kay kay new my-app
@@ -22,7 +17,7 @@ bun install
 bun run dev   # http://localhost:3000, reloads on every change
 ```
 
-The project depends on it as `"kay": "npm:@kayjs/kay@~<version>"`, a tilde since a minor may break, so imports read `kay`, `kay/server` and so on, and carries an `.npmrc` pointing the scope at the registry. `bun src/cli.ts new ../my-app` from a checkout of this repository depends on a packed copy of it instead.
+The project depends on it as `"kay": "npm:@kayjs/kay@~<version>"`, a tilde since a minor may break, so imports read `kay`, `kay/server` and so on. `bun src/cli.ts new ../my-app` from a checkout of this repository depends on a packed copy of it instead.
 
 ## A page and an island
 

@@ -8,7 +8,7 @@ description: Translate an Astro site into a kay project with kay migrate astro, 
 
 `kay migrate astro` reads an Astro project and writes its `.astro` files as `.kay` ones.
 
-Point `--outdir` at a new or empty directory, one with no `package.json`, and it writes a whole kay project there. With Bun pointed at kay's registry, as in [Installation](/getting-started/installation), run it from the Astro project.
+Point `--outdir` at a new or empty directory, one with no `package.json`, and it writes a whole kay project there. Run it from the Astro project.
 
 ```sh
 bunx -p @kayjs/kay kay migrate astro . --outdir ../my-site-kay
@@ -110,7 +110,7 @@ In the `.kay` file, the code an item concerns is commented out under a `// kay m
 - **`import.meta.env`**: declare the variable in a `defineEnv` schema from `kay/server` and read it from there, or as an `s.Public` field for an island (see [Data loading](/essentials/data-loading)).
 - **A script from another host**: kay's Content-Security-Policy blocks it until `security: { csp: { 'script-src': ['https://unpkg.com'] } }` in `kay.config.ts` allows it.
 - **UnoCSS**: kay has no plugin for it, so its packages are left out and a class only UnoCSS knows (a variant group, a shortcut, a custom variant, a theme colour) passes through unstyled; port them to Tailwind 4.
-- **A `@kaynooo/*` range** carried over: the registry may hold no version in it, which fails `bun install`.
+- **A `@kaynooo/*` range** carried over: npm may hold no version in it, which fails `bun install`.
 - **A Markdown page** (`src/pages/*.md`): make it an entry of a [content collection](/guides/content) and render it from a page.
 - **A `site` or `base` that is not a plain string**, such as one read from the environment: set it in `kay.config.ts`.
 

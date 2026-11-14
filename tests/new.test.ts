@@ -582,7 +582,7 @@ describe('kay command line', () => {
 
     try {
       expect((await kay(['new', 'styled', '--kay', '^1.0.0', '--template', 'blank', '--with', 'tailwind, tests'], dir)).code).toBe(0)
-      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', '.mcp.json', '.npmrc', '.vscode', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'CLAUDE.md', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
+      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', '.mcp.json', '.vscode', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'CLAUDE.md', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
       const lean = await kay(['new', 'lean', '--kay', '^1.0.0', '--without', 'docker,ci'], dir)
 
       expect(lean.code).toBe(0)
@@ -696,7 +696,6 @@ describe('kay new', () => {
 
     expect(manifest.devDependencies['axe-core']).toBe(peers['axe-core'])
     expect(manifest.devDependencies.typescript7).toBe(peers.typescript7)
-    expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
     expect(manifest.dependencies.kay).toBe('^1.0.0')
     expect(await Bun.file(join(dir, 'src/components/header.kay')).text()).toContain('(href="/") my-app\n')
     // As strict as kay itself, and checked, linted and tested on every push.
@@ -1004,9 +1003,8 @@ describe('kay new', () => {
       const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.blank.features })
       const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string>, scripts: Record<string, string> }
 
-      expect(files).toEqual(['.gitignore', '.mcp.json', '.npmrc', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'CLAUDE.md', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
-      // kay itself comes from the registry this names, whatever else is left out.
-      expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
+      expect(files).toEqual(['.gitignore', '.mcp.json', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'CLAUDE.md', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
+
       expect(manifest.scripts).toEqual({ 'dev': 'kay dev', 'build': 'kay build --static', 'check': 'kay check', 'fmt': 'kay fmt', 'fmt:check': 'kay fmt --check' })
       // An agent reads kay's docs as installed, renames the site every title ends with, and runs the checks this project's scripts hold.
       expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toBe('# my-app\n\nBuilt with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`, and `bunx kay docs <words>` prints the section of them or of an installed library\'s that matches:\n\n@node_modules/kay/llms.txt\n\nThe `kay` MCP server (`.mcp.json`, started by `bunx kay mcp`) gives an agent the project\'s own tools: `check`, `routes`, `explain`, `docs`, `render`, `screenshot`, `doctor`, `fmt`, `generate`, `add`, `test`, `build`, `types`, `fix`, `upgrade`, `lint`, `env`, `i18n_missing`, `a11y`, `dev_errors` and `not_found`. Prefer them to running the commands by hand; `generate`, `add`, `fix`, `upgrade` and `lint` only preview unless the server runs as `bunx kay mcp --write`.\n\nA page waits for every `await` in its `--- server` fence before anything is sent, so a click waits as long: await in the fence only what the first paint needs, start the rest unawaited so an `await` block streams it, and cache what is shared with `cached`. `kay check` warns (`serial-awaits`) of independent awaits one after the other; `kay dev` warns of loads past `observe.loadBudget`.\n\nEvery page title ends with `seo.name` from `kay.config.ts`, which `kay new` filled in from the folder name: set it to the site\'s real name.\n\nBefore calling a change done, run `bun run check` and `bun run fmt`.\n')

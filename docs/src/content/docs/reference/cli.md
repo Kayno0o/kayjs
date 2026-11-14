@@ -14,7 +14,6 @@ bun install
 bun run dev
 ```
 
-This needs Bun to know the registry first, see [Installation](/getting-started/installation#registry-setup).
 
 | Command | Does |
 | --- | --- |

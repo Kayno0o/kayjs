@@ -150,7 +150,7 @@ export function serverContainerFiles({ has }: Setup): Record<string, string> {
   return {
     'Dockerfile': `FROM oven/bun:${Bun.version} AS build
 WORKDIR /app
-COPY package.json bun.lock* .npmrc ./
+COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run compile

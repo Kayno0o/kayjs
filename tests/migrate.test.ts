@@ -301,7 +301,7 @@ export const authors = collection('content/authors', {
     const report = await migrateAstroProject(root, out, { kay: '^1.0.0' })
     const packageJson = await Bun.file(join(out, 'package.json')).json() as { scripts: Record<string, string>, dependencies: Record<string, string>, devDependencies: Record<string, string> }
 
-    expect(report.written.toSorted()).toEqual(['.gitignore', '.mcp.json', '.npmrc', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'CLAUDE.md', 'kay.config.ts', 'package.json', 'src/layouts/layout.kay', 'src/routes/index.kay', 'src/server.ts', 'tsconfig.json'])
+    expect(report.written.toSorted()).toEqual(['.gitignore', '.mcp.json', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'CLAUDE.md', 'kay.config.ts', 'package.json', 'src/layouts/layout.kay', 'src/routes/index.kay', 'src/server.ts', 'tsconfig.json'])
     expect(report.copied.toSorted()).toEqual(['public/.well-known/security.txt', 'public/favicon.svg', 'src/styles/global.css'])
     expect(await Bun.file(join(out, 'src/routes/index.kay')).text()).toBe('--- server\nimport Layout from \'../layouts/layout.kay\'\n---\nLayout\n  h1 Accueil\n')
     expect(await Bun.file(join(out, 'kay.config.ts')).text()).toBe('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'fr\',\n  site: \'https://example.com\',\n  base: \'/docs\',\n})\n')
@@ -427,7 +427,7 @@ const host = import.meta.env.RCON_HOST
     expect(Object.keys(packageJson.devDependencies)).toEqual(['@iconify-json/mdi', '@kaynooo/eslint', '@types/bun', 'axe-core', 'typescript7'])
     expect(await Bun.file(join(out, '.gitignore')).text()).toEndWith('\n# From the Astro project\nworld\ndata\npublic/generated/\n')
     expect(report.notes.map(note => `${note.file}:${note.line} ${lead(note.message)}`)).toEqual([
-      'package.json:6 `@kaynooo/utils@^1.0.14` is carried over, and the Forgejo registry the .npmrc names may hold no version in that range',
+      'package.json:6 `@kaynooo/utils@^1.0.14` is carried over, and npm may hold no version in that range',
       'src/components/Tree.astro:3 Astro.props without a `Props` type',
       'src/components/Tree.astro:4 import.meta.env.RCON_HOST is Vite\'s',
       'src/components/Tree.astro:8 Astro.self, a component rendering itself, has no kay counterpart (import its own .kay file under a name and render that)',

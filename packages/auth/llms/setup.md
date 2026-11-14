@@ -4,7 +4,7 @@
 
 ### Setup
 
-kayjs-auth is published as `@kayjs/auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia (an implementation detail of kay: an app names `KayPlugin` and `Schema`, never Elysia's types), kayjs-ui (for the prebuilt pages) and `@kaynooo/pg-orm` (for the default store) are peer dependencies.
+kayjs-auth is published as `@kayjs/auth` to npm, beside kay. kay, Elysia (an implementation detail of kay: an app names `KayPlugin` and `Schema`, never Elysia's types), kayjs-ui (for the prebuilt pages) and `@kaynooo/pg-orm` (for the default store) are peer dependencies.
 
 One line in kay.config.ts is the whole setup, and the app has no auth file:
 

@@ -298,9 +298,9 @@ describe('the documentation site', () => {
   it('shows on the home page the steps Installation gives', async () => {
     const home = await Bun.file(join(root, 'docs/src/routes/(docs)/index.kay')).text()
     const installation = await Bun.file(join(root, 'docs/src/content/docs/getting-started/installation.md')).text()
-    const steps = ['REGISTRY', 'CREATE'].map(name => home.match(new RegExp(`const ${name} = \`([^\`]+)\``))?.[1])
+    const steps = ['CREATE'].map(name => home.match(new RegExp(`const ${name} = \`([^\`]+)\``))?.[1])
 
-    expect(steps).toEqual([expect.any(String), expect.any(String)])
+    expect(steps).toEqual([expect.any(String)])
 
     for (const step of steps)
       expect(installation).toContain(`\n${step}\n\`\`\``)

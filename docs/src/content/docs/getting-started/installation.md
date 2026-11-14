@@ -1,21 +1,13 @@
 ---
 title: Installation
 order: 3
-description: Point Bun at the registry, scaffold a project with kay new and start the dev server.
+description: Scaffold a project with kay new and start the dev server.
 ---
 
-You need [Bun](https://bun.sh) 1.4.4 or later. kay is published as `@kayjs/kay` on npm, and its libraries as `@kayjs/ui`, `@kayjs/auth`, `@kayjs/mail`, `@kayjs/cms` and `@kayjs/ai`. The other `@kaynooo` packages a project uses (pg-orm, eslint) live on the Forgejo registry, so tell Bun where the `@kaynooo` scope lives once, then create a project.
+You need [Bun](https://bun.sh) 1.4.4 or later. kay is published as `@kayjs/kay` on npm, and its libraries as `@kayjs/ui`, `@kayjs/auth`, `@kayjs/mail`, `@kayjs/cms` and `@kayjs/ai`. Everything a new project installs comes from npm too, so there is nothing to configure first. kay's own Forgejo registry carries the same packages as a mirror.
 
 A project depends on kay under the name `kay`, so imports read `kay` and `kay/server`. `kay new` writes the line `"kay": "npm:@kayjs/kay@~<version>"` in `package.json` for you.
 
-## Registry setup
-
-Add the scope to `~/.bunfig.toml`. When `$XDG_CONFIG_HOME` is set, use `$XDG_CONFIG_HOME/.bunfig.toml` instead, because Bun then reads only that file.
-
-```toml
-[install.scopes]
-"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
-```
 
 ## Create a project
 

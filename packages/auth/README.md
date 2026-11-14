@@ -4,13 +4,13 @@ Auth for kay apps, built on kay's sessions: OAuth and OpenID Connect sign-in (Di
 
 ## Install
 
-kayjs-auth is published to npm as `@kayjs/auth`, beside kay, and to the Forgejo registry at git.kaynooo.fr under the same name.
+kayjs-auth is published to npm as `@kayjs/auth`, beside kay, and as a mirror to the Forgejo registry at git.kaynooo.fr.
 
 ```sh
 bun add @kayjs/auth
 ```
 
-kay, Elysia and kayjs-ui (for the prebuilt pages) are peers, and `@kaynooo/pg-orm` too for the Postgres and SQLite store. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
+kay, Elysia and kayjs-ui (for the prebuilt pages) are peers, and `@kaynooo/pg-orm` too for the Postgres and SQLite store. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together.
 
 ## Set up
 

@@ -11,7 +11,7 @@ description: Call an LLM from a kay app with no SDK and no streaming code, over 
 bun add @kayjs/ai
 ```
 
-It installs from npm as `@kayjs/ai`, and from the Forgejo registry under the same name. The other `@kaynooo` packages a project uses, such as pg-orm, need that scope pointed at the Forgejo registry: a project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
+It installs from npm as `@kayjs/ai`, and the Forgejo registry carries the same package as a mirror.
 
 kay is a peer. kayjs-ai is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 

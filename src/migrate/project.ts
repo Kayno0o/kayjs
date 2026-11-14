@@ -330,9 +330,9 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
 
     project['package.json'] = carried
 
-    // A `@kaynooo/*` range the registry the .npmrc names may hold no version of, which fails `bun install`.
+    // A `@kaynooo/*` range npm may hold no version of, which fails `bun install`.
     for (const [name, range] of Object.entries({ ...written.dependencies, ...written.devDependencies }).filter(([name]) => KAYNOOO_PACKAGE.test(name) && !(name in { ...own.dependencies, ...own.devDependencies })))
-      note('package.json', undefined, { line: lineOfPackage(astroText, name), message: `\`${name}@${range}\` is carried over, and the Forgejo registry the .npmrc names may hold no version in that range: if \`bun install\` fails with No version matching, change the range to a published one` })
+      note('package.json', undefined, { line: lineOfPackage(astroText, name), message: `\`${name}@${range}\` is carried over, and npm may hold no version in that range: if \`bun install\` fails with No version matching, change the range to a published one` })
 
     if (Object.keys(paths).length > 0)
       project['tsconfig.json'] = `${JSON.stringify({ extends: 'kay/tsconfig.json', compilerOptions: { paths } }, null, 2)}\n`

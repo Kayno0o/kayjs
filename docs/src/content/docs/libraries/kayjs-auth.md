@@ -15,11 +15,10 @@ Each account page is titled after its tab, such as "Security - Your account", so
 bun add @kayjs/auth
 ```
 
-It installs from npm as `@kayjs/auth`, and from the Forgejo registry under the same name. The other `@kaynooo` packages a project uses, such as pg-orm, need that scope pointed at the Forgejo registry: a project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
+It installs from npm as `@kayjs/auth`, and the Forgejo registry carries the same package as a mirror.
 
 kay, Elysia and kayjs-ui are peers (Elysia is an implementation detail of kay: you name `KayPlugin` and `Schema`, never its types), as its pages use kayjs-ui's components. `@kaynooo/pg-orm` is a peer too, for the Postgres store. kayjs-auth is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 
-An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
 
 ## Setup
 

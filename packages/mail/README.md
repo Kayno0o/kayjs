@@ -4,13 +4,13 @@ Mail for kay apps: SMTP configured from typed environment variables, mails writt
 
 ## Install
 
-kayjs-mail is published to npm as `@kayjs/mail`, beside kay, and to the Forgejo registry at git.kaynooo.fr under the same name.
+kayjs-mail is published to npm as `@kayjs/mail`, beside kay, and as a mirror to the Forgejo registry at git.kaynooo.fr.
 
 ```sh
 bun add @kayjs/mail
 ```
 
-kay and Elysia are peers. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
+kay and Elysia are peers. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together.
 
 ## Use
 

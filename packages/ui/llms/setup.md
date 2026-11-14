@@ -4,7 +4,7 @@
 
 ### Setup
 
-kayjs-ui is published as `@kayjs/ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Tailwind v4 and `@iconify-json/tabler` are peer dependencies. It is released with kay at its version and peers on kay's minor: the app installs the one matching its kay and moves them together.
+kayjs-ui is published as `@kayjs/ui` to npm, beside kay. kay, Tailwind v4 and `@iconify-json/tabler` are peer dependencies. It is released with kay at its version and peers on kay's minor: the app installs the one matching its kay and moves them together.
 
 ```sh
 kay add ui

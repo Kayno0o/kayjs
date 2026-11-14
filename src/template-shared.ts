@@ -33,8 +33,6 @@ export function holds(features: ReadonlySet<Feature>): (feature: Feature) => boo
   return feature => features.has(feature) || (feature === 'ui' && features.has('auth'))
 }
 
-export const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
-
 // A file of these lines, each `false` left out.
 export function lines(...entries: (string | false)[]): string {
   return `${entries.filter(entry => entry !== false).join('\n')}\n`

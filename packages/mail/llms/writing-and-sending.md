@@ -6,7 +6,7 @@
 
 `kay add mail` does the install and lists `mail()` in `kay.config.ts` (SMTP from the environment, outbox in development and under `bun test`); `mail({ from, locale, ... })` takes the options of `mailer()` below and builds the mailer as `pages()` does, with no module. `send(message)` and `enqueue(message)` from `@kayjs/mail` use the mailer `mail()` built as the site started (they assume one running site per process: when several run, as test sites can, the latest started is used, so each of them calls its own mailer's `send`; they throw when none runs), `registeredMailer()` gives it for `list()`, `drain()` or `suppress()`; `kayjs-auth` sends through it when the app has no `src/mail.ts`.
 
-kayjs-mail is published as `@kayjs/mail` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay and Elysia (an implementation detail of kay: an app names `KayPlugin` and `Schema`, never Elysia's types) are peer dependencies.
+kayjs-mail is published as `@kayjs/mail` to npm, beside kay. kay and Elysia (an implementation detail of kay: an app names `KayPlugin` and `Schema`, never Elysia's types) are peer dependencies.
 
 ```ts
 // kay.config.ts

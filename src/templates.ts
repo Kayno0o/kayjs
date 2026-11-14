@@ -3,7 +3,7 @@ import { authFiles, authTestFiles } from './template-auth'
 import { pagesWorkflow, testWorkflow } from './template-ci'
 import { config, SERVER_ENTRY } from './template-config'
 import { serverContainerFiles, staticContainerFiles } from './template-docker'
-import { blocks, DEFAULT_RUNNERS, holds, lines, REGISTRY } from './template-shared'
+import { blocks, DEFAULT_RUNNERS, holds, lines } from './template-shared'
 import { home, homeTest, layout, starterFiles } from './template-starter'
 import { ACCENT_FILES, editorExtensions, editorSettings, PLAIN_CSS, tailwindCss } from './template-styles'
 import { WS_TEST, wsFiles } from './template-ws'
@@ -46,8 +46,6 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
   const server = has('server')
 
   return {
-    // kay itself is published there, as are @kaynooo/eslint and @kaynooo/pg-orm.
-    '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
     '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', (server || has('postgres')) && 'data', (server || has('postgres')) && 'data-prod', '.env', '.env.*', '!.env.example', '!.env.test'),
     'kay.config.ts': config(setup),
     'src/routes/_layout.kay': layout(setup),

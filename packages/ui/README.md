@@ -4,13 +4,13 @@ Components for kay apps: buttons and icons, toasts, dialogs and a form dialog ca
 
 ## Install
 
-kayjs-ui is published to npm as `@kayjs/ui`, beside kay, and to the Forgejo registry at git.kaynooo.fr under the same name.
+kayjs-ui is published to npm as `@kayjs/ui`, beside kay, and as a mirror to the Forgejo registry at git.kaynooo.fr.
 
 ```sh
 bun add @kayjs/ui @iconify-json/tabler
 ```
 
-kay and Tailwind v4 are peers. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it. Three more are optional, installed only by an app using what needs them: `chartist` (2.x) for LineChart, `leaflet` for MapView, and `hls.js` for MediaGallery to play `.m3u8` playlists in browsers without native HLS.
+kay and Tailwind v4 are peers. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. Three more are optional, installed only by an app using what needs them: `chartist` (2.x) for LineChart, `leaflet` for MapView, and `hls.js` for MediaGallery to play `.m3u8` playlists in browsers without native HLS.
 
 ## Theme
 

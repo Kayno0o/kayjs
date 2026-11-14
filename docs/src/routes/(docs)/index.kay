@@ -8,8 +8,6 @@ import { navigation } from '../../pages'
 export const page = { prerender: true }
 
 // Installation's own steps, which tests/docs.test.ts holds them to.
-const REGISTRY = `[install.scopes]
-"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"`
 
 const CREATE = `bunx -p @kayjs/kay kay new my-app
 cd my-app
@@ -68,8 +66,8 @@ Layout(preheader="Your account is ready")
   Paragraph Welcome, {name}. Confirm your address to start.
   Button(href={url}) Confirm my address`
 
-const [registry, create, sample, auth, mail, allComponents, { groups }] = await Promise.all([
-  highlightCode(REGISTRY, 'toml', { highlight }),
+const [create, sample, auth, mail, allComponents, { groups }] = await Promise.all([
+
   highlightCode(CREATE, 'bash', { highlight }),
   highlightCode(SAMPLE, 'kay', { highlight }),
   highlightCode(AUTH, 'kay', { highlight }),
@@ -130,10 +128,7 @@ head
       Button(class="px-4 py-2 text-sm" href="/getting-started/choosing-kay" label="Choosing kay")
     ol.install
       li
-        p Once, point Bun at kay's registry in #[code ~/.bunfig.toml]:
-        div(innerHTML={registry})
-      li
-        p Then scaffold a project and start it:
+        p Scaffold a project and start it:
         div(innerHTML={create})
   .home-body
     .hero-code(innerHTML={sample})
