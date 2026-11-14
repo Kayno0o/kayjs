@@ -83,7 +83,7 @@ export async function post<Output>(url: string, input: unknown, onProgress: (sen
   const invalidated = response.headers.get(INVALIDATED_HEADER)
 
   if (invalidated !== null)
-    caller.invalidated = JSON.parse(invalidated) as string[]
+    caller.invalidated = invalidatedKeys(invalidated)
 
   return readActionResponse(response, url, left, caller, async () => {
     const again = await answered()
@@ -148,4 +148,16 @@ export async function readActionResponse<Output>(response: Response, action: str
   }
 
   return (body === '' ? undefined : decodeServerValue(body)) as Output
+}
+
+// The keys of the header, URL-encoded JSON; one that does not read as a list of texts names none.
+function invalidatedKeys(header: string): string[] | undefined {
+  try {
+    const keys: unknown = JSON.parse(decodeURIComponent(header))
+
+    return Array.isArray(keys) && keys.every(key => typeof key === 'string') ? keys : undefined
+  }
+  catch {
+    return undefined
+  }
 }

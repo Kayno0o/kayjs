@@ -1,12 +1,14 @@
 import type { LivePage, LiveRequest, LiveUpdate } from './live-value'
 import { withBase } from './base'
-import { CACHE_LIVE_ID } from './cache-live-id'
+import { CACHE_LIVE_ID, liveCache } from './cache-live-id'
 import { dirtyGuard, navigation } from './navigation'
 import { retryLater } from './retry-later'
 import { decodeServerValue } from './wire'
 
 // The cached values a page follows (`cached(..., { live: true })`) are kept up to date by the route live values use, `POST /_kay/live`, through a reader of its own: this module stays out of the code every page loads, so it imports nothing of the runtime that code does not already reach.
 // A `resource()` reading a route the same way follows the keys the route's handler read, through the proof its answer carries.
+
+liveCache.loaded = true
 
 const ROUTE = '/_kay/live'
 // A deferred island's script is told from the page's by its attribute, so a page's renewal of its proofs leaves it alone.
@@ -105,9 +107,9 @@ export function followCaches(): void {
   follow()
 }
 
-// Whether the page shown, or a resource, follows one of these keys, whose invalidation it then shows through the connection.
+// Whether the page shown, or a resource, follows one of these keys through a connection that is up or coming back, whose invalidation it then shows.
 export function follows(keys: readonly string[]): boolean {
-  return keys.some(key => rendered.has(key) || islands.has(key) || [...routes.values()].some(route => route.reads.has(key)))
+  return connection !== undefined && keys.some(key => rendered.has(key) || islands.has(key) || [...routes.values()].some(route => route.reads.has(key)))
 }
 
 // Follows the keys a route's answer carried the proof of for a resource, or lets go of them when `header` is null: called after each answer, which replaces the last, and when the resource is gone.

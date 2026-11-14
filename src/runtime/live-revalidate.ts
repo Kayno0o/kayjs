@@ -5,7 +5,7 @@ import { onCleanup } from './reactive'
 const MAX_TIMER = 2_147_483_647
 
 // Asks again each time the browser says so, until the owner is gone: the tab getting the focus back, the network returning, or an interval while the tab shows.
-export function revalidating(when: Revalidation | readonly Revalidation[], run: (fresh: boolean) => void): void {
+export function revalidating(when: Revalidation | readonly Revalidation[], run: (honoursStale: boolean) => void): void {
   for (const trigger of typeof when === 'string' ? [when] : when) {
     if (trigger === 'focus') {
       const focused = () => run(true)

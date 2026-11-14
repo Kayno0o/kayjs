@@ -21,8 +21,6 @@ import { decodeServerValue } from './wire'
 // Defined by the browser build, which never runs the server's half: tested where it is read, so the bundler drops it.
 declare const KAY_BROWSER: true | undefined
 
-// A timer waits 2^31 - 1 ms at most.
-
 // Type only: what each value an event stream sends is.
 declare const EVENTS: unique symbol
 
@@ -686,7 +684,7 @@ class Entry {
   busy: boolean
   asked: Read | undefined = undefined
   // When a value was last written, in ms, which a `stale` window counts from.
-  answeredAt = 0
+  answeredAt = Date.now()
   gone = false
   private current: AbortController | undefined
   private followed = false

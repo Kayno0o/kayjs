@@ -314,8 +314,13 @@ const MAX_INVALIDATED = 20
 
 // Names the keys a call's handler invalidated on its answer, for the page to tell whether its live connection shows them.
 export function invalidatedHeader(keys: ReadonlySet<string>, headers: Headers, called: boolean): void {
-  if (called && keys.size > 0 && keys.size <= MAX_INVALIDATED)
-    headers.set(INVALIDATED_HEADER, JSON.stringify([...keys]))
+  if (!called || keys.size === 0 || keys.size > MAX_INVALIDATED)
+    return
+
+  const text = encodeURIComponent(JSON.stringify([...keys]))
+
+  if (text.length <= MAX_ROUTE_KEY_BYTES)
+    headers.set(INVALIDATED_HEADER, text)
 }
 
 // An invalidation, this process's or another's, tells the pages following what it dropped: each key gets the time, which only grows and is never before a read another process dated with a clock ahead of this one.

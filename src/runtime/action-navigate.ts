@@ -1,5 +1,6 @@
 import type { Refreshable } from './action-shared'
 import { skew } from './build'
+import { liveCache } from './cache-live-id'
 import { leave, mayLeave, navigation } from './navigation'
 import { reload } from './stale'
 
@@ -35,7 +36,7 @@ export async function refreshedUnlessFollowed(keys: readonly string[] | undefine
   const [navigations, visits] = [navigation.navigations, navigation.visits]
 
   try {
-    if (keys !== undefined && (await import('./live-cache')).follows(keys))
+    if (keys !== undefined && liveCache.loaded && (await import('./live-cache')).follows(keys))
       return
   }
   catch {}

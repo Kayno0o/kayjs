@@ -348,7 +348,7 @@ In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from an
 
 `focusInvalid()` from `kay` moves focus to the first field marked `aria-invalid`.
 
-The page is loaded again after a call that went through, unless you pass `{ refresh: false }`, or the handler invalidated a [cached value](/guides/live-and-realtime) the page follows, which the page then shows through its live connection with only the elements that read it (`{ refresh: true }` loads the page anyway). A visitor clicking a link meanwhile is not affected: the reload waits for the link's page, and is dropped when that page shows another URL or the link ends in a full load.
+The page is loaded again after a call that went through, unless you pass `{ refresh: false }`, or the handler invalidated a [cached value](/guides/live-and-realtime) the page follows, which the page then shows through its live connection, a moment after the answer (`{ refresh: true }` loads the page at once). A visitor clicking a link meanwhile is not affected: the reload waits for the link's page, and is dropped when that page shows another URL or the link ends in a full load.
 
 While an island's `onSubmit` returns a promise, the form and its submit buttons are `aria-busy`, and a second submit is ignored until the promise settles.
 
