@@ -23,7 +23,7 @@ async function passwordsOf(site: Pick<TestSite, 'cookies' | 'fetch'>) {
   const passwords = activePasswords()
 
   if (!passwords)
-    throw configError('cms', 'guard', 'the site\'s `cms({ guard })` is not a `passwordGuard()`')
+    throw configError('cms', 'guard', 'the site\'s `cms({ access })` is not a password: `access: { password }` is what `signInAs` signs in with')
 
   return passwords
 }

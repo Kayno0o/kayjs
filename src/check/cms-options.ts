@@ -46,7 +46,7 @@ export async function cmsOptions(root: string, options: CheckOptions): Promise<C
         const role = property('role')
 
         if (role)
-          found.push({ property: role, message: '`role` of `cms()` is deprecated since 1.105: `access` says who is let in', help: 'write `access` for `role`', edits: role.shorthand || spread || present('access') ? null : [{ start: base + role.key.start, end: base + role.key.end, text: 'access' }] })
+          found.push({ property: role, message: '`role` of `cms()` is deprecated since 1.105: `access` says who is let in', help: 'write `access` for `role`', edits: role.shorthand || spread || present('access') || present('member') ? null : [{ start: base + role.key.start, end: base + role.key.end, text: 'access' }] })
 
         const guard = property('guard')
 
@@ -54,7 +54,7 @@ export async function cmsOptions(root: string, options: CheckOptions): Promise<C
           const [password, given] = guard.value.arguments
           const inner = given?.type === 'ObjectExpression' && given.properties.length > 0 ? source.slice(base + given.start + 1, base + given.end - 1).trim().replace(TRAILING_COMMA, '') : ''
           const simple = password !== undefined && password.type !== 'SpreadElement' && (given === undefined || (given.type === 'ObjectExpression' && !given.properties.some(one => one.type === 'SpreadElement')))
-          const edits = simple && !spread && !present('access') && !guard.shorthand ? [{ start: base + guard.start, end: base + guard.end, text: `access: { password: ${source.slice(base + password.start, base + password.end)}${inner === '' ? '' : `, ${inner}`} }` }] : null
+          const edits = simple && !spread && !present('access') && !present('member') && !guard.shorthand ? [{ start: base + guard.start, end: base + guard.end, text: `access: { password: ${source.slice(base + password.start, base + password.end)}${inner === '' ? '' : `, ${inner}`} }` }] : null
 
           found.push({ property: guard, message: '`guard: passwordGuard()` of `cms()` is deprecated since 1.105: `access: { password }` takes the passwords and their options', help: 'write `access: { password }` for the `passwordGuard()`; the import it leaves unused can go', edits })
         }

@@ -17,7 +17,7 @@ A `path` is one route, a `prefix` a subtree, and every `guard` option takes a gu
 | `health.path`, `metrics.path` | route | none: `metrics` takes a token, `health` is open | open | no guard option |
 | `jobs.path`, `jobs.guard` | route | guard, list or `{ load }` | the boot stops: the page lists payloads | refused |
 | `vitals({ prefix, guard })` | prefix | guard, list or `{ load }` | closed, 403 | opens the screen |
-| `cms({ prefix, guard })` | prefix | guard, list or `{ load }` | closed, 403 | admits everyone |
+| `cms({ prefix, access })` | prefix | role, list, `{ password }`, function or `false` | closed, 403 | admits everyone |
 | `images.guard` | before `images.resolve` | guard, list or `{ load }` | open | not needed |
 | `extension.routes`, `extension.api` `prefix` | prefix | the library's own guards | as the library says | no guard option |
 | `page = { guards: false }`, `api({ guards: false })` | one page, endpoint or API module | none | under the guards above it | skips them |

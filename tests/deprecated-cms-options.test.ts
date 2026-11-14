@@ -60,6 +60,7 @@ describe('deprecated-cms-options', () => {
       'export const c = cms({ access: \'admin\', role: \'editor\' })',
       'export const d = cms({ guard: mine })',
       'export const e = other({ role: \'editor\' })',
+      'export const f = cms({ role: \'editor\', member: mine })',
       '',
     ].join('\n')
 
@@ -68,7 +69,7 @@ describe('deprecated-cms-options', () => {
     try {
       const found = await cmsOptions(root, {})
 
-      expect(found.map(one => one.line)).toEqual([4, 5, 6])
+      expect(found.map(one => one.line)).toEqual([4, 5, 6, 9, 9])
       expect(found.some(one => one.fixes !== undefined)).toBe(false)
     }
     finally {
