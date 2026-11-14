@@ -309,10 +309,15 @@ export function gatheringInvalidated<T>(keys: Set<string>, run: () => T): T {
   return invalidating.run(keys, run)
 }
 
+// Tells the browser the page leaves its refresh after a call to its live connection, for a page whose `liveRefresh` setting is `true`.
+export function liveRefreshMark(setting: unknown): string {
+  return setting === true ? '<script type="application/json" data-kay-live-refresh></script>' : ''
+}
+
 // The most followed keys an answer names; an action invalidating more leaves the page to refresh as before.
 const MAX_INVALIDATED = 20
 
-// Names the keys a call's handler invalidated on its answer, for the page to tell whether its live connection shows them.
+// Names the keys a call's handler invalidated on its answer, for the page to tell whether its live connection shows them; a header dropped by the cap on keys or on length makes the client refresh the page.
 export function invalidatedHeader(keys: ReadonlySet<string>, headers: Headers, called: boolean): void {
   if (!called || keys.size === 0 || keys.size > MAX_INVALIDATED)
     return

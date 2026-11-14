@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { invalidatedHeader } from '../src/server/live'
+import { invalidatedHeader, liveRefreshMark } from '../src/server/live'
 
 const INVALIDATED = 'x-kay-invalidated'
 
@@ -18,5 +18,11 @@ describe('the keys a call invalidated, named on its answer', () => {
     invalidatedHeader(new Set(), headers, true)
     invalidatedHeader(new Set(Array.from({ length: 21 }, (_, index) => `k${index}`)), headers, true)
     expect(headers.has(INVALIDATED)).toBe(false)
+  })
+
+  it('marks only a page whose liveRefresh setting is true', () => {
+    expect(liveRefreshMark(true)).toContain('data-kay-live-refresh')
+    expect(liveRefreshMark(false)).toBe('')
+    expect(liveRefreshMark(undefined)).toBe('')
   })
 })

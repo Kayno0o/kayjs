@@ -850,6 +850,7 @@ interface PageSettings
   keep?: boolean
   /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ lastmod?: ((params: Record<string, string>) => Lastmod | Promise<Lastmod | undefined> | undefined) | Lastmod
   layouts?: boolean
+  liveRefresh?: boolean
   /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ noindex?: boolean
   prerender?: boolean | object
   query?: Schema

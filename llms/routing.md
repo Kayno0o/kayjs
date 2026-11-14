@@ -242,8 +242,9 @@ export default (value: string) =>
 | `rateLimit` | `{ max, window, key? }` or a list, counted per page after its guards, 429 with `Retry-After` past it; `false` lifts a layout's | [Rate limits](rate-limits.md) |
 | `security` | `{ csp, headers }` added to the site's security headers for the page's responses | [Production](proxy-and-security.md#security-headers) |
 | `reload` | a boolean: `true` loads the page fully from any link or form, past the page swap | [Islands](islands.md) |
+| `liveRefresh` | a boolean: `true` leaves the page to its live connection after a call that invalidated only cached keys it follows, instead of loading it again | [Actions from islands](actions-from-islands.md) |
 
-- The flags `keep`, `layouts` and `reload` are plain booleans, `true` or `false` as written, and the one a page leaves out is off for `keep` and `reload` and on for `layouts`; `guards: true` says what the default does. `kay check` reports a `layouts` that is not a literal, and a `guards` that is a boolean written another way. An endpoint's and an `api()` module's `guards` is the same option.
+- The flags `keep`, `layouts`, `reload` and `liveRefresh` are plain booleans, `true` or `false` as written, and the one a page leaves out is off for `keep`, `reload` and `liveRefresh` and on for `layouts`; `guards: true` says what the default does. `kay check` reports a `layouts` that is not a literal, and a `guards` that is a boolean written another way. An endpoint's and an `api()` module's `guards` is the same option.
 - A page or a layout whose `page` has `layouts: false` among its keys is wrapped by none of the layouts above it.
 - `export const page = { layouts: false }` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header.
 

@@ -37,7 +37,7 @@ import { formsScript } from './forms'
 import { historyScript } from './history'
 import { hydrationScript } from './hydration'
 import { DEFAULT_LANG, invalidKeys, messagesScript } from './i18n'
-import { followsCaches, liveScript, noteStreams } from './live'
+import { followsCaches, liveRefreshMark, liveScript, noteStreams } from './live'
 import { newTabRule } from './new-tab'
 import { INSTALL_OFFER, registerScript } from './offline'
 import { seoTags } from './page-seo'
@@ -487,7 +487,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither ships only `historyScript`, and links from it load pages, losing no state.
   const posts = client.entry !== undefined && client.navigation === true && forms.size > 0
   // The entry fetches a deferred server island as it nears the viewport.
-  const liveText = liveScript()
+  const liveText = liveScript() + liveRefreshMark(chainSetting(modules, 'liveRefresh'))
   // A page following cached values loads the entry too, which opens the connection telling it they changed.
   const follows = client.entry !== undefined && followsCaches()
   const defers = client.entry !== undefined && scan?.modes.includes('defer') === true

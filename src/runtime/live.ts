@@ -8,7 +8,6 @@ import { withBase } from './base'
 import { callBody } from './call-body'
 import { trackCalls } from './call-result'
 import { connection, connectionHooks, ended } from './connection'
-import { durationSeconds } from './duration'
 import { withKeepalive } from './keepalive'
 import { listenerSet } from './listener-set'
 import { serverResource } from './live-resource.server'
@@ -684,13 +683,14 @@ class Entry {
   busy: boolean
   asked: Read | undefined = undefined
   // When a value was last written, in ms, which a `stale` window counts from.
-  answeredAt = Date.now()
+  answeredAt: number
   gone = false
   private current: AbortController | undefined
   private followed = false
 
   constructor(readonly key: string | undefined, known?: { value: unknown }) {
     this.value = known?.value
+    this.answeredAt = known === undefined ? 0 : Date.now()
     this.rev = known === undefined ? 0 : 1
     this.status = known === undefined ? 'loading' : 'ready'
     this.busy = known === undefined
@@ -962,11 +962,8 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
       void next.load(read, 'first')
   })
 
-  if (first?.revalidate !== undefined) {
-    const staleMs = first.stale === undefined ? 0 : durationSeconds(first.stale, 'the stale of resource()') * 1000
-
-    revalidating(first.revalidate, event => entry?.revalidate(event ? staleMs : 0))
-  }
+  if (first?.revalidate !== undefined)
+    revalidating(first.revalidate, first.stale, staleMs => entry?.revalidate(staleMs))
 
   onCleanup(() => {
     gone = true

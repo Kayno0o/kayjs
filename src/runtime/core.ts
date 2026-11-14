@@ -518,6 +518,9 @@ export interface PageSettings {
   // `true` loads the page fully from any link or form of the site, past the page swap: a page whose scripts expect a fresh document.
   // `false`, the default, says nothing.
   reload?: boolean
+  // `true` leaves the page to its live connection after a call whose handler invalidated cached keys it follows, when every key the call invalidated is followed: the call does not load the page again. For a page whose every read of what actions change is a `cached(..., { live: true })` value or a `resource()`.
+  // `false`, the default, loads the page again after every call.
+  liveRefresh?: boolean
   /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
   search?: PageSearch | ((params: Record<string, string>) => PageSearch | undefined | Promise<PageSearch | undefined>)
 }

@@ -107,9 +107,9 @@ export function followCaches(): void {
   follow()
 }
 
-// Whether the page shown, or a resource, follows one of these keys through a connection that is up or coming back, whose invalidation it then shows.
+// Whether the page opted in (`liveRefresh`) and follows every one of these keys through a connection that is up or coming back, whose invalidations it then shows.
 export function follows(keys: readonly string[]): boolean {
-  return connection !== undefined && keys.some(key => rendered.has(key) || islands.has(key) || [...routes.values()].some(route => route.reads.has(key)))
+  return connection !== undefined && document.querySelector('script[data-kay-live-refresh]') !== null && keys.every(key => rendered.has(key) || islands.has(key) || [...routes.values()].some(route => route.reads.has(key)))
 }
 
 // Follows the keys a route's answer carried the proof of for a resource, or lets go of them when `header` is null: called after each answer, which replaces the last, and when the resource is gone.
