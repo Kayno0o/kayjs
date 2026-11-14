@@ -241,6 +241,8 @@ describe('the docs write the signatures the code has', () => {
   }
 
   const SERVER_HOOKS = new Set(['onError', 'onSend', 'onSave'])
+  // Positional by design: the `ai({ ... })` hooks (`Hook<AiToolCall>`) and the cms `CustomFieldProps.onChange(next)` setter, not component events.
+  const POSITIONAL = new Set(['docs/src/content/docs/libraries/kayjs-ai.md:onToolCall', 'packages/ai/llms/hooks.md:onToolCall', 'packages/cms/llms/fields.md:onChange'])
   const SIGNATURE = /`(on[A-Z]\w*)\(([^`]*)\)`/g
   const DOCS = ['docs/src/content/ui/*.md', 'docs/src/content/docs/**/*.md', 'llms/*.md', 'packages/*/llms/*.md', 'packages/*/llms.txt', 'llms.txt']
 
@@ -263,6 +265,9 @@ describe('the docs write the signatures the code has', () => {
 
           // `onError`, `onSend` and `onSave` are also the server hooks of mail, cms and queues, whose events carry other fields.
           if (SERVER_HOOKS.has(name!) && args!.trim().startsWith('{'))
+            continue
+
+          if (!args!.trim().startsWith('{') && POSITIONAL.has(`${file}:${name}`))
             continue
 
           if (!args!.trim().startsWith('{')) {

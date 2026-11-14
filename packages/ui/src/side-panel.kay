@@ -41,7 +41,7 @@ const { open, trigger, title, label, heading, level = 2, actions, header, close,
   actions?: Snippet
   // The whole head line in place of the title, `actions` and the close button.
   header?: Snippet
-  // The close button in place of the library's own: it closes by `onOpenChange(false)`, or by going to `closeHref`.
+  // The close button in place of the library's own: it closes by `onOpenChange({ open: false })`, or by going to `closeHref`.
   close?: Snippet
   // Work the panel must not drop, such as a request in flight: a click outside, Escape and the close button leave it open. Typing is not that: it asks first, see `discard`.
   dirty?: boolean | undefined
@@ -53,7 +53,7 @@ const { open, trigger, title, label, heading, level = 2, actions, header, close,
   closeLabel?: string | undefined
   // `false` shows the panel beside the page instead of over it: the page under it stays interactive, a click outside leaves it open and only Escape or the close control closes it. It renders open on the server, so a page driven by the URL shows it with no JavaScript.
   modal?: boolean | undefined
-  // With `dock`, a closed panel leaves a button of this label in the window's bottom right corner that opens it through `onOpenChange(true)`, off the dev tool's drawer, and publishes the room it takes as `--kay-panel-right` for the dev tool's bar. Without it a closed panel leaves nothing.
+  // With `dock`, a closed panel leaves a button of this label in the window's bottom right corner that opens it through `onOpenChange({ open: true })`, off the dev tool's drawer, and publishes the room it takes as `--kay-panel-right` for the dev tool's bar. Without it a closed panel leaves nothing.
   launcher?: string | undefined
   // Written after the component's own declarations, so it wins: a docked panel's `z-index` is set here. The launcher takes none of it, only `launcherLayer`.
   style?: string | undefined
@@ -71,10 +71,10 @@ const { open, trigger, title, label, heading, level = 2, actions, header, close,
   // When this value changes the body scrolls back to the top, for a panel kept in place (a `persist` island) while its content changes under it, as the next item of a list.
   scrollKey?: string | number | undefined
 } & (
-  // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the panel with no island of its own. Such a panel's `launcher` is a link to `launcherHref`, which the types ask for, as nothing else could open it.
+  // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange({ open: false })` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the panel with no island of its own. Such a panel's `launcher` is a link to `launcherHref`, which the types ask for, as nothing else could open it.
   | { closeHref: string, onOpenChange?: undefined, launcher?: undefined, launcherHref?: undefined }
   | { closeHref: string, onOpenChange?: undefined, launcher: string, launcherHref: string }
-  // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone. `launcherHref` makes the launcher a link too: the link navigates and `onOpenChange(true)` is called as well.
+  // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone. `launcherHref` makes the launcher a link too: the link navigates and `onOpenChange({ open: true })` is called as well.
   | { closeHref?: string | undefined, onOpenChange?: ((event: { open: boolean }) => unknown) | undefined, launcherHref?: string | undefined }
 )>()
 

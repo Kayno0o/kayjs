@@ -55,12 +55,12 @@ const { open, trigger, title, label, heading, level = 2, size = 'md', bare = fal
   actions?: Snippet
   // The whole head line in place of the title, `actions` and the close button.
   header?: Snippet
-  // The close button in place of the library's own: it closes by `onOpenChange(false)`, or by going to `closeHref`.
+  // The close button in place of the library's own: it closes by `onOpenChange({ open: false })`, or by going to `closeHref`.
   close?: Snippet
   closeLabel?: string | undefined
   footer?: Snippet
 } & (
-  // Makes the close control a link to this URL, for a dialog open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the dialog with no island of its own.
+  // Makes the close control a link to this URL, for a dialog open on the server whose close needs no JavaScript; the link navigates and `onOpenChange({ open: false })` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the dialog with no island of its own.
   | { closeHref: string, onOpenChange?: undefined }
   // Called with `true` when `trigger` opens it and with `false` however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
   | { closeHref?: string | undefined, onOpenChange?: ((event: { open: boolean }) => unknown) | undefined }

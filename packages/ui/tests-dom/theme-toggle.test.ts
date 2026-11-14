@@ -36,6 +36,19 @@ test('picking a mode puts it on html, keeps it in the cookie and tells onChange'
   expect(heard.map(args => args[0])).toEqual(['dark', 'system'])
 })
 
+test('onValueChange hears one event and takes the place of the deprecated onChange', async () => {
+  const heard: unknown[][] = []
+  const old: unknown[][] = []
+
+  mounted = await mountComponent(await library('theme-toggle'), {
+    onValueChange: (...args: unknown[]) => heard.push(args),
+    onChange: (...args: unknown[]) => old.push(args),
+  })
+  await mounted.click('input[value="dark"]')
+  expect(heard).toEqual([[{ value: 'dark', option: expect.objectContaining({ value: 'dark' }) }]])
+  expect(old).toEqual([])
+})
+
 test('modes picks and words the choices, and a mode stays in the order given', async () => {
   mounted = await mountComponent(await library('theme-toggle'), { modes: ['dark', { value: 'light', label: 'Day' }] })
   expect([...mounted.root.querySelectorAll('label')].map(label => label.textContent?.trim())).toEqual(['Dark', 'Day'])

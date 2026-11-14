@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import MoonAccordion from '../tests/fixture/src/components/moon-accordion.kay'
+import { library } from './dom'
 
 let mounted: Mounted | undefined
 
@@ -74,4 +75,19 @@ test('a level makes each section title a heading in its summary, a span without 
   mounted = await mountComponent(MoonAccordion)
   expect(mounted.root.querySelector('summary > span.kui-heading-section')?.textContent).toBe('Mars')
   expect(mounted.root.querySelector('h1, h2, h3, h4, h5, h6')).toBeNull()
+})
+
+test('onValueChange hears one event and the deprecated onChange still hears the positional list', async () => {
+  const heard: unknown[][] = []
+  const old: unknown[][] = []
+
+  mounted = await mountComponent(await library('accordion'), {
+    items: [{ key: 'mars', label: 'Mars' }, { key: 'earth', label: 'Earth' }],
+    panel: () => document.createElement('p'),
+    onValueChange: (...args: unknown[]) => heard.push(args),
+    onChange: (...args: unknown[]) => old.push(args),
+  })
+  await mounted.click('summary')
+  expect(heard).toEqual([[{ value: ['mars'] }]])
+  expect(old).toEqual([[['mars']]])
 })

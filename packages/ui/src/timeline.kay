@@ -24,7 +24,7 @@ const { entries, selected, onSelectedChange, label, emptyLabel, empty, ...rest }
   // The key of the picked entry, if any; a new one from the parent is followed.
   selected?: Key | undefined
   // Makes the entries buttons, one picked at a time; with `selected` alone they stay buttons too. Gets the picked key, or undefined when the picked entry is pressed again, and the entry pressed.
-  // The shape `selected` takes first, so `onSelectedChange={picked.set}` round-trips.
+  // The shape `selected` takes first, as `selected` takes it back.
   onSelectedChange?: ((event: { key: Key | undefined, entry: TimelineEntry<Key> }) => unknown) | undefined
   // Names the list for screen readers.
   label: string

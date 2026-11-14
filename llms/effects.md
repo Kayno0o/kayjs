@@ -70,7 +70,7 @@ p {seconds()}s on the page, last key {key()}
 ## Reference
 
 - `effect(fn)` runs once the render is done and again whenever what it read changes; `effect(fn, { signal })` stops it when the signal aborts, as `every`, `watch` and `listen` stop.
-- `onMount({ fn })` is the sugar for `effect(() => untrack(fn))`: it runs once, after the markup is in place, and never runs again. It takes `{ signal }` too. `onCleanup`, `untrack`, `batch`, `root` and `flush` come from `kay` as well.
+- `onMount(fn)` is the sugar for `effect(() => untrack(fn))`: it runs once, after the markup is in place, and never runs again. It takes `{ signal }` too. `onCleanup`, `untrack`, `batch`, `root` and `flush` come from `kay` as well.
 - Which one: `effect` to keep something in step with the signals it reads, `watch(source, run)` to react when `source` changes (the callback reads what it likes, gets the value before, and `{ immediate: true }` runs it once at the start too), `onMount` for what happens once, `every` for a timer and `listen` for an event.
 - A function an `effect` or `onMount` callback returns runs as its cleanup, as one passed to `onCleanup` does: `effect(() => { const t = setInterval(tick, 1000); return () => clearInterval(t) })`.
 - `effect`, `watch`, `every`, `listen` and `onCleanup` run with no owner at a module's top level, after an `await`, or in a timer: nothing stops the first four, which live until the page goes, and `onCleanup` drops its function. In development each logs a `[kay]` warning naming it, once, and `kay check` reports a call in an inline handler (one more per event), a timer, a promise callback or after an `await` as the `unowned-effect` lint; `root(fn)` is the owner to give them.

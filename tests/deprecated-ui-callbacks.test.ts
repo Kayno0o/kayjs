@@ -36,6 +36,10 @@ describe('deprecated-ui-callbacks', () => {
     expect(found('Tabs(tabs={TABS} onChange={picked.set})')).toEqual([{ at: 'onChange', safe: false, fixed: 'Tabs(tabs={TABS} onValueChange={picked.set})' }])
   })
 
+  it('offers no fix where the new name is already written beside the old one', () => {
+    expect(found('Tabs(tabs={TABS} onChange={old} onValueChange={({ value }) => picked = value})')).toEqual([{ at: 'onChange', safe: undefined, fixed: undefined }])
+  })
+
   it('leaves the new names, other components and other props alone', () => {
     expect(found('Tabs(tabs={TABS} onValueChange={({ value }) => picked = value})')).toEqual([])
     expect(found('Other(onChange={value => picked = value})')).toEqual([])

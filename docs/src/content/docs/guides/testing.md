@@ -467,7 +467,7 @@ The page clicks and types as a user does.
 | `evaluate(fn, ...args)` | Runs a function in the page |
 | `goto`, `back`, `forward`, `reload`, `path()` | Navigate and read where the page is |
 | `upload(selector, files)` | Puts files, given by path, in a file input, as the picker does |
-| `onDialog({ handler })` | Answers the page's `alert`, `confirm`, `prompt` and `beforeunload` dialogs |
+| `onDialog(handler)` | Answers the page's `alert`, `confirm`, `prompt` and `beforeunload` dialogs |
 
 A page's load on a freshly started browser, one kay started or restarted after recycling it, waits 20 seconds when you gave no `timeout`, until one page has loaded, as Chrome starts its renderer then and a busy CI host can take seconds over it. Every later load keeps the 5 seconds.
 

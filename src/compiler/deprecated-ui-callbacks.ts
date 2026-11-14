@@ -39,6 +39,14 @@ export function deprecatedUiCallbacks(element: ElementNode, file: string, text: 
     return
 
   const message = `\`${renamed.from}\` on \`${element.name}\` is \`${renamed.to}\` since 1.105, and its callback takes one event object: \`{ ${renamed.fields.join(', ')} }\``
+  const both = element.attributes.some(one => one.kind !== 'spread' && text(one.name) === renamed.to)
+
+  if (both) {
+    report(attribute.name, message, { help: `Drop \`${renamed.from}\`, \`${renamed.to}\` is already there` })
+
+    return
+  }
+
   const edits = [rename(attribute, renamed.from, renamed.to)]
   const arrow = attribute.kind === 'expression' && !attribute.shorthand ? ARROW.exec(text(attribute.expression).trimStart()) : null
   const names = arrow?.slice(1).filter(name => name !== undefined) ?? []

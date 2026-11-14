@@ -28,7 +28,7 @@ Once the audio has played, the lock screen and the headset buttons show the chap
 
 ## Reading the position
 
-`onPositionChange` gets the seconds played, and `onChapterChange` the index of the chapter now playing, or -1 before the first. `position` goes the other way: a player whose parent passes a position more than a second away from its own seeks to it, so `position={at()} onPositionChange={at.set}` keeps both in step. A position the player reported in the last second is taken as an echo and never seeks. One that comes back later is behind the audio and seeks it backwards.
+`onPositionChange` gets the seconds played, and `onChapterChange` the index of the chapter now playing, or -1 before the first. `position` goes the other way: a player whose parent passes a position more than a second away from its own seeks to it, so `position={at()} onPositionChange={({ seconds }) => at = seconds}` keeps both in step. A position the player reported in the last second is taken as an echo and never seeks. One that comes back later is behind the audio and seeks it backwards.
 
 ## Labels
 

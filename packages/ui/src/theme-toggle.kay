@@ -74,7 +74,7 @@ async function settle(answer: PromiseLike<unknown>, mode: ThemeMode) {
 }
 
 function pick({ value: mode, option: chosen }: { value: ThemeMode, option: Option | undefined }) {
-  const answer = onValueChange?.({ value: mode, option: chosen }) ?? onChange?.(mode, chosen)
+  const answer = onValueChange ? onValueChange({ value: mode, option: chosen }) : onChange?.(mode, chosen)
 
   if (isPromiseLike(answer))
     return settle(answer, mode)

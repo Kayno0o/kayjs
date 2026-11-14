@@ -16,7 +16,7 @@ const sticky = toast.error('Offline', { duration: false })
 toast.error('Could not pull: the branch diverged', { action: { label: 'Rebase onto origin/main', run: () => rebase() } })
 
 // `description` adds a quieter second line, and `message` may be markup, a snippet, instead of a string. `onDismiss({ reason })` is called once the toast has gone, `reason` being `timeout`, `user` (close button or Escape), `action` (its button ran) or `api` (`dismissToast(id)`, `toast.update` closing it); one that throws is logged.
-toast.info('Exported', { description: '12 rows, 3 skipped', onDismiss: reason => track(reason) })
+toast.info('Exported', { description: '12 rows, 3 skipped', onDismiss: ({ reason }) => track(reason) })
 
 // `action` may be a link instead: `{ label: 'Open', href: '/exports/12' }` draws a link-button. A click runs its `run` when it has one (not awaited, the navigation goes on), then closes the toast with the reason `action`, as toasts outlive a page swap.
 
@@ -44,7 +44,7 @@ await attempt(() => publish({ id }), 'Could not publish', (data: { error: string
 
 A call to an API route made with `call()` throws `ApiError`, which `attempt` reads too: `refused` gets its `data`, else the words the route gave (the text it answered or the `message` or `error` of its JSON) are toasted for a 4xx when they read as a message (one line of at most 200 characters, not markup nor a code such as `NOT_FOUND` or `404`; `ACCESS DENIED` is a message), `refused` is called only for a JSON object answer, and one that throws counts as saying nothing and is logged with `console.error`, and `failure` stands for status 0 (no answer came), a 5xx or an answer with no words: `await attempt(() => call(notes, '/:id', { method: 'delete', params: { id } }), 'Could not delete')`.
 
-`onRefused({ data })` in the options gets what a refusal carries instead of any toast (an action's `ctx.fail` data, or a route's JSON object answer), to show it in place without a `try`/`catch` and `action.refused`: `await attempt(() => apply(), { failure: 'Could not apply', onRefused: data => output = data.output })`. `onRefused` is awaited, and one that throws or rejects is logged and toasts `failure`. A failure that is no refusal (a schema refusal, a network error, a 5xx answer, any other throw) still toasts `failure`, and `attempt` resolves to `undefined` either way.
+`onRefused({ data })` in the options gets what a refusal carries instead of any toast (an action's `ctx.fail` data, or a route's JSON object answer), to show it in place without a `try`/`catch` and `action.refused`: `await attempt(() => apply(), { failure: 'Could not apply', onRefused: ({ data }) => output = data.output })`. `onRefused` is awaited, and one that throws or rejects is logged and toasts `failure`. A failure that is no refusal (a schema refusal, a network error, a 5xx answer, any other throw) still toasts `failure`, and `attempt` resolves to `undefined` either way.
 
 `messageOf(error, fallback)` is the same reading for a page that shows the message where it is, not as a toast: the route's words of an `ApiError` or an action's refusal when they read as a message, else `fallback` (status 0, a 5xx, any other error): `catch (error) { notice = messageOf(error, 'Could not load') }`.
 
