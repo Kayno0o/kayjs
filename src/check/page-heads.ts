@@ -207,7 +207,7 @@ function headFacts(file: KayFile): HeadFacts {
   facts.title ??= title && { ...title, wrapped: true }
   facts.description ??= shorthand('description')
 
-  if (head?.attributes.some(entry => entry.kind !== 'spread' && file.source.slice(entry.name.start, entry.name.end) === 'noindex' && entry.kind !== 'static'))
+  if (head?.attributes.some(entry => entry.kind !== 'spread' && file.source.slice(entry.name.start, entry.name.end) === 'noindex' && entry.kind !== 'static' && !(entry.kind === 'expression' && file.source.slice(entry.expression.start, entry.expression.end).trim() === 'false')))
     facts.robots ??= { text: 'noindex' }
 
   facts.image ??= shorthand('image')
