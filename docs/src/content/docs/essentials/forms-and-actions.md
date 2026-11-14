@@ -151,7 +151,7 @@ An `input` that writes its own `value` keeps it, while a `textarea` or a `select
 
 In an island the record fills a field until the visitor changes it. If the record changes later, the fields the visitor has not touched follow it and the ones they edited keep what they typed.
 
-When a post is refused, the page shows what the visitor sent, not the record, so their edits survive. Several forms can post to one action, one per row of a list. Each form with `values` names itself in a hidden field, so after a refusal only the form that posted shows its values again and the others keep their records.
+When a post is refused, the page shows what the visitor sent, not the record, so their edits survive. A form an island builds in the browser writes no key of its own, so a refused post re-shows its refusal and values in every such form. Several forms can post to one action, one per row of a list. Each form with `values` names itself in a hidden field, so after a refusal only the form that posted shows its values again and the others keep their records.
 
 ## Showing errors
 
