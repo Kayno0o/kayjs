@@ -7,9 +7,9 @@ import { aiLanguage } from '../src/check/ai-language'
 import { cmsOptions } from '../src/check/cms-options'
 import { applySafeFixes } from '../src/check/fixes'
 
+import { formatDurationNumbers } from '../src/check/format-duration'
 import { guardOptions } from '../src/check/guard-options'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
-import { formatDurationNumbers } from '../src/check/format-duration'
 import { localState } from '../src/check/local-state'
 import { mailApi } from '../src/check/mail-api'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
@@ -78,8 +78,6 @@ describe('every deprecated lint has a safe fix', () => {
     const compiled = names.filter(name => !(name in SITE))
 
     expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-if-alias', 'deprecated-image-options', 'deprecated-mail-send', 'deprecated-page-cache', 'deprecated-page-island', 'deprecated-page-seo', 'deprecated-script-fence', 'deprecated-ui-props'])
-    expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-if-alias', 'deprecated-image-options', 'deprecated-script-fence', 'deprecated-ui-props'])
-    expect(compiled.sort()).toEqual(['deprecated-if-alias', 'deprecated-image-options', 'deprecated-page-cache', 'deprecated-page-seo', 'deprecated-script-fence', 'deprecated-ui-props'])
     expect(Object.keys(NO_SAFE_FIX).filter(name => !names.includes(name as Name))).toEqual([])
   })
 

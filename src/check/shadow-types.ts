@@ -44,9 +44,9 @@ import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsChe
 import { guardOptions } from './guard-options'
 
 import { unguardedRoutes, unguardedTools } from './guards'
-import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
-
 import { islandOnlyComponents } from './island-only'
+
+import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 
 import { largePublicImages } from './large-images'
 import { localState } from './local-state'

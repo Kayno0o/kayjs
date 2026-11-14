@@ -1,7 +1,7 @@
 import type { ClassTable } from '../runtime/class-table'
 import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode } from './ast'
-import type { ImageOptionAttributes } from './image-attributes'
 import type { FormInfo } from './form-info'
+import type { ImageOptionAttributes } from './image-attributes'
 import type { CodeBuilder } from './mapping'
 import type { BindingPlan, ElementShape } from './plan'
 import { resolveClasses } from '../runtime/class-table'
@@ -545,12 +545,13 @@ export abstract class TemplateWriter {
 
       if (calledByBind.has(attribute))
         continue
+
       // Read by the fields of the form, and never written.
       if (attribute.kind === 'expression' && name === 'values' && actionOf(element, this.src))
         continue
 
       if (this.skips(element, name))
-      continue
+        continue
 
       namedEntry(attribute, name)
     }
