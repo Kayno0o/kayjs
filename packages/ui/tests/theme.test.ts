@@ -1,3 +1,4 @@
+import { dirname, resolve } from 'node:path'
 import { describe, expect, test } from 'bun:test'
 import { compileKay } from 'kay/compiler'
 import { compile } from 'tailwindcss'
@@ -887,9 +888,9 @@ describe('theme.css', () => {
   test('builds the starfield once for an app importing both its stylesheet and the space skin', async () => {
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
     const both = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n@import './src/starfield.css';\n@import './src/skins/space.css';\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (id, base) => {
-      const path = id === 'tailwindcss/theme.css' ? tailwind : `${ROOT}${id.replace('./', '').replace('../starfield.css', 'src/starfield.css')}`
+      const path = id === 'tailwindcss/theme.css' ? tailwind : resolve(base, id)
 
-      return { path, base, content: await Bun.file(path).text() }
+      return { path, base: dirname(path), content: await Bun.file(path).text() }
     } })
     const css = both.build(['starfield'])
 
