@@ -520,7 +520,7 @@ Without `on` the shortcut binds the whole page. It cancels the browser's own act
 
 A shortcut with `mod`, `ctrl`, `meta` or `alt` also fires in a text field. A bare key such as `/` fires there only with `{ inputs: true }`. Of two bindings on one key, the innermost wins.
 
-A handler of your own on Enter in a text field starts with `if (composing(event)) return`, with `composing` from `kay`. The Enter that confirms a candidate of an input method (Japanese, Chinese, Korean) is not a submit: Safari sends it with `keyCode` 229 after `isComposing` is already false, and `composing` catches both. `shortcut` and the `.enter` event modifier already skip it.
+A handler of your own on Enter in a text field starts with `if (composing(event)) return`, with `composing` from `kay`. The Enter that confirms a candidate of an input method (Japanese, Chinese, Korean) is not a submit: Safari sends it with `keyCode` 229 after `isComposing` is already false, and `composing` catches both. `shortcut` and the `.enter` event modifier already skip it on keydown.
 
 <ReadMore href="/llms/navigation">Which keys fire in a text field, how Shift and AltGr match, and the other options of `shortcut`.</ReadMore>
 

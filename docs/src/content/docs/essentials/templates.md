@@ -267,7 +267,7 @@ More modifiers follow the same way and run in the order written. `|once` runs th
 
 `|capture` and `|passive` are the options `addEventListener` takes, so `div(onTouchStart|passive={track})` never blocks scrolling. They attach a native listener on the element itself, so the page's shared click listener is not used and a disabled button still runs the handler. They do not work on an element that spreads props, a passive listener cannot call `preventDefault`, and `onSubmit` takes `|capture` only.
 
-On `onKeyDown`, `onKeyUp` and `onKeyPress`, a key name runs the handler for that key only, and not while an input method is composing text: `input(onKeyDown|enter={send})`. The names are `enter`, `escape`, `space`, `tab`, `backspace`, `delete`, `home`, `end`, `pageup`, `pagedown`, `up`, `down`, `left` and `right`, and several of them run the handler for any of those keys. For any other key, check `event.key` in the handler.
+On `onKeyDown`, `onKeyUp` and `onKeyPress`, a key name runs the handler for that key only, and, on keydown, not while an input method is composing text: `input(onKeyDown|enter={send})`. The names are `enter`, `escape`, `space`, `tab`, `backspace`, `delete`, `home`, `end`, `pageup`, `pagedown`, `up`, `down`, `left` and `right`, and several of them run the handler for any of those keys. For any other key, check `event.key` in the handler.
 
 `|once` is spent by the first event that passes the filters written with it. On an element that spreads props, it starts over each time the spread is evaluated again.
 

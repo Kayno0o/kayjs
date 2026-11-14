@@ -130,6 +130,7 @@ export function shortcut(keys: string | (() => string | null | undefined), handl
 }
 
 // Whether a key press belongs to an IME composition: one inside it, or the Enter that closes it, which Safari sends with `keyCode` 229 after `isComposing` has already turned false. A handler acting on Enter in a text field returns early on it.
+// kept: free
 export function composing(event: KeyboardEvent): boolean {
   return event.isComposing || event.keyCode === 229
 }

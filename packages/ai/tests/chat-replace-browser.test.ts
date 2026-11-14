@@ -66,7 +66,7 @@ it('resends an edited message with every later turn gone, the action reading how
   await page.fill('.kai-chat-turn[data-editing] textarea', 'uno')
   expect(await composedEnters(page, '.kai-chat-turn[data-editing] textarea')).toBe(false)
   expect(await page.count('.kai-chat-turn[data-editing]')).toBe(1)
-  await page.click('.kai-chat-save')
+  await page.press('Enter')
   await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'edit:4 roles=u last=uno files=0' })
 
   expect(await log(page)).toEqual(['u:uno', 'a:edit:4 roles=u last=uno files=0'])

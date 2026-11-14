@@ -14,6 +14,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   byteCount: 'free',
   call: 'request',
   carrySchema: 'free',
+  composing: 'free',
   createContext: 'free',
   ctx: 'request',
   debounced: 'free',

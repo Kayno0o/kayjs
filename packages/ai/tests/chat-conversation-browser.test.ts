@@ -29,7 +29,6 @@ async function named(page: Page) {
 async function send(page: Page, text: string, answer: string) {
   fakeAi.reply(counted)
   await page.fill('.kai-chat-form textarea', text)
-  expect(await composedEnters(page, '.kai-chat-form textarea')).toBe(false)
   await page.click('.kai-chat-form .kai-chat-send')
   await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: answer })
 }
@@ -54,6 +53,18 @@ it('keeps the conversation on the server: the address names it, a reload shows i
 
   expect(await log(page)).toEqual(['u:first question', 'a:read 1 after first question', 'u:second', 'a:read 3 after second'])
   expect(await shown(page)).toBe(id)
+  expect(page.errors).toEqual([])
+}, 120_000)
+
+it('ignores the Enter of an IME composition in the message field, and sends on a plain one', async () => {
+  await using page = await site.open('/keeping')
+
+  fakeAi.reply(counted)
+  await page.fill('.kai-chat-form textarea', 'about trains')
+  expect(await composedEnters(page, '.kai-chat-form textarea')).toBe(false)
+  expect(await page.count('.kai-chat-turn')).toBe(0)
+  await page.press('Enter')
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'read 1 after about trains' })
   expect(page.errors).toEqual([])
 }, 120_000)
 

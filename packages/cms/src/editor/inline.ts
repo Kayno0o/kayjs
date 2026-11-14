@@ -4,7 +4,7 @@ import type { EntryRef, ScreenCollection } from '../kay/contract'
 import type { FieldMarker, FieldPath, MarkedField } from '../markers'
 import { announce } from '@kayjs/ui/announce'
 import { sleep } from '@kaynooo/utils/function'
-import { signal } from 'kay'
+import { composing, signal } from 'kay'
 import { wording } from 'kay/words'
 import { checkField, fieldsOf, itemAt } from '../fields'
 import { allMarked, BODY, entryKey, markedRange, markersOf } from '../markers'
@@ -208,8 +208,6 @@ export function inlineValue(field: Field, text: string): unknown {
 let active: { element: HTMLElement, end: () => void } | undefined
 let issueCount = 0
 
-// Safari ends a composition with an Enter whose keyCode is 229 and whose isComposing is already false.
-const COMPOSING_KEY = 229
 // The attributes the edit puts on the element, all removed when it ends.
 const EDIT_ATTRIBUTES = ['contenteditable', 'data-kay-typing', 'data-kay-multiline', 'aria-multiline', 'role', 'aria-label', 'aria-invalid', 'aria-describedby']
 
@@ -673,7 +671,7 @@ export function startInline({ entry, path, field, label, element, busy, block }:
       commit()
   }, { signal })
   element.addEventListener('keydown', (event) => {
-    if (event.isComposing || event.keyCode === COMPOSING_KEY)
+    if (composing(event))
       return
 
     const keeps = event.key === 'Enter' && (!multiline || event.ctrlKey || event.metaKey)

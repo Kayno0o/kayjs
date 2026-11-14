@@ -77,7 +77,7 @@ function addModifiedHandler(b: CodeBuilder, expression: Span, modifiers: string[
       body.push('if (kayEvent.target !== kayEvent.currentTarget) return;')
     }
     else if (KEYS.has(modifier)) {
-      // The keys are checked together, where the first of them is written.
+      // The keys are checked together, where the first of them is written; the composition check mirrors `composing` in src/runtime/shortcut.ts.
       if (!keyed)
         body.push(`if (kayEvent.isComposing || kayEvent.keyCode === 229 || !${JSON.stringify(keys)}.includes(kayEvent.key)) return;`)
 
