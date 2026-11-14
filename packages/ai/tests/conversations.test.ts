@@ -8,7 +8,7 @@ import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
 import { ai, AiError, anthropic, ask, resuming, tool } from '../src'
 import { conversationStore } from '../src/conversation-home'
-import { LEFT_OUT, MOST_STORED_RESULTS, MOST_TURNS, sqliteConversations, withinResultCap } from '../src/conversation-store'
+import { LEFT_OUT, MOST_STORED_RESULTS, MOST_TURNS, sqliteAi, withinResultCap } from '../src/conversation-store'
 import { titleOf } from '../src/conversation-title'
 import { conversationCallOf } from '../src/resume'
 import { anthropicEvents, provider, stream } from './helpers/provider'
@@ -308,7 +308,7 @@ describe('a conversation held on the server', () => {
   })
 
   it('waits for the write of a reply just stopped, so a send right after it reads the revision that write reaches', async () => {
-    const store = sqliteConversations(':memory:')
+    const store = sqliteAi(':memory:')
     const model = recording()
     const slow: Provider = {
       name: 'slow',
@@ -319,7 +319,7 @@ describe('a conversation held on the server', () => {
       },
     }
 
-    ai({ conversations: { ...store, write: async (...args) => {
+    ai({ store: { ...store, write: async (...args) => {
       await Bun.sleep(50)
 
       return store.write(...args)
@@ -393,7 +393,7 @@ describe('a conversation held on the server', () => {
   })
 
   it('still names a reply running past its request when its write lands while the load reads the store', async () => {
-    const store = sqliteConversations(':memory:')
+    const store = sqliteAi(':memory:')
     const gate = Promise.withResolvers<void>()
     const reading = Promise.withResolvers<void>()
     const written = Promise.withResolvers<void>()
@@ -410,7 +410,7 @@ describe('a conversation held on the server', () => {
     let held: Promise<void> | undefined
 
     // A store whose read answers what it read once the test lets it, as one over the network may.
-    ai({ conversations: { ...store, get: async (key) => {
+    ai({ store: { ...store, get: async (key) => {
       const found = await store.get(key)
 
       await held
@@ -444,14 +444,14 @@ describe('a conversation held on the server', () => {
   })
 
   it('refuses the next send of a tab whose reply lost its write to another tab sending at once, and lets the winner go on', async () => {
-    const store = sqliteConversations(':memory:')
+    const store = sqliteAi(':memory:')
     const both = Promise.withResolvers<void>()
     const first = Promise.withResolvers<void>()
     const won = Promise.withResolvers<void>()
     let reads = 0
 
     // Both tabs read the conversation at revision 0 before either reply is stored.
-    ai({ conversations: { ...store, get: async (key) => {
+    ai({ store: { ...store, get: async (key) => {
       const found = await store.get(key)
 
       if (++reads === 2)
@@ -736,7 +736,7 @@ describe('the conversation header', () => {
 
 describe('the SQLite store', () => {
   it('writes only at the revision it was read at, and keeps the latest turns', async () => {
-    const store = sqliteConversations(':memory:')
+    const store = sqliteAi(':memory:')
     const key = { owner: 'ann', scope: '/chat', id: ID }
 
     expect(await store.write(key, 1, { drop: 0, add: [], title: 't' })).toBeUndefined()
@@ -755,7 +755,7 @@ describe('the SQLite store', () => {
   })
 
   it('shortens the results of the oldest turns once a conversation holds more than the cap, never the latest exchange\'s', async () => {
-    const store = sqliteConversations(':memory:')
+    const store = sqliteAi(':memory:')
     const key = { owner: 'ann', scope: '/chat', id: ID }
     const turn = (result: string) => ({ role: 'assistant' as const, content: 'x', steps: [[{ id: 'a', name: 'n', arguments: '{}', result, ok: true }]] })
     const big = 'r'.repeat(4000)
@@ -772,12 +772,32 @@ describe('the SQLite store', () => {
   })
 
   it('is the default, in memory under bun test, unless ai() is given one', () => {
-    const own = sqliteConversations(':memory:')
+    const own = sqliteAi(':memory:')
 
-    ai({ conversations: own })
+    ai({ store: own })
     expect(conversationStore()).toBe(own)
     ai()
     expect(conversationStore()).not.toBe(own)
+  })
+
+  it('still takes conversations, the name before 1.105, and refuses both', async () => {
+    const own = sqliteAi(':memory:')
+
+    ai({ conversations: own })
+    expect(conversationStore()).toBe(own)
+    expect(() => ai({ store: own, conversations: own })).toThrow('ai() takes `store`')
+    ai()
+  })
+
+  it('names its tables and its helpers as the other libraries do', async () => {
+    const pg = await import('../src/pg')
+    const sqlite = await import('../src/sqlite')
+
+    expect(pg.aiTables).toEqual(['kay_ai_conversations'])
+    expect(pg.conversationTable).toBe(pg.aiTables[0])
+    expect(pg.pgConversations).toBe(pg.pgAi)
+    expect(pg.createConversationTable).toBe(pg.createAiTables)
+    expect(sqlite.sqliteConversations).toBe(sqlite.sqliteAi)
   })
 })
 

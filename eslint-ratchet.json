@@ -52,7 +52,7 @@
     "max-lines-per-function": 248
   },
   "packages/mail/src/list.ts": {
-    "max-lines-per-function": 334
+    "max-lines-per-function": 328
   },
   "packages/mail/src/mailer.ts": {
     "max-lines-per-function": 238

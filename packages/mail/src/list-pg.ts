@@ -1,15 +1,17 @@
 import type { SQL } from 'bun'
 import type { PgSource } from 'kay/library'
 import type { Broadcast, BroadcastProgress, DeliveryState, ListStore, Proof, Subscriber } from './list-store'
+import type { MailStore } from './mail-store'
+import type { SuppressionStore } from './suppressions'
 import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
 import { DELIVERY_TRIES } from './list-store'
 import { pgSuppressions, SUPPRESSIONS_TABLE } from './suppressions-pg'
 
-// The tables the Postgres store keeps its data in, for a pg-orm `ignoreTables` of an app that creates them with `createMailListTables`.
-export const mailListTableNames = ['kay_mail_subscribers', 'kay_mail_broadcasts', 'kay_mail_deliveries', 'kay_mail_suppressions'] as const
+// The tables the Postgres store keeps its data in, for a pg-orm `ignoreTables` of an app that creates them with `createMailTables`.
+export const mailTables = ['kay_mail_subscribers', 'kay_mail_broadcasts', 'kay_mail_deliveries', 'kay_mail_suppressions'] as const
 
 // The tables a store needs to open: the suppressions one is made by the first suppression.
-const coreTables = mailListTableNames.slice(0, 3)
+const coreTables = mailTables.slice(0, 3)
 
 // A confirmation nobody clicked is forgotten after this long; a finished broadcast and its deliveries are kept this long.
 const PENDING_KEPT_MS = 7 * 24 * 3_600_000
@@ -33,11 +35,11 @@ async function rows<Row>(db: SQL, text: string, params: unknown[] = []): Promise
 }
 
 // Creates the tables and their indexes unless they exist, for an app whose role creates nothing: run it as the database's owner, in a boot script. `pgLists` creates them itself when its role may. Replicas running it together take turns.
-export async function createMailListTables(source: PgSource): Promise<void> {
+export async function createMailTables(source: PgSource): Promise<void> {
   const db = connectionOf(source)
 
   try {
-    if (!await relationsMissing(db, mailListTableNames))
+    if (!await relationsMissing(db, mailTables))
       return
 
     await db.begin(async (tx) => {
@@ -59,7 +61,7 @@ export async function createMailListTables(source: PgSource): Promise<void> {
 }
 
 // The mailing lists in the app's Postgres, shared by every process of every replica: `mail.list(name, { store: pgLists(db) })`, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgData` takes. Keep one `pgLists(db)` and give it to every list, so they share its connection.
-// The tables are created on first use, which takes a role that may create tables; with one that may not, `createMailListTables` run by the owner makes them and `mailListTableNames` goes in pg-orm's `ignoreTables`.
+// The tables are created on first use, which takes a role that may create tables; with one that may not, `createMailTables` run by the owner makes them and `mailTables` goes in pg-orm's `ignoreTables`.
 export function pgLists(source: PgSource): ListStore & { close: () => Promise<void> } {
   const db = connectionOf(source)
   let ready: Promise<SQL> | undefined
@@ -69,11 +71,11 @@ export function pgLists(source: PgSource): ListStore & { close: () => Promise<vo
       return db
 
     try {
-      await createMailListTables(db)
+      await createMailTables(db)
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error('kayjs-mail: pgLists needs its kay_mail_* tables, and its role may not create them: run `await createMailListTables(db)` from kayjs-mail as the database\'s owner, and list `mailListTableNames` in pg-orm\'s `ignoreTables`', { cause: error })
+        throw new Error('kayjs-mail: pgLists needs its kay_mail_* tables, and its role may not create them: run `await createMailTables(db)` from kayjs-mail as the database\'s owner, and list `mailTables` in pg-orm\'s `ignoreTables`', { cause: error })
 
       throw error
     }
@@ -217,4 +219,12 @@ export function pgLists(source: PgSource): ListStore & { close: () => Promise<vo
       return { sent: counts.get('sent') ?? 0, failed: counts.get('failed') ?? 0, retrying: counts.get('retry') ?? 0, unsure: counts.get('sending') ?? 0, waiting: Number(waiting!.total) }
     },
   }
+}
+
+// The mailing lists and the bounces of a mailer in the app's Postgres, shared by every process of every replica: `mail({ store: pgMail(db) })`, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgData` takes. One connection serves both, and `pgLists` keeps the suppressions beside the lists.
+export function pgMail(source: PgSource): Required<Pick<MailStore, 'lists' | 'suppressions'>> & { close: () => Promise<void> } {
+  // `pgLists` always has the three members that keep suppressions.
+  const lists = pgLists(source) as ReturnType<typeof pgLists> & SuppressionStore
+
+  return { lists, suppressions: lists, close: lists.close }
 }

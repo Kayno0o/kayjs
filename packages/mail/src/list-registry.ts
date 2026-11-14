@@ -1,7 +1,7 @@
 import type { ListStore } from './list-store'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
-import { openLists } from './list-store'
+import { sqliteLists } from './list-store'
 
 // Whether the file holds lists, read without making their tables, so a file only suppressions were kept in stays without them.
 function holdsLists(path: string): boolean {
@@ -32,7 +32,7 @@ export function listRegistry(fallback: { file: () => string | undefined, store: 
     let lists = files.get(file)
 
     if (!lists)
-      files.set(file, lists = openLists(file))
+      files.set(file, lists = sqliteLists(file))
 
     return lists
   }

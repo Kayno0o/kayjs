@@ -36,7 +36,7 @@ export interface Broadcast {
 }
 
 // A store answers at once (SQLite) or with a promise (Postgres), as `MaybePromise` says: callers await every call.
-// What the mailing lists keep their data in; `openLists` is the SQLite one, `pgLists` the Postgres one, both with the same semantics: a delivery is claimed before its mail goes, and removing or erasing a subscriber takes its deliveries with it.
+// What the mailing lists keep their data in; `sqliteLists` is the SQLite one, `pgLists` the Postgres one, both with the same semantics: a delivery is claimed before its mail goes, and removing or erasing a subscriber takes its deliveries with it.
 export interface ListStore {
   // Whether the store was closed, which the sweep then leaves alone.
   readonly closed?: boolean
@@ -101,7 +101,7 @@ function broadcastOf(row: BroadcastRow): Broadcast {
 }
 
 // The lists in one SQLite file, shared by the processes of the machine opening it. Addresses are stored once per list, in the form `normalizeAddress` gives; the file is readable by the server's user alone.
-export function openLists(path: string) {
+export function sqliteLists(path: string) {
   const db: Database = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_mail_subscribers (id TEXT PRIMARY KEY, list TEXT NOT NULL, email TEXT NOT NULL, status TEXT NOT NULL, locale TEXT NOT NULL, created_at INTEGER NOT NULL, confirmed_at INTEGER, source TEXT, wording TEXT)')

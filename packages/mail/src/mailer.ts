@@ -3,6 +3,7 @@ import type { EnqueueOptions, ExtensionApp, FailedJob, JobContext, KayExtension,
 import type { EventSecrets, Found, StoredSuppression, Suppression, SuppressionReason } from './events'
 import type { ListOptions, ListRun, ListsHandle, MailingList, Subscription } from './list'
 import type { ListStore } from './list-store'
+import type { MailStore } from './mail-store'
 import type { MailReply } from './mime'
 import type { Relayed } from './outbox'
 import type { Relay } from './preview'
@@ -83,9 +84,11 @@ export interface MailerOptions {
   logRecipients?: boolean | undefined
   // Names each mail's subject in the log, which says `A mail` otherwise: a subject can hold a visitor's name or an organization's.
   logSubjects?: boolean | undefined
-  // Where the mailing lists live unless a list names its own `store` or `file`, such as `pgLists(db)` for a site on Postgres. It is also where a link of a list this process has not declared yet looks, and what `mail.erase` reaches, so declare it here rather than on each list.
+  // Where the mailing lists and the bounces live unless a list names its own `store`: `pgMail(db)` for a site on Postgres or on several servers, `sqliteMail(path)` for one SQLite file, or `{ lists, suppressions }` of stores of your own, either optional. Left out they are in the app's database (`store` of kay.config.ts) or `data/app.sqlite`. It is also where a link of a list this process has not declared yet looks, and what `mail.erase` reaches, so declare it here rather than on each list.
+  store?: MailStore | undefined
+  // `store.lists` before 1.105; both are a configuration error.
   listStore?: ListStore | undefined
-  // Where bounces and complaints are kept, such as `pgSuppressions(db)` for a site on several servers with no list. Without it they go where the lists keep theirs, else in the app's database or `data/mail-list.sqlite`, made by the first one.
+  // `store.suppressions` before 1.105; both are a configuration error.
   suppressionStore?: SuppressionStore | undefined
   // The secrets of the routes where a provider reports bounces and complaints (`/_kay/mail/events/<provider>`) and a mail server hands over delivery reports and replies (`/_kay/mail/inbound`), `MAIL_EVENTS_<PROVIDER>` and `MAIL_EVENTS_INBOUND` in the environment unless given here. A route without its secret answers 404.
   events?: EventSecrets | undefined
@@ -465,7 +468,7 @@ export async function enqueue<P extends object>(message: MailMessage<P>, options
   return runningOrThrow().enqueue(message, options)
 }
 
-const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, url: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, listStore: true, suppressionStore: true, events: true, inbound: true, beforeSend: true, onSend: true, onError: true, onSuppress: true, optional: true }
+const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, url: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, store: true, listStore: true, suppressionStore: true, events: true, inbound: true, beforeSend: true, onSend: true, onError: true, onSuppress: true, optional: true }
 
 // Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; its `mail.auth` and `mail.contact` messages come with the package (`kay.messages`).
 // `mail({ from, locale, ...})` takes the options of `mailer()` and builds it as `pages()` does, with no module, and `mail()` alone uses the `mail` a `src/mail.ts` exports when the app has one. `module` or `server` are for a mailer written by the app elsewhere, loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
@@ -511,8 +514,18 @@ export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
   return { name: '@kayjs/mail', server: build, ...!given && server === undefined && { appFiles: APP_FILES }, devTool, env }
 }
 
+// What `createLists` starts from: `store`, or the `listStore` and `suppressionStore` it replaced.
+function mailStoreOf(options: MailerOptions) {
+  const { lists, suppressions, file } = options.store ?? {}
+
+  return { store: lists ?? options.listStore, suppressions: suppressions ?? options.suppressionStore, file }
+}
+
 // Throws for an option that cannot be used, where the mailer is made rather than at its first mail.
 function checkMailerOptions(options: MailerOptions): void {
+  if (options.store !== undefined && (options.listStore !== undefined || options.suppressionStore !== undefined))
+    throw configError('mail', 'store', 'mailer() takes `store`, which replaces `listStore` and `suppressionStore`: give `store: { lists, suppressions }`, not both')
+
   if (options.url !== undefined && options.transport !== undefined)
     throw configError('mail', 'url', 'mailer() takes `url` or `transport`, not both: `url` names the server the environment would, which a `transport` replaces')
 
@@ -708,7 +721,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     configured: () => (configured?.missing() ?? []).length === 0 && !senderless(),
     render,
     deliver: async (mail, signal) => deliver(await approve(mail), signal),
-  }, { store: options.listStore, suppressions: options.suppressionStore })
+  }, mailStoreOf(options))
 
   suppressions.lists = lists
 

@@ -1,6 +1,6 @@
 import type { KayExtension } from 'kay/server'
 import type { AiOptions } from './limits'
-import { checkOptionKeys, underKayDev } from 'kay/library'
+import { checkOptionKeys, configError, underKayDev } from 'kay/library'
 import { api } from 'kay/server'
 import { aiEnv, choose } from './config'
 import { registerConversationData, useConversations } from './conversation-home'
@@ -24,7 +24,7 @@ function providerNow(): { provider: string, model: string | null } | { error: st
   }
 }
 
-const KNOWN_OPTIONS: Record<keyof AiOptions, true> = { rateLimit: true, budget: true, key: true, conversations: true, conversationAge: true, imageAlt: true, models: true, default: true, beforeRequest: true, onStep: true, onToolCall: true, onSuccess: true, onError: true, retry: true, fallback: true }
+const KNOWN_OPTIONS: Record<keyof AiOptions, true> = { rateLimit: true, budget: true, key: true, store: true, conversations: true, conversationAge: true, imageAlt: true, models: true, default: true, beforeRequest: true, onStep: true, onToolCall: true, onSuccess: true, onError: true, retry: true, fallback: true }
 
 // Lists the variables `ask` reads in `kay.config.ts`'s `extensions`, so `kay env` shows them without the app wiring them, holds the limit and budget every `ask` counts against, adds `kay i18n translate` and the dev tool's AI tab, and with `imageAlt` drafts the `alt` of the imported images a page shows with none; `ask` works without it, unlimited in development and under the production defaults otherwise.
 export function ai(options: AiOptions = {}): KayExtension {
@@ -40,7 +40,10 @@ export function ai(options: AiOptions = {}): KayExtension {
   if (imageAlt)
     startDrafting()
 
-  useConversations(options.conversations, options.conversationAge)
+  if (options.store !== undefined && options.conversations !== undefined)
+    throw configError('ai', 'store', 'ai() takes `store`, which replaces `conversations`: give one')
+
+  useConversations(options.store ?? options.conversations, options.conversationAge)
   registerConversationData()
 
   return {

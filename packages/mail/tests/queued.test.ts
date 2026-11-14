@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
 import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
-import { openLists } from '../src/list-store'
+import { sqliteLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
 import { smtp } from '../src/smtp'
 import { startSmtp } from './helpers/smtp'
@@ -141,7 +141,7 @@ describe('a mail queued by one mailer and claimed by another', () => {
 
   it('runs a mailing list broadcast on the mailer that queued it', async () => {
     const file = join(await scratchDir('queued-'), 'list.sqlite')
-    const lists = openLists(file)
+    const lists = sqliteLists(file)
     const { id: subscriber } = lists.ask('news', 'ada@example.com', 'news-ada', 'en', 1000)
 
     lists.confirm('news', subscriber, 2000)

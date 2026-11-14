@@ -5,7 +5,7 @@ import { describe, expect, it } from 'bun:test'
 import { normalizeAddress } from 'kay/library'
 import { scratchDir, testSite } from 'kay/test'
 import { CONFIRMS_PER_HOUR, createLists } from '../src/list'
-import { openLists } from '../src/list-store'
+import { sqliteLists } from '../src/list-store'
 import { checkToken, signToken } from '../src/list-token'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
@@ -530,7 +530,7 @@ describe('list names', () => {
     app.list('twice', { file: ':memory:' })
     expect(() => app.list('twice', { file: ':memory:', pace: { batch: 3 } })).not.toThrow()
     expect(() => app.list('twice', { file: 'other.sqlite' })).toThrow('a list keeps one')
-    expect(() => app.list('twice', { store: openLists(':memory:') })).toThrow('another store')
+    expect(() => app.list('twice', { store: sqliteLists(':memory:') })).toThrow('another store')
     expect(() => app.list('twice')).not.toThrow()
   })
 
@@ -575,7 +575,7 @@ describe('a link of a list this process does not declare', () => {
 
   it('confirms and unsubscribes through the default file when it exists', async () => {
     const file = join(await scratchDir('list-'), 'default.sqlite')
-    const store = openLists(file)
+    const store = sqliteLists(file)
     const first = store.ask('elsewhere', 'a@example.com', 'first', 'en')
     const second = store.ask('elsewhere', 'b@example.com', 'second', 'en')
 
@@ -587,7 +587,7 @@ describe('a link of a list this process does not declare', () => {
     expect(await lists.confirm(signToken('confirm', { list: 'elsewhere', id: first.id, locale: 'en' }))).toMatchObject({ kind: 'confirmed' })
     expect(await lists.unsubscribe(signToken('unsubscribe', { list: 'elsewhere', id: second.id, locale: 'en' }))).toMatchObject({ valid: true })
 
-    const check = openLists(file)
+    const check = sqliteLists(file)
 
     expect(check.subscribers('elsewhere').map(row => row.email)).toEqual(['a@example.com'])
     check.close()
@@ -646,7 +646,7 @@ describe('the sweep of the lists', () => {
 
   it('drops a pending address after 8 days with no new subscription, and keeps a confirmed one', async () => {
     const file = join(await scratchDir('list-'), 'sweep.sqlite')
-    const store = openLists(file)
+    const store = sqliteLists(file)
     const lists = createLists(host)
     const old = Date.now() - 8 * 24 * 3_600_000
 
@@ -663,7 +663,7 @@ describe('the sweep of the lists', () => {
 
   it('sweeps on its timers, and ends them when stopped so a reload does not stack them', async () => {
     const file = join(await scratchDir('list-'), 'timed.sqlite')
-    const store = openLists(file)
+    const store = sqliteLists(file)
     const lists = createLists(host, { sweepAfter: 10, sweepEvery: 30 })
     const old = Date.now() - 8 * 24 * 3_600_000
 
@@ -684,7 +684,7 @@ describe('the sweep of the lists', () => {
 
   it('leaves a closed store out of the sweep, with no warning', async () => {
     const file = join(await scratchDir('list-'), 'closed.sqlite')
-    const store = openLists(file)
+    const store = sqliteLists(file)
     const lists = createLists(host)
     const warnings: string[] = []
     const warn = console.warn
@@ -716,7 +716,7 @@ describe('the sweep of the lists', () => {
 describe('the subscribe form\'s queue insert', () => {
   it('is off the response path for a new address, and absent for a listed one, so both answers take the same steps', async () => {
     const file = join(await scratchDir('list-'), 'form.sqlite')
-    const store = openLists(file)
+    const store = sqliteLists(file)
     const known = fresh()
 
     store.confirm('news', store.ask('news', known, 'known', 'en').id)

@@ -3,6 +3,7 @@ import type { ActionContext, ActionProtect, ActionProtection, Duration, Failure,
 import type { Hook } from 'kay/library'
 import type { SuppressionReason } from './events'
 import type { BroadcastProgress, ListStore, Subscriber } from './list-store'
+import type { MailStore } from './mail-store'
 import type { SuppressionStore } from './suppressions'
 import type { Address, Mail, MailMessage } from './types'
 import process from 'node:process'
@@ -17,6 +18,7 @@ import { LIST_FILE } from './list-store'
 import { listSweeper } from './list-sweeper'
 import { checkToken, signToken } from './list-token'
 import { log } from './log'
+import { partsOf } from './mail-store'
 import { messageId } from './message-id'
 import { addressOf } from './outbox'
 import { keepsSuppressions, sqliteSuppressions, suppressionsOf } from './suppressions'
@@ -47,10 +49,10 @@ export interface ListConfirmProps {
 }
 
 export interface ListOptions {
-  // The SQLite file holding the lists, the app's database or `data/mail-list.sqlite` unless given (in memory under `bun test`), shared by every list naming the same one.
+  // Where the list is kept: `pgMail(db)` for a site on Postgres or on several servers, `sqliteMail(path)` for a SQLite file (shared by every list naming the same one), or a `ListStore` of your own. Left out it is the mailer's `store`, else the app's database or `data/app.sqlite` (in memory under `bun test`).
+  store?: ListStore | MailStore | undefined
+  // `store: sqliteMail(file)` before 1.105; not with `store`.
   file?: string | undefined
-  // Keeps the lists elsewhere than in SQLite, such as `pgLists(db)` for a site on Postgres or on several servers; not with `file`.
-  store?: ListStore | undefined
   // How fast a broadcast goes out: `batch` mails, then a wait of `every` before the next batch. 20 mails every minute by default.
   pace?: { batch?: number | undefined, every?: Duration | undefined } | undefined
   // The confirmation mail's own `.kay` view, given `ListConfirmProps`, in place of kayjs-mail's.
@@ -65,7 +67,7 @@ export interface ListOptions {
   privacy?: string | undefined
   // Told when an address signs up through the form of this list, once its confirmation is mailed; not for one asking again while pending, nor one confirmed already. A throw is reported and the sign-up stands.
   onSubscribe?: Hook<ListEvent> | undefined
-  // Told when the address confirms, once. Needs a store with `find`, as `openLists` and `pgLists` have.
+  // Told when the address confirms, once. Needs a store with `find`, as `sqliteLists` and `pgLists` have.
   onConfirm?: Hook<ListEvent> | undefined
   // Told when the address leaves the list by its unsubscribe link or `list.unsubscribe()`, once. A removal by `mail.erase()`, a bounce or a complaint tells nothing. The link needs a store with `find`.
   onUnsubscribe?: Hook<ListEvent> | undefined
@@ -226,6 +228,29 @@ function personalise(message: StoredMessage, subscriber: Subscriber, list: strin
   }
 }
 
+// A list's `privacy` is a path or a URL.
+function checkPrivacy(name: string, privacy: string | undefined): void {
+  if (privacy === undefined)
+    return
+
+  try {
+    void new URL(privacy, 'https://kay.invalid')
+  }
+  catch {
+    throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): privacy is ${JSON.stringify(privacy)}, a path or a URL`)
+  }
+}
+
+// What a list's `store` names: a `ListStore`, or the file of `sqliteMail(path)` (`file` before 1.105).
+function sourcesOf(name: string, options: ListOptions): { store: ListStore | undefined, file: string | undefined } {
+  if (options.store !== undefined && options.file !== undefined)
+    throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): give \`store\`, which replaces \`file\`: not both`)
+
+  const { lists, file } = partsOf(options.store)
+
+  return { store: lists, file: file ?? options.file }
+}
+
 // `fallback` is where a list with no store of its own lives and a link of an undeclared list looks: the mailer's `listStore`, else the default SQLite file, which a test names as `file` since the default is skipped under `bun test`. `suppressions` is the mailer's `suppressionStore`.
 export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>, fallback: { file?: string | undefined, store?: ListStore | undefined, suppressions?: SuppressionStore | undefined, sweepAfter?: number, sweepEvery?: number } = {}) {
   // The queues are made after the lists, which they run: the mailer hands them over with `connect`.
@@ -283,11 +308,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     if (!NAME.test(name))
       throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): a list's name is letters, digits, dashes and underscores, at most 40 characters`)
 
-    if (options.store !== undefined && options.file !== undefined)
-      throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): give a store or a file, not both`)
-
-    const file = () => options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : defaultFile() ?? defaultSqliteFile([LIST_FILE]))
-    const chosen = () => options.store ?? (options.file === undefined ? defaultStore() : undefined)
+    const own = sourcesOf(name, options)
+    const file = () => own.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : defaultFile() ?? defaultSqliteFile([LIST_FILE]))
+    const chosen = () => own.store ?? (own.file === undefined ? defaultStore() : undefined)
     const lists = {
       get: (): ListStore => {
         const given = chosen()
@@ -295,9 +318,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         if (given !== undefined)
           return given
 
-        const home = options.file === undefined ? fallbackHome() : undefined
+        const home = own.file === undefined ? fallbackHome() : undefined
 
-        if (home !== undefined)
+        if (home)
           warnLocalLists(home)
 
         return stores.open(file())
@@ -316,17 +339,10 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
     durationSeconds(pace.every, `mail.list(${JSON.stringify(name)})'s pace.every`)
 
-    if (options.store !== undefined)
-      stores.give(options.store)
+    if (own.store !== undefined)
+      stores.give(own.store)
 
-    if (options.privacy !== undefined) {
-      try {
-        void new URL(options.privacy, 'https://kay.invalid')
-      }
-      catch {
-        throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): privacy is ${JSON.stringify(options.privacy)}, a path or a URL`)
-      }
-    }
+    checkPrivacy(name, options.privacy)
 
     const honeypot = options.honeypot ?? 'website'
     const emailError = () => wording('mail.list.errors.email', 'Please write a valid email address.')
@@ -492,7 +508,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
     const opened = (): ListStore | undefined => chosen() ?? stores.existing(file())
 
-    return { list, hooks: options, source: options.store ?? options.file, get lists() {
+    return { list, hooks: options, source: own.store ?? own.file, get lists() {
       return lists.get()
     }, opened, pace }
   }
@@ -582,8 +598,11 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         sweeper.start()
         host.activate()
       }
-      else if ((options.store ?? options.file) !== undefined && (options.store ?? options.file) !== entry.source) {
-        throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): the list was made with another ${options.store === undefined ? 'file' : 'store'}, and a list keeps one`)
+      else {
+        const { store, file } = sourcesOf(name, options)
+
+        if ((store ?? file) !== undefined && (store ?? file) !== entry.source)
+          throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): the list was made with another ${store === undefined ? 'file' : 'store'}, and a list keeps one`)
       }
 
       return entry.list

@@ -12,6 +12,7 @@ import { appModules, setSite } from 'kay/library'
 import { memoryAuth } from '../src/memoryStore'
 import { emailOf, MAIL_EXTENSION } from '../src/own'
 import { auth, LOAD_AUTH } from '../src/pages'
+import { sqliteAuth } from '../src/sqlite'
 
 const PASSWORD = 'correct horse battery'
 const SECRET = 'a-test-secret-that-is-long-enough-for-kayjs-auth'
@@ -247,6 +248,13 @@ describe('the store', () => {
     await registerOn({ store: { url: 'sqlite://data/auth.db' } })
 
     expect(existsSync(join(root, 'data/auth.db'))).toBe(true)
+  })
+
+  test('is the file sqliteAuth names, under the project root', async () => {
+    await registerOn({ store: sqliteAuth('data/users.sqlite') })
+
+    expect(existsSync(join(root, 'data/users.sqlite'))).toBe(true)
+    expect(new Database(join(root, 'data/users.sqlite'), { readonly: true }).query('SELECT COUNT(*) AS n FROM kay_users').get()).toEqual({ n: 1 })
   })
 
   test('is AUTH_DATABASE_URL when set', async () => {

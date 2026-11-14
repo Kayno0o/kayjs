@@ -53,7 +53,7 @@ export interface ConversationChange {
   title: string
 }
 
-// Where `ask` keeps the conversations of a Chat with `keepOnServer`: `pgConversations(db)` or `sqliteConversations(path)`, or one of the app's own given to `ai({ conversations })`; left out, the database of the app's `store`.
+// Where `ask` keeps the conversations of a Chat with `keepOnServer`: `pgAi(db)` or `sqliteAi(path)`, or one of the app's own given to `ai({ store })`; left out, the database of the app's `store`.
 export interface ConversationStore {
   // The owner's conversations under `scope`, the most recently updated first, `limit` at most.
   list: (owner: string, scope: string, limit: number) => Promise<ConversationRow[]>
@@ -131,7 +131,7 @@ export function turnsOf(text: string): StoredTurn[] {
 }
 
 // The conversations in one SQLite file, which the processes of the machine opening it share; the file is readable by the server's user alone.
-export function sqliteConversations(path: string = defaultSqliteFile([LEGACY_CONVERSATIONS_FILE])): ConversationStore {
+export function sqliteAi(path: string = defaultSqliteFile([LEGACY_CONVERSATIONS_FILE])): ConversationStore {
   let opened: ReturnType<typeof open> | undefined
 
   // Opened by the first query, so building or checking an app makes no file.
@@ -222,3 +222,6 @@ function open(path: string) {
 
   return { list, get, write: (key: ConversationKey, revision: number, change: ConversationChange) => write.immediate(key, revision, change), rename, remove, owned, eraseOwner, older }
 }
+
+/** @deprecated `sqliteAi`, since 1.105. */
+export const sqliteConversations = sqliteAi

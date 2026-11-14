@@ -33,6 +33,10 @@
     "./pg": {
       "types": "./types/pg.d.ts",
       "default": "./src/pg.ts"
+    },
+    "./sqlite": {
+      "types": "./types/sqlite.d.ts",
+      "default": "./src/sqlite.ts"
     }
   },
   "files": [

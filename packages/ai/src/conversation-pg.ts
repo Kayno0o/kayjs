@@ -5,8 +5,8 @@ import type { ConversationRow } from './conversation-title'
 import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
 import { MOST_CONVERSATIONS, MOST_TURNS, turnsOf, withinResultCap } from './conversation-store'
 
-// The table the Postgres store keeps its conversations in, for a pg-orm `ignoreTables` of an app that creates it with `createConversationTable`.
-export const conversationTable = 'kay_ai_conversations'
+// The tables the Postgres store keeps its data in, for a pg-orm `ignoreTables` of an app that creates them with `createAiTables`.
+export const aiTables = ['kay_ai_conversations'] as const
 
 const CREATE = 'CREATE TABLE IF NOT EXISTS kay_ai_conversations (owner text NOT NULL, scope text NOT NULL, id text NOT NULL, title text NOT NULL, revision integer NOT NULL, updated_at bigint NOT NULL, turns text NOT NULL, user_id text, PRIMARY KEY (owner, scope, id))'
 const INDEXES = [
@@ -18,7 +18,7 @@ const INDEXES = [
 interface Row { id: string, title: string, revision: number, updated_at: string, turns: string }
 
 // Creates the table, its `user_id` column and its indexes unless they exist, for an app whose role creates nothing: run it as the database's owner, in a boot script, and list `kay_ai_conversations` in pg-orm's `ignoreTables`.
-export async function createConversationTable(source: PgSource): Promise<void> {
+export async function createAiTables(source: PgSource): Promise<void> {
   const db = connectionOf(source)
 
   try {
@@ -35,22 +35,22 @@ export async function createConversationTable(source: PgSource): Promise<void> {
   }
 }
 
-// The conversations of a Chat with `keepOnServer` in the app's Postgres, shared by every process of every replica: `ai({ conversations: pgConversations(db) })`, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgData` takes. An app whose `store` is `pgData(url)` needs to write nothing.
+// The conversations of a Chat with `keepOnServer` in the app's Postgres, shared by every process of every replica: `ai({ store: pgAi(db) })`, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgData` takes. An app whose `store` is `pgData(url)` needs to write nothing.
 // The table is created on first use, which takes a role that may create tables.
-export function pgConversations(source: PgSource): ConversationStore & { close: () => Promise<void> } {
+export function pgAi(source: PgSource): ConversationStore & { close: () => Promise<void> } {
   const db = connectionOf(source)
   let ready: Promise<SQL> | undefined
 
   const create = async (): Promise<SQL> => {
-    if (!await relationsMissing(db, [conversationTable]) && (await db.unsafe<unknown[]>('SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = \'kay_ai_conversations\' AND column_name = \'user_id\'')).length > 0)
+    if (!await relationsMissing(db, aiTables) && (await db.unsafe<unknown[]>('SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = \'kay_ai_conversations\' AND column_name = \'user_id\'')).length > 0)
       return db
 
     try {
-      await createConversationTable(db)
+      await createAiTables(db)
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error('kayjs-ai: pgConversations needs its kay_ai_conversations table with its user_id column and indexes, and its role may not create or alter it: run `await createConversationTable(db)` from kayjs-ai/pg as the database\'s owner, and list `conversationTable` in pg-orm\'s `ignoreTables`', { cause: error })
+        throw new Error('kayjs-ai: pgAi needs its kay_ai_conversations table with its user_id column and indexes, and its role may not create or alter it: run `await createAiTables(db)` from kayjs-ai/pg as the database\'s owner, and list `aiTables` in pg-orm\'s `ignoreTables`', { cause: error })
 
       throw error
     }
@@ -72,7 +72,7 @@ export function pgConversations(source: PgSource): ConversationStore & { close: 
     }
   }
 
-  const existing = async (): Promise<SQL | undefined> => ready === undefined && await relationsMissing(db, [conversationTable]) ? undefined : connected()
+  const existing = async (): Promise<SQL | undefined> => ready === undefined && await relationsMissing(db, aiTables) ? undefined : connected()
 
   const summaryOf = (row: Row): ConversationRow => ({ id: row.id, title: row.title, updatedAt: Number(row.updated_at) })
 
@@ -146,3 +146,12 @@ export function pgConversations(source: PgSource): ConversationStore & { close: 
     },
   }
 }
+
+/** @deprecated `aiTables`, since 1.105. */
+export const conversationTable = aiTables[0]
+
+/** @deprecated `createAiTables`, since 1.105. */
+export const createConversationTable = createAiTables
+
+/** @deprecated `pgAi`, since 1.105. */
+export const pgConversations = pgAi

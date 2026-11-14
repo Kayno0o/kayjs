@@ -6,7 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test
 import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
 import { contactForm } from '../src/contact'
-import { openLists } from '../src/list-store'
+import { sqliteLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
 
@@ -284,7 +284,7 @@ describe('the list hooks', () => {
     const list = app.list('loud', { file, onUnsubscribe: () => {
       throw new Error('crm down')
     } })
-    const lists = openLists(file)
+    const lists = sqliteLists(file)
 
     lists.confirm('loud', lists.ask('loud', email, 'loud-1', 'en', 1000).id, 2000)
     lists.close()
@@ -297,7 +297,7 @@ describe('the list hooks', () => {
     const told: unknown[] = []
     const app = mailer({ from: 'a@example.com' })
     const list = app.list('news', { file, pace: { batch: 2, every: '50ms' }, onBroadcast: event => void told.push(event) })
-    const lists = openLists(file)
+    const lists = sqliteLists(file)
 
     for (const index of [0, 1, 2]) {
       const email = `reader${index}@example.com`

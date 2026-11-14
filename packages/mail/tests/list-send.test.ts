@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
-import { openLists } from '../src/list-store'
+import { sqliteLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
 import { isOwnMessageId } from '../src/message-id'
 import { outbox } from '../src/outbox'
@@ -26,7 +26,7 @@ afterEach(() => outbox.clear())
 
 // Subscribers confirmed straight in the file, as the confirmation links would have.
 function seed(count: number, name = 'news'): string[] {
-  const lists = openLists(file)
+  const lists = sqliteLists(file)
   const emails = Array.from({ length: count }, (_, index) => `reader${index}@example.com`)
 
   for (const email of emails) {
@@ -134,7 +134,7 @@ describe('a broadcast', () => {
     const app = mailer({ from: 'a@fixture.test' })
     const list = app.list('news', { file, pace: { batch: 5, every: '50ms' } })
     const { id } = await list.send({ subject: 'News', text: 'Hello' })
-    const lists = openLists(file)
+    const lists = sqliteLists(file)
     const stranded = lists.next(lists.broadcast(id)!, 1)[0]!
 
     // What a process dying between the claim and the end of the send leaves.
@@ -190,7 +190,7 @@ describe('a broadcast', () => {
     await list.unsubscribe(waiting[0]!)
     await app.erase(waiting[1]!)
 
-    const lists = openLists(file)
+    const lists = sqliteLists(file)
 
     lists.confirm('news', lists.ask('news', 'late@example.com', 'late', 'en', Date.now() + 10_000).id, Date.now() + 10_000)
     lists.close()
@@ -231,7 +231,7 @@ describe('a broadcast', () => {
 describe('a store failing after a mail left', () => {
   it('leaves the delivery claimed instead of giving it back for another send', async () => {
     const emails = seed(1)
-    const inner = openLists(file)
+    const inner = sqliteLists(file)
     const store: ListStore = { ...inner, sent: () => {
       throw new Error('the store went away')
     } }

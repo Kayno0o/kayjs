@@ -41,7 +41,9 @@ export interface AiOptions extends AskHooks, Resilience, ModelsOptions {
   budget?: BudgetOptions | false | undefined
   // Who a signed-in visitor is, such as their id: counted in place of their address, and the owner of the conversations a `Chat` keeps on the server, and in place of the user a library such as kayjs-auth names. Left out, that user counts, else the address.
   key?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
-  // Where the conversations of a `Chat` with `keepOnServer` are kept: the app's database (`pgConversations`, or the SQLite file of `sqliteData`) or `data/ai-conversations.sqlite` unless given (in memory under `bun test`).
+  // Where the conversations of a `Chat` with `keepOnServer` are kept: the app's database (`pgAi`, or the SQLite file of `sqliteData`) or `data/app.sqlite` unless given (in memory under `bun test`).
+  store?: ConversationStore | undefined
+  // `store` before 1.105; both are a configuration error.
   conversations?: ConversationStore | undefined
   // How long a conversation is kept after its last turn, a year (`'365d'`) unless set; `false` keeps them until their visitor deletes them. The conversations of an erased user go with the account whatever this says.
   conversationAge?: Duration | false | undefined

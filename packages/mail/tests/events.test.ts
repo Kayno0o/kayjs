@@ -9,7 +9,7 @@ import { beforeAll, describe, expect, it } from 'bun:test'
 import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
 import { createLists } from '../src/list'
-import { openLists } from '../src/list-store'
+import { sqliteLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
 import { sqliteSuppressions } from '../src/suppressions'
@@ -480,7 +480,7 @@ describe('inbound replies', () => {
 describe('a store of the app\'s own', () => {
   it('keeps its suppressions in the default file, which a restarted process reads again', async () => {
     const file = join(await scratchDir('mail-custom-store'), 'lists.sqlite')
-    const own = openLists(':memory:')
+    const own = sqliteLists(':memory:')
     // A store that implements none of the suppression methods, as one written before them.
     const custom: ListStore = { ...own, suppress: undefined, suppressed: undefined, lift: undefined }
     const host = { configured: () => true, render: async () => {
@@ -536,7 +536,7 @@ describe('suppressions of a mailer with no list', () => {
 
   it('reads, lifts and erases what a default file holding lists kept before suppressions had a store of their own', async () => {
     const file = join(await scratchDir('mail-old-file'), 'mail-list.sqlite')
-    const old = openLists(file)
+    const old = sqliteLists(file)
     const [bounced, subscribed] = [fresh(), fresh()]
 
     old.suppress(bounced, 'bounce', 'dsn')
@@ -552,7 +552,7 @@ describe('suppressions of a mailer with no list', () => {
   })
 
   it('writes to the mailer\'s suppressionStore alone, and keeps in force what a list store kept', async () => {
-    const own = openLists(':memory:')
+    const own = sqliteLists(':memory:')
     const kept = sqliteSuppressions(join(await scratchDir('mail-suppression-store'), 'suppressions.sqlite'))
     const [before, after] = [fresh(), fresh()]
 

@@ -34,7 +34,7 @@ export function pgSuppressions(source: PgSource): SuppressionStore & { close: ()
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error('kayjs-mail: the kay_mail_suppressions table is missing, and the role may not create it: run `await createMailSuppressionTables(db)` from kayjs-mail as the database\'s owner (`createMailListTables(db)` beside lists), and list the table in pg-orm\'s `ignoreTables`', { cause: error })
+        throw new Error('kayjs-mail: the kay_mail_suppressions table is missing, and the role may not create it: run `await createMailSuppressionTables(db)` from kayjs-mail as the database\'s owner (`createMailTables(db)` beside lists), and list the table in pg-orm\'s `ignoreTables`', { cause: error })
 
       throw error
     }

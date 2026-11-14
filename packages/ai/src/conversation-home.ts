@@ -4,8 +4,8 @@ import process from 'node:process'
 import { logFrom } from 'kay'
 import { APP_SQLITE_FILE, appDatabase, appStore, configError, defaultSqliteFile, durationSeconds } from 'kay/library'
 import { personalData } from 'kay/server'
-import { pgConversations } from './conversation-pg'
-import { LEGACY_CONVERSATIONS_FILE, sqliteConversations } from './conversation-store'
+import { pgAi } from './conversation-pg'
+import { LEGACY_CONVERSATIONS_FILE, sqliteAi } from './conversation-store'
 
 interface Held {
   store: ConversationStore | undefined
@@ -31,7 +31,7 @@ function slot(): Held {
   return holder[SLOT] ??= { store: undefined, app: undefined, chosen: undefined, age: ageMs(DEFAULT_AGE), purgedAt: 0 }
 }
 
-// Set by `ai({ conversations, conversationAge })`; undefined goes back to the default, opened again on use, so a test calling `ai()` starts on an empty one.
+// Set by `ai({ store, conversationAge })`; undefined goes back to the default, opened again on use, so a test calling `ai()` starts on an empty one.
 export function useConversations(store: ConversationStore | undefined, age: Duration | false | undefined = undefined): void {
   void closeHeld(slot())
   slot().chosen = store
@@ -73,7 +73,7 @@ export function registerConversationData(): void {
       const { eraseOwner } = conversationStore()
 
       if (eraseOwner === undefined)
-        throw configError('ai', 'conversations', 'the conversation store has no eraseOwner(owner), so a user\'s conversations cannot be erased with their account; add it to the store given to ai({ conversations })')
+        throw configError('ai', 'store', 'the conversation store has no eraseOwner(owner), so a user\'s conversations cannot be erased with their account; add it to the store given to ai({ store })')
 
       return eraseOwner(user)
     },
@@ -81,7 +81,7 @@ export function registerConversationData(): void {
       const { ownedBy } = conversationStore()
 
       if (ownedBy === undefined)
-        throw configError('ai', 'conversations', 'the conversation store has no ownedBy(owner), so a user\'s conversations cannot be exported; add it to the store given to ai({ conversations })')
+        throw configError('ai', 'store', 'the conversation store has no ownedBy(owner), so a user\'s conversations cannot be exported; add it to the store given to ai({ store })')
 
       const found = await ownedBy(user)
 
@@ -122,7 +122,7 @@ function defaultStore(held: Held): ConversationStore {
   }
 
   held.app = app
-  held.store = followed?.kind === 'pg' ? pgConversations(followed.source) : sqliteConversations(testing ? ':memory:' : file)
+  held.store = followed?.kind === 'pg' ? pgAi(followed.source) : sqliteAi(testing ? ':memory:' : file)
 
   return held.store
 }

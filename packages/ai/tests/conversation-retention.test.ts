@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, setSystemTime } from 'bun:
 import { personalData } from 'kay/server'
 import { ai } from '../src'
 import { conversationStore, purgeAged } from '../src/conversation-home'
-import { sqliteConversations } from '../src/conversation-store'
+import { sqliteAi } from '../src/conversation-store'
 
 const DAY = 24 * 60 * 60 * 1000
 const add = [{ role: 'user' as const, content: 'my phone is 06 12 34 56 78' }, { role: 'assistant' as const, content: 'noted' }]
@@ -17,7 +17,7 @@ afterEach(() => {
 
 describe('a conversation store', () => {
   it('lists, erases and ages the conversations of an owner under every scope', async () => {
-    const store = sqliteConversations(':memory:')
+    const store = sqliteAi(':memory:')
 
     await store.write({ owner: 'ann', scope: '/a', id: 'c1' }, 0, change)
     await store.write({ owner: 'ann', scope: '/b', id: 'c2' }, 0, change)
@@ -54,7 +54,7 @@ describe('what an erase and an export of a person reach', () => {
 
 describe('a store that cannot erase or export', () => {
   it('fails the erase and the export, naming the missing method, instead of keeping the data', async () => {
-    const { ownedBy, eraseOwner, ...bare } = sqliteConversations(':memory:')
+    const { ownedBy, eraseOwner, ...bare } = sqliteAi(':memory:')
 
     void ownedBy
     void eraseOwner

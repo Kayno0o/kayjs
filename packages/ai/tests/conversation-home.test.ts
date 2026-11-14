@@ -4,7 +4,7 @@ import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { setupStore } from '../../../src/server/app-store'
 import { scratchDir } from '../../../tests/scratch'
-import { sqliteConversations } from '../src/conversation-store'
+import { sqliteAi } from '../src/conversation-store'
 
 afterEach(() => setupStore(undefined))
 
@@ -18,7 +18,7 @@ describe('the conversations table', () => {
     old.run('INSERT INTO kai_conversations VALUES (\'ann\', \'/a\', \'c1\', \'Kept\', 3, 5, \'[]\')')
     old.close()
 
-    const store = sqliteConversations(file)
+    const store = sqliteAi(file)
 
     expect((await store.get({ owner: 'ann', scope: '/a', id: 'c1' }))?.title).toBe('Kept')
 
@@ -82,7 +82,7 @@ describe('two processes opening a file from before 1.88', () => {
 
     legacyFile(file, false)
 
-    const [first, second] = [sqliteConversations(file), sqliteConversations(file)]
+    const [first, second] = [sqliteAi(file), sqliteAi(file)]
 
     expect((await first.get({ owner: 'ann', scope: '/a', id: 'c1' }))?.title).toBe('Kept')
     expect((await second.get({ owner: 'ann', scope: '/a', id: 'c1' }))?.title).toBe('Kept')
@@ -92,7 +92,7 @@ describe('two processes opening a file from before 1.88', () => {
     const file = join(await scratchDir('ai-empty-new'), 'empty.sqlite')
 
     legacyFile(file, true)
-    expect((await sqliteConversations(file).get({ owner: 'ann', scope: '/a', id: 'c1' }))?.title).toBe('Kept')
+    expect((await sqliteAi(file).get({ owner: 'ann', scope: '/a', id: 'c1' }))?.title).toBe('Kept')
   })
 })
 

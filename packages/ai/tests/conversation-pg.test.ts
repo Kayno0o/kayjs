@@ -1,6 +1,6 @@
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { pgConversations } from '../src/conversation-pg'
+import { pgAi } from '../src/conversation-pg'
 
 // Skipped without a Postgres. A database of its own, as TEST_DATABASE_URL names a server whose user may create them, not one to write into.
 const server = process.env.TEST_DATABASE_URL ?? ''
@@ -13,7 +13,7 @@ if (admin !== undefined) {
   await admin.unsafe(`CREATE DATABASE ${database}`)
 }
 
-const store = url === '' ? undefined : pgConversations(url)
+const store = url === '' ? undefined : pgAi(url)
 const key = { owner: 'ann', scope: '/_kay/action/chat', id: 'c1' }
 
 afterAll(async () => {
@@ -22,7 +22,7 @@ afterAll(async () => {
   await admin?.close()
 })
 
-describe.skipIf(url === '')('pgConversations', () => {
+describe.skipIf(url === '')('pgAi', () => {
   it('writes at the revision read, lists the latest first, renames and deletes with the answer', async () => {
     const first = await store!.write(key, 0, { drop: 0, add: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'hello' }], title: 'Greeting' })
 
@@ -77,7 +77,7 @@ describe.skipIf(url === '')('pgConversations', () => {
 
     const oldUrl = Object.assign(new URL(url), { pathname: `/${old}` }).href
     const check = new Bun.SQL(oldUrl)
-    const legacy = pgConversations(oldUrl)
+    const legacy = pgAi(oldUrl)
 
     try {
       await check.unsafe('CREATE TABLE kay_ai_conversations (owner text NOT NULL, scope text NOT NULL, id text NOT NULL, title text NOT NULL, revision integer NOT NULL, updated_at bigint NOT NULL, turns text NOT NULL, PRIMARY KEY (owner, scope, id))')
@@ -97,7 +97,7 @@ describe.skipIf(url === '')('pgConversations', () => {
     await admin!.unsafe(`DROP DATABASE IF EXISTS ${database}_empty WITH (FORCE)`)
     await admin!.unsafe(`CREATE DATABASE ${database}_empty`)
 
-    const empty = pgConversations(Object.assign(new URL(url), { pathname: `/${database}_empty` }).href)
+    const empty = pgAi(Object.assign(new URL(url), { pathname: `/${database}_empty` }).href)
 
     try {
       expect(await empty.ownedBy!('zed')).toEqual([])

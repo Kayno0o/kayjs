@@ -3,8 +3,8 @@ import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { memoryJobs } from 'kay/server'
 import { testSite } from 'kay/test'
-import { createMailListTables, mailListTableNames, pgLists } from '../src/list-pg'
-import { DELIVERY_TRIES, openLists } from '../src/list-store'
+import { createMailTables, mailTables, pgLists } from '../src/list-pg'
+import { DELIVERY_TRIES, sqliteLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
 import { createMailSuppressionTables, pgSuppressions } from '../src/suppressions-pg'
@@ -35,7 +35,7 @@ function names() {
 }
 
 const stores: [string, () => ListStore, boolean][] = [
-  ['sqlite', () => openLists(':memory:'), true],
+  ['sqlite', () => sqliteLists(':memory:'), true],
   ['postgres', () => pg!, url !== ''],
 ]
 
@@ -239,15 +239,15 @@ for (const [kind, open, enabled] of stores) {
 }
 
 describe.skipIf(url === '')('a list on Postgres', () => {
-  it('creates its three tables, and createMailListTables is safe to repeat', async () => {
+  it('creates its three tables, and createMailTables is safe to repeat', async () => {
     const db = new Bun.SQL(url)
 
     try {
       await pg!.count('anything')
-      await createMailListTables(db)
-      await createMailListTables(db)
+      await createMailTables(db)
+      await createMailTables(db)
 
-      const [found] = await db.unsafe<{ present: boolean }[]>(`SELECT ${mailListTableNames.map(name => `to_regclass('${name}') IS NOT NULL`).join(' AND ')} AS present`)
+      const [found] = await db.unsafe<{ present: boolean }[]>(`SELECT ${mailTables.map(name => `to_regclass('${name}') IS NOT NULL`).join(' AND ')} AS present`)
 
       expect(found!.present).toBe(true)
     }
@@ -403,7 +403,7 @@ describe.skipIf(url === '')('a list on Postgres', () => {
     expect(await pg!.progress((await pg!.broadcast(broadcast))!)).toMatchObject({ unsure: 0 })
   })
 
-  it('is the store of the lists of a mailer, its links and its erase when given as listStore', async () => {
+  it('is the store of the lists of a mailer, its links and its erase when given as store.lists', async () => {
     const { list, email } = names()
     const store = pgLists(url)
     const address = email('m')
@@ -413,12 +413,12 @@ describe.skipIf(url === '')('a list on Postgres', () => {
 
       await store.confirm(list, subscriber.id, 2000)
 
-      const app = mailer({ from: 'a@fixture.test', listStore: store })
+      const app = mailer({ from: 'a@fixture.test', store: { lists: store } })
 
       // A link of a list this mailer has not declared finds the store, and so does an erase.
       expect(await app.list(list).count()).toBe(1)
 
-      const other = mailer({ from: 'a@fixture.test', listStore: store })
+      const other = mailer({ from: 'a@fixture.test', store: { lists: store } })
 
       expect(await other.erase(address)).toBe(1)
       expect(await store.count(list)).toBe(0)
@@ -431,6 +431,6 @@ describe.skipIf(url === '')('a list on Postgres', () => {
   it('refuses a store given with a file', () => {
     const app = mailer({ from: 'a@fixture.test' })
 
-    expect(() => app.list('both', { store: pg!, file: ':memory:' })).toThrow('a store or a file')
+    expect(() => app.list('both', { store: pg!, file: ':memory:' })).toThrow('which replaces `file`')
   })
 })
