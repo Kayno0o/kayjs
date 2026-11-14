@@ -529,7 +529,9 @@ if (import.meta.main) {
   const { record, refused, unknown } = recordBreaking(breaking, process.argv.includes('--breaking'), named)
 
   // A name moved between a package's API file and its internal one reports nothing, and its files still change.
-  const rewritten = [...current].some(([path, text]) => (existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : '') !== text)
+  const deprecatedText = deprecatedList(deprecations(current))
+  const onDisk = (path: string): string => existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : ''
+  const rewritten = [...current].some(([path, text]) => onDisk(path) !== text) || onDisk(DEPRECATED_FILE) !== deprecatedText
 
   if (report.length === 0 && stale.length === 0 && !(update && rewritten)) {
     console.log('api: unchanged')
@@ -549,7 +551,7 @@ if (import.meta.main) {
     for (const path of stale)
       await Bun.file(join(root, path)).delete()
 
-    await Bun.write(join(root, DEPRECATED_FILE), deprecatedList(deprecations(current)))
+    await Bun.write(join(root, DEPRECATED_FILE), deprecatedText)
 
     if (record.length > 0) {
       const recorded = existsSync(join(root, BREAKING_FILE)) ? readFileSync(join(root, BREAKING_FILE), 'utf8').split('\n').filter(Boolean) : []
