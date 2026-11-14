@@ -3,7 +3,6 @@ import { t } from 'elysia'
 import { action } from 'kay'
 
 export const bump = action(t.Object({ by: t.Optional(t.Numeric()) }), () => {})
----
 --- script
 import Late from '../components/late.kay'
 ---
