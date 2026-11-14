@@ -19,7 +19,7 @@ export const schedule = action(t.Object({ title: t.String({ maxLength: 10_000, m
 
 export const leak = action(t.Object({}), () => ({ format: new Intl.NumberFormat() }))
 
-const scheduled = schedule.succeeded()
+const scheduled = schedule.data()
 const failure = schedule.failed()
 --- script
 import List from '../components/list.kay'
@@ -39,6 +39,6 @@ form(action={schedule})
   input(name="at" aria-label="At")
   button Schedule
 if scheduled then done
-  p.done Scheduled {done.data.title} on {done.data.at.toISOString()}, {done.data.tags.size} tag, {String(done.data.seats)} seats
+  p.done Scheduled {done.title} on {done.at.toISOString()}, {done.tags.size} tag, {String(done.seats)} seats
 if failure?.data then data
   p.error Not before {data.earliest.getUTCFullYear()}
