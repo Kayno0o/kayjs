@@ -125,7 +125,7 @@ async function appRoutes(root: string, config: KayConfig, collections: Collectio
 
     // Each locale's copy, the layouts and guards under the first alone, as every copy shares them.
     for (const [index, copy] of localeCopies(settings, route.pattern).entries())
-      listed.push({ methods: 'GET', path: withMatchers(copy.path, route), kind: 'page', by: shown(route.file), file: shown(route.file), notes: [...localeNotes(copy, settings), ...prerendered, ...guards], layouts: route.layouts.map(shown), guards: route.guards.map(guard => shown(guard.file)), ...index > 0 && { copy: true } })
+      listed.push({ methods: 'GET', path: withMatchers(copy.path, route), kind: 'page', by: shown(route.file), file: shown(route.file), notes: [...localeNotes(copy, settings), ...prerendered, ...guards], layouts: route.layouts.map(shown), guards: route.guards.map(guard => guardShown(guard)), ...index > 0 && { copy: true } })
 
     // A layout's actions once, though every page under it renders it.
     for (const file of [...route.layouts, ...route.actionModules ?? [], route.file].filter(file => !actionFiles.has(file))) {
@@ -137,7 +137,7 @@ async function appRoutes(root: string, config: KayConfig, collections: Collectio
   }
 
   for (const endpoint of endpoints)
-    listed.push({ methods: 'GET', path: endpointPath(endpoint), kind: 'endpoint', by: shown(endpoint.file), file: shown(endpoint.file), notes: guardNotes(endpoint.guards, endpoint.open, required), guards: endpoint.guards.map(guard => shown(guard.file)) })
+    listed.push({ methods: 'GET', path: endpointPath(endpoint), kind: 'endpoint', by: shown(endpoint.file), file: shown(endpoint.file), notes: guardNotes(endpoint.guards, endpoint.open, required), guards: endpoint.guards.map(guard => guardShown(guard)) })
 
   return listed
 }
@@ -152,7 +152,7 @@ async function apiRoutes(root: string, config: KayConfig, modules: ApiModule[], 
   const appOf = extensionApps(extensions, root)
 
   for (const module of modules) {
-    const guards = module.guards.map(guard => shown(guard.file))
+    const guards = module.guards.map(guard => guardShown(guard))
     // A library's module asks no guard of the app, but runs those of its own directory.
     const notes = guardNotes(module.guards, module.open === true && module.guards.length === 0, required)
 
@@ -259,6 +259,11 @@ function localeNotes(copy: { locale: string | undefined, host?: string }, settin
     return []
 
   return [copy.host === undefined ? copy.locale : `${copy.locale} at ${copy.host}`]
+}
+
+// A guard file as the route listing shows it, the `guards` a file lists itself marked as its own.
+function guardShown(guard: { file: string, own?: true | undefined }): string {
+  return guard.own === true ? `${shown(guard.file)} (its own guards)` : shown(guard.file)
 }
 
 function guardNotes(guards: GuardFile[] | { file: string }[], open: boolean | undefined, required: GuardRequirement): string[] {

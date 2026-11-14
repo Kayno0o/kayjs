@@ -76,4 +76,6 @@ export const page = { guards: false }
 h1 Sign in
 ```
 
+Give a route guards of its own with `guards: [requireRole('billing')]`: they run after the `_guard.ts` files above it, `false` being the way to skip those.
+
 <ReadMore href="/guides/sessions-and-guards#guards">Guards, public routes and sites that require a guard on every route.</ReadMore>

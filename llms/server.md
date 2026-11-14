@@ -166,6 +166,23 @@ export const page = { guards: false }
 h1 Sign in
 ```
 
+### Add a guard to one route
+
+`guards` takes a guard, a list or `{ load }` returning one, which runs after the `_guard.ts` files above the route, on a page and its actions, an endpoint and an API module alike:
+
+```kay
+--- server
+import { requireRole } from '../../auth'
+
+export const page = { guards: [requireRole('billing')] }
+---
+h1 Invoices
+```
+
+```ts
+export default api({ guards: requireRole('billing') }).get('/', listInvoices)
+```
+
 ### Refuse every route no guard covers
 
 Once a site has a guard of its own, a page, endpoint or API module no guard covers answers 403 with no setting, unless it sets `guards: false`; `guards: { default: 'closed' }` extends that to a site with no guard yet and to the actions of layouts, and `guards: { default: 'open' }` turns it off:

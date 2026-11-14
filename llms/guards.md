@@ -20,7 +20,7 @@ A `path` is one route, a `prefix` a subtree, and every `guards` option takes a g
 | `cms({ prefix, access })` | prefix | role, list, `{ password }`, function or `false` | closed, 403 | admits everyone |
 | `images.guards` | before `images.resolve` | guard, list or `{ load }` | closed, 403 | resizes for everyone |
 | `extension.routes`, `extension.api` `prefix` | prefix | the library's own guards | as the library says | no guard option |
-| `page = { guards: false }`, `api({ guards: false })` | one page, endpoint or API module | none | under the guards above it | skips them |
+| `page = { guards }`, `api({ guards })` | one page, endpoint or API module | guard, list or `{ load }`, run after the guards above it | under the guards above it | skips them |
 
 ### Guards
 
@@ -50,9 +50,12 @@ A `path` is one route, a `prefix` a subtree, and every `guards` option takes a g
 - A denied page renders the nearest page of its status (`_403.kay`, else `_error.kay`) outside the guard's directory, inside the layouts outside it, so nothing the guard protects renders.
 - A layout's `ctx.redirect` is no guard: actions never run layout loads.
 - Neither is an Elysia `onBeforeHandle` testing the page's path: actions are served under `/_kay/action/`.
-- `export const page = { guards: false }` runs none of the guards above a page or its actions, a sign-in page under a root guard asking for a session; in a layout, none above its actions; in an endpoint, none above it.
-- An API module does so with `api({ guards: false })`.
-- Both are read from the source as written, as `layouts: false` is, so `kay check` and `kay dev` report a `guards` or `layouts` held in a variable, an expression or a spread rather than ignore it.
+- One rule for every route: `guards: false` runs none of the guards above it, and a guard, a list or `{ load }` runs after them, outermost first. A route's own guards are the last of its chain.
+- `export const page = { guards: false }` runs none of the guards above a page or its actions, a sign-in page under a root guard asking for a session; in a layout, none above its actions; in an endpoint, none above it. An API module does so with `api({ guards: false })`.
+- `export const page = { guards: [needsKey] }` adds `needsKey` after the `_guard.ts` files above a page and its actions, an endpoint, or a layout's own actions (the pages under a layout keep the guards above them); an API module does so with `api({ guards: [needsKey] })`. The module is imported when the first request asks, and the list is read from it as written there.
+- Each guard of the list reads what the ones before it returned in its own `ctx.guard`, and what they return is read by the page, its layouts and its actions as the files' is. `kay check` does not type it: a field only a route's own guard returns is a type error on `ctx.guard`, as the module's own assertion `api<{ org: Org }>()` names it.
+- A route with guards of its own is covered: `unguarded-route` and `guards.default` leave it out, and `kay build --static` refuses to write it, as for one a `_guard.ts` covers.
+- `false` is read from the source as written, as `layouts: false` is, so `kay check` and `kay dev` report a `guards` set to `(false)`, `!open`, `false || open`, a method, a getter, and a `layouts` or a spread held in a variable or an expression, rather than ignore it. A variable holding `false` is no guard: the route answers 500 when asked, naming the file.
 - `guards: { default }` left unset, on a site with at least one guard of its own, answers 403 for each page, endpoint or API module of the app that no guard covers (a library's routes, layouts and action modules excepted), and `kay check` reports each as an `unguarded-route` error; a site with no guard at all stays open, and `default: 'open'` keeps a site that mixes them open.
 - `guards: { default: 'closed' }` in kay.config.ts (`requireGuards: true` until 1.108) fails closed everywhere, a layout's and an `_actions.kay`'s actions included: every page, action, endpoint and API module of the app that no guard covers and that does not set `guards: false` answers 403, the OpenAPI document too unless a guard covers every module not setting `guards: false`, and `kay build --static` refuses to write such a page or endpoint.
 - A layout a library mounts asks no guard of its actions, which still run the guards above it, and the OpenAPI document is served when every module is open.

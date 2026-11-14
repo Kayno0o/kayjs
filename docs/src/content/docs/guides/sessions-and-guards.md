@@ -261,7 +261,7 @@ To slow a client down inside a guard, count its attempts with `rateLimit`, see [
 
 ### Public routes
 
-A page that anyone may reach under a guard, such as the sign-in page under a root guard asking for a session, sets `guards: false` in its `page`. It and its actions run none of the guards above. Write `false` itself: kay reads it from the source, so `kay check` and `kay dev` report a variable or an expression there rather than ignore it.
+A page that anyone may reach under a guard, such as the sign-in page under a root guard asking for a session, sets `guards: false` in its `page`. It and its actions run none of the guards above. Write `false` itself: kay reads it from the source, so `kay check` and `kay dev` report `(false)`, `!open` or an expression standing for it rather than ignore it.
 
 ```kay
 --- server
@@ -275,6 +275,21 @@ An endpoint sets it in its own `export const page`. An API module sets it in its
 ```ts
 export default api({ guards: false }).post('/webhook', handle)
 ```
+
+### Guards on one route
+
+Where `false` skips the guards above a route, a guard, a list of guards or `{ load }` adds to them. They run after the `_guard.ts` files above the route, in order, and each reads what the ones before returned in `ctx.guard`.
+
+```kay
+--- server
+import { requireRole } from '../auth'
+
+export const page = { guards: [requireRole('billing')] }
+---
+h1 Invoices
+```
+
+A page's own guards cover its actions, a layout's its own actions alone, and an endpoint and an `api({ guards })` module take them the same way. A route with guards of its own counts as guarded, so a site that refuses the routes no guard covers serves it. `kay check` does not type what a route's own guards return on `ctx.guard`.
 
 ### Requiring guards
 

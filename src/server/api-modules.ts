@@ -10,7 +10,8 @@ import { KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
 import { TRAILING_SLASH } from '../runtime/base'
 import { rateLimitOf } from './config-limits'
-import { apiMounts, directoriesUp, falseKeys, fileAt } from './routes'
+import { falseKeys, ownGuards } from './route-settings'
+import { apiMounts, directoriesUp, fileAt } from './routes'
 
 // The API modules of a project and where they are served, apart from `./api` so `kay check` and the editor, which only list them, load no Elysia.
 // A module under the API directory or an extension's, as `pages()` mounts it.
@@ -30,6 +31,8 @@ export interface ApiGuard {
   file: string
   // Where it sits as the API directory and the extensions' laid over it read, whatever machine built the server: `admin/_guard.ts`.
   path: string
+  // The `guards` the module lists in its `api()` options, `file` being the module itself.
+  own?: true | undefined
 }
 
 export const API_PREFIX = '/api'
@@ -162,9 +165,11 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = [], apiPath
         continue
 
       const file = join(dir, path)
-      const open = falseKeys(await Bun.file(file).text(), API_OPTIONS).has('guards')
+      const source = await Bun.file(file).text()
+      const open = falseKeys(source, API_OPTIONS).has('guards')
+      const own: ApiGuard[] = ownGuards(source, API_OPTIONS) ? [{ file, path: '', own: true }] : []
 
-      modules.push({ file, mount, guards: open ? [] : guardsAt(trees, at), ...(open || index > 0) && { open: true }, ...extension !== undefined && { extension } })
+      modules.push({ file, mount, guards: [...open ? [] : guardsAt(trees, at), ...own], ...(open || index > 0) && { open: true }, ...extension !== undefined && { extension } })
     }
   }
 
@@ -174,11 +179,12 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = [], apiPath
 
 // The guards every module runs, the API directory's own first; with none of its own, those of a directory holding every module. A module setting `guards: false` runs none and leaves them as they are.
 export function sharedGuards(modules: ApiModule[]): string[] {
+  const files = (module: ApiModule) => module.guards.filter(guard => guard.own !== true)
   const [first, ...rest] = modules.filter(module => module.open !== true || module.guards.length > 0)
   const shared: string[] = []
 
-  for (const [index, guard] of first?.guards.entries() ?? []) {
-    if (!rest.every(module => module.guards[index]?.file === guard.file))
+  for (const [index, guard] of first === undefined ? [] : files(first).entries()) {
+    if (!rest.every(module => files(module)[index]?.file === guard.file))
       break
 
     shared.push(guard.file)

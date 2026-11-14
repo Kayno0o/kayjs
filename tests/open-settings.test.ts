@@ -2,7 +2,7 @@ import { relative } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { writeShadowTypes } from '../src/check'
 import { compileKay } from '../src/compiler'
-import { unreadSettings } from '../src/server/routes'
+import { unreadSettings } from '../src/server/route-settings'
 import { scratchDir } from './scratch'
 
 const API_OBJECT = /\bapi\s*\(\s*\{/
@@ -11,9 +11,8 @@ const SETTING = (key: string) => `kay reads \`${key}\` as a literal \`true\` or 
 
 describe('unreadSettings', () => {
   it.each([
-    ['a value held in a variable', 'const open = false\nexport const page = { guards: open }\n', undefined, ['guards']],
     ['a negated value', 'export const page = { guards: !protect }\n', undefined, ['guards']],
-    ['a shorthand property', 'export default api({ guards })\n', API_OBJECT, ['guards']],
+    ['a variable for layouts', 'export const page = { layouts: bare }\n', undefined, ['layouts']],
     ['a spread, which may carry either key', 'export const page = { ...settings, noindex: true }\n', undefined, ['...']],
     ['a computed key', 'export const page = { [\'layouts\']: false }\n', undefined, ['...']],
     ['an expression starting with a literal', 'export const page = { layouts: false || open }\n', undefined, ['layouts']],
@@ -36,6 +35,7 @@ describe('unreadSettings', () => {
     ['an object that is not the page', 'const other = { guards: flag }\n', undefined],
     ['a page written in a comment', '// export const page = { guards: flag }\n', undefined],
     ['an api object with a literal', 'export default api({ cors: { origins: [] }, guards: false })\n', API_OBJECT],
+    ['a guard, a list, a lazy guard, an arrow function or a shorthand', 'export const page = { guards: admin, layouts: true }\nexport default api({ guards: [admin, other] })\nexport const lazy = api({ guards: { load: () => admin } })\nexport const inline = api({ guards: ({ deny }) => deny(403) })\nexport const short = api({ guards })\n', undefined],
   ])('leaves %s', (_name, source, head) => {
     expect(unreadSettings(source, head)).toEqual([])
   })
@@ -43,7 +43,6 @@ describe('unreadSettings', () => {
 
 describe('a guards or layouts setting kay cannot read', () => {
   it.each([
-    ['a variable', 'const open = false\nexport const page = { guards: open }', 'guards'],
     ['a negation', 'export const page = { guards: !protect }', 'guards'],
     ['a variable for layouts', 'const bare = true\nexport const page = { layouts: bare }', 'layouts'],
     ['a call', 'export const page = { layouts: pick() }', 'layouts'],
@@ -54,11 +53,11 @@ describe('a guards or layouts setting kay cannot read', () => {
   })
 
   it('is reported in a layout, at the setting', () => {
-    const source = '--- server\nconst open = false\nexport const page = { seo: { noindex: true }, guards: open }\n---\nslot'
+    const source = '--- server\nconst open = false\nexport const page = { seo: { noindex: true }, guards: !open }\n---\nslot'
     const [found] = compileKay(source, '_layout.kay', { check: true }).diagnostics
 
     expect(found?.message).toBe(SETTING('guards'))
-    expect(source.slice(found!.start, found!.end)).toBe('open')
+    expect(source.slice(found!.start, found!.end)).toBe('!open')
   })
 
   it('is reported for a spread, which may carry either key', () => {
@@ -81,13 +80,13 @@ describe('kay check', () => {
     dir = await scratchDir('open-settings-')
     await Promise.all([
       Bun.write(`${dir}/routes/index.kay`, 'h1 Home\n'),
-      Bun.write(`${dir}/routes/login.kay`, '--- server\nconst open = false\nexport const page = { guards: open }\n---\nh1 Login\n'),
+      Bun.write(`${dir}/routes/login.kay`, '--- server\nconst open = false\nexport const page = { guards: !open }\n---\nh1 Login\n'),
       Bun.write(`${dir}/routes/area/_layout.kay`, '--- server\nexport const page = { layouts: !wrapped }\nconst wrapped = true\n---\nslot\n'),
       Bun.write(`${dir}/routes/area/index.kay`, 'h1 Area\n'),
-      Bun.write(`${dir}/routes/feed.json.ts`, 'const open = false\nexport const page = { guards: open }\nexport function GET() {\n  return \'items\'\n}\n'),
+      Bun.write(`${dir}/routes/feed.json.ts`, 'const open = false\nexport const page = { guards: !open }\nexport function GET() {\n  return \'items\'\n}\n'),
       Bun.write(`${dir}/routes/ping.json.ts`, 'export const page = { ...base, noindex: true }\nexport function GET() {\n  return \'pong\'\n}\n'),
       Bun.write(`${dir}/routes/ok.json.ts`, 'export const page = { guards: false }\nexport function GET() {\n  return \'ok\'\n}\n'),
-      Bun.write(`${dir}/api/notes.ts`, 'import { api } from \'kay/server\'\n\nconst guards = false\n\nexport default api({ guards }).get(\'/\', () => [])\n'),
+      Bun.write(`${dir}/api/notes.ts`, 'import { api } from \'kay/server\'\n\nconst guards = false\n\nexport default api({ guards: !guards }).get(\'/\', () => [])\n'),
       Bun.write(`${dir}/api/health.ts`, 'import { api } from \'kay/server\'\n\nexport default api({ guards: false }).get(\'/\', () => \'up\')\n'),
     ])
   })

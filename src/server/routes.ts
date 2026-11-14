@@ -9,6 +9,7 @@ import { KayError } from '../compiler/errors'
 import { STATUS_PAGES, statusPageFile } from '../compiler/status-pages'
 import { TRAILING_SLASH } from '../runtime/base'
 import { reachOver } from './reach'
+import { falseKeys, ownGuards } from './route-settings'
 
 const chains = new WeakMap<string[], { file: string, files: string[], key: string }>()
 
@@ -100,6 +101,8 @@ export interface Endpoint {
 export interface GuardFile {
   file: string
   special: SpecialPages
+  // Set for the `guards` a page, layout or endpoint lists itself, run after the `_guard.ts` files above it: `file` is then that file, which holds them, read when a request first asks.
+  own?: true | undefined
 }
 
 // A page rendered in place of another, wrapped by the layouts of its own directory.
@@ -144,10 +147,6 @@ const DYNAMIC_SEGMENT = /^\[(\.\.\.)?([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]$/i
 const OPTIONAL_SEGMENT = /^\[\[([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]\]$/i
 // `(marketing)`: groups pages for their layouts and guards, adding nothing to the URL.
 const GROUP_SEGMENT = /^\(.+\)$/
-// A file whose `page` sets `layouts: false` is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones; a page setting `guards: false` runs none of the guards above it, nor do its actions, and a layout setting it opens its own actions.
-const PAGE_EXPORT = /^export\s+const\s+page\s*=\s*\{/m
-const FALSE_KEY = /(?:([A-Za-z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*:\s*false(?![\w$])/y
-const SPACE = /\s/
 const LAYOUT = '_layout.kay'
 const ACTIONS = '_actions.kay'
 const NOT_FOUND = '_404.kay'
@@ -279,13 +278,14 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], r
       if (route && !served.has(routerKey(route.pattern))) {
         const at = virtualDir(trees, dirname(file))
         const open = setsFalse(file, 'guards', read)
+        const special = specialPagesIn(trees, at, read)
 
         const { layouts, keys } = layoutsAndKeys(trees, at, file, read)
         const mounted = tree !== trees[0]
 
         const actionModules = directoriesUp(at).flatMap(dir => fileAt(trees, dir, ACTIONS) ?? []).reverse()
 
-        own.push({ ...route, layouts, ...keys !== undefined && { contextKeys: keys }, layoutAccess: layouts.map(accessOf), ...actionModules.length > 0 && { actionModules, actionAccess: actionModules.map(accessOf) }, special: specialPagesIn(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || mounted) && { open: true }, ...tree.editor && { editorOwn: true } })
+        own.push({ ...route, layouts, ...keys !== undefined && { contextKeys: keys }, layoutAccess: layouts.map(accessOf), ...actionModules.length > 0 && { actionModules, actionAccess: actionModules.map(accessOf) }, special, guards: withOwn(open ? [] : guardsOf(trees, at, read), file, special, read), ...(open || mounted) && { open: true }, ...tree.editor && { editorOwn: true } })
       }
     }
 
@@ -314,7 +314,7 @@ export async function scanEndpoints(routesDir: string, mounts: RouteMount[] = []
       if (endpoint && !served.has(endpointKey(endpoint))) {
         const open = setsFalse(file, 'guards', read)
 
-        own.push({ ...endpoint, guards: open ? [] : guardsOf(trees, virtualDir(trees, dirname(file)), read), ...(open || tree !== trees[0]) && { open: true } })
+        own.push({ ...endpoint, guards: withOwn(open ? [] : guardsOf(trees, virtualDir(trees, dirname(file)), read), file, {}, read), ...(open || tree !== trees[0]) && { open: true } })
       }
     }
 
@@ -478,9 +478,26 @@ function setsFalse(file: string, key: string, read: LayoutsRead): boolean {
   let found = read.get(file)
 
   if (found === undefined)
-    read.set(file, found = falseKeys(readFileSync(file, 'utf8')))
+    read.set(file, found = settingsRead(readFileSync(file, 'utf8')))
 
   return found.has(key)
+}
+
+// What `read` keeps of a file: the keys it sets to `false`, and `OWN_GUARDS` when it lists guards of its own.
+const OWN_GUARDS = '+guards'
+
+function settingsRead(source: string): Set<string> {
+  const found = falseKeys(source)
+
+  if (ownGuards(source))
+    found.add(OWN_GUARDS)
+
+  return found
+}
+
+// The `_guard.ts` files of a directory, then the guards the file lists itself, which run after them.
+function withOwn(guards: GuardFile[], file: string, special: SpecialPages, read: LayoutsRead): GuardFile[] {
+  return setsFalse(file, OWN_GUARDS, read) ? [...guards, { file, special, own: true }] : guards
 }
 
 // The guards a layout's actions run, its own directory's and above whichever page it wraps; a library's are open, as its pages are.
@@ -491,198 +508,7 @@ function layoutAccess(trees: RouteMount[], layout: string, read: LayoutsRead): L
   // An outer layout has no place in the URL tree: it wraps every page, so the guards from the root cover it.
   const at = trees.some(tree => tree.outer === layout) ? '' : virtualDir(trees, dirname(layout))
 
-  return { guards: guardsOf(trees, at, read), ...!layout.startsWith(trees[0]!.dir + sep) && { open: true } }
-}
-
-// The keys set to `false` in the object literal `head` opens, `export const page = { ... }` unless named, read without parsing the module: the server never loads a compiler.
-export function falseKeys(source: string, head = PAGE_EXPORT): Set<string> {
-  const keys = new Set<string>()
-
-  for (const at of entryStarts(source, head)) {
-    FALSE_KEY.lastIndex = at
-    const key = FALSE_KEY.exec(source)
-    // The literal itself, not an expression starting with it: a comma or the closing brace follows.
-    const next = key ? source[codeAfter(source, FALSE_KEY.lastIndex)] : undefined
-
-    if (key && (next === ',' || next === '}'))
-      keys.add(key[1] ?? key[2] ?? key[3]!)
-  }
-
-  return keys
-}
-
-export interface UnreadSetting {
-  // The setting's key, or `...` for a spread or a computed key, which may carry any.
-  key: string
-  // Where the entry starts in the source.
-  index: number
-}
-
-// A getter, setter, async or generator method may lead the key: the entry is then not a literal, so it is reported.
-const SETTING_KEY = /(?:(?:async|get|set)\s+(?=[\w$'"*]))?\*?\s*(?:([A-Z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*/iy
-const LITERAL_SETTING = /(?:[A-Za-z_$][\w$]*|'[^'\n]*'|"[^"\n]*")\s*:\s*(?:true|false)(?![\w$])/y
-const LITERAL_SETTINGS = new Set(['guards', 'layouts'])
-
-// The entries of the object literal `head` opens that kay does not read as written: a spread or a computed key, which may carry `guards` or `layouts`, and a `guards` or `layouts` set to anything but a literal `true` or `false`, which the server ignores.
-export function unreadSettings(source: string, head = PAGE_EXPORT): UnreadSetting[] {
-  const found: UnreadSetting[] = []
-
-  for (const index of entryStarts(source, head)) {
-    if (source.startsWith('...', index) || source[index] === '[') {
-      found.push({ key: '...', index })
-
-      continue
-    }
-
-    SETTING_KEY.lastIndex = index
-    const key = SETTING_KEY.exec(source)
-    const name = key ? key[1] ?? key[2] ?? key[3]! : undefined
-
-    if (name === undefined || !LITERAL_SETTINGS.has(name))
-      continue
-
-    // Written as the server reads it, key, colon and value with no comment or parenthesis between.
-    LITERAL_SETTING.lastIndex = index
-    const literal = LITERAL_SETTING.test(source) && [',', '}'].includes(source[codeAfter(source, LITERAL_SETTING.lastIndex)]!)
-
-    if (!literal)
-      found.push({ key: name, index })
-  }
-
-  return found
-}
-
-// Where each entry of the object literal `head` opens starts, past its brace or a comma: a key, a spread, or the bracket of a computed key.
-function entryStarts(source: string, head: RegExp): number[] {
-  const starts: number[] = []
-  const found = codeMatch(source, head)
-
-  if (!found)
-    return starts
-
-  let depth = 1
-  // Where a key of the object itself may start: past its brace or a comma.
-  let atKey = true
-
-  for (let i = found.index + found[0].length; i < source.length && depth > 0; i++) {
-    const char = source[i]!
-    const end = literalEnd(source, i)
-
-    if (end !== -1) {
-      if (depth === 1 && atKey && (char === '\'' || char === '"'))
-        starts.push(i)
-
-      if (char !== '/')
-        atKey = false
-
-      i = end
-    }
-    else if (char === '{' || char === '(' || char === '[') {
-      if (depth === 1 && atKey && char === '[')
-        starts.push(i)
-
-      depth++
-      atKey = false
-    }
-    else if (char === '}' || char === ')' || char === ']') {
-      depth--
-    }
-    else if (depth === 1 && char === ',') {
-      atKey = true
-    }
-    else if (!SPACE.test(char)) {
-      if (depth === 1 && atKey)
-        starts.push(i)
-
-      atKey = false
-    }
-  }
-
-  return starts
-}
-
-// The first match of `pattern` in code, not in a comment, a string or a template literal.
-function codeMatch(source: string, pattern: RegExp): RegExpExecArray | undefined {
-  const global = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`)
-  // Where the code read so far ends.
-  let code = 0
-
-  for (let found = global.exec(source); found; found = global.exec(source)) {
-    while (code < found.index) {
-      const end = literalEnd(source, code)
-
-      code = end === -1 ? code + 1 : end + 1
-    }
-
-    if (code === found.index)
-      return found
-
-    global.lastIndex = code
-  }
-
-  return undefined
-}
-
-// Where the code past `start` resumes, after spaces and comments.
-function codeAfter(source: string, start: number): number {
-  let at = start
-
-  while (at < source.length) {
-    if (SPACE.test(source[at]!))
-      at++
-    else if (source[at] === '/' && (source[at + 1] === '/' || source[at + 1] === '*'))
-      at = literalEnd(source, at) + 1
-    else
-      break
-  }
-
-  return at
-}
-
-// Where the comment, string or template literal starting at `start` ends, its last character; -1 when none starts there.
-function literalEnd(source: string, start: number): number {
-  const char = source[start]
-
-  if (char === '/' && (source[start + 1] === '/' || source[start + 1] === '*')) {
-    const end = source[start + 1] === '/' ? source.indexOf('\n', start) : source.indexOf('*/', start + 2) + 1
-
-    return end <= 0 ? source.length : end
-  }
-
-  if (char !== '\'' && char !== '"' && char !== '`')
-    return -1
-
-  for (let i = start + 1; i < source.length; i++) {
-    if (source[i] === '\\') {
-      i++
-    }
-    else if (source[i] === char) {
-      return i
-    }
-    else if (char === '`' && source.startsWith('${', i)) {
-      i = closingBrace(source, i + 2)
-    }
-  }
-
-  return source.length
-}
-
-// The brace closing a block opened before `start`, past the literals it holds.
-function closingBrace(source: string, start: number): number {
-  let depth = 1
-
-  for (let i = start; i < source.length; i++) {
-    const end = literalEnd(source, i)
-
-    if (end !== -1)
-      i = end
-    else if (source[i] === '{')
-      depth++
-    else if (source[i] === '}' && --depth === 0)
-      return i
-  }
-
-  return source.length
+  return { guards: withOwn(guardsOf(trees, at, read), layout, specialPagesIn(trees, at, read), read), ...!layout.startsWith(trees[0]!.dir + sep) && { open: true } }
 }
 
 function guardsOf(trees: RouteMount[], at: string, read: LayoutsRead): GuardFile[] {

@@ -3,7 +3,18 @@ import type { GuardRequirement } from './guard-requirement'
 import type { GuardFile, LayoutAccess, Route, SpecialPages } from './routes'
 import { KayError } from '../compiler/errors'
 import { importModule } from './bundle'
-import { handOn, startGuardValues } from './request-scope'
+import { guardList, isGuardOption } from './lazy-guard'
+import { guardValues, handOn, startGuardValues } from './request-scope'
+
+export type { GuardOption } from './lazy-guard'
+
+// Where `api({ guards })` keeps the module's own guards on its instance, as it keeps its `cors` and `rateLimit`.
+const API_GUARDS = Symbol('kay.api.guards')
+
+export function keepOwnGuards(instance: object, option: unknown): void {
+  if (typeof option !== 'boolean' && option !== undefined)
+    Object.defineProperty(instance, API_GUARDS, { value: option })
+}
 
 export interface LoadedGuard extends GuardFile {
   check: Guard
@@ -40,6 +51,9 @@ export function requiredGuards(guards: LoadedGuard[], route: { file: string, ope
 }
 
 export async function loadGuard(guard: GuardFile): Promise<LoadedGuard> {
+  if (guard.own === true)
+    return ownGuard(guard)
+
   const check = (await importModule<{ default?: unknown }>(guard.file)).default
 
   if (typeof check !== 'function')
@@ -63,4 +77,33 @@ export async function runGuards(guards: LoadedGuard[], ctx: GuardContext): Promi
   }
 
   return undefined
+}
+
+// The `guards` a module lists itself, `export const page = { guards }` or `api({ guards })`, run after the files above it, each reading what the ones before it returned in `ctx.guard`. The module is imported when the first request asks, as its page is, and the list is built once per value it holds.
+function ownGuard(guard: GuardFile): LoadedGuard {
+  let given: unknown
+  let list: Guard[] = []
+
+  return {
+    ...guard,
+    async check(ctx) {
+      const module = await importModule<{ page?: { guards?: unknown }, default?: { [API_GUARDS]?: unknown } }>(guard.file)
+      const option = module.page?.guards ?? module.default?.[API_GUARDS]
+
+      if (option !== given) {
+        if (!isGuardOption(option))
+          throw new KayError('route-invalid', `kay: the guards in ${guard.file} take a guard, a list of guards or { load } returning one; \`false\` skips the guards above and is read from the source as a literal`)
+
+        given = option
+        list = guardList(option)
+      }
+
+      const values = guardValues(ctx.request)
+
+      for (const check of list)
+        handOn(values, await check(ctx))
+
+      return undefined
+    },
+  }
 }

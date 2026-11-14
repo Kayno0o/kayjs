@@ -1,6 +1,7 @@
 import type { CookieMap } from 'bun'
 import type { CookieDeleteOptions } from '../server/cookies'
 import type { CorsOptions } from '../server/cors'
+import type { GuardOption } from '../server/lazy-guard'
 import type { RateLimit } from './action-shared'
 import type { ByteSize } from './byte-size'
 import type { Deferred, Locals, Redirect, Register, RouteParams } from './checks'
@@ -438,8 +439,8 @@ export type EndpointContext<Params extends Record<string, unknown> = Record<stri
 export interface EndpointSettings {
   // A static export writes the file's `GET` once: `true` for a path without params, else the params of each page to write, as a list or a function returning one.
   prerender?: boolean | object
-  // `false` serves the file with no guard, where `requireGuards` would refuse it; `true`, the default, says nothing.
-  guards?: boolean
+  // `false` runs none of the `_guard.ts` files above the file, which a site closing unguarded routes would otherwise refuse it for; a guard, a list of them or `{ load }` returning one runs after those files. `true`, the default, says nothing.
+  guards?: GuardOption | boolean | undefined
   // The search params `ctx.query` is read against; a query it refuses answers 400.
   query?: Schema
   // At most `max` requests from one client, or from whatever `key` names, every `window`, counted across the file's methods after its guards; past that it answers 429 with `Retry-After`.
@@ -494,8 +495,8 @@ export interface PageSettings {
   cacheControl?: string | false
   // `false` renders the page, or the layouts below this one, without the layouts above; `true`, the default, says nothing.
   layouts?: boolean
-  // `false` runs none of the `_guard.ts` files above the page, nor above its actions or a layout's: a sign-in page under a guard asking for a session; `true`, the default, says nothing.
-  guards?: boolean
+  // `false` runs none of the `_guard.ts` files above the page, nor above its actions or a layout's: a sign-in page under a guard asking for a session. A guard, a list of them or `{ load }` returning one runs after those files, before the page and its actions; on a layout, before its actions alone. `true`, the default, says nothing.
+  guards?: GuardOption | boolean | undefined
   // At most `max` requests from one client, or from whatever `key` names, every `window`, counted after the guards for each page apart (a layout's applies to every page under it, the innermost that sets one winning, `false` lifting it); past that it answers 429 with `Retry-After` through the nearest `_429.kay` or `_error.kay`. A page with one is counted on every request, a prerendered copy included.
   rateLimit?: RateLimit | RateLimit[] | false | undefined
   // The longest the page may take to answer, in place of `serve.timeout`: a string such as '30s', or `false` for none. Past it the page answers 504 through the nearest `_error.kay`; the innermost layout or page that sets it wins.

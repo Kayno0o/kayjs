@@ -71,7 +71,7 @@ const NO_VERB = `a handler for a method, ${ENDPOINT_VERBS.slice(0, -1).join(', '
 
 // Each default export the server calls, a guard's, an API module's or a matcher's, assigned to the type it is called as, so a wrong one is a type error at its file rather than a refusal at boot.
 export function exportsCheck(root: string, routesDir: string, routes: Route[], api: ApiModule[], endpoints: Endpoint[]): Assertions<{ file: string, wanted: string }> {
-  const guards = new Set([...routes, ...api, ...endpoints].flatMap(served => served.guards.map(guard => guard.file)))
+  const guards = new Set([...routes, ...api, ...endpoints].flatMap(served => served.guards.filter(guard => guard.own !== true).map(guard => guard.file)))
   const matchers = new Set(routes.flatMap(route => Object.values(route.matchers ?? {})).map(matcher => matcherSource(routesDir, matcher)).filter((source): source is string => source !== undefined && source !== 'kay'))
   const entries: { file: string, type: string, wanted: string, named?: string }[] = [
     ...[...guards].map(file => ({ file, type: 'Guard', wanted: 'a guard by default: export default guard(ctx => ...)' })),

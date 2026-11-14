@@ -224,8 +224,8 @@ export default (value: string) =>
 
 - A page's settings are the keys of one object its server fence exports, `export const page = { prerender: true, cache: '1h' }`.
 - `kay` exports the type `PageSettings`, which `kay check` types the object by (`satisfies PageSettings`): the editor completes the keys and an unknown one is a type error.
-- kay reads the object as written, a literal with no spread, computed key or method, and `guards` and `layouts` as a literal `true` or `false`: a variable or an expression there is reported by `kay check` and `kay dev`, not ignored.
-- A layout takes `layouts`, `query`, `security`, `reload`, `seo` (its `noindex` and `search`), `cache` and `rateLimit`, all but `layouts` and `query` applying to every page under it (for `noindex`, `cache`, `rateLimit` and `search` the innermost layout or page that sets one wins, so a page's `seo: { noindex: false }` undoes its layout's), and `guards: false`, which opens its own actions alone, the pages under it keeping their guards.
+- kay reads the object as written, a literal with no spread, computed key or method, and `layouts` as a literal `true` or `false`, and `guards` as a literal `false` or a guard, a list or `{ load }`: a variable or an expression standing for the booleans is reported by `kay check` and `kay dev`, not ignored.
+- A layout takes `layouts`, `query`, `security`, `reload`, `seo` (its `noindex` and `search`), `cache` and `rateLimit`, all but `layouts` and `query` applying to every page under it (for `noindex`, `cache`, `rateLimit` and `search` the innermost layout or page that sets one wins, so a page's `seo: { noindex: false }` undoes its layout's), and `guards`, `false` opening its own actions and a list adding to their guards, the pages under it keeping theirs.
 - `query` on a special page is reported; a layout sets it like a page does (see `ctx.query`).
 - A setting exported under its own name, `export const prerender = true` or `export async function prerender()`, is a compile error.
 - `kay check --fix` moves it into `page`, a function as an arrow, unless the fence names a value `page` itself or reads the setting.
@@ -238,12 +238,12 @@ export default (value: string) =>
 | `seo` | `{ title, description, image, canonical, noindex, sitemap, lastmod, search, feed }`: the head of the page and what the sitemap and the site search read of it (the five last were keys of `page` before 1.105) | [Head and SEO](head.md), [Sitemap](sitemap-search-fonts.md#sitemap-and-robotstxt) |
 | `layouts` | a boolean: `false` drops the layouts above | this section |
 | `query` | a schema `ctx.query` is read against | `ctx.query`, below |
-| `guards` | a boolean: `false` runs none of the `_guard.ts` files above; on a layout, above its actions alone | [Server](server.md) |
+| `guards` | `false` runs none of the `_guard.ts` files above; a guard, a list or `{ load }` runs after them; on a layout, for its actions alone | [Guards](guards.md) |
 | `rateLimit` | `{ max, window, key? }` or a list, counted per page after its guards, 429 with `Retry-After` past it; `false` lifts a layout's | [Rate limits](rate-limits.md) |
 | `security` | `{ csp, headers }` added to the site's security headers for the page's responses | [Production](proxy-and-security.md#security-headers) |
 | `reload` | a boolean: `true` loads the page fully from any link or form, past the page swap | [Islands](islands.md) |
 
-- The four flags (`keep`, `layouts`, `guards`, `reload`) are plain booleans, `true` or `false` as written, and the one a page leaves out is off for `keep` and `reload` and on for `layouts` and `guards`: `guards: true` says what the default does. `kay check` reports a `guards` or `layouts` that is not a literal. An endpoint's and an `api()` module's `guards` is the same boolean.
+- The flags `keep`, `layouts` and `reload` are plain booleans, `true` or `false` as written, and the one a page leaves out is off for `keep` and `reload` and on for `layouts`; `guards: true` says what the default does. `kay check` reports a `layouts` that is not a literal, and a `guards` that is a boolean written another way. An endpoint's and an `api()` module's `guards` is the same option.
 - A page or a layout whose `page` has `layouts: false` among its keys is wrapped by none of the layouts above it.
 - `export const page = { layouts: false }` gives a page none at all, a layout starts the chain afresh, so a section can drop the site's header.
 

@@ -17,7 +17,8 @@ import { parseKay } from '../compiler/parser'
 import { projectPaths, SHADOW_SETTINGS } from '../project'
 import * as builtInMatchers from '../runtime/params'
 import { matcherFile } from '../server/params'
-import { directoriesUp, falseKeys, fileAt, routeOf, routeTrees, virtualDir } from '../server/routes'
+import { falseKeys } from '../server/route-settings'
+import { directoriesUp, fileAt, routeOf, routeTrees, virtualDir } from '../server/routes'
 import { serverFacts } from './layout-facts'
 
 export { SHADOW_SETTINGS }

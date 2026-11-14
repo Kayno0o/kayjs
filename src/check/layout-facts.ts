@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { slotNames } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
-import { falseKeys } from '../server/routes'
+import { falseKeys } from '../server/route-settings'
 
 export interface ServerFacts {
   // The `server` fence analysed, undefined when the file has none.

@@ -3,7 +3,7 @@ import type { ServedProject } from './shadow-types'
 import { positionAt } from '../compiler/mapping'
 import { unreadSettingReport } from '../compiler/page-settings'
 import { API_OPTIONS } from '../server/api-modules'
-import { unreadSettings } from '../server/routes'
+import { unreadSettings } from '../server/route-settings'
 
 const NODE_MODULES = /[\\/]node_modules[\\/]/
 

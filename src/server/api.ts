@@ -10,7 +10,7 @@ import type { ActionOptions } from './actions'
 import type { ApiModule } from './api-modules'
 import type { BodyLimit, RouteBodyLimit } from './body'
 import type { CorsOptions, CorsRule } from './cors'
-import type { LoadedGuard } from './guards'
+import type { GuardOption, LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
 import type { KayPlugin } from './plugin'
 import type { SocketLimits } from './ws-limits'
@@ -31,7 +31,7 @@ import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflig
 import { admitCrossSite, crossSiteRefused, crossSiteResponse } from './cross-site'
 import { streamReporters } from './event-stream'
 import { refusedFields, validated } from './field-errors'
-import { loadGuard, requiredGuards } from './guards'
+import { keepOwnGuards, loadGuard, requiredGuards } from './guards'
 import { handlerTiming } from './handler-timing'
 import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
@@ -163,7 +163,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         hooks.error = [hooks.error].flat().map(hook => localizedHook(hook, options))
     }
 
-    const guards = requiredGuards(await Promise.all(module.guards.map(async ({ file }) => loadGuard({ file, special: {} }))), module, {}, options.requireGuards)
+    const guards = requiredGuards(await Promise.all(module.guards.map(async ({ file, own }) => loadGuard({ file, special: {}, ...own && { own } }))), module, {}, options.requireGuards)
     const methods = [...new Set(instance.routes.map(route => route.method.toUpperCase()).filter(method => method !== 'OPTIONS' && method !== 'WS'))]
 
     app.group(module.mount, (group) => {
@@ -802,8 +802,8 @@ export interface ApiOptions {
   cors?: CorsOptions | false | undefined
   // At most `max` requests to any route of the module from one client, or from whatever `key` names, every `window`; past that they answer 429 with `Retry-After`. Counted after the module's guards.
   rateLimit?: RateLimit | RateLimit[] | undefined
-  // Runs none of the guards above the module, as a page's `guards: false` does; read from the `api({ guards: false })` call as written.
-  guards?: boolean | undefined
+  // `false` runs none of the guards above the module, as a page's `guards: false` does, read from the call as written; a guard, a list of them or `{ load }` returning one runs after the `_guard.ts` files above it.
+  guards?: GuardOption | boolean | undefined
 }
 
 // What a route of an `api()` module reads besides the app's locals: the values the `_guard.ts` files above it handed on, and `ctx.once`.
@@ -830,6 +830,8 @@ export function api<Guarded extends object = object>(options: ApiOptions = {}): 
 
   if (options.rateLimit !== undefined)
     Object.defineProperty(instance, RATE_LIMIT, { value: options.rateLimit })
+
+  keepOwnGuards(instance, options.guards)
 
   const socketRoute = instance.ws.bind(instance) as (path: string, options: SocketOptions) => unknown
 
