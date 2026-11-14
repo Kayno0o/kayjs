@@ -8,9 +8,9 @@ export const gated = action(t.Object({ message: t.String({ maxLength: 200 }) }),
 export const faked = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { protect: { proofOfWork: { difficulty: 500, maxAge: '1h', pretend: true } }, messages: { proofOfWork: reason => `${reason}!` } })
 
 const failure = solve.failed() ?? gated.failed() ?? faked.failed()
-const solved = solve.succeeded()
-const passed = gated.succeeded()
-const sent = faked.succeeded()
+const solved = solve.status() === 'ready'
+const passed = gated.status() === 'ready'
+const sent = faked.status() === 'ready'
 ---
 form(action={solve})
   input(name="message" aria-label="Message")
@@ -24,8 +24,8 @@ form(action={faked})
 if failure
   p.error {failure.status} {Object.values(failure.errors).join(' ')}
 if solved
-  p.solved Solved {solved.data}
+  p.solved Solved {solve.data()}
 if passed
-  p.passed Passed {passed.data}
+  p.passed Passed {gated.data()}
 if sent
-  p.sent Sent {sent.data}
+  p.sent Sent {faked.data()}

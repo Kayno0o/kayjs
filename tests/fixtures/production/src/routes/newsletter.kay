@@ -7,7 +7,7 @@ export const page = { prerender: true }
 export const join = action(t.Object({ email: t.String({ maxLength: 200, format: 'email', error: 'Not an email' }) }), ({ email }) => email.split('@')[0])
 
 const failure = join.failed()
-const joined = join.succeeded()
+const joined = join.status() === 'ready'
 ---
 form(action={join})
   input(name="email" aria-label="Email" value={failure?.values.email})
@@ -15,4 +15,4 @@ form(action={join})
 if failure
   p.error {failure.errors.email}
 if joined
-  p.joined Welcome {joined.data}
+  p.joined Welcome {join.data()}

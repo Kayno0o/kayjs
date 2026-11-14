@@ -7,8 +7,8 @@ export const ask = action(t.Object({ message: t.String({ maxLength: 200 }) }), (
 export const quick = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { protect: { minTime: { after: '3s', maxAge: '1h', pretend: true } } })
 
 const failure = ask.failed()
-const asked = ask.succeeded()
-const sent = quick.succeeded()
+const asked = ask.status() === 'ready'
+const sent = quick.status() === 'ready'
 ---
 form(action={ask})
   input(name="message" aria-label="Message")
@@ -16,9 +16,9 @@ form(action={ask})
 if failure
   p.error {failure.status} {Object.values(failure.errors).join(' ')}
 if asked
-  p.asked Asked {asked.data}
+  p.asked Asked {ask.data()}
 form(action={quick})
   input(name="message" aria-label="Message")
   button Send
 if sent
-  p.sent Sent {sent.data}
+  p.sent Sent {quick.data()}

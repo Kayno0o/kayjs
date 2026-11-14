@@ -6,7 +6,7 @@ export const note = action(t.Object({ text: t.String({ maxLength: 4 * 1024 * 102
 export const attach = action(t.Object({ text: t.String({ maxLength: 4 * 1024 * 1024 }) }), ({ text }) => text.length, { maxSize: 4 * 1024 * 1024 })
 
 const failure = note.failed()
-const sent = note.succeeded()
+const sent = note.status() === 'ready'
 ---
 form(action={note})
   textarea(name="text" aria-label="Text")
@@ -14,4 +14,4 @@ form(action={note})
 if failure
   p.error {failure.status} {Object.values(failure.errors).join(' ')}
 if sent
-  p.sent Sent {sent.data}
+  p.sent Sent {note.data()}

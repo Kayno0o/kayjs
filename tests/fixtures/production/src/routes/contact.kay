@@ -7,7 +7,7 @@ export const send = action(t.Object({ message: t.String({ maxLength: 200 }) }), 
 export const write = action(t.Object({ message: t.String({ maxLength: 2000 }) }), ({ message }) => message.length, { protect: { rateLimit: { max: 1, window: '1m' }, honeypot: 'website' }, maxSize: '1kb', messages: { honeypot: 'Laissez ce champ vide', rateLimit: wait => `Réessayez dans ${wait} s`, maxSize: bytes => `${bytes} octets au plus` } })
 
 const failure = send.failed()
-const sent = send.succeeded()
+const sent = send.status() === 'ready'
 ---
 form(action={send})
   input(name="message" aria-label="Message")
@@ -15,4 +15,4 @@ form(action={send})
 if failure
   p.error {failure.status} {Object.values(failure.errors).join(' ')}
 if sent
-  p.sent Sent {sent.data}
+  p.sent Sent {send.data()}
