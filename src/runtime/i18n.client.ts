@@ -3,7 +3,7 @@ import type { Duration } from './duration'
 import type { DateFormatOptions, Direction, DurationFormatOptions, ListFormatOptions, Locale, LocaleSettings, Localize, Message, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
 import { fragment, insert, markers } from './dom'
-import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, richMessage, setTimeZone, timeZone as siteTimeZone, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
+import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, richMessage, richProps, setTimeZone, timeZone as siteTimeZone, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
 import { noteLinkPayload } from './i18n-links'
 import { pageData } from './page-data'
 import { createSignal, effect, memo, onCleanup } from './reactive'
@@ -73,7 +73,8 @@ export const t = ((key: string, params?: Record<string, MessageValue>) => {
 }) as Translate
 
 // Rendered again when a placeholder it fills changes.
-export const T = ((props: { key: string }) => fragment((parent) => {
+export const T = ((given: string | { key: string }, values?: object) => fragment((parent) => {
+  const props = richProps(given, values)
   const [start, end] = markers(parent)
 
   insert(null, start, end, () => {

@@ -77,8 +77,21 @@ export type MergeMessages<A, B> = {
 type IsGroup<Value> = Value extends string ? false : IsPlural<Value> extends true ? false : true
 // `T(key="intro" name={name})` with an `@about(text)` block per tag of the message: its key, its placeholders and its tags typed from the default locale's file.
 export type RichText = [Messages] extends [never]
-  ? (props: { key: string } & Record<string, MessageValue | Block>) => JSX.Element
-  : <Key extends KeysOf<Messages>>(props: { key: Key } & Params<At<Messages, Key>> & Record<TagsOf<At<Messages, Key>>, Block>) => JSX.Element
+  ? {
+    (props: { key: string } & Record<string, MessageValue | Block>): JSX.Element
+    (key: string, values?: Record<string, MessageValue | Block>): JSX.Element
+  }
+  : {
+    <Key extends KeysOf<Messages>>(key: Key, ...values: ValueArgs<At<Messages, Key>>): JSX.Element
+    <Key extends KeysOf<Messages>>(props: { key: Key } & Values<At<Messages, Key>>): JSX.Element
+  }
+type Values<Value> = Params<Value> & Record<TagsOf<Value>, Block>
+type ValueArgs<Value> = [ParamsOf<Value> | TagsOf<Value>] extends [never] ? [values?: Values<Value>] : [values: Values<Value>]
+
+// `T('intro', { name, about })` is `T(key="intro" name=... @about)`: the key, then the placeholders and the blocks of the tags in one object.
+export function richProps(key: string | { key: string }, values: object | undefined): { key: string } {
+  return typeof key === 'string' ? { ...values, key } : key
+}
 export type Localize = <const Href extends string>(href: Href & CheckedHref<Href>, locale?: Locale) => string
 
 // The site's `timeZone`, which a date is written in unless the call names another; the server installs it and the page carries it to the browser.

@@ -43,6 +43,7 @@ const UPPERCASE_METHODS = new Set(['"GET"', '"POST"', '"DIALOG"'])
 const KEYWORD_ALIAS = /^\w+<(.*)>$/
 const NAME_AT = /^[\w:-]+(?==)/
 const TAG_NAME = /^[\w$.:-]+$/
+const NO_OVERLOAD = /^No overload matches this call\.\n {2}The last overload gave the following error\.\n {4}([\s\S]*)$/
 const UNDECLARED_PROP = /^Type '[\s\S]*?' is not assignable to type '([\s\S]*)'\.\n\s*Property '([\w$-]+)' does not exist on type '[\s\S]*'\.?$/
 const PROP_MEMBER = /^\s*([\w$]+)\??:([\s\S]*)$/
 const COMPONENT_CALL = /^([A-Z][\w$.]*)\(/
@@ -461,6 +462,18 @@ const undeclaredProp: Row = (diagnostic, source, span) => {
 }
 
 const ROWS: Row[] = [calledHandler, mistypedBind, unknownElement, undeclaredProp, reactNames, tooltipName, svgAttributeName, enumeratedValue]
+
+// A component call of the template typed with overloads, as `T` is, fails with "No overload matches this call", the last overload's error nested inside: its own error is the one about the props written.
+export function lastOverload(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined): TsgoDiagnostic {
+  const found = NO_OVERLOAD.exec(diagnostic.message)
+
+  if (found === null || span === undefined)
+    return diagnostic
+
+  const line = source.slice(source.lastIndexOf('\n', span.start - 1) + 1).trimStart()
+
+  return line.startsWith('@') || COMPONENT_CALL.test(line) ? { ...diagnostic, code: ASSIGNABILITY, message: found[1]!.replaceAll(/\n {2}/g, '\n') } : diagnostic
+}
 
 export function templateHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined, tsx: string): TemplateHint | 'duplicate' | undefined {
   if (span === undefined)

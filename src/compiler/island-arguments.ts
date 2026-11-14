@@ -2,7 +2,7 @@ import type { Diagnostic, Span } from './ast'
 import type { ScriptAnalysis } from './script'
 import { BUTTON_FORM_KEY } from '../runtime/button-form'
 
-const MESSAGE_KEY = /(?:\b(?:t|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
+const MESSAGE_KEY = /(?:\b(?:t|T|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
 
 function messageKeys(source: string): string[] {
   return [...new Set(Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!))]

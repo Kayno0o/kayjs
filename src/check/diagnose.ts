@@ -20,7 +20,7 @@ import { localePrefixes, localeSettings } from '../server/i18n'
 import { unknownNameHelp } from './export-homes'
 import { loopIndexFix, positionalKeyFix } from './loop-index-fix'
 import { sourceSpan } from './shadow'
-import { templateHint } from './template-hints'
+import { lastOverload, templateHint } from './template-hints'
 
 // What `noUnusedLocals` reports: `kay check` turns it on for .kay files, and leaves other files to the project's tsconfig.
 const UNUSED_CODES = new Set([6133, 6192, 6196, 6198, 6199, 6205])
@@ -125,8 +125,9 @@ function blockWithoutParameters(diagnostic: TsgoDiagnostic, source: string, span
 }
 
 // A diagnostic in a .kay file's shadow TSX, read at the levels its source gives the lints.
-export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, levelAt: (lint: LintName, offset: number) => LintLevel): Diagnosed | undefined {
-  const span = sourceSpan(shadow, diagnostic.start, diagnostic.end, 'loose')
+export function diagnoseShadow(shadow: ShadowFile, reported: TsgoDiagnostic, levelAt: (lint: LintName, offset: number) => LintLevel): Diagnosed | undefined {
+  const span = sourceSpan(shadow, reported.start, reported.end, 'loose')
+  const diagnostic = lastOverload(reported, shadow.source, span)
   const offset = span?.start ?? 0
   const lint = typeLint(diagnostic.message, propBefore(shadow.source, span) ?? blockName(diagnostic.message, shadow.source, span)) ?? unkeyedRows(diagnostic.message)
 

@@ -263,6 +263,7 @@ T(key="intro" name="Ada")
 ```
 
 - Each block gets its tag's text, placeholders filled; the text inside a tag and out is escaped, a value holding `<b>` included.
+- `T('intro', { name: 'Ada', about: text => ... })` is the same call in a script or an expression: the key, then the placeholders and one block per tag in one object. `kay check` types both forms alike: a missing placeholder, an unknown value and a missing or unknown block are errors in the template and in the call, and an island's source naming the key as a literal sends the message.
 - `kay check` types the key, the placeholders as props and one block per tag of the default locale's message, a tag without its block or a block for no tag being an error, and holds every locale to the default one's tags.
 - Tags do not nest, and a plural's `count` goes as a prop like any placeholder.
 - In an island, `T` renders again when a placeholder changes.

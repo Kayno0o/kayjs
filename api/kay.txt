@@ -2490,17 +2490,22 @@ interface RelativeTimeOptions extends Intl.RelativeTimeFormatOptions, LocaleOpti
   now?: Date | number | undefined
 
 [./i18n] RichText
-type RichText = [Messages] extends [never] ? (props: {
-  key: string
-} & Record<string, MessageValue | Block>) => JSX.Element : <Key extends KeysOf<Messages>>(props: {
-  key: Key
-} & Params<At<Messages, Key>> & Record<TagsOf<At<Messages, Key>>, Block>) => JSX.Element
+type RichText = [Messages] extends [never] ? {
+  (props: {
+    key: string
+  } & Record<string, MessageValue | Block>): JSX.Element (key: string, values?: Record<string, MessageValue | Block>): JSX.Element
+} : {
+  <Key extends KeysOf<Messages>>(key: Key, ...values: ValueArgs<At<Messages, Key>>): JSX.Element <Key extends KeysOf<Messages>>(props: {
+    key: Key
+  } & Values<At<Messages, Key>>): JSX.Element
+}
 
 [./i18n] t
 function t(key: string, params?: Record<string, MessageValue> | undefined): string
 
 [./i18n] T
 function T(props: { key: string; } & Record<string, Block | MessageValue>): Element
+function T(key: string, values?: Record<string, Block | MessageValue> | undefined): Element
 
 [./i18n] timeZone
 function timeZone(): string | undefined

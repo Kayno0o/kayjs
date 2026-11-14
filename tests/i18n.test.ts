@@ -192,6 +192,7 @@ describe('locale prefixes', () => {
     expect((await get('/')).html).toContain('<p class="intro">Lisez <strong>notre histoire</strong>, &lt;Ada>, ou <em>la doc de &lt;Ada></em>.</p>')
     expect((await get('/en')).html).toContain('<p class="intro">Read <strong>our story</strong>, &lt;Ada>, or <em>the docs of &lt;Ada></em>.</p>')
     expect(islandMessages('T(key="intro" name={name})\nT(name={name} key=\'rich.other\')\np {t(\'nav.home\')}')).toBe(', ["intro","rich.other","nav.home"]')
+    expect(islandMessages('const text = T(\'intro\', { name })\nconst more = T( "rich.other")')).toBe(', ["intro","rich.other"]')
   })
 
   it('write dir="rtl" on a page in a locale written right to left, and nothing on one written left to right', async () => {
@@ -700,7 +701,13 @@ describe('kay check', () => {
         Bun.write(rich, [
           '--- server',
           'import { T } from \'kay/i18n\'',
+          'const blocks = { about: (text: string) => text, docs: (text: string) => text }',
+          'const ok = T(\'intro\', { name: \'Ada\', ...blocks })',
+          'const noName = T(\'intro\', { ...blocks })',
+          'const noBlock = T(\'intro\', { name: \'Ada\', about: blocks.about })',
+          'const unknown = T(\'intro\', { name: \'Ada\', nom: \'Ada\', ...blocks })',
           '---',
+          'p {ok} {noName} {noBlock} {unknown}',
           'T(key="intro" name="Ada")',
           '  @about(text)',
           '    strong {text}',
@@ -731,12 +738,13 @@ describe('kay check', () => {
       const expected = {
         'src/messages/en.ts': [1, 6, 7, 7, 8, 8, 8],
         'src/routes/typo.kay': [4, 5, 6, 7],
-        'src/routes/rich.kay': [9, 12, 17, 19],
+        'src/routes/rich.kay': [5, 6, 7, 15, 18, 23, 25],
         'src/routes/links.kay': [2, 3],
         'src/routes': [1],
       }
 
       // What the changes break and nothing else: the fixture's own pages pass, their unprefixed links included, as the server sends those on to the visitor's locale. A file reported that should not be is shown with its messages.
+
       expect(found.filter(({ file }) => !(file in expected))).toEqual([])
       expect(lines).toEqual(expected)
       expect(found.filter(({ file }) => file === 'src/messages/en.ts').map(({ line, message }) => [line, message])).toEqual(expect.arrayContaining([
@@ -748,6 +756,8 @@ describe('kay check', () => {
         [8, 'gives intro without <docs>, which src/messages/fr.ts has, so its block renders nothing'],
         [8, 'gives intro a <story>, which src/messages/fr.ts has not, so no block renders it'],
       ]))
+      // A script call of T reads like its template twin: a missing placeholder, a missing block and an unknown value are each named.
+      expect(found.filter(({ file, line }) => file === 'src/routes/rich.kay' && line <= 7).map(({ message }) => message.match(/Property '(\w+)' is missing|'(\w+)' does not exist/)?.slice(1).find(Boolean))).toEqual(['name', 'docs', 'nom'])
       expect(found.find(({ file }) => file === 'src/routes')?.message).toContain('are both served at / in en')
     }
     finally {
@@ -904,9 +914,17 @@ describe('in the browser', () => {
       const container = document.createElement('p')
 
       document.body.innerHTML = '<script type="application/json" data-kay-i18n>{"messages":{"intro":"Read <about>our story</about>, {name}, or <b>{name}</b>."}}</script>'
-      render(() => T({ key: 'intro', name: '<Ada>', about: text => Object.assign(document.createElement('strong'), { textContent: text }) }), container)
+      const about = (text: string) => Object.assign(document.createElement('strong'), { textContent: text })
+
+      render(() => T({ key: 'intro', name: '<Ada>', about }), container)
 
       expect(container.innerHTML).toBe('<!--[-->Read <strong>our story</strong>, &lt;Ada&gt;, or &lt;Ada&gt;.<!--]-->')
+
+      const called = document.createElement('p')
+
+      render(() => T('intro', { name: '<Ada>', about }), called)
+
+      expect(called.innerHTML).toBe(container.innerHTML)
     }
     finally {
       await GlobalRegistrator.unregister()

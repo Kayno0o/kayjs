@@ -4,7 +4,7 @@ import type { DateFormatOptions, Direction, DurationFormatOptions, ListFormatOpt
 import type { JSX } from './jsx'
 import type { LocaleState } from './locale-state'
 import { KayError } from '../compiler/errors'
-import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, onSite, richMessage, textDirection, translate } from './i18n'
+import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, onSite, richMessage, richProps, textDirection, translate } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState, shownEntryUrls, siteDefaultLocale } from './locale-state'
 import { PART_END, PART_START } from './markers'
@@ -35,8 +35,9 @@ export const t = ((key: string, params?: Record<string, MessageValue>) => {
 
 // The message at `key` with each of its tags rendered through the block of that name: `T(key="intro")` with `@about(text)` for `<about>our story</about>`.
 // kept: free
-export const T = ((props: { key: string }) => {
+export const T = ((given: string | { key: string }, values?: object) => {
   const state = current('T')
+  const props = richProps(given, values)
 
   if (!insideIsland())
     return richMessage(state, props.key, props) as JSX.Element
