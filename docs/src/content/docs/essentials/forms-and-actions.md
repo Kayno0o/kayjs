@@ -155,7 +155,7 @@ When a post is refused, the page shows what the visitor sent, not the record, so
 
 ## Writing each name once
 
-A component given `field` names the bare control written inside it, so a field's name is written once. `FormField(label="Title" field="title")` around an `input` with no name gives that input `name="title"`, the constraints of the schema and the same `aria` attributes `input(field="title")` has.
+A `FormField` given `field` names the bare control written inside it, so a field's name is written once. Any other component keeps its own `field` prop. `FormField(label="Title" field="title")` around an `input` with no name gives that input `name="title"`, the constraints of the schema and the same `aria` attributes `input(field="title")` has.
 
 `label(field="title")` writes the label's `for` and the `id` of the control of that field in the form, so the two meet without an id of yours. It wants exactly one control of that field: for a group of radio buttons, write `for` and `id` yourself. Several forms posting to one action, such as one per row, would repeat the id, so write them by hand there too.
 

@@ -713,7 +713,7 @@ export class JsxTemplate {
     }
 
     // A bare control in a component given `field` takes its name, checked against the action's input as `field` is.
-    addInheritedName(b, element, this.src, this.facts, this.options.check)
+    addInheritedName(b, element, this.src, this.facts)
 
     if (merge.last)
       addMergedClass(b, element, merge, this.src)

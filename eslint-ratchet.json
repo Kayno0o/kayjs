@@ -85,7 +85,7 @@
     "complexity": 44
   },
   "src/compiler/a11y.ts": {
-    "max-lines-per-function": 379,
+    "max-lines-per-function": 378,
     "complexity": 115
   },
   "src/compiler/codegen.ts": {

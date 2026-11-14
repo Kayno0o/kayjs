@@ -61,6 +61,8 @@ interface Context {
   dialog: boolean
   // Inside a `fieldset` or a group, whose name the radios it holds are read under.
   grouped: boolean
+  // Where the form the element sits in starts: a `label(field)` names a field of its own form only.
+  form?: number | undefined
   // The link or button holding the element, which may not hold another control.
   control?: ElementNode | undefined
   // Which alternative of each block the element renders in, `if` branches and `await` blocks being one page each.
@@ -215,6 +217,11 @@ function speaksForTooltip(read: Reader, element: ElementNode): boolean {
   return tooltip.kind === 'static' && part!.kind === 'chunk' && part!.text.trim() === tooltip.text.trim()
 }
 
+// What `label(field="title")` points at: the control of that field in the same form, as `for` points at an id; one with no `field` names `undefined`, which no control asks for.
+function labelledField(form: number | undefined, field: string | undefined): string {
+  return `field:${form}:${field}`
+}
+
 // What a page needs to be used without seeing it, read off the markup alone: a control with no label, a button or link with nothing to announce, a heading skipping a level.
 function elementLints(file: KayFile): Diagnostic[] {
   const { source } = file
@@ -222,7 +229,7 @@ function elementLints(file: KayFile): Diagnostic[] {
   const found: Diagnostic[] = []
   const labelled = new Set<string>()
   const labels: { element: ElementNode, target: string }[] = []
-  const controls: ElementNode[] = []
+  const controls: { element: ElementNode, form: number | undefined }[] = []
   const references: { attribute: NamedAttribute, id: string }[] = []
   const radios = new Map<string, ElementNode[]>()
   const ids: IdUse[] = []
@@ -435,8 +442,7 @@ function elementLints(file: KayFile): Diagnostic[] {
     if (element.name === 'label') {
       const target = staticValue(element, 'for')
 
-      // `label(field="title")` points at the control of that field in its form, as `for` points at an id; one with no `field` adds `field:undefined`, which no control asks for.
-      labelled.add(`field:${staticValue(element, 'field')}`)
+      labelled.add(labelledField(context.form, staticValue(element, 'field')))
 
       if (target !== undefined) {
         labelled.add(target)
@@ -462,7 +468,7 @@ function elementLints(file: KayFile): Diagnostic[] {
     const field = (LABELLED.has(element.name) && !(element.name === 'input' && type !== undefined && UNLABELLED_TYPES.has(type))) || element.name === 'meter' || roles.some(role => NAMED_ROLES.has(role))
 
     if (field && !context.label && !context.component && !NAMING.some(name => has(element, name)))
-      controls.push(element)
+      controls.push({ element, form: context.form })
 
     const radioName = element.name === 'input' && type === 'radio' && !context.grouped && !context.component ? staticValue(element, 'name') : undefined
 
@@ -560,6 +566,7 @@ function elementLints(file: KayFile): Diagnostic[] {
   }
 
   const inside = (element: ElementNode, context: Context): Context => ({
+    ...context,
     label: context.label || element.name === 'label',
     component: context.component || element.component,
     hidden: context.hidden || hidden(element),
@@ -567,10 +574,8 @@ function elementLints(file: KayFile): Diagnostic[] {
     ariaHidden: (context.ariaHidden || staticValue(element, 'aria-hidden') === 'true') && !context.removed && !has(element, 'hidden') && !has(element, 'inert'),
     dialog: context.dialog || element.name === 'dialog',
     grouped: context.grouped || element.name === 'fieldset' || (staticValue(element, 'role')?.trim().toLowerCase().split(WHITESPACE).some(role => GROUP_ROLES.has(role)) ?? false),
+    form: element.name === 'form' || has(element, 'action') ? element.start : context.form,
     control: context.control ?? (!element.component && (element.name === 'button' || (element.name === 'a' && has(element, 'href'))) ? element : undefined),
-    branches: context.branches,
-    repeated: context.repeated,
-    snippet: context.snippet,
   })
   // Each alternative of a block renders on its own, so what one holds never meets what another does.
   const alternatives = (context: Context, count: number, visitOne: (index: number, branch: Context) => void) => {
@@ -632,14 +637,14 @@ function elementLints(file: KayFile): Diagnostic[] {
       calls.push({ name: match[1]!, branches: new Map(), repeated: false, snippet: undefined })
   }
 
-  for (const control of controls) {
+  for (const { element: control, form } of controls) {
     const id = control.id ? text(control.id) : staticValue(control, 'id')
     const dynamicId = !control.id && named(control).some(attribute => attribute.kind === 'expression' && text(attribute.name) === 'id')
 
     // An id written as an expression may be the one a label points at.
     const field = staticValue(control, 'field') ?? staticValue(control, 'name')
 
-    if (dynamicId || (id !== undefined && labelled.has(id)) || (field !== undefined && labelled.has(`field:${field}`)))
+    if (dynamicId || (id !== undefined && labelled.has(id)) || (field !== undefined && labelled.has(labelledField(form, field))))
       continue
 
     lint(control, 'missing-label', `This \`${control.name}\` has no label`, { note: 'a screen reader announces a field by its label, and says nothing of what to type in one without', help: id === undefined ? 'wrap it in a `label`, or give it an id a `label(for="...")` points at' : `add \`label(for="${id}")\`, or name it with \`aria-label\`` })

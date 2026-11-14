@@ -1,7 +1,7 @@
 import type { Attribute, ElementNode, Span, TemplateFacts } from './ast'
 import type { CodeBuilder } from './mapping'
 import { FIELD_ATTRIBUTE } from './ast'
-import { isBareControl } from './form-info'
+import { FIELD_COMPONENT, isBareControl } from './form-info'
 
 // The action to check a name against, and the written text it comes from.
 interface Checked {
@@ -24,22 +24,21 @@ function checkedAction(element: ElementNode, facts: TemplateFacts, check: boolea
   return check && !facts.loose.has(element) ? facts.forms.get(element) : undefined
 }
 
-// The name a component's `field` gives a bare control in its content, as the control's own `field` would.
-export function addInheritedName(b: CodeBuilder, element: ElementNode, source: string, facts: TemplateFacts, check: boolean | undefined): void {
+// The name a component's `field` gives a bare control in its content, as the control's own `field` would. It is checked against the action once, on the component's `field`, so a group of radios under it reports one error.
+export function addInheritedName(b: CodeBuilder, element: ElementNode, source: string, facts: TemplateFacts): void {
   const named = isBareControl(element, source) ? facts.inherited.get(element) : undefined
-  const target = checkedAction(element, facts, check)
 
   if (!named)
     return
 
   b.add(' ')
-  addFieldName(b, named.at.name, 'name', target && { target, value: named.at.value }, named.name)
+  addFieldName(b, named.at.name, 'name', undefined, named.name)
 }
 
 // What a static `field` is written as on something that is not a control: the `field` of a component, the `for` of a label.
 function writtenAs(element: ElementNode): string | undefined {
   if (element.component)
-    return FIELD_ATTRIBUTE
+    return element.name === FIELD_COMPONENT ? FIELD_ATTRIBUTE : undefined
 
   return element.name === 'label' ? 'for' : undefined
 }

@@ -16,7 +16,7 @@ import { modifierProblems } from './event-modifiers'
 import { valuesCall } from './form-info'
 import { shorthandProblems } from './head-shorthand'
 import { kayCtxImport } from './script-shared'
-import { buttonActionProblem, fieldProblem } from './validate-fields'
+import { attributeProblem, fieldProblem } from './validate-fields'
 import { AttributeFixes, PART_NAME, PART_NAME_LIST } from './validate-fixes'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
@@ -621,7 +621,7 @@ class Validator {
   }
 
   private attribute(element: ElementNode, attribute: NamedAttribute, name: string): void {
-    this.misuse(attribute, buttonActionProblem(element, attribute, name))
+    this.misuse(attribute, attributeProblem(element, attribute, name, this.src))
 
     if (name === 'part' && (attribute.kind !== 'static' || !attribute.text.trim().split(WHITESPACE).every(part => PART_NAME.test(part))))
       this.error('part-invalid', attribute.name, '`part` names a part with a string: `part="head"`', { note: 'the `class` type of the component is built from the names at compile time', help: 'write a name of letters, digits and dashes', ...this.fixes.writtenText(attribute, 'part', PART_NAME_LIST) })

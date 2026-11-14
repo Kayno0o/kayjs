@@ -1,6 +1,8 @@
 import type { Details, ElementNode, NamedAttribute } from './ast'
 import type { FormInfo } from './form-info'
 import type { AttributeFixes } from './validate-fixes'
+import { FIELD_ATTRIBUTE } from './ast'
+import { FIELD_COMPONENT } from './form-info'
 import { FIELD_NAME } from './validate-fixes'
 
 // A `form-misuse` of a form's field: the message and its details, for the attribute it is reported on.
@@ -49,7 +51,18 @@ export function fieldProblem(element: ElementNode, attribute: NamedAttribute, so
   return info.labelled.get(attribute.text) === 1 && (element.id !== undefined || written(element, source, 'id')) ? { message: `A \`label(field="${attribute.text}")\` gives this field its id, so it writes none`, details: { help: 'drop the `id`, or write the label\'s `for` yourself' } } : undefined
 }
 
-// A `button(action={x})` outside a form is wrapped in one, so one left is inside a form already.
-export function buttonActionProblem(element: ElementNode, attribute: NamedAttribute, name: string): FieldProblem | undefined {
+// A `FormField` names its control by `name` or by `field`, which also names the bare control inside it, so it takes one.
+function fieldComponentProblem(element: ElementNode, name: string, source: string): FieldProblem | undefined {
+  const named = element.component && element.name === FIELD_COMPONENT && name === FIELD_ATTRIBUTE ? written(element, source, 'name') : undefined
+
+  return named ? { message: 'A FormField has `field` or `name`, not both', details: { related: [{ ...named.name, label: 'named here' }], help: 'drop `name`: `field` is the name too' } } : undefined
+}
+
+// A `button(action={x})` outside a form is wrapped in one, so one left is inside a form already; a FormField with `field` and `name`.
+export function attributeProblem(element: ElementNode, attribute: NamedAttribute, name: string, source: string): FieldProblem | undefined {
+  return fieldComponentProblem(element, name, source) ?? buttonActionProblem(element, attribute, name)
+}
+
+function buttonActionProblem(element: ElementNode, attribute: NamedAttribute, name: string): FieldProblem | undefined {
   return name === 'action' && element.name === 'button' && !element.component && attribute.kind === 'expression' ? { message: 'A button with `action` is a form of its own, so it sits outside one', details: { help: 'the button of a form posts it as it is: write `form(action={...})` around it, or take the `action` off the button' } } : undefined
 }

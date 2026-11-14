@@ -65,6 +65,13 @@ function nestingOf(element: ElementNode, chain: Chain, report: Report) {
   const paragraph = CLOSES_P.has(name) ? within(chain, 'p') : undefined
 
   if (paragraph) {
+    // The form kay writes around a `button(action)` has no tag of its own: the button is what the page wrote.
+    if (element.tag.end === element.tag.start && name === 'form') {
+      report('This `button` with an `action` sits inside a `p`', 'its `action` makes it a form, and the browser closes the `p` where a form starts, so the server\'s HTML and the DOM an island builds differ', 'make the `p` a `div`, or put the button beside it', paragraph)
+
+      return
+    }
+
     report(`This \`${name}\` sits inside a \`p\``, 'the browser closes the `p` where a block starts, so the server\'s HTML and the DOM an island builds differ', `make the \`p\` a \`div\`, or put the \`${name}\` beside it`, paragraph)
 
     return

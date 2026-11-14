@@ -42,8 +42,14 @@ export function valuesCall(element: ElementNode, attribute: Attribute, source: s
   return attribute.kind === 'expression' && valuesOf(element, source) === attribute && CALL.test(source.slice(attribute.expression.start, attribute.expression.end))
 }
 
-// The `field` a component is given: the name its bare controls take when it is static text, none when it is computed, and `fallback` when it has none.
+// The component whose `field` names its controls: kayjs-ui's. Any other component's `field` is its own prop.
+export const FIELD_COMPONENT = 'FormField'
+
+// The `field` a FormField is given: the name its bare controls take when it is static text, none when it is computed, and `fallback` for a component with none or one that is not a FormField.
 function fieldOfComponent(element: ElementNode, source: string, fallback: FieldContent | undefined): FieldContent | undefined {
+  if (element.name !== FIELD_COMPONENT)
+    return fallback
+
   const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === FIELD_ATTRIBUTE)
 
   if (!attribute)

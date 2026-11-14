@@ -39,6 +39,7 @@ import { hookLifecycle, hookRequests } from './app-hooks'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
 import { serveBuildFiles } from './build-files'
+import { BUTTON_FORM_STYLE } from './button-form-rule'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { imageLimits, remoteLimits, timeoutMs } from './config-limits'
@@ -54,8 +55,8 @@ import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { loadGuard, requiredGuards } from './guards'
 import { refuseUnknownHosts } from './host-allowlist'
-import { avifQuality, serveImages, webpQuality } from './image'
 
+import { avifQuality, serveImages, webpQuality } from './image'
 import { jobsPageOf, serveJobsPage } from './jobs-page'
 import { countWrites, NO_WRITES } from './kept-pages'
 import { joinGuards } from './lazy-guard'
@@ -185,7 +186,7 @@ export function bootOf(input: BootInput) {
   // The browser fetches the dictionary under `connect-src`, so it joins the policy as what an island needs does: the app's own sources, unless it removed the directive or set it to 'none'.
   const dictionaryUsed = compressing && !env.dev && client.dictionary !== undefined
   const directives = dictionaryUsed ? { ...client.directives, 'connect-src': [...new Set([...client.directives?.['connect-src'] ?? [], '\'self\''])] } : client.directives
-  const securityOptions = { ...options, dev: env.dev, islands: directives, scripts: client.installs !== undefined && client.installs.length > 0 ? [...scripts, INSTALL_OFFER] : scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client), ...newTabStyles(locales.translations.values())].map(style => rebaseCss(style, env.base)))] }
+  const securityOptions = { ...options, dev: env.dev, islands: directives, scripts: client.installs !== undefined && client.installs.length > 0 ? [...scripts, INSTALL_OFFER] : scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client), ...newTabStyles(locales.translations.values()), BUTTON_FORM_STYLE].map(style => rebaseCss(style, env.base)))] }
   // Offered, so an app file at the path keeps it; only a running server counts, as `kay dev` restarts on every change and an export serves nothing.
   const metricsConfig = env.serving ? metricsOf(options.metrics) : undefined
   const metrics: Claim | undefined = metricsConfig && { path: metricsConfig.path ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }

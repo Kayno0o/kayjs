@@ -29,6 +29,7 @@ import { NAVIGATION_ENTRY } from '../runtime/navigation-entry'
 import { BUILD_META, LOADING_META } from '../runtime/swap'
 import { LINK_SCHEMES_META } from '../runtime/url'
 import { encodeValue, unsendable } from '../runtime/wire'
+import { buttonFormRule } from './button-form-rule'
 import { INLINE_LIMIT, islandChunks } from './client'
 import { STYLE_TAG } from './compress'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, liveReload, problemsBlock, STYLES_SCRIPT, typeProblemsBlock } from './dev'
@@ -510,7 +511,8 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const sheets = stylesheets(client, styled)
   // The nearest-`data-prefetch` selector is needed once the page holds the attribute or may gain it later: a streamed part, an island, or a server island spliced into a prerendered page.
   const mayPrefetchPerLink = shipsEntry || streamed || (scan?.modes.length ?? 0) > 0 || [markup, head.html, head.root].some(html => DATA_PREFETCH.test(html))
-  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${shipsEntry && client.navigation === true ? prefetchMeta(options.client?.prefetch) : pageSpeculation(options, mayPrefetchPerLink)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.client?.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const mayGain = hasIslands || streamed
+  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, mayGain, options.sameTabLinks === true)}${buttonFormRule(markup, mayGain)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${shipsEntry && client.navigation === true ? prefetchMeta(options.client?.prefetch) : pageSpeculation(options, mayPrefetchPerLink)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.client?.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 

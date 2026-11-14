@@ -2,6 +2,8 @@ import type { Action } from '../src/runtime'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
+import { BUTTON_FORM_STYLE } from '../src/server/button-form-rule'
+import { sourceHash } from '../src/server/csp'
 import { testSite } from '../src/test'
 
 const root = 'tests/fixtures/form-fields'
@@ -43,33 +45,53 @@ describe('a bare control in a component given a field', () => {
   })
 
   it('writes the same name on the server and in the browser, and checks it against the action', () => {
-    const template = 'form(action={save})\n  Wrap(field="title")\n    input\n'
+    const template = 'form(action={save})\n  FormField(field="title")\n    input\n'
 
     for (const output of ['html', 'dom'] as const)
       expect(compile(template, output).tsx).toContain('name=\\"title\\"')
 
-    expect(compile(template).tsx).toContain('<input name={KayField((save), "title")} />')
+    expect(compile(template).tsx).toContain('<input name="title" />')
     expect(compile(template).tsx).toContain('field={KayField((save), "title")}')
   })
 
   it('stops at a form of its own and at a component that is one', () => {
-    const nested = compile('form(action={save})\n  Wrap(field="title")\n    form(action={save})\n      input\n', 'html').tsx
-    const component = compile('form(action={save})\n  Wrap(field="title")\n    Form(action={save})\n      input\n', 'html').tsx
+    const nested = compile('form(action={save})\n  FormField(field="title")\n    form(action={save})\n      input\n', 'html').tsx
+    const component = compile('form(action={save})\n  FormField(field="title")\n    Form(action={save})\n      input\n', 'html').tsx
 
     expect(nested.match(/name=\\"title\\"/g)).toBeNull()
     expect(component.match(/name=\\"title\\"/g)).toBeNull()
   })
 
   it('stops at any nested form and at a component with a computed field', () => {
-    const plain = compile('form(action={save})\n  Wrap(field="title")\n    form(method="get")\n      input\n', 'html').tsx
-    const computed = compile('form(action={save})\n  Wrap(field="title")\n    Wrap(field={other})\n      input\n', 'html').tsx
+    const plain = compile('form(action={save})\n  FormField(field="title")\n    form(method="get")\n      input\n', 'html').tsx
+    const computed = compile('form(action={save})\n  FormField(field="title")\n    FormField(field={other})\n      input\n', 'html').tsx
 
     expect(plain.match(/name=\\"title\\"/g)).toBeNull()
     expect(computed.match(/name=\\"title\\"/g)).toBeNull()
   })
 
+  it('leaves the field of any other component to it, and names no control for it', () => {
+    const other = compile('form(action={save})\n  Column(field="title")\n    input\n', 'html').tsx
+
+    expect(other).not.toContain('name=')
+    expect(other).not.toContain('KayField(')
+    expect(messages('form(action={save})\n  Column(field="nope")\n    input\n')).toEqual([])
+  })
+
+  it('takes `field` or `name` on a FormField, not both', () => {
+    expect(messages('form(action={save})\n  FormField(name="title" field="title")\n    input\n')).toContain('A FormField has `field` or `name`, not both')
+    expect(messages('form(action={save})\n  FormField(field="title")\n    input\n')).not.toContain('A FormField has `field` or `name`, not both')
+  })
+
+  it('checks the name against the action once for a group of controls', () => {
+    const { tsx } = compile('form(action={save})\n  FormField(field="nope")\n    input(type="radio" value="a")\n    input(type="radio" value="b")\n    input(type="radio" value="c")\n')
+
+    expect(tsx.match(/KayField\(/g)).toHaveLength(1)
+    expect(tsx.match(/name=\\"nope\\"|name="nope"/g)).toHaveLength(3)
+  })
+
   it('names nothing outside a form', () => {
-    expect(compile('Wrap(field="title")\n  input\n', 'html').tsx).not.toContain('name=')
+    expect(compile('FormField(field="title")\n  input\n', 'html').tsx).not.toContain('name=')
   })
 })
 
@@ -97,16 +119,23 @@ describe('a label given a field', () => {
     expect(messages('label(field="title") T\n')).toContain('`field` on a label names a field of a form posting to an action, so it sits inside one')
   })
 
+  it('silences missing-label in its own form only', () => {
+    const codes = (template: string) => compile(template).diagnostics.map(diagnostic => diagnostic.code)
+
+    expect(codes('form(action={save})\n  label(field="title") T\nform(action={save})\n  input(field="title")\n')).toContain('missing-label')
+    expect(codes('form(action={save})\n  label(field="title") T\n  input(field="title")\nform(action={save})\n  label(field="title") T\n  input(field="title")\n')).not.toContain('missing-label')
+  })
+
   it('gives the id to a control with a computed type or a spread, and counts the innermost component\'s bare control once', () => {
     const typed = compile('form(action={save})\n  label(field="title") T\n  input(field="title" type={kind})\n', 'html').tsx
     const spread = compile('form(action={save})\n  label(field="title") T\n  input(field="title" {...rest})\n', 'html').tsx
-    const nested = compile('form(action={save})\n  label(field="title") T\n  Wrap(field="done")\n    Wrap(field="title")\n      input\n', 'html').tsx
+    const nested = compile('form(action={save})\n  label(field="title") T\n  FormField(field="done")\n    FormField(field="title")\n      input\n', 'html').tsx
 
     expect(typed).toContain('id=\\"save-title\\"')
     expect(spread).not.toContain('id=\\"save-title\\"')
     expect(messages('form(action={save})\n  label(field="title") T\n  input(field="title" {...rest})\n')).toContain('A label\'s `field` points at the one control of that field, and this form has 0')
     expect(nested).toContain('id=\\"save-title\\"')
-    expect(messages('form(action={save})\n  label(field="title") T\n  Wrap(field="done")\n    Wrap(field="title")\n      input\n')).not.toContain('A label\'s `field` points at the one control of that field, and this form has 2')
+    expect(messages('form(action={save})\n  label(field="title") T\n  FormField(field="done")\n    FormField(field="title")\n      input\n')).not.toContain('A label\'s `field` points at the one control of that field, and this form has 2')
   })
 
   it('points the same on a page under a base path', async () => {
@@ -121,8 +150,27 @@ describe('a button given an action, alone', () => {
   it('is a form of its own on a static page, one per button', async () => {
     const { html } = await site.visit('/lone')
 
-    expect(html.match(/<form style="display:contents"/g)).toHaveLength(2)
+    expect(html.match(/<form data-kay-button-form/g)).toHaveLength(2)
     expect(html).toContain('<button class="one">Add one</button>')
+  })
+
+  it('has no box of its own under a strict style-src, on a page and in an island page', async () => {
+    const strict = await testSite({ root, islands: false, security: { csp: { 'style-src': ['\'self\''] } } })
+
+    for (const path of ['/lone', '/island']) {
+      const { html, headers } = await strict.visit(path)
+
+      expect(html).toContain('<form data-kay-button-form')
+      expect(html).toContain(`<style>${BUTTON_FORM_STYLE}</style>`)
+      expect(html).not.toContain('style="display:contents"')
+      expect(headers.get('content-security-policy')).toContain(sourceHash(BUTTON_FORM_STYLE))
+    }
+
+    expect((await site.visit('/')).html).not.toContain(BUTTON_FORM_STYLE)
+  })
+
+  it('names the button when it sits in a p', () => {
+    expect(messages('p\n  button(action={save}) Go\n')).toContain('This `button` with an `action` sits inside a `p`')
   })
 
   it('posts through its form, with the arguments of its call', async () => {
@@ -136,7 +184,7 @@ describe('a button given an action, alone', () => {
     const island = compile('script\n  import { signal } from \'kay\'\n  const n = signal(0)\nbutton(type="button" onClick={() => n += 1}) {n()}\nbutton.go(action={save}) Go\n', 'dom').tsx
 
     expect(island).toContain('KayFormAction((save))')
-    expect(island).toContain('display:contents')
+    expect(island).toContain('data-kay-button-form')
     expect(messages('form(action={save})\n  button(action={save}) Go\n')).toContain('A button with `action` is a form of its own, so it sits outside one')
     expect(messages('button(action={save}) Go\n')).not.toContain('A button with `action` is a form of its own, so it sits outside one')
   })
