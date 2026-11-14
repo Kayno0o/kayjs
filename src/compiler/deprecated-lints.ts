@@ -74,7 +74,7 @@ export const DEPRECATED_LINTS = {
     level: 'warn',
     group: 'deprecated',
     since: '1.105',
-    summary: 'The `--- island`, `--- static` and `--- client` fence lines, and `export const island = { ... }` in a `--- module` fence, since 1.105: a component declares what it says of its role with `island({ render, hydrate, persist, interactive })` first in its script, as it declares its props with `props<T>()`. `render` is `\'island\'` (the default), `\'client\'` (`--- client`) or `\'static\'` (`--- static`). The old forms work until 1.108. The fix writes `---` for the fence line and the call at the top of the script, with the properties of the exported `island` in it and the `--- module` fence dropped when nothing else is in it; a component with no script fence line is reported with no fix.',
+    summary: 'The `--- island`, `--- static` and `--- client` fence lines, and `export const island = { ... }` in a `--- module` fence, since 1.105: a component declares what it says of its role with `island({ render, hydrate, persist, interactive })` first in its script, as it declares its props with `props<T>()`. `render` is `\'island\'` (the default), `\'client\'` (`--- client`) or `\'static\'` (`--- static`). The old forms work until 1.108. The fix writes `---` for the fence line and the call at the top of the script, with the properties of the exported `island` in it and the `--- module` fence dropped when nothing else is in it, its comments going above the call; a component with no script fence line is reported with no fix.',
     wrong: '--- island\nconst { label } = props<{ label: string }>()\n---\nbutton {label}',
     right: '---\nisland()\nconst { label } = props<{ label: string }>()\n---\nbutton {label}',
   },

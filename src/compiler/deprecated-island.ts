@@ -7,6 +7,8 @@ import { declaredIsland, readableCall } from './island-declaration'
 const FENCE_WORD = /^---([ \t]+)(client|island|static)\b/
 const LABELED_LINE = /^---[ \t]*[a-z<]/
 const TRAILING_COMMA = /,$/
+// Text holding line comments alone, which a dropped module fence hands to the call.
+const onlyComments = (text: string): boolean => text.split('\n').every(line => line.trim() === '' || line.trimStart().startsWith('//'))
 
 // The line ending a file writes, which what a fix inserts follows.
 export const eolOf = (source: string): string => source.includes('\r\n') ? '\r\n' : '\n'
@@ -80,6 +82,8 @@ export function deprecatedIslandForms(file: KayFile, script: ScriptAnalysis): Di
   const edits: Fix['edits'] = []
   // What stays above the script's fence line.
   let before = file.source.slice(0, line.start)
+  // The comments of a module fence that goes, written above the call.
+  let carried = ''
 
   if (exported !== undefined) {
     const module = file.module!
@@ -88,9 +92,10 @@ export function deprecatedIslandForms(file: KayFile, script: ScriptAnalysis): Di
     const header = file.source.lastIndexOf('\n', module.start - 2) + 1
     const own = file.source.startsWith('\r\n', exported.statement.end) ? 2 : Number(file.source[exported.statement.end] === '\n')
 
-    // A fence holding nothing else goes with its line, when a labeled line closes it and the next fence does not need it.
-    if (rest.trim() === '' && labeled && file.source.slice(header, module.start).trim() === '--- module') {
+    // A fence holding nothing else but comments goes with its line, when a labeled line closes it and the next fence does not need it.
+    if (onlyComments(rest) && labeled && file.source.slice(header, module.start).trim() === '--- module') {
       edits.push({ start: header, end: module.end, text: '' })
+      carried = rest.trim()
       // A module fence below the script line changes nothing above it.
       before = header < line.start ? file.source.slice(0, header) + file.source.slice(module.end, line.start) : before
     }
@@ -106,7 +111,7 @@ export function deprecatedIslandForms(file: KayFile, script: ScriptAnalysis): Di
   const properties = [render === undefined ? '' : `render: '${render}'`, exported?.properties ?? ''].filter(each => each !== '')
 
   // The call goes first in the script, which a `--- client` or `--- island` fence line no longer opens.
-  edits.push({ start: file.script.start, end: file.script.start, text: `island(${properties.length === 0 ? '' : `{ ${properties.join(', ')}${LINE_COMMENT_END.test(properties.at(-1)!) ? eol : ' '}}`})${eol}` })
+  edits.push({ start: file.script.start, end: file.script.start, text: `${carried === '' ? '' : `${carried}${eol}`}island(${properties.length === 0 ? '' : `{ ${properties.join(', ')}${LINE_COMMENT_END.test(properties.at(-1)!) ? eol : ' '}}`})${eol}` })
 
   const at = word === null ? exported!.statement : { start: line.start + 3 + word[1]!.length, end: line.start + 3 + word[1]!.length + word[2]!.length }
 

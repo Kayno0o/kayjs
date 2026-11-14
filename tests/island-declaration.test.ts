@@ -85,6 +85,12 @@ describe('deprecated-island-fence', () => {
     expect(apply(shared, lints(shared, 'deprecated-island-fence')[0]!)).toBe('--- module\nexport const unit = 1\n--- script\nisland({ hydrate: \'idle\' })\n---\nbutton Go\n')
   })
 
+  it('carries the comments of a module fence it drops above the call', () => {
+    const source = '--- module\n// Why it persists.\n// And when.\nexport const island = { persist: true } as const\n--- island\n---\nbutton Go\n'
+
+    expect(apply(source, lints(source, 'deprecated-island-fence')[0]!)).toBe('---\n// Why it persists.\n// And when.\nisland({ persist: true })\n---\nbutton Go\n')
+  })
+
   it('stays quiet for a component that declares island()', () => {
     expect(lints('---\nisland({ hydrate: \'idle\' })\n---\nbutton Go\n', 'deprecated-island-fence')).toEqual([])
   })
