@@ -1,0 +1,73 @@
+/*
+ * A starfield for the page, on its own: the `starfield` utility paints a sky of dots behind an element, with no skin, font or colour scheme of its own. Import it after theme.css, or after `@import 'tailwindcss'` with `ui()`, then put `class="starfield"` on `body` or a section.
+ * The dots read three tokens that follow the colour scheme (white by night, ink by day), so an app retints the sky from its own `@theme`, never by restyling `::before`. The ground is `--color-background`; `class="starfield bg-surface"` changes it.
+ */
+@theme {
+  --color-star: light-dark(#1d2433, #ffffff);
+  --color-star-cool: light-dark(#2c4a8f, #c8d2ff);
+  --color-star-warm: light-dark(#8a5320, #ffecd6);
+}
+
+/* Eleven dots in three tints over four prime tile sizes, so the layers never line up into a grid, on a fixed ::before layer behind the content: a fixed background repaints the viewport on every scroll frame. */
+@utility starfield {
+  background-color: var(--color-background);
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      radial-gradient(circle at 23px 41px, color-mix(in srgb, var(--color-star) 32%, transparent) 0.7px, transparent 1.3px),
+      radial-gradient(circle at 131px 97px, color-mix(in srgb, var(--color-star) 18%, transparent) 0.6px, transparent 1.2px),
+      radial-gradient(circle at 79px 157px, color-mix(in srgb, var(--color-star-cool) 22%, transparent) 0.6px, transparent 1.2px),
+      radial-gradient(circle at 211px 29px, color-mix(in srgb, var(--color-star) 14%, transparent) 0.6px, transparent 1.2px),
+      radial-gradient(circle at 53px 223px, color-mix(in srgb, var(--color-star-warm) 24%, transparent) 0.7px, transparent 1.3px),
+      radial-gradient(circle at 167px 181px, color-mix(in srgb, var(--color-star) 12%, transparent) 0.5px, transparent 1.1px),
+      radial-gradient(circle at 293px 113px, color-mix(in srgb, var(--color-star-cool) 28%, transparent) 0.8px, transparent 1.4px),
+      radial-gradient(circle at 37px 311px, color-mix(in srgb, var(--color-star) 16%, transparent) 0.6px, transparent 1.2px),
+      radial-gradient(circle at 241px 277px, color-mix(in srgb, var(--color-star) 10%, transparent) 0.5px, transparent 1.1px),
+      radial-gradient(circle at 389px 359px, color-mix(in srgb, var(--color-star) 36%, transparent) 0.9px, transparent 1.5px),
+      radial-gradient(circle at 101px 433px, color-mix(in srgb, var(--color-star-cool) 20%, transparent) 0.6px, transparent 1.2px);
+    background-size:
+      173px 173px,
+      173px 173px,
+      173px 173px,
+      241px 241px,
+      241px 241px,
+      241px 241px,
+      337px 337px,
+      337px 337px,
+      337px 337px,
+      461px 461px,
+      461px 461px;
+  }
+
+  /* Where random() works, stars scattered over the viewport instead of tiled, as one box-shadow list on a layer painted once. A random() without a key draws anew at each place in the list, var() expansions included, so --w64 is 64 different stars. */
+  @supports (top: random(0px, 1px)) {
+    &::before {
+      inset: auto;
+      top: 0;
+      left: 0;
+      background-image: none;
+      width: 1px;
+      height: 1px;
+      border-radius: 50%;
+      --w: random(0vw, 100vw) random(0vh, 100vh) 0 random(0px, 0.4px) color-mix(in srgb, var(--color-star) random(12%, 45%), transparent);
+      --b: random(0vw, 100vw) random(0vh, 100vh) 0 random(0px, 0.5px) color-mix(in srgb, var(--color-star-cool) random(15%, 40%), transparent);
+      --a: random(0vw, 100vw) random(0vh, 100vh) 0 random(0px, 0.5px) color-mix(in srgb, var(--color-star-warm) random(15%, 40%), transparent);
+      --x: random(0vw, 100vw) random(0vh, 100vh) 0 random(0.4px, 0.9px) color-mix(in srgb, var(--color-star) random(35%, 65%), transparent);
+      --w4: var(--w), var(--w), var(--w), var(--w);
+      --w16: var(--w4), var(--w4), var(--w4), var(--w4);
+      --w64: var(--w16), var(--w16), var(--w16), var(--w16);
+      --b4: var(--b), var(--b), var(--b), var(--b);
+      --b16: var(--b4), var(--b4), var(--b4), var(--b4);
+      --a4: var(--a), var(--a), var(--a), var(--a);
+      --a16: var(--a4), var(--a4), var(--a4), var(--a4);
+      --x4: var(--x), var(--x), var(--x), var(--x);
+      box-shadow: var(--w64), var(--w64), var(--w64), var(--b16), var(--b16), var(--b16), var(--a16), var(--a16), var(--x4), var(--x4), var(--x4);
+    }
+  }
+}

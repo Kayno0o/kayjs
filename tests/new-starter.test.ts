@@ -21,8 +21,8 @@ describe('the starter', () => {
       expect(files['src/app.css']).toContain('@import \'@kayjs/ui/skins/space.css\';')
       expect(files['src/app.css']).toContain('--color-background: #090a10;')
       expect(files['src/app.css']).toContain('--color-foreground: #d8dbe6;')
-      expect(files['src/app.css']).toContain('body::before')
-      expect(files['src/app.css']).toContain('@supports (top: random(0px, 1px))')
+      expect(files['src/app.css']).toMatch(/body \{\s*@apply starfield /)
+      expect(files['src/app.css']).not.toContain('body::before')
       // A static export holds no extension's API routes, so a site imports the theme where a server mounts it.
       expect(files['kay.config.ts']!.includes('ui()')).toBe(preset.features.includes('server'))
       expect(files['src/app.css']!.includes('@import \'@kayjs/ui/theme.css\';')).toBe(!preset.features.includes('server'))

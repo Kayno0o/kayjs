@@ -47,71 +47,7 @@ const ACCENT_COLOURS = {
   coral: '#f27b72',
 }
 
-// Orbit's starfield, drawn on the body: a dense tiled fallback, and where `random()` works, stars scattered over the viewport as one box-shadow list on a fixed layer painted once.
-const STARFIELD = `/* The sky behind the page, on a fixed layer so a scroll repaints nothing. */
-body {
-  isolation: isolate;
-}
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    radial-gradient(circle at 23px 41px, rgb(255 255 255 / 0.32) 0.7px, transparent 1.3px),
-    radial-gradient(circle at 131px 97px, rgb(255 255 255 / 0.18) 0.6px, transparent 1.2px),
-    radial-gradient(circle at 79px 157px, rgb(200 210 255 / 0.22) 0.6px, transparent 1.2px),
-    radial-gradient(circle at 211px 29px, rgb(255 255 255 / 0.14) 0.6px, transparent 1.2px),
-    radial-gradient(circle at 53px 223px, rgb(255 236 214 / 0.24) 0.7px, transparent 1.3px),
-    radial-gradient(circle at 167px 181px, rgb(255 255 255 / 0.12) 0.5px, transparent 1.1px),
-    radial-gradient(circle at 293px 113px, rgb(200 210 255 / 0.28) 0.8px, transparent 1.4px),
-    radial-gradient(circle at 37px 311px, rgb(255 255 255 / 0.16) 0.6px, transparent 1.2px),
-    radial-gradient(circle at 241px 277px, rgb(255 255 255 / 0.1) 0.5px, transparent 1.1px),
-    radial-gradient(circle at 389px 359px, rgb(255 255 255 / 0.36) 0.9px, transparent 1.5px),
-    radial-gradient(circle at 101px 433px, rgb(200 210 255 / 0.2) 0.6px, transparent 1.2px);
-  background-size:
-    173px 173px,
-    173px 173px,
-    173px 173px,
-    241px 241px,
-    241px 241px,
-    241px 241px,
-    337px 337px,
-    337px 337px,
-    337px 337px,
-    461px 461px,
-    461px 461px;
-}
-
-/* A random() without a key draws anew at each place in the list, var() expansions included, so --w64 is 64 different stars. */
-@supports (top: random(0px, 1px)) {
-  body::before {
-    inset: auto;
-    top: 0;
-    left: 0;
-    background-image: none;
-    width: 1px;
-    height: 1px;
-    border-radius: 50%;
-    --w: random(0vw, 100vw) random(0vh, 100vh) 0 random(0px, 0.4px) rgb(255 255 255 / random(0.12, 0.45));
-    --b: random(0vw, 100vw) random(0vh, 100vh) 0 random(0px, 0.5px) rgb(200 210 255 / random(0.15, 0.4));
-    --a: random(0vw, 100vw) random(0vh, 100vh) 0 random(0px, 0.5px) rgb(255 236 214 / random(0.15, 0.4));
-    --x: random(0vw, 100vw) random(0vh, 100vh) 0 random(0.4px, 0.9px) rgb(255 255 255 / random(0.35, 0.65));
-    --w4: var(--w), var(--w), var(--w), var(--w);
-    --w16: var(--w4), var(--w4), var(--w4), var(--w4);
-    --w64: var(--w16), var(--w16), var(--w16), var(--w16);
-    --b4: var(--b), var(--b), var(--b), var(--b);
-    --b16: var(--b4), var(--b4), var(--b4), var(--b4);
-    --a4: var(--a), var(--a), var(--a), var(--a);
-    --a16: var(--a4), var(--a4), var(--a4), var(--a4);
-    --x4: var(--x), var(--x), var(--x), var(--x);
-    box-shadow: var(--w64), var(--w64), var(--w64), var(--b16), var(--b16), var(--b16), var(--a16), var(--a16), var(--x4), var(--x4), var(--x4);
-  }
-}`
-
-// The look of orbit's apps: kayjs-ui's space skin over a near-black palette, a hairline on every box, a starfield behind the page, and an accent the picker in the header changes.
+// The look of orbit's apps: kayjs-ui's space skin over a near-black palette, a hairline on every box, kayjs-ui's `starfield` behind the page, and an accent the picker in the header changes.
 // The colours carry kayjs-ui's names (`background`, `foreground`, `border`), none of them one of Tailwind's own utilities such as `text-base`.
 export function tailwindCss({ has }: Setup): string {
   const ui = has('ui')
@@ -145,10 +81,9 @@ ${has('accents') ? '\n  /* The accent picker sets --accent on the page. */\n  --
   --radius-md: 3px;
   --radius-lg: 4px;
 }`,
-    STARFIELD,
     `@layer base {
   body {
-    @apply flex min-h-screen flex-col bg-background font-sans text-foreground;
+    @apply ${ui ? 'starfield ' : ''}flex min-h-screen flex-col bg-background font-sans text-foreground;
   }
 
   a {

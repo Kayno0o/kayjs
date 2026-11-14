@@ -80,7 +80,14 @@ Soft sets `--label-case`, `--tracking-label` and `--shadow-raised`. Brutalist se
 
 A skin's rules sit at one class of specificity or none, so a rule of yours with one class in `@layer components` beats them. Unlayered CSS and the classes of `src/ui.ts` already did. The key's hover is the one exception, at two classes like the theme's own.
 
-`starfield` sets `--color-background` and `isolation: isolate` on the element and draws four dots on its `::before`, a fixed layer behind the content, so an app that styles `.starfield::before` knows. `class="starfield bg-surface"` changes the ground. For a fuller sky, style `.starfield::before` with your own `background-image` that repeats the dots and adds your gradients, with its own `background-size`.
+`starfield` sets `--color-background` and `isolation: isolate` on the element and draws eleven dots in three tints on its `::before`, a fixed layer behind the content, so an app that styles `.starfield::before` knows. `class="starfield bg-surface"` changes the ground. Where the browser supports `random()`, the sky is scattered stars instead of tiles.
+
+The utility also works without the space skin, in light and dark. Import `@kayjs/ui/starfield.css` after the theme and put `class="starfield"` on `body`: your fonts and `color-scheme` stay, and the dots follow the scheme, white by night and ink by day. They read `--color-star`, `--color-star-cool` and `--color-star-warm`, so a `@theme` of yours retints the sky without restyling `::before`.
+
+```css
+@import '@kayjs/ui/theme.css';
+@import '@kayjs/ui/starfield.css';
+```
 
 Add the one line to `src/app.css`, after the theme import (an app using `ui()` has the theme already, so it goes after `@import 'tailwindcss'`):
 
