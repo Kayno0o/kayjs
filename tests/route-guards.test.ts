@@ -182,6 +182,30 @@ describe('reading the guards of a route from its source', () => {
   })
 })
 
+describe('pages importChecked must still serve', () => {
+  it('serves a page with guards: false, a typed page with none, and a layout with guards of its own', async () => {
+    const dir = await scratchDir('route-guards-served-')
+
+    await Promise.all(Object.entries({
+      'lib/keys.ts': KEYS,
+      'routes/open.kay': '--- server\nexport const page = { guards: false }\n---\np open\n',
+      'routes/typed.kay': '--- server\nimport type { PageSettings } from \'kay\'\n\nexport const page: PageSettings = { layouts: true }\n---\np typed\n',
+      'routes/area/_layout.kay': '--- server\nimport { needsKey } from \'../../lib/keys\'\n\nexport const page = { guards: needsKey }\n---\nslot\n',
+      'routes/area/index.kay': 'p area\n',
+    }).map(async ([file, text]) => Bun.write(join(dir, file), text)))
+
+    try {
+      const app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
+
+      for (const path of ['/open', '/typed', '/area'])
+        expect((await app.handle(new Request(`http://localhost${path}`))).status).toBe(200)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('guards the scan cannot see in the source', () => {
   const root = async (files: Record<string, string>) => {
     const dir = await scratchDir('route-guards-unseen-')

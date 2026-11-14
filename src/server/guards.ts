@@ -22,7 +22,7 @@ const declared = new Set<string>()
 // A module holding guards the scan did not find would serve its route with none of them, such as a settings object that is no literal in the file, so it stops the request instead.
 export function refuseUndeclared(file: string, option: unknown, found: boolean): void {
   if (option !== undefined && typeof option !== 'boolean' && !found)
-    throw new KayError('route-invalid', `kay: the guards in ${file} are not written where kay reads them, so none would run: set \`guards\` in the object literal of \`export const page = { ... }\` or of \`api({ ... })\` in the file itself`)
+    throw new KayError('route-invalid', `kay: the guards in ${file} are not written where kay reads them, so none would run: set \`guards\` in the object literal of \`export const page = { ... }\` or of \`api({ ... })\` in the file itself; a special page (_404, _error, _loading) takes none`)
 }
 
 // A page module as the server imports it, refused when it holds guards the scan never saw.
