@@ -286,8 +286,6 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
   // A site made at the top of a file or a describe posts as a new client in each test, so no test meets the rate limits another one's posts counted; one made inside a test, or outside bun test, keeps one.
   const logs: LogEntry[] = []
-  // Shared by `as()` views of the site.
-  const world = createWorld(options.outgoing === 'allow')
   const untap = tapLogs(entry => void logs.push(entry))
 
   try {
@@ -298,6 +296,9 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     afterAll(release)
   }
   catch {}
+
+  // Shared by `as()` views of the site.
+  const world = createWorld(options.outgoing === 'allow')
 
   world.resetEachTest()
 

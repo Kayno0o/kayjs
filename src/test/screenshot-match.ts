@@ -9,7 +9,7 @@ export interface MatchScreenshotOptions {
 }
 
 const NAME = /^[\w.-]+(?:\/[\w.-]+)*$/
-const TEST_FILE = /(\/[^\s():]+\.test\.[cm]?[jt]sx?):\d+:\d+/
+const TEST_FILE = /^\s*at (?:.*\()?(?:file:\/\/)?(\/.+?\.test\.[cm]?[jt]sx?):\d+:\d+\)?$/m
 
 // The test file calling `matchScreenshot`, read off the stack where the call began, as Bun gives no hook the file of the running test.
 export function callingTestFile(stack: string | undefined): string {

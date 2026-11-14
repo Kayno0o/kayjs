@@ -89,4 +89,25 @@ describe('refusal names', () => {
     expect(site.refusal).toBe(site.expectRefused)
     expect(site.socketRefusal).toBe(site.socket.refused)
   })
+
+  it('keeps the hooks of each as() view to that view', async () => {
+    const calls: string[] = []
+    const first = site.as('a=1')
+    const second = site.as('b=2')
+
+    first.joinSignIn({ name: 'lib', signIn: async () => {
+      calls.push('first')
+
+      return { role: 'a' } as never
+    }, signOut: () => void calls.push('first:out') })
+    second.joinSignIn({ name: 'lib', signIn: async () => {
+      calls.push('second')
+
+      return { role: 'b' } as never
+    }, signOut: () => void calls.push('second:out') })
+
+    expect(await first.signInAs({})).toEqual({ role: 'a' } as never)
+    first.signOut()
+    expect(calls).toEqual(['first', 'first:out'])
+  })
 })

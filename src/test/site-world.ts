@@ -2,9 +2,8 @@ import type { SignInHook, TestSite } from './site-types'
 import { afterEach, beforeEach, setSystemTime } from 'bun:test'
 import { clearStubs, guardOutgoing, stubFetch } from './outgoing'
 
-// What the views of one site share: the sign-ins the libraries' `test(site)` joined, whether the clock was moved and the guard on `fetch`.
+// What the views of one site share: whether the clock was moved and the guard on `fetch`.
 export interface World {
-  hooks: SignInHook[]
   clock: { moved: boolean }
   // Forgets the stubs before each test and puts the clock back after it, for a site made at the top of a file or a describe; one made in a test has no hook to take.
   resetEachTest: () => void
@@ -15,7 +14,6 @@ export interface World {
 export function createWorld(allowOutgoing: boolean): World {
   const unguard = guardOutgoing(allowOutgoing)
   const world: World = {
-    hooks: [],
     clock: { moved: false },
     resetEachTest() {
       try {
@@ -41,23 +39,26 @@ function restoreClock({ clock }: World): void {
 }
 
 // The helpers that fake what the app meets outside its own routes: who is signed in, the time, and the network.
+// The sign-ins the libraries' `test(site)` joined are the view's own, as each closes over the cookies of the view it was given.
 export function worldOf(world: World): Pick<TestSite, 'signInAs' | 'signOut' | 'joinSignIn' | 'freezeTime' | 'fetchStub'> {
+  const hooks: SignInHook[] = []
+
   return {
     joinSignIn: (hook) => {
-      const known = world.hooks.findIndex(({ name }) => name === hook.name)
+      const known = hooks.findIndex(({ name }) => name === hook.name)
 
       if (known === -1)
-        world.hooks.push(hook)
+        hooks.push(hook)
       else
-        world.hooks[known] = hook
+        hooks[known] = hook
     },
     signInAs: async (who) => {
-      if (world.hooks.length === 0)
+      if (hooks.length === 0)
         throw new Error('kay: signInAs signs the site in through the libraries that joined it: call `test(site)` of `@kayjs/auth/test` or `@kayjs/cms/test` first')
 
       const signedIn: Record<string, unknown> = {}
 
-      for (const hook of world.hooks)
+      for (const hook of hooks)
         Object.assign(signedIn, await hook.signIn(who))
 
       if (Object.keys(signedIn).length === 0)
@@ -66,7 +67,7 @@ export function worldOf(world: World): Pick<TestSite, 'signInAs' | 'signOut' | '
       return signedIn
     },
     signOut: () => {
-      for (const hook of world.hooks)
+      for (const hook of hooks)
         hook.signOut()
     },
     freezeTime: (at = new Date()) => {
