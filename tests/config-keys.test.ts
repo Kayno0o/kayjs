@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { defineConfig } from '../src/config'
 import { mergeConfig } from '../src/config-loader'
 import { mergeBags, REMOVED_KEYS, unknownConfigKeys } from '../src/config-shape'
 
@@ -37,5 +38,39 @@ describe('the grouped config keys', () => {
   it('checks the keys of each bag', () => {
     expect(unknownConfigKeys({ dirs: { routes: 'a' }, limits: { body: 1 }, serve: { compress: true }, observe: { log: false }, client: { saveData: false } })).toEqual([])
     expect(unknownConfigKeys({ dirs: { route: 'a' }, client: { saveDat: false }, limits: { max: 1 } })).toEqual(['`dirs.route`, did you mean `dirs.routes`?', '`client.saveDat`, did you mean `client.saveData`?', '`limits.max`'])
+  })
+})
+
+describe('the unknown keys defineConfig refuses by type', () => {
+  it('checks every option bag of the config, at any depth, with no list of them', () => {
+    // @ts-expect-error a mistyped key of a bag the type once left unchecked
+    expect(defineConfig({ images: { widht: 1 } })).toBeDefined()
+    // @ts-expect-error a bag held by a bag
+    expect(defineConfig({ security: { cookies: { httpOnlee: true } } })).toBeDefined()
+    // @ts-expect-error a bag three levels down
+    expect(defineConfig({ images: { card: { font: { famly: 'Inter' } } } })).toBeDefined()
+    // @ts-expect-error a bag that takes a switch
+    expect(defineConfig({ health: { pth: '/up' } })).toBeDefined()
+    // @ts-expect-error the library bags
+    expect(defineConfig({ store: { sesions: undefined } })).toBeDefined()
+  })
+
+  it('takes true, false or a bag where a feature switches, and keeps the contextual type of a callback', () => {
+    const config = defineConfig({
+      robots: true,
+      sitemap: false,
+      favicon: true,
+      security: { cookies: true, csp: false },
+      health: { check: () => true },
+      images: { avif: true, placeholder: true, rateLimit: false, card: { font: { family: 'Inter' } } },
+      live: { rateLimit: true },
+      offline: false,
+      preview: true,
+      proxy: true,
+      client: { hydration: { visible: '200px' } },
+      observe: { onError: event => void event.error },
+    })
+
+    expect(config.robots).toBe(true)
   })
 })

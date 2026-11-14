@@ -51,28 +51,28 @@ export interface KayConfig extends AppHooks {
   site?: string | undefined
   seo?: SeoConfig | undefined
   // What `/robots.txt` says besides pointing at the sitemap, or `false` to serve none: `{ disallow: ['/admin'] }`. Needs `site`, as the sitemap does.
-  robots?: RobotsConfig | false | undefined
+  robots?: RobotsConfig | boolean | undefined
   // How `/sitemap.xml` is kept, or `false` to serve none (and name none in `/robots.txt`).
-  sitemap?: SitemapConfig | false | undefined
+  sitemap?: SitemapConfig | boolean | undefined
   // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
   head?: HeadTag[] | undefined
   images?: ImagesConfig | undefined
   // The most a page may load, compressed: `{ js: '20kb', css: '10kb' }` for its scripts and stylesheets, `weight: '500kb'` for the whole page and `grade: 'C'` for the worst EcoIndex grade it may have. `kay build` reports each page over it with `over-budget`, naming the modules weighing most for `js` and `css`; a key left out sets no limit, and with none nothing is checked.
   budget?: BudgetConfig | undefined
   // A square image, relative to the root, 512 pixels wide or more for sharp icons, a smaller one enlarged with a warning: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page. `{ image, svg }` adds an SVG of it, served as `/favicon.svg` and linked after the ICO; a square SVG alone is both, every icon drawn from it. Defaults to kay's own mark; `false` serves none.
-  favicon?: string | FaviconConfig | false | undefined
+  favicon?: string | FaviconConfig | boolean | undefined
   // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
   manifest?: ManifestConfig | undefined
   // The server entry, relative to the root, `src/server.ts` by default: what `kay dev`, `start`, `render`, `check` and `build` run and type against, unless `--entry` names another. With no file there, kay's own server of the pages.
   entry?: string | undefined
   // A service worker keeping the build's files and some pages for a visitor offline, `true` or what it keeps; off by default, as `false` is.
-  offline?: true | OfflineConfig | false | undefined
+  offline?: OfflineConfig | boolean | undefined
   // `true` has `kay build` index the text of the pages it renders, which `searchSite()` from `kay` searches in the browser; off by default.
   search?: boolean | undefined
   // Self-hosted fonts, declared on every page and preloaded where they ask for it.
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
-  security?: SecurityConfig | false | undefined
+  security?: SecurityConfig | boolean | undefined
   // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Left out in production, one proxy is in front for a request from a private address that carries `X-Forwarded-For`; `false` says none is, and the address the server was reached from is the client. Outside production, left out or `false`, the address the server was reached from is the client.
   proxy?: ProxyConfig | number | boolean | undefined
   // What a route no guard covers comes to. Left out, a site with a guard of its own answers 403 on each page, endpoint and API module no `_guard.ts` covers unless it sets `guards: false`, in its `page` or its `api()` options, and a site with no guard stays open. `default: 'closed'` asks it of every site and of the actions of layouts and `_actions.kay` files too, `default: 'open'` turns it off; `kay check` reports each such route. A library's routes keep the guards it gives them, and a feature that lists or changes private data (`jobs`, `vitals()`, `images.resolve`, `cms()`) is closed with no `guards` whatever the default, opened only by its own `guards: false`.
@@ -86,7 +86,7 @@ export interface KayConfig extends AppHooks {
   // Serves an MCP endpoint at `/mcp` over Streamable HTTP, or at `mcp: { path: '/tools' }`, for an agent to call the app: a tool per API route that sets `tool` in its `detail`, and per action that sets `tool` on its protection. A call runs through the same guards, rate limits and `ctx.locals` as a fetch would.
   mcp?: boolean | McpConfig | undefined
   // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
-  health?: HealthConfig | false | undefined
+  health?: HealthConfig | boolean | undefined
   // Serves `/metrics` in the Prometheus text format for a collector: requests by method, route and status, their durations, scheduled runs, cache reads and live connections. Read only from this machine or a private network by a request no proxy forwarded, or from anywhere with the `Authorization: Bearer` token `KAY_METRICS_TOKEN` holds; `{ path }` moves it. Off by default, and under `kay dev`.
   metrics?: boolean | MetricsConfig | undefined
   // Serves a page of the app's queues at `/_kay/jobs` in production: each queue's waiting, running and failed jobs with payload and error, and a button to retry or delete one. It mounts only with a `guard`, a kay guard or a list of them such as `ctx => ctx.locals.auth.requireAdmin()`, which runs on every request, and without one the boot stops. `{ path }` moves it. Off by default, and under `kay dev`, whose dev tool has a Jobs tab.
@@ -123,7 +123,7 @@ export interface KayConfig extends AppHooks {
   // The app's one secret, at least 32 random characters: it seals `session()`'s cookie, signs form stamps, links to private files and the flash cookie, and gives `preview` its key, each under a key derived for its use. `KAY_SECRET` alone does the same, so this is for a secret kept elsewhere than the environment. A list, or commas in `KAY_SECRET`, rotates it: the first seals and signs, every one opens and verifies: sessions, kayjs-auth's sealed data, stamps, private-file links, the flash cookie and preview links, so a rotation breaks none of them. Development and tests derive one for the checkout; production without any refuses to boot a `session()`, and a production server using none refuses to start, as it would sign with a key of the process, which a restart changes and other replicas do not share; `KAY_EPHEMERAL_SECRET=1` starts it anyway, for a single throwaway server.
   secret?: string | string[] | undefined
   // Lets an editor see drafts on the live site, `false` for none: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
-  preview?: PreviewConfig | false | undefined
+  preview?: PreviewConfig | boolean | undefined
 
   // Where the app keeps what outlives one process, for every feature naming no store of its own: `session()`'s data, `cached` values, `live()` values, queued jobs and schedule locks, rate limit counts, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts and the notifications `notify()` stores, the push subscriptions, the small keyed values libraries keep with an end (`kv`), and the files `files` from `kay/server` keeps in `files`, which only the app writes: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`. `sqliteData('data/app.sqlite')` keeps all but the files in one file; `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications, push, kv, files }` takes stores of your own, each optional, Redis say, and each may have `ping` for `health` and `close` for a stop. Without it sessions and jobs stay in `data/app.sqlite`, the one file kay and its libraries share (`session({ store: false })` keeps sessions in their cookie), and the others in memory.
   store?: AppStore | undefined
@@ -283,7 +283,7 @@ export interface LiveConfig {
   // How many live connections one client address holds at once, 20 by default: a few tabs, not a flood. One more answers 429.
   connections?: number | undefined
   // How many openings a client address may make in a window, `{ max: 120, window: '1m' }` by default, the shape of every rate limit in kay, or `false` for no limit.
-  rateLimit?: Omit<RateLimit, 'key'> | false | undefined
+  rateLimit?: Omit<RateLimit, 'key'> | boolean | undefined
 }
 
 export interface JobsConfig {
@@ -308,7 +308,7 @@ export interface HealthConfig {
 
 export interface SecurityConfig {
   // Directives merged over kay's Content-Security-Policy, `{ 'img-src': ["'self'"] }`, one given `false` left out, or `false` for no policy; `script-src` keeps the hashes of kay's inline scripts.
-  csp?: Record<string, string[] | false> | false | undefined
+  csp?: Record<string, string[] | false> | boolean | undefined
   // Directives merged over the enforced policy and sent as `Content-Security-Policy-Report-Only`, to see what a stricter policy would block before enforcing it.
   reportOnly?: Record<string, string[] | false> | undefined
   // Where browsers report what either policy blocks: `true` for kay's own route, which logs each violation and hands it to `onError` as a `CspViolationError`, or a collector's URL.
@@ -320,7 +320,7 @@ export interface SecurityConfig {
   // Production answers 421 to a request whose `Host` is not the site's, one of the `i18n` locale hosts or listed here, against DNS rebinding and a link built from `ctx.url.origin` poisoned by the header: `true` allows those alone, which is the default once `site` is set, and `false` trusts every `Host`. Localhost and IP addresses always pass, as a health check reaches the server by them. Under `kay dev` it is `KAY_DEV_HOSTS` instead.
   hosts?: string[] | boolean | undefined
   // What a cookie set with `ctx.cookies.set` gets for an option it does not give, so an app's cookies are as hardened as kay's own, on by default: `HttpOnly`, `SameSite=Lax`, `Secure` over https and `Path` the `base`, and a call's own option wins. `false` (or `security: false`) leaves Bun's plain defaults (`SameSite=Lax`, `Path=/`, neither `HttpOnly` nor `Secure`).
-  cookies?: CookieDefaults | false | undefined
+  cookies?: CookieDefaults | boolean | undefined
 }
 
 export interface CookieDefaults {
@@ -454,7 +454,7 @@ export interface ImagesConfig {
   // How long the image route waits for a remote host, redirects included, a string such as `'30s'`; 10 seconds by default. A slower host answers 502.
   remoteTimeout?: Duration | undefined
   // The most variants one client may have the image route encode in a window, counted by its address (the forwarded one behind a trusted `proxy`); a variant already made is never counted. Past it the route answers 429 with `Retry-After`. `{ max: 120, window: '1m' }` by default, `false` for no limit.
-  rateLimit?: Omit<RateLimit, 'key'> | false | undefined
+  rateLimit?: Omit<RateLimit, 'key'> | boolean | undefined
   // The most variants the route keeps cached of one source image, so a client varying width, quality, crop and format cannot fill the cache without bound. Past it the oldest cached variant of that image is removed to make room, and one asked for again is encoded again, within `rateLimit`. Counted from the files on disk. 256 by default, `false` for no limit.
   maxVariants?: number | false | undefined
   // The most encodes waiting for one of the four being drawn; past it the route answers 503 with `Retry-After` rather than queue more. 128 by default, `false` for no limit.
@@ -466,11 +466,11 @@ export interface ImagesConfig {
   // The widths in pixels `image()` resizes to and the route makes, whole numbers from 1 to 16384, at most 16, in any order: `[480, 960, 1440, 1920]`. Defaults to `[320, 640, 960, 1280, 1920, 2560]`, and no variant is wider than the last width, which a list of your own does not do: it also gets each image's own size. Each width is a file per image, so a short ladder builds fewer.
   widths?: number[] | undefined
   // AVIF variants beside the WebP ones, a third to a half smaller, sent to a browser whose `Accept` names `image/avif`: on at quality 50 by default, `false` serves WebP alone. Development and a static export serve WebP.
-  avif?: false | { quality?: number } | undefined
+  avif?: boolean | { quality?: number } | undefined
   // The most pixels per CSS pixel an image loads at on a denser screen, at least 1. Defaults to 2: a 3x phone loads what a 2x one does, which looks the same; `Infinity` leaves the browser's choice.
   maxDensity?: number | undefined
   // `false` leaves out the color an image's box shows until it loads, which kay reads off each imported, Markdown, `dirs` and `remote` image without transparency; `image(src, { placeholder: false })` and `no-placeholder` on an `img` leave out one image's. Shown as a `style` attribute, so a CSP without `'unsafe-inline'` for styles drops it.
-  placeholder?: false | undefined
+  placeholder?: boolean | undefined
   // The aspect ratios `image(src, { aspect })` may cut to, each one adding a variant per width the route makes on request: `['1/1', '3/2', '2/3', '4/3', '3/4', '16/9', '9/16']` by default.
   aspects?: string[] | undefined
   // How `shareCard()` draws a page's card.
@@ -602,21 +602,6 @@ export const CONFIG_FILE = 'kay.config.ts'
 // The app's own request values for templates, listed as an extension's `context` while the file exists.
 export const APP_CONTEXT = 'src/context.ts'
 
-// The nested bags whose own keys are checked as the config's are, by the key holding them and the shape they take.
-interface NestedBags {
-  dirs: DirsConfig
-  limits: LimitsConfig
-  serve: ServeConfig
-  observe: ObserveConfig
-  client: ClientConfig
-  security: SecurityConfig
-  i18n: I18nConfig
-  seo: SeoConfig
-  offline: OfflineConfig
-  health: HealthConfig
-  proxy: ProxyConfig
-}
-
 // The known key a mistyped one differs from by its case alone, which a type can tell; `kay check` names the nearest by distance.
 type CaseVariant<Key, Known> = { [Name in keyof Known & string]: Lowercase<Name> extends Lowercase<Key & string> ? Name : never }[keyof Known & string]
 
@@ -625,11 +610,17 @@ type Misspelled<Key, Known> = [CaseVariant<Key, Known>] extends [never] ? 'unkno
 
 type UnknownKeys<Given, Known> = Given extends object ? { [Key in Exclude<keyof Given, keyof Known>]: Misspelled<Key, Known> } : unknown
 
-// The config with every key `KayConfig` and its nested bags lack typed so that setting it is an error: an inferred type parameter gets no excess property check of its own. The bags are indexed by `NestedBags` rather than by the given config's keys, as a mapped type over those loses the contextual type of a callback elsewhere in the config.
-type Checked<Config> = UnknownKeys<Config, KayConfig> & { [Key in keyof NestedBags]?: UnknownKeys<Key extends keyof Config ? Config[Key] : unknown, NestedBags[Key]> }
+// The option bag a key's type holds, if any: an object type that is no list, no function, no record of free keys and has no required key, so a class, a `Logger` or a list of entries is never checked as one.
+type BagOf<Value> = Value extends readonly unknown[] ? never : Value extends (...args: never[]) => unknown ? never : Value extends object ? (string extends keyof Value ? never : Record<never, never> extends Value ? Value : never) : never
+
+// How deep the option bags nest at most, which no config comes near.
+type Deepest = [unknown, unknown, unknown, unknown]
+
+// The config with every key `KayConfig` and the option bags it holds, however deep, lack typed so that setting it is an error: an inferred type parameter gets no excess property check of its own. A bag added to `KayConfig` is covered with nothing to list. The bags are walked by the known type rather than by the given config's keys, as a mapped type over those loses the contextual type of a callback elsewhere in the config.
+type Checked<Given, Known, Depth extends unknown[] = []> = UnknownKeys<Given, Known> & (Depth['length'] extends Deepest['length'] ? unknown : { [Key in keyof Known]?: [BagOf<NonNullable<Known[Key]>>] extends [never] ? unknown : Checked<Key extends keyof Given ? Given[Key] : unknown, BagOf<NonNullable<Known[Key]>>, [...Depth, unknown]> })
 
 // Gives the config back as written, so `kay check` reads the types of what it declares off it.
-export function defineConfig<Config extends KayConfig>(config: Config & Checked<Config>): Config {
+export function defineConfig<Config extends KayConfig>(config: Config & Checked<Config, KayConfig>): Config {
   return config
 }
 

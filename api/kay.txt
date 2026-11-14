@@ -2735,17 +2735,73 @@ const dataTableNames: readonly string[]
 
 [./server] defineConfig
 function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Config, KayConfig> & {
-  dirs?: UnknownKeys<"dirs" extends keyof Config ? Config[keyof Config & "dirs"] : unknown, DirsConfig>;
-  limits?: UnknownKeys<"limits" extends keyof Config ? Config[keyof Config & "limits"] : unknown, LimitsConfig>;
-  serve?: UnknownKeys<"serve" extends keyof Config ? Config[keyof Config & "serve"] : unknown, ServeConfig>;
-  observe?: UnknownKeys<"observe" extends keyof Config ? Config[keyof Config & "observe"] : unknown, ObserveConfig>;
-  client?: UnknownKeys<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig>;
-  security?: UnknownKeys<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, SecurityConfig>;
-  i18n?: UnknownKeys<"i18n" extends keyof Config ? Config[keyof Config & "i18n"] : unknown, I18nConfig>;
-  seo?: UnknownKeys<"seo" extends keyof Config ? Config[keyof Config & "seo"] : unknown, SeoConfig>;
-  offline?: UnknownKeys<"offline" extends keyof Config ? Config[keyof Config & "offline"] : unknown, OfflineConfig>;
-  health?: UnknownKeys<"health" extends keyof Config ? Config[keyof Config & "health"] : unknown, HealthConfig>;
-  proxy?: UnknownKeys<"proxy" extends keyof Config ? Config[keyof Config & "proxy"] : unknown, ProxyConfig>;
+  dirs?: Checked<"dirs" extends keyof Config ? Config[keyof Config & "dirs"] : unknown, DirsConfig, [unknown]>;
+  limits?: Checked<"limits" extends keyof Config ? Config[keyof Config & "limits"] : unknown, LimitsConfig, [unknown]>;
+  serve?: Checked<"serve" extends keyof Config ? Config[keyof Config & "serve"] : unknown, ServeConfig, [unknown]>;
+  observe?: Checked<"observe" extends keyof Config ? Config[keyof Config & "observe"] : unknown, ObserveConfig, [unknown]>;
+  client?: Checked<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig, [unknown]>;
+  actions?: Checked<"actions" extends keyof Config ? Config[keyof Config & "actions"] : unknown, ActionsConfig, [unknown]>;
+  publicCache?: unknown;
+  minify?: unknown;
+  lang?: unknown;
+  site?: unknown;
+  seo?: Checked<"seo" extends keyof Config ? Config[keyof Config & "seo"] : unknown, SeoConfig, [unknown]>;
+  robots?: Checked<"robots" extends keyof Config ? Config[keyof Config & "robots"] : unknown, RobotsConfig, [unknown]>;
+  sitemap?: Checked<"sitemap" extends keyof Config ? Config[keyof Config & "sitemap"] : unknown, SitemapConfig, [unknown]>;
+  head?: unknown;
+  images?: Checked<"images" extends keyof Config ? Config[keyof Config & "images"] : unknown, ImagesConfig, [unknown]>;
+  budget?: Checked<"budget" extends keyof Config ? Config[keyof Config & "budget"] : unknown, BudgetConfig, [unknown]>;
+  favicon?: unknown;
+  manifest?: Checked<"manifest" extends keyof Config ? Config[keyof Config & "manifest"] : unknown, ManifestConfig, [unknown]>;
+  entry?: unknown;
+  offline?: Checked<"offline" extends keyof Config ? Config[keyof Config & "offline"] : unknown, OfflineConfig, [unknown]>;
+  search?: unknown;
+  fonts?: unknown;
+  security?: Checked<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, SecurityConfig, [unknown]>;
+  proxy?: Checked<"proxy" extends keyof Config ? Config[keyof Config & "proxy"] : unknown, ProxyConfig, [unknown]>;
+  guards?: Checked<"guards" extends keyof Config ? Config[keyof Config & "guards"] : unknown, GuardsConfig, [unknown]>;
+  requireGuards?: unknown;
+  cors?: unknown;
+  openapi?: Checked<"openapi" extends keyof Config ? Config[keyof Config & "openapi"] : unknown, OpenApiConfig, [unknown]>;
+  mcp?: Checked<"mcp" extends keyof Config ? Config[keyof Config & "mcp"] : unknown, McpConfig, [unknown]>;
+  health?: Checked<"health" extends keyof Config ? Config[keyof Config & "health"] : unknown, HealthConfig, [unknown]>;
+  metrics?: Checked<"metrics" extends keyof Config ? Config[keyof Config & "metrics"] : unknown, MetricsConfig, [unknown]>;
+  jobs?: Checked<"jobs" extends keyof Config ? Config[keyof Config & "jobs"] : unknown, JobsConfig, [unknown]>;
+  rewrite?: unknown;
+  redirects?: unknown;
+  runtimeRedirects?: Checked<"runtimeRedirects" extends keyof Config ? Config[keyof Config & "runtimeRedirects"] : unknown, {
+    hosts?: string[] | undefined;
+  }, [unknown]>;
+  live?: Checked<"live" extends keyof Config ? Config[keyof Config & "live"] : unknown, LiveConfig, [unknown]>;
+  i18n?: unknown;
+  timeZone?: unknown;
+  base?: unknown;
+  links?: Checked<"links" extends keyof Config ? Config[keyof Config & "links"] : unknown, {
+    outside?: "new-tab" | "same-tab" | undefined;
+    schemes?: string[] | undefined;
+  }, [unknown]>;
+  trailingSlash?: unknown;
+  contentConfig?: unknown;
+  markdown?: Checked<"markdown" extends keyof Config ? Config[keyof Config & "markdown"] : unknown, MarkdownConfig, [unknown]>;
+  plugins?: unknown;
+  librarySettings?: unknown;
+  lints?: Checked<"lints" extends keyof Config ? Config[keyof Config & "lints"] : unknown, Partial<Record<"a11y" | "anchor-is-valid" | "async-reply" | "autofocus" | "brace-in-attribute" | "broken-canonical" | "browser-global-at-load" | "click-without-key" | "code" | "constant-signal" | "css-import-without-text" | "dangling-aria" | "dangling-label" | "default-favicon" | "default-locale-path" | "deprecated" | "deprecated-ai-labels" | "deprecated-ai-language" | "deprecated-auth-rate-limits" | "deprecated-cms-options" | "deprecated-config-switch" | "deprecated-disk-files" | "deprecated-format-duration" | "deprecated-guard-option" | "deprecated-if-alias" | "deprecated-image-options" | "deprecated-import-path" | "deprecated-island-attributes" | "deprecated-island-fence" | "deprecated-job-handler" | "deprecated-job-options" | "deprecated-listen-target" | "deprecated-local-state" | "deprecated-mail-form" | "deprecated-mail-send" | "deprecated-navigate-query" | "deprecated-navigation-hooks" | "deprecated-package-names" | "deprecated-page-cache" | "deprecated-page-island" | "deprecated-page-seo" | "deprecated-persisted-call" | "deprecated-persisted-query" | "deprecated-rate-enforce" | "deprecated-schedule-call" | "deprecated-schema-type" | "deprecated-script-fence" | "deprecated-store-names" | "deprecated-test-helpers" | "deprecated-ui-props" | "draft-entry" | "draft-message" | "duplicate-description" | "duplicate-id" | "duplicate-title" | "empty-control" | "empty-heading" | "endpoint-export" | "external-redirect" | "fieldset-without-legend" | "forms" | "hand-tooltip" | "held-back-reference" | "hidden-focusable" | "hidden-tool" | "hydration-mismatch" | "i18n" | "incomplete-match" | "interactive-tabindex" | "invalid-aria-value" | "invalid-autocomplete" | "invalid-nesting" | "island-marker" | "island-prop" | "islands" | "large-public-image" | "link-as-button" | "literal-tag" | "long-description" | "long-title" | "meta-refresh" | "missing-alt" | "missing-autocomplete" | "missing-captcha" | "missing-captions" | "missing-description" | "missing-label" | "missing-share-image" | "missing-site" | "missing-state" | "missing-title" | "mouse-only-event" | "multiple-h1" | "nested-control" | "no-access-key" | "noindex-in-sitemap" | "old-bun-image" | "once-read-prop" | "one-way-hreflang" | "orphan-page" | "over-budget" | "performance" | "positional-key" | "positive-tabindex" | "public-env-outside-src" | "redirect-chain" | "redundant-alt" | "redundant-role" | "removed-ui-token" | "secret-prop" | "section-not-a-link" | "security" | "seo" | "serial-awaits" | "server-only-import" | "signal-set-call" | "skipped-heading" | "table-without-header" | "text-size-colour" | "trusted-folder" | "unannounced-click" | "unbounded-string" | "uncalled-signal" | "uncaught-await" | "uncontrolled-autoplay" | "undescribed-page" | "ungrouped-radios" | "unguarded-route" | "unguarded-tool" | "unkept-page" | "unkeyed-rows" | "unknown-aria" | "unknown-role" | "unknown-tool-label" | "unmounted-jobs" | "unowned-effect" | "unreachable-click" | "unreachable-selector" | "unreachable-tooltip" | "unread-name" | "unreturned-fail" | "unsized-image" | "unsized-share-image" | "unstructured-page" | "unsupported-aria" | "untitled-page" | "untyped-socket" | "unused-selector" | "unused-status-page", LintLevel>> & {
+    satisfied?: ("anchor-is-valid" | "async-reply" | "autofocus" | "brace-in-attribute" | "broken-canonical" | "browser-global-at-load" | "click-without-key" | "constant-signal" | "css-import-without-text" | "dangling-aria" | "dangling-label" | "default-favicon" | "default-locale-path" | "deprecated-ai-labels" | "deprecated-ai-language" | "deprecated-auth-rate-limits" | "deprecated-cms-options" | "deprecated-config-switch" | "deprecated-disk-files" | "deprecated-format-duration" | "deprecated-guard-option" | "deprecated-if-alias" | "deprecated-image-options" | "deprecated-import-path" | "deprecated-island-attributes" | "deprecated-island-fence" | "deprecated-job-handler" | "deprecated-job-options" | "deprecated-listen-target" | "deprecated-local-state" | "deprecated-mail-form" | "deprecated-mail-send" | "deprecated-navigate-query" | "deprecated-navigation-hooks" | "deprecated-package-names" | "deprecated-page-cache" | "deprecated-page-island" | "deprecated-page-seo" | "deprecated-persisted-call" | "deprecated-persisted-query" | "deprecated-rate-enforce" | "deprecated-schedule-call" | "deprecated-schema-type" | "deprecated-script-fence" | "deprecated-store-names" | "deprecated-test-helpers" | "deprecated-ui-props" | "draft-entry" | "draft-message" | "duplicate-description" | "duplicate-id" | "duplicate-title" | "empty-control" | "empty-heading" | "endpoint-export" | "external-redirect" | "fieldset-without-legend" | "hand-tooltip" | "held-back-reference" | "hidden-focusable" | "hidden-tool" | "hydration-mismatch" | "incomplete-match" | "interactive-tabindex" | "invalid-aria-value" | "invalid-autocomplete" | "invalid-nesting" | "island-marker" | "island-prop" | "large-public-image" | "link-as-button" | "literal-tag" | "long-description" | "long-title" | "meta-refresh" | "missing-alt" | "missing-autocomplete" | "missing-captcha" | "missing-captions" | "missing-description" | "missing-label" | "missing-share-image" | "missing-site" | "missing-state" | "missing-title" | "mouse-only-event" | "multiple-h1" | "nested-control" | "no-access-key" | "noindex-in-sitemap" | "old-bun-image" | "once-read-prop" | "one-way-hreflang" | "orphan-page" | "over-budget" | "positional-key" | "positive-tabindex" | "public-env-outside-src" | "redirect-chain" | "redundant-alt" | "redundant-role" | "removed-ui-token" | "secret-prop" | "section-not-a-link" | "serial-awaits" | "server-only-import" | "signal-set-call" | "skipped-heading" | "table-without-header" | "text-size-colour" | "trusted-folder" | "unannounced-click" | "unbounded-string" | "uncalled-signal" | "uncaught-await" | "uncontrolled-autoplay" | "undescribed-page" | "ungrouped-radios" | "unguarded-route" | "unguarded-tool" | "unkept-page" | "unkeyed-rows" | "unknown-aria" | "unknown-role" | "unknown-tool-label" | "unmounted-jobs" | "unowned-effect" | "unreachable-click" | "unreachable-selector" | "unreachable-tooltip" | "unread-name" | "unreturned-fail" | "unsized-image" | "unsized-share-image" | "unstructured-page" | "unsupported-aria" | "untitled-page" | "untyped-socket" | "unused-selector" | "unused-status-page")[] | undefined;
+    comments?: AllowRules | undefined;
+  }, [unknown]>;
+  secret?: unknown;
+  preview?: Checked<"preview" extends keyof Config ? Config[keyof Config & "preview"] : unknown, PreviewConfig, [unknown]>;
+  store?: Checked<"store" extends keyof Config ? Config[keyof Config & "store"] : unknown, AppStore, [unknown]>;
+  env?: Checked<"env" extends keyof Config ? Config[keyof Config & "env"] : unknown, {
+    compose?: string | string[] | undefined;
+    example?: string | undefined;
+  }, [unknown]>;
+  checks?: unknown;
+  extensions?: unknown;
+  beforeRequest?: unknown;
+  onResponse?: unknown;
+  onStart?: unknown;
+  onStop?: unknown;
 }): Config
 
 [./server] defineEnv
@@ -2945,11 +3001,11 @@ interface KayConfig extends AppHooks
   entry?: string | undefined
   env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
-  favicon?: FaviconConfig | false | string | undefined
+  favicon?: FaviconConfig | boolean | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
-  health?: HealthConfig | false | undefined
+  health?: HealthConfig | boolean | undefined
   i18n?: I18nConfig | undefined
   images?: ImagesConfig | undefined
   jobs?: JobsConfig | undefined
@@ -2971,21 +3027,21 @@ interface KayConfig extends AppHooks
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
-  preview?: PreviewConfig | false | undefined
+  preview?: PreviewConfig | boolean | undefined
   proxy?: ProxyConfig | boolean | number | undefined
   publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   redirects?: Redirects | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
-  robots?: RobotsConfig | false | undefined
+  robots?: RobotsConfig | boolean | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   search?: boolean | undefined
   secret?: string | string[] | undefined
-  security?: SecurityConfig | false | undefined
+  security?: SecurityConfig | boolean | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   site?: string | undefined
-  sitemap?: SitemapConfig | false | undefined
+  sitemap?: SitemapConfig | boolean | undefined
   store?: AppStore | undefined
   timeZone?: string | undefined
   trailingSlash?: TrailingSlash | undefined
@@ -3203,11 +3259,11 @@ interface PagesOptions extends KayConfig
   entry?: string | undefined
   env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
-  favicon?: FaviconConfig | false | string | undefined
+  favicon?: FaviconConfig | boolean | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
-  health?: HealthConfig | false | undefined
+  health?: HealthConfig | boolean | undefined
   i18n?: I18nConfig | undefined
   images?: ImagesConfig | undefined
   jobs?: JobsConfig | undefined
@@ -3230,22 +3286,22 @@ interface PagesOptions extends KayConfig
   openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
-  preview?: PreviewConfig | false | undefined
+  preview?: PreviewConfig | boolean | undefined
   proxy?: ProxyConfig | boolean | number | undefined
   publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   redirects?: Redirects | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
-  robots?: RobotsConfig | false | undefined
+  robots?: RobotsConfig | boolean | undefined
   root?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   search?: boolean | undefined
   secret?: string | string[] | undefined
-  security?: SecurityConfig | false | undefined
+  security?: SecurityConfig | boolean | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   site?: string | undefined
-  sitemap?: SitemapConfig | false | undefined
+  sitemap?: SitemapConfig | boolean | undefined
   store?: AppStore | undefined
   timeZone?: string | undefined
   trailingSlash?: TrailingSlash | undefined
@@ -4246,12 +4302,12 @@ interface TestOptions extends PagesOptions
   entry?: string | undefined
   env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
-  favicon?: FaviconConfig | false | string | undefined
+  favicon?: FaviconConfig | boolean | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
   headers?: Record<string, string> | undefined
-  health?: HealthConfig | false | undefined
+  health?: HealthConfig | boolean | undefined
   i18n?: I18nConfig | undefined
   images?: ImagesConfig | undefined
   islands?: boolean | undefined
@@ -4278,23 +4334,23 @@ interface TestOptions extends PagesOptions
   outgoing?: "allow" | "fail" | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
-  preview?: PreviewConfig | false | undefined
+  preview?: PreviewConfig | boolean | undefined
   proxy?: ProxyConfig | boolean | number | undefined
   proxyKey?: string | undefined
   publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   redirects?: Redirects | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
-  robots?: RobotsConfig | false | undefined
+  robots?: RobotsConfig | boolean | undefined
   root?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   search?: boolean | undefined
   secret?: string | string[] | undefined
-  security?: SecurityConfig | false | undefined
+  security?: SecurityConfig | boolean | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   site?: string | undefined
-  sitemap?: SitemapConfig | false | undefined
+  sitemap?: SitemapConfig | boolean | undefined
   store?: AppStore | undefined
   styles?: boolean | undefined
   timeZone?: string | undefined

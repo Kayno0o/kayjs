@@ -1096,7 +1096,7 @@ function noteInferred(): void {
     return
 
   notedInferred = true
-  kayLog('warn', 'a request carries X-Forwarded-For from a private address and kay.config.ts sets no proxy, so kay counts one proxy in front and reads the visitor from the last entry; a server reached directly through a private peer (a Docker bridge or userland proxy, an L4 balancer) lets a client pick its own address that way. Set proxy: 1 to confirm one proxy in front, proxy: 2 or proxy: { header } for another setup, or proxy: false when none is in front')
+  kayLog('warn', 'a request carries X-Forwarded-For from a private address and kay.config.ts sets no proxy, so kay counts one proxy in front and reads the visitor from the last entry; a server reached directly through a private peer (a Docker bridge or userland proxy, an L4 balancer) lets a client pick its own address that way. Set proxy: true to confirm one proxy in front, proxy: { hops: 2 } or proxy: { header } for another setup, or proxy: false when none is in front')
 }
 
 function warnUnconfigured(): void {

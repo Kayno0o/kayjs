@@ -36,13 +36,14 @@ import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { aiLanguage } from './ai-language'
 import { authRateLimits } from './auth-rate-limits'
 import { cmsOptions } from './cms-options'
+import { configSwitches } from './config-switches'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
+
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-
 import { formatDurationNumbers } from './format-duration'
-import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 
+import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { guardOptions } from './guard-options'
 import { unguardedRoutes, unguardedTools } from './guards'
 
@@ -188,6 +189,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => storeNames(root, options),
   async ({ root, options }) => formatDurationNumbers(root, options),
   async ({ root, options }) => guardOptions(root, options),
+  async ({ root, options }) => configSwitches(root, options),
   async ({ root, options }) => rateEnforce(root, options),
   async ({ root, options }) => authRateLimits(root, options),
 ]

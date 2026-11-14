@@ -15,6 +15,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
+import { bagOf } from '../config-switch'
 import { optionMs } from '../runtime/duration'
 import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, defaultLadder, FILES_ROUTE, IMAGE_ROUTE, imageWidths, ladderFor, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setPlaceholders, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
 import { kayLog } from '../runtime/log'
@@ -24,8 +25,8 @@ import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './av
 import { imageLimits } from './config-limits'
 import { coverImage } from './crop'
 import { dominantColor, setImageColors } from './image-color'
-import { decodable, drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
 
+import { decodable, drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
 import { encodeGate, waitFor } from './image-limits'
 import { limiter } from './limit'
 import { clientAddress } from './protection'
@@ -96,8 +97,8 @@ export function webpQuality(images: { quality?: number | undefined, webp?: { qua
 }
 
 // `images.avif` as a quality, or undefined when it is off.
-export function avifQuality(images: { avif?: false | { quality?: number | undefined } | undefined } | undefined): number | undefined {
-  return images?.avif === false ? undefined : images?.avif?.quality ?? DEFAULT_AVIF_QUALITY
+export function avifQuality(images: { avif?: boolean | { quality?: number | undefined } | undefined } | undefined): number | undefined {
+  return images?.avif === false ? undefined : bagOf(images?.avif)?.quality ?? DEFAULT_AVIF_QUALITY
 }
 
 function inFormat(name: string, format: VariantFormat): string {
@@ -730,7 +731,7 @@ export function sourceFile(whole: string, options: ImageRouteOptions): { path: s
 }
 
 // `images.maxDensity`, `images.widths`, `images.aspects`, `images.remote`, `images.placeholder` and whether `images.resolve` is set, checked and set for every image this process renders, served or prerendered; `inlineStyles` is whether the site's CSP lets an element carry a `style` attribute. Returns the density.
-export async function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, placeholder?: false | undefined, resolve?: unknown, guards?: unknown, guard?: unknown } | undefined, inlineStyles = true): Promise<number> {
+export async function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, placeholder?: boolean | undefined, resolve?: unknown, guards?: unknown, guard?: unknown } | undefined, inlineStyles = true): Promise<number> {
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
 
   if ((images?.guards ?? images?.guard) !== undefined && images?.resolve === undefined)

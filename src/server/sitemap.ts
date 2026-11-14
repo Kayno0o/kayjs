@@ -11,6 +11,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { NotFoundError } from 'elysia'
 import { KayError } from '../compiler/errors'
+import { bagOf } from '../config-switch'
 import { isCollection } from '../content'
 import { entryModified } from '../content/entry-head'
 import { ALL_READS, onKeysInvalidated } from '../runtime/cache'
@@ -56,7 +57,7 @@ export interface SitemapOptions {
   onError?: ObserveConfig['onError'] | undefined
   trailingSlash?: TrailingSlash | undefined
   locales?: LocaleSettings | undefined
-  robots?: RobotsConfig | false | undefined
+  robots?: RobotsConfig | boolean | undefined
   // `false` serves no sitemap, and `robots.txt` names none.
   sitemap?: boolean | undefined
   // The mount point, which the paths of `robots` go under.
@@ -176,7 +177,7 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
   }
 
   if (options.robots !== false) {
-    const rules = robotsRules(options.robots)
+    const rules = robotsRules(bagOf(options.robots))
 
     // The same for every request to a host, so written once per host.
     const written = new Map<string | undefined, string>()

@@ -18,7 +18,7 @@ export const NOINDEX = /(?:^|,)\s*noindex\s*(?:,|$)/i
 export interface SiteSeo {
   site?: string | undefined
   seo?: SeoConfig | undefined
-  favicon?: string | FaviconConfig | false | undefined
+  favicon?: string | FaviconConfig | boolean | undefined
   lints?: LintLevels | undefined
 }
 

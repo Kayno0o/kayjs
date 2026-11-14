@@ -329,7 +329,7 @@ A `limits.byPath` entry at the path of an API module wins over the module's own 
 
 ## Trust a proxy
 
-Behind nginx, Caddy or Cloudflare, every request comes from the proxy. In production, kay counts one proxy in front for a request from a private address that carries `X-Forwarded-For`, so a single nginx or Caddy works, and kay warns once that it guessed. Say `proxy: 1` to confirm it, `proxy: 2` when there are more, and `proxy: false` when there are none: a server reached directly through a private address, such as a Docker bridge, would otherwise let a visitor choose their own address.
+Behind nginx, Caddy or Cloudflare, every request comes from the proxy. In production, kay counts one proxy in front for a request from a private address that carries `X-Forwarded-For`, so a single nginx or Caddy works, and kay warns once that it guessed. Say `proxy: true` to confirm it, `{ hops: 2 }` for more, and `false` for none: a server reached directly through a private address, such as a Docker bridge, would otherwise let a visitor choose their own address.
 
 ```ts
 export default defineConfig({
@@ -337,7 +337,7 @@ export default defineConfig({
 })
 ```
 
-`true` is one proxy, `2` is two, such as Cloudflare then nginx, and `false` is none. To read a header the proxy sets, name it: `proxy: { header: 'cf-connecting-ip' }`.
+`true` is one proxy, `{ hops: 2 }` is two, such as Cloudflare then nginx, and `false` is none. To read a header the proxy sets, name it: `proxy: { header: 'cf-connecting-ip' }`.
 
 Only trust a proxy every request goes through. If a visitor can reach the server past it, they can write the header themselves.
 

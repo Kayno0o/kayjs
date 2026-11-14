@@ -56,9 +56,9 @@ describe('config values checked once at load', () => {
   })
 
   it('reports an object where a bag is, and the inner problem of the bag an object stands for', () => {
-    expect(invalidConfigValues({ images: 'x', health: true, security: { cookies: { secure: 'yes' } }, proxy: { hops: 'one' } })).toEqual([
+    expect(invalidConfigValues({ images: 'x', health: 'x', security: { cookies: { secure: 'yes' } }, proxy: { hops: 'one' } })).toEqual([
       '`images` is "x", expected an object of options',
-      '`health` is true, expected false or an object of options',
+      '`health` is "x", expected true or false or an object of options',
       '`security.cookies.secure` is "yes", expected true or false or one of "auto"',
       '`proxy.hops` is "one", expected a number',
     ])

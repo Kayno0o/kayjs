@@ -4,6 +4,7 @@ kay [./server] QueueOptions
 kay [./server] WorkflowOptions
 kay [./server] WorkflowRun
 kay [./server] background
+kay [./server] defineConfig
 kay [./server] diskFiles
 kay [./server] queue
 kay [./server] schedule

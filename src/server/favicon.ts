@@ -45,13 +45,13 @@ function servesSvg(favicon: string | FaviconConfig | undefined): boolean {
 }
 
 // The favicon's source: the project's own, kay's mark when it names none, or none once turned off.
-export function faviconSource(root: string, favicon: string | FaviconConfig | false | undefined, manifest?: ManifestConfig): FaviconSource | undefined {
+export function faviconSource(root: string, favicon: string | FaviconConfig | boolean | undefined, manifest?: ManifestConfig): FaviconSource | undefined {
   if (favicon === false)
     return undefined
 
   const maskable = manifest?.maskable === undefined ? {} : { maskable: resolve(root, manifest.maskable) }
 
-  if (favicon === undefined)
+  if (favicon === undefined || favicon === true)
     return { image: DEFAULT_FAVICON, svg: DEFAULT_SVG, ...maskable }
 
   if (typeof favicon === 'string')

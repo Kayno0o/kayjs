@@ -13,6 +13,7 @@ import type { ProjectSource } from './source'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { extensionApps, extensionContexts, extensionServers, serverExtensions } from '../config-extensions'
+import { bagOf } from '../config-switch'
 import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
@@ -144,7 +145,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   serveLocales(root, locales)
   setTimeZone(config.timeZone)
   const base = basePath(config.base)
-  const maxDensity = await applyImageConfig(config.images, config.security === false || allowsStyleAttributes(config.security?.csp, config.security?.reportOnly))
+  const maxDensity = await applyImageConfig(config.images, config.security === false || allowsStyleAttributes(bagOf(config.security)?.csp, bagOf(config.security)?.reportOnly))
   const site = siteWithBase(config.site, config.base)
 
   // Holds copies of private files and their variants, so only this user may enter it.

@@ -3,6 +3,7 @@ import { readdir, readlink } from 'node:fs/promises'
 import process from 'node:process'
 import { within } from '@kaynooo/utils/promise'
 import { KayError } from '../compiler/errors'
+import { bagOf } from '../config-switch'
 import { healthTimeoutMs } from '../server/config-limits'
 import { HEALTH_PATH } from '../server/lifecycle'
 
@@ -33,7 +34,7 @@ export interface VerifyOptions {
 }
 
 // The longest `--health` may take: 10 s, or `health.timeout` and a margin when the app raises it past that.
-export function probeWait(health: HealthConfig | false | undefined): number {
+export function probeWait(health: HealthConfig | boolean | undefined): number {
   return Math.max(PROBE_TIMEOUT_MS, (health === false ? 0 : healthTimeoutMs(health)) + PROBE_MARGIN_MS)
 }
 
@@ -41,7 +42,7 @@ export function probeWait(health: HealthConfig | false | undefined): number {
 // A server that exits before it answers fails with its own output, one that never answers within 30 s with what it printed so far.
 // An answer only counts when the socket answering it belongs to the server's own process group (where /proc says so, on Linux) and the server is still running a moment later, as another process that took the port between picking it and the server binding it would answer for a server that then exits.
 // The server runs in a group of its own, which is stopped whole: nothing it spawned outlives the verify, an interrupted build included, as the group no longer gets the terminal's signals.
-export async function verifyExecutable(executable: string, root: string, health: HealthConfig | false | undefined, options: VerifyOptions = {}): Promise<number> {
+export async function verifyExecutable(executable: string, root: string, health: HealthConfig | boolean | undefined, options: VerifyOptions = {}): Promise<number> {
   const { startTimeoutMs = START_TIMEOUT_MS, probeTimeoutMs = probeWait(health) } = options
   const started = performance.now()
   const port = String(await freePort())
@@ -58,7 +59,7 @@ export async function verifyExecutable(executable: string, root: string, health:
   const release = onInterrupt(live)
 
   try {
-    const url = `http://127.0.0.1:${port}${health === false ? '/' : health?.path ?? HEALTH_PATH}`
+    const url = `http://127.0.0.1:${port}${health === false ? '/' : bagOf(health)?.path ?? HEALTH_PATH}`
     let ready = false
     // While another process answers in the server's place, its sockets are looked at again only now and then.
     let foreignUntil = 0

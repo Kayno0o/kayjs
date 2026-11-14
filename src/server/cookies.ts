@@ -2,6 +2,7 @@ import type { CookieInit, CookieMap, CookieStoreDeleteOptions } from 'bun'
 
 import type { CookieDefaults } from '../config'
 import { KayError } from '../compiler/errors'
+import { bagOf, switchOf } from '../config-switch'
 import { requestRecord } from './request-record'
 import { overHttps } from './request-url'
 
@@ -16,8 +17,9 @@ export interface ResolvedCookieDefaults {
 }
 
 // What `security.cookies` gives every cookie an app sets with `ctx.cookies.set`: on unless `security: false` or `cookies: false` turns it off, `{}` when the app says nothing.
-export function cookieDefaults(security: { cookies?: CookieDefaults | false | undefined } | false | undefined, base: string): ResolvedCookieDefaults | undefined {
-  const setting = security === false ? false : security?.cookies ?? {}
+export function cookieDefaults(security: { cookies?: CookieDefaults | boolean | undefined } | boolean | undefined, base: string): ResolvedCookieDefaults | undefined {
+  const own = bagOf(security)
+  const setting = security === false ? false : switchOf(own?.cookies) ?? {}
 
   if (setting === false)
     return undefined

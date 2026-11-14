@@ -5,6 +5,7 @@ import type { FontAssets } from './fonts'
 import type { LocaleCopy } from './i18n'
 import { join } from 'node:path'
 import { KayError } from '../compiler/errors'
+import { switchOf } from '../config-switch'
 import { projectPaths } from '../project'
 import { inlineText, keepHeadMarkup } from '../runtime/head'
 import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from '../runtime/image'
@@ -51,8 +52,10 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
       styles.push(lightFontCss(fonts.css))
   }
 
-  if (config.favicon !== false)
-    extra.push(...faviconTags(config.favicon))
+  const favicon = switchOf(config.favicon)
+
+  if (favicon !== false)
+    extra.push(...faviconTags(favicon))
 
   // A site linking its own icons still colours the browser around its pages.
   extra.push(...themeColorTags(config.seo?.themeColor ?? config.manifest?.themeColor))

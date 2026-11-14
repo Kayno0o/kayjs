@@ -8,7 +8,7 @@ import { nearest } from './nearest'
 // A key takes `true` to accept any value while its type is too open to check; a lane adding a key to `KayConfig` adds it here, beside its type, with a check from `config-rules.ts` (`str`, `bool`, `oneOf('a', 'b')`, `list(str)`, `bag({ ... })`, `either(...)`), and a bag it holds as a `Record<keyof ItsInterface, Rule>` passed to `bag`.
 const localized = either(str, map(str))
 const guardOption = either(fn, list(fn), bag({ load: fn }), lit(false))
-const SECURITY_KEYS: Record<keyof SecurityConfig, Rule> = { csp: either(lit(false), map(either(list(str), lit(false)))), reportOnly: map(either(list(str), lit(false))), reports: either(lit(true), str), permissions: map(either(str, list(str), lit(false))), headers: map(either(str, lit(false))), hosts: either(list(str), bool), cookies: either(lit(false), bag({ httpOnly: bool, sameSite: oneOf('lax', 'strict', 'none'), secure: either(bool, oneOf('auto')), path: str } satisfies Record<keyof CookieDefaults, Rule>)) }
+const SECURITY_KEYS: Record<keyof SecurityConfig, Rule> = { csp: either(bool, map(either(list(str), lit(false)))), reportOnly: map(either(list(str), lit(false))), reports: either(lit(true), str), permissions: map(either(str, list(str), lit(false))), headers: map(either(str, lit(false))), hosts: either(list(str), bool), cookies: either(bool, bag({ httpOnly: bool, sameSite: oneOf('lax', 'strict', 'none'), secure: either(bool, oneOf('auto')), path: str } satisfies Record<keyof CookieDefaults, Rule>)) }
 const I18N: Record<keyof I18nConfig, Rule> = { locales: list(str), defaultLocale: str, prefixDefault: bool, domains: map(str), paths: map(map(str)), messages: str }
 const I18N_BAG = bag(I18N, ({ locales, defaultLocale }, path, out) => {
   if (Array.isArray(locales) && typeof defaultLocale === 'string' && !locales.includes(defaultLocale))
@@ -30,7 +30,7 @@ const ROBOTS: Record<keyof RobotsConfig, Rule> = { disallow: list(str), allow: l
 const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: duration, sharedNotBefore: fn }
 // The limit of kay's own routes: `RateLimit` but for `key`, as they count the client's address.
 const KAY_ROUTE_LIMIT: Record<string, Rule> = { max: num, window: duration, store: obj, onLimit: fn }
-const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, rateLimit: either(lit(false), bag(KAY_ROUTE_LIMIT)) }
+const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)) }
 const JOBS: Record<keyof JobsConfig, Rule> = { guards: guardOption, guard: guardOption, path: str }
 const METRICS: Record<keyof MetricsConfig, Rule> = { path: str }
 const BUDGET: Record<keyof BudgetConfig, Rule> = { js: bytes, css: bytes, weight: bytes, grade: oneOf('A', 'B', 'C', 'D', 'E', 'F', 'G') }
@@ -38,7 +38,7 @@ const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
 const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: either(str, bag({ light: str, dark: str })), backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
 const MARKDOWN: Record<keyof MarkdownConfig, Rule> = { highlight: fn, transform: fn, preprocess: fn, containers: bool, footnotes: bool, headingLinks: bool, readingSpeed: num, imageSizes: str }
 const CARD: Record<keyof CardConfig, Rule> = { font: bag({ family: str, weight: num }), background: str, color: str, logo: str }
-const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, rateLimit: either(lit(false), bag(KAY_ROUTE_LIMIT)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(lit(false), bag({ quality: num })), maxDensity: numOrInfinity, placeholder: lit(false), aspects: list(str), card: bag(CARD), resolve: fn, guards: guardOption, guard: guardOption }
+const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(bool, bag({ quality: num })), maxDensity: numOrInfinity, placeholder: bool, aspects: list(str), card: bag(CARD), resolve: fn, guards: guardOption, guard: guardOption }
 const CORS = bag({ origins: either(oneOf('*'), list(str)), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
 const CONFIG: Record<keyof KayConfig, Rule> = {
   dirs: bag(DIRS),
@@ -58,25 +58,25 @@ const CONFIG: Record<keyof KayConfig, Rule> = {
   lang: str,
   site: str,
   seo: bag(SEO),
-  robots: either(lit(false), bag(ROBOTS)),
-  sitemap: either(lit(false), bag(SITEMAP)),
+  robots: either(bool, bag(ROBOTS)),
+  sitemap: either(bool, bag(SITEMAP)),
   head: list(obj),
   images: bag(IMAGES),
   budget: bag(BUDGET),
-  favicon: either(str, lit(false), bag(FAVICON)),
+  favicon: either(str, bool, bag(FAVICON)),
   manifest: bag(MANIFEST),
   entry: str,
-  offline: either(lit(true), lit(false), bag(OFFLINE)),
+  offline: either(bool, bag(OFFLINE)),
   search: bool,
   fonts: list(obj),
-  security: either(lit(false), bag(SECURITY_KEYS)),
+  security: either(bool, bag(SECURITY_KEYS)),
   proxy: either(bool, num, bag(PROXY)),
   requireGuards: bool,
   guards: bag({ default: oneOf('open', 'closed') }),
   cors: CORS,
   openapi: either(bool, obj),
   mcp: either(bool, obj),
-  health: either(lit(false), bag(HEALTH)),
+  health: either(bool, bag(HEALTH)),
   metrics: either(bool, bag(METRICS)),
   jobs: bag(JOBS),
   rewrite: true,
@@ -93,7 +93,7 @@ const CONFIG: Record<keyof KayConfig, Rule> = {
   librarySettings: map(str),
   lints: true,
   secret: either(str, list(str)),
-  preview: either(lit(false), bag(PREVIEW)),
+  preview: either(bool, bag(PREVIEW)),
   store: true,
   env: true,
   checks: true,

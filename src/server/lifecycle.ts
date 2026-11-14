@@ -5,6 +5,7 @@ import type { StoreBase } from '../runtime/store-base'
 import type { PluginInput } from './plugin'
 import process from 'node:process'
 import { within } from '@kaynooo/utils/promise'
+import { bagOf } from '../config-switch'
 import { kayLog } from '../runtime/log'
 import { appStore, storesOf } from './app-store'
 import { wholeResponse } from './compress'
@@ -360,7 +361,7 @@ function probeHost(host: string | undefined): string {
 }
 
 // What `<executable> --health` exits with: 0 when the server running beside it answers its health route, on `PORT` or 3000 and at `HOST` when it is set, else 1, for a container image with no curl.
-export async function probeHealth(config: HealthConfig | false | undefined, port = process.env.PORT ?? '3000', host = process.env.HOST): Promise<number> {
+export async function probeHealth(config: HealthConfig | boolean | undefined, port = process.env.PORT ?? '3000', host = process.env.HOST): Promise<number> {
   if (config === false) {
     kayLog('error', 'health is false in kay.config.ts, so the server has no health route to ask')
 
@@ -368,7 +369,7 @@ export async function probeHealth(config: HealthConfig | false | undefined, port
   }
 
   try {
-    const response = await fetch(`http://${probeHost(host)}:${port}${config?.path ?? HEALTH_PATH}`, { signal: AbortSignal.timeout(healthTimeoutMs(config)) })
+    const response = await fetch(`http://${probeHost(host)}:${port}${bagOf(config)?.path ?? HEALTH_PATH}`, { signal: AbortSignal.timeout(healthTimeoutMs(config)) })
 
     return response.ok ? 0 : 1
   }

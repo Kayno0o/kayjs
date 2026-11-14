@@ -24,6 +24,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { MAPS_DIR } from '../build/assets'
 import { pageHooks, servedPageHooks } from '../config-extensions'
+import { bagOf } from '../config-switch'
 import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
 import { serveFeeds } from '../content/server'
@@ -191,7 +192,7 @@ export function bootOf(input: BootInput) {
   const metricsConfig = env.serving ? metricsOf(options.metrics) : undefined
   const metrics: Claim | undefined = metricsConfig && { path: metricsConfig.path ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
   // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
-  const health: Claim | undefined = options.health === false ? undefined : { path: options.health?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
+  const health: Claim | undefined = options.health === false ? undefined : { path: bagOf(options.health)?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
   const log: Logger = options.observe?.log ?? env.production
   // The routes later stages register, which the dev tool's Routes tab reads when it answers, as it registers before them.
   const registered: { extensions: OwnRoutes['extensions'], actions: boolean, api: MountedApi[] } = { extensions: [], actions: false, api: [] }
@@ -280,11 +281,11 @@ export function inlinePageStyles(client: ClientBuild): string[] {
 }
 
 // The host names a server answers to: the ones `security.hosts` sets, or in production with `site` known the site's own and the locale hosts, so the `Host` header is not trusted by default. `hosts: false` and `security: false` opt out.
-function hostsToAnswer(security: SecurityConfig | false | undefined, site: string | undefined, env: ServerMode): string[] | true | undefined {
-  if (!env.serving || security === false)
+function hostsToAnswer(setting: SecurityConfig | boolean | undefined, site: string | undefined, env: ServerMode): string[] | true | undefined {
+  if (!env.serving || setting === false)
     return undefined
 
-  const hosts = security?.hosts
+  const hosts = bagOf(setting)?.hosts
 
   return hosts === false ? undefined : hosts ?? (env.production && site !== undefined ? true : undefined)
 }
@@ -389,7 +390,7 @@ export function kayEndpoints({ app, env, options, served, lifecycle, health, met
   if (health) {
     served.offer(health)
     // Before the extension servers, whose hooks it answers ahead of; it answers only where the claims, known once all are in, leave it the path.
-    serveHealth(app, lifecycle, () => served.holds(health), options.health === false ? undefined : options.health, security || undefined)
+    serveHealth(app, lifecycle, () => served.holds(health), bagOf(options.health), security || undefined)
   }
 
   // Read in development too, so a setting without a guard fails there; claimed, so an app file at the path stops the boot.
@@ -621,7 +622,7 @@ export function reports({ app, options, setup: { i18n, site, collections }, hasP
 
   serveLive(app, options.live)
 
-  if (options.security !== undefined && options.security !== false && options.security.reports === true)
+  if (bagOf(options.security)?.reports === true)
     serveViolationReports(app, options.observe?.onError, i18n?.settings.hosts === undefined ? site : undefined)
 
   if (hasPreview) {
@@ -743,7 +744,7 @@ export async function siteFiles(boot: Boot) {
   const { app, env, options, served, routes, log, dictionaryUsed, project: { root, paths, mode }, setup: { source, client, site, i18n, locales, collections, appManifest } } = boot
 
   if (site !== undefined)
-    serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.observe?.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base, sitemap: options.sitemap !== false, ttl: options.sitemap === false ? undefined : options.sitemap?.ttl })
+    serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.observe?.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base, sitemap: options.sitemap !== false, ttl: bagOf(options.sitemap)?.ttl })
 
   const favicon = faviconSource(root, options.favicon, options.manifest)
 

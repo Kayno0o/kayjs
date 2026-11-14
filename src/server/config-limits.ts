@@ -2,6 +2,7 @@ import type { HealthConfig, ImagesConfig, LiveConfig } from '../config'
 import type { RateLimit } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
+import { bagOf, switchOf } from '../config-switch'
 import { byteSize } from '../runtime/byte-size'
 import { durationSeconds, optionMs } from '../runtime/duration'
 
@@ -26,7 +27,8 @@ export function cappedError(message: string): string {
 }
 
 // The milliseconds a health check may take, `health.timeout` read once per use: a value that is no positive duration throws naming the option.
-export function healthTimeoutMs(config: HealthConfig | undefined): number {
+export function healthTimeoutMs(setting: HealthConfig | boolean | undefined): number {
+  const config = bagOf(setting)
   const ms = durationSeconds(config?.timeout ?? DEFAULT_CHECK_TIMEOUT, 'health.timeout') * 1000
 
   // A timer past this fires at once.
@@ -73,8 +75,10 @@ export interface RateWindowMs extends Pick<RateLimit, 'store' | 'onLimit'> {
   windowMs: number
 }
 
-// A `rateLimit` option of the config: a `RateLimit` without `key` (kay's own routes count the client's address), or `false` for none. Left out, `fallback` a minute.
-export function rateLimitOf(what: string, rateLimit: Omit<RateLimit, 'key'> | false | undefined, fallback: number): RateWindowMs | undefined {
+// A `rateLimit` option of the config: a `RateLimit` without `key` (kay's own routes count the client's address), or `false` for none. Left out or `true`, `fallback` a minute.
+export function rateLimitOf(what: string, setting: Omit<RateLimit, 'key'> | boolean | undefined, fallback: number): RateWindowMs | undefined {
+  const rateLimit = switchOf(setting)
+
   if (rateLimit === false)
     return undefined
 

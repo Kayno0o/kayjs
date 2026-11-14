@@ -1,12 +1,13 @@
 import type { ClientConfig, KayConfig, SecurityConfig, ServeConfig } from '../config'
 import type { PageSecurity } from '../runtime'
+import { switchOf } from '../config-switch'
 import { pushListed, registersWorker } from '../project'
 import { basePath } from './base'
 import { inlineScriptHashes, sourceHash } from './csp'
 import { CSP_ENDPOINT, CSP_REPORTS } from './violations'
 
 export interface SecurityOptions {
-  security?: SecurityConfig | false | undefined
+  security?: SecurityConfig | boolean | undefined
   client?: ClientConfig | undefined
   serve?: ServeConfig | undefined
   dev?: boolean | undefined
@@ -86,7 +87,9 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
   const pageHeaders = pages.flatMap(page => page.headers ? [page.headers] : [])
 
   // A site sending none still sends what a page asks for.
-  if (options.security === false)
+  const security = switchOf(options.security)
+
+  if (security === false)
     return pageHeaders.length > 0 ? withHeaders({}, pageHeaders) : undefined
 
   const headers: Record<string, string> = { ...HEADERS }
@@ -95,9 +98,10 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
   if (options.dev !== true && URL.parse(options.site ?? '')?.protocol === 'https:')
     headers['strict-transport-security'] = HSTS
 
-  headers['permissions-policy'] = permissionsPolicy(options.security?.permissions)
+  headers['permissions-policy'] = permissionsPolicy(security?.permissions)
 
-  const { csp, reports, reportOnly } = options.security ?? {}
+  const { reports, reportOnly } = security ?? {}
+  const csp = switchOf(security?.csp)
   const base = basePath(options.base)
   const hashes = [...inlineScriptHashes({ prefetch: options.client?.prefetch, apiPath: options.serve?.apiPrefix, dev: options.dev, base, offline: registersWorker(options, { dev: options.dev === true }), installOffer: pushListed(options), lateStyles: options.client?.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
   const styles = [...new Set((options.styles ?? []).map(sourceHash))]
@@ -124,7 +128,7 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
   if (reportOnly)
     headers['content-security-policy-report-only'] = serialized(policy([enforced ? csp ?? {} : {}, reportOnly], hashes, styles, reportTo, options.islands, added))
 
-  return withHeaders(headers, [options.security?.headers ?? {}, ...pageHeaders])
+  return withHeaders(headers, [security?.headers ?? {}, ...pageHeaders])
 }
 
 // kay's features with the app's merged over them, one given `false` left out: `self` and `*` are keywords, any other source an origin that gets quoted.
@@ -167,7 +171,9 @@ export type { HeaderCopies } from './own-headers'
 const HASH_OR_NONCE = /^'(?:nonce-|sha(?:256|384|512)-)/i
 
 // Whether the site's policy lets an element carry a `style` attribute, its report-only one included, which would log each: the first of `style-src-attr`, `style-src` and `default-src` it sets must allow `'unsafe-inline'`, which a nonce or a hash in it switches off.
-export function allowsStyleAttributes(csp: Record<string, string[] | false> | false | undefined, reportOnly?: Record<string, string[] | false>): boolean {
+export function allowsStyleAttributes(setting: Record<string, string[] | false> | boolean | undefined, reportOnly?: Record<string, string[] | false>): boolean {
+  const csp = switchOf(setting)
+
   if (csp === false)
     return reportOnly === undefined || allowsStyles({ ...DIRECTIVES, ...reportOnly })
 

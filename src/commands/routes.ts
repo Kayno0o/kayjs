@@ -15,6 +15,7 @@ import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { extensionApps, JOBS_DIR, PLUGINS_DIR, serverExtensions } from '../config-extensions'
 import { loadConfigWithin } from '../config-loader'
+import { bagOf } from '../config-switch'
 import { isRouteOf } from '../content/claims'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
@@ -210,7 +211,7 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
   const documented = openApiPaths(openapi, apiPathOf(config.serve?.apiPrefix))
 
   return [
-    ...config.health === false ? [] : [kay(config.health?.path ?? HEALTH_PATH, 'health check')],
+    ...config.health === false ? [] : [kay(bagOf(config.health)?.path ?? HEALTH_PATH, 'health check')],
     ...metricsOf(config.metrics) === undefined ? [] : [kay(metricsOf(config.metrics)?.path ?? METRICS_PATH, 'metrics')],
     ...config.publicEnv ? [kay(PUBLIC_ENV_PATH, 'public environment')] : [],
     kay('/_kay/*', 'build files'),
@@ -219,7 +220,7 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
     kay(`${FILES_ROUTE}*`, 'stored files'),
     kay(ERROR_REPORTS, 'browser error reports', 'POST'),
     kay(LIVE_ROUTE, 'live values', 'POST'),
-    ...typeof config.security === 'object' && config.security.reports === true ? [kay(CSP_REPORTS, 'CSP violation reports', 'POST')] : [],
+    ...bagOf(config.security)?.reports === true ? [kay(CSP_REPORTS, 'CSP violation reports', 'POST')] : [],
     ...config.preview !== undefined && config.preview !== false ? [kay(PREVIEW_ROUTE, 'preview mode')] : [],
     ...mcpAt === undefined ? [] : [kay(mcpAt, 'MCP endpoint', 'POST'), kay(RESOURCE_METADATA, 'MCP sign-in metadata'), kay(`${RESOURCE_METADATA}${mcpAt}`, 'MCP sign-in metadata')],
     ...openapi !== undefined && openapi.dev !== true ? [kay(documented.document, 'OpenAPI document'), ...openapi.reference === true ? [kay(documented.reference, 'API reference')] : []] : [],

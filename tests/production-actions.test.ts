@@ -887,7 +887,7 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
         await app.handle(forwarded)
         await app.handle(forwarded)
 
-        const guessed = warn.mock.calls.map(([message]) => String(message)).filter(message => message.includes('proxy: 1 to confirm'))
+        const guessed = warn.mock.calls.map(([message]) => String(message)).filter(message => message.includes('proxy: true to confirm'))
 
         expect(guessed).toHaveLength(1)
         expect(guessed[0]).toContain('proxy: false')

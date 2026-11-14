@@ -9,6 +9,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { pageHooks } from '../config-extensions'
+import { bagOf, switchOf } from '../config-switch'
 import { cacheDir, resolveProject } from '../project'
 import { joinBase } from '../runtime/base'
 import { escape, escapeAttribute } from '../runtime/escape'
@@ -266,7 +267,8 @@ function pageFiles(path: string): string[] {
 // A page's own `security` is not part of them, and neither is the CSP report endpoint, which a static site lacks.
 // A page with a `cache` gets its `cache-control` in `_headers` too, by its path under the base; nginx cannot say it per path, so the include leaves it out.
 async function writeHeaders(out: string, config: KayConfig, pages: Awaited<ReturnType<typeof pagesApp>>, caches: ReadonlyMap<string, string>): Promise<string[]> {
-  const security = config.security === false || config.security?.reports !== true ? config.security : { ...config.security, reports: undefined }
+  const given = switchOf(config.security)
+  const security = given === false || given?.reports !== true ? given : { ...given, reports: undefined }
   const headers = securityHeaders({ ...pages.securityOptions, security })
   const nginx = join(out, 'headers.nginx.conf')
   const written = [nginx]
@@ -281,7 +283,7 @@ async function writeHeaders(out: string, config: KayConfig, pages: Awaited<Retur
   if (text === '')
     return written
 
-  if (headers && config.security !== false && config.security?.reports === true)
+  if (headers && bagOf(config.security)?.reports === true)
     kayLog('warn', 'security.reports: true sends CSP reports to an endpoint a static site lacks, so the exported headers leave it out; name a URL in reports to receive them')
 
   const own = headers ? await routesWithSecurity(pages.routes) : []

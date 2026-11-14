@@ -6,6 +6,7 @@ import { plugin } from 'bun'
 import { inspecting } from '../build/assets'
 import { SCRIPT_FILE, scriptLoader } from '../build/files'
 import { loadConfig } from '../config-loader'
+import { switchOf } from '../config-switch'
 import { projectPaths } from '../project'
 
 interface Load {
@@ -146,7 +147,7 @@ export async function registerLoader(root: string, settings?: Record<string, str
     const project: Project = { root: at, prefixes: prefixesOf(at), settings: key, early: false, ready: Promise.resolve(), loads: [] }
 
     projects.set(at, project)
-    project.ready = register(project, chosen, config.images?.placeholder, pages)
+    project.ready = register(project, chosen, switchOf(config.images?.placeholder), pages)
   }
 
   current = projects.get(at)
