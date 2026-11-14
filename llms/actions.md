@@ -212,7 +212,7 @@ form(action={add})
 - An `input` or checkbox that writes its own `value` or `checked` keeps it over the record; a `select` and a `textarea` take the record over their own `selected` option or text, on the server and in an island alike.
 - In an island the record fills a field until the visitor edits it, so a record that changes later leaves what was typed: the field's default is what moves, and a form `reset` goes back to it.
 - A hidden, password, file or disabled field, a `select multiple`, a field with a spread or a `bind:` on its value is left as written.
-- Each field reads `values` on its own, so a call with arguments in it is a compile error (`form-misuse`): compute it once in the script and pass the name; a signal read, `todo()`, is fine.
+- Each field reads `values` on its own, so a call with arguments in it is a compile error (`form-misuse`): compute it once in the script and pass the name; a signal read, `todo()`, is fine, and any `(` followed by something else, a parenthesised group included, is refused. The key of a form is its place in the template and its count in the page, so a refusal finds it when the page renders the same forms again.
 - A `Form(action={save} values={todo})` component fills the fields written in its content on the server only.
 
 ### Refused posts
