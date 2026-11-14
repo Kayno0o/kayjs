@@ -314,7 +314,8 @@ export interface EditorModule {
 // The editor's module by its file, imported before a page in edit mode renders, which does not wait.
 export const editors = new Map<string, EditorModule>()
 
-const isNoindexTag = (tag: HeadTag) => tag.tag === 'meta' && tag.props.name === 'robots' && tag.props.content === 'noindex'
+// A robots meta whose comma-separated list holds `noindex`, however it is cased.
+export const isNoindexTag = (tag: HeadTag) => tag.tag === 'meta' && tag.props.name === 'robots' && typeof tag.props.content === 'string' && tag.props.content.split(',').some(part => part.trim().toLowerCase() === 'noindex')
 
 // The head a page starts from, a page or a layout above it saying `noindex` asking search engines to leave it out, or `noindex: false` taking back the robots tag the config's `seo.noindex` adds; a layout or the page may still set its own `robots`.
 function pageHead(modules: PageModule[], head: HeadOptions | undefined): HeadOptions | undefined {

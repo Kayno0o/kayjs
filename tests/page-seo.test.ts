@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { isNoindexTag } from '../src/server/render-document'
 import { kayBuild } from './check-helper'
 import { fixtureCopy } from './scratch'
 
@@ -165,5 +166,17 @@ describe('seo and cache along the layouts, the config and a wrong cache', () => 
         await rm(built.dir, { recursive: true, force: true })
       }
     }
+  })
+})
+
+describe('isNoindexTag', () => {
+  const robots = (content: string) => ({ tag: 'meta', props: { name: 'robots', content } })
+
+  it('matches a robots list holding noindex, in any case', () => {
+    expect(isNoindexTag(robots('noindex'))).toBe(true)
+    expect(isNoindexTag(robots('NoIndex, nofollow'))).toBe(true)
+    expect(isNoindexTag(robots('nofollow,noindex'))).toBe(true)
+    expect(isNoindexTag(robots('index, follow'))).toBe(false)
+    expect(isNoindexTag({ tag: 'meta', props: { name: 'description', content: 'noindex' } })).toBe(false)
   })
 })

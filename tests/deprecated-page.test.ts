@@ -42,6 +42,12 @@ describe('deprecated-page-cache', () => {
     expect(fixed(page('{ cacheControl: false }'), 'deprecated-page-cache').text).toBe(page('{ cache: false }'))
   })
 
+  it('keeps a comment between the moved settings where it is', () => {
+    expect(fixed(page('{\n  noindex: true,\n  // the feed\n  feed: false,\n  prerender: true,\n}'), 'deprecated-page-seo').text).toBe(page('{\n  seo: { noindex: true, feed: false },\n  // the feed\n  prerender: true,\n}'))
+    expect(fixed(page('{ noindex: true, /* c */ search: false, prerender: true }'), 'deprecated-page-seo').text).toBe(page('{ seo: { noindex: true, search: false }, /* c */ prerender: true }'))
+    expect(fixed(page('{\n  prerender: true,\n  noindex: true,\n  // why\n  search: false,\n}'), 'deprecated-page-seo').text).toBe(page('{\n  prerender: true,\n  seo: { noindex: true, search: false },\n  // why\n}'))
+  })
+
   it('reports with no fix a header written out, both settings, or a cache already there', () => {
     for (const settings of ['{ cacheControl: \'public, max-age=9\' }', '{ ttl: \'1h\', cacheControl: false }', '{ ttl: \'1h\', cache: \'2h\' }']) {
       const result = fixed(page(settings), 'deprecated-page-cache')
