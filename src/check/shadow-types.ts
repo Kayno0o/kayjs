@@ -41,9 +41,9 @@ import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 
 import { formatDurationNumbers } from './format-duration'
-import { guardOptions } from './guard-options'
-
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
+
+import { guardOptions } from './guard-options'
 import { unguardedRoutes, unguardedTools } from './guards'
 
 import { islandOnlyComponents } from './island-only'

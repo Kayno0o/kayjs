@@ -10,6 +10,19 @@ ai [./test] aiTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper
 ai [.] DescribeImageOptions.language	1.108	deprecated-ai-language	Written `locale`; `deprecated-ai-language` rewrites it. Removed in 1.108.
 ai [.] TranscribeOptions.language	1.108	deprecated-ai-language	Written `locale`, which takes a BCP 47 tag; `deprecated-ai-language` rewrites it. Removed in 1.108.
 auth [./test] authTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
+auth [.] LimitsOption.emailChangeAccount	1.108	deprecated-auth-rate-limits	`emailChange.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.emailCodeAccount	1.108	deprecated-auth-rate-limits	`emailCode.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.forgotAccount	1.108	deprecated-auth-rate-limits	`forgot.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.inviteAddress	1.108	deprecated-auth-rate-limits	`invite.address`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.magicLinkAccount	1.108	deprecated-auth-rate-limits	`magicLink.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.oauthDocument	1.108	deprecated-auth-rate-limits	`oauth.document`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.oauthRegister	1.108	deprecated-auth-rate-limits	`oauth.register`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.oauthRegisterAll	1.108	deprecated-auth-rate-limits	`oauth.registerAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.oauthToken	1.108	deprecated-auth-rate-limits	`oauth.token`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.resendAccount	1.108	deprecated-auth-rate-limits	`resend.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.signInAccount	1.108	deprecated-auth-rate-limits	`signIn.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.signInAccountAll	1.108	deprecated-auth-rate-limits	`signIn.accountAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
+auth [.] LimitsOption.twoFactorAccount	1.108	deprecated-auth-rate-limits	`twoFactor.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
 cms [./pg] PgLoaderOptions	1.108.0	deprecated-store-names	Use `PgCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 cms [./pg] pgLoader	1.108.0	deprecated-store-names	Use `pgCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 cms [./sqlite] SqliteLoaderOptions	1.108.0	deprecated-store-names	Use `SqliteCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
@@ -21,6 +34,7 @@ kay [./mount] mount	1.108.0	deprecated-import-path	Import `mount` from `kay`, it
 kay [./server] QueueOptions.lostAfter	1.108	deprecated-job-options	`timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it.
 kay [./server] RateLimit	1.108.0	deprecated-import-path	Import `RateLimit` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] RateLimitRefusal	1.108.0	deprecated-import-path	Import `RateLimitRefusal` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
+kay [./server] RateLimiter.enforce	1.108	deprecated-rate-enforce	`check(ctx, message?)`, as `limiter().enforce(key)` counts under a key and refuses nothing. Removed in 1.108; `deprecated-rate-enforce` rewrites it.
 kay [./server] WorkflowOptions.lostAfter	1.108	deprecated-job-options	`timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it.
 kay [./server] diskFiles	1.108	deprecated-disk-files	`diskFiles({ dir, ...hooks })`. Removed in 1.108; `deprecated-disk-files` rewrites it.
 kay [./server] s	1.108.0	deprecated-import-path	Import `s` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
