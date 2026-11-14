@@ -1523,6 +1523,39 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types bind: on a component against a prop and its change callback', async () => {
+    const panel = '---\nconst { open = false, index = 0, label, onOpenChange, onIndexChange } = props<{ open?: boolean | undefined, onOpenChange?: ((open: boolean) => unknown) | undefined, index?: number | undefined, onIndexChange?: ((index: number, open: boolean) => unknown) | undefined, label?: string | undefined }>()\n---\nbutton(onClick={() => onOpenChange?.(!open)}) {label} {index}\nbutton(onClick={() => onIndexChange?.(index + 1, open)}) next\n'
+
+    const page = [
+      '---',
+      'import { signal } from \'kay\'',
+      'import Panel from \'../Panel.kay\'',
+      '',
+      'const open = signal(false)',
+      'const count = signal(0)',
+      'const name = signal(\'a\')',
+      'const plain = false',
+      '---',
+      'Panel(bind:open={open} bind:index={count})',
+      'Panel(bind:open={open} onOpenChange={opened => console.log(opened)})',
+      'Panel(bind:open={count})',
+      'Panel(bind:label={name})',
+      'Panel(bind:open={plain})',
+      'Panel(bind:missing={open})',
+      'Panel(open={open()} onOpenChange={opened => open = opened})',
+      '',
+    ].join('\n')
+
+    const root = await scratchProject({ 'src/Panel.kay': panel, 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[12, 'TS2322'], [12, 'TS2345'], [13, 'TS2345'], [14, 'TS2349'], [14, 'TS2339'], [15, 'TS2322'], [15, 'TS2345']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('takes a ref that returns whatever its expression gives', async () => {
     const root = await scratchProject({ 'src/components/index.kay': '---\nlet list: HTMLElement | undefined\nconst all: HTMLElement[] = []\n---\nol(ref={el => list = el}) a\np(ref={el => all.push(el)}) b\ndiv(ref={el => () => el.remove()}) {String(list)}\n' })
 

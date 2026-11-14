@@ -6,6 +6,7 @@ import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
+import { addBoundWrites, calledByBinds, changeOf } from './bound-props'
 import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
 import { contentOf } from './items'
@@ -488,16 +489,10 @@ export abstract class TemplateWriter {
       }
 
       entry(name, read, true)
-      separate()
-      b.add(`set ${JSON.stringify(name)}(kayValue) { `)
-
-      if (passedOn === undefined)
-        target().add('.set(kayValue)')
-      else
-        b.add(`${PROPS}[${JSON.stringify(passedOn)}] = kayValue`)
-
-      b.add(' }')
+      addBoundWrites(b, name, separate, () => passedOn === undefined ? target().add('.set(kayValue)') : b.add(`${PROPS}[${JSON.stringify(passedOn)}] = kayValue`), changeOf(element, this.src, name))
     }
+
+    const calledByBind = element.component && getters ? calledByBinds(element, this.src) : new Set<Attribute>()
 
     const lastSpread = element.attributes.findLastIndex(attribute => attribute.kind === 'spread')
     const ownStyle = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'style')
@@ -540,6 +535,9 @@ export abstract class TemplateWriter {
 
       // Laid over the sources by `spreadOver`.
       if (!element.component && attribute.kind === 'expression' && (name.startsWith('style:') || name.startsWith('bind:')))
+        continue
+
+      if (calledByBind.has(attribute))
         continue
 
       if (this.skips(element, name))

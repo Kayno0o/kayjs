@@ -14,7 +14,7 @@ function compile(source: string, output?: 'dom' | 'html') {
 
 describe('bind: on a component', () => {
   it('hands the child a getter and a setter in the browser and the value on the server', () => {
-    expect(compile(PARENT, 'dom').tsx).toContain('{ get "open"() { return (open)() }, set "open"(kayValue) { (open).set(kayValue) } }')
+    expect(compile(PARENT, 'dom').tsx).toContain('get "open"() { return (open)() }, set "open"(kayValue) { (open).set(kayValue) }')
     expect(compile(PARENT, 'html').tsx).toContain('{ "open": (open)() }')
   })
 
@@ -28,20 +28,20 @@ describe('bind: on a component', () => {
   it('passes a Bindable prop of the parent on by name, through two levels', () => {
     const middle = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nToggle(bind:open={open})\n'
 
-    expect(compile(middle, 'dom').tsx).toContain('{ get "open"() { return (__props.open) }, set "open"(kayValue) { __props["open"] = kayValue } }')
+    expect(compile(middle, 'dom').tsx).toContain('get "open"() { return (__props.open) }, set "open"(kayValue) { __props["open"] = kayValue }')
   })
 
   it('hands on the default of an optional Bindable prop, and writes the props object', () => {
     const middle = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst { open = false } = props<{ open?: Bindable<boolean> | undefined }>()\n---\nToggle(bind:open={open})\n'
 
-    expect(compile(middle, 'dom').tsx).toContain('{ get "open"() { return ((__props.open !== undefined ? __props.open : false)) }, set "open"(kayValue) { __props["open"] = kayValue } }')
+    expect(compile(middle, 'dom').tsx).toContain('get "open"() { return ((__props.open !== undefined ? __props.open : false)) }, set "open"(kayValue) { __props["open"] = kayValue }')
     expect(compile(middle, 'html').tsx).toContain('{ "open": ((__props.open !== undefined ? __props.open : false)) }')
   })
 
   it('passes on the prop through the name of the props object', () => {
     const middle = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst p = props<{ open: Bindable<boolean> }>()\n---\nToggle(bind:open={p.open})\n'
 
-    expect(compile(middle, 'dom').tsx).toContain('{ get "open"() { return (p.open) }, set "open"(kayValue) { __props["open"] = kayValue } }')
+    expect(compile(middle, 'dom').tsx).toContain('get "open"() { return (p.open) }, set "open"(kayValue) { __props["open"] = kayValue }')
   })
 
   it('reads and assigns the prop as a plain name, wrapping the props only where a prop is Bindable', () => {
@@ -112,6 +112,36 @@ describe('bind: on a component', () => {
   it('refuses a bind that is not an expression or not a name', () => {
     expect(compile('---\nimport Toggle from \'./Toggle.kay\'\n---\nToggle(bind:open="yes")\n', 'dom').diagnostics.map(d => d.message)).toEqual([expect.stringContaining('needs a signal or a `Bindable` prop')])
     expect(compile('---\nimport Toggle from \'./Toggle.kay\'\n---\nToggle(bind:open={1 + 1})\n', 'dom').diagnostics.map(d => d.message)).toEqual([expect.stringContaining('needs a signal or a `Bindable` prop')])
+  })
+})
+
+describe('bind: on a component with a value and change pair', () => {
+  const dialog = '---\nimport { signal } from \'kay\'\nimport Dialog from \'./Dialog.kay\'\nconst open = signal(false)\n---\n'
+
+  it('hands the child the value and the signal write as its onChange, in the browser only', () => {
+    const dom = compile(`${dialog}Dialog(bind:open={open})\n`, 'dom').tsx
+    const html = compile(`${dialog}Dialog(bind:open={open})\n`, 'html').tsx
+
+    expect(dom).toContain('get "open"() { return (open)() }, set "open"(kayValue) { (open).set(kayValue) }, "onOpenChange"(kayValue) { (open).set(kayValue) }')
+    expect(html).toContain('{ "open": (open)() }')
+    expect(html).not.toContain('onOpenChange')
+  })
+
+  it('writes the Bindable prop of the component it is passed on from', () => {
+    const middle = '---\nimport { type Bindable } from \'kay\'\nimport Dialog from \'./Dialog.kay\'\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nDialog(bind:open={open})\n'
+
+    expect(compile(middle, 'dom').tsx).toContain('"onOpenChange"(kayValue) { __props["open"] = kayValue }')
+  })
+
+  it('keeps an onChange written beside it, called after the write with every argument', () => {
+    const dom = compile(`${dialog}Dialog(bind:open={open} onOpenChange={(opened, index) => log(opened, index)})\n`, 'dom').tsx
+
+    expect(dom).toContain('"onOpenChange"(kayValue, ...kayRest) { (open).set(kayValue); ((opened, index) => log(opened, index))(kayValue, ...kayRest) }')
+    expect(dom.match(/onOpenChange/g)).toHaveLength(1)
+  })
+
+  it('names the callback after the prop, whatever it is', () => {
+    expect(compile(`${dialog}Dialog(bind:index={open})\n`, 'dom').tsx).toContain('"onIndexChange"(kayValue) { (open).set(kayValue) }')
   })
 })
 

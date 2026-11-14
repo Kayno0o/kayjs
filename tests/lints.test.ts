@@ -766,6 +766,15 @@ describe('signal-set-call', () => {
     expect(found(fixed(source))).toEqual([])
   })
 
+  it('treats a selection as a signal: assigned, and .set reported, its .is left alone', () => {
+    const source = '---\nimport { selection } from \'kay\'\n\nconst picked = selection<string>()\nconst rows = [\'a\']\n---\nbutton(onClick={() => picked.set(\'a\')}) {picked()}\nfor row of rows\n  p(class={{ on: picked.is(row) }}) {row}\n'
+    const result = compileKay(source, 'list.kay', { check: true })
+
+    expect(result.diagnostics.map(d => [d.code, source.slice(d.start, d.end)])).toEqual([['signal-set-call', 'picked.set(\'a\')']])
+    expect(compileKay(source.replace('picked.set(\'a\')', 'picked = \'a\''), 'list.kay', { output: 'dom' }).tsx).toContain('picked.set(\'a\')')
+    expect(compileKay(source, 'list.kay', { output: 'dom' }).tsx).toContain('picked.is(row())')
+  })
+
   it('reports a named function handed to .set, which the assignment hands over as it is', () => {
     const source = script('function reset(next: number) {\n  return next\n}\nconst saved = signal(reset)\nsaved.set(reset)', 'p {count()} {open()}')
 

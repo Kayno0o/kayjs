@@ -25,14 +25,20 @@ type PropsOfComponent<Tag> = Tag extends (props: infer Props) => unknown ? Props
 // Whether a type carries the mark, which `unknown`, `object` and `any` do not.
 type Marked<T> = 0 extends 1 & T ? false : [T] extends [never] ? false : typeof BINDABLE extends keyof T ? true : false
 
-// The props of a component typed `Bindable`, which `bind:` takes.
-export type BindableKeys<Tag> = { [Key in keyof PropsOfComponent<Tag>]-?: Marked<NonNullable<PropsOfComponent<Tag>[Key]>> extends true ? Key : never }[keyof PropsOfComponent<Tag>]
+// The callback a prop reports its changes through: `open` and `onOpenChange`.
+type ChangeKey<Key> = `on${Capitalize<Key & string>}Change`
+
+// What the change callback of a prop takes first, when the component has one.
+type ChangedValue<Props, Key> = ChangeKey<Key> extends keyof Props ? NonNullable<Props[ChangeKey<Key>]> extends (value: infer Value, ...rest: never[]) => unknown ? Value : never : never
+
+// The props `bind:` takes: those typed `Bindable`, and those with an `on<Prop>Change` callback beside them.
+export type BindableKeys<Tag> = { [Key in keyof PropsOfComponent<Tag>]-?: Marked<NonNullable<PropsOfComponent<Tag>[Key]>> extends true ? Key : [ChangedValue<PropsOfComponent<Tag>, Key>] extends [never] ? never : Key }[keyof PropsOfComponent<Tag>]
 
 // What `bind:name` demands of the prop it names.
-export type BoundProp<Tag, Key> = Key extends BindableKeys<Tag> ? unknown : { kayError: 'bind: needs a prop typed Bindable<T> in the component' }
+export type BoundProp<Tag, Key> = Key extends BindableKeys<Tag> ? unknown : { kayError: 'bind: needs a prop typed Bindable<T>, or one with an on<Prop>Change callback beside it' }
 
-// What a component writes to a bound prop, which the parent's signal takes.
-export type BoundValue<Tag, Key> = Key extends keyof PropsOfComponent<Tag> ? Required<PropsOfComponent<Tag>>[Key] : never
+// What a component writes to a bound prop, which the parent's signal takes: the prop itself, or what its change callback reports.
+export type BoundValue<Tag, Key> = Key extends keyof PropsOfComponent<Tag> ? Marked<NonNullable<PropsOfComponent<Tag>[Key]>> extends true ? Required<PropsOfComponent<Tag>>[Key] : [ChangedValue<PropsOfComponent<Tag>, Key>] extends [never] ? Required<PropsOfComponent<Tag>>[Key] : ChangedValue<PropsOfComponent<Tag>, Key> : never
 
 // Lets the checker tell islands from plain components.
 export interface IslandBrand { readonly [ISLAND]: true }

@@ -76,6 +76,8 @@ if open()
   p Details
 ```
 
+`bind:` also takes any prop that has an `on<Prop>Change` callback beside it, which is how kayjs-ui's controls report their state: `Dialog(bind:open={open})` is `Dialog(open={open()} onOpenChange={v => open = v})`, and a component of your own with `{ open?: boolean, onOpenChange?: (open: boolean) => unknown }` takes it the same. The long form stays; an `onOpenChange` written beside the bind is called after the write, with the callback's every argument. `kay check` types the bind by the callback's first parameter.
+
 ### Run code when a value changes, on a timer or on an event
 
 `effect`, `watch`, `debounced`, `every` and `listen` each have their task in [Effects and lifecycle](effects.md#common-tasks).
@@ -181,9 +183,9 @@ ul
 - Assigning works on any signal a `const` or an import holds, wherever it was made: the script's own, a module's, a re-export, one a function returns or a destructuring gives, and a prop typed `Bindable<T>`.
 - `kay check` reports assigning a memo, or a `const` or an import holding no signal, at its name; a `const` plainly holding none, `const n = 1` or `const seen = new Set()`, is a compile error.
 - Assigning writes a signal wherever it sits: one a `const`, an import, a `let` or `var` set to `signal(...)` holds, and also one in an object's property or an array element, `box.count = 1`, `list[2]++`, or in a `let` set from a function's result. The compiler cannot tell those from a plain write, so the runtime does: a signal there is written, anything else assigned, and `kay check` types the write by what the target holds, `box.count = 'x'` being a type error for a `Signal<number>`. A function assigned there, a signal included, replaces what was held. A target kay sees holds no signal, a literal or `new Map()`, is assigned as written, and so is a field of `this`, a write beside another write, a `let` written with an `await`, a compound write holding an `await`, and a `let` update whose value is read: use `.set` there. A `readonly` property or array element holding no signal, written this way, is a `kay check` error, as in plain code.
-- `bind:name={signal}` on a component needs a signal and a prop typed `Bindable<T>`; a child hands it on with `bind:name={name}`, through any number of levels. `bind:` on a component makes the parent an island. `...rest` and a props spread hand a `Bindable` prop on whole; a member of `rest` is a value and `bind:` refuses it. `kay check` reports a prop not typed `Bindable`, and a memo or a value that is no signal.
-- A prop is always a value: a parent hands a signal's or a memo's value, `Toggle(open={open()})`, kept current through a getter, or binds a `Bindable<T>` prop with `bind:`.
-- `persisted`, `queryParam` and `linked` signals read and write as `signal` ones do; a `selection`, a `resource` or a `socket` is called or read through its members.
+- `bind:name={signal}` on a component needs a signal and a prop typed `Bindable<T>` or with an `on<Name>Change` callback beside it; a child hands it on with `bind:name={name}`, through any number of levels. `bind:` on a component makes the parent an island. `...rest` and a props spread hand a `Bindable` prop on whole; a member of `rest` is a value and `bind:` refuses it. `kay check` reports a prop with neither, and a memo or a value that is no signal.
+- A prop is always a value: a parent hands a signal's or a memo's value, `Toggle(open={open()})`, kept current through a getter, or binds the prop with `bind:`.
+- `persisted`, `queryParam`, `linked` and `selection` signals read and write as `signal` ones do (`selected = id`); a `resource` or a `socket` is called or read through its members. A `live` value is the one state written by `.set`, on the server only: assigning it is the compile error `live value which the server writes`.
 - `kay check` narrows a signal or memo a template expression calls within that expression: `{error() && error().message}`, with `error` a `signal<Error>()`, checks.
 - A write in between, as by a function the expression calls, is not seen by that narrowing.
 - Reads inside a function the template writes, a handler or a `.map` callback, run later and are not narrowed at all: copy the value into a `const` in the script, or assert it, `sent()!`.
@@ -222,7 +224,7 @@ p {game.miners[0].ore}
 - A `linked` signal drops its edit when its source changes, even when the source comes back to the value it was edited over.
 - `linked` reads a prop of a component inside an island, or of an island marked `persist`, the ones whose props change in place, a prop given unchanged keeping its edit.
 - A top-level island whose props changed on a refresh renders afresh from them, its dialogs and focus lost: one whose state should outlive a refresh, such as an editor, is marked `persist`, so it stays and takes the new props.
-- `selection<Key>(initial?)` from `kay` holds one selected string or number key among many rows, or none. It reads as `selected()` and writes as `selected.set(id)`.
+- `selection<Key>(initial?)` from `kay` holds one selected string or number key among many rows, or none. It is a signal: it reads as `selected()` and writes as `selected = id`.
 - `selected.is(row.id)` re-runs only for the rows a change selects or unselects, not every row: `tr(class={{ danger: selected.is(row.id) }})`.
 
 ### Effects and lifecycle

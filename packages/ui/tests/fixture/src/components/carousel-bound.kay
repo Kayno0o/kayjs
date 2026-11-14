@@ -1,0 +1,15 @@
+---
+import Carousel from '@kayjs/ui/carousel.kay'
+import Dialog from '@kayjs/ui/dialog.kay'
+import { signal } from 'kay'
+
+// The index lives in this page's signal, bound with no `onIndexChange` of its own; `#jump` writes it as a parent would.
+const slides = ['a', 'b', 'c'].map(name => ({ src: `/${name}.png`, alt: name }))
+const index = signal(0)
+const shown = signal(false)
+---
+Carousel#carousel(slides={slides} bind:index={index})
+p#index {index()}
+button#jump(type="button" onClick={() => index = 2}) Jump
+Dialog(bind:open={shown} title="Bound")
+  p Bound dialog

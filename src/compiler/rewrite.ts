@@ -29,7 +29,7 @@ const LIVE_WRITES = new Set(['set', 'delete'])
 const LIVE_STATE = new Set(['status', 'pending', 'error', 'retry'])
 
 // What `kay` exports that is read by calling it, in the template as in the script, and whether it is written too.
-const ACCESSORS: Record<string, 'signal' | 'memo'> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo', throttled: 'memo' }
+const ACCESSORS: Record<string, 'signal' | 'memo'> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', selection: 'signal', memo: 'memo', debounced: 'memo', throttled: 'memo' }
 // The compound assignments that write only when the value changes.
 const LOGICAL = new Set(['||', '&&', '??'])
 // The signals the modules of `kay` export.
@@ -268,7 +268,7 @@ class RewriteFinder {
     if (isCall(parent) && (parent.callee === node || !compilerCall(parent.callee)))
       return undefined
 
-    if (parent.type === 'MemberExpression' && parent.object === node && !parent.computed && parent.property.type === 'Identifier' && (parent.property.name === 'set' || (live && LIVE_STATE.has(parent.property.name))))
+    if (parent.type === 'MemberExpression' && parent.object === node && !parent.computed && parent.property.type === 'Identifier' && (parent.property.name === 'set' || parent.property.name === 'is' || (live && LIVE_STATE.has(parent.property.name))))
       return undefined
 
     // `count++` writes it.

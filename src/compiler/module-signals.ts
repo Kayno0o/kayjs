@@ -7,7 +7,7 @@ export type SignalKind = 'signal' | 'memo' | 'live' | 'persisted'
 // The signals and memos of each module a component imports, by the specifier it imports them with.
 export type ImportedSignals = Record<string, Record<string, SignalKind>>
 
-export const MADE: Record<string, SignalKind> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo', throttled: 'memo', live: 'live' }
+export const MADE: Record<string, SignalKind> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', selection: 'signal', memo: 'memo', debounced: 'memo', throttled: 'memo', live: 'live' }
 const NAMES_KAY = /["']kay["']/
 const EXPORT = /\bexport\b/
 
