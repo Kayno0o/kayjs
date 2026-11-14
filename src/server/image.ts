@@ -730,11 +730,11 @@ export function sourceFile(whole: string, options: ImageRouteOptions): { path: s
 }
 
 // `images.maxDensity`, `images.widths`, `images.aspects`, `images.remote`, `images.placeholder` and whether `images.resolve` is set, checked and set for every image this process renders, served or prerendered; `inlineStyles` is whether the site's CSP lets an element carry a `style` attribute. Returns the density.
-export async function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, placeholder?: false | undefined, resolve?: unknown, guard?: unknown } | undefined, inlineStyles = true): Promise<number> {
+export async function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, placeholder?: false | undefined, resolve?: unknown, guards?: unknown, guard?: unknown } | undefined, inlineStyles = true): Promise<number> {
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
 
-  if (images?.guard !== undefined && images.resolve === undefined)
-    throw new KayError('image-invalid', 'kay: images.guard admits the images images.resolve looks up, and images.resolve is not set')
+  if ((images?.guards ?? images?.guard) !== undefined && images?.resolve === undefined)
+    throw new KayError('image-invalid', 'kay: images.guards admits the images images.resolve looks up, and images.resolve is not set')
 
   if (!(maxDensity >= 1))
     throw new Error(`images.maxDensity is ${maxDensity}: it is at least 1, or Infinity to leave the browser's choice`)

@@ -22,7 +22,7 @@ import { claimEndpoints } from './endpoint-claims'
 import { holdPublicEnv } from './env'
 import { PUBLIC_ENV_PATH, publicEnvFiles, publicInFenceMessage } from './env-state'
 import { faviconSource, MANIFEST, manifestJson } from './favicon'
-import { guardRequirement } from './guard-requirement'
+import { guardRequirement, requiredBy } from './guard-requirement'
 import { loadGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
 import { dropExitListenerOnStop } from './lifecycle'
@@ -170,7 +170,7 @@ export async function pagesApp(project: Project<ServedOptions>, loadClient: () =
   const { served, table, publicServed, redirects, mcpAt } = setup.claimed
 
   // The API modules are read here, as an unset `requireGuards` comes to what the app's own routes, endpoints and API modules guard.
-  const required = guardRequirement(options.requireGuards, setup.routes, setup.endpoints, await setup.api)
+  const required = guardRequirement(requiredBy(options), setup.routes, setup.endpoints, await setup.api)
   const routes = await servedRoutes(setup.routes, setup.claimed.routes, required)
   const app = new Elysia({ name: 'kay/pages', seed: root })
 

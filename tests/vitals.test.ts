@@ -584,8 +584,14 @@ describe('the screen', () => {
     expect((await screen({ guard: [() => undefined, ctx => ctx.deny(403, 'not you')] })).status).toBe(403)
     expect((await screen({ guard: [() => undefined, () => undefined] })).status).toBe(200)
     expect((await screen({ guard: false })).status).toBe(200)
-    expect(() => vitals({ guard: [] })).toThrow('takes a guard')
-    expect(() => vitals({ guard: true as never })).toThrow('takes a guard')
+    expect(() => vitals({ guard: [] })).toThrow('takes `guards`')
+    expect(() => vitals({ guards: true as never })).toThrow('takes `guards`')
+  })
+
+  it('takes `guards`, the name every guard option has, `guard` working beside it', async () => {
+    expect((await screen({ guards: ctx => ctx.deny(403, 'not you') })).status).toBe(403)
+    expect((await screen({ guards: [() => undefined] })).status).toBe(200)
+    expect((await screen({ guards: false })).status).toBe(200)
   })
 
   it('takes a guard built when the first request reaches it', async () => {

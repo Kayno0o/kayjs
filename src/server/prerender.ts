@@ -26,7 +26,7 @@ import { projectApi } from './api-modules'
 import { dropOrphanCopies, keepClasses, missingClasses, PRERENDERED_DIR, readManifest, styleUsesOf, writeManifest } from './client'
 import { writeDictionary } from './dictionary'
 import { exportedEndpoints } from './endpoints'
-import { guardRequirement } from './guard-requirement'
+import { guardRequirement, requiredBy } from './guard-requirement'
 import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK, withoutCacheScripts } from './live'
 import { pageFlags } from './page-flags'
@@ -158,7 +158,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   const { source, mounts, routes, endpoints, matchers, i18n, locales, site, renderOptions } = await setupPages(project, () => client, true)
 
   const dir = join(output, PRERENDERED_DIR)
-  const required = guardRequirement(config.requireGuards, routes, endpoints, await projectApi(root, config))
+  const required = guardRequirement(requiredBy(config), routes, endpoints, await projectApi(root, config))
 
   options.routes?.push(...routes)
   countStandInReads(STAND_IN_READS)

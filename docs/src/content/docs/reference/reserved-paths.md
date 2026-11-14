@@ -47,7 +47,7 @@ A route follows the same rule. An endpoint is `/_kay/<noun>`, such as `/_kay/car
 | `/_kay/fields/` | the honeypot and stamp of a form an island builds |
 | `/_kay/live` | live values |
 | `/_kay/health` | the health check |
-| `/_kay/jobs` | the jobs page, with `jobs: { guard }` |
+| `/_kay/jobs` | the jobs page, with `jobs: { guards }` |
 | `/_kay/error`, `/_kay/csp`, `/_kay/vitals`, `/_kay/analytics`, `/_kay/push` | reports and beacons |
 | `/_kay/search.json`, `/_kay/search/` | the site search index |
 | `/_kay/preview`, `/_kay/draft` | preview mode |

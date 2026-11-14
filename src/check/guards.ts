@@ -3,7 +3,7 @@ import type { ServedProject } from './shadow-types'
 import { lintLevel } from '../compiler/lints'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
-import { guardRequirement } from '../server/guard-requirement'
+import { guardRequirement, requiredBy } from '../server/guard-requirement'
 
 const HELP = 'add a `_guard.ts` to its directory or one above it, or, if anyone may reach it, set `guards: false`'
 
@@ -12,19 +12,19 @@ const HELP = 'add a `_guard.ts` to its directory or one above it, or, if anyone 
 export async function unguardedRoutes(options: CheckOptions, { routes, endpoints, apiModules }: ServedProject): Promise<CheckDiagnostic[]> {
   const level = lintLevel('unguarded-route', options.lints)
 
-  const required = guardRequirement(options.requireGuards, routes, endpoints, apiModules)
+  const required = guardRequirement(requiredBy(options), routes, endpoints, apiModules)
 
   if (required === false || level === 'allow')
     return []
 
-  const unset = options.requireGuards === undefined
+  const unset = requiredBy(options) === undefined
 
   const report = (file: string, message: string, help = HELP): CheckDiagnostic => ({
     file,
     line: 1,
     column: 1,
     message,
-    help: unset ? `${help}, or set \`requireGuards: false\` to keep it open` : help,
+    help: unset ? `${help}, or set \`guards: { default: 'open' }\` to keep it open` : help,
     code: 'unguarded-route',
     severity: level === 'warn' ? 'warning' : 'error',
   })

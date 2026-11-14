@@ -92,7 +92,7 @@ A zero-width space parts two words, as it does in Thai. Soft hyphens and zero-wi
 
 Each page is read from its `main`, or its `body` without one. Navigation, footers, scripts, buttons outside a heading and anything marked `data-search="false"` stay out.
 
-So do pages behind a guard or refused by `requireGuards`, pages with `noindex`, and pages setting `search: false` in their `page`.
+So do pages behind a guard or refused by `guards: { default }`, pages with `noindex`, and pages setting `search: false` in their `page`.
 
 Set `search: { weight: 0.5 }` to make a page's words count half as much, so its hits come after the others'.
 

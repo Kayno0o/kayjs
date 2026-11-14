@@ -67,7 +67,7 @@ kay explain template-syntax
 | `font-invalid` | build | A font in `fonts` that is no font file, no installed Fontsource package, or lacks the weight, style or subset asked for. | [Fonts](sitemap-search-fonts.md#fonts) |
 | `favicon-invalid` | build | A favicon, manifest icon or SVG that is no SVG kay can draw, has no size, is not square, or a manifest path outside its scope. | [Favicon and web manifest](sitemap-search-fonts.md#favicon-and-web-manifest) |
 | `share-card-invalid` | build | A share card drawn with no font, a logo that is missing, not square or not an image kay draws, a colour that is no #rrggbb, an empty title, or a `_card.kay` with no Chrome to draw it or a card on an image it cannot show. | [Draw a share card for a page](images.md#draw-a-share-card-for-a-page) |
-| `image-invalid` | build | An image the build cannot fetch, or `images` settings that do not go together: `guard` with no `resolve`, a box given both a width and a height. | [Responsive images](images.md#responsive-images) |
+| `image-invalid` | build | An image the build cannot fetch, or `images` settings that do not go together: `guards` with no `resolve`, a box given both a width and a height. | [Responsive images](images.md#responsive-images) |
 | `env-invalid` | build | The environment does not match its schema. | [Environment](environment.md#environment) |
 | `config-invalid` | build | A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, a file store asked for what it does not hold, or an option of a library (kayjs-auth, kayjs-cms, kayjs-mail, kayjs-ai) that it refuses at boot. | [Project setup](project.md#project-setup) |
 | `export-private-file` | export | A static export linking a private or stored file, which only a server can serve. | [Static export](prerendering.md#static-export) |
@@ -89,7 +89,7 @@ kay explain template-syntax
 | `export-image-route` | export | A page linking an image only the image route resizes, which no file of the export holds. | [Static export](prerendering.md#static-export) |
 | `export-site-url` | export | A page reading the site's URL when neither `site` nor SITE_URL sets it. | [Site defaults and social cards](head.md#site-defaults-and-social-cards) |
 | `export-server-render` | export | A page with something only a server renders per request: a server island, a form stamp or work challenge, a live value, a deferred island with no browser entry. | [Server islands](server-islands.md#server-islands) |
-| `export-guard` | export | A page or endpoint a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request. | [Guards](guards.md#guards) |
+| `export-guard` | export | A page or endpoint a guard covers, or that `guards: { default }` leaves with no guard: only a server runs one per request. | [Guards](guards.md#guards) |
 | `export-action` | export | A page exporting an action, which only a server can take. | [Static export](prerendering.md#static-export) |
 | `export-path-clash` | export | Two pages that would be prerendered to the same file. | [Prerendering](prerendering.md#prerendering) |
 | `export-api-module` | export | An API module, which answers requests only a server does. | [API modules](api-routes.md#api-modules) |

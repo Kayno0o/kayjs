@@ -1,6 +1,13 @@
 // What a start does with a route no guard covers: `true` refuses every page, layout with actions, endpoint and API module of the app, `'routes'` only its pages, endpoints and API modules, `false` none.
 export type GuardRequirement = boolean | 'routes'
 
+// What `guards: { default }` says of the app's routes, `'closed'` being `requireGuards: true` and `'open'` `requireGuards: false`; `requireGuards` stays until 1.108, and `guards.default` wins when both are set. Undefined leaves it to what the routes guard.
+export function requiredBy(config: { guards?: { default?: 'open' | 'closed' | undefined } | undefined, requireGuards?: boolean | undefined }): boolean | undefined {
+  const given = config.guards?.default
+
+  return given === undefined ? config.requireGuards : given === 'closed'
+}
+
 interface Access {
   open?: true | undefined
   guards: readonly unknown[]

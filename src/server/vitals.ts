@@ -15,6 +15,8 @@ export interface VitalsOptions {
   // Where the numbers are shown, `/vitals` by default.
   prefix?: string | undefined
   // Who may open the screen, such as kayjs-auth's `auth.guard({ require: 'admin' })`, a list of guards run in order, or `{ load }` returning one, which runs on the first request rather than as kay.config.ts loads. Without one the screen stays closed, though the numbers are still collected; `false` opens it to everyone.
+  guards?: GuardOption | false | undefined
+  // Replaced by `guards` in 1.105, and works until 1.108.
   guard?: GuardOption | false | undefined
   // `true` waits for the visitor's yes on the `kay_analytics` cookie before a view is reported and `false` never waits. Left out, the numbers follow `analytics({ awaitConsent })` when the site has it, and are reported at once otherwise, as they hold no identifier.
   awaitConsent?: boolean | undefined
@@ -50,7 +52,8 @@ export function vitalsSettings(): VitalsSettings {
 // It sets no cookie and keeps neither an address nor a title: a view is counted in a bucket of its route.
 // Only a production server (`NODE_ENV=production`) keeps a report: `kay dev` and a test answer the same and keep nothing.
 export function vitals(options: VitalsOptions = {}): KayExtension {
-  const { prefix = DEFAULT_PREFIX, guard } = options
+  const { prefix = DEFAULT_PREFIX } = options
+  const guard = options.guards ?? options.guard
   const { awaitConsent } = options
   const refuse = (reason: string): never => {
     throw new KayError('config-invalid', `kay: vitals ${reason}`)
@@ -66,7 +69,7 @@ export function vitals(options: VitalsOptions = {}): KayExtension {
     refuse(`takes awaitConsent as true or false; got ${JSON.stringify(awaitConsent)}`)
 
   if (guard !== undefined && guard !== false && !isGuardOption(guard))
-    refuse('takes a guard that is a function, a list of them, or { load } returning one, or false')
+    refuse('takes `guards` as a function, a list of them, or { load } returning one, or false')
 
   current = { guard: guardOf(guard) }
 

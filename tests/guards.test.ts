@@ -71,6 +71,15 @@ describe('requireGuards', () => {
     expect(await status(required, '/api/health')).toBe(200)
   })
 
+  it('reads `guards: { default }` as `requireGuards`, and prefers it', async () => {
+    const config = async (extra: object) => pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, ...extra })
+
+    expect(await status(await config({ guards: { default: 'closed' } }), '/')).toBe(403)
+    expect(await status(await config({ guards: { default: 'open' } }), '/')).toBe(200)
+    expect(await status(await config({ guards: { default: 'closed' }, requireGuards: false }), '/')).toBe(403)
+    expect(await status(await config({ guards: {} }), '/')).toBe(await status(unset, '/'))
+  })
+
   it('serves what a guard lets through, as without it', async () => {
     expect(await status(required, '/admin')).toBe(403)
     expect(await status(required, '/admin', { 'x-admin': '1' })).toBe(200)
@@ -163,7 +172,7 @@ describe('requireGuards', () => {
     // Routes alone: a layout's or module's actions are not routes a start with no setting refuses.
     expect(found.map(problem => [relative(dir, problem.file), problem.severity])).toEqual([['routes/index.kay', 'error'], ['routes/feed.json.ts', 'error'], ['api/notes.ts', 'error']])
     expect(found.every(problem => problem.message.endsWith('so the server refuses it') || problem.message.endsWith('so the server refuses its routes'))).toBe(true)
-    expect(found.every(problem => problem.help?.includes('requireGuards: false'))).toBe(true)
+    expect(found.every(problem => problem.help?.includes('guards: { default: \'open\' }'))).toBe(true)
     expect(await reported(false)).toEqual([])
   })
 

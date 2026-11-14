@@ -1,3 +1,4 @@
+import type { ImagesConfig } from '../src/config'
 import type { ImageRouteOptions } from '../src/server/image'
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -287,6 +288,15 @@ describe('images.resolve and images.guard', () => {
 
     expect((await ask()).status).toBe(401)
     expect((await ask(signedIn)).status).toBe(200)
+  })
+
+  it('takes `guards`, a list or false, and closes a resolve that has none', async () => {
+    const ask = async (images: ImagesConfig) => (await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { resolve: () => HERO, ...images } })).handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/media/7')}&w=320`))
+
+    expect((await ask({})).status).toBe(403)
+    expect((await ask({ guards: ctx => ctx.deny(401, 'Sign in') })).status).toBe(401)
+    expect((await ask({ guards: [() => undefined] })).status).toBe(200)
+    expect((await ask({ guards: false })).status).toBe(200)
   })
 
   it('answers the redirect resolve throws', async () => {

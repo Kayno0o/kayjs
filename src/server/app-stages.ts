@@ -1,7 +1,7 @@
 import type { Elysia as App } from 'elysia'
-import type { SecurityConfig, TrailingSlash } from '../config'
+import type { KayConfig, SecurityConfig, TrailingSlash } from '../config'
 import type { Mode, Project } from '../project'
-import type { GuardContext } from '../runtime'
+import type { Guard, GuardContext } from '../runtime'
 import type { ActionOptions } from './actions'
 import type { ServedOptions } from './app'
 import type { ClientBuild } from './client'
@@ -630,6 +630,16 @@ export function reports({ app, options, setup: { i18n, site, collections }, hasP
 }
 
 // The paths the config names resolve where the server runs, and development serves WebP, so a page's first load does not wait on AVIF encoding.
+// What `images.resolve` runs behind: the `guards` given, none when they are `false`, and a refusal when the app gave none, as every feature reading private files closes.
+function imageGuard(images: KayConfig['images']): Guard | undefined {
+  const given = images?.guards ?? images?.guard
+
+  if (given === false)
+    return undefined
+
+  return given === undefined ? ctx => ctx.deny(403, 'images.resolve has no guards: give `images` a `guards`, or `guards: false` to resize them for everyone') : joinGuards(given)
+}
+
 async function imageRouteOf({ project: { root }, options, env, setup: { source, client, imageCache }, security }: Boot, actions: ActionOptions): Promise<ImageRouteOptions> {
   const lookup = options.images?.resolve
   const runtimeRoot = source.runtimeRoot(root)
@@ -650,7 +660,7 @@ async function imageRouteOf({ project: { root }, options, env, setup: { source, 
       const path = await lookup(src, ctx)
 
       return path === undefined ? undefined : resolve(runtimeRoot, path)
-    }, guard: options.images?.guard === undefined ? undefined : joinGuards(options.images.guard), actions },
+    }, guard: imageGuard(options.images), actions },
   }
 }
 

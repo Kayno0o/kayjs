@@ -1671,6 +1671,7 @@ function vitals(options?: VitalsOptions): KayExtension<AnyElysia>
 interface VitalsOptions
   awaitConsent?: boolean | undefined
   guard?: GuardOption | false | undefined
+  guards?: GuardOption | false | undefined
   prefix?: string | undefined
 
 [./analytics] vitalsReport
@@ -2945,6 +2946,7 @@ interface KayConfig extends AppHooks
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | false | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
+  guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
   health?: HealthConfig | false | undefined
   i18n?: I18nConfig | undefined
@@ -3202,6 +3204,7 @@ interface PagesOptions extends KayConfig
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | false | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
+  guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
   health?: HealthConfig | false | undefined
   i18n?: I18nConfig | undefined
@@ -4242,6 +4245,7 @@ interface TestOptions extends PagesOptions
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | false | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
+  guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
   headers?: Record<string, string> | undefined
   health?: HealthConfig | false | undefined

@@ -246,6 +246,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport hero from \'./hero.jpg\'\n---\nimg(src={hero} no-placeholder alt="The workshop")',
     right: '---\nimport hero from \'./hero.jpg\'\n---\nimg(src={hero} placeholder={false} alt="The workshop")',
   },
+  'deprecated-guard-option': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`guard` in the options of `vitals()` and in the `jobs` and `images` of kay.config.ts, `guards` since 1.105: every guard option is named `guards` and takes a guard, a list of guards, `{ load }` returning one, or `false`, as a page\'s and an API module\'s do; and `requireGuards` of kay.config.ts, `guards: { default: \'closed\' }` for `true` and `\'open\'` for `false`. The old forms work until 1.108. Found in the options written in the call of `vitals` imported from `kay/server` and in the object kay.config.ts exports, in the TypeScript files and `.kay` files of the project. The fix renames the key; one beside a `guards` is reported with no fix.',
+    wrong: '// kay.config.ts\nexport default { jobs: { guard: ctx => ctx.deny(401) } }',
+    right: '// kay.config.ts\nexport default { jobs: { guards: ctx => ctx.deny(401) } }',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

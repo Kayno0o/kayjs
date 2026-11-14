@@ -70,6 +70,7 @@ export const CHECK_CONFIG = [
   'images',
   // Reports each route of the app no guard covers, which the server refuses.
   'requireGuards',
+  'guards',
   // Reports the actions offered as tools that bot protection alone stands before.
   'mcp',
   // Where the OpenAPI document and its reference page are served, which links to them are checked against.

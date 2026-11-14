@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { JobsConfig } from '../config'
+import type { Guard } from '../runtime/core'
 import type { ActionOptions } from './actions'
 import type { LoadedGuard } from './guards'
 import type { JobView, QueueView } from './job-admin'
@@ -16,27 +17,32 @@ export const JOBS_PATH = '/_kay/jobs'
 const HTML = 'text/html; charset=utf-8'
 const HEADERS = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow', 'referrer-policy': 'no-referrer' }
 
+const refuseUnguarded: Guard = ctx => ctx.deny(403, 'jobs has no guards: give `jobs` a `guards` such as `ctx => ctx.locals.auth.requireAdmin()`, or `guards: false` to open the page to everyone')
+
 export interface JobsPage {
   path: string
   guards: LoadedGuard[]
 }
 
-// The guards the setting names, or the error that stops the boot: the page lists payloads and deletes jobs, so it never mounts without one.
+// The guards the setting names. The page lists payloads and deletes jobs, so with none it answers 403 rather than open; `guards: false` opens it.
 export function jobsPageOf(setting: JobsConfig | undefined): JobsPage | undefined {
   if (setting === undefined)
     return undefined
 
-  const given = typeof setting === 'object' && setting !== null ? setting.guard as unknown : undefined
+  const object = typeof setting === 'object' && setting !== null
+  const given = object ? (setting.guards ?? setting.guard) as unknown : undefined
 
-  if (!isGuardOption(given))
-    throw new KayError('config-invalid', 'kay: `jobs` needs a `guard`, a guard function, a list of them or `{ load }`, such as `jobs: { guard: ctx => ctx.locals.auth.requireAdmin() }`: the page lists the payloads of the queues and deletes their jobs, so it never mounts open')
+  if (given !== undefined && given !== false && !isGuardOption(given))
+    throw new KayError('config-invalid', 'kay: `jobs.guards` takes a guard function, a list of them, `{ load }` returning one, or `false`, such as `jobs: { guards: ctx => ctx.locals.auth.requireAdmin() }`')
 
   const path = setting.path ?? JOBS_PATH
 
   if (!path.startsWith('/') || (path.length > 1 && path.endsWith('/')))
     throw new KayError('config-invalid', `kay: \`jobs.path\` is an absolute path without a trailing slash, not ${JSON.stringify(path)}`)
 
-  return { path, guards: guardList(given).map(check => ({ file: 'kay.config.ts', special: {}, check })) }
+  const checks = given === false ? [] : guardList(given ?? refuseUnguarded)
+
+  return { path, guards: checks.map(check => ({ file: 'kay.config.ts', special: {}, check })) }
 }
 
 // A due time past the range of a Date (a store may hold any number) is shown as it is.

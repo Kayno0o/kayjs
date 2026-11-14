@@ -27,7 +27,7 @@ import { vitals } from 'kay/analytics'
 
 export default defineConfig({
   store: sqliteData('data/app.sqlite'),
-  extensions: [vitals({ guard: { load: async () => (await import('./src/auth')).auth.guard({ require: 'admin' }) } })],
+  extensions: [vitals({ guards: { load: async () => (await import('./src/auth')).auth.guard({ require: 'admin' }) } })],
 })
 ```
 

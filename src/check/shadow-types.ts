@@ -41,6 +41,7 @@ import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-typ
 
 import { formatDurationNumbers } from './format-duration'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
+import { guardOptions } from './guard-options'
 
 import { unguardedRoutes, unguardedTools } from './guards'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
@@ -183,6 +184,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => diskFilesCalls(root, options),
   async ({ root, options }) => storeNames(root, options),
   async ({ root, options }) => formatDurationNumbers(root, options),
+  async ({ root, options }) => guardOptions(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

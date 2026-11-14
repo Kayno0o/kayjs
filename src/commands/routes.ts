@@ -24,7 +24,7 @@ import { apiPathOf, mcpPath, openApiPaths, projectApi, RESOURCE_METADATA } from 
 import { buildingWithoutEnv, PUBLIC_ENV_PATH } from '../server/env-state'
 import { ERROR_REPORTS } from '../server/errors'
 import { FAVICON_PATHS, faviconSource, localeManifests } from '../server/favicon'
-import { guardRequirement } from '../server/guard-requirement'
+import { guardRequirement, requiredBy } from '../server/guard-requirement'
 import { localeCopies, localeSettings, routedSettings } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { registerLoader } from '../server/loader'
@@ -107,7 +107,7 @@ export async function listRoutes(root: string): Promise<{ routes: Listed[], unli
   const { routes: routesDir } = projectPaths(root, config)
   const mounts = routeMounts(root, config.extensions)
   const [pages, endpoints, modules] = await Promise.all([scanRoutes(routesDir, mounts), scanEndpoints(routesDir, mounts), projectApi(root, config)])
-  const required = guardRequirement(config.requireGuards, pages, endpoints, modules)
+  const required = guardRequirement(requiredBy(config), pages, endpoints, modules)
   const routes = [...await appRoutes(root, config, content.routes, { pages, endpoints, required }), ...await apiRoutes(root, config, modules, required), ...pluginRoutes(config), ...redirectRoutes(config), ...feedRoutes(content.feeds), ...kayRoutes(root, config)]
 
   return { routes, unlisted: unlistedServers(root, config) }

@@ -148,7 +148,7 @@ In `client`, what pages ship to the browser and how it behaves there:
 
 | Option | Effect |
 | --- | --- |
-| `images` | `quality`, `widths`, `webp`, `avif`, the densest screen an image loads for (`maxDensity`, 2 by default), the shapes `aspect` may cut to (`aspects`), `placeholder: false` to leave out the color an image shows until it loads, how long a cut variant is kept on disk (`ttl`, 30 days), the limits on new variants (`rateLimit`, `maxVariants`, `queue`), the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`, with `remoteMaxSize` and `remoteTimeout`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
+| `images` | `quality`, `widths`, `webp`, `avif`, the densest screen an image loads for (`maxDensity`, 2 by default), the shapes `aspect` may cut to (`aspects`), `placeholder: false` to leave out the color an image shows until it loads, how long a cut variant is kept on disk (`ttl`, 30 days), the limits on new variants (`rateLimit`, `maxVariants`, `queue`), the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`, with `remoteMaxSize` and `remoteTimeout`) are resized, and the app's own lookup of private images (`resolve`, `guards`). See [Styling and assets](/essentials/styling-and-assets) |
 | `fonts` | Self-hosted fonts, from files or a Fontsource package |
 | `plugins` | Bun plugins the browser build runs, such as Tailwind's |
 | `budget` | The most JavaScript (`js`), CSS (`css`) or whole page (`weight`) one page may load, compressed, as `'20kb'`, and the worst EcoIndex `grade` it may have. `kay build` warns with `over-budget` for a page over it. All are off until set. See [Set a budget](/guides/performance#set-a-budget) |
@@ -167,27 +167,27 @@ In `client`, what pages ship to the browser and how it behaves there:
 | `health` | The route a load balancer polls, `/_kay/health` by default. `{ path, check, timeout }` renames it and fails it with 503 when `check` returns false, throws or takes longer than `timeout` (5 seconds by default). `false` serves none |
 | `checks` | Your own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report()`. See [Your own checks](/reference/cli#your-own-checks) |
 | `env` | The compose file or files and the example env file, `{ compose: 'compose.prod.yaml', example: '.env.example' }`, that `kay check` and `kay env` compare with the declared variables. `false` turns the comparison off, the default one included. |
-| `requireGuards` | Left out, a site with a guard of its own answers 403 on each page, endpoint and API module no guard covers unless it sets `guards: false`, and a site with no guard stays open. `true` asks it of every site and of actions too, `false` turns it off. `kay build --static` refuses to export such a page. A library's routes are left open. See [Sessions and guards](/guides/sessions-and-guards) |
+| `guards` | `{ default }` says what a route no guard covers comes to, `requireGuards` until 1.108. Left out, a site with a guard of its own answers 403 on each page, endpoint and API module no guard covers unless it sets `guards: false`, and a site with no guard stays open. `default: 'closed'` asks it of every site and of actions too, `'open'` turns it off. `kay build --static` refuses to export such a page. A library's routes are left open. See [Sessions and guards](/guides/sessions-and-guards) |
 | `cors` | The origins every API module accepts that sets no `cors` of its own, as `api({ cors })` takes them. `api({ cors: false })` opts a module out. An endpoint file sets its own in `page.cors`. See [Calls from other sites](/guides/api-routes#calls-from-other-sites) |
 | `mcp` | `true` serves an MCP endpoint at `/mcp`, or at `{ path }`, for AI agents, at most 120 requests a client a minute unless `{ rateLimit: { max, window } }` says otherwise, and only to a client sending `{ key }` as a bearer token when it is set, with a tool per API route or action that sets `tool`. Off by default. See [API routes](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) |
 | `openapi` | `true` serves an OpenAPI document of the API modules at `/api/openapi.json`. `{ reference: true }` adds a page at `/api/reference`. `path` and `referencePath` move them, `title` and `version` fill the document's `info`, and `dev: true` serves both under `kay dev` alone. See [API routes](/guides/api-routes#openapi) |
 | `live` | `{ connections, rateLimit }`: how many live connections one client address holds at once (20), and how many it opens in a `rateLimit` of `{ max, window }` (120 a minute, `false` for no limit). See [Live values and realtime](/guides/live-and-realtime) |
 | `metrics` | `true` serves `/metrics` in the Prometheus text format: requests by route and status, their durations, scheduled runs, cache reads and live connections. Answered only to a request straight from this machine or a private network, or carrying `KAY_METRICS_TOKEN` as a bearer token. `{ path }` moves it. Off by default |
-| `jobs` | `{ guard, path }` serves a page of the queues' jobs at `/_kay/jobs` with retry and delete buttons. The guard is a guard, a list of them or `{ load }`, run on every request, and without one the server does not start. Off by default |
+| `jobs` | `{ guards, path }` serves a page of the queues' jobs at `/_kay/jobs` with retry and delete buttons. The guard is a guard, a list of them or `{ load }`, run on every request, and without one the page answers 403. Off by default |
 
 ## Path and guard options
 
-A `path` is one route and a `prefix` a subtree. Every `guard` option takes a guard, a list of guards run in order, or `{ load }` returning one, which runs on the first request so `kay.config.ts` imports nothing of your auth. `false` opens what is closed without a guard.
+A `path` is one route and a `prefix` a subtree. Every `guards` option takes a guard, a list of guards run in order, or `{ load }` returning one, which runs on the first request so `kay.config.ts` imports nothing of your auth. `false` opens what is closed without a guard.
 
 | Option | Reads as | Without a guard | `false` |
 | --- | --- | --- | --- |
 | `serve.apiPrefix` | Prefix of the API modules, the OpenAPI document and its reference | The API directory's `_guard.ts` decides | No guard option |
 | `openapi.path`, `openapi.referencePath`, `mcp.path` | One route | The API directory's `_guard.ts` decides | No guard option |
 | `health.path`, `metrics.path` | One route | Open, `metrics` takes a token | No guard option |
-| `jobs.path`, `jobs.guard` | One route | The server does not start: the page lists payloads | Refused |
-| `vitals({ prefix, guard })` | Prefix | Closed, 403 | Opens the screen |
+| `jobs.path`, `jobs.guards` | One route | Closed, 403 | Opens the page |
+| `vitals({ prefix, guards })` | Prefix | Closed, 403 | Opens the screen |
 | `cms({ prefix, access })` | Prefix | Closed, 403 | Admits everyone |
-| `images.guard` | Runs before `images.resolve` | Open | Not needed |
+| `images.guards` | Runs before `images.resolve` | Closed, 403 | Resizes for everyone |
 | A page's `guards: false`, an API module's `api({ guards: false })` | One page or module | Under the guards above it | Skips them |
 
 <ReadMore href="/llms/project">Every option and its exact behaviour are in the full project reference, with the head, locales and production references for the topics above.</ReadMore>

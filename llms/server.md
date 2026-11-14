@@ -168,12 +168,12 @@ h1 Sign in
 
 ### Refuse every route no guard covers
 
-Once a site has a guard of its own, a page, endpoint or API module no guard covers answers 403 with no setting, unless it sets `guards: false`; `requireGuards: true` extends that to a site with no guard yet and to the actions of layouts, and `requireGuards: false` turns it off:
+Once a site has a guard of its own, a page, endpoint or API module no guard covers answers 403 with no setting, unless it sets `guards: false`; `guards: { default: 'closed' }` extends that to a site with no guard yet and to the actions of layouts, and `guards: { default: 'open' }` turns it off:
 
 ```ts
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ requireGuards: true }) // false keeps every route open
+export default defineConfig({ guards: { default: 'closed' } }) // 'open' keeps every route open
 ```
 
 ## Reference

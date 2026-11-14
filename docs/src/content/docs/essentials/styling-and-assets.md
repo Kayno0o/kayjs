@@ -383,7 +383,7 @@ kay asks the host directly, without an `HTTP_PROXY`, and does not accept a compr
 
 ### Private images
 
-An image the app keeps behind a session, such as one looked up by a database id, goes through the same variants. `images.resolve` gives its file and `images.guard` admits the request.
+An image the app keeps behind a session, such as one looked up by a database id, goes through the same variants. `images.resolve` gives its file and `images.guards` admits the request, and without them the route answers 403.
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -392,7 +392,7 @@ import { mediaPath } from './src/media'
 
 export default defineConfig({
   images: {
-    guard: guard((ctx) => {
+    guards: guard((ctx) => {
       if (!ctx.locals.session.get('userId'))
         ctx.deny(401)
     }),

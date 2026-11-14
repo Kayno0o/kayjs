@@ -53,11 +53,20 @@ describe('the production jobs page', () => {
     expect((await get(await app(), '/_kay/jobs')).status).toBe(404)
   })
 
-  it('refuses to boot without a guard', async () => {
-    await expect(app({ jobs: {} })).rejects.toThrow('guard')
-    await expect(app({ jobs: true })).rejects.toThrow('guard')
-    await expect(app({ jobs: { guard: [] } })).rejects.toThrow('guard')
-    await expect(app({ jobs: { guard: 'admin' } })).rejects.toThrow('guard')
+  it('answers 403 without guards, as every feature that lists private data does', async () => {
+    const response = await get(await app({ jobs: {} }), '/_kay/jobs')
+
+    expect(response.status).toBe(403)
+    expect(await response.text()).toContain('jobs has no guards')
+    await expect(app({ jobs: { guards: [] } })).rejects.toThrow('guards')
+    await expect(app({ jobs: { guards: 'admin' } })).rejects.toThrow('guards')
+  })
+
+  it('takes `guards`, and `guard` until 1.108, and opens with `guards: false`', async () => {
+    expect((await get(await app({ jobs: { guards: admin } }), '/_kay/jobs')).status).toBe(403)
+    expect((await get(await app({ jobs: { guards: admin } }), '/_kay/jobs', { 'x-admin': 'yes' })).status).toBe(200)
+    expect((await get(await app({ jobs: { guard: admin } }), '/_kay/jobs')).status).toBe(403)
+    expect((await get(await app({ jobs: { guards: false } }), '/_kay/jobs')).status).toBe(200)
   })
 
   it('is not mounted under kay dev', async () => {
@@ -101,7 +110,6 @@ describe('the production jobs page', () => {
     expect((await get(site, '/_kay/jobs')).status).toBe(403)
     expect((await get(await app({ jobs: { guard: lazy } }), '/_kay/jobs', { 'x-admin': 'yes' })).status).toBe(200)
     expect(built).toBe(2)
-    await expect(app({ jobs: { guard: false } })).rejects.toThrow('guard')
   })
 
   it('lists a failed job with its escaped error, uncached and not indexed', async () => {
