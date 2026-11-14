@@ -8,7 +8,6 @@ You need [Bun](https://bun.sh) 1.4.4 or later. kay is published as `@kayjs/kay` 
 
 A project depends on kay under the name `kay`, so imports read `kay` and `kay/server`. `kay new` writes the line `"kay": "npm:@kayjs/kay@~<version>"` in `package.json` for you.
 
-
 ## Create a project
 
 ```sh
