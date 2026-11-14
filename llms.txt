@@ -49,7 +49,7 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Islands: state to ids](llms/islands-state-to-ids.md): shared state, transitions, context
 - [Browser-only code](llms/browser-only.md): browser globals on the server, server globals in the browser
 - [Navigation](llms/navigation.md): in-place navigation, islands kept across pages
-- [Navigating from code](llms/navigation-from-code.md): `navigate`, `refresh`, `navigation`, `onNavigate`, `mount`
+- [Navigating from code](llms/navigation-from-code.md): `navigate`, `refresh`, `navigation`, `mount`
 - [Pages and routing](llms/routing.md): file-based routes, params, layouts, `ctx`
 - [Special pages and error reporting](llms/routing-special-pages.md): `_error.kay`, status pages, `observe.onError`
 - [Endpoints, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `GET`/`POST`, `redirects`

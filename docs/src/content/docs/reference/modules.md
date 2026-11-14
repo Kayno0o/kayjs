@@ -13,7 +13,7 @@ import { collection } from 'kay/content'
 
 A name is imported where it is used, in a `.kay` file and in a `.ts` file alike; only `props` needs no import. A type is imported with `import type`. A name used with no import is a type error, and `kay check --fix` writes the import of any name a `kay/*` entry exports.
 
-`kay/server` also exports `s`, so a server module imports `defineEnv` and `s` from one path. A module an island also imports takes `s` from `kay`, which has the lighter browser build.
+`s` comes from `kay`, whichever side runs the module, and has the lighter browser build. `kay/server` exported it too before 1.105, and still does until 1.108: `kay upgrade` moves the import.
 
 ## kay
 
@@ -45,7 +45,7 @@ A name is imported where it is used, in a `.kay` file and in a `.ts` file alike;
 | `searchResults`, `searchSite` | The site search from an island: following a signal holding the query, or as a promise |
 | `shortcut` | Binds a keyboard shortcut such as `mod+s` for as long as the island lives, on the page or one element. See [Islands](/essentials/islands#keyboard-shortcuts) |
 | `guardLeave` | Warns before leaving a page with unsaved changes |
-| `navigation`, `onBeforeNavigate`, `onNavigate` | Where an in-place navigation stands (`status()`, `pending()`, `to()`, `error()`), a hook that may cancel one, and a hook after each shown page. See [Islands](/essentials/islands#page-navigation) |
+| `navigation` | Where an in-place navigation stands (`status()`, `pending()`, `to()`, `error()`), and its hooks: `onBeforeNavigate`, which may cancel one, and `onNavigate`, after each shown page. See [Islands](/essentials/islands#page-navigation) |
 | `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`, which has the route's `status` (0 when no answer came), a `message` safe to show, `errors` per field and the route's `data`. See [API routes](/guides/api-routes) |
 | `apiUrl` | Where a route of an API module is served, under `base` and `serve.apiPrefix`, for code that needs the URL rather than a call. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables marked `s.Public` in `defineEnv`, exposed to islands |
@@ -111,7 +111,7 @@ Types include `BrowserError` and `CspViolationError`, the browser errors and CSP
 | `kay/words` | `wording`, `pageLocale`, `sizeText`, `formatDate`, `formatNumber`: the lookup a library words its default texts through. See [Internationalization](/guides/i18n) |
 | `kay/params` | The route matchers `integer`, `uuid` and `slug` |
 | `kay/pg-orm` | `jobTables`, with `KayJobs` and `KayLocks`: the job queue's tables as pg-orm definitions, for the app's `new Database({ tables })`. Needs `@kaynooo/pg-orm`. See [Background jobs](/guides/background-jobs#postgres) |
-| `kay/cache` | `cached`, `cache`, `cacheTag`, `invalidate`, `invalidatePage`, `sqliteCache` (also exported from `kay/server`). See [Caching and streaming](/guides/caching-and-streaming) |
+| `kay/cache` | `cached`, `cache`, `cacheTag`, `invalidate`, `invalidatePage`, `sqliteCache` (`kay/server` still exports it until 1.108). See [Caching and streaming](/guides/caching-and-streaming) |
 | `kay/analytics` | `analytics`, the extension counting visits through your own origin, `consent`, the visitor's answer to its notice, and `vitals` with `vitalsReport`, the real visitors' Web Vitals. See [Privacy](/guides/privacy#counting-visits) |
 | `kay/library` | What a library's extension, commands and dev routes use: `KayCommand`, `underKayDev`, `missingTranslations`, `writeDraftMessages`, `escapeHtml` and more. See [Component libraries](/guides/component-libraries#extensions) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |
@@ -120,7 +120,7 @@ Types include `BrowserError` and `CspViolationError`, the browser errors and CSP
 | `kay/test/preload` | The preload `kay test` loads, and a project's `bunfig.toml` lists for a plain `bun test`; it also closes the test sites and copies a database per file from a `pg-orm.config.ts`. See [Testing](/guides/testing#a-database-for-each-test-file) |
 | `kay/test/dom` | Registers happy-dom's DOM, popover API included, which `mountComponent` loads on its first mount. See [Testing](/guides/testing#one-component) |
 | `kay/bun` | `kay`, the Bun plugin compiling `.kay` files for a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
-| `kay/mount` | `mount` (also exported from `kay`), which renders a component into an element on a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
+| `kay/mount` | `mount`, which `kay` exports too and is the home of: the entry stays until 1.108. It renders a component into an element on a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
 | `kay/eslint` | The ESLint processor for `.kay` files. See [Checks](/reference/checks) |
 | `kay/tsconfig.json` | The base tsconfig a project extends |
 | `kay/jsx-runtime` | Where TypeScript finds the JSX types, through the `jsxImportSource` of the base tsconfig. Nothing to import |

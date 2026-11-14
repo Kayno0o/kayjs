@@ -133,7 +133,7 @@ As in Next.js, props to an island are serialized, so a page cannot pass one a fu
 | `className` | The `.name` shorthand or `class` |
 | `dangerouslySetInnerHTML` | `innerHTML` through `trustHtml` or `sanitizeHtml` |
 | Zustand, Jotai, Redux | A module exporting a signal, shared by every island that imports it |
-| A preference kept in a cookie or `localStorage` | `persisted('theme', 'light')`, kept in a cookie the server reads too |
+| A preference kept in a cookie or `localStorage` | `persisted.cookie('theme', 'light')`, kept in a cookie the server reads too |
 
 State shared across islands lives in a `.ts` module.
 
@@ -141,7 +141,7 @@ State shared across islands lives in a `.ts` module.
 import { persisted, signal } from 'kay'
 
 export const cart = signal<string[]>([])
-export const theme = persisted('theme', 'light')
+export const theme = persisted.cookie('theme', 'light')
 ```
 
 ## Data, caching and rendering

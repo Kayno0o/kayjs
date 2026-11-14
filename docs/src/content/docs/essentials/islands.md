@@ -66,7 +66,7 @@ An effect made with no owner, at the top of a module, after an `await` or in a t
 
 ### Stopping a helper early
 
-`every`, `watch`, `listen`, `shortcut`, `guardLeave`, `followLog` and `presence` last as long as the island, and each returns what stops it sooner, as `mount` and `onNavigate` do. Calling it twice does nothing. Each also takes `{ signal }`, an `AbortSignal`, which stops it when aborted: a helper given a signal that is already aborted starts nothing, and `listen` takes it as one of the options of `addEventListener`.
+`every`, `watch`, `listen`, `shortcut`, `guardLeave`, `followLog` and `presence` last as long as the island, and each returns what stops it sooner, as `mount` and `navigation.onNavigate` do. Calling it twice does nothing. Each also takes `{ signal }`, an `AbortSignal`, as do `effect`, `onMount`, `debounced` and `throttled`, which stops it when aborted: a helper given a signal that is already aborted starts nothing, and `listen` takes it as one of the options of `addEventListener`.
 
 ```ts
 import { every, listen } from 'kay'
@@ -74,7 +74,7 @@ import { every, listen } from 'kay'
 const stop = every('3s', refresh)
 const abort = new AbortController()
 
-listen(window, 'online', refresh, { signal: abort.signal })
+listen(() => window, 'online', refresh, { signal: abort.signal })
 // later: stop() and abort.abort()
 ```
 
@@ -178,18 +178,18 @@ A signal exported from a `.ts` module is one state for every island on the page 
 import { persisted, signal } from 'kay'
 
 export const cart = signal<string[]>([])
-export const theme = persisted('theme', 'light')
+export const theme = persisted.cookie('theme', 'light')
 ```
 
-`persisted` keeps its value across pages and visits in a cookie. The server reads the cookie too, so the first paint is right. The cookie lasts a year; pass `{ maxAge: '30d' }` for another time.
+`persisted.cookie()` keeps its value across pages and visits in a cookie. The server reads the cookie too, so the first paint is right. The cookie lasts a year; pass `{ maxAge: '30d' }` for another time.
 
-A cookie can hold a value your app never offers, after an old release or an edit by hand. Name the values the signal may hold, and anything else reads as the default, on the server and in the browser: `persisted('theme', 'light', { values: ['light', 'dark'] })`. The signal is then typed `'light' | 'dark'`, and a default outside them is a type error.
+A cookie can hold a value your app never offers, after an old release or an edit by hand. Name the values the signal may hold, and anything else reads as the default, on the server and in the browser: `persisted.cookie('theme', 'light', { values: ['light', 'dark'] })`. The signal is then typed `'light' | 'dark'`, and a default outside them is a type error.
 
-A param kept in the URL takes `values` too: `persisted.query('tab', 'site', { values: ['site', 'logs'] })`; a number or a boolean in `values` is compared with what the page's `query` schema reads, or, with no schema naming the param, with its text, so `?page=2` reads as `2` for `values: [1, 2, 3]`.
+A param kept in the URL takes `values` too: `queryParam('tab', { default: 'site', values: ['site', 'logs'] })`; a number or a boolean in `values` is compared with what the page's `query` schema reads, or, with no schema naming the param, with its text, so `?page=2` reads as `2` for `values: [1, 2, 3]`.
 
-Each storage has its own entry, taking the options that storage can use: `persisted.cookie()`, which `persisted()` is, `persisted.local()`, `persisted.session()` and `persisted.query()`.
+Each storage has its own entry, taking the options that storage can use: `persisted.cookie()`, `persisted.local()` and `persisted.session()`, and a call always names its storage. A bare `persisted(name, value)` still keeps a cookie until 1.108, and `kay upgrade` writes `.cookie` for it.
 
-`persisted.query('q', '')` keeps a string in the page's URL instead, as `?q=...`. A filter then survives a reload and a shared link. A param that is cleared stays cleared too: when the default is not empty, an empty string or list is written as `?q=` or `?tags=`, so a reload reads it back as empty rather than as the default.
+`queryParam('q', { default: '' })` keeps a string in the page's URL instead, as `?q=...`, and is the one signal of a query param. A filter then survives a reload and a shared link. A param that is cleared stays cleared too: when the default is not empty, an empty string or list is written as `?q=` or `?tags=`, so a reload reads it back as empty rather than as the default.
 
 `persisted.local('draft', '')` uses localStorage. The server never sees it, so every island reading it renders the default first, then shows the kept value. `persisted.session()` does the same in sessionStorage, which lasts as long as the tab and is not shared with another one.
 
@@ -326,9 +326,9 @@ button(onClick={() => navigate('/todos')}) Todos
 
 A path goes where the same `href` would: your `base` and the current locale's prefix are added, `/todos` on a French page going to `/fr/todos`, and a path that already has a locale prefix is left as it is.
 
-`navigate({ query: { sort: 'name', page: null } })` changes the current page's query in place. The scroll and the focus stay, and a null or empty value drops its param. A text field the swap replaces, such as a search box whose island gets the new value, keeps its caret and selection, and the keys typed meanwhile, so a search as you type keeps taking the keys.
+`navigate.query({ sort: 'name', page: null })` changes the current page's query in place, and takes the options of `navigate()`. The scroll and the focus stay, and a null or empty value drops its param. A text field the swap replaces, such as a search box whose island gets the new value, keeps its caret and selection, and the keys typed meanwhile, so a search as you type keeps taking the keys.
 
-To link to the current page with one param changed, use `withQuery`. It works in a server fence, a template and an island, and follows the same rules as `navigate({ query })`.
+To link to the current page with one param changed, use `withQuery`. It works in a server fence, a template and an island, and follows the same rules as `navigate.query()`.
 
 ```kay
 ---
@@ -337,7 +337,7 @@ import { withQuery } from 'kay'
 a(href={withQuery({ page: 2 })}) Next
 ```
 
-In an island it follows the address, so the link changes with each `navigate({ query })`, page swap and Back. It keeps the other params, and your `base`, `trailingSlash` and locale prefix are added the way they are to any link.
+In an island it follows the address, so the link changes with each `navigate.query()`, page swap and Back. It keeps the other params, and your `base`, `trailingSlash` and locale prefix are added the way they are to any link.
 
 `navigate('/todos', { scroll: 'keep' })` goes to the page without scrolling to the top, and `{ transition: false }` swaps it without a view transition. A link does the same with `data-keep-scroll` and `data-no-transition`, which an element around several links can carry. The nearest `data-keep-scroll` to the link decides, so `data-keep-scroll="false"` on one link inside a keeping element scrolls to the top.
 
@@ -365,13 +365,13 @@ if navigation.pending()
 
 `navigation` answers `status()`, `pending()` and `error()` as every other source an island reads does: see [island sources](/llms/island-sources).
 
-`onBeforeNavigate` asks before a link, `navigate()`, Back or Forward leaves the page, and keeps the page when it returns `false`. `onNavigate` runs after each page is shown. Both get one object, end with the island, and return a function that removes them sooner. A handler that throws is logged and the navigation goes on.
+`navigation.onBeforeNavigate` asks before a link, `navigate()`, Back or Forward leaves the page, and keeps the page when it returns `false`. `navigation.onNavigate` runs after each page is shown. Both get one object, end with the island, and return a function that removes them sooner. A handler that throws is logged and the navigation goes on.
 
 ```ts
-import { onBeforeNavigate, onNavigate } from 'kay'
+import { navigation } from 'kay'
 
-onBeforeNavigate(({ url }) => !uploading() || url.pathname.startsWith('/uploads'))
-onNavigate(({ url }) => track(url.pathname))
+navigation.onBeforeNavigate(({ url }) => !uploading() || url.pathname.startsWith('/uploads'))
+navigation.onNavigate(({ url }) => track(url.pathname))
 ```
 
 What a script appends to `<body>` goes with the next swap, as the next page never renders it. Mark it `data-kay-keep` to keep it through every swap, the same element at the end of the body, such as a live region an announcer fills. The swap never moves it, so a live region is still read. Only a direct child of `<body>` is kept this way, and only one a script added: an element the server renders comes back with the next page.
@@ -484,7 +484,9 @@ onMount(() => drawMap(center))
 
 `every(interval, run)` runs `run` on a timer while the island lives, `interval` being a duration such as `'1s'`. `every('1s', () => now = Date.now())` ticks a clock. The timer pauses while the tab is hidden and runs once as it shows again; pass `{ background: true }` to keep it running. An interval of zero, a negative one or one that is not a duration throws.
 
-`listen(window, 'keydown', event => ...)` listens to an event of `window` or `document`. It removes the listener when the island ends. Call it with an arrow function or read the target as `event.currentTarget`, as the callback has no `this`. An `effect()` or `onCleanup()` inside the callback belongs to the island and builds up with every event, as in an element's handler, so keep them out of it.
+`listen(() => window, 'keydown', event => ...)` listens to an event of `window` or `document`, the target being a function returning it: that is the one form, which a `.ts` module runs on the server too, and a `ref` or a signal follows as it changes. `listen(window, ...)` works until 1.108, `kay upgrade` wrapping the target (`deprecated-listen-target`). It removes the listener when the island ends.
+
+Call it with an arrow function or read the target as `event.currentTarget`, as the callback has no `this`. An `effect()` or `onCleanup()` inside the callback belongs to the island and builds up with every event, as in an element's handler, so keep them out of it.
 
 `kay check` reports the `unowned-effect` lint for such a call, and for one in a timer or after an `await`; in development the same call with no owner at all logs a warning.
 
@@ -599,10 +601,10 @@ if !connected()
 
 ## A page kay does not serve
 
-A page bundled by something else, such as an HTML file `Bun.serve` imports, can render `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`. Then render one with `mount` from `kay` (`kay/mount` is the same function), which returns a handle: call it, or call its `dispose`, to remove the component, and call `update` to give it other props.
+A page bundled by something else, such as an HTML file `Bun.serve` imports, can render `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`. Then render one with `mount` from `kay`, which returns a handle: call it, or call its `dispose`, to remove the component, and call `update` to give it other props.
 
 ```ts
-import { mount } from 'kay/mount'
+import { mount } from 'kay'
 import Panel from './panel.kay'
 
 const panel = mount(Panel, document.querySelector('#panel')!, { title: 'Tickets' })

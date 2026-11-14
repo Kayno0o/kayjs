@@ -21,7 +21,8 @@ export const Todo = defineTable('todo', f => ({
 
 ```ts
 // src/env.ts
-import { defineEnv, s } from 'kay/server'
+import { s } from 'kay'
+import { defineEnv } from 'kay/server'
 
 export const env = defineEnv(s.Object({ DATABASE_URL: s.String() }))
 ```

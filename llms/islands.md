@@ -40,26 +40,26 @@ p {cart().length} in the cart
 
 ### Keep a value across pages and visits
 
-`persisted` keeps it in a cookie the server reads too, so the first paint shows it:
+`persisted.cookie()` keeps it in a cookie the server reads too, so the first paint shows it:
 
 ```kay
 ---
 import { persisted } from 'kay'
 
-const theme = persisted('theme', 'light')
+const theme = persisted.cookie('theme', 'light')
 ---
 button(onClick={() => theme = theme() === 'light' ? 'dark' : 'light'}) Theme: {theme()}
 ```
 
 ### Keep a filter in the URL
 
-`persisted.query()` keeps it as a query param, so a reload or a shared link keeps it (`persisted.local()` and `persisted.session()` keep it in the browser's storage):
+`queryParam()` keeps it as a query param, so a reload or a shared link keeps it (`persisted.local()` and `persisted.session()` keep it in the browser's storage):
 
 ```kay
 ---
-import { persisted } from 'kay'
+import { queryParam } from 'kay'
 
-const q = persisted.query('q', '')
+const q = queryParam('q', { default: '' })
 ---
 input(type="search" bind:value={q} aria-label="Search")
 ```

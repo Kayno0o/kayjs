@@ -72,7 +72,7 @@ This release ships the helpers (`dispatch()`, `decide()`, `hookContext()`, `Hook
 - Hooks are flat keys in the options of the factory that owns the transition (`auth({ onEvent })`), never a `hooks: {}` bag. App-wide hooks go in `kay.config.ts`.
 - A library with many audit-style transitions may add one catch-all `onEvent({ event, ...fields, context })`, `event` in kebab case, beside the per-transition hooks.
 - Not hooks: resolvers (`allow`, `authorize`, `locate`, `exportData`, `profileFields`) compute a value the library needs, are awaited and let their errors propagate; a controlled-state pair keeps `on<Prop>Change` (`open` and `onOpenChange`).
-- A function that registers a hook is `on` plus the hook's name: `onBeforeNavigate(fn)` registers `beforeNavigate`. Browser hooks follow the same rule, and are never a security boundary: the server checks again.
+- A function that registers a hook is `on` plus the hook's name: `navigation.onBeforeNavigate(fn)` registers `beforeNavigate`. Browser hooks follow the same rule, and are never a security boundary: the server checks again.
 
 ### Errors in `onX`
 

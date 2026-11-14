@@ -165,7 +165,7 @@ A store is a module that exports a signal. Every island that imports it shares o
 import { persisted, signal } from 'kay'
 
 export const cart = signal<string[]>([])
-export const theme = persisted('theme', 'light')
+export const theme = persisted.cookie('theme', 'light')
 ```
 
 `writable` becomes `signal`, `derived` becomes `memo`, and `$cart` becomes `cart()`. `persisted` keeps its value in a cookie, so the server renders the right first paint.

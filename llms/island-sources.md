@@ -45,7 +45,7 @@ A failure is an `ApiError` from `kay` whatever raised it: `status`, `message`, `
 | `track()`, `call.track` | `idle`, `loading`, `ready`, `failed` | `onSuccess`, `onError` |
 | `local` | `syncStatus()` reads `loading`, `synced`, `unsynced`, `offline`, `signed-out`, `unavailable` | `onSync`, `onIssue`, `onError` |
 | `live()` handle | `idle`, `connecting`, `open`, `failed` | none |
-| `navigation` | `idle`, `loading`, `swapping` | `onNavigate`, `onBeforeNavigate` |
+| `navigation` | `idle`, `loading`, `swapping` | `navigation.onNavigate`, `navigation.onBeforeNavigate` |
 | `infiniteList` (kayjs-ui) | `loading`, `ready`, `failed` | `load` and `onError` props, see kayjs-ui `infiniteList` |
 
 - `local` keeps its own words in `status()` until 2.0 (`pending` for `unsynced`), and its `pending()` still counts the writes the server has not taken until then: read `unsynced()` for that count and `syncStatus()` for the states. `error()` is set when a read of the server failed or the browser keeps no IndexedDB.
