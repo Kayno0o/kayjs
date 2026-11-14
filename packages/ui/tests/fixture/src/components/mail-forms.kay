@@ -15,6 +15,8 @@ const action = Object.assign(async () => undefined, {
   url: '/_kay/action/mail/form',
   pending: () => false,
   succeeded: () => done(),
+  status: () => done() === undefined ? 'idle' : 'ready',
+  data: () => done()?.data,
   failed: () => failed(),
   error: (field = '') => (failed()?.errors as Record<string, string> | undefined)?.[field],
 }) as unknown as Action<never, unknown>
