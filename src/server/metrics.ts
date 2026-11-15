@@ -8,7 +8,7 @@ import { routerPath } from './base'
 import { pathOf, statusOf } from './log'
 import { fromPrivateNetwork } from './protection'
 import { sameText } from './seal'
-import { checkSecret, readSecret, secretSource } from './secret'
+import { checkSecret, readSecret, secretSource, verifying } from './secret'
 
 export const METRICS_PATH = '/metrics'
 const TOKEN_VARIABLE = 'KAY_METRICS_TOKEN'
@@ -43,7 +43,7 @@ function configuredToken(setting: MetricsConfig['token'], root: string): string 
     return undefined
 
   const secret = setting === true ? undefined : checkSecret(setting, 'metrics.token', '`true` to read KAY_METRICS_TOKEN')
-  const token = secret === undefined ? environmentToken() : readSecret(secret, root)
+  const token = secret === undefined ? environmentToken() ?? verifying() : readSecret(secret, root)
 
   if (token !== undefined)
     return token

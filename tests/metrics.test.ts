@@ -25,6 +25,7 @@ const stops: (() => Promise<unknown>)[] = []
 afterEach(async () => {
   delete process.env.KAY_METRICS_TOKEN
   delete process.env.KAY_PROXY_KEY
+  delete process.env.KAY_BUILD_VERIFY
   process.env.NODE_ENV = 'test'
   await Promise.all(stops.splice(0).map(async stop => stop()))
 })
@@ -168,6 +169,22 @@ describe('metrics', () => {
     delete process.env.KAY_METRICS_TOKEN
 
     await expect(listening({ ops: { metrics: { token: true } } })).rejects.toThrow('KAY_METRICS_TOKEN')
+  })
+
+  it('boots a build verify with `token: true` and no KAY_METRICS_TOKEN, the route refusing every request', async () => {
+    delete process.env.KAY_METRICS_TOKEN
+
+    const url = await listening({ ops: { metrics: { token: true } } }, { KAY_BUILD_VERIFY: '1' })
+
+    expect(await status(`${url}/metrics`)).toBe(403)
+  })
+
+  it('outside production, a `token: true` with no KAY_METRICS_TOKEN boots and refuses every request', async () => {
+    delete process.env.KAY_METRICS_TOKEN
+
+    const url = await listening({ ops: { metrics: { token: true } } }, { NODE_ENV: 'test' })
+
+    expect(await status(`${url}/metrics`)).toBe(403)
   })
 
   it('reads KAY_METRICS_TOKEN for `token: true`', async () => {
