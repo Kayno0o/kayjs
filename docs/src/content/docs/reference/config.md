@@ -57,7 +57,7 @@ export default defineConfig({
   dirs: { routes: 'src/pages', public: 'static' },
   limits: { body: '2mb', byPath: { '/upload': '50mb' } },
   serve: { compress: false },
-  observe: { onError: ({ error }) => report(error) },
+  onError: ({ error }) => report(error),
   client: { navigation: false },
 })
 ```
@@ -93,20 +93,20 @@ At the top level, hooks for the whole app:
 | --- | --- |
 | `beforeRequest` | Runs before the guards of every request that reaches a route. Return `false` or throw `refuse()` to refuse it, or return a `Response` to answer it |
 | `onResponse` | Told `{ request, url, status, duration }` after each answer |
-| `onStart`, `onStop` | Run when the server listens and when it stops |
+| `onListen`, `onStop` | Run when the server listens and when it stops |
+| `onError` | Receives `{ error, request }` for every error a load, render, guard, action, API route, job or island throws, for an error tracker; the request is `undefined` outside one |
 | `actions` | Defaults for every action: `protect`, `maxSize`, `messages`, and the hooks `beforeRun`, `onSuccess` and `onError`. An action's own settings replace them key by key, and `protect: false` takes none. See [Hooks](/guides/hooks) |
 
 In `observe`, what you watch the server by:
 
 | Option | Effect |
 | --- | --- |
-| `observe.log` | One line per request, and kay's own messages. On in production as text; `'json'` writes one JSON object each, a function receives each `LogEntry`, and `false` turns the request lines off |
+| `observe.log` | One line per request, and kay's own messages. On in production as text; `{ format: 'json' }` writes one JSON object each, `{ sink }` receives each `LogEntry`, `{ requests: false }` and `false` turn the request lines off |
 | `observe.serverTiming` | A `Server-Timing` header on pages rendered per request, and on actions, endpoints and API routes. On in development, off otherwise unless set |
 | `observe.loadBudget` | In development, how long a page's loads may take before kay warns in the terminal, the browser console and the dev tool, naming the slowest load: a duration, `'300ms'` by default, or `false` for no warning |
 | `observe.requestIdHeader` | The header a request's id goes out on and a trusted proxy's comes in on, `x-request-id` by default. See [Deployment](/guides/deployment) |
 | `observe.extract` | Reads a request's trace context from its headers, as `headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. Kay reads `traceparent` itself by default; `false` ignores incoming traces |
 | `observe.tracer` | An OpenTelemetry tracer, as `trace.getTracer('my-site')`, giving a span per page and API request. None by default |
-| `observe.onError` | Receives `{ error, request }` for every error a load, render, guard, action, API route, job or island throws, for an error tracker; the request is `undefined` outside one |
 
 In `client`, what pages ship to the browser and how it behaves there:
 

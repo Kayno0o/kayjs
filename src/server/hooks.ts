@@ -21,17 +21,17 @@ export interface HookContext {
   locale: string | undefined
 }
 
-// An `onX` hook: told what happened, its return ignored.
-export type Hook<E> = (event: E & { context: HookContext }) => unknown
+// An `onX` hook: told what happened, its return ignored. `context` is the one a hook is told where it runs, which a hook of a place with more to tell (an action) widens.
+export type Hook<E, Context extends HookContext = HookContext> = (event: E & { context: Context }) => unknown
 
 // A `beforeX` hook: nothing goes on unchanged, an object lays the fields it may change over the input, `false` refuses, and throwing `refuse()` refuses with a message.
-export type BeforeHook<E, Change> = (event: E & { context: HookContext }) => void | false | Partial<Change> | Promise<void | false | Partial<Change>>
+export type BeforeHook<E, Change, Context extends HookContext = HookContext> = (event: E & { context: Context }) => void | false | Partial<Change> | Promise<void | false | Partial<Change>>
 
-export interface DispatchOptions {
+export interface DispatchOptions<Context extends HookContext = HookContext> {
   // Runs the hooks off the caller's path: not awaited, for a streaming answer or a timing-sensitive one.
   detached?: boolean | undefined
   // The context to hand the hooks, for a caller that built it already; read from the request being answered otherwise.
-  context?: HookContext | undefined
+  context?: Context | undefined
 }
 
 // How long a hook is waited for: it is left running after, and the late finish is reported.
@@ -88,8 +88,8 @@ async function reportLate(source: string, outcome: Promise<Outcome>, context: Ho
     await reportHookError(source, done.error, context.request)
 }
 
-async function runHooks<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, given: HookContext | undefined): Promise<void> {
-  const context = given ?? await hookContext()
+async function runHooks<E extends object, Context extends HookContext>(source: string, hooks: readonly (Hook<E, Context> | undefined)[], event: E, given: Context | undefined): Promise<void> {
+  const context = given ?? await hookContext() as Context
   const told = { ...event, context }
 
   for (const hook of hooks) {
@@ -111,7 +111,7 @@ async function runHooks<E extends object>(source: string, hooks: readonly (Hook<
 
 // Tells the `onX` hooks of one transition, in order: each is awaited for up to 10 s, a throw or a late finish is logged and handed to the app's `onError` with `source`, and the next hook still runs.
 // Never rejects.
-export async function dispatch<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached = false, context }: DispatchOptions = {}): Promise<void> {
+export async function dispatch<E extends object, Context extends HookContext = HookContext>(source: string, hooks: readonly (Hook<E, Context> | undefined)[], event: E, { detached = false, context }: DispatchOptions<Context> = {}): Promise<void> {
   if (!hooks.some(hook => hook !== undefined))
     return
 
@@ -126,11 +126,11 @@ export async function dispatch<E extends object>(source: string, hooks: readonly
 const LATE = Symbol('late')
 
 // Runs the `beforeX` hooks of one transition in order: each sees the event with what the ones before changed, the first refusal stops the chain, and a throw other than `refuse()` refuses as a server error after it is reported.
-export async function decide<E extends object, C extends object>(source: string, hooks: readonly (BeforeHook<E, C> | undefined)[], event: E, given?: HookContext): Promise<{ change: Partial<C> } | { refused: ErrorShape & { retryAfter?: number | undefined } }> {
+export async function decide<E extends object, C extends object, Context extends HookContext = HookContext>(source: string, hooks: readonly (BeforeHook<E, C, Context> | undefined)[], event: E, given?: Context): Promise<{ change: Partial<C> } | { refused: ErrorShape & { retryAfter?: number | undefined } }> {
   if (!hooks.some(hook => hook !== undefined))
     return { change: {} }
 
-  const context = given ?? await hookContext()
+  const context = given ?? await hookContext() as Context
   let change: Partial<C> = {}
 
   for (const hook of hooks) {

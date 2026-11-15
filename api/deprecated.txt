@@ -59,6 +59,7 @@ cms [.] CollectionSettings.onUpload	1.108	deprecated-hook-names	Written `afterUp
 kay [./compiler] CompileResult.why	2.0.0	-	Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. Removed in 2.0.0. No lint: a field of the compile result that tools read, nothing in an app's source.
 kay [./mount] Mounted	1.108.0	deprecated-import-path	Import `Mounted` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./mount] mount	1.108.0	deprecated-import-path	Import `mount` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
+kay [./server] PagesOptions.onStart	1.108	deprecated-app-hooks	Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108.
 kay [./server] QueueOptions.lostAfter	1.108	deprecated-job-options	`timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it.
 kay [./server] RateLimit	1.108.0	deprecated-import-path	Import `RateLimit` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] RateLimitRefusal	1.108.0	deprecated-import-path	Import `RateLimitRefusal` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
@@ -70,9 +71,13 @@ kay [./server] diskFiles	1.108	deprecated-disk-files	`diskFiles({ dir, ...hooks 
 kay [./server] s	1.108.0	deprecated-import-path	Import `s` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] schedule	1.108	deprecated-schedule-call	`schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it.
 kay [./server] sqliteCache	1.108.0	deprecated-import-path	Import `sqliteCache` from `kay/cache`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
+kay [./test] TestOptions.onStart	1.108	deprecated-app-hooks	Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108.
 kay [./test] TestSite.refusal	1.108.0	deprecated-test-helpers	`site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 kay [./test] TestSite.socketRefusal	1.108.0	deprecated-test-helpers	`site.socket.refused`, beside the `site.socket` it refuses. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 kay [.] Action.succeeded	1.108.0	deprecated-source-readers	Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
+kay [.] ActionDone.ctx	1.108	deprecated-hook-context	Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108.
+kay [.] ActionFailed.ctx	1.108	deprecated-hook-context	Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108.
+kay [.] ActionRun.ctx	1.108	deprecated-hook-context	Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108.
 kay [.] Connection.last	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] Local.onSync	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] Local.rows	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.

@@ -1,4 +1,4 @@
-import type { ObserveConfig } from '../config'
+import type { ErrorHook } from './app-hooks'
 import { within } from '@kaynooo/utils/promise'
 import { errorCodeOf } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
@@ -20,7 +20,7 @@ export function isUncaught(error: unknown, code: unknown): boolean {
 }
 
 // Logs an error kay caught while answering `request`, under that request, and hands it to the app's `onError`, without holding the response for it.
-export function reportServerError(error: unknown, request: Request, onError: ObserveConfig['onError']): void {
+export function reportServerError(error: unknown, request: Request, onError: ErrorHook | undefined): void {
   const record = requestRecord(request)
   const seen = record.reported
 
@@ -49,7 +49,7 @@ export function reportServerError(error: unknown, request: Request, onError: Obs
     void deliver(error, request, onError)
 }
 
-async function deliver(error: unknown, request: Request | undefined, onError: NonNullable<ObserveConfig['onError']>, source?: string): Promise<void> {
+async function deliver(error: unknown, request: Request | undefined, onError: ErrorHook, source?: string): Promise<void> {
   try {
     const code = errorCodeOf(error)
 
@@ -65,9 +65,9 @@ async function deliver(error: unknown, request: Request | undefined, onError: No
 }
 
 // What `onError` of the app being served is, for the errors met outside any request, where no config is at hand.
-let appOnError: ObserveConfig['onError']
+let appOnError: ErrorHook | undefined
 
-export function useAppOnError(onError: ObserveConfig['onError']): void {
+export function useAppOnError(onError: ErrorHook | undefined): void {
   appOnError = onError
 }
 

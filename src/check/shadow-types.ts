@@ -35,32 +35,35 @@ import { readRuntimeRedirects } from '../server/runtime-redirects'
 
 import { actionType } from './action-type'
 import { aiLanguage } from './ai-language'
+import { appHooks } from './app-hooks'
 import { authRateLimits } from './auth-rate-limits'
 import { cmsOptions } from './cms-options'
 import { configSwitches } from './config-switches'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
+
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-
 import { formatDurationNumbers } from './format-duration'
+
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
-
 import { guardOptions } from './guard-options'
-import { unguardedRoutes, unguardedTools } from './guards'
 
+import { unguardedRoutes, unguardedTools } from './guards'
+import { hookContext } from './hook-context'
 import { hookNames } from './hook-names'
 import { imagesKeys } from './images-keys'
-
 import { islandOnlyComponents } from './island-only'
 
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
-import { largePublicImages } from './large-images'
 
+import { largePublicImages } from './large-images'
 import { liveApi } from './live-api'
+
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
 import { unreadOpenSettings } from './open-settings'
+import { pagesOptions } from './pages-options'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { rateEnforce } from './rate-enforce'
 import { removedUiTokens } from './removed-ui-tokens'
@@ -200,6 +203,9 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => guardOptions(root, options),
   async ({ root, options }) => configSwitches(root, options),
   async ({ root, options }) => imagesKeys(root, options),
+  async ({ root, options }) => appHooks(root, options),
+  async ({ root, options }) => hookContext(root, options),
+  async ({ root, options }) => pagesOptions(root, options),
   async ({ root, options }) => ttlNames(root, options),
   async ({ root, options }) => rateEnforce(root, options),
   async ({ root, options }) => authRateLimits(root, options),

@@ -1,4 +1,4 @@
-import type { ConfigInput, ImageFormats, ImageLimits, KayConfig, Loadable, RemoteImages } from './config'
+import type { ConfigInput, ImageFormats, ImageLimits, KayConfig, Loadable, ObserveConfig, ObserveInput, RemoteImages } from './config'
 import { isRecord } from './config-rules'
 
 // A list as the config gave it: itself, or what the function returns, awaited.
@@ -40,7 +40,16 @@ async function resolveImages(images: NonNullable<ConfigInput['images']>): Promis
   }
 }
 
-// The config `kay.config.ts` wrote as the `KayConfig` the server reads: each list that a function gave loaded once, the old flat keys of `images` in their groups. Called as the config loads, so `kay dev` calls the functions again after a change to the file.
+// `observe` with its `log` as the group it is since 1.105 (`'json'` is `{ format: 'json' }`, a function `{ sink }`), and the `onError` it held, which is a key of the config now, set aside.
+function resolveObserve(observe: ObserveInput): { observe: ObserveConfig, onError: ObserveInput['onError'] } {
+  const { log, onError, ...rest } = observe
+  const named = log === 'json' ? { format: 'json' as const } : log
+  const grouped = typeof named === 'function' ? { sink: named } : named
+
+  return { observe: { ...rest, ...grouped !== undefined && { log: grouped } }, onError }
+}
+
+// The config `kay.config.ts` wrote as the `KayConfig` the server reads: each list that a function gave loaded once, the old flat keys of `images`, the `onStart` hook and `observe`'s `onError` and `log` in the places they have since 1.105. Called as the config loads, so `kay dev` calls the functions again after a change to the file.
 export async function resolveConfig(config: ConfigInput): Promise<KayConfig> {
   const [security, proxy, robots, i18n, redirects, images] = await Promise.all([
     loadKeys(config.security, ['hosts']),
@@ -51,7 +60,9 @@ export async function resolveConfig(config: ConfigInput): Promise<KayConfig> {
     config.images === undefined ? undefined : resolveImages(config.images),
   ])
   const cors = config.cors === undefined ? undefined : await loadKeys(config.cors, ['origins'])
-  const resolved: Record<string, unknown> = { ...config, security, proxy, robots, i18n, redirects, images, cors }
+  const { onStart, ...kept } = config
+  const observed = config.observe === undefined ? undefined : resolveObserve(config.observe)
+  const resolved: Record<string, unknown> = { ...kept, security, proxy, robots, i18n, redirects, images, cors, observe: observed?.observe, onListen: config.onListen ?? onStart, onError: config.onError ?? observed?.onError }
 
   for (const key of Object.keys(resolved)) {
     if (resolved[key] === undefined)

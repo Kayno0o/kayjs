@@ -1,8 +1,9 @@
 import type { Elysia } from 'elysia'
-import type { ObserveConfig, RobotsConfig, TrailingSlash } from '../config'
+import type { RobotsConfig, TrailingSlash } from '../config'
 import type { Collection } from '../content'
 import type { Duration } from '../runtime/duration'
 import type { LocaleSettings } from '../runtime/i18n'
+import type { ErrorHook } from './app-hooks'
 import type { ServedRoute } from './guards'
 import type { LocaleCopy } from './i18n'
 import type { ListedParams } from './prerendered'
@@ -54,7 +55,7 @@ const DEGRADED_MS = 60 * 1000
 
 export interface SitemapOptions {
   dev?: boolean | undefined
-  onError?: ObserveConfig['onError'] | undefined
+  onError?: ErrorHook | undefined
   trailingSlash?: TrailingSlash | undefined
   locales?: LocaleSettings | undefined
   robots?: RobotsConfig | boolean | undefined

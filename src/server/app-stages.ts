@@ -10,7 +10,6 @@ import type { GuardRequirement } from './guard-requirement'
 import type { ServedRoute } from './guards'
 import type { ImageRouteOptions } from './image'
 import type { Writes } from './kept-pages'
-import type { Logger } from './log'
 import type { MountedApi } from './openapi'
 import type { Unmatched } from './page-routes'
 import type { ClaimedFile } from './public'
@@ -64,7 +63,7 @@ import { joinGuards } from './lazy-guard'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { liveConnections, serveLive } from './live'
 import { warnOfLocalFiles } from './local-files'
-import { announceStart, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
+import { announceStart, loggerOf, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
 import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
 import { METRICS_PATH, metricsOf, serveMetrics } from './metrics'
 import { newTabStyles } from './new-tab'
@@ -193,7 +192,7 @@ export function bootOf(input: BootInput) {
   const metrics: Claim | undefined = metricsConfig && { path: metricsConfig.path ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
   // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
   const health: Claim | undefined = options.health === false ? undefined : { path: bagOf(options.health)?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
-  const log: Logger = options.observe?.log ?? env.production
+  const log = loggerOf(options.observe?.log, env.production)
   // The routes later stages register, which the dev tool's Routes tab reads when it answers, as it registers before them.
   const registered: { extensions: OwnRoutes['extensions'], actions: boolean, api: MountedApi[] } = { extensions: [], actions: false, api: [] }
 
@@ -340,7 +339,7 @@ export function compressAnswers({ app, env, options, setup: { client }, compress
 
   // Development builds none, so its pages are served as they are.
   const dictionary = env.dev ? undefined : servedDictionary(client, env.base)
-  const onError = options.observe?.onError
+  const onError = options.onError
 
   // eslint-disable-next-line ts/promise-function-async -- Elysia sends an empty body when a mapResponse promise resolves to undefined
   app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed, error => reportServerError(error, request, onError), dictionary) : undefined)
@@ -350,10 +349,10 @@ export function compressAnswers({ app, env, options, setup: { client }, compress
 
 // kay's own messages go out whether requests are logged or not; one line per request when they are.
 export function logAnswers({ app, options, log, health }: Boot): void {
-  useLogger(typeof log === 'boolean' || log)
+  useLogger(log.writer)
 
-  if (log !== false)
-    logRequests(app, log, health?.path, kayApiPrefixes(options.extensions))
+  if (log.requests)
+    logRequests(app, log.writer, health?.path, kayApiPrefixes(options.extensions))
 }
 
 // The app's rewrite, with the API paths a library moved; returns the mounts it reads, which the API modules fill once they are served.
@@ -527,7 +526,7 @@ export async function buildFiles({ app, env, setup: { client }, security, filePa
 
 // The options actions, API modules, endpoints and kay's guarded routes share.
 export function actionOptionsOf({ env, options, setup, late, project, required }: Boot, skipBroken: boolean): ActionOptions {
-  return { skipBroken, toolOutputs: setup.source.toolOutputs(project.root, project.paths.output), dev: env.dev, serverTiming: options.observe?.serverTiming ?? env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: required, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
+  return { skipBroken, toolOutputs: setup.source.toolOutputs(project.root, project.paths.output), dev: env.dev, serverTiming: options.observe?.serverTiming ?? env.dev, onError: options.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: required, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
 }
 
 // The app's request, response and lifecycle hooks, after kay's own checks and endpoints so a refused host or the health check run none, and before the extensions so their routes run them too.
@@ -617,13 +616,13 @@ export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }:
 
 // The routes the browser reports to: errors, with their stack mapped back to the source, then live values, policy violations and previews.
 export function reports({ app, options, setup: { i18n, site, collections }, hasPreview, mapStack }: Boot) {
-  useAppOnError(options.observe?.onError)
-  serveErrorReports(app, options.observe?.onError, mapStack)
+  useAppOnError(options.onError)
+  serveErrorReports(app, options.onError, mapStack)
 
   serveLive(app, options.live)
 
   if (bagOf(options.security)?.reports === true)
-    serveViolationReports(app, options.observe?.onError, i18n?.settings.hosts === undefined ? site : undefined)
+    serveViolationReports(app, options.onError, i18n?.settings.hosts === undefined ? site : undefined)
 
   if (hasPreview) {
     servePreview(app)
@@ -744,7 +743,7 @@ export async function siteFiles(boot: Boot) {
   const { app, env, options, served, routes, log, dictionaryUsed, project: { root, paths, mode }, setup: { source, client, site, i18n, locales, collections, appManifest } } = boot
 
   if (site !== undefined)
-    serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.observe?.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base, sitemap: options.sitemap !== false, ttl: bagOf(options.sitemap)?.ttl })
+    serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base, sitemap: options.sitemap !== false, ttl: bagOf(options.sitemap)?.ttl })
 
   const favicon = faviconSource(root, options.favicon, options.manifest)
 
@@ -762,8 +761,8 @@ export async function siteFiles(boot: Boot) {
   trackWhileRunning(app, prerendered, client, site, mode, paths.output, publishing)
 
   // `kay dev` prints its own.
-  if (log !== false && !env.dev)
-    announceStart(app, log, [...prerendered.values()].reduce((count, pages) => count + pages.size, 0))
+  if (log.requests && !env.dev)
+    announceStart(app, log.writer, [...prerendered.values()].reduce((count, pages) => count + pages.size, 0))
 
   return prerendered
 }
@@ -805,6 +804,6 @@ export async function pageRoutes(boot: Boot, { redirects, publicServed, redirect
   pageFor.unmatched = unmatched
   boot.late.answerUnmatched(unmatched)
 
-  answerUncaught(app, { dev: env.dev, onError: options.observe?.onError, page: uncaught })
+  answerUncaught(app, { dev: env.dev, onError: options.onError, page: uncaught })
   agreeOnWildcards(app)
 }

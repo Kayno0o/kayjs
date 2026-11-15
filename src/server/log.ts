@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import type { LogConfig } from '../config'
 import type { LogLevel } from '../runtime/log'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import process from 'node:process'
@@ -43,6 +44,20 @@ export interface MessageEntry {
 }
 
 export type LogEntry = RequestEntry | MessageEntry
+
+// How the app's `observe.log` reads: what kay writes through, and whether each request gets its line.
+export interface LogSetup {
+  writer: Exclude<Logger, false>
+  requests: boolean
+}
+
+// The log as `observe.log` says, `production` deciding the requests of a config that leaves them out.
+export function loggerOf(config: boolean | LogConfig | undefined, production: boolean): LogSetup {
+  if (typeof config === 'object')
+    return { writer: config.sink ?? (config.format === 'json' ? 'json' : true), requests: config.requests ?? true }
+
+  return { writer: true, requests: config ?? production }
+}
 
 // `true` logs requests outside production too, `false` logs none; kay's messages go out either way, as text, as JSON with `'json'`, or to the function.
 export type Logger = boolean | 'json' | ((entry: LogEntry) => void)
@@ -239,11 +254,11 @@ export function announceStart(app: Elysia, logger: Exclude<Logger, false>, prere
 }
 
 // Writes the line of a request an early hook answered before the request log saw it, the same line under the same id; undefined when requests are not logged.
-export function requestRefusalLogger(logger: Logger): ((request: Request, status: number) => void) | undefined {
-  if (logger === false)
+export function requestRefusalLogger({ writer, requests }: LogSetup): ((request: Request, status: number) => void) | undefined {
+  if (!requests)
     return undefined
 
-  const writeLine = writerFor(logger)
+  const writeLine = writerFor(writer)
 
   return (request, status) => writeLine({ type: 'request', time: nowIso(), level: 'info', method: request.method, path: pathOf(request.url), status, duration: 0, id: requestId(request) })
 }

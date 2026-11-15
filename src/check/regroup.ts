@@ -12,11 +12,12 @@ export function nameOf(property: Node): string {
 }
 
 // The edits that group the old keys, leaving every other property, its comments and the object's layout as written: the first old property of a feature becomes `feature: { part: value }` holding all of its parts, the others are removed. Undefined where that cannot be done without reading what a value is: a spread, a computed or shorthand key, a part named twice, a feature written both ways, or a comment that a removal would take.
-export function regrouped(object: NodeOfType<'ObjectExpression'>, text: string, movedTo: (name: string, property: Property) => [string, string] | undefined): Edit[] | undefined {
+// With `whole`, a part is the property as written (a shorthand or a method included) rather than `part: value`, for a group that takes the keys under their own names.
+export function regrouped(object: NodeOfType<'ObjectExpression'>, text: string, movedTo: (name: string, property: Property) => [string, string] | undefined, whole = false): Edit[] | undefined {
   const properties: Property[] = []
 
   for (const property of object.properties) {
-    if (property.type !== 'Property' || property.computed || property.method || property.kind !== 'init')
+    if (property.type !== 'Property' || property.computed || (property.method && !whole) || (property.kind !== 'init' && !whole))
       return undefined
 
     properties.push(property)
@@ -39,10 +40,10 @@ export function regrouped(object: NodeOfType<'ObjectExpression'>, text: string, 
     const [feature, part] = target
     const held = features.get(feature) ?? { first: index, parts: new Map<string, string>() }
 
-    if (property.shorthand || held.parts.has(part))
+    if ((property.shorthand && !whole) || held.parts.has(part))
       return undefined
 
-    held.parts.set(part, text.slice(property.value.start, property.value.end))
+    held.parts.set(part, whole ? text.slice(property.start, property.end) : text.slice(property.value.start, property.value.end))
     features.set(feature, held)
     moved.add(index)
   }
@@ -59,7 +60,7 @@ export function regrouped(object: NodeOfType<'ObjectExpression'>, text: string, 
   for (const [feature, { first, parts }] of features) {
     const property = properties[first]!
 
-    edits.push({ start: property.start, end: property.end, text: `${feature}: { ${[...parts].map(([part, value]) => `${part}: ${value}`).join(', ')} }` })
+    edits.push({ start: property.start, end: property.end, text: `${feature}: { ${[...parts].map(([part, value]) => whole ? value : `${part}: ${value}`).join(', ')} }` })
   }
 
   for (const index of gone.filter(index => index < lastKept))

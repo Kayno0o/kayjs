@@ -18,10 +18,24 @@ export interface ResponseEvent extends RequestEvent {
   duration: number
 }
 
-// What `onStart` is told: the URL the server listens on, undefined for an app that never listened.
+// What `onListen` is told: the URL the server listens on, undefined for an app that never listened.
 export interface StartEvent {
   url: string | undefined
 }
+
+// What the `onError` of the config is told about each error kay logs.
+export interface ErrorEvent {
+  error: unknown
+  // The request being answered, undefined for an error met outside any: a scheduled or background job, or an `onStop` hook.
+  request: Request | undefined
+  // Set for an error a hook of kay or a library threw, such as `'cms.afterSave'`; undefined for any other.
+  source?: string | undefined
+  // The registered name of a `KayError` (`kay explain <code>`), undefined for any other error.
+  code?: string | undefined
+}
+
+// The `onError` of the config.
+export type ErrorHook = (event: ErrorEvent) => void | Promise<void>
 
 // The hooks of the whole app, `kay.config.ts` keys.
 export interface AppHooks {
@@ -30,8 +44,13 @@ export interface AppHooks {
   // Told after the answer is made, for a page, an action, an endpoint and an API route alike: log, count or bill it. A throw is reported and never changes the answer.
   onResponse?: Hook<ResponseEvent> | undefined
   // Told once the server listens, and once it stops after the open requests finished, in the order the hooks were registered. A throw is reported and the others still run.
-  onStart?: Hook<StartEvent> | undefined
+  onListen?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
+  // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
+  // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
+  // An error a hook of kay or a library threw comes with its `source`, such as `'cms.afterSave'`; it is undefined for any other.
+  // `code` is the registered name of a `KayError` (`kay explain <code>`), undefined for any other error.
+  onError?: ErrorHook | undefined
 }
 
 interface Noted {
@@ -82,8 +101,8 @@ export function hookRequests(app: Elysia, { beforeRequest, onResponse }: AppHook
 // The apps of this process that started and have not stopped.
 let listening = 0
 
-// Registers `onStart` and `onStop` after the plugins and extensions, so the app's stop hook runs once theirs did.
-export function hookLifecycle(app: Elysia, { onStart, onStop }: AppHooks): void {
+// Registers `onListen` and `onStop` after the plugins and extensions, so the app's stop hook runs once theirs did.
+export function hookLifecycle(app: Elysia, { onListen, onStop }: AppHooks): void {
   // The upkeep of kay's stores and libraries ends with the last server of the process to stop, before the app's own hook runs: it is shared by every app in the process, so one app stopping must not end the other's. A `kay dev` reload stops the old apps before the new ones are made, which then arm their own.
   let started = false
 
@@ -103,9 +122,9 @@ export function hookLifecycle(app: Elysia, { onStart, onStop }: AppHooks): void 
       stopMaintenance()
   })
 
-  if (onStart !== undefined) {
+  if (onListen !== undefined) {
     app.onStart(async (root) => {
-      await dispatch('onStart', [onStart], { url: root.server?.url.href })
+      await dispatch('onListen', [onListen], { url: root.server?.url.href })
     })
   }
 

@@ -1,4 +1,4 @@
-import type { BeforeHook, Hook } from '../server/hooks'
+import type { BeforeHook, Hook, HookContext } from '../server/hooks'
 import type { ActionError, FAILURE } from './action-error'
 import type { ApiError } from './api-error'
 import type { ByteSize } from './byte-size'
@@ -150,8 +150,12 @@ export interface ActionRun {
   action: string
   file: string
   input: unknown
+  /** @deprecated Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108. */
   ctx: ActionContext
 }
+
+// What an action's hooks are told as `context`: the action's own (`request`, `locals`, `cookies`, `params`, `locale`), with the hook's `ip`, `userAgent` and `userId`.
+export type ActionHookContext = Omit<HookContext, keyof ActionContext> & ActionContext
 
 // A run that went through: what the handler returned, undefined after a redirect.
 export interface ActionDone extends ActionRun {
@@ -170,11 +174,11 @@ export interface ActionFailed extends ActionRun {
 // The hooks an action takes, in its options and, for every action, in `actions` of kay.config.ts: the app's run first.
 export interface ActionHooks {
   // Runs once the guards and the schema let the post through, before the handler: returning `false` or throwing `refuse()` stops it and fails the post. It changes nothing: the input was validated, so a handler that wants another one makes it.
-  beforeRun?: BeforeHook<ActionRun, never> | undefined
+  beforeRun?: BeforeHook<ActionRun, never, ActionHookContext> | undefined
   // Told after the handler returned, a redirect it threw included. A throw is reported and never fails the action.
-  onSuccess?: Hook<ActionDone> | undefined
+  onSuccess?: Hook<ActionDone, ActionHookContext> | undefined
   // Told after the handler failed with `ctx.fail`, `refuse()`, `ctx.deny()`, `ctx.notFound()` or an error. A redirect is no failure.
-  onError?: Hook<ActionFailed> | undefined
+  onError?: Hook<ActionFailed, ActionHookContext> | undefined
 }
 
 // What an action reads of its third argument, grouped by concern: `protect` for the checks above, `messages` for their refusals, `tool` for agents, `maxSize` for the body, and the hooks.

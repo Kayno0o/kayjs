@@ -336,7 +336,7 @@ export function renderDocument(files: string[], modules: PageModule[], data: Rec
   const rules = queryRules(chainQuery(files, modules))
 
   // A page a persisted signal's cookie shaped is told apart by it in any cache.
-  return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.observe?.onError), () => documentOf(files, modules, data, client, rendering, options, rules, entry), () => rendering.headers.append('vary', 'cookie'), rules)
+  return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.onError), () => documentOf(files, modules, data, client, rendering, options, rules, entry), () => rendering.headers.append('vary', 'cookie'), rules)
 }
 
 // Registers what a module's `page.seo` says of its head, when it says anything.
@@ -522,7 +522,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   }
 
   // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
-  return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.observe?.onError), { hydration: hasIslands, forms: posts ? forms : undefined, words: checked !== '', locale: hasIslands || (checked !== '' && words.size > 0), dev: options.dev, polish })
+  return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.onError), { hydration: hasIslands, forms: posts ? forms : undefined, words: checked !== '', locale: hasIslands || (checked !== '' && words.size > 0), dev: options.dev, polish })
 }
 
 // Takes the rejection of a promise whose render was dropped.

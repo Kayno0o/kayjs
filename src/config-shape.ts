@@ -1,5 +1,5 @@
 import type { BudgetConfig } from './build/budget'
-import type { ActionsConfig, CardConfig, ClientConfig, CookieDefaults, DirsConfig, FaviconConfig, HealthConfig, I18nConfig, ImageFormats, ImageLimits, ImagesInput, JobsConfig, KayConfig, LimitsConfig, LiveConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveConfig, OfflineConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
+import type { ActionsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DirsConfig, FaviconConfig, HealthConfig, I18nConfig, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveInput, OfflineConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
 import type { Rule } from './config-rules'
 import { bag, bool, bytes, duration, either, fn, isRecord, list, lit, map, num, numOrInfinity, obj, oneOf, str, typedKeys } from './config-rules'
 import { nearest } from './nearest'
@@ -18,7 +18,8 @@ const SEO: Record<keyof SeoConfig, Rule> = { name: localized, titleTemplate: loc
 const DIRS: Record<keyof DirsConfig, Rule> = { routes: str, api: str, public: str }
 const LIMITS: Record<keyof LimitsConfig, Rule> = { body: bytes, byPath: map(bytes) }
 const SERVE: Record<keyof ServeConfig, Rule> = { apiPrefix: str, compress: bool, compressionDictionary: bool, shutdownTimeout: duration, timeout: either(duration, lit(false)) }
-const OBSERVE: Record<keyof ObserveConfig, Rule> = { log: true, serverTiming: bool, loadBudget: either(duration, lit(false)), requestIdHeader: str, tracer: true, extract: either(fn, lit(false)), onError: fn }
+const LOG: Record<keyof LogConfig, Rule> = { format: oneOf('text', 'json'), requests: bool, sink: fn }
+const OBSERVE: Record<keyof ObserveInput, Rule> = { log: either(bool, oneOf('json'), fn, bag(LOG)), serverTiming: bool, loadBudget: either(duration, lit(false)), requestIdHeader: str, tracer: true, extract: either(fn, lit(false)), onError: fn }
 const HYDRATION = bag({ visible: str, serverIslands: str })
 const CLIENT: Record<keyof ClientConfig, Rule> = { navigation: bool, inlineStyles: bool, lateStyles: bool, typography: bool, hydration: HYDRATION, prefetch: either(oneOf('conservative', 'moderate', 'eager'), lit(false)), saveData: bool, pageTimeout: duration, loadingDelay: duration }
 const ACTIONS: Record<keyof ActionsConfig, Rule> = { protect: either(lit(false), obj), maxSize: bytes, messages: obj, beforeRun: fn, onSuccess: fn, onError: fn }
@@ -44,7 +45,7 @@ const IMAGE_FORMATS: Record<keyof ImageFormats, Rule> = { quality: num, webp: ba
 const IMAGE_LIMITS: Record<keyof ImageLimits, Rule> = { variants: either(num, lit(false)), queue: either(num, lit(false)) }
 const IMAGES: Record<keyof ImagesInput, Rule> = { ttl: duration, dirs: map(str), remote: either(fn, list(str), bag(REMOTE_IMAGES)), formats: bag(IMAGE_FORMATS), limits: bag(IMAGE_LIMITS), remoteMaxSize: bytes, remoteTimeout: duration, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: AVIF, maxDensity: numOrInfinity, placeholder: bool, aspects: list(str), card: bag(CARD), resolve: fn, guards: guardOption, guard: guardOption }
 const CORS = bag({ origins: either(oneOf('*'), list(str), fn), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
-const CONFIG: Record<keyof KayConfig, Rule> = {
+const CONFIG: Record<keyof ConfigInput, Rule> = {
   dirs: bag(DIRS),
   limits: bag(LIMITS),
   serve: bag(SERVE),
@@ -53,8 +54,10 @@ const CONFIG: Record<keyof KayConfig, Rule> = {
   actions: bag(ACTIONS),
   beforeRequest: fn,
   onResponse: fn,
+  onListen: fn,
   onStart: fn,
   onStop: fn,
+  onError: fn,
 
   i18n: I18N_BAG,
   publicCache: map(duration),
@@ -126,7 +129,6 @@ export const REMOVED_KEYS: Record<string, string> = {
   serverTiming: 'observe.serverTiming',
   requestIdHeader: 'observe.requestIdHeader',
   tracer: 'observe.tracer',
-  onError: 'observe.onError',
   navigation: 'client.navigation',
   inlineStyles: 'client.inlineStyles',
   lateStyles: 'client.lateStyles',
@@ -135,6 +137,9 @@ export const REMOVED_KEYS: Record<string, string> = {
   prefetch: 'client.prefetch',
   saveData: 'client.saveData',
 }
+
+// The keys the config takes at its top level, which `kay check` tells from the other options of `pages()` and `testSite()`.
+export const CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(CONFIG))
 
 export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'observe', 'client'] as const
 

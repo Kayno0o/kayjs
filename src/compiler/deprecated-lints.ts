@@ -351,6 +351,33 @@ export const DEPRECATED_LINTS = {
     wrong: 'import { authCore } from \'@kayjs/auth\'\n\nexport const auth = authCore({ rateLimit: { signIn: { max: 20, window: \'15m\' }, signInAccount: { max: 3, window: \'15m\' } } } as never)',
     right: 'import { authCore } from \'@kayjs/auth\'\n\nexport const auth = authCore({ rateLimit: { signIn: { ip: { max: 20, window: \'15m\' }, account: { max: 3, window: \'15m\' } } } } as never)',
   },
+  'deprecated-app-hooks': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'The hooks and log of the config under their names before 1.105, when the hooks became flat keys named by the moment they run: `onStart` is `onListen` (a job\'s `onStart` keeps its name), `observe.onError` is `onError` beside `observe`, and `observe.log` as `\'json\'` or a function is `{ format: \'json\' }` or `{ sink }`. The old forms work until 1.108. Found in the object kay.config.ts exports and in the options of `pages()` and `testSite()` with their `config`. The fix renames and moves the keys; an `onListen` or `onError` already written, a comment in the way or an `observe` that is no literal is reported with no fix.',
+    wrong: '// kay.config.ts\nexport default { onStart: ({ url }) => console.log(url), observe: { log: \'json\', onError: ({ error }) => report(error) } }',
+    right: '// kay.config.ts\nexport default { onListen: ({ url }) => console.log(url), onError: ({ error }) => report(error), observe: { log: { format: \'json\' } } }',
+  },
+  'deprecated-hook-context': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`ctx` read off the event of an action\'s `beforeRun`, `onSuccess` and `onError`, `context` since 1.105: every hook event carries one `context`, an action\'s being its own context beside `ip`, `userAgent` and `userId`. The old field works until 1.108. Found in the hooks written in `actions` of kay.config.ts and in the options of an `action()` call imported from `kay`, as `{ ctx }` in the parameters or `event.ctx`. The fix writes `context: ctx` or `context`; a name given a default is reported with no fix, a hook passed by name is not found.',
+    wrong: '// kay.config.ts\nexport default { actions: { onSuccess: ({ action, ctx }) => audit(action, ctx.locals) } }',
+    right: '// kay.config.ts\nexport default { actions: { onSuccess: ({ action, context: ctx }) => audit(action, ctx.locals) } }',
+  },
+  'deprecated-pages-options': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'The config keys written beside `root` in the options of `pages()` and `testSite()`, `config` since 1.105: `pages({ root, config: { minify: false } })`, the options no longer mirroring the whole config. `root`, `dev`, `prebuilt` and a test site\'s `browser`, `headers`, `use`, `locals`, `outgoing`, `islands`, `styles`, `mcpKey` and `proxyKey` stay. The old form works until 1.108. Found in a call of `pages` from `kay/server` or `testSite` from `kay/test`. The fix moves the keys into `config`; options that spread, hold a computed key or have a `config` already are reported with no fix.',
+    wrong: '// src/server.ts\nimport { pages } from \'kay/server\'\n\nexport default pages({ root: import.meta.dir, client: { navigation: false }, minify: false })',
+    right: '// src/server.ts\nimport { pages } from \'kay/server\'\n\nexport default pages({ root: import.meta.dir, config: { client: { navigation: false }, minify: false } })',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

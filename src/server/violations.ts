@@ -1,5 +1,5 @@
 import type { Elysia } from 'elysia'
-import type { ObserveConfig } from '../config'
+import type { ErrorHook } from './app-hooks'
 import { KayError } from '../compiler/errors'
 import { overCeiling } from './ceiling'
 import { readCapped } from './errors'
@@ -52,7 +52,7 @@ export class CspViolationError extends KayError {
 const seen = new Set<string>()
 
 // Takes the browser's violation reports, in the Reporting API's format or `report-uri`'s, logging each distinct one once per process, the enforced policy's apart from the report-only one's, and handing it to `onError`; a flood from one client or anything too big is refused, and a report about a page of neither the `site` nor the request's own origin is answered but dropped: noise filtering, not authentication, as a report can name any page.
-export function serveViolationReports(app: Elysia, onError: ObserveConfig['onError'], site?: string): void {
+export function serveViolationReports(app: Elysia, onError: ErrorHook | undefined, site?: string): void {
   const origin = site === undefined ? undefined : URL.parse(site)?.origin
 
   app.post(CSP_REPORTS, async ({ request, server }) => {

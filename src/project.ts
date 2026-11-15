@@ -159,6 +159,8 @@ export const RENDER_CONFIG = [
   // Where the API is mounted, which pages are never prefetched under.
   'serve',
   'observe',
+  // Told every error a render reports.
+  'onError',
   // `prefetch`, `lateStyles` (pages load the whole stylesheet after paint, so no class lacks its rule), `typography` (`false` leaves a French page's spaces as they were typed) and `saveData` (`false` serves every visitor the same page).
   'client',
 ] as const satisfies readonly (keyof KayConfig)[]

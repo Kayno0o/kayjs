@@ -41,7 +41,7 @@ interface ActionContext<Params extends Readonly<Record<string, unknown>> = Route
 [.] ActionDone
 interface ActionDone extends ActionRun
   action: string
-  ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
+  /** @deprecated Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108. */ ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
   file: string
   input: unknown
   result: unknown
@@ -64,7 +64,7 @@ interface ActionErrorDetail
 [.] ActionFailed
 interface ActionFailed extends ActionRun
   action: string
-  ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
+  /** @deprecated Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108. */ ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
   data: unknown
   error: unknown
   errors: Partial<Record<string, string>>
@@ -78,9 +78,9 @@ interface ActionFor<Params extends Readonly<Record<string, unknown>>, Guarded ex
 
 [.] ActionHooks
 interface ActionHooks
-  beforeRun?: BeforeHook<ActionRun, never> | undefined
-  onError?: Hook<ActionFailed> | undefined
-  onSuccess?: Hook<ActionDone> | undefined
+  beforeRun?: BeforeHook<ActionRun, never, ActionHookContext> | undefined
+  onError?: Hook<ActionFailed, ActionHookContext> | undefined
+  onSuccess?: Hook<ActionDone, ActionHookContext> | undefined
 
 [.] ActionProtect
 interface ActionProtect<Field extends string = never>
@@ -91,11 +91,11 @@ interface ActionProtect<Field extends string = never>
 
 [.] ActionProtection
 interface ActionProtection<Field extends string = never, Output = never, Shape extends OutputSchema = OutputSchema> extends ActionHooks
-  beforeRun?: BeforeHook<ActionRun, never> | undefined
+  beforeRun?: BeforeHook<ActionRun, never, ActionHookContext> | undefined
   maxSize?: ByteSize | undefined
   messages?: ProtectionMessages | undefined
-  onError?: Hook<ActionFailed> | undefined
-  onSuccess?: Hook<ActionDone> | undefined
+  onError?: Hook<ActionFailed, ActionHookContext> | undefined
+  onSuccess?: Hook<ActionDone, ActionHookContext> | undefined
   protect?: ActionProtect<Field> | false | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   tool?: ActionTool<Output, Shape> | boolean | string | undefined
@@ -122,7 +122,7 @@ class ActionRedirectError
 [.] ActionRun
 interface ActionRun
   action: string
-  ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
+  /** @deprecated Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108. */ ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
   file: string
   input: unknown
 
@@ -1148,14 +1148,14 @@ interface RequestContext<Params extends Record<string, unknown> = Record<string,
 
 [.] ResolvedProtection
 interface ResolvedProtection extends ActionHooks
-  beforeRun?: BeforeHook<ActionRun, never> | undefined
+  beforeRun?: BeforeHook<ActionRun, never, ActionHookContext> | undefined
   defaults?: false | undefined
   honeypot?: HoneypotOptions<string> | string | undefined
   maxSize?: ByteSize | undefined
   messages?: ProtectionMessages | undefined
   minTime?: MinTimeOptions | `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  onError?: Hook<ActionFailed> | undefined
-  onSuccess?: Hook<ActionDone> | undefined
+  onError?: Hook<ActionFailed, ActionHookContext> | undefined
+  onSuccess?: Hook<ActionDone, ActionHookContext> | undefined
   proofOfWork?: ProofOfWorkOptions | boolean | number | undefined
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
@@ -2724,7 +2724,9 @@ interface BasicAuthOptions
   user: string | undefined
 
 [./server] BeforeHook
-type BeforeHook<E, Change> = (event: E & { context: HookContext }) => void | false | Partial<Change> | Promise<void | false | Partial<Change>>
+type BeforeHook<E, Change, Context extends HookContext = HookContext> = (event: E & {
+  context: Context
+}) => void | false | Partial<Change> | Promise<void | false | Partial<Change>>
 
 [./server] BrowserError
 class BrowserError
@@ -2786,6 +2788,11 @@ const dataTableNames: readonly string[]
 
 [./server] defineConfig
 function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<Config, ConfigInput> & {
+  onStart?: unknown;
+  observe?: Checked<"observe" extends keyof Config ? Config[keyof Config & "observe"] : unknown, Omit<ObserveConfig, "log"> & {
+    log?: "json" | ((entry: LogEntry) => void) | LogConfig | boolean | undefined;
+    onError?: ErrorHook | undefined;
+  }, [unknown]>;
   cors?: Checked<"cors" extends keyof Config ? Config[keyof Config & "cors"] : unknown, NonNullable<ConfigCors | undefined>, [unknown]>;
   security?: Checked<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, Omit<SecurityConfig, "hosts"> & {
     hosts?: Loadable<string[]> | boolean | undefined;
@@ -2810,6 +2817,7 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   search?: unknown;
   client?: Checked<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig, [unknown]>;
   offline?: Checked<"offline" extends keyof Config ? Config[keyof Config & "offline"] : unknown, OfflineConfig, [unknown]>;
+  onError?: unknown;
   base?: unknown;
   seo?: Checked<"seo" extends keyof Config ? Config[keyof Config & "seo"] : unknown, SeoConfig, [unknown]>;
   live?: Checked<"live" extends keyof Config ? Config[keyof Config & "live"] : unknown, LiveConfig, [unknown]>;
@@ -2820,7 +2828,6 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   dirs?: Checked<"dirs" extends keyof Config ? Config[keyof Config & "dirs"] : unknown, DirsConfig, [unknown]>;
   limits?: Checked<"limits" extends keyof Config ? Config[keyof Config & "limits"] : unknown, LimitsConfig, [unknown]>;
   serve?: Checked<"serve" extends keyof Config ? Config[keyof Config & "serve"] : unknown, ServeConfig, [unknown]>;
-  observe?: Checked<"observe" extends keyof Config ? Config[keyof Config & "observe"] : unknown, ObserveConfig, [unknown]>;
   actions?: Checked<"actions" extends keyof Config ? Config[keyof Config & "actions"] : unknown, ActionsConfig, [unknown]>;
   publicCache?: unknown;
   minify?: unknown;
@@ -2861,9 +2868,8 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   checks?: unknown;
   beforeRequest?: unknown;
   onResponse?: unknown;
-  onStart?: unknown;
-  onStop?: unknown;
-}): Config
+  onListen?: unknown;
+  onStop?: unknown; ...#16709f96 (2 lines)
 
 [./server] defineEnv
 function defineEnv<Spec extends EnvSchema>(declared: Spec, source?: Record<string, string | undefined>): Static<Spec> & (keyof PublicFieldsOf<Spec> extends never ? unknown : WithPublicFields<Spec>)
@@ -2962,7 +2968,7 @@ function forgetPushDevice(request: Request, user: string): Promise<void>
 function holdsType(bytes: Uint8Array<ArrayBufferLike>, type: string): boolean
 
 [./server] Hook
-type Hook<E> = (event: E & { context: HookContext }) => unknown
+type Hook<E, Context extends HookContext = HookContext> = (event: E & { context: Context }) => unknown
 
 [./server] HookContext
 interface HookContext
@@ -3083,8 +3089,9 @@ interface KayConfig extends AppHooks
   minify?: boolean | undefined
   observe?: ObserveConfig | undefined
   offline?: OfflineConfig | boolean | undefined
+  onError?: ErrorHook | undefined
+  onListen?: Hook<StartEvent> | undefined
   onResponse?: Hook<ResponseEvent> | undefined
-  onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
@@ -3303,7 +3310,7 @@ interface NotifyOptions
 type PageHook = (page: RenderedPage) => string | Promise<string>
 
 [./server] pages
-function pages(options?: PagesOptions): Promise<KayPlugin>
+function pages(given?: PagesOptions): Promise<KayPlugin>
 
 [./server] PagesOptions
 interface PagesOptions extends ConfigInput
@@ -3313,6 +3320,7 @@ interface PagesOptions extends ConfigInput
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
   client?: ClientConfig | undefined
+  config?: ConfigInput | undefined
   contentConfig?: string | undefined
   cors?: ConfigCors | undefined
   dev?: boolean | undefined
@@ -3339,10 +3347,12 @@ interface PagesOptions extends ConfigInput
   mcp?: McpConfig | boolean | undefined
   metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
-  observe?: ObserveConfig | undefined
+  observe?: ObserveInput | undefined
   offline?: OfflineConfig | boolean | undefined
+  onError?: ErrorHook | undefined
+  onListen?: Hook<StartEvent> | undefined
   onResponse?: Hook<ResponseEvent> | undefined
-  onStart?: Hook<StartEvent> | undefined
+  /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */ onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
@@ -4358,6 +4368,7 @@ interface TestOptions extends PagesOptions
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
   client?: ClientConfig | undefined
+  config?: ConfigInput | undefined
   contentConfig?: string | undefined
   cors?: ConfigCors | undefined
   dev?: boolean | undefined
@@ -4388,10 +4399,12 @@ interface TestOptions extends PagesOptions
   mcpKey?: string | undefined
   metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
-  observe?: ObserveConfig | undefined
+  observe?: ObserveInput | undefined
   offline?: OfflineConfig | boolean | undefined
+  onError?: ErrorHook | undefined
+  onListen?: Hook<StartEvent> | undefined
   onResponse?: Hook<ResponseEvent> | undefined
-  onStart?: Hook<StartEvent> | undefined
+  /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */ onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
   outgoing?: "allow" | "fail" | undefined
@@ -4462,7 +4475,7 @@ interface TestPage
   warnings: string[]
 
 [./test] testSite
-function testSite(options?: TestOptions): Promise<TestSite>
+function testSite(given?: TestOptions): Promise<TestSite>
 
 [./test] TestSite
 interface TestSite

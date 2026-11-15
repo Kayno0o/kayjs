@@ -5,19 +5,22 @@ import { describe, expect, it } from 'bun:test'
 
 import { actionType } from '../src/check/action-type'
 import { aiLanguage } from '../src/check/ai-language'
+import { appHooks } from '../src/check/app-hooks'
 import { authRateLimits } from '../src/check/auth-rate-limits'
 import { cmsOptions } from '../src/check/cms-options'
 import { configSwitches } from '../src/check/config-switches'
 import { applySafeFixes } from '../src/check/fixes'
 import { formatDurationNumbers } from '../src/check/format-duration'
 import { guardOptions } from '../src/check/guard-options'
-import { hookNames } from '../src/check/hook-names'
 
+import { hookContext } from '../src/check/hook-context'
+import { hookNames } from '../src/check/hook-names'
 import { imagesKeys } from '../src/check/images-keys'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
 import { liveApi } from '../src/check/live-api'
 import { mailApi } from '../src/check/mail-api'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
+import { pagesOptions } from '../src/check/pages-options'
 import { rateEnforce } from '../src/check/rate-enforce'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
@@ -60,6 +63,9 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-guard-option': guardOptions,
   'deprecated-config-switch': configSwitches,
   'deprecated-images-keys': imagesKeys,
+  'deprecated-app-hooks': appHooks,
+  'deprecated-hook-context': hookContext,
+  'deprecated-pages-options': pagesOptions,
   'deprecated-ttl-names': ttlNames,
   'deprecated-package-names': async (root, options) => renamedPackages(root, options.lints),
   // Its fix is safe only in a project that lists kayjs-ui, where the new form comes from.

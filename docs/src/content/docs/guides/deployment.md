@@ -222,7 +222,7 @@ GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw
 
 An error logged while answering the request starts with the same id. `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept, and `observe: { requestIdHeader: 'x-correlation-id' }` in kay.config.ts names another header for both.
 
-Set `log: 'json'` to write these lines, and kay's own errors and warnings, as one JSON object each. Use it for a log collector.
+Set `log: { format: 'json' }` to write these lines, and kay's own errors and warnings, as one JSON object each. Use it for a log collector.
 
 ### Logging from a library
 
@@ -257,7 +257,7 @@ Set `tracer` to an OpenTelemetry tracer from the `@opentelemetry/api` and SDK th
 import { trace } from '@opentelemetry/api'
 
 export default defineConfig({
-  observe: { log: 'json', tracer: trace.getTracer('my-site') },
+  observe: { log: { format: 'json' }, tracer: trace.getTracer('my-site') },
 })
 ```
 

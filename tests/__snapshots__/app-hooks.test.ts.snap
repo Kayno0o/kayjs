@@ -837,7 +837,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
     "() => { if (!started) { started = !0; listening++; } }",
-    "async (root) => { await dispatch("onStart", [onStart], { url: root.server?.url.href }); }",
+    "async (root) => { await dispatch("onListen", [onListen], { url: root.server?.url.href }); }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
     "() => { publishing.start(); for (const { track } of tracked) track(); }",
     "(root) => { if (!root.server) return; const mode = process.env.NODE_ENV === void 0 ? "" : \` in \${pro...",

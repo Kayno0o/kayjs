@@ -24,7 +24,7 @@ import { installClassTable } from '../runtime/class-table'
 import { durationSeconds } from '../runtime/duration'
 import { solveWork } from '../runtime/work'
 import { MCP_PATH, mcpPath } from '../server/api-modules'
-import { servePages } from '../server/app'
+import { flatOptions, servePages } from '../server/app'
 import { basePath, routerPath } from '../server/base'
 import { clientOptionsKey, readClient, readManifest } from '../server/client'
 import { scheduledOf } from '../server/jobs'
@@ -223,7 +223,11 @@ function testStore(configured: AppStore | undefined, given: AppStore | undefined
 }
 
 // The project's pages and actions without a server, their islands built for the browser as a check: pages then render their islands' markup and no scripts.
-export async function testSite(options: TestOptions = {}): Promise<TestSite> {
+export async function testSite(given: TestOptions = {}): Promise<TestSite> {
+  return siteOf(flatOptions(given))
+}
+
+async function siteOf(options: TestOptions): Promise<TestSite> {
   const root = testRoot(options.root)
   const serving = loaderRoot()
 

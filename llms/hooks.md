@@ -86,14 +86,15 @@ For one transition: the library's own work (log, counters), the app-wide hooks o
 
 ### The app's own hooks
 
-`kay.config.ts` takes flat keys, all optional: `beforeRequest`, `onResponse`, `onStart`, `onStop`, and `actions: { protect, maxSize, messages, beforeRun, onSuccess, onError }`.
+`kay.config.ts` takes flat keys, all optional, named by the moment they run: `beforeRequest`, `onResponse`, `onListen`, `onStop`, `onError`, and `actions: { protect, maxSize, messages, beforeRun, onSuccess, onError }`.
 
 ```ts
 export default defineConfig({
   beforeRequest: ({ request, url, context }) => (blocked(context.ip) ? false : undefined),
   onResponse: ({ request, url, status, duration }) => metrics.count(url.pathname, status, duration),
-  onStart: ({ url }) => console.log(`listening on ${url}`),
+  onListen: ({ url }) => console.log(`listening on ${url}`),
   onStop: async () => pool.end(),
+  onError: ({ error, request }) => tracker.capture(error),
   actions: {
     protect: { rateLimit: { max: 30, window: '1m' } },
     onError: ({ action, file, status, message }) => audit(action, file, status, message),
@@ -103,8 +104,9 @@ export default defineConfig({
 
 - `beforeRequest({ request, url, locals, context })` runs before the guards, the loads and the validation of the input of every request that reaches a route (a page, an action, an endpoint, an API route, an extension's route), after kay's own host, proxy and security checks, so a refused caller learns nothing from a field error. `false` or a thrown `refuse()` refuses it, 403 or the refusal's status; a returned `Response` answers instead; any other throw, or a hook that does not finish in 10 s, answers 500 and is reported with source `beforeRequest`. `locals` holds what kay and the app's own plugins added before it, not the `derive` and `resolve` values of extensions: read who asks from `context`.
 - `onResponse({ request, url, locals, status, duration })` is told after the answer is made, `duration` in milliseconds, up to the first byte for a streamed answer. A throw is reported with source `onResponse`.
-- `onStart({ url })` runs when the server listens and `onStop()` when it stops, after the open requests finished and after the `onStop` hooks of the plugins and extensions; a throw is reported and the others still run.
-- `actions.beforeRun({ action, file, input, ctx })` runs before every action's handler, once the guards and the schema let the post through; `false` or `refuse()` fails the post. It cannot change the input. `onSuccess` adds `result`, `onError` adds `status`, `message`, `errors`, `data` and `error` (undefined for `ctx.fail`).
+- `onListen({ url })` runs when the server listens and `onStop()` when it stops, after the open requests finished and after the `onStop` hooks of the plugins and extensions; a throw is reported and the others still run.
+- `onError({ error, request, source, code })` receives every error kay logs ([Error reporting](routing-special-pages.md#error-reporting)); it was `observe.onError` before 1.105.
+- `actions.beforeRun({ action, file, input, context })` runs before every action's handler, once the guards and the schema let the post through; `false` or `refuse()` fails the post. It cannot change the input. `onSuccess` adds `result`, `onError` adds `status`, `message`, `errors`, `data` and `error` (undefined for `ctx.fail`). Every hook event carries one `context`, an action's being its own context (`request`, `locals`, `cookies`, `params`, `locale`) with `ip`, `userAgent` and `userId` beside: `({ context }) => context.locals`. `ctx` in the event works until 1.108 and `deprecated-hook-context` rewrites it; `onStart` of the config, which ran when the server listens, is `onListen` the same way (`deprecated-app-hooks`), `onStart` naming where a job, a queue or a workflow run begins.
 - A redirect the handler throws is a success (the action did its work, as in post-redirect-get): `onSuccess` is told it with `result` undefined, and `onError` is not. `onSuccess` of a streaming action is told as the stream starts, before it is read.
 - The app's action hooks run before the action's own (`action(schema, handler, { onSuccess })`), both observing, a throw reported and never failing the action.
 

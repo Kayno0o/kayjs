@@ -37,14 +37,23 @@ import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
 import { projectSource } from './source'
 
-// Options given here win over the project's `kay.config.ts`.
+// The options of `pages()` and `testSite()`: `config` holds what wins over the project's `kay.config.ts`, key by key, one bag level deep. The config's keys written beside `root` instead work until 1.108, as `deprecated-pages-options` rewrites them.
 export interface PagesOptions extends ConfigInput {
+  // Config laid over the project's `kay.config.ts`, as `kay.config.ts` writes it: `pages({ config: { client: { navigation: false } } })`.
+  config?: ConfigInput | undefined
   // Project root: island ids and `.kay/` output are relative to it. Defaults to the working directory.
   root?: string | undefined
   // Shows thrown errors with their stack. Defaults to on when NODE_ENV is development.
   dev?: boolean | undefined
   // Serves the bundle `kay build` wrote instead of bundling at boot. Defaults to on when NODE_ENV is production.
   prebuilt?: boolean | undefined
+}
+
+// The options with the keys of `config` laid over those written beside it, the way an app wrote them before 1.105, so what reads the options sees the config's keys at one level; a key given in both is the one of `config`.
+export function flatOptions<Options extends PagesOptions>(options: Options): Omit<Options, 'config'> {
+  const { config, ...rest } = options
+
+  return config === undefined ? rest : { ...rest, ...Object.fromEntries(Object.entries(config).filter(([, value]) => value !== undefined)) }
 }
 
 // The options with their lists loaded, as the server reads them.

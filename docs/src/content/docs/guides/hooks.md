@@ -59,7 +59,7 @@ When several `beforeX` hooks are set, each sees what the one before changed, and
 
 ## Hooks for the whole app
 
-`kay.config.ts` takes the same flat keys. `beforeRequest` runs before the guards of every request that reaches a route and can refuse it with `false` or `refuse()`, or answer with a `Response`. `onResponse` is told the status and the duration of every answer. `onStart` and `onStop` run when the server listens and when it stops; `onStop` runs after the hooks of plugins and extensions. A redirect an action throws counts as a success for `onSuccess`.
+`kay.config.ts` takes the same flat keys. `beforeRequest` runs before the guards of every request that reaches a route and can refuse it with `false` or `refuse()`, or answer with a `Response`. `onResponse` is told the status and the duration of every answer. `onListen` and `onStop` run when the server listens and when it stops, and `onError` is handed every error kay logs; `onStop` runs after the hooks of plugins and extensions. A redirect an action throws counts as a success for `onSuccess`.
 
 ```ts
 export default defineConfig({
@@ -73,7 +73,7 @@ Every action gets the same treatment from `actions`: `beforeRun`, `onSuccess` an
 
 ## When an `onX` hook throws
 
-The transition has already happened, so the error never undoes it. The error is logged and handed to the `observe.onError` of `kay.config.ts` with a `source` naming the hook, such as `cms.afterSave`. Kay waits up to 10 seconds for a hook, then leaves it running, reports that it was late, and goes on. All the `onX` hooks of one transition run in order, even when one throws.
+The transition has already happened, so the error never undoes it. The error is logged and handed to the `onError` of `kay.config.ts` with a `source` naming the hook, such as `cms.afterSave`. Kay waits up to 10 seconds for a hook, then leaves it running, reports that it was late, and goes on. All the `onX` hooks of one transition run in order, even when one throws.
 
 Hooks that must not slow an answer, such as the ones of a streamed reply, run detached: kay does not wait for them at all.
 

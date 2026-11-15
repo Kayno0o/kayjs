@@ -174,7 +174,7 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
     if (hasFlash(context.request, renderOptions.base ?? '') || handedOverFlash(context.request))
       return forVisitor(render)
 
-    const revalidating = revalidateStale(page, async () => prerender(route, params, url, key), error => reportServerError(error, context.request, renderOptions.observe?.onError))
+    const revalidating = revalidateStale(page, async () => prerender(route, params, url, key), error => reportServerError(error, context.request, renderOptions.onError))
 
     if (revalidating)
       await revalidating
@@ -238,7 +238,7 @@ export type Unmatched = (given: RequestContext & { set: Context['set'] }) => Pro
 // Returns how an error thrown before any page was chosen is answered, in the locale the request names, and how a path none serves is, when the routes directory has a page for either.
 export function servePageRoutes(app: Elysia, { table, served: claims, matchers, i18n, locales, client, renderOptions, trailingSlash, fallback, respond, timeout }: PageRoutes): { uncaught: (error: unknown, context: RequestContext) => Promise<Response>, unmatched: Unmatched | undefined } {
   const settings = i18n?.settings
-  const onError = renderOptions.observe?.onError
+  const onError = renderOptions.onError
   const inImplicitLocale = async (url: URL, request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, url.pathname, request), run)
 
   const answer = async (candidates: Candidate[], context: RequestContext & { params: unknown }, url: URL): Promise<Response> => {

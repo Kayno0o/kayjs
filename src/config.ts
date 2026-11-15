@@ -19,7 +19,7 @@ import type { CorsOptions } from './server/cors'
 import type { EnvSchema } from './server/env'
 import type { GuardOption } from './server/lazy-guard'
 
-import type { Logger } from './server/log'
+import type { LogEntry } from './server/log'
 import type { OpenApiConfig } from './server/openapi'
 import type { PageHook } from './server/page-hook'
 import type { PluginInput } from './server/plugin'
@@ -169,13 +169,23 @@ export interface ServeConfig {
   compressionDictionary?: boolean | undefined
   // How long a stopping server gives open requests and streams to finish before closing them, a string such as '30s'; 10 seconds by default.
   shutdownTimeout?: Duration | undefined
-  // The longest a page, an action, an `api()` route or an endpoint may take to answer, a string such as '15s'; past it the request answers 504 (a page through the nearest `_error.kay`), is logged and handed to `observe.onError`, and `ctx.signal` aborts. None by default. A page sets its own in `export const page = { timeout }`, an `api({ timeout })` module and an action's third argument likewise, `false` for none.
+  // The longest a page, an action, an `api()` route or an endpoint may take to answer, a string such as '15s'; past it the request answers 504 (a page through the nearest `_error.kay`), is logged and handed to `onError`, and `ctx.signal` aborts. None by default. A page sets its own in `export const page = { timeout }`, an `api({ timeout })` module and an action's third argument likewise, `false` for none.
   timeout?: Duration | false | undefined
 }
 
+// How kay writes what it logs: the line of each request and kay's own messages.
+export interface LogConfig {
+  // `'text'`, a line each, or `'json'`, one JSON object each, requests and kay's own messages alike; `'text'` by default.
+  format?: 'text' | 'json' | undefined
+  // Whether each request gets its line, `true` once the object is given; `false` keeps kay's messages and logs no request.
+  requests?: boolean | undefined
+  // Receives every entry, request lines and messages, in place of stdout and stderr.
+  sink?: ((entry: LogEntry) => void) | undefined
+}
+
 export interface ObserveConfig {
-  // One line per request on stdout, on by default when NODE_ENV is production, `false` for none; `'json'` writes it and kay's own messages as one JSON object each instead, and a function receives them all.
-  log?: Logger | undefined
+  // One line per request on stdout, on by default when NODE_ENV is production, `true` for it outside production too, `false` for none; kay's own messages go out either way. `{ format: 'json', requests, sink }` sets how they are written, as one JSON object each or to a function.
+  log?: boolean | LogConfig | undefined
   // A `Server-Timing` header on each action, endpoint and API route, timing its guards and handler, and on each page rendered per request, timing its guards, the import of its modules, its loads and its render for the browser's network panel: on in development, off otherwise unless set.
   serverTiming?: boolean | undefined
   // In development, how long a page's loads may take before kay warns in the console and the dev tool, naming the slowest load: a duration such as `'500ms'`, `'300ms'` by default, `false` for no warning. A page waits for its loads before anything is sent, so one past the budget is a click that waits as long; start what the first paint does not need unawaited and read it in an `await` block.
@@ -186,11 +196,6 @@ export interface ObserveConfig {
   tracer?: Tracer | undefined
   // Reads the trace a request arrives in out of its headers, a one-liner with OpenTelemetry: `extract: headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. By default kay reads the W3C `traceparent` header itself, so a tracer's server spans join the caller's trace; `false` ignores incoming traces and starts a new one per request.
   extract?: TraceExtractor | false | undefined
-  // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
-  // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
-  // An error a hook of kay or a library threw comes with its `source`, such as `'cms.onSave'`; it is undefined for any other.
-  // `code` is the registered name of a `KayError` (`kay explain <code>`), undefined for any other error.
-  onError?: ((event: { error: unknown, request: Request | undefined, source?: string | undefined, code?: string | undefined }) => void | Promise<void>) | undefined
 }
 
 export interface ClientConfig {
@@ -640,7 +645,10 @@ export type ConfigCors = Omit<CorsOptions, 'origins' | 'credentials'> & ({ origi
 type Over<Bag, Given> = Omit<Bag, keyof Given> & Given
 
 // What `kay.config.ts` may write: `KayConfig` with each list that may come from a CMS or a database loadable, and the keys of before 1.105 `kay check --fix` rewrites. Kay turns it into a `KayConfig` as it loads.
-export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'robots' | 'redirects' | 'i18n' | 'images'> {
+export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'robots' | 'redirects' | 'i18n' | 'images' | 'observe'> {
+  /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */
+  onStart?: AppHooks['onListen']
+  observe?: ObserveInput | undefined
   cors?: ConfigCors | undefined
   security?: boolean | Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined }> | undefined
   proxy?: boolean | number | Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined }> | undefined
@@ -648,6 +656,14 @@ export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'prox
   redirects?: Loadable<Redirects> | undefined
   i18n?: Over<I18nConfig, { paths?: Loadable<Record<string, Record<string, string>>> | undefined }> | undefined
   images?: ImagesInput | undefined
+}
+
+// `observe` as an app written it before 1.105 may still: `onError` here, `log` as `'json'` or a function.
+export type ObserveInput = Omit<ObserveConfig, 'log'> & {
+  // `'json'` and a function still work until 1.108, written `{ format: 'json' }` and `{ sink }` since 1.105; `deprecated-app-hooks` rewrites them.
+  log?: ObserveConfig['log'] | 'json' | ((entry: LogEntry) => void) | undefined
+  /** @deprecated Written `onError` beside `observe`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */
+  onError?: AppHooks['onError']
 }
 
 export type ImagesInput = Over<ImagesConfig, { remote?: Loadable<string[]> | Over<RemoteImages, { hosts?: Loadable<string[]> | undefined }> | undefined }> & DeprecatedImages

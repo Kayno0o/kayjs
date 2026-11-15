@@ -638,7 +638,7 @@ export interface RenderedServerIslands {
 export async function renderServerIslands(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions, path: Set<unknown> | undefined, skip?: ServerIslandMode): Promise<RenderedServerIslands | Response> {
   const rendering = createRendering(context, params, options, route.contextKeys)
   const { request } = rendering.ctx
-  const report = (error: unknown) => reportServerError(error, request, options.observe?.onError)
+  const report = (error: unknown) => reportServerError(error, request, options.onError)
   const own = withEditor(route, options)
 
   return withOutcome(rendering.outcome, async () => {
@@ -923,7 +923,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   const denied = error instanceof Denied
 
   if (!notFound && !denied)
-    reportServerError(error, rendering.ctx.request, options.observe?.onError)
+    reportServerError(error, rendering.ctx.request, options.onError)
 
   // A page that found no entry because its end date passed answers that it is gone for good.
   const pageError: PageError = notFound && askedForEndedEntry() ? { status: 410, message: 'Gone' } : pageErrorOf(error, options.dev)
@@ -977,7 +977,7 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
       return renderDocument(files, modules, loading instanceof Promise ? await loading : loading, client, rendering, withEditor(page, options))
     }
     catch (error) {
-      reportServerError(error, rendering.ctx.request, options.observe?.onError)
+      reportServerError(error, rendering.ctx.request, options.onError)
     }
   }
 

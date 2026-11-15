@@ -141,4 +141,12 @@ An app with no `store` now keeps sessions, jobs and every library in one SQLite 
 
 `signed.sign(use, value, { ttl })`, `files.url(key, { ttl })` and the `ttl` of an action's `protect.minTime` and `protect.proofOfWork` replace `maxAge`, which stays for an HTTP header or a cookie. `deprecated-ttl-names` (`kay check --fix`) renames it; `maxAge` works there until 1.108.
 
+### Hooks are flat keys named by the moment they run
+
+`onListen` replaces the config's `onStart` (a job's, queue's and workflow's `onStart` keep theirs), `onError` is a key of the config beside `observe`, and every hook event carries one `context`: an action's `beforeRun`, `onSuccess` and `onError` read `context` where they read `ctx`, which holds the action's own context besides `ip`, `userAgent` and `userId`. `observe.log` is `false`, `true` or `{ format: 'json', requests, sink }`, replacing `'json'` and a function. `deprecated-app-hooks` and `deprecated-hook-context` (`kay check --fix`) rewrite them; the old forms work until 1.108.
+
+### `pages()` and `testSite()` take `{ config }`
+
+The config keys written beside `root` in the options (`pages({ root, client: { navigation: false } })`) go under `config`: `pages({ root, config: { client: { navigation: false } } })`; `root`, `dev`, `prebuilt` and a test site's own options (`browser`, `headers`, `outgoing`, `mcpKey` and the rest) stay. `deprecated-pages-options` (`kay check --fix`) moves them; the old form works until 1.108.
+
 Releases before 1.105 are in [Upgrading, older releases](upgrading-archive.md).

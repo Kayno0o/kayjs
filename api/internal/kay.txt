@@ -866,7 +866,9 @@ function appStore(): AppStore | undefined
 function asConfigError<T>(read: () => T): T
 
 [./library] BeforeHook
-type BeforeHook<E, Change> = (event: E & { context: HookContext }) => void | false | Partial<Change> | Promise<void | false | Partial<Change>>
+type BeforeHook<E, Change, Context extends HookContext = HookContext> = (event: E & {
+  context: Context
+}) => void | false | Partial<Change> | Promise<void | false | Partial<Change>>
 
 [./library] byteSize
 function byteSize(value: unknown, what: string): number
@@ -934,7 +936,7 @@ function currentRequest(): Request | undefined
 type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
 
 [./library] decide
-function decide<E extends object, C extends object>(source: string, hooks: readonly (BeforeHook<E, C> | undefined)[], event: E, given?: HookContext | undefined): Promise<{
+function decide<E extends object, C extends object, Context extends HookContext = HookContext>(source: string, hooks: readonly (BeforeHook<E, C, Context> | undefined)[], event: E, given?: Context | undefined): Promise<{
   change: Partial<C>;
 } | {
   refused: ErrorShape<unknown> & {
@@ -959,11 +961,13 @@ function dismissMissing(path: string, file?: string | undefined): Promise<boolea
 function dismissMissing(paths: readonly string[], file?: string | undefined): Promise<number>
 
 [./library] dispatch
-function dispatch<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached, context }?: DispatchOptions): Promise<void>
+function dispatch<E extends object, Context extends HookContext = HookContext>(source: string, hooks: readonly (Hook<E, Context> | undefined)[], event: E, {
+  detached, context
+}?: DispatchOptions<Context>): Promise<void>
 
 [./library] DispatchOptions
-interface DispatchOptions
-  context?: HookContext | undefined
+interface DispatchOptions<Context extends HookContext = HookContext>
+  context?: Context | undefined
   detached?: boolean | undefined
 
 [./library] drainQueues
@@ -1026,7 +1030,7 @@ function hear(db: SQL, kind: string, name: string | undefined, wake: () => void)
 type Highlighter = (code: string, language: string | undefined) => string | Promise<string>
 
 [./library] Hook
-type Hook<E> = (event: E & { context: HookContext }) => unknown
+type Hook<E, Context extends HookContext = HookContext> = (event: E & { context: Context }) => unknown
 
 [./library] hookContext
 function hookContext(): Promise<HookContext>

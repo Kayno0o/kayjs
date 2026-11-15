@@ -6,7 +6,7 @@ import { bunProblem } from '../bun'
 import { KayError } from '../compiler/errors'
 import { resolveProject } from '../project'
 import { kayLog } from '../runtime/log'
-import { servePages } from './app'
+import { flatOptions, servePages } from './app'
 import { listenWhenIdle } from './auto-listen'
 import { bootFailure } from './dev'
 import { recordBootFailure, trackDevErrors } from './dev-errors'
@@ -96,7 +96,9 @@ export { forgetLocalMirrors } from './writes'
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
-export async function pages(options: PagesOptions = {}): Promise<KayPlugin> {
+export async function pages(given: PagesOptions = {}): Promise<KayPlugin> {
+  const options = flatOptions(given)
+
   shareThePort()
 
   const problem = bunProblem()

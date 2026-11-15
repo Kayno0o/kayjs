@@ -1,16 +1,16 @@
 import type { TSchema } from 'elysia'
 import type { ActionsConfig } from '../config'
-import type { ActionDone, ActionFailed, ActionHooks, ActionRun, ServerAction } from '../runtime/action'
+import type { ActionDone, ActionFailed, ActionHookContext, ActionHooks, ActionRun, ServerAction } from '../runtime/action'
 import type { ErrorShape } from '../runtime/api-error'
 import type { BeforeHook, Hook } from './hooks'
 import { resolveProtection } from '../runtime/action-protection'
-import { decide, dispatch } from './hooks'
+import { decide, dispatch, hookContext } from './hooks'
 
 // The hooks of one action in the order they run: the app's, then the action's own.
 export interface ActionHookLists {
-  before: BeforeHook<ActionRun, never>[]
-  success: Hook<ActionDone>[]
-  error: Hook<ActionFailed>[]
+  before: BeforeHook<ActionRun, never, ActionHookContext>[]
+  success: Hook<ActionDone, ActionHookContext>[]
+  error: Hook<ActionFailed, ActionHookContext>[]
 }
 
 const NONE: ActionHookLists = { before: [], success: [], error: [] }
@@ -30,24 +30,31 @@ export function hasHooks(lists: ActionHookLists): boolean {
   return lists.before.length + lists.success.length + lists.error.length > 0
 }
 
+// The `context` of an action's hooks: the action's own, read through it as it is lazy, with who asks.
+async function contextOf({ ctx }: ActionRun): Promise<ActionHookContext> {
+  const { ip, userAgent, userId } = await hookContext()
+
+  return Object.create(ctx, { ip: { value: ip, enumerable: true }, userAgent: { value: userAgent, enumerable: true }, userId: { value: userId, enumerable: true } }) as ActionHookContext
+}
+
 // The `beforeRun` hooks of a run: the refusal when one stops it.
 export async function refusedBeforeRun(lists: ActionHookLists, event: ActionRun): Promise<(ErrorShape & { retryAfter?: number | undefined }) | undefined> {
   if (lists.before.length === 0)
     return undefined
 
-  const answer = await decide('actions.beforeRun', lists.before, event)
+  const answer = await decide('actions.beforeRun', lists.before, event, await contextOf(event))
 
   return 'refused' in answer ? answer.refused : undefined
 }
 
 export async function tellSuccess(lists: ActionHookLists, event: ActionRun, result: unknown): Promise<void> {
   if (lists.success.length > 0)
-    await dispatch('actions.onSuccess', lists.success, { ...event, result })
+    await dispatch('actions.onSuccess', lists.success, { ...event, result }, { context: await contextOf(event) })
 }
 
 export async function tellError(lists: ActionHookLists, event: ActionRun, failure: Pick<ActionFailed, 'status' | 'message' | 'errors' | 'data' | 'error'>): Promise<void> {
   if (lists.error.length > 0)
-    await dispatch('actions.onError', lists.error, { ...event, ...failure })
+    await dispatch('actions.onError', lists.error, { ...event, ...failure }, { context: await contextOf(event) })
 }
 
 // The action as one app serves it, with the app's `actions` defaults laid under its own options key by key: a check the action names replaces the app's, `messages` merge one level, and `protect: false` keeps the app's checks out (its `maxSize` and `messages` still apply). The action itself is left as declared, so two apps in one process (a test site after another) each read their own defaults.

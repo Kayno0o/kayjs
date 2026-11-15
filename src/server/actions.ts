@@ -1,12 +1,13 @@
 import type { CookieMap } from 'bun'
 import type { Elysia, TSchema, ValidationError } from 'elysia'
 import type { Server } from 'elysia/universal'
-import type { ActionsConfig, ObserveConfig } from '../config'
+import type { ActionsConfig } from '../config'
 import type { GuardContext, Locals, RouteParams } from '../runtime'
 import type { ActionContext, ActionRun, FieldErrors, RateKeyContext, ServerAction } from '../runtime/action'
 import type { Locale } from '../runtime/i18n'
 import type { LocaleState } from '../runtime/locale-state'
 import type { ActionHookLists } from './action-hooks'
+import type { ErrorHook } from './app-hooks'
 import type { BodyLimit } from './body'
 import type { CookieJar } from './cookies'
 import type { CorsOptions } from './cors'
@@ -99,7 +100,7 @@ const BODY_PREFIX = /^body\./
 export interface ActionOptions {
   // Shows a failed action's message instead of a generic one.
   dev?: boolean | undefined
-  onError?: ObserveConfig['onError'] | undefined
+  onError?: ErrorHook | undefined
   // An action runs in the locale of the page it was sent from, or the site's one language without `i18n`; an endpoint, which has no locale prefix, in the default one.
   i18n: I18n
   // Where the site is mounted, which the page a refused form post came from is served under.
@@ -747,8 +748,6 @@ function pretended(action: ServerAction<TSchema, unknown>, request: Request, bas
 
 // A redirect or a denial goes out with the cookies set so far; anything else was a mistake, answered with a generic 500 since Elysia would send its message.
 export function stopped(error: unknown, request: Request, { jar, headers }: GuardedRequest, options: ActionOptions): Response {
-  const { dev, onError } = options
-
   if (error instanceof Redirect) {
     headers.set(redirectHeader(request), options.redirectSpelling?.(error.location) ?? error.location)
     jar.writeTo(headers)
@@ -763,9 +762,9 @@ export function stopped(error: unknown, request: Request, { jar, headers }: Guar
     return error instanceof Denied ? new Response(error.message, { status: error.status, headers }) : new Response('Not Found', { status: 404, headers })
   }
 
-  reportServerError(error, request, onError)
+  reportServerError(error, request, options.onError)
 
-  return new Response(dev && error instanceof Error ? error.message : 'Internal Server Error', { status: 500, headers: { 'content-type': TEXT } })
+  return new Response(options.dev && error instanceof Error ? error.message : 'Internal Server Error', { status: 500, headers: { 'content-type': TEXT } })
 }
 
 // A result holding a function or a class instance is a mistake in the handler, logged with what it returned.
