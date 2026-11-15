@@ -1,0 +1,21 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const add = action(t.Object({
+  title: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
+}), () => 'ok')
+--- script
+import Row from '../row.kay'
+---
+snippet note
+  error title
+  pending
+    p.saving Saving
+
+form.own(action={add})
+  input(field="title")
+  {note()}
+  Row
+div.outside
+  {note()}

@@ -16,7 +16,7 @@ import { emitHeadTag, emitHeadText } from './head-tags'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
 import { asksOf, exportsIslandOptions, islandMessages } from './island-arguments'
-import { constDeclaration } from './items'
+import { ambientHelpers, constDeclaration } from './items'
 import { JsxTemplate } from './jsx'
 import { planLoads } from './load-plan'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
@@ -324,7 +324,7 @@ class ModuleShell {
     if (server)
       b.add(`import type { ${this.pageContextType()} as KayPageContext, PageData as KayPageData${this.guardValues() !== undefined ? ', GuardValues as KayGuardValues' : ''}${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''}${this.actionsTyped ? ', ActionFor as KayActionFor' : ''} } from 'kay'\n`)
 
-    const kayHelpers: KayHelper[] = facts.actionForm ? ['formAction'] : []
+    const kayHelpers: KayHelper[] = [...facts.actionForm ? ['formAction' as const] : [], ...ambientHelpers(facts)]
 
     if (this.rootBlocks().length > 0)
       kayHelpers.push('fill')
@@ -364,7 +364,7 @@ class ModuleShell {
       kayHelpers.push('uiRecipe')
 
     if (kayHelpers.length > 0)
-      b.add(`import { ${kayHelpers.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/internal'\n`)
+      b.add(`import { ${[...new Set(kayHelpers)].map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/internal'\n`)
 
     if (server && !fence) {
       for (const name of actions)
@@ -1078,7 +1078,7 @@ function fillElement(block: SlotNode): ElementNode {
   return { kind: 'element', start: block.start, end: block.end, tag: { start: block.start, end: block.start }, name: 'KayFill', component: true, classes: [], attributes: [], children: block.children, fills: block.name }
 }
 
-type KayHelper = 'fill' | 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formInitial' | 'formInitialChecked' | 'formStart' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'formScope' | 'issueScope' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
+type KayHelper = 'fill' | 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formInitial' | 'formInitialChecked' | 'formStart' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formHere' | 'formProtection' | 'formScope' | 'issueScope' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
 
 type Helper = TemplateHelper | 'omit'
 

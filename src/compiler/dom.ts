@@ -1,5 +1,5 @@
 import type { ClassTable } from '../runtime/class-table'
-import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, Span, TemplateFacts, TryNode } from './ast'
+import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, PendingNode, Span, TemplateFacts, TryNode } from './ast'
 import type { Declaration, DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import type { BindingPlan, LinkPlan } from './plan'
@@ -202,6 +202,10 @@ export class DomTemplate extends TemplateWriter {
           b.wrap(item.node, () => {
             b.add(`KayInsert(${at}, () => ${helperName('errorParagraph')}(KayFormError((`).addSource(target).add(`), ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, this.errors?.lines.get(item.node))}));`)
           })
+        }
+        else {
+          // The form it renders in, taken now: the message is read again when the action answers, outside any render.
+          b.add(`{ const KayHere = ${helperName('formHere')}(); KayInsert(${at}, () => ${helperName('errorParagraph')}(${helperName('formError')}(KayHere, ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, undefined)})); }`)
         }
 
         break
@@ -437,6 +441,18 @@ export class DomTemplate extends TemplateWriter {
     return property === 'innerHTML' && !raw && checksMarkup(this.src, expression, this.ownMarkup) ? helperName('checkedMarkup') : ''
   }
 
+  // An island's `pending` block shows while a call of its form's action is in flight, however the handler made it; with no form around it in the file, the action of the form it renders in, taken now.
+  private followCalls(pending: PendingNode, node: TemplateNode): Binding {
+    const followed = this.formOf(pending)
+
+    return (variable) => {
+      if (followed)
+        this.b.add(`KayEffect(() => ${helperName('pendingCall')}(${variable(node)}, (`).addSource(followed).add(')));')
+      else
+        this.b.add(`{ const KayHere = ${helperName('formHere')}(); KayEffect(() => ${helperName('pendingCall')}(${variable(node)}, KayHere)); }`)
+    }
+  }
+
   // The element's markup for the template, with what the code binds collected along the way.
   private templateOf(element: ElementNode, node: TemplateNode, bindings: Binding[]): string {
     const { b } = this
@@ -456,11 +472,9 @@ export class DomTemplate extends TemplateWriter {
     else {
       const plan = this.plan(element, this.errors)
       const { action, described, link } = plan
-      const followed = element.pendingOf && this.formOf(element.pendingOf)
 
-      // An island's block shows while a call of its form's action is in flight, however the handler made it.
-      if (followed)
-        own.push(variable => b.add(`KayEffect(() => ${helperName('pendingCall')}(${variable(node)}, (`).addSource(followed).add(')));'))
+      if (element.pendingOf)
+        own.push(this.followCalls(element.pendingOf, node))
 
       if (plan.id !== undefined)
         html += ` id="${escapeStaticAttribute(plan.id)}"`

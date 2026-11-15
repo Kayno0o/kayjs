@@ -175,7 +175,7 @@ form(action={add})
 
 While the post is refused, `error title` renders `p.error` with the message. The field is marked `aria-invalid` and described by it.
 
-Anywhere else, `add.error('title')` reads the message.
+Written in a snippet or a component inside the form, `error title` shows the message of the form it renders in, so a field row can hold its own. Anywhere else, `add.error('title')` reads the message.
 
 ### Showing that a form is posting
 
@@ -188,6 +188,8 @@ form(action={add})
   pending
     p Saving...
 ```
+
+A `pending` block in a snippet or a component follows the form it renders in as well.
 
 The block is hidden when the page renders, after the answer, after a refused post and with JavaScript off. It stays shown until the page a redirect leads to is in, and while a page from another origin, or a reload after a lost answer, is loading. A load that never replaces the page, such as a download, loses it after ten seconds. Its text goes to screen readers through a polite live region the runtime writes outside the form.
 

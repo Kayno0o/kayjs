@@ -236,13 +236,13 @@ export class HtmlTemplate extends TemplateWriter {
     }
   }
 
-  // Outside a form posting to an action, which `kay check` reports, it renders nothing.
+  // Outside every form of the file, in a snippet or a component, it follows the form it renders in.
   private error(node: ErrorNode): void {
     const { b } = this
     const target = this.facts.forms.get(node)
 
     if (!target) {
-      b.add('""')
+      b.add(`${helperName('errorParagraph')}(${helperName('formError')}(${helperName('formHere')}(), ${JSON.stringify(node.name)}), ${errorParagraphArguments(node, this.src, undefined)})`)
 
       return
     }

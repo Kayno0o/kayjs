@@ -63,6 +63,8 @@ form(action={subscribe})
     p Subscribing...
 ```
 
+In a snippet or a child component, `error` and `pending` follow the form that renders it (the form around a snippet's declaration when there is one), so a field row holds its own. The values behind them, `add.error('title')` and, in an island, `add.pending()`, read from any expression.
+
 ### Show what a post returned
 
 The handler's result comes back on the next render of the page, once, through `createToken.data()`:

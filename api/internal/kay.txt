@@ -686,6 +686,9 @@ function formDescribed(element: Element, target: unknown, field: string, id: str
 [./internal] formError
 function formError(target: unknown, field: string): string | undefined
 
+[./internal] formHere
+function formHere(): unknown
+
 [./internal] formInitial
 function formInitial(values: unknown, name: string, type?: string | undefined): string | undefined
 

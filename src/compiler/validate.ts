@@ -193,6 +193,7 @@ class Validator {
   private readonly forms: Map<Node, Span>
   private readonly infos: TemplateFacts['formInfos']
   private foreign = false
+  private snippets = 0
   // The names bound to an imported PNG, JPEG, WebP, GIF or AVIF, whose size kay writes on the `img` showing them.
   private sizedImports = new Set<string>()
   // The names bound to a kayjs-ui or kayjs-ai component, by the library and the component's file, for `deprecatedUiProps`.
@@ -424,19 +425,19 @@ class Validator {
 
           break
         case 'pending':
-          if (!this.forms.has(node))
-            this.error('form-misuse', node, '`pending` shows while a form posts to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
-
-          this.nodes(node.children)
-
-          break
         case 'error':
-          if (!this.forms.has(node))
-            this.error('form-misuse', node, '`error` shows the message of a form posting to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
+          // A snippet and a component render inside the form that calls them, which a line there follows.
+          if (!this.forms.has(node) && this.snippets === 0 && (this.options.pageFile === true || this.options.layoutFile === true))
+            this.error('form-misuse', node, `\`${node.kind}\` follows the form it sits in, which posts to an action`, { help: 'move it into the `form(action={...})` it reports on, or into a snippet or a component rendered inside one' })
+
+          if (node.kind === 'pending')
+            this.nodes(node.children)
 
           break
         case 'snippet':
+          this.snippets++
           this.nodes(node.children)
+          this.snippets--
 
           break
         case 'const':

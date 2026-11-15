@@ -277,6 +277,12 @@ export function formErrors(): (field: string) => string | undefined {
   return isAction(target) ? field => (target as FormTarget).error(field) : () => undefined
 }
 
+// The action of the form being rendered, none outside one: what an `error` or `pending` line outside every `form(action)` of its file, in a snippet or a component, follows, taken as it renders and read later.
+// kept: free, as `formErrors` is.
+export function formHere(): unknown {
+  return reading.at(-1)
+}
+
 const QUOTES = /["\\]/g
 
 // The fields named `name` in the markup the server wrote for the island being hydrated, none outside a hydration.

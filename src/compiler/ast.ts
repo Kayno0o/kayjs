@@ -533,6 +533,8 @@ export interface TemplateFacts {
   ui?: UiEntry | undefined
   // The action of the form each node sits in, from `formTargets`.
   forms: Map<Node, Span>
+  // Whether an `error` or a `pending` line sits in no `form(action)` of this file, so it follows the form it renders in, as a snippet or a component's does.
+  ambientForm: boolean
   // The nodes of `forms` whose form is a component given an `action`.
   loose: Set<Node>
   // What the form each node sits in carries beside its action.
@@ -707,7 +709,7 @@ function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
 
 function factsOf(file: KayFile): TemplateFacts {
   const { targets, loose, infos, inherited } = formTargets(file.template, file.source)
-  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: targets, loose, formInfos: infos, initial: initialHelpers(infos), inherited, functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
+  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, ambientForm: false, forms: targets, loose, formInfos: infos, initial: initialHelpers(infos), inherited, functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
   const text = (span: Span) => file.source.slice(span.start, span.end)
 
   visitNodes(file.template, (node) => {
@@ -770,6 +772,10 @@ function factsOf(file: KayFile): TemplateFacts {
     }
     else if (node.kind === 'error') {
       facts.classes.push(...node.classes.map(text))
+      facts.ambientForm ||= !targets.has(node)
+    }
+    else if (node.kind === 'pending') {
+      facts.ambientForm ||= !targets.has(node)
     }
   })
 

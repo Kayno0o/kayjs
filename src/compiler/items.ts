@@ -243,3 +243,8 @@ export function fixedSource(element: ElementNode): string {
 
   return names.length === 0 ? '' : `, { ${names.map(name => `${JSON.stringify(name)}: ""`).join(', ')} }`
 }
+
+// What an `error` or `pending` line outside every form of its file reads: the form it renders in, and the message the action gave a field; the import drops a repeat.
+export function ambientHelpers(facts: { ambientForm: boolean }): ('formHere' | 'formError')[] {
+  return facts.ambientForm ? ['formHere', 'formError'] : []
+}
