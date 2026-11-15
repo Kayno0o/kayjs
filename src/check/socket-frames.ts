@@ -4,7 +4,7 @@ import { lintLevel } from '../compiler/lints'
 import { importedName, walk } from './ast'
 import { scan } from './renamed-exports'
 
-const OLD_FRAME = /\.send\(\s*JSON\.stringify\(/
+const OLD_FRAME = /\.(?:send|publish)\([^)]*JSON\.stringify\(/
 const HANDLERS = new Set(['open', 'message', 'close'])
 
 // `ws.send(JSON.stringify(value))` in a handler of an `api()` module's `.ws()` route: every frame is JSON since 1.105, so the text sent here would reach the client as a string holding JSON.
@@ -88,14 +88,14 @@ function isWsOfApi(node: Node & { type: 'CallExpression' }, apis: Set<string>): 
   return false
 }
 
-// `<name>.send(JSON.stringify(argument))` with one argument: the whole inner call and the argument.
+// `<name>.send(JSON.stringify(argument))` or `<name>.publish(topic, JSON.stringify(argument))`, a compress flag allowed: the whole inner call and the argument.
 function framed(node: Node, name: string): { start: number, end: number, argument: Node } | undefined {
-  if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.object.type !== 'Identifier' || node.callee.object.name !== name || node.callee.property.type !== 'Identifier' || node.callee.property.name !== 'send')
+  if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.object.type !== 'Identifier' || node.callee.object.name !== name || node.callee.property.type !== 'Identifier' || (node.callee.property.name !== 'send' && node.callee.property.name !== 'publish'))
     return undefined
 
-  const [inner, ...rest] = node.arguments
+  const inner = node.arguments[node.callee.property.name === 'publish' ? 1 : 0]
 
-  if (rest.length > 0 || inner?.type !== 'CallExpression' || inner.callee.type !== 'MemberExpression' || inner.callee.object.type !== 'Identifier' || inner.callee.object.name !== 'JSON' || inner.callee.property.type !== 'Identifier' || inner.callee.property.name !== 'stringify' || inner.arguments.length !== 1 || inner.arguments[0]!.type === 'SpreadElement')
+  if (inner?.type !== 'CallExpression' || inner.callee.type !== 'MemberExpression' || inner.callee.object.type !== 'Identifier' || inner.callee.object.name !== 'JSON' || inner.callee.property.type !== 'Identifier' || inner.callee.property.name !== 'stringify' || inner.arguments.length !== 1 || inner.arguments[0]!.type === 'SpreadElement')
     return undefined
 
   return { start: inner.start, end: inner.end, argument: inner.arguments[0]! }

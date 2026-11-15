@@ -16,6 +16,12 @@ const answers: Record<string, unknown> = {
 }
 
 export default api()
+  .ws('/boom', {
+    error: () => 'reported',
+    message() {
+      throw new Error('boom')
+    },
+  })
   .ws('/replies', {
     body: s.String(),
     message(ws, kind) {

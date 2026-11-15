@@ -43,6 +43,18 @@ async function until(done: () => boolean): Promise<void> {
 }
 
 describe('the frames of a websocket route', () => {
+  it('hand a handler that throws to the route\'s error hook, the socket staying open', async () => {
+    const { socket, frames } = await raw('/boom')
+
+    socket.send('1')
+    await until(() => frames.length === 1)
+    socket.send('2')
+    await until(() => frames.length === 2)
+
+    expect(frames.map(frame => JSON.parse(frame) as unknown)).toEqual(['reported', 'reported'])
+    socket.close()
+  })
+
   it('are JSON both ways: a string, a number, a boolean, null, an object and an array read back as what they were', async () => {
     const { socket, frames } = await raw('/replies')
 

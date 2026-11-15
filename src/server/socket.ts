@@ -1,5 +1,4 @@
 import type { Elysia } from 'elysia'
-import type { Admission } from './ws-limits'
 import { getSchemaValidator, ValidationError } from 'elysia'
 import { ElysiaWS } from 'elysia/ws'
 import { underKayDev } from '../build/assets'
@@ -22,6 +21,8 @@ export interface SocketRoute {
   close?: ((ws: Peer, code: number, reason: string) => unknown) | undefined
   // Checks a decoded message against the route's `body`, answering what the handler gets or why it is refused.
   check?: ((message: unknown) => Checked) | undefined
+  // Hands a failure to the route's `error` hooks and the app's `onError`, answering whether one took it.
+  fail?: ((error: unknown, data: object, ws: Peer) => Promise<boolean>) | undefined
 }
 
 type Peer = ElysiaWS
@@ -110,32 +111,30 @@ function refusal(key: SocketRefusal['error']['key'], fields: Record<string, stri
   return JSON.stringify({ error: { key, fields } } satisfies SocketRefusal)
 }
 
-// Runs a handler in the request's locale, a failure reported and the socket left as it was: one handler's fault closes nothing.
-async function guarded(admission: Admission, what: string, run: () => unknown): Promise<unknown> {
-  try {
-    return await admission.locale(run)
-  }
-  catch (error) {
-    kayLog('error', `a websocket route's ${what} handler failed`, error)
-
-    return undefined
-  }
-}
+// A route with no admission, run outside `serveApi`: its messages are still decoded and checked, with no limits.
+const UNLIMITED = { limits: undefined, release: () => undefined, opened: () => undefined, locale: <T>(run: () => T) => run() }
 
 // Takes the socket's frames over from Elysia once it opens, so a frame is measured before it is parsed and nothing wraps what Bun calls: the route's own message, close and open handlers run on what the protocol decoded.
-export function adopt(ws: ElysiaWS, route: SocketRoute): ElysiaWS {
+// A handler's failure goes to the route's `error` hooks and the app's `onError`, as Elysia would send it, and is logged when none answers: one handler's fault closes nothing.
+export async function adopt(ws: ElysiaWS, route: SocketRoute): Promise<ElysiaWS> {
   const { raw } = ws
   const data = raw.data as { message?: unknown, close?: unknown }
-  const admission = admissionOf(data)
+  const admission = admissionOf(data) ?? UNLIMITED
 
   adapted(ws)
-
-  if (!admission)
-    return ws
-
   admission.opened()
 
-  const guard = frameGuard(admission.limits)
+  const guard = admission.limits ? frameGuard(admission.limits) : () => undefined
+
+  async function guarded(what: string, peer: ElysiaWS, run: () => unknown): Promise<void> {
+    try {
+      await answer(peer, await admission.locale(run))
+    }
+    catch (error) {
+      if (!await admission.locale(async () => route.fail?.(error, data, peer)))
+        kayLog('error', `a websocket route's ${what} handler failed`, error)
+    }
+  }
 
   data.message = async (socket: ElysiaWS['raw'], frame: string | ArrayBuffer | Uint8Array) => {
     const stop = guard(frame)
@@ -148,28 +147,30 @@ export function adopt(ws: ElysiaWS, route: SocketRoute): ElysiaWS {
     if (decoded === undefined)
       return socket.send(admission.locale(() => refusal('kay.socket.notJson', { '': kayWord('kay.socket.notJson') })))
 
-    await guarded(admission, 'message', async () => {
-      let message = decoded.value
-      const checked = route.check === undefined ? undefined : await route.check(message)
+    const peer = adapted(new ElysiaWS(socket, data, decoded.value))
+
+    await guarded('message', peer, async () => {
+      const checked = route.check === undefined ? undefined : await route.check(decoded.value)
 
       if (checked && 'refused' in checked) {
         socket.send(refusal('kay.socket.invalid', refusedFields(checked.schema, checked.refused)))
 
-        return
+        return undefined
       }
 
-      if (checked)
-        message = checked.value
+      const message = checked ? checked.value : decoded.value
 
-      const peer = adapted(new ElysiaWS(socket, data, message))
-
-      await answer(peer, route.message?.(peer, message as never))
+      return route.message?.(peer, message as never)
     })
   }
   data.close = async (socket: ElysiaWS['raw'], code: number, reason: string) => {
     admission.release()
-    await guarded(admission, 'close', () => route.close?.(adapted(new ElysiaWS(socket, data)), code, reason))
+    const peer = adapted(new ElysiaWS(socket, data))
+
+    await guarded('close', peer, () => route.close?.(peer, code, reason))
   }
+
+  await guarded('open', ws, () => route.open?.(ws))
 
   return ws
 }
@@ -233,7 +234,12 @@ export function holdToLimits(app: Elysia): (context: Holding) => void {
         }
       }
 
-      return upgrade(request, options)
+      const upgraded = upgrade(request, options)
+
+      if (!upgraded)
+        admission?.release()
+
+      return upgraded
     }
   }
 }
@@ -308,11 +314,30 @@ export interface SocketOptions extends SocketRoute {
   [option: string]: unknown
 }
 
+// What Elysia does with a handler's failure: the route's `error` hooks, then the app's `onError`, the first to answer sending its answer.
+function failing(app: Elysia, error: unknown): NonNullable<SocketRoute['fail']> {
+  return async (failure, data, ws) => {
+    const hooks = [...[error ?? []].flat(), ...(app.event.error ?? []).map(hook => typeof hook === 'function' ? hook : hook.fn)] as ((context: object) => unknown)[]
+
+    for (const hook of hooks.filter(hook => typeof hook === 'function')) {
+      const answered = await hook(Object.assign(data, { error: failure }))
+
+      if (answered !== undefined) {
+        ws.send(answered)
+
+        return true
+      }
+    }
+
+    return hooks.length > 0
+  }
+}
+
 // The options Elysia's `.ws()` is given in place of a route's own: it opens by adopting the socket, which then speaks the protocol, and its `body` is checked by the protocol, not by Elysia.
 // `name` is the route as the app sees it, read when a refusal is logged, once the module is mounted.
 export function socketOptions(app: Elysia, options: SocketOptions, name: () => string): SocketOptions {
   const { open, message, close, body } = options
-  const route: SocketRoute = { open, message, close, check: message === undefined ? undefined : socketBody(app, body, name)?.check }
+  const route: SocketRoute = { open, message, close, check: message === undefined ? undefined : socketBody(app, body, name)?.check, fail: failing(app, options.error) }
 
   return {
     ...options,
@@ -330,11 +355,7 @@ export function socketOptions(app: Elysia, options: SocketOptions, name: () => s
       return undefined
     },
     async open(ws: ElysiaWS) {
-      adopt(ws, route)
-
-      const admission = admissionOf(ws.raw.data)
-
-      await answer(ws, admission === undefined ? open?.(ws) : await guarded(admission, 'open', () => open?.(ws)))
+      await adopt(ws, route)
     },
   }
 }

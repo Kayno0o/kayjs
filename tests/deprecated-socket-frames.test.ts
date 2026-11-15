@@ -20,13 +20,13 @@ async function fixed(files: Record<string, string>) {
 describe('deprecated-socket-frames', () => {
   it('sends the value itself where a handler sent its JSON text', async () => {
     const { root, found, read } = await fixed({
-      'src/api/chat.ts': 'import { api } from \'kay/server\'\n\nexport default api().ws(\'/\', {\n  open(ws) {\n    ws.send(JSON.stringify({ hello: 1 }))\n  },\n  message(socket, body) {\n    socket.send(JSON.stringify(body))\n    socket.send(\'plain\')\n  },\n})\n',
+      'src/api/chat.ts': 'import { api } from \'kay/server\'\n\nexport default api().ws(\'/\', {\n  open(ws) {\n    ws.send(JSON.stringify({ hello: 1 }))\n  },\n  message(socket, body) {\n    socket.send(JSON.stringify(body), true)\n    socket.publish(\'room\', JSON.stringify(body))\n    socket.send(\'plain\')\n  },\n})\n',
     })
 
     try {
-      expect(found).toHaveLength(2)
+      expect(found).toHaveLength(3)
       expect(found.every(one => one.code === 'deprecated-socket-frames' && one.fixes?.[0]?.safe === true)).toBe(true)
-      expect(await read('src/api/chat.ts')).toBe('import { api } from \'kay/server\'\n\nexport default api().ws(\'/\', {\n  open(ws) {\n    ws.send({ hello: 1 })\n  },\n  message(socket, body) {\n    socket.send(body)\n    socket.send(\'plain\')\n  },\n})\n')
+      expect(await read('src/api/chat.ts')).toBe('import { api } from \'kay/server\'\n\nexport default api().ws(\'/\', {\n  open(ws) {\n    ws.send({ hello: 1 })\n  },\n  message(socket, body) {\n    socket.send(body, true)\n    socket.publish(\'room\', body)\n    socket.send(\'plain\')\n  },\n})\n')
       expect(await socketFrames(root, {})).toEqual([])
     }
     finally {
