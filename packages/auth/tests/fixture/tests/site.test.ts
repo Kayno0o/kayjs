@@ -766,7 +766,7 @@ describe('a site on kayjs-auth with no wiring of its own', () => {
   })
 
   test('under a base and trailing slashes, a visitor is sent to the sign-in page under the base, coming back to the path the server saw', async () => {
-    const site = await testSite({ root: ROOT, base: '/app', trailingSlash: 'always' })
+    const site = await testSite({ root: ROOT, config: { base: '/app', trailingSlash: 'always' } })
     const sentTo = async (path: string) => (await site.fetch(path, { redirect: 'manual' })).headers.get('location')
 
     expect(await sentTo('/note/')).toBe('/app/auth/sign-in?redirect=%2Fnote%2F')
@@ -776,7 +776,7 @@ describe('a site on kayjs-auth with no wiring of its own', () => {
   })
 
   test('under a base, a session signs in, keeps its cookie and reaches requireUser and signInUrl, the paths given with the base or without it', async () => {
-    const site = await testSite({ root: ROOT, base: '/app' })
+    const site = await testSite({ root: ROOT, config: { base: '/app' } })
 
     expect(await site.visit('/note')).toMatchObject({ url: '/app/auth/sign-in?redirect=%2Fnote', status: 200 })
 

@@ -10,7 +10,7 @@ const ROOT = join(import.meta.dir, '..')
 
 async function siteWith(passwords: string | Record<string, string>) {
   const options: CmsOptions = { guard: passwordGuard(passwords), roles: { editor: [], admin: ['redirects'] } }
-  const made = await testSite({ root: ROOT, extensions: [cms(options)] })
+  const made = await testSite({ root: ROOT, config: { extensions: [cms(options)] } })
 
   cms(options)
 

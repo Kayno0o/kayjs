@@ -1448,7 +1448,7 @@ describe('Combobox described rows on the server', () => {
 
 describe('TreeView link rows under base and trailingSlash', () => {
   test('the server marks the node whose href is the page, the base on its links and a slash ending the address', async () => {
-    const mounted = await testSite({ root: ROOT, base: '/app', trailingSlash: 'always' })
+    const mounted = await testSite({ root: ROOT, config: { base: '/app', trailingSlash: 'always' } })
 
     try {
       const page = await mounted.visit('/app/tree-links/?view=b')

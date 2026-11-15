@@ -6,7 +6,7 @@ import { passwordGuard } from '../../../src/password'
 
 const ROOT = join(import.meta.dir, '..')
 const options = { guard: passwordGuard({ editor: 'pw-editor' }) }
-const built = await testSite({ root: ROOT, extensions: [cms(options)], browser: true })
+const built = await testSite({ root: ROOT, config: { extensions: [cms(options)] }, browser: true })
 
 cms(options)
 

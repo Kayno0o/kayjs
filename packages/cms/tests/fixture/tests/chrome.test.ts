@@ -10,7 +10,7 @@ const ROOT = join(import.meta.dir, '..')
 // The fixture's kay.config.ts calls cms() as it loads, after this one, so the settings are given again once it has.
 async function adminSite(options: Parameters<typeof cms>[0], site: Parameters<typeof testSite>[0] = {}) {
   const guard: Guard = () => undefined
-  const made = await testSite({ root: ROOT, ...site, extensions: [cms({ guard, ...options })] })
+  const made = await testSite({ root: ROOT, ...site, config: { extensions: [cms({ guard, ...options })] } })
 
   cms({ guard, ...options })
 

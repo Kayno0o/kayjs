@@ -5,7 +5,7 @@ import { testSite } from 'kay/test'
 
 const ROOT = join(import.meta.dir, '..')
 const rooms = memoryRooms()
-const built = await testSite({ root: ROOT, browser: true, store: { rooms } })
+const built = await testSite({ root: ROOT, browser: true, config: { store: { rooms } } })
 // A tab that closed leaves its room after a grace and a heartbeat.
 const SETTLED = { timeout: '15s' } as const
 

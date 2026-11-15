@@ -10,7 +10,7 @@ const ROOT = join(import.meta.dir, '..')
 // The fixture's kay.config.ts calls cms() as it loads, after this one, so the settings are given again once it has.
 async function siteWith(guard: Guard | undefined, extra: Record<string, unknown> = {}) {
   const options = { guard, ...extra }
-  const made = await testSite({ root: ROOT, extensions: [cms(options)] })
+  const made = await testSite({ root: ROOT, config: { extensions: [cms(options)] } })
 
   cms(options)
 
@@ -145,7 +145,7 @@ test('a site without a password guard and without kayjs-auth sends the sign-in s
 
 test('under a base, the sign-in leads back to the page asked for under that base', async () => {
   const options = { guard: passwordGuard('pw-editor') }
-  const based = await testSite({ root: ROOT, base: '/site', extensions: [cms(options)] })
+  const based = await testSite({ root: ROOT, config: { base: '/site', extensions: [cms(options)] } })
 
   cms(options)
 

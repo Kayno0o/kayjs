@@ -211,7 +211,7 @@ test('keeps the 301 or 302 status of a stored redirect edited in place', async (
 
 test('lists the redirects of kay.config.ts read-only, under a base and a trailing slash', async () => {
   const options = { guard: () => undefined }
-  const based = await testSite({ root: join(import.meta.dir, '..'), base: '/cms', trailingSlash: 'always', redirects: { '/old-config': '/about', '/moved-config': { to: '/empty', status: 301 } }, extensions: [cms(options)] })
+  const based = await testSite({ root: join(import.meta.dir, '..'), config: { base: '/cms', trailingSlash: 'always', redirects: { '/old-config': '/about', '/moved-config': { to: '/empty', status: 301 } }, extensions: [cms(options)] } })
 
   cms(options)
 
