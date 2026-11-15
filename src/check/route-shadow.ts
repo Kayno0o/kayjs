@@ -76,6 +76,11 @@ function renamedImport(program: ReturnType<typeof parseProgram>['program'], modu
   return undefined
 }
 
+// A `declare global` would be declared twice, by the file and by its shadow.
+function declaresGlobal(program: Program): boolean {
+  return program.body.some(statement => statement.type === 'TSModuleDeclaration' && (statement.kind === 'global' || (statement as { global?: boolean }).global === true))
+}
+
 function leavesProject(program: Program, root: string, file: string): boolean {
   return program.body.some((statement) => {
     const specifier = 'source' in statement && statement.source !== null && statement.source !== undefined ? statement.source.value : undefined
@@ -122,7 +127,7 @@ export function routeShadow(root: string, file: string, source: string, { guards
   const { program } = parseProgram(source, { lang: 'ts', recover: true })
 
   // `rootDirs` merges only paths inside the project, so an import leaving it would resolve from the shadow's deeper folder.
-  if (leavesProject(program, root, file))
+  if (leavesProject(program, root, file) || declaresGlobal(program))
     return undefined
 
   const shadow = routeShadowPath(root, file)

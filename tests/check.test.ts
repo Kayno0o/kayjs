@@ -3423,6 +3423,21 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     }
   })
 
+  it('leaves a route file declaring a global to be checked as it is', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p hi\n',
+      'src/routes/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(() => ({ org: 1 }))\n',
+      'src/routes/g.json.ts': 'import type { EndpointContext } from \'kay\'\n\ndeclare global {\n  const kayFlag: number\n}\n\nexport function GET(ctx: EndpointContext<Record<string, never>, { org: number }>) {\n  return Response.json([ctx.guard.org, kayFlag])\n}\n',
+    })
+
+    try {
+      expect((await check(root)).filter(d => d.code?.startsWith('TS'))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('checks the endpoints of an extension and reports a guard without a default export once', async () => {
     const lib = await scratchDir('check-lib-')
     const root = await scratchProject({
