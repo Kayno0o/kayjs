@@ -39,7 +39,7 @@ export function fileAnswer(file: Blob, request: Request | undefined, options: Fi
   if (options.cacheControl !== undefined)
     headers['cache-control'] = options.cacheControl
 
-  return answer(file, request, { ...headers, ...options.headers }, headers => headers)
+  return answer(file, request, { ...headers, ...Object.fromEntries(Object.entries(options.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value])) }, headers => headers)
 }
 
 /** Answers `data` whole or by range under `headers`, `own` finishing the headers of an answer from a route. */
