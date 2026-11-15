@@ -348,7 +348,7 @@ function failing(app: Elysia, error: unknown): NonNullable<SocketRoute['fail']> 
     const hooks = [...[error ?? []].flat(), ...(app.event.error ?? []).map(hook => typeof hook === 'function' ? hook : hook.fn)] as ((context: object) => unknown)[]
 
     for (const hook of hooks.filter(hook => typeof hook === 'function')) {
-      const answered = await hook(Object.assign(data, { error: failure }))
+      const answered = await hook({ ...data, error: failure })
 
       if (answered !== undefined) {
         ws.send(answered)
@@ -357,7 +357,7 @@ function failing(app: Elysia, error: unknown): NonNullable<SocketRoute['fail']> 
       }
     }
 
-    return hooks.length > 0
+    return false
   }
 }
 

@@ -4,7 +4,7 @@ import { lintLevel } from '../compiler/lints'
 import { importedName, walk } from './ast'
 import { scan } from './renamed-exports'
 
-const OLD_FRAME = /\.(?:send|publish)\([^)]*JSON\.stringify\(/
+const OLD_FRAME = /\.(?:send|publish)\([\s\S]*?JSON\.stringify\(/
 const HANDLERS = new Set(['open', 'message', 'close'])
 
 // `ws.send(JSON.stringify(value))` in a handler of an `api()` module's `.ws()` route: every frame is JSON since 1.105, so the text sent here would reach the client as a string holding JSON.
