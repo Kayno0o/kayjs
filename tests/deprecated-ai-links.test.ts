@@ -30,6 +30,8 @@ describe('deprecated-ai-links', () => {
     expect(found('Sources(sources={list} label="Sources" here)')[0]?.fixed).toBe('Sources(sources={list} label="Sources" newTab="auto")')
     expect(found('Sources(sources={list} here={local})')[0]?.fixed).toBe('Sources(sources={list} newTab={local ? \'auto\' : true})')
     expect(found('Sources(sources={list} {here})')[0]?.fixed).toBe('Sources(sources={list} newTab={here ? \'auto\' : true})')
+    expect(found('Sources(sources={list} here={props.local})')[0]?.fixed).toBe('Sources(sources={list} newTab={props.local ? \'auto\' : true})')
+    expect(found('Sources(sources={list} here={a ? b : c})')[0]?.fixed).toBe('Sources(sources={list} newTab={(a ? b : c) ? \'auto\' : true})')
   })
 
   it('reports with no fix where newTab is written already, or the value is not one of the two words', () => {

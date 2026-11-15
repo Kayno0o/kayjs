@@ -3,6 +3,8 @@ import type { Named } from './deprecated-ui-props'
 
 type Report = (span: Span, message: string, details: Details) => void
 
+const PLAIN_PATH = /^[\w$]+(?:\.[\w$]+)*$/
+
 const MESSAGE = 'Which links open in a new tab is `newTab` since 1.105, as the links of kayjs-ui take it: `true`, `false` or `\'auto\'`, which opens a link to a page of this site in place'
 
 // `Chat`'s `links` and `Sources`' `here`, `newTab` since 1.105: `links="apart"` is `newTab={true}`, `links="here"` and `here` are `newTab="auto"`. Found on a component bound to the library's file; the fix offers none beside a `newTab` already written, or a value it cannot read.
@@ -50,8 +52,12 @@ function here(attribute: Named, text: (span: Span) => string): string | undefine
   if (attribute.kind === 'boolean')
     return 'newTab="auto"'
 
-  if (attribute.kind === 'expression')
-    return `newTab={${attribute.shorthand ? text(attribute.name) : text(attribute.expression).trim()} ? 'auto' : true}`
+  if (attribute.kind === 'expression') {
+    const value = attribute.shorthand ? text(attribute.name) : text(attribute.expression).trim()
+
+    // Anything but a name or a member path is parenthesised, so a conditional keeps its meaning under the new one.
+    return `newTab={${PLAIN_PATH.test(value) ? value : `(${value})`} ? 'auto' : true}`
+  }
 
   return undefined
 }
