@@ -731,7 +731,7 @@ export function ratesFallingBack<Store extends RateStore>(name: string, store: S
 
   // Each method is read off the store on each call, so one replaced on it later, as a test spies on it, is the one called.
   return {
-    hit: async (key, window, weight) => answered(name, store, async (...args: [string, Duration | number, number | undefined]) => store.hit(...args), [key, lengthFor(store, lengthMs(window)), weight], () => memory.hit(key, lengthMs(window), weight)),
+    hit: async (key, window, weight) => answered(name, store, (...args: [string, Duration | number, number | undefined]): ReturnType<RateStore['hit']> => store.hit(...args), [key, lengthFor(store, lengthMs(window)), weight], () => memory.hit(key, lengthMs(window), weight)),
     ...peek && { peek: async key => answered(name, store, store.peek ?? peek, [key], () => memory.peek(key)) },
     // Taken back in memory too, where the attempt was counted if the store failed then; memory only takes it off a window closing at that same `resetAt`.
     ...refund && { refund: async (key, resetAt) => {
