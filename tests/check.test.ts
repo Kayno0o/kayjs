@@ -2387,7 +2387,7 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).map(d => [d.file.split('/').at(-1), d.line, named(d)])).toEqual([
-        ['other.kay', 2, '`error` shows the message of a form posting to an action, so it sits inside one'],
+        ['other.kay', 2, '`error` follows the form it sits in, which posts to an action'],
         ['index.kay', 12, 'TS2345'],
         ['index.kay', 14, 'TS2345'],
       ])
@@ -2415,7 +2415,7 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).map(d => [d.file.split('/').at(-1), d.line, named(d)])).toEqual([
-        ['other.kay', 2, '`pending` shows while a form posts to an action, so it sits inside one'],
+        ['other.kay', 2, '`pending` follows the form it sits in, which posts to an action'],
         ['index.kay', 10, 'TS2345'],
       ])
     }
