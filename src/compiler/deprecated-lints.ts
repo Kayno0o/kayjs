@@ -130,6 +130,14 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Chat from \'@kayjs/ai/chat.kay\'\nimport { send } from \'./send\'\n---\nChat(action={send} sendLabel="Go" stopLabel="Halt")',
     right: '---\nimport Chat from \'@kayjs/ai/chat.kay\'\nimport { send } from \'./send\'\n---\nChat(action={send} labels={{ send: "Go", stop: "Halt" }})',
   },
+  'deprecated-ai-links': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: 'Chat\'s `links` and Sources\' `here`, `newTab` since 1.105: which links of a reply and which cited sources open in a new tab, as the links of kayjs-ui take it, `true`, `false` or `\'auto\'`, which opens a link to a page of this site in place. `links="apart"` is `newTab={true}`, and `links="here"` and `here` are `newTab="auto"`. The old props work until 1.108 and `newTab` wins when both are written. Found on a `Chat` or a `Sources` bound to the library\'s file in a template. The fix writes `newTab`, reading `here={value}` as `newTab={value ? \'auto\' : true}`; a template that has a `newTab` already, or a `links` that is not one of the two words, is reported with no fix.',
+    wrong: '---\nimport Chat from \'@kayjs/ai/chat.kay\'\nimport { send } from \'./send\'\n---\nChat(action={send} links="here")',
+    right: '---\nimport Chat from \'@kayjs/ai/chat.kay\'\nimport { send } from \'./send\'\n---\nChat(action={send} newTab="auto")',
+  },
   'deprecated-ui-callbacks': {
     level: 'warn',
     group: 'deprecated',

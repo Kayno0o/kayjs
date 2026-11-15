@@ -52,9 +52,11 @@ A page without a `--- server` fence that has an `on*`, `bind:` or `ref`, a brows
 - `mailer()` and `mail()` take every `MAIL_*` setting as an option that wins over the variable: `url`, `smtp.insecure`, `smtp.rateLimit` and `smtp.dkim` join `from`, `to` and `events`. Nothing to change.
 ### kayjs-ai calls share one options type, and a chat takes `labels`
 
-`kay upgrade` rewrites both forms it can find (`deprecated-ai-labels`, `deprecated-ai-language`); the old forms work until 1.108.
+`kay upgrade` rewrites the forms it can find (`deprecated-ai-labels`, `deprecated-ai-language`, `deprecated-ai-links`); the old forms work until 1.108.
 
 - `Chat`, `ChatLauncher` and `ChatPanel` take `labels={{ send: 'Go', stop: 'Halt' }}`, keyed as the messages are (`ai.chat.send`), in place of the `sendLabel` and `stopLabel` props; `waitingLabel` is `labels.thinking` and `failureLabel` `labels.error`. A flat prop still wins over `labels`.
+- `Chat` takes `newTab` (`true`, `false` or `'auto'`, as kayjs-ui's links do) in place of `links`: `links="apart"` is `newTab={true}`, `links="here"` is `newTab="auto"`; `Sources` takes `newTab` in place of `here`. `ChatLauncher` takes `newTab` too, `'auto'` by default.
+- The launcher's panel and button are kayjs-ui's `SidePanel` now, so a restyle of `@kayjs/ai/chat-panel.kay` changes: its parts `panel`, `button` and `glyph` are `root` and `launcher` of `'@kayjs/ui/side-panel.kay'` (the glyph is the button's icon), `head` and `title` are the same parts of `'@kayjs/ui/side-panel.kay'`, `body` is its `body`, and `actions` and `action` are gone: the header's buttons are the `new`, `expand` and `close` parts of `chat-panel.kay`. `kay check` already reports a part a component no longer has, listing the ones it has, which is why there is no lint for them. The `.kai-launcher` wrapper is no longer a fixed container and `.kai-launcher-panel` is a `dialog` that is `display: none` unless `[open]` (no `[hidden]`): a rule of an app's own on `.kai-launcher-head`, `-title`, `-actions`, `-glyph` or `.kai-launcher-panel[hidden]` moves to those parts and to `[open]`.
 - `transcribe()` and `describeImage()` take `locale`, a BCP 47 tag, in place of `language`.
 - `ask`, `describeImage`, `transcribe`, `speak` and `embed` take one `CallOptions`, so `retry`, `fallback`, `timeout`, `signal` and the `ai()` hooks reach each of them. `timeout` also takes a single duration for the whole call.
 ### Query params, persisted state, navigation and effects have one API each

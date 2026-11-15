@@ -946,6 +946,7 @@ component default
   maxChars?: number | undefined
   maxFiles?: number | undefined
   maxSize?: ByteSize | undefined
+  newTab?: "auto" | boolean | undefined
   note?: Element
   onEdit?: ((event: { text: string; }) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined

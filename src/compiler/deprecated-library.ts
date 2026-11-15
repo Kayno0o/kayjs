@@ -1,6 +1,7 @@
 import type { Details, ElementNode, Span } from './ast'
 import type { LintName } from './lints'
 import { deprecatedAiLabels } from './deprecated-ai-labels'
+import { deprecatedAiLinks } from './deprecated-ai-links'
 import { deprecatedUiCallbacks } from './deprecated-ui-callbacks'
 import { deprecatedUiProps } from './deprecated-ui-props'
 
@@ -9,4 +10,5 @@ export function deprecatedLibrary(element: ElementNode, file: string, text: (spa
   deprecatedUiProps(element, file, text, (span, message, details) => lint(span, 'deprecated-ui-props', message, details))
   deprecatedUiCallbacks(element, file, text, (span, message, details) => lint(span, 'deprecated-ui-callbacks', message, details))
   deprecatedAiLabels(element, file, text, (span, message, details) => lint(span, 'deprecated-ai-labels', message, details))
+  deprecatedAiLinks(element, file, text, (span, message, details) => lint(span, 'deprecated-ai-links', message, details))
 }
