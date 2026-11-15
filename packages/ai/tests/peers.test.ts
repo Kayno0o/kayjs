@@ -17,5 +17,5 @@ test('kayjs-ui is an optional peer, imported by the chat files alone', async () 
       importers.push(file)
   }
 
-  expect(importers.sort()).toEqual(['src/chat-launcher.kay', 'src/chat.kay'])
+  expect(importers.sort()).toEqual(['src/chat-attachments.ts', 'src/chat-launcher.kay', 'src/chat-panel.kay', 'src/chat.kay'])
 })

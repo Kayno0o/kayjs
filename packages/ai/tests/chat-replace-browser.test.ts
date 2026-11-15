@@ -264,7 +264,7 @@ it('does not close the launcher panel when Escape cancels an edit', async () => 
   // The launcher hydrates when the browser is idle, which a loaded machine puts off: a click before it opens nothing.
   await page.waitUntil(() => (document.querySelector('.kai-launcher')?.closest('[data-component]') as unknown as { _$k?: boolean } | null)?._$k === true)
   await page.click('.kai-launcher-button')
-  await page.waitFor('.kai-launcher-panel:not([hidden])')
+  await page.waitFor('.kai-launcher-panel[open]')
   await page.waitUntil(() => [...document.querySelectorAll('[data-hydrate=visible]')].every(island => '_$k' in island))
   await send(page, 'one', 'fresh roles=u last=one files=0')
   await page.click(EDIT)
@@ -274,12 +274,12 @@ it('does not close the launcher panel when Escape cancels an edit', async () => 
   await page.press('Escape')
   await page.waitFor('.kai-chat-turn[data-editing]', { gone: true })
 
-  expect(await page.evaluate(() => document.querySelector('.kai-launcher-panel')!.hasAttribute('hidden'))).toBe(false)
+  expect(await page.evaluate(() => !(document.querySelector('.kai-launcher-panel') as HTMLDialogElement).open)).toBe(false)
 
   await page.click(EDIT)
   await page.press('Escape')
   await page.press('Escape')
-  await page.waitFor('.kai-launcher-panel[hidden]')
+  await page.waitFor('.kai-launcher-panel:not([open])')
 }, 120_000)
 
 it('says why Save sent nothing when the message is empty and has no file, and stops saying it once the visitor types', async () => {

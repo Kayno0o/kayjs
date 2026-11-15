@@ -59,3 +59,5 @@ button#dock-bottom(onClick={() => dockEdge = 'bottom'}) Dock bottom
 SidePanel#late(open={true} modal={false} dock={lateEdge()} title="Saturn" onOpenChange={() => undefined})
   p Sixth planet
 button#late-dock(onClick={() => lateEdge = 'bottom'}) Dock late
+SidePanel#floating(modal={false} keep title="Uranus" launcher="Open Uranus" launcherButton={{ openIcon: 'close', openLabel: 'Close Uranus', tone: 'accent', tooltip: 'left' }})
+  p#floating-body Seventh planet

@@ -125,7 +125,7 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 - Send and Stop are round icon buttons, `icons` (`send`, `stop`) replacing the arrow and the square, which are kayjs-ui icon slots (`send`, `stop`, `chat`, `expand`, `collapse`) an app restyles through `settings.icons`.
 - A table wider than the chat scrolls sideways inside it, and the keyboard can scroll it.
 - A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
-- A link in a reply opens in a new tab, so following it never loses the conversation; `links="here"` opens a link to your own site in place, which `ChatLauncher` sets.
+- A link in a reply opens in a new tab, so following it never loses the conversation; `newTab="auto"` opens a link to your own site in place, which `ChatLauncher` sets, and `newTab={false}` opens none in a new tab.
 - A reply shows no image, since a model reading a hostile page could point one at an address carrying the conversation. `images="/files"` lets a reply show the images under that path of your site, such as a picture a tool returned the address of; images of other hosts or paths stay out. Give it a folder that holds only images: a redirect, a proxy or an endpoint that echoes its query under it would let a model send the conversation away.
 
 A reply grounded in documents cites them as `[1]`, `[2]`. Give `ask` the documents and the chat links each number outside code to its document and lists the cited ones under the turn, in a new tab for an outside link:
@@ -216,7 +216,7 @@ Every element is a part that keeps its `kai-` class and takes utilities from `sr
 - `chat.kay`: `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `note`, `status`, `disclosure`, `form`, `field`, `send` and `retry` (the Try again button, shown only after a failed reply).
 - `chat-calls.kay` (the tool calls): `root`, `summary`, `list`, `call`, `name`, `status`, `title` and `code`.
 - `chat-sources.kay` (the sources listed under a reply): `root`, `label`, `list`, `item` and `link`.
-- `chat-panel.kay` (the launcher's panel): `root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button` and `glyph`.
+- `chat-panel.kay` (the launcher's header buttons): `root`, `new`, `expand` and `close`; the panel and its button are kayjs-ui's `SidePanel`, restyled through its own parts.
 - A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
 
 A site restyles the panel with custom properties, all optional: `--kai-chat-accent`, `--kai-chat-bubble`, `--kai-chat-radius`, `--kai-chat-shadow`, `--kai-chat-width`, `--kai-chat-width-large`, `--kai-chat-height` and `--kai-chat-height-large`. The other props are `Chat`'s. The button has a `data-tooltip`, which shows when the layout renders kayjs-ui's `TooltipHost`.

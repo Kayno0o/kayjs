@@ -65,8 +65,6 @@ describe('restyling the chat from src/ui.ts', () => {
     'kai-chat-sources-list list-decimal',
     'kai-chat-source py-1',
     'kai-chat-source-link underline',
-    'kai-launcher-panel shadow-2xl',
-    'kui-icon-btn kai-launcher-button size-16',
   ])('draws class="%s"', (classes) => {
     expect(html).toContain(`class="${classes}"`)
   })
@@ -98,10 +96,15 @@ describe('restyling the chat from src/ui.ts', () => {
     expect(outside.match(/^\S/gm)?.length).toBe(2)
   })
 
+  test('the launcher panel and button take the classes of the side panel they are built on', () => {
+    expect(html).toMatch(/<dialog [^>]*class="[^"]*shadow-2xl[^"]* kai-launcher-panel"/)
+    expect(html).toMatch(/class="[^"]*kai-launcher-button[^"]*"/)
+    expect(html).toMatch(/class="[^"]* size-16[^"]*"/)
+  })
+
   test('a part nothing restyles keeps its kai class alone', () => {
     expect(html).toContain('class="kai-chat-disclosure"')
     expect(html).toContain('class="kai-chat-form"')
-    expect(html).toContain('class="kai-launcher-body"')
   })
 
   test('the field and the buttons keep the kayjs-ui classes the theme styles', () => {

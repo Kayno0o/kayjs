@@ -936,7 +936,7 @@ component default
   greeting?: string | undefined
   hash?: false | string | undefined
   history?: number | undefined
-  icons?: (Partial<Record<ChatIconName, ChatIconValue>> & Partial<Record<"close" | "collapse" | "expand" | "open", ChatIconValue>>) | undefined
+  icons?: ChatLauncherIcons | undefined
   images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
   keepOnServer?: boolean | undefined
@@ -977,15 +977,15 @@ component default
   children?: Element
   class?: string | undefined | {
   root?: string | undefined;
-  panel?: string | undefined;
-  head?: string | undefined;
-  title?: string | undefined;
-  actions?: string | undefined;
-  action?: string | undefined;
-  expand?: string | undefined;
-  body?: string | undefined;
-  button?: string | undefined;
-  glyph?: string | undefined;
+  new?: string | undefined | {
+    root?: string | undefined;
+  };
+  expand?: string | undefined | {
+    root?: string | undefined;
+  };
+  close?: string | undefined | {
+    root?: string | undefined;
+  };
 }
   closeIcon: Element
   collapseIcon: Element
@@ -1002,8 +1002,9 @@ component default
 component default
   block?: ((source: Source, n: number) => Element) | undefined
   class?: string | undefined | { root?: string | undefined; label?: string | undefined; list?: string | undefined; item?: string | undefined; link?: string | undefined; }
-  here: boolean
+  here?: boolean | undefined
   label: string
+  newTab?: "auto" | boolean | undefined
   sources: Source[]
 
 [./chat.kay] default
@@ -1112,6 +1113,7 @@ component default
   maxFiles?: number | undefined
   maxSize?: ByteSize | undefined
   newButton?: boolean | undefined
+  newTab?: "auto" | boolean | undefined
   onEdit?: ((event: { text: string; }) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
   onRegenerate?: (() => unknown) | undefined

@@ -865,8 +865,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
   describe('the launcher', () => {
     // The launcher is the island, marked `_$k` once hydrated.
     const chatHydrated = () => (document.querySelector('.kai-launcher')?.closest('[data-component]') as unknown as { _$k?: boolean } | null)?._$k === true
-    const closed = '.kai-launcher-panel[hidden]'
-    const opened = '.kai-launcher-panel:not([hidden])'
+    const closed = '.kai-launcher-panel:not([open])'
+    const opened = '.kai-launcher-panel[open]'
 
     test('the launcher hydrates when the browser is idle, and the button opens and closes the panel by keyboard', async () => {
       const page = await site.open('/launcher/one')
@@ -1113,7 +1113,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
 
       expect(await width()).toBeGreaterThan(small)
 
-      await page.click('.kai-launcher-actions button')
+      await page.click('.kai-launcher-action')
       await page.waitFor('.kai-chat-empty')
 
       expect(await page.count('.kai-chat-turn')).toBe(0)
@@ -1198,7 +1198,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       expect(large.height).toBeGreaterThan(empty.height)
       expect(large.formBottom).toBeCloseTo(empty.formBottom, 0)
 
-      await page.click('.kai-launcher-actions button')
+      await page.click('.kai-launcher-action')
       await page.waitFor('.kai-chat-empty')
 
       expect(await measure()).toMatchObject({ height: large.height })

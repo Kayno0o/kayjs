@@ -445,101 +445,22 @@
     font-family: ui-monospace, monospace;
   }
 
-  /* The launcher: a button at the bottom right of the page and the panel it opens above it. */
-  .kai-launcher {
-    position: fixed;
-    inset-block-end: max(1rem, env(safe-area-inset-bottom));
-    inset-inline-end: max(1rem, env(safe-area-inset-right));
-    z-index: 40;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 1rem;
-    max-width: calc(100vw - 2rem);
-  }
-
-  .kai-launcher .kai-launcher-button {
-    width: 3.25rem;
-    height: 3.25rem;
-    border: 0;
-    border-radius: 9999px;
-    background-color: var(--kai-chat-accent, var(--color-accent));
-    color: var(--color-accent-foreground);
-    box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 25%);
-    cursor: pointer;
-  }
-
-  .kai-launcher .kai-launcher-button:hover {
-    background-color: var(--color-accent-hover);
-  }
-
-  .kai-launcher .kai-launcher-button:focus-visible {
-    outline: 2px solid var(--kai-chat-accent, var(--color-accent));
-    outline-offset: 3px;
-  }
-
-  .kai-launcher-glyph {
-    display: inline-flex;
-  }
-
-  .kai-launcher-glyph[hidden] {
-    display: none;
-  }
-
-  .kai-launcher .kai-launcher-button .kui-icon {
+  /* The launcher is kayjs-ui's SidePanel: its button, panel and header are drawn there, ChatPanel setting the geometry inline. What stays here is the glyph's size and what the panel holds. */
+  .kai-launcher-button .kui-icon {
     width: 1.5rem;
     height: 1.5rem;
   }
 
-  .kai-launcher-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    box-sizing: border-box;
-    width: min(var(--kai-chat-width, 36rem), calc(100vw - 2rem));
-    height: min(var(--kai-chat-height, 40rem), calc(100dvh - 7.5rem));
-    padding: 0 1rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: calc(var(--kai-chat-radius, 0.75rem) + 0.25rem);
-    background-color: var(--color-background);
-    color: var(--color-foreground);
-    box-shadow: var(--kai-chat-shadow, 0 0.75rem 2.5rem rgb(0 0 0 / 22%), 0 0 0 1px light-dark(transparent, rgb(255 255 255 / 6%)));
-  }
-
-  .kai-launcher-panel[data-large] {
-    width: min(var(--kai-chat-width-large, 56rem), calc(100vw - 2rem));
-    height: min(var(--kai-chat-height-large, 100dvh), calc(100dvh - 7.5rem));
-  }
-
-  .kai-launcher-panel[hidden] {
-    display: none;
-  }
-
-  .kai-launcher-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-inline: -1rem;
-    padding: 0.5rem 0.75rem 0.5rem 1rem;
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .kai-launcher-title {
-    margin: 0;
-    font-size: 0.9375rem;
-  }
-
-  .kai-launcher-actions {
-    display: flex;
-    gap: 0.125rem;
-  }
-
   /* A phone has no room for a second size. */
   @media (max-width: 40rem) {
-    .kai-launcher-actions .kai-launcher-expand {
+    .kai-launcher-expand {
       display: none;
     }
+  }
+
+  .kai-launcher-panel[open] {
+    display: flex;
+    flex-direction: column;
   }
 
   .kai-launcher-body {

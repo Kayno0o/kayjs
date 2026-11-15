@@ -3,9 +3,11 @@ import type { Snippet } from 'kay'
 import type { ChatLauncherLabelProps, ChatLauncherLabels } from './types'
 import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
+import BareIconButton from '@kayjs/ui/bare-icon-button.kay'
+import SidePanel from '@kayjs/ui/side-panel.kay'
 import { eventText } from './chat-events'
 
-const look = recipe({ parts: { root: 'kai-launcher', panel: 'kai-launcher-panel', head: 'kai-launcher-head', title: 'kai-launcher-title', actions: 'kai-launcher-actions', action: 'kui-icon-btn', expand: 'kui-icon-btn kai-launcher-expand', body: 'kai-launcher-body', button: 'kui-icon-btn kai-launcher-button', glyph: 'kai-launcher-glyph' } })
+const look = recipe({ parts: { root: 'kai-launcher', new: 'kai-launcher-action', expand: 'kai-launcher-action kai-launcher-expand', close: 'kai-launcher-action' } })
 
 const { labels = {}, label = wording('ai.chat.label', 'Chat'), openLabel = labels.open ?? wording('ai.chat.open', 'Open the chat'), closeLabel = labels.close ?? wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = labels.new ?? wording('ai.chat.new', 'New conversation'), expandLabel = labels.expand ?? wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = labels.collapse ?? wording('ai.chat.collapse', 'Shrink the chat'), open: wanted, onOpenChange, hash = '#chat' } = props<{
   // Names the panel for screen readers and heads it.
@@ -30,17 +32,21 @@ const { labels = {}, label = wording('ai.chat.label', 'Chat'), openLabel = label
 const open = signal(wanted === true)
 const large = signal(false)
 const panelId = uid()
-let button: HTMLButtonElement | undefined
-let panel: HTMLElement | undefined
+let root: HTMLElement | undefined
+
+// The panel is a card above the round button, whose size the app sets with `--kai-chat-width`, `-height` and their `-large` forms. Set inline, it wins over the side panel's own edge geometry.
+function panelStyle() {
+  const width = large() ? 'var(--kai-chat-width-large, 56rem)' : 'var(--kai-chat-width, 36rem)'
+  const height = large() ? 'var(--kai-chat-height-large, 100dvh)' : 'var(--kai-chat-height, 40rem)'
+
+  return `position: fixed; box-sizing: border-box; padding: 0; z-index: 40; inset: auto max(1rem, env(safe-area-inset-right)) calc(5.25rem + var(--kay-dev-inset-bottom, 0px)) auto; width: min(${width}, calc(100vw - 2rem)); height: min(${height}, calc(100dvh - 7.5rem)); max-width: none; max-height: none; border: 1px solid var(--color-border); border-radius: calc(var(--kai-chat-radius, 0.75rem) + 0.25rem); background-color: var(--color-background); box-shadow: var(--kai-chat-shadow, 0 0.75rem 2.5rem rgb(0 0 0 / 22%), 0 0 0 1px light-dark(transparent, rgb(255 255 255 / 6%))); transition: none; translate: none`
+}
+
+const dialog = () => root?.querySelector('dialog') ?? null
 
 function show() {
   open = true
-  queueMicrotask(() => (panel?.querySelector<HTMLElement>('textarea') ?? panel)?.focus())
-}
-
-function hide() {
-  open = false
-  button?.focus()
+  queueMicrotask(() => (dialog()?.querySelector<HTMLElement>('textarea') ?? dialog())?.focus())
 }
 
 async function logged(pending: Promise<unknown>) {
@@ -57,7 +63,7 @@ function toggle(next: boolean) {
   if (next)
     show()
   else
-    hide()
+    open = false
 
   try {
     const result = onOpenChange?.({ open: next })
@@ -68,6 +74,12 @@ function toggle(next: boolean) {
   catch (error) {
     console.error(error)
   }
+}
+
+// The side panel reports every change, the ones the page made included: only a difference from what is shown is the visitor's.
+function changed(event: { open: boolean }) {
+  if (event.open !== open())
+    toggle(event.open)
 }
 
 // The page sets `open`: the panel follows it, the focus where the visitor has it, since nobody pressed a button.
@@ -82,8 +94,8 @@ effect(() => {
 
 // The chat inside is told to start over; it hears the event once the launcher hydrated.
 function startOver() {
-  panel?.querySelector('.kai-chat')?.dispatchEvent(new CustomEvent('kai:chat-new', { detail: {} }))
-  queueMicrotask(() => panel?.querySelector('textarea')?.focus())
+  dialog()?.querySelector('.kai-chat')?.dispatchEvent(new CustomEvent('kai:chat-new', { detail: {} }))
+  queueMicrotask(() => dialog()?.querySelector('textarea')?.focus())
 }
 
 // The visitor opening the panel from a link, the address or an event of the page: the same as pressing the button, if it is not open already.
@@ -113,7 +125,7 @@ const RETRY_LIMIT = 200
 
 // Hands the text to the chat once it is there to hear it: the launcher hydrates when the browser is idle, and a listener cancels the event it takes.
 function forward(type: string, text: string, tries = 0) {
-  const chat = panel?.querySelector('.kai-chat')
+  const chat = dialog()?.querySelector('.kai-chat')
   const handled = chat !== null && chat !== undefined && !chat.dispatchEvent(new CustomEvent(type, { detail: type.includes(':') ? { text } : text, cancelable: true }))
 
   if (!handled && !disposed && tries < RETRY_LIMIT)
@@ -122,7 +134,7 @@ function forward(type: string, text: string, tries = 0) {
 
 function relay(event: Event) {
   // Only the page's own events, not the ones the chat sends up from inside the panel.
-  if (event.target instanceof Node && panel?.contains(event.target))
+  if (event.target instanceof Node && dialog()?.contains(event.target))
     return
 
   const text = eventText((event as CustomEvent<unknown>).detail)
@@ -155,30 +167,19 @@ effect(() => {
     document.removeEventListener('kai:chat-draft', relay)
   })
 })
-
-function keyDown(event: KeyboardEvent) {
-  // A reply under way stops on Escape first, which the chat marks by preventing the event's default.
-  if (event.key === 'Escape' && open() && !event.defaultPrevented && !event.isComposing) {
-    event.preventDefault()
-    toggle(false)
-  }
-}
 ---
-div(part="root" onKeyDown={keyDown})
-  section(part="panel" id={panelId} role="dialog" aria-labelledby={`${panelId}-title`} tabindex="-1" hidden={!open()} data-large={large()} ref={element => { panel = element }})
-    header(part="head")
-      h2(part="title" id={`${panelId}-title`}) {label}
-      div(part="actions")
-        button(part="action" type="button" aria-label={newLabel} data-tooltip={newLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={startOver})
-          | {newIcon}
-        button(part="expand" type="button" aria-label={large() ? collapseLabel : expandLabel} data-tooltip={large() ? collapseLabel : expandLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={() => large = !large()})
-          | {large() ? collapseIcon : expandIcon}
-        button(part="action" type="button" aria-label={closeLabel} data-tooltip={closeLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={() => toggle(false)})
-          | {closeIcon}
-    div(part="body")
-      slot
-  button(part="button" type="button" ref={element => { button = element }} aria-label={openLabel} aria-expanded={open()} aria-controls={panelId} data-tooltip={open() ? closeLabel : openLabel} data-tooltip-placement="left" data-size="lg" data-variant="solid" data-tone="accent" onClick={() => toggle(!open())})
-    span(part="glyph" hidden={open()})
+div(part="root" ref={element => { root = element }})
+  SidePanel(id={panelId} open={open()} onOpenChange={changed} modal={false} keep title={label} closeLabel={closeLabel} launcher={openLabel} launcherLayer={40} launcherButton={{ openLabel: closeLabel, size: 'lg', variant: 'solid', tone: 'accent', tooltip: 'left' }} style={panelStyle()} data-large={large()} class={{ root: 'kai-launcher-panel', launcher: 'kai-launcher-button size-13 rounded-full border-0 bg-[var(--kai-chat-accent,var(--color-accent))] text-accent-foreground shadow-[0_0.25rem_1rem_rgb(0_0_0/25%)] hover:bg-accent-hover', body: 'kai-launcher-body flex flex-col px-4 pt-2 pb-3', head: 'px-4 py-2', title: 'text-[0.9375rem]' }})
+    @actions
+      BareIconButton(part="new" label={newLabel} size="md" variant="ghost" tone="neutral" data-tooltip-placement="bottom span-left" onClick={startOver})
+        | {newIcon}
+      BareIconButton(part="expand" label={large() ? collapseLabel : expandLabel} size="md" variant="ghost" tone="neutral" data-tooltip-placement="bottom span-left" onClick={() => large = !large()})
+        | {large() ? collapseIcon : expandIcon}
+    @launcherIcon
       | {icon}
-    span(part="glyph" hidden={!open()})
+    @launcherOpenIcon
       | {closeIcon}
+    @close
+      BareIconButton(part="close" label={closeLabel} size="md" variant="ghost" tone="neutral" data-tooltip-placement="bottom span-left" onClick={() => toggle(false)})
+        | {closeIcon}
+    slot

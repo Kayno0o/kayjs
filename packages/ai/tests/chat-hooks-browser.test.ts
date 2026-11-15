@@ -26,20 +26,20 @@ it('calls the app\'s callbacks as a suggestion is pressed, the message goes out 
 it('opens and closes a launcher the app controls, and tells the app when the visitor does', async () => {
   await using page = await site.open('/opening')
 
-  expect(await page.evaluate(() => document.querySelector('.kai-launcher-panel')!.hasAttribute('hidden'))).toBe(true)
+  expect(await page.evaluate(() => !(document.querySelector('.kai-launcher-panel') as HTMLDialogElement).open)).toBe(true)
   await page.click('.ask')
-  await page.waitFor('.kai-launcher-panel:not([hidden])')
+  await page.waitFor('.kai-launcher-panel[open]')
   // Set by the app, so the app is not told.
   expect(await page.text('.changes')).toBe('')
 
   await page.click('.kai-launcher-button')
-  await page.waitFor('.kai-launcher-panel[hidden]')
+  await page.waitFor('.kai-launcher-panel:not([open])')
   expect(await page.text('.changes')).toBe('false')
 
   await page.click('.kai-launcher-button')
-  await page.waitFor('.kai-launcher-panel:not([hidden])')
+  await page.waitFor('.kai-launcher-panel[open]')
   await page.click('.dismiss')
-  await page.waitFor('.kai-launcher-panel[hidden]')
+  await page.waitFor('.kai-launcher-panel:not([open])')
   expect(await page.text('.changes')).toBe('false;true')
   expect(page.errors).toEqual([])
 }, 120_000)

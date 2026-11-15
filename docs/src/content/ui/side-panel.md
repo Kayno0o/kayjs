@@ -53,6 +53,12 @@ The panel publishes its size on `html` as `--kui-dock-right` or `--kui-dock-bott
 
 `launcher` is the label of a button the closed panel leaves in the window's bottom right corner, off the dev tool's drawer, which opens it through `onOpenChange({ open: true })`; `launcherLayer` sets its `z-index`, the one thing of it a parent sets, as the panel's `style` does not reach it. It names the panel it opens through `aria-controls`, the panel's `id`, and publishes its room as `--kay-panel-right`.
 
+`launcher` works with any `modal={false}` panel, docked or floating. `launcherButton` shapes the button: `icon` (`menu`), `size`, `variant`, `tone` and `tooltip` (where the tooltip opens), or the `@launcherIcon` block for an icon of your own.
+
+With an `openIcon` (or `@launcherOpenIcon`) and an `openLabel` it stays on screen while the panel is open, draws that icon, closes the panel when pressed, carries `aria-expanded` and takes the focus back when the panel closes.
+
+`keep` leaves the head and the body rendered while the panel is closed, hidden with it, so what lives in them is not built again on each opening.
+
 `launcherHref` makes the launcher a link to that URL instead, so a panel driven by the URL opens with no JavaScript too; a panel with a `closeHref` and no `onOpenChange` must give one with its `launcher`, as nothing else could open it, and the types ask for it.
 
 `closeHref` makes the close button a link to that URL, so such a page closes it with no JavaScript too. With JavaScript the link navigates and `onOpenChange({ open: false })` is called as well, so its handler need not navigate.

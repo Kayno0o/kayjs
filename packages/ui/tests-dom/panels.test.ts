@@ -169,7 +169,7 @@ describe('SidePanel with a closeHref and no onOpenChange', () => {
 })
 
 describe('SidePanel with a dock', () => {
-  const launcher = (root: Element) => root.querySelector<HTMLElement>('[data-part=launcher]')
+  const launcher = (root: Element) => root.querySelector<HTMLElement>('[data-part=launcher][aria-controls="docked"]')
 
   const html = document.documentElement
   const dock = (root: Element) => root.querySelector<HTMLDialogElement>('#docked')!
@@ -365,6 +365,32 @@ describe('SidePanel with a dock', () => {
       if (width)
         Object.defineProperty(HTMLElement.prototype, 'offsetWidth', width)
     }
+  })
+
+  test('a floating panel with an openIcon keeps its launcher as a toggle, its body mounted while closed, and takes the focus back on close', async () => {
+    const root = await panels()
+    const panel = root.querySelector<HTMLDialogElement>('#floating')!
+    const button = () => root.querySelector<HTMLElement>('[data-part=launcher][aria-controls="floating"]')!
+
+    await settle()
+    expect(panel.open).toBe(false)
+    expect(panel.querySelector('#floating-body')).not.toBeNull()
+    expect(button().getAttribute('aria-label')).toBe('Open Uranus')
+    expect(button().getAttribute('aria-expanded')).toBe('false')
+    expect(button().getAttribute('data-tooltip-placement')).toBe('left')
+    expect(button().getAttribute('data-tone')).toBe('accent')
+
+    click(button())
+    await settle()
+    expect(panel.open).toBe(true)
+    expect(button().getAttribute('aria-label')).toBe('Close Uranus')
+    expect(button().getAttribute('aria-expanded')).toBe('true')
+
+    click(button())
+    await settle()
+    expect(panel.open).toBe(false)
+    expect(button().getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(button())
   })
 
   test('a closeHref panel with a launcherHref and no onOpenChange leaves a launcher that is a link', async () => {

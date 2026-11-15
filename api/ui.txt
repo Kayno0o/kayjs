@@ -1671,7 +1671,7 @@ component default
   name?: string | undefined
   onChange?: ((event: { files: File[]; }) => unknown) | undefined
   onFiles?: ((event: { files: File[]; }) => unknown) | undefined
-  onReject?: ((event: { files: File[]; reason: Reason; }) => unknown) | undefined
+  onReject?: ((event: { files: File[]; reason: FileRejection; }) => unknown) | undefined
   paste?: boolean | undefined
   removeLabel?: ((file: File) => string) | undefined
   size?: "md" | "sm" | undefined
@@ -2722,11 +2722,17 @@ component default
   body?: string | undefined;
   footer?: string | undefined;
   launcher?: string | undefined | {
-    root?: string | undefined | {
-      root?: string | undefined;
-    };
+    root?: string | undefined;
   };
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((event: { size: number; settled: boolean; }) => unknown) | undefined; open?: boolean | undefined; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; launcher?: undefined; launcherButton?: undefined | {
+  icon?: IconProps | IconSlot | undefined;
+  openIcon?: IconProps | IconSlot | undefined;
+  openLabel?: string | undefined;
+  size?: Size | undefined;
+  variant?: "ghost" | "inline" | "solid" | undefined;
+  tone?: Tone | undefined;
+  tooltip?: string | undefined;
+}; launcherHref?: undefined; launcherIcon?: Element; launcherLayer?: number | undefined; launcherOpenIcon?: Element; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((event: { size: number; settled: boolean; }) => unknown) | undefined; open?: boolean | undefined; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
   | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
@@ -2736,11 +2742,17 @@ component default
   body?: string | undefined;
   footer?: string | undefined;
   launcher?: string | undefined | {
-    root?: string | undefined | {
-      root?: string | undefined;
-    };
+    root?: string | undefined;
   };
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher: string; launcherHref: string; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((event: { size: number; settled: boolean; }) => unknown) | undefined; open?: boolean | undefined; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; launcher: string; launcherButton?: undefined | {
+  icon?: IconProps | IconSlot | undefined;
+  openIcon?: IconProps | IconSlot | undefined;
+  openLabel?: string | undefined;
+  size?: Size | undefined;
+  variant?: "ghost" | "inline" | "solid" | undefined;
+  tone?: Tone | undefined;
+  tooltip?: string | undefined;
+}; launcherHref: string; launcherIcon?: Element; launcherLayer?: number | undefined; launcherOpenIcon?: Element; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((event: { size: number; settled: boolean; }) => unknown) | undefined; open?: boolean | undefined; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
   | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
@@ -2750,11 +2762,17 @@ component default
   body?: string | undefined;
   footer?: string | undefined;
   launcher?: string | undefined | {
-    root?: string | undefined | {
-      root?: string | undefined;
-    };
+    root?: string | undefined;
   };
-}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; onSizeChange?: ((event: { size: number; settled: boolean; }) => unknown) | undefined; open?: boolean | undefined; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
+}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; launcher?: string | undefined; launcherButton?: undefined | {
+  icon?: IconProps | IconSlot | undefined;
+  openIcon?: IconProps | IconSlot | undefined;
+  openLabel?: string | undefined;
+  size?: Size | undefined;
+  variant?: "ghost" | "inline" | "solid" | undefined;
+  tone?: Tone | undefined;
+  tooltip?: string | undefined;
+}; launcherHref?: string | undefined; launcherIcon?: Element; launcherLayer?: number | undefined; launcherOpenIcon?: Element; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; onSizeChange?: ((event: { size: number; settled: boolean; }) => unknown) | undefined; open?: boolean | undefined; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
 
 [./site-favicon.kay] default
 component default
