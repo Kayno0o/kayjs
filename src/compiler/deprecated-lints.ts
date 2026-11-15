@@ -368,6 +368,15 @@ export const DEPRECATED_LINTS = {
     wrong: '// kay.config.ts\nexport default { mcp: { key: true }, proxy: { key: \'x-upstream-key\' } }',
     right: '// kay.config.ts\nexport default { mcp: { token: true }, proxy: { key: { header: \'x-upstream-key\' } } }',
   },
+  'deprecated-socket-frames': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`ws.send(JSON.stringify(value))` in a handler of an `api()` module\'s `.ws()` route, `ws.send(value)` since 1.105: every websocket frame is JSON, so a string, a number, a boolean or `null` reads back as what it was, and a text that already is JSON would reach the client as a string holding it. The old form still sends, but the client reads the JSON text as a string, where it read the object before; it is reported until 1.108. Found on the first parameter of an `open`, `message` or `close` handler written in the options of a `.ws()` chained from the `api` a file imports from `kay/server`. The fix sends the value itself.',
+    wrong: '// src/api/chat.ts\nimport { api } from \'kay/server\'\n\nexport default api().ws(\'/\', {\n  message(ws, message) {\n    ws.send(JSON.stringify({ echo: message }))\n  },\n})',
+    right: '// src/api/chat.ts\nimport { api } from \'kay/server\'\n\nexport default api().ws(\'/\', {\n  message(ws, message) {\n    ws.send({ echo: message })\n  },\n})',
+  },
   'deprecated-ttl-names': {
     level: 'warn',
     group: 'deprecated',

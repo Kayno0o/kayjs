@@ -32,6 +32,7 @@ import { rateEnforce } from '../src/check/rate-enforce'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
 import { secretKeys } from '../src/check/secret-keys'
+import { socketFrames } from '../src/check/socket-frames'
 import { sourceReaders } from '../src/check/source-readers'
 import { storeMs } from '../src/check/store-ms'
 import { storeNames } from '../src/check/store-names'
@@ -56,6 +57,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-source-readers': sourceReaders,
   'deprecated-live-api': liveApi,
   'deprecated-action-type': actionType,
+  'deprecated-socket-frames': socketFrames,
 
   'deprecated-persisted-call': persistedCall,
   'deprecated-persisted-query': persistedQuery,

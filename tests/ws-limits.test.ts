@@ -32,13 +32,13 @@ interface Outcome {
   reason: string | undefined
 }
 
-// Opens a raw socket, sends the messages, and waits for the server to close it or for the last echo.
+// Opens a raw socket, sends the messages (a string as the JSON it is), and waits for the server to close it or for the last echo.
 async function talk(path: string, ...messages: (string | ArrayBuffer)[]): Promise<Outcome> {
   const socket = new WebSocket(`ws://localhost:${port}/api/chat${path}`)
   const outcome: Outcome = { received: [], code: undefined, reason: undefined }
 
   socket.onmessage = (event) => {
-    outcome.received.push(String(event.data))
+    outcome.received.push(JSON.parse(String(event.data)) as string)
   }
   socket.onclose = (event) => {
     outcome.code = event.code
@@ -50,7 +50,7 @@ async function talk(path: string, ...messages: (string | ArrayBuffer)[]): Promis
   })
 
   for (const message of messages)
-    socket.send(message)
+    socket.send(typeof message === 'string' ? JSON.stringify(message) : message)
 
   for (let waited = 0; outcome.code === undefined && outcome.received.length < messages.length && waited < 3_000; waited += 10)
     await Bun.sleep(10)
@@ -75,7 +75,7 @@ describe('the payload of a websocket message', () => {
 
   it('counts bytes, not characters, and takes one at the limit', async () => {
     expect((await talk('/', 'é'.repeat(600_000))).code).toBe(1009)
-    expect((await talk('/', 'x'.repeat(1_048_576))).received).toEqual(['echo:1048576'])
+    expect((await talk('/', 'x'.repeat(1_048_574))).received).toEqual(['echo:1048574'])
   })
 
   it('closes the socket on the message, the ones before it answered', async () => {
@@ -87,9 +87,10 @@ describe('the payload of a websocket message', () => {
 
   it('is raised or lowered by the route\'s messages.maxSize', async () => {
     expect((await talk('/big', 'x'.repeat(3_000_000))).received).toEqual(['echo:3000000'])
+    expect((await talk('/big', 'x'.repeat(16 * 1024 * 1024))).code).toBe(1009)
     expect((await talk('/big', 'x'.repeat(5_000_000))).code).toBe(1009)
-    expect((await talk('/tiny', 'x'.repeat(100))).received).toEqual(['echo:100'])
-    expect((await talk('/tiny', 'x'.repeat(101))).code).toBe(1009)
+    expect((await talk('/tiny', 'x'.repeat(98))).received).toEqual(['echo:98'])
+    expect((await talk('/tiny', 'x'.repeat(99))).code).toBe(1009)
   })
 })
 
@@ -145,15 +146,13 @@ describe('the open sockets of one client', () => {
   })
 
   it('are not counted as one client when the address is unknown, as on a unix socket', () => {
-    const server = { upgrade: (_request: Request, _options?: { data?: unknown }) => true, requestIP: () => null }
+    const server = { requestIP: () => null }
     const hook = socketLimits('/', { connections: 2 })
 
     for (let opened = 0; opened < 5; opened++) {
-      const request = new Request('http://localhost/')
-      const context = { request, server }
+      const request = new Request('http://localhost/', { headers: { upgrade: 'websocket' } })
 
-      expect(hook(context)).toBeUndefined()
-      expect(server.upgrade(request, { data: context })).toBe(true)
+      expect(hook({ request, server })).toBeUndefined()
     }
   })
 
@@ -207,7 +206,7 @@ describe('the rate of a websocket\'s messages', () => {
 
     for (let round = 0; round < 3; round++) {
       for (let count = 0; count < 800; count++)
-        socket.send('x')
+        socket.send('1')
 
       // Every echo of the round is in before the wait, so a loaded server still answering it does not count it in the next window.
       for (let tries = 0; tries < 300 && received.length < (round + 1) * 800; tries++)
@@ -231,7 +230,7 @@ describe('every websocket route', () => {
     const closed = new Promise<number>(resolve => (plain.onclose = event => resolve(event.code)))
 
     await new Promise<void>(resolve => (plain.onopen = () => resolve()))
-    plain.send('x'.repeat(1_100_000))
+    plain.send(JSON.stringify('x'.repeat(1_100_000)))
 
     // The close event itself, bounded by the test's own timeout, as a fixed sleep races a loaded host.
     expect(await closed).toBe(1009)

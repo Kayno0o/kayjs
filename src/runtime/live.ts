@@ -2,6 +2,7 @@ import type { UrlInput } from './api-url'
 import type { CallResult, TrackHooks } from './call-result'
 import type { Duration } from './duration'
 import type { Seed } from './live-resource.server'
+import type { SocketRefusal } from './socket-message'
 import { ApiError, apiErrorOf, failed, refused, textOf, unreachable } from './api-error'
 import { routeUrl } from './api-url'
 import { withBase } from './base'
@@ -14,9 +15,11 @@ import { serverResource } from './live-resource.server'
 import { askingAgain } from './live-revalidate'
 import { pageData } from './page-data'
 import { effect, isHydrating, onCleanup, onMount, ownSignal, untrack } from './reactive'
-
+import { readMessage, refusalOfMessage } from './socket-message'
 import { parseEvents, SENDABLE_ID } from './sse'
 import { decodeServerValue } from './wire'
+
+export { API_MOUNT, apiUrl, routeUrl } from './api-url'
 
 // Defined by the browser build, which never runs the server's half: tested where it is read, so the bundler drops it.
 declare const KAY_BROWSER: true | undefined
@@ -37,10 +40,6 @@ const NORMAL_CLOSURE = 1000
 const REFUSED_CODES = 4000
 // What a socket keeps to send while it connects, the oldest dropped past it: half the 100 messages a second a route takes by default, so the flush after a reconnect stays under it.
 const MAX_QUEUED = 50
-// What Elysia's websocket parser reads as JSON, by first character: `"`, `[`, `{`.
-const JSON_START = /^["[{]/
-const NUMERIC = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i
-
 const JSON_TYPE = /^application\/(?:[\w.+-]+\+)?json\b/i
 // An answer without a type, an empty one say, reads as text too.
 const TEXT_TYPE = /^(?:text\/|$)/i
@@ -135,6 +134,8 @@ export interface ConnectionHooks<T> {
 export interface Socket<Send, Receive> extends Reader<Receive, ConnectionStatus> {
   // Sent at once while open, otherwise once the connection opens.
   send: (message: Send) => void
+  // Called with `{ key, fields }` when the route refuses a message it was sent: it answers it as `{ error: { key, fields } }`, which is no message of the route's `reply`, so `data()` and `onData` never see it. Returns what stops it.
+  onRefused: (listener: (event: SocketRefusal) => void) => () => void
   /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   last: () => Receive | undefined
 
@@ -160,32 +161,6 @@ export interface Connection<T> extends Reader<T, ConnectionStatus> {
   ended: () => Promise<T | undefined>
 }
 
-// A message as Elysia sends it: an object as JSON, anything else as its text, which its own parser reads back the same way.
-function readMessage(data: unknown): unknown {
-  if (typeof data !== 'string')
-    return data
-
-  if (JSON_START.test(data)) {
-    try {
-      return JSON.parse(data)
-    }
-    catch {
-      return data
-    }
-  }
-
-  if (NUMERIC.test(data))
-    return Number(data)
-
-  if (data === 'true')
-    return true
-
-  if (data === 'false')
-    return false
-
-  return data === 'null' ? null : data
-}
-
 // The handler a message's `type` names, given the message: one function per type in place of a `switch`, every type handled, as the compiler checks.
 // A type no handler names, such as one a newer server sends, throws, saying which.
 // kept: request
@@ -197,9 +172,14 @@ export function dispatch<Message extends { type: string }, Handlers extends { [T
 }
 
 // A websocket that reconnects after a drop, waiting longer each time, until `close()`; `connect` gives none where there is nothing to connect from.
-export function openSocket<Send, Receive>(connect: () => WebSocket | undefined, hooks?: ConnectionHooks<Receive>): Socket<Send, Receive> & { start: () => void } {
+export function openSocket<Send, Receive>(connect: () => WebSocket | undefined, hooks?: ConnectionHooks<Receive> & { onRefused?: ((event: SocketRefusal) => void) | undefined }): Socket<Send, Receive> & { start: () => void } {
   const link = connection<Receive>(start, true)
   const opened = listenerSet<{ reconnected: boolean }>()
+  const refused = listenerSet<SocketRefusal>()
+
+  if (hooks?.onRefused)
+    refused.on(hooks.onRefused)
+
   const queued: string[] = []
   let current: WebSocket | undefined
   let closed = false
@@ -223,7 +203,15 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined, 
       for (const message of queued.splice(0))
         ws.send(message)
     })
-    ws.addEventListener('message', event => link.receive(readMessage(event.data) as Receive))
+    ws.addEventListener('message', (event) => {
+      const message = readMessage(event.data)
+      const refusal = refusalOfMessage(message)
+
+      if (refusal)
+        refused.emit(refusal)
+      else
+        link.receive(message as Receive)
+    })
     ws.addEventListener('close', (event) => {
       current = undefined
 
@@ -267,6 +255,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined, 
         link.retry()
     },
     ...connectionHooks(link, opened.on, hooks),
+    onRefused: refused.on,
     close: () => {
       closed = true
       queued.length = 0
@@ -437,7 +426,7 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
   }
 }
 
-export type SocketOptions<Module, Path> = UrlOptions<SocketRoute<Module, Path>> & ConnectionHooks<Received<SocketRoute<Module, Path>>>
+export type SocketOptions<Module, Path> = UrlOptions<SocketRoute<Module, Path>> & ConnectionHooks<Received<SocketRoute<Module, Path>>> & { onRefused?: ((event: SocketRefusal) => void) | undefined }
 export type SocketOf<Module, Path> = Socket<Sent<SocketRoute<Module, Path>>, Received<SocketRoute<Module, Path>>>
 
 // Opens a websocket route of a module under `src/api` from an island, once it is in the page: messages typed both ways from the route's `body` and `response` schemas, sent as Elysia reads them.
@@ -1000,7 +989,7 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
 }
 
 export { ApiError }
-export { API_MOUNT, apiUrl, routeUrl } from './api-url'
+export type { SocketRefusal } from './socket-message'
 
 // The methods a node answers over HTTP, a websocket's left out.
 export type CallMethod<Node> = Exclude<RouteKey<Node>, 'subscribe'>

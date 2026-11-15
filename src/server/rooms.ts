@@ -1,10 +1,11 @@
+import type { TSchema } from 'elysia'
 import type { FSWatcher } from 'node:fs'
 import type { Duration } from '../runtime/duration'
 import type { StoreBase } from '../runtime/store-base'
 import type { Hook } from './hooks'
 import { watch } from 'node:fs'
 import { basename, dirname } from 'node:path'
-import { t } from 'elysia'
+import { getSchemaValidator, t } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
@@ -57,6 +58,8 @@ export interface RoomStore extends StoreBase {
 }
 
 export interface RoomsOptions<Message = never, State = undefined, Member = undefined> {
+  // The schema of the messages the rooms send, which the route gives as its `reply` (`reply: chats.response`): the message type is read from it, and a message published or sent as a snapshot that it refuses throws `socket-reply-invalid` where it was sent, so a wrong message is met by its sender, not by a client.
+  reply?: (TSchema & { static: Message }) | undefined
   // What a connection is listed as when `join` gives no member, read from the connection (`ws.data` holds the route's context): the signed-in user's name, so no route repeats it.
   member?: ((ws: RoomConnection) => Member) | undefined
   // Asked before a connection joins, in the same turn: `false` or a reason refuses it, the socket closed with 1008 (the reason as its text) and `join` answering `false`, nothing sent and `onJoin` not told. A throw is reported and refuses too.
@@ -87,7 +90,7 @@ export interface RoomsBase<Message, Member = undefined> {
   roomsOf: (ws: RoomConnection) => string[]
   // The member this process's connection joined a room as, undefined for one that is not in it or joined with none.
   memberOf: (ws: RoomConnection, room: string) => Member | undefined
-  // A `response` schema for the ws routes of these rooms: it takes any message and types it as `Message`, so an island's `socket()` gets typed messages without a schema written for typing only. Nothing is checked against it.
+  // A `response` schema for the ws routes of these rooms: it takes any message and types it as `Message`, so an island's `socket()` gets typed messages without a schema written for typing only. With a `reply` schema in the options it is that schema, and the rooms check what they send against it.
   response: ReturnType<typeof t.Unsafe<Message>>
   // The members of a room, in every process sharing the store; a room no one is in is gone, and lists none.
   members: (room: string) => Member[]
@@ -134,6 +137,15 @@ export function rooms<Message, Member, State = undefined>(...[options]: [options
 export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, Member>] : [options: RoomsOptions<Message, State, Member> & { state: () => State }]): Rooms<Message, Member, State>
 export function rooms<Message, Member, State>(...[options = {}]: [options?: RoomsOptions<Message, State, Member>]): Rooms<Message, Member, State> {
   const store: RoomStore = options.store ?? memoryRooms()
+  const replyCheck = options.reply === undefined ? undefined : getSchemaValidator(options.reply as never, {})
+
+  // The text a message goes out as, once the room's `reply` schema has taken it.
+  const textOf = (message: unknown): string => {
+    if (replyCheck?.Check(message) === false)
+      throw new KayError('socket-reply-invalid', 'kay: a room was sent a message its `reply` schema refuses')
+
+    return messageText(message)
+  }
 
   if ((options.state !== undefined || options.snapshot !== undefined) && (store.state === undefined || store.update === undefined))
     throw new Error('kay: rooms({ state }) needs a store that keeps a room\'s state, and this one has no `state` and `update`')
@@ -218,7 +230,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
   }
 
   return {
-    response: t.Unsafe<Message>(t.Any()),
+    response: (options.reply ?? t.Unsafe<Message>(t.Any())),
     memberOf(ws, room) {
       const written = local.get(room)?.get(idOf(ws.raw))?.member
 
@@ -275,7 +287,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
           const state = await readState(room)
 
           if (local.get(room)?.has(id))
-            ws.raw.sendText(messageText(options.snapshot!(state, room)))
+            ws.raw.sendText(textOf(options.snapshot!(state, room)))
         }
 
         void settled('sending a joiner its snapshot', send())
@@ -306,7 +318,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
       return JSON.parse(text) as State
     },
     publish(room, message, { except, to } = {}) {
-      store.publish(named(room), messageText(message), { ...except && { except: idOf(except.raw) }, ...to !== undefined && { to: JSON.stringify(to) } })
+      store.publish(named(room), textOf(message), { ...except && { except: idOf(except.raw) }, ...to !== undefined && { to: JSON.stringify(to) } })
     },
     coalesce(read, { wait = DEFAULT_WAIT } = {}) {
       const delay = optionMs(wait, '`coalesce` wait')
@@ -325,9 +337,9 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
           const sent = read(room)
 
           if (isThenable(sent))
-            void settled('sending a room its snapshot', (async () => store.publish(named(room), messageText(await sent), {}))())
+            void settled('sending a room its snapshot', (async () => store.publish(named(room), textOf(await sent), {}))())
           else
-            store.publish(named(room), messageText(sent), {})
+            store.publish(named(room), textOf(sent), {})
         }), delay)
       }
     },
@@ -348,9 +360,14 @@ async function settled(what: string, work: Promise<unknown>): Promise<void> {
   }
 }
 
-// A message as Elysia sends one: a string as it is, anything else as JSON.
+// A message as a websocket route sends one: always JSON, so a string reads back as a string.
 function messageText(message: unknown): string {
-  return typeof message === 'string' ? message : JSON.stringify(message)
+  const text = JSON.stringify(message)
+
+  if (text === undefined)
+    throw new KayError('socket-reply-invalid', `kay: a room was sent ${typeof message}, which JSON cannot carry`)
+
+  return text
 }
 
 // What a timer runs, its error logged rather than taking the process down.

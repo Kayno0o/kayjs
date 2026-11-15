@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.105.0
 
+### Websocket frames are always JSON
+
+On an `api()` module, `ws.send(value)` now sends `JSON.stringify(value)` for a string too, and a frame a client sends must be JSON: one that is not is answered `{ error: { key: 'kay.socket.notJson', fields } }`, and a message failing `body` `{ error: { key: 'kay.socket.invalid', fields } }` where it was dropped before. `deprecated-socket-frames` (`kay check --fix`) rewrites `ws.send(JSON.stringify(x))` to `ws.send(x)`, which sends what it did; a raw `WebSocket` client of your own parses each frame with `JSON.parse` and sends `JSON.stringify(message)`, and `socket()` does both. `rooms().publish` goes out as JSON the same way, a string included.
+
 ### Secrets are one shape
 
 `deprecated-secret-keys` (`kay check --fix`) renames `mcp: { key }` to `mcp: { token }` and writes `proxy: { key: 'x-upstream-key' }` as `proxy: { key: { header: 'x-upstream-key' } }`; the old keys work until 1.108. The loaded `KayConfig` has `mcp.token` and `proxy.key` as `{ header, secret? }` only, so code reading `config.mcp.key` or a string `config.proxy.key` reads the new fields. A secret is a string, `{ env: 'NAME' }` or `{ file: 'path' }`. One behaviour changes with the rename: `mcp.key: { file }` read `KAY_MCP_KEY` first, and `mcp.token: { file }` reads the file alone (`token: true` still reads the environment). `testSite({ mcpKey, proxyKey })` still work until 1.108 and `kay check` reports them: set `config: { mcp: { token }, proxy: { key: { secret } } }` instead, by hand.

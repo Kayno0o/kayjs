@@ -83,7 +83,7 @@ input(bind:value={text})
 button(onClick={() => messages.send({ text: text() })}) Send
 ```
 
-On an `api()` chain only, a message failing `body` is dropped, with no reply or `onError` (logged under `kay dev`); a valid one is decoded as an HTTP body is, extra keys stripped.
+On an `api()` chain only, a message failing `body` is answered `{ error: { key, fields } }`, which `messages.onRefused(({ key, fields }) => ...)` reads and `data()` and `onData` never see (logged under `kay dev`); a valid one is decoded as an HTTP body is, extra keys stripped.
 
 ## Reference
 

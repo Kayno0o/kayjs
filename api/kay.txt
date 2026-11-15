@@ -1425,6 +1425,7 @@ interface Socket<Send, Receive> extends Reader<Receive, ConnectionStatus>
   onData: (listener: (event: { value: Receive; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
   onOpen: (listener: (event: { reconnected: boolean; }) => void) => () => void
+  onRefused: (listener: (event: SocketRefusal) => void) => () => void
   pending: () => boolean
   retry: () => void
   send: (message: Send) => void
@@ -3711,6 +3712,7 @@ interface RoomsOptions<Message = never, State = undefined, Member = undefined>
   member?: ((ws: RoomConnection<any>) => Member) | undefined
   onJoin?: Hook<RoomEvent<Member>> | undefined
   onLeave?: Hook<RoomEvent<Member>> | undefined
+  reply?: (TSchema & { static: Message; }) | undefined
   snapshot?: ((state: State, room: string) => Message) | undefined
   state?: (() => State) | undefined
   store?: RoomStore | undefined

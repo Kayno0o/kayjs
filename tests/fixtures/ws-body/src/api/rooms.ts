@@ -12,7 +12,7 @@ export default api()
       s.Object({ type: s.Literal('move'), at: s.Integer() }),
     ]),
     message(ws, body) {
-      ws.send(JSON.stringify({ type: 'echo', body, kinds: Object.entries(body).map(([key, value]) => `${key}:${typeof value}`) }))
+      ws.send({ type: 'echo', body, kinds: Object.entries(body).map(([key, value]) => `${key}:${typeof value}`) })
     },
   })
   .ws('/nested', {
@@ -24,19 +24,19 @@ export default api()
       return 'refused'
     },
     message(ws, body) {
-      ws.send(JSON.stringify({ type: 'echo', body }))
+      ws.send({ type: 'echo', body })
     },
   })
   .ws('/optional', {
     body: s.Object({ type: s.Literal('a'), nested: s.Optional(s.Object({ n: s.Integer() })) }),
     message(ws, body) {
-      ws.send(JSON.stringify({ type: 'echo', body, own: Object.keys(body) }))
+      ws.send({ type: 'echo', body, own: Object.keys(body) })
     },
   })
   .get('/errors', () => errors)
   .ws('/plain', {
     message(ws, body) {
-      ws.send(JSON.stringify({ type: 'echo', body }))
+      ws.send({ type: 'echo', body })
     },
   })
   .ws('/typed', {

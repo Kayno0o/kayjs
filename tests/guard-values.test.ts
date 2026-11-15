@@ -50,7 +50,7 @@ describe('what a guard hands on', () => {
       Bun.write(join(dir, 'routes/memo/index.kay'), `--- server\n${COUNT}const org = await ctx.once('org', async () => { counts.org = (counts.org ?? 0) + 1; return { name: 'second' } })\nconst other = await ctx.once('other', () => { throw new Error('boom') }).catch(() => 'failed')\nconst again = await ctx.once('other', () => 'never').catch(() => 'failed again')\n---\np.page {org.name} {other} {again} {counts.org}\n`),
       Bun.write(join(dir, 'api/_guard.ts'), GUARD('({ request }) => ({ who: request.headers.get(\'x-who\') ?? \'nobody\' })')),
       Bun.write(join(dir, 'api/me.ts'), 'import { api } from \'kay/server\'\n\nexport default api<{ who: string }>()\n  .get(\'/\', async ({ guard, once }) => ({ who: guard.who, again: await once(\'k\', () => guard.who) === await once(\'k\', () => \'other\') }))\n'),
-      Bun.write(join(dir, 'api/sock.ts'), 'import { api } from \'kay/server\'\n\nexport default api<{ who: string }>().ws(\'/\', { message(ws) {\n  ws.send(JSON.stringify(ws.data.guard))\n} })\n'),
+      Bun.write(join(dir, 'api/sock.ts'), 'import { api } from \'kay/server\'\n\nexport default api<{ who: string }>().ws(\'/\', { message(ws) {\n  ws.send(ws.data.guard)\n} })\n'),
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api({ guards: false })\n  .get(\'/\', ({ guard }) => ({ keys: Object.keys(guard) }))\n'),
     ])
     app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
@@ -144,7 +144,7 @@ describe('what a guard hands on', () => {
       const reply = new Promise<string>((resolve, reject) => {
         socket.addEventListener('message', event => resolve(String(event.data)))
         socket.addEventListener('error', () => reject(new Error('the socket failed')))
-        socket.addEventListener('open', () => socket.send('hi'))
+        socket.addEventListener('open', () => socket.send('"hi"'))
       })
 
       expect(await reply).toBe('{"who":"dee"}')

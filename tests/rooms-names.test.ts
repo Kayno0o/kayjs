@@ -61,7 +61,7 @@ describe('a room named by a visitor', () => {
     expect(live.members(hostile)).toEqual(['ada'])
     expect(live.members('hall')).toEqual(['bob'])
     live.publish(hostile, 'hi')
-    expect(ada.received).toEqual(['hi'])
+    expect(ada.received).toEqual(['"hi"'])
     expect(bob.received).toEqual([])
   })
 
@@ -81,7 +81,7 @@ describe('a room named by a visitor', () => {
     expect(two.members(hostile)).toEqual(['ada', 'bob'])
     one.publish(hostile, 'hi')
     await until(() => bob.received.length === 1)
-    expect(bob.received).toEqual(['hi'])
+    expect(bob.received).toEqual(['"hi"'])
   })
 })
 
@@ -149,7 +149,7 @@ pgDescribe('a room named by a visitor in Postgres', () => {
     expect(two.members(hostile).sort()).toEqual(['ada', 'bob'])
     one.publish(hostile, 'hi')
     await until(() => bob.received.length === 1)
-    expect(bob.received).toEqual(['hi'])
+    expect(bob.received).toEqual(['"hi"'])
     await Promise.all(stores.map(async store => store.close()))
   })
 

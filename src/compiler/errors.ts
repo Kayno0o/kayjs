@@ -463,6 +463,11 @@ export const ERRORS = {
     summary: 'A check hook of kay or a library (`onSave` and the like) that did not finish within 10 s, so the change it guards is refused.',
     fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
+  'socket-reply-invalid': {
+    group: 'runtime',
+    summary: 'A websocket route sent a message its `response` schema refuses, or one JSON cannot carry (a function, a symbol).',
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
+  },
   'store-closed': {
     group: 'runtime',
     summary: 'A call on a store (kv, rooms, notifications, vitals, push subscriptions, live values, cache) after it was closed.',

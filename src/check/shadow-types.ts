@@ -78,6 +78,7 @@ import { routeShadow, routeShadowPath } from './route-shadow'
 import { schemaType } from './schema-type'
 import { secretKeys } from './secret-keys'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
+import { socketFrames } from './socket-frames'
 import { untypedSockets } from './socket-routes'
 import { sourceReaders } from './source-readers'
 import { unusedStatusPages } from './status-pages'
@@ -189,6 +190,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => sourceReaders(root, options),
   async ({ root, options }) => liveApi(root, options),
   async ({ root, options }) => actionType(root, options),
+  async ({ root, options }) => socketFrames(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
 
   async ({ root, options }) => persistedCall(root, options),

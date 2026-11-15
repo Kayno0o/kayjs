@@ -13,14 +13,13 @@ import type { CorsOptions, CorsRule } from './cors'
 import type { GuardOption, LoadedGuard, OwnGuardValues } from './guards'
 import type { MountedApi } from './openapi'
 import type { KayPlugin } from './plugin'
+import type { SocketOptions } from './socket'
 import type { SocketLimits } from './ws-limits'
-import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile, getSchemaValidator, StatusMap } from 'elysia'
-import { underKayDev } from '../build/assets'
+import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile, StatusMap } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { TRAILING_SLASH } from '../runtime/base'
 import { API_MOUNT } from '../runtime/live'
 import { runInLocale } from '../runtime/locale-state'
-import { kayLog } from '../runtime/log'
 import { withDefaultBounds } from '../runtime/schema-bounds'
 import { contextLocale, guardsFirst, passGuards, requestState } from './actions'
 import { withDecodedParams } from './api-params'
@@ -48,6 +47,7 @@ import { mismatchOf } from './response-mismatch'
 import { apiRoutePath, withoutSlash } from './routes'
 import { markPrivate, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
+import { holdToLimits, socketOptions } from './socket'
 import { answered, failed, replyTrace, SERVER_SPAN, startSpan, tracedUnder, tracing } from './trace'
 import { kayWord } from './words'
 import { socketLimits } from './ws-limits'
@@ -157,7 +157,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
       // Whichever way the module chains its `.ws()` (in a group, a guard or a used plugin), every websocket route is held to its limits.
       if (hooks && route.method === 'WS')
-        hooks.beforeHandle = [socketLimits(route.path, hooks.detail?.messages, app), ...[hooks.beforeHandle ?? []].flat()]
+        hooks.beforeHandle = [socketLimits(route.path, hooks.detail?.messages, app, (request, run) => inApiLocale(request, options, run)), holdToLimits(app), ...[hooks.beforeHandle ?? []].flat()]
 
       if (hooks?.error !== undefined)
         hooks.error = [hooks.error].flat().map(hook => localizedHook(hook, options))
@@ -834,91 +834,10 @@ export function api<Guarded extends object = object, const Own extends GuardOpti
   keepOwnGuards(instance, options.guards)
 
   const socketRoute = instance.ws.bind(instance) as (path: string, options: SocketOptions) => unknown
+  const named = (path: string) => () => withoutSlash(apiRoutePath((instance as { [API_MOUNT]?: string })[API_MOUNT] ?? '', path))
 
   // `.ws()` returns the instance, so the chain goes on as it was written.
-  instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, decoded(instance, path, socketOptions))) as typeof instance.ws
+  instance.ws = ((path: string, routeOptions: SocketOptions) => socketRoute(path, socketOptions(instance, routeOptions, named(path)))) as typeof instance.ws
 
   return kayPlugin(instance) as unknown as KayPlugin<ApiRequest<Guarded & OwnGuardValues<Own>>>
-}
-
-// The first thing a schema finds wrong with a value, as text.
-function firstRefusal(validator: object, value: unknown): string {
-  try {
-    const errors = (validator as { Errors?: (value: unknown) => Iterable<{ path?: string, message?: string }> }).Errors?.(value)
-    const first: { path?: string, message?: string } | undefined = errors?.[Symbol.iterator]().next().value as { path?: string, message?: string } | undefined
-
-    return first === undefined ? 'it does not match' : `${first.path ?? ''} ${first.message ?? ''}`.trim()
-  }
-  catch {
-    return 'it does not match'
-  }
-}
-
-interface SocketOptions {
-  beforeHandle?: unknown
-  detail?: unknown
-  body?: unknown
-  message?: (ws: unknown, message: unknown) => unknown
-}
-
-interface Definitions {
-  definitions: { typebox: never, type: never }
-}
-
-// A websocket route's `body` as an HTTP route's: a message arrives cleaned and decoded, `at: '1'` as `1` for an integer, and one the schema refuses is dropped, where Elysia would send the sender a validation frame carrying the schema, which an island applying every server message reads as one of its own.
-// Elysia's validation is left out of the route and done here, with the validator Elysia would have built.
-function decoded(app: Elysia, path: string, options: SocketOptions): SocketOptions {
-  if (options.body === undefined || options.message === undefined)
-    return options
-
-  const { definitions } = app as unknown as Definitions
-  const validator = getSchemaValidator(options.body as never, { modules: definitions.typebox, models: definitions.type, normalize: app.config.normalize })
-
-  if (validator === undefined || validator.provider === 'standard')
-    return options
-
-  const { message } = options
-  let loggedAt = 0
-
-  // Under `kay dev` only, and at most once a second per route: the sender is told nothing, so the developer is, in quotes as what a client sent may hold control codes.
-  const drop = (value: unknown): undefined => {
-    if (underKayDev() && performance.now() - loggedAt >= 1000) {
-      loggedAt = performance.now()
-      kayLog('warn', `the websocket route ${JSON.stringify(withoutSlash(apiRoutePath((app as { [API_MOUNT]?: string })[API_MOUNT] ?? '', path)))} dropped a message its body refused: ${JSON.stringify(firstRefusal(validator, value))}`)
-    }
-
-    return undefined
-  }
-
-  return {
-    ...options,
-    body: undefined,
-    message(ws, raw) {
-      let cleaned: unknown
-
-      // A structure the cleaner cannot walk is refused as a failed check is, never passed on unstripped.
-      try {
-        cleaned = validator.Clean?.(raw) ?? raw
-      }
-      catch {
-        return drop(raw)
-      }
-
-      if (validator.Check(cleaned) === false)
-        return drop(cleaned)
-
-      let value = cleaned
-
-      try {
-        if (validator.hasTransform)
-          value = validator.Decode(cleaned)
-      }
-      catch {
-        // A transform that refuses the value is a refused message too.
-        return undefined
-      }
-
-      return message(ws, value)
-    },
-  }
 }

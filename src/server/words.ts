@@ -23,6 +23,8 @@ export const KAY_ENGLISH = {
   'kay.entry.type': '{field} is not valid',
   'kay.entry.data': 'The data',
   'kay.entry.item': '{field}, item {n}',
+  'kay.socket.notJson': 'A message must be JSON',
+  'kay.socket.invalid': 'The message is not valid',
   'kay.protection.honeypot': 'Leave this field empty',
   'kay.protection.minTime.early': 'Sent too fast; take a moment, then send it again',
   'kay.protection.minTime.expired': 'This form has expired; send it again',

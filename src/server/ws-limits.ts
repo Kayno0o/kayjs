@@ -15,11 +15,13 @@ export interface SocketLimits {
   connections?: number | false | undefined
 }
 
-const LIMITS = Symbol.for('kay.socketLimits')
+const ADMISSION = Symbol.for('kay.socketAdmission')
 const CLOSE_POLICY = 1008
 const CLOSE_TOO_BIG = 1009
 const DEFAULT_RATE = { max: 100, window: '1s' } as const
 const DEFAULT_CONNECTIONS = 20
+// How long the place of an upgrade is held while the socket has not opened, which a refused handshake never does.
+const PENDING_MS = 10_000
 
 interface Limits {
   bytes: number
@@ -30,24 +32,29 @@ interface Limits {
 }
 
 interface Upgradable {
-  upgrade: (request: Request, options?: { data?: unknown }) => boolean
-}
-
-type Handler = (ws: Closable, message: string | ArrayBuffer | Uint8Array) => unknown
-type CloseHandler = (ws: Closable, code: number, reason: string) => unknown
-
-interface Closable {
-  close: (code: number, reason: string) => unknown
+  requestIP?: unknown
 }
 
 interface RouteContext {
   request?: Request
   server?: Upgradable | null
-  [LIMITS]?: Limits
+  [ADMISSION]?: Admission
 }
 
-// Servers whose `upgrade` already carries the limits, so it is wrapped once.
-const wrapped = new WeakSet<Upgradable>()
+// What the upgrade of one socket was admitted with: the route's limits, the place it holds among its client's open sockets, and how its own messages run in the request's locale.
+export interface Admission {
+  limits: Limits
+  // Frees the place, once: the socket closed, or the upgrade never opened.
+  release: () => void
+  // The socket opened, so its place is held until it closes.
+  opened: () => void
+  locale: <T>(run: () => T) => T
+}
+
+// The admission an upgrade left in the data of its socket.
+export function admissionOf(data: unknown): Admission | undefined {
+  return (data as { [ADMISSION]?: Admission } | undefined)?.[ADMISSION]
+}
 
 function limitsOf(path: string, given: SocketLimits | undefined): Limits {
   const bytes = byteSize(given?.maxSize ?? DEFAULT_BODY_LIMIT, `the maxSize of the websocket route ${path}`)
@@ -75,17 +82,17 @@ function measured(text: string, bytes: number): number {
   return text.length * 3 > bytes ? Buffer.byteLength(text) : 0
 }
 
-// What one socket's messages are held to: a message over `bytes` closes it with 1009, more than `max` in a window with 1008.
+// What one socket's messages are held to: a message over the route's `bytes` closes it with 1009, more than `max` in a window with 1008.
 // Counted per socket in memory, the window opening at its first message.
-function guarded(message: Handler, { bytes, max, windowMs }: Limits): Handler {
+export function frameGuard({ bytes, max, windowMs }: Limits): (frame: string | ArrayBuffer | Uint8Array) => { code: number, reason: string } | undefined {
   let opened = 0
   let count = 0
 
-  return (ws, raw) => {
-    const size = typeof raw === 'string' ? measured(raw, bytes) : raw.byteLength
+  return (frame) => {
+    const size = typeof frame === 'string' ? measured(frame, bytes) : frame.byteLength
 
     if (size > bytes)
-      return ws.close(CLOSE_TOO_BIG, 'Message too big')
+      return { code: CLOSE_TOO_BIG, reason: 'Message too big' }
 
     const now = performance.now()
 
@@ -94,7 +101,7 @@ function guarded(message: Handler, { bytes, max, windowMs }: Limits): Handler {
       count = 0
     }
 
-    return ++count > max ? ws.close(CLOSE_POLICY, 'Too many messages') : message(ws, raw)
+    return ++count > max ? { code: CLOSE_POLICY, reason: 'Too many messages' } : undefined
   }
 }
 
@@ -122,79 +129,54 @@ function clientKey(request: Request, server: Upgradable | null | undefined): str
   return address === undefined ? undefined : rateKey(address)
 }
 
-function hasRoom({ connections }: Limits, request: Request | undefined, server: Upgradable | null | undefined): boolean {
-  const client = request === undefined ? undefined : clientKey(request, server)
-
+function hasRoom({ connections }: Limits, client: string | undefined): boolean {
   return !connections || client === undefined || (connections.open.get(client) ?? 0) < connections.most
 }
 
-// Elysia hands the server's `upgrade` the socket's data, whose `message` Bun calls with the raw frame before Elysia parses it: wrapping it there is the one place a frame is measured before a 16 MB JSON is parsed.
-// Its `close` frees the client's place among the open sockets of the route.
-function limitUpgrades(server: Upgradable): void {
-  if (wrapped.has(server))
-    return
-
-  const upgrade = server.upgrade.bind(server)
-
-  wrapped.add(server)
-  server.upgrade = (request, options) => {
-    const data = options?.data as { message?: Handler, close?: CloseHandler | undefined, [LIMITS]?: Limits } | undefined
-    const limits = data?.[LIMITS]
-
-    if (!data || !limits)
-      return upgrade(request, options)
-
-    data.message &&= guarded(data.message, limits)
-
-    const { connections } = limits
-    const client = clientKey(request, server)
-
-    if (!connections || client === undefined)
-      return upgrade(request, options)
-
-    if (!hasRoom(limits, request, server))
-      return false
-
-    const close = data.close
-
-    data.close = (ws, code, reason) => {
-      const left = (connections.open.get(client) ?? 1) - 1
-
-      if (left > 0)
-        connections.open.set(client, left)
-      else
-        connections.open.delete(client)
-
-      return close?.(ws, code, reason)
-    }
-
-    if (!upgrade(request, options)) {
-      data.close = close
-
-      return false
-    }
-
-    connections.open.set(client, (connections.open.get(client) ?? 0) + 1)
-
-    return true
-  }
-}
-
-// A hook run before a websocket route's upgrade, its limits checked when the module mounts: it puts them on the context, which Elysia copies into the socket's data, and answers 429 to a client whose places are all taken.
-export function socketLimits(path: string, given: SocketLimits | undefined, app?: Elysia): (context: RouteContext) => Response | undefined {
+// A hook run before a websocket route's upgrade, its limits checked when the module mounts: it answers 429 to a client whose places are all taken, and else takes one for the upgrade and leaves the admission on the context, which Elysia copies into the socket's data for `adopt()`.
+// The place is freed when the socket closes, or after `PENDING_MS` when the upgrade never opened.
+export function socketLimits(path: string, given: SocketLimits | undefined, app?: Elysia, inLocale: <T>(request: Request, run: () => T) => T = (_request, run) => run()): (context: RouteContext) => Response | undefined {
   const limits = limitsOf(path, given)
 
   if (app)
     capPayload(app, limits.bytes)
 
   return (context) => {
-    if (!hasRoom(limits, context.request, context.server))
+    const { request, server } = context
+    const client = request === undefined ? undefined : clientKey(request, server)
+
+    if (!hasRoom(limits, client))
       return new Response('Too many open connections', { status: 429 })
 
-    context[LIMITS] = limits
+    const { connections } = limits
+    const upgrading = request?.headers.get('upgrade')?.toLowerCase() === 'websocket'
+    let held = false
+    let timer: ReturnType<typeof setTimeout> | undefined
 
-    if (context.server)
-      limitUpgrades(context.server)
+    const release = () => {
+      clearTimeout(timer)
+
+      if (!held || !connections || client === undefined)
+        return
+
+      held = false
+
+      const left = (connections.open.get(client) ?? 1) - 1
+
+      if (left > 0)
+        connections.open.set(client, left)
+      else
+        connections.open.delete(client)
+    }
+
+    if (upgrading && connections && client !== undefined) {
+      held = true
+      connections.open.set(client, (connections.open.get(client) ?? 0) + 1)
+      timer = setTimeout(release, PENDING_MS)
+      timer.unref()
+    }
+
+    context[ADMISSION] = { limits, release, opened: () => clearTimeout(timer), locale: run => request === undefined ? run() : inLocale(request, run) }
 
     return undefined
   }

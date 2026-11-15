@@ -376,7 +376,9 @@ news.onClose(({ status }) => console.log(status))
 
 A `.ws()` route in an API module is a websocket. Its `body` types what a client sends, and `response` types what it receives.
 
-On the chain of an `api()` module, a message that fails `body` is dropped: the sender gets no reply, so nothing collides with the messages your island handles, and `onError` is not called. A valid one arrives decoded as an HTTP body is, so `'1'` reaches `message()` as `1` for an integer, and a key the schema does not name is stripped rather than refused. Under `kay dev` the server logs each drop. A plain `new Elysia()`, or a `.group()` or `.guard()` callback, keeps Elysia's behaviour.
+On the chain of an `api()` module, every frame is JSON in both directions, so a string, a number, a boolean and `null` read back as what they were. A message that is not JSON, or fails `body`, is answered `{ error: { key, fields } }`, where `fields` holds the words for each field in the visitor's language and never the schema. Your island reads it with `onRefused({ key, fields })`, so it never collides with the messages `onData` handles, and the socket stays open.
+
+A valid message arrives decoded as an HTTP body is, so `'1'` reaches `message()` as `1` for an integer, and a key the schema does not name is stripped rather than refused. Under `kay dev` the server logs each refusal. A plain `new Elysia()`, or a `.group()` or `.guard()` callback, keeps Elysia's behaviour.
 
 ```ts
 export default api().ws('/:room', {
@@ -419,7 +421,7 @@ A route takes 1 MB a message and 100 messages a second from one socket. A socket
 })
 ```
 
-The server also tells Bun the largest `maxSize` of your routes, so a bigger frame is dropped as it arrives instead of being buffered first. One client may keep 20 sockets open on a route; the next one gets a 429 until one closes. `connections` changes that number, and `connections: false` removes the limit. A socket whose address is unknown, such as one on a unix socket, is not counted.
+The server also tells Bun the largest `maxSize` of your routes, so a bigger frame is dropped as it arrives instead of being buffered first, and kay measures a frame before it parses it. One client may keep 20 sockets open on a route; the next one gets a 429 until one closes. `connections` changes that number, and `connections: false` removes the limit. A socket whose address is unknown, such as one on a unix socket, is not counted.
 
 Server code that opens a websocket to another service, with headers or a protocol, uses `WebSocket` from `kay/server`. It is the `WebSocket` Bun runs, typed with Bun's options, as the DOM types in a project give the global one no second argument:
 
@@ -513,7 +515,7 @@ export default api()
 
 `publish(room, message)` sends to everyone in the room. Pass `{ except: ws }` to skip the sender.
 
-Rooms know the type of what they send, so `response: chats.response` hands it to the route. An island's `socket()` then receives typed messages, and you do not write the same union again as a schema, or cast what `last()` gives. The schema accepts any message and checks nothing.
+Rooms know the type of what they send, so `response: chats.response` hands it to the route. An island's `socket()` then receives typed messages, and you do not write the same union again as a schema, or cast what `last()` gives. Give `rooms({ reply: schema })` the schema of what the rooms send, and each message you publish is checked against it where you publish it, so a wrong one throws in your code instead of reaching a client; without it the schema accepts any message and checks nothing.
 
 A room no one is in is gone. Rooms live in the memory of one process by default. To reach every process of the machine, give `rooms` `sqliteRooms(path)`. A message reaches the other processes as soon as the file changes. The `poll` option, `'250ms'` by default, is how often a process also looks, in case the folder cannot be watched.
 

@@ -52,6 +52,6 @@ Each extends `KayError`, so its `code`, `kind`, `status` and `name` are set and 
 | `TimeoutError` | `poll-timeout` | A database call a store gave up on after its time limit. |
 | `MarkdownError` | `markdown-invalid` | Markdown an entry holds that kay cannot read, with the `line`. |
 
-A request can also raise a `KayError` with no class of its own, told by its code: `response-schema-mismatch` (an API answer failing its `response` schema, 500), `api-answer-invalid`, `redirect-target-invalid`, `live-value-invalid`, `session-too-big`, `outside-request`, `hook-timeout` and `store-closed`.
+A request can also raise a `KayError` with no class of its own, told by its code: `response-schema-mismatch` (an API answer failing its `response` schema, 500), `api-answer-invalid`, `redirect-target-invalid`, `live-value-invalid`, `session-too-big`, `outside-request`, `hook-timeout`, `socket-reply-invalid` (a websocket route or a room sent a message its `response` or `reply` schema refuses, or one JSON cannot carry) and `store-closed`.
 
 The libraries list their own classes in an `Errors` table of their `llms/`: [kayjs-ai](../packages/ai/llms/testing-and-errors.md#errors), [kayjs-auth](../packages/auth/llms/hardening-and-testing.md#errors), [kayjs-cms](../packages/cms/llms/options.md#errors), [kayjs-mail](../packages/mail/llms/contact-form-and-testing.md#errors) and [kayjs-ui](../packages/ui/llms/setup.md#errors).
