@@ -64,6 +64,11 @@ kay [./mount] Mounted	1.108.0	deprecated-import-path	Import `Mounted` from `kay`
 kay [./mount] mount	1.108.0	deprecated-import-path	Import `mount` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] KayConfig.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
+kay [./server] PagesOptions.favicon	1.108	deprecated-config-groups	Written `assets.favicon`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./server] PagesOptions.fonts	1.108	deprecated-config-groups	Written `assets.fonts`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./server] PagesOptions.health	1.108	deprecated-config-groups	Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./server] PagesOptions.images	1.108	deprecated-config-groups	Written `assets.images`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./server] PagesOptions.jobs	1.108	deprecated-config-groups	Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.links	1.108	deprecated-client-keys	Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.manifest	1.108	deprecated-config-groups	Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.metrics	1.108	deprecated-config-groups	Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108.
@@ -85,6 +90,11 @@ kay [./server] s	1.108.0	deprecated-import-path	Import `s` from `kay`, its one h
 kay [./server] schedule	1.108	deprecated-schedule-call	`schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it.
 kay [./server] sqliteCache	1.108.0	deprecated-import-path	Import `sqliteCache` from `kay/cache`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./test] TestOptions.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
+kay [./test] TestOptions.favicon	1.108	deprecated-config-groups	Written `assets.favicon`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./test] TestOptions.fonts	1.108	deprecated-config-groups	Written `assets.fonts`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./test] TestOptions.health	1.108	deprecated-config-groups	Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./test] TestOptions.images	1.108	deprecated-config-groups	Written `assets.images`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./test] TestOptions.jobs	1.108	deprecated-config-groups	Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.links	1.108	deprecated-client-keys	Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.manifest	1.108	deprecated-config-groups	Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.metrics	1.108	deprecated-config-groups	Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108.

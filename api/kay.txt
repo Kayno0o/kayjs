@@ -2905,13 +2905,8 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   lints?: unknown;
   secret?: unknown;
   preview?: Checked<"preview" extends keyof Config ? Config[keyof Config & "preview"] : unknown, PreviewConfig, [unknown]>;
-  envFiles?: Checked<"envFiles" extends keyof Config ? Config[keyof Config & "envFiles"] : unknown, {
-    compose?: string | string[] | undefined;
-    example?: string | undefined;
-  }, [unknown]>;
-  env?: Checked<"env" extends keyof Config ? Config[keyof Config & "env"] : unknown, {
-    compose?: string | string[] | undefined;
-    example?: string | undefined; ...#e9b3e520 (2 lines)
+  envFiles?: Checked<"envFiles" extends keyof Config ? Config[keyof Co ...#cda223d3 (4 lines)
+  env?: Checked<"env" extends keyof Config ? Config[keyof Config & "en ...#122f7109 (4 lines)
   checks?: unknown;
   beforeRequest?: unknown;
   onResponse?: unknown;
