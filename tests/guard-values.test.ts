@@ -251,14 +251,16 @@ describe('kay check on ctx.guard', () => {
     expect(code).toBe(0)
   }, TIMEOUT)
 
-  it('reports guard.org on an API route that names nothing', async () => {
+  it('types guard.org on an API route that names nothing from the guard above it, and reports a field no guard returns', async () => {
     const { code, output } = await check({
       'src/api/_guard.ts': ORG,
-      'src/api/org.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', ({ guard }) => guard.org)\n',
+      'src/api/org.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', ({ guard }) => guard.org.name)\n',
+      'src/api/team.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', ({ guard }) => guard.team)\n',
       'src/routes/index.kay': 'p Home\n',
     })
 
-    expect(output).toContain('org')
+    expect(output).toContain('team')
+    expect(output).not.toContain('org.ts')
     expect(code).not.toBe(0)
   }, TIMEOUT)
 
