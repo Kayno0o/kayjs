@@ -2781,6 +2781,12 @@ function clientAddress(request: Request, server: Server<unknown> | null | undefi
 interface CoalesceOptions
   wait?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
+[./server] ContextDefinition
+interface ContextDefinition<Values extends object = object>
+  load?: ((request: Request) => Promise<Values> | Values) | undefined
+  loaders?: Record<string, (request: Request) => unknown> | undefined
+  values?: Values | undefined
+
 [./server] CorsOptions
 type CorsOptions = CorsCommon & ({ origins: '*', credentials?: false | undefined } | { origins: readonly string[], credentials?: boolean | undefined })
 
@@ -2891,15 +2897,24 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   lints?: unknown;
   secret?: unknown;
   preview?: Checked<"preview" extends keyof Config ? Config[keyof Config & "preview"] : unknown, PreviewConfig, [unknown]>;
-  env?: Checked<"env" extends keyof Config ? Config[keyof Config & "env"] : unknown, {
+  envFiles?: Checked<"envFiles" extends keyof Config ? Config[keyof Config & "envFiles"] : unknown, {
     compose?: string | string[] | undefined;
     example?: string | undefined;
   }, [unknown]>;
+  env?: Checked<"env" extends keyof Config ? Config[keyof Config & "env"] : unknown, {
+    compose?: string | string[] | undefined;
+    example?: string | undefined; ...#e9b3e520 (2 lines)
   checks?: unknown;
   beforeRequest?: unknown;
   onResponse?: unknown;
   onListen?: unknown;
   onStop?: unknown; ...#16709f96 (2 lines)
+
+[./server] defineContext
+function defineContext<Values extends object>(load: (request: Request) => Promise<Values> | Values): ContextDefinition<Values>
+function defineContext<Loaders extends Record<string, (request: Request) => unknown>>(loaders: Loaders): ContextDefinition<{
+  [Key in keyof Loaders]: Awaited<ReturnType<Loaders[Key]>>;
+}>
 
 [./server] defineEnv
 function defineEnv<Spec extends EnvSchema>(declared: Spec, source?: Record<string, string | undefined>): Static<Spec> & (keyof PublicFieldsOf<Spec> extends never ? unknown : WithPublicFields<Spec>)
@@ -2972,7 +2987,9 @@ const files: {
   }): Promise<StoredFile[]>;
   variants(keys: string[]): Promise<Map<string, string[]>>;
   url(key: string, options?: UrlOptions): string;
-  response(key: string, request?: Request | undefined): Promise<Response>;
+  response(key: string, request?: Request | undefined, options?: {
+    download?: boolean | string | undefined;
+  }): Promise<Response>;
 }
 
 [./server] FileStore
@@ -3098,7 +3115,8 @@ interface KayConfig extends AppHooks
   cors?: CorsOptions | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
-  env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
+  /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
+  envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | boolean | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
@@ -3358,7 +3376,8 @@ interface PagesOptions extends ConfigInput
   dev?: boolean | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
-  env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
+  /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
+  envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | boolean | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
@@ -3649,7 +3668,8 @@ function retryLater(wait: `${number}d` | `${number}h` | `${number}m` | `${number
 
 [./server] RoomConnection
 interface RoomConnection
-  raw: object & { sendText: (text: string) => unknown; }
+  data?: unknown
+  raw: object & { sendText: (text: string) => unknown; close?: (code?: number | undefined, reason?: string | undefined) => unknown; }
 
 [./server] RoomRecipients
 interface RoomRecipients
@@ -3657,14 +3677,22 @@ interface RoomRecipients
   to?: string
 
 [./server] rooms
-function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State>] : [options: RoomsOptions<Message, State> & {
+function rooms<Message, Member, State = undefined>(...[options]: (undefined extends State ? never : [options: RoomsOptions<Message, State, Member> & {
+  state: () => State;
+  member: (ws: RoomConnection) => Member;
+}]) | [options: RoomsOptions<Message, State, Member> & {
+  member: (ws: RoomConnection) => Member;
+}]): Rooms<Message, Member, State> & {
+  join: (ws: RoomConnection, room: string, member?: Member | undefined) => boolean;
+}
+function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, Member>] : [options: RoomsOptions<Message, State, Member> & {
   state: () => State;
 }]): Rooms<Message, Member, State>
 
 [./server] Rooms
 interface Rooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member>
   coalesce: (read: (room: string) => Message | Promise<Message>, options?: CoalesceOptions | undefined) => (room: string) => void
-  join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => void
+  join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => boolean
   leave: (ws: RoomConnection, room?: string | undefined) => void
   memberOf: (ws: RoomConnection, room: string) => Member | undefined
   members: (room: string) => Member[]
@@ -3675,7 +3703,11 @@ interface Rooms<Message, Member = undefined, State = undefined> extends RoomsBas
   update: (room: string, change: (state: State) => State) => Promise<State>
 
 [./server] RoomsOptions
-interface RoomsOptions<Message = never, State = undefined>
+interface RoomsOptions<Message = never, State = undefined, Member = undefined>
+  beforeJoin?: ((event: RoomEvent<Member>) => boolean | string | void) | undefined
+  member?: ((ws: RoomConnection) => Member) | undefined
+  onJoin?: Hook<RoomEvent<Member>> | undefined
+  onLeave?: Hook<RoomEvent<Member>> | undefined
   snapshot?: ((state: State, room: string) => Message) | undefined
   state?: (() => State) | undefined
   store?: RoomStore | undefined
@@ -3876,6 +3908,9 @@ interface Session<Data extends object>
   regenerate: () => Promise<void>
   set: <Key extends keyof Data>(key: Key, value: Data[Key]) => Promise<void>
   settings: SessionSettings
+  start: (data: Partial<Data>, options?: undefined | {
+  maxAge?: "browser" | `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+}) => Promise<void>
   unset: (key: keyof Data) => Promise<void>
 
 [./server] SessionData
@@ -4411,7 +4446,8 @@ interface TestOptions extends PagesOptions
   dev?: boolean | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
-  env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
+  /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
+  envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | boolean | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined

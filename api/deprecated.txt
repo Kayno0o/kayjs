@@ -62,6 +62,8 @@ kay [./compiler] CompileResult.why	2.0.0	-	Read `cause`: `why`, the sentence of 
 kay [./library/auth-mails] AuthMailData.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [./mount] Mounted	1.108.0	deprecated-import-path	Import `Mounted` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./mount] mount	1.108.0	deprecated-import-path	Import `mount` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
+kay [./server] KayConfig.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
+kay [./server] PagesOptions.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.links	1.108	deprecated-client-keys	Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.offline	1.108	deprecated-client-keys	Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.onStart	1.108	deprecated-app-hooks	Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108.
@@ -78,6 +80,7 @@ kay [./server] diskFiles	1.108	deprecated-disk-files	`diskFiles({ dir, ...hooks 
 kay [./server] s	1.108.0	deprecated-import-path	Import `s` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] schedule	1.108	deprecated-schedule-call	`schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it.
 kay [./server] sqliteCache	1.108.0	deprecated-import-path	Import `sqliteCache` from `kay/cache`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
+kay [./test] TestOptions.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.links	1.108	deprecated-client-keys	Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.offline	1.108	deprecated-client-keys	Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.onStart	1.108	deprecated-app-hooks	Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108.
