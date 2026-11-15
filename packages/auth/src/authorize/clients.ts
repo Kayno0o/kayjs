@@ -152,7 +152,7 @@ async function cachedClient(documents: Kv, href: string): Promise<OAuthClient | 
 
 async function cacheClient(documents: Kv, href: string, client: OAuthClient): Promise<void> {
   try {
-    await documents.set(href, JSON.stringify(client), CACHE_MS)
+    await documents.set(href, JSON.stringify(client), `${CACHE_MS}ms`)
   }
   catch {
     // Fetched again on the next ask.

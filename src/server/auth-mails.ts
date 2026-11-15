@@ -20,6 +20,8 @@ export interface AuthMailData {
   // The language to write in, one of the `locales` option's.
   locale: string
   // How long the mail's link and its code work, for the ones it carries, as durations: `{ link: '24h', code: '10m' }`. `lifetime(duration, locale)` words them.
+  ttl?: { link?: Duration, code?: Duration } | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
   maxAge?: { link?: Duration, code?: Duration } | undefined
 }
 

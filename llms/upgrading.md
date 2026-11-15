@@ -139,7 +139,9 @@ An app with no `store` now keeps sessions, jobs and every library in one SQLite 
 
 ### `ttl` is how long data lives
 
-`signed.sign(use, value, { ttl })`, `files.url(key, { ttl })` and the `ttl` of an action's `protect.minTime` and `protect.proofOfWork` replace `maxAge`, which stays for an HTTP header or a cookie. `deprecated-ttl-names` (`kay check --fix`) renames it; `maxAge` works there until 1.108.
+`signed.sign(use, value, { ttl })`, `files.url(key, { ttl })`, `workChallenge(scope, { ttl })`, kayjs-auth's `proofOfWork({ ttl })`, the `ttl` of an action's `protect.minTime` and `protect.proofOfWork`, and the `ttl: { link, code }` a kayjs-auth mail's data carries to a template replace `maxAge`, which stays for an HTTP header or a cookie. `deprecated-ttl-names` (`kay check --fix`) renames it; `maxAge` works there until 1.108 (a mail template destructuring `{ maxAge }` is changed by hand, as the lint finds `data.maxAge.link` and `data.maxAge.code` only). `window` of a rate limit and `failedTtl` of a queue keep their names: a window is a span counted in, not how long data lives, and `failedTtl` already is a `ttl`.
+
+A store receives its lengths as a `Duration`: `RateStore.hit(key, window)`, `KvStore`'s `set(key, value, ttl)` and `once(key, ttl)`, `SessionStore.set(id, data, maxAge)` and `LiveStore.endAll(id, ttl)`. A store you wrote before 1.105 keeps working with no edit: kay hands milliseconds as a number to every store without `durations: true`, until 1.108. To move one over, add `durations: true` and read the length with `lengthMs(value)` from `kay`, which takes a `Duration` or a number; `kv(ns).set(key, value, 60_000)` written with milliseconds still works and `deprecated-store-ms` rewrites it as `'60000ms'`. kay's own stores take both forms. The types of a store's parameters accept both, so no store fails to type check, and no lint finds a store of your own, as its methods cannot be told from any other object's.
 
 ### Hooks are flat keys named by the moment they run
 

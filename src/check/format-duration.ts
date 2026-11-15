@@ -6,11 +6,12 @@ import { scan } from './renamed-exports'
 const FORMAT = /\bformatDuration\b/
 const FROM_I18N = (source: string) => source === 'kay/i18n'
 const HELP = 'write the length with its unit, `formatDuration(\'125m\')`'
-const EXPRESSION = /^\d[\d_]*(?:\.\d+)?(?:\s*[*+\-/]\s*\d[\d_]*(?:\.\d+)?)*$/
+
+export const EXPRESSION = /^\d[\d_]*(?:\.\d+)?(?:\s*[*+\-/]\s*\d[\d_]*(?:\.\d+)?)*$/
 const TERMS = /\s*([*+\-/])\s*/
 
 // The value of numbers written with `+`, `-`, `*` and `/` between them, as the language reads them; the caller checked there is nothing else.
-function evaluate(text: string): number {
+export function evaluate(text: string): number {
   const parts = text.replaceAll('_', '').split(TERMS)
   const terms = [Number(parts[0])]
   const signs: string[] = []

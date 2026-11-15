@@ -247,7 +247,7 @@ export class Passwords {
     const signature = value?.split('.')[2] ?? ''
 
     try {
-      await this.signedOut.set(keyedDigest('cms-session', signature), '1', Math.max(1, left))
+      await this.signedOut.set(keyedDigest('cms-session', signature), '1', `${Math.max(1, left)}ms`)
     }
     catch (error) {
       log.error(`the store did not keep a signed-out cookie, so other processes still accept it until it expires: ${error instanceof Error ? error.message : String(error)}`)

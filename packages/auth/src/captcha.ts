@@ -41,6 +41,8 @@ export interface AuthProofOfWorkOptions {
   // The highest number the browser may hash up to past the threshold, 100,000 by default, doubled with each attempt after up to 16 times.
   difficulty?: number | undefined
   // How long a challenge stays good, an hour by default.
+  ttl?: Duration | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
   maxAge?: Duration | undefined
   // Where the solutions already used are kept, this process's memory by default: `sqliteRates(path)` from `kay/server` shares them between processes.
   store?: RateStore | undefined
@@ -49,7 +51,7 @@ export interface AuthProofOfWorkOptions {
 }
 
 export interface ProofOfWorkCaptcha {
-  proofOfWork: { difficulty: number, maxAge: Duration, store: RateStore | undefined }
+  proofOfWork: { difficulty: number, ttl: Duration, store: RateStore | undefined }
   on: CaptchaRules
 }
 
@@ -79,7 +81,7 @@ export function proofOfWork(options: AuthProofOfWorkOptions = {}): ProofOfWorkCa
     throw configError('auth', 'proofOfWork', `proofOfWork's difficulty is ${difficulty}; it takes a whole number from 1 to ${1e9 / 2 ** MOST_DOUBLINGS}`)
 
   return {
-    proofOfWork: { difficulty, maxAge: options.maxAge ?? '1h', store: options.store },
+    proofOfWork: { difficulty, ttl: options.ttl ?? options.maxAge ?? '1h', store: options.store },
     on: { 'register': 'always', 'guest': false, 'reset': 'always', 'magic-link': 'always', 'sign-in': 3, ...options.on },
   }
 }
@@ -138,7 +140,7 @@ export async function captchaChallenge(state: RequestState, action: CaptchaActio
 
   const past = await pastThreshold(state, action)
 
-  return past === undefined ? null : workChallenge(workScope(action), { difficulty: workDifficulty(captcha, past), maxAge: captcha.proofOfWork.maxAge })
+  return past === undefined ? null : workChallenge(workScope(action), { difficulty: workDifficulty(captcha, past), ttl: captcha.proofOfWork.ttl })
 }
 
 // Spends one attempt of `action` against this client and answers what refuses it: `limited` past the limit, `captcha` without a token that checks out where one is needed.

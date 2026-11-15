@@ -32,7 +32,9 @@ ai [.] TranscribeOptions.language	1.108	deprecated-ai-language	Written `locale`,
 ai [.] TranscribeOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] TranscribeOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 auth [./test] authTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
+auth [.] AuthMailMessage.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 auth [.] AuthOptions.onSignUp	1.108	deprecated-hook-names	Written `afterSignUp`; `deprecated-hook-names` rewrites it. Removed in 1.108.
+auth [.] AuthProofOfWorkOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 auth [.] LimitsOption.emailChangeAccount	1.108	deprecated-auth-rate-limits	`emailChange.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
 auth [.] LimitsOption.emailCodeAccount	1.108	deprecated-auth-rate-limits	`emailCode.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
 auth [.] LimitsOption.forgotAccount	1.108	deprecated-auth-rate-limits	`forgot.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
@@ -57,6 +59,7 @@ cms [.] CmsOptions.onUpload	1.108	deprecated-hook-names	Written `afterUpload`; `
 cms [.] CollectionSettings.onSave	1.108	deprecated-hook-names	Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 cms [.] CollectionSettings.onUpload	1.108	deprecated-hook-names	Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 kay [./compiler] CompileResult.why	2.0.0	-	Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. Removed in 2.0.0. No lint: a field of the compile result that tools read, nothing in an app's source.
+kay [./library/auth-mails] AuthMailData.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [./mount] Mounted	1.108.0	deprecated-import-path	Import `Mounted` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./mount] mount	1.108.0	deprecated-import-path	Import `mount` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] PagesOptions.onStart	1.108	deprecated-app-hooks	Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108.
@@ -66,6 +69,7 @@ kay [./server] RateLimitRefusal	1.108.0	deprecated-import-path	Import `RateLimit
 kay [./server] RateLimiter.enforce	1.108	deprecated-rate-enforce	`check(ctx, message?)`, as `limiter().enforce(key)` counts under a key and refuses nothing. Removed in 1.108; `deprecated-rate-enforce` rewrites it.
 kay [./server] SignOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [./server] UrlOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
+kay [./server] WorkChallengeOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [./server] WorkflowOptions.lostAfter	1.108	deprecated-job-options	`timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it.
 kay [./server] diskFiles	1.108	deprecated-disk-files	`diskFiles({ dir, ...hooks })`. Removed in 1.108; `deprecated-disk-files` rewrites it.
 kay [./server] s	1.108.0	deprecated-import-path	Import `s` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.

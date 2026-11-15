@@ -38,6 +38,7 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   installPrompt: 'browser',
   isEmail: 'shared',
   jobs: 'browser',
+  lengthMs: 'shared',
   linked: 'browser',
   listen: 'browser',
   live: 'browser',

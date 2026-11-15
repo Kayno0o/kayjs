@@ -12,6 +12,7 @@ import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
+import { lengthFor, lengthMs } from '../runtime/store-base'
 import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
 import { appStore } from './app-store'
 import { nodeNet } from './builtins'
@@ -21,6 +22,7 @@ import { inMemory } from './memory-mark'
 import { STORE_TIMEOUT_MS } from './pg-limit'
 import { TimeoutError } from './pg-poll'
 import { refused } from './rate-refusal'
+import { makeRoom } from './rate-windows'
 import { onReload } from './reload'
 import { recordOf, requestRecord } from './request-record'
 import { rewrittenAddress } from './rewrite'
@@ -40,8 +42,6 @@ export interface ProtectionRefusal {
 // A post a honeypot caught, answered as if it went through.
 export const PRETEND = 'pretend'
 
-// The most windows a memory store keeps: past it, a new client makes room by dropping the expired windows, then the oldest ones.
-const MAX_WINDOWS = 10_000
 // How often the SQLite store sweeps the windows that closed.
 const SWEEP_MS = 60_000
 const ZONE = /%.*$/
@@ -144,7 +144,7 @@ export function memoryRates(): SyncRates {
 
         // Moved to the end, as the newest window.
         windows.delete(key)
-        windows.set(key, window = { count: 0, resetAt: now + length })
+        windows.set(key, window = { count: 0, resetAt: now + lengthMs(length) })
       }
 
       window.count += weight
@@ -238,7 +238,7 @@ export function sqliteRates(path: string): SyncRates {
 }
 
 // Answered at once, as a store reading SQLite needs no promise.
-export interface SyncRates { hit: (key: string, windowMs: number, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined, refund: (key: string, resetAt: number) => void, reset: (key: string) => void }
+export interface SyncRates { hit: (key: string, window: Duration | number, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined, refund: (key: string, resetAt: number) => void, reset: (key: string) => void }
 type OpenRates = SyncRates & { close: () => void }
 
 function openRates(path: string): OpenRates {
@@ -272,7 +272,7 @@ function openRates(path: string): OpenRates {
         sweep.run(now)
       }
 
-      const row = hit.get(hashed(key), now, window, weight)!
+      const row = hit.get(hashed(key), now, lengthMs(window, 'a rate window'), weight)!
 
       return { count: row.count, resetAt: row.reset_at }
     },
@@ -348,6 +348,7 @@ export function makeLimiter({ name, max, ms, store: given, failure, memory }: { 
     return standIn.rates
   }
   const keyed = (key: string) => `${name}\n${key}`
+  const hitIn = async (used: RateStore, key: string, weight?: number) => used.hit(keyed(key), lengthFor(used, ms), weight)
 
   const peek = async (key: string): Promise<RateWindow | undefined> => {
     const used = store()
@@ -355,14 +356,14 @@ export function makeLimiter({ name, max, ms, store: given, failure, memory }: { 
     if (used.peek)
       return used.peek(keyed(key))
 
-    const window = await used.hit(keyed(key), ms, 0)
+    const window = await used.hit(keyed(key), lengthFor(used, ms), 0)
 
     return window.count > 0 ? window : undefined
   }
 
   return {
     max,
-    hit: async (key, weight) => store().hit(keyed(key), ms, weight),
+    hit: async (key, weight) => hitIn(store(), key, weight),
     peek,
     reset: async (key) => {
       const used = store()
@@ -379,12 +380,12 @@ export function makeLimiter({ name, max, ms, store: given, failure, memory }: { 
         return
 
       // The window may have closed between the two calls, which a hit of minus the count would open at a negative count.
-      const left = await used.hit(keyed(key), ms, -window.count)
+      const left = await used.hit(keyed(key), lengthFor(used, ms), -window.count)
 
       if (left.count < 0)
-        await used.hit(keyed(key), ms, -left.count)
+        await used.hit(keyed(key), lengthFor(used, ms), -left.count)
     },
-    enforce: async (key, weight) => waitFor(await store().hit(keyed(key), ms, weight), max),
+    enforce: async (key, weight) => waitFor(await hitIn(store(), key, weight), max),
     refund: async (key, resetAt) => {
       const used = store()
 
@@ -730,7 +731,7 @@ export function ratesFallingBack<Store extends RateStore>(name: string, store: S
 
   // Each method is read off the store on each call, so one replaced on it later, as a test spies on it, is the one called.
   return {
-    hit: async (key, window, weight) => answered(name, store, store.hit, [key, window, weight], () => memory.hit(key, window, weight)),
+    hit: async (key, window, weight) => answered(name, store, async (...args: [string, Duration | number, number | undefined]) => store.hit(...args), [key, lengthFor(store, lengthMs(window)), weight], () => memory.hit(key, lengthMs(window), weight)),
     ...peek && { peek: async key => answered(name, store, store.peek ?? peek, [key], () => memory.peek(key)) },
     // Taken back in memory too, where the attempt was counted if the store failed then; memory only takes it off a window closing at that same `resetAt`.
     ...refund && { refund: async (key, resetAt) => {
@@ -838,16 +839,6 @@ function memoryOf(name: string): ReturnType<typeof memoryRates> {
     memories.set(name, memory = memoryRates())
 
   return memory
-}
-
-// Expired windows sit first, so dropping them, then the oldest live ones when still full, costs each new window what it removes.
-function makeRoom(windows: Map<string, RateWindow>, now: number): void {
-  for (const [key, window] of windows) {
-    if (window.resetAt > now && windows.size < MAX_WINDOWS)
-      return
-
-    windows.delete(key)
-  }
 }
 
 // One key per IPv6 /64, the block a single host or home network holds, so rotating through it buys no fresh window.

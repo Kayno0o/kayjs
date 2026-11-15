@@ -72,6 +72,7 @@ import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pa
 import { untypedSockets } from './socket-routes'
 import { sourceReaders } from './source-readers'
 import { unusedStatusPages } from './status-pages'
+import { storeMs } from './store-ms'
 import { storeNames } from './store-names'
 import { testHelpers } from './test-helpers'
 import { textSizeColour } from './text-size-colour'
@@ -207,6 +208,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => hookContext(root, options),
   async ({ root, options }) => pagesOptions(root, options),
   async ({ root, options }) => ttlNames(root, options),
+  async ({ root, options }) => storeMs(root, options),
   async ({ root, options }) => rateEnforce(root, options),
   async ({ root, options }) => authRateLimits(root, options),
 ]

@@ -8,6 +8,8 @@ import type { DeletableSessionStore, SessionData } from './session'
 import type { VitalCount, VitalReading, VitalsStore } from './vitals-store'
 import { parse, stringify } from 'devalue'
 import { kayLog } from '../runtime/log'
+
+import { lengthMs } from '../runtime/store-base'
 import { maintenance } from './maintenance'
 import { rowsOf } from './pg-jobs'
 import { limited, limitedStore, MAINTENANCE_TIMEOUT_MS } from './pg-limit'
@@ -71,7 +73,7 @@ export function pgSessions(pg: PgHandle): DeletableSessionStore {
       if (++writes % SWEEP_EVERY === 0)
         void sweepLogged()
 
-      await query(db, `INSERT INTO kay_sessions (id, data, expires) VALUES ($1, $2, ${NOW} + $3::bigint) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires`, [id, text, Math.round(maxAge)])
+      await query(db, `INSERT INTO kay_sessions (id, data, expires) VALUES ($1, $2, ${NOW} + $3::bigint) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires`, [id, text, Math.round(lengthMs(maxAge, 'a session store\'s maxAge'))])
     },
     async delete(id) {
       const db = await pg.db()
@@ -141,7 +143,7 @@ export function pgRates(pg: PgHandle): RateStore {
       }
 
       // The row's old values are what both cases read: a closed window opens afresh, an open one counts the weight more.
-      const [row] = await query<{ count: number, reset_at: string }>(db, `WITH t AS (SELECT ${NOW} AS now) INSERT INTO kay_rates (key, count, reset_at) SELECT $1, $2::integer, t.now + $3::bigint FROM t ON CONFLICT (key) DO UPDATE SET count = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN $2::integer ELSE kay_rates.count + $2::integer END, reset_at = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN (SELECT now FROM t) + $3::bigint ELSE kay_rates.reset_at END RETURNING count, reset_at`, [hash, weight, Math.round(window)])
+      const [row] = await query<{ count: number, reset_at: string }>(db, `WITH t AS (SELECT ${NOW} AS now) INSERT INTO kay_rates (key, count, reset_at) SELECT $1, $2::integer, t.now + $3::bigint FROM t ON CONFLICT (key) DO UPDATE SET count = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN $2::integer ELSE kay_rates.count + $2::integer END, reset_at = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN (SELECT now FROM t) + $3::bigint ELSE kay_rates.reset_at END RETURNING count, reset_at`, [hash, weight, Math.round(lengthMs(window, 'a rate window'))])
 
       return { count: row!.count, resetAt: Number(row!.reset_at) }
     },
@@ -189,7 +191,7 @@ export function pgKv(pg: PgHandle): KvStore {
       const db = await pg.db()
 
       await sweep(db)
-      await query(db, `INSERT INTO kay_kv (key, value, expires_at) VALUES ($1, $2, CASE WHEN $3::bigint IS NULL THEN NULL ELSE ${NOW} + $3::bigint END) ON CONFLICT (key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`, [key, value, ttlMs === undefined ? null : Math.round(ttlMs)])
+      await query(db, `INSERT INTO kay_kv (key, value, expires_at) VALUES ($1, $2, CASE WHEN $3::bigint IS NULL THEN NULL ELSE ${NOW} + $3::bigint END) ON CONFLICT (key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`, [key, value, ttlMs === undefined ? null : Math.round(lengthMs(ttlMs, 'a kv ttl'))])
     },
     async delete(key) {
       const db = await pg.db()
@@ -202,7 +204,7 @@ export function pgKv(pg: PgHandle): KvStore {
 
       await sweep(db)
 
-      const taken = await query<{ key: string }>(db, `INSERT INTO kay_kv (key, value, expires_at) VALUES ($1, '1', ${NOW} + $2::bigint) ON CONFLICT (key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at WHERE kay_kv.expires_at IS NOT NULL AND kay_kv.expires_at <= ${NOW} RETURNING key`, [key, Math.round(ttlMs)])
+      const taken = await query<{ key: string }>(db, `INSERT INTO kay_kv (key, value, expires_at) VALUES ($1, '1', ${NOW} + $2::bigint) ON CONFLICT (key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at WHERE kay_kv.expires_at IS NOT NULL AND kay_kv.expires_at <= ${NOW} RETURNING key`, [key, Math.round(lengthMs(ttlMs, 'a kv ttl'))])
 
       return taken.length > 0
     },

@@ -16,6 +16,7 @@ import { guardOptions } from '../src/check/guard-options'
 import { hookContext } from '../src/check/hook-context'
 import { hookNames } from '../src/check/hook-names'
 import { imagesKeys } from '../src/check/images-keys'
+
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
 import { liveApi } from '../src/check/live-api'
 import { mailApi } from '../src/check/mail-api'
@@ -25,6 +26,7 @@ import { rateEnforce } from '../src/check/rate-enforce'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
 import { sourceReaders } from '../src/check/source-readers'
+import { storeMs } from '../src/check/store-ms'
 import { storeNames } from '../src/check/store-names'
 import { testHelpers } from '../src/check/test-helpers'
 import { ttlNames } from '../src/check/ttl-names'
@@ -67,6 +69,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-hook-context': hookContext,
   'deprecated-pages-options': pagesOptions,
   'deprecated-ttl-names': ttlNames,
+  'deprecated-store-ms': storeMs,
   'deprecated-package-names': async (root, options) => renamedPackages(root, options.lints),
   // Its fix is safe only in a project that lists kayjs-ui, where the new form comes from.
   'deprecated-mail-form': async (root, options) => {

@@ -1,29 +1,35 @@
+import type { Duration } from '../runtime/duration'
 import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import { KayError } from '../compiler/errors'
 import { PURGE_STALE_MS } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
+import { lengthFor, lengthMs } from '../runtime/store-base'
 import { appStore, storeSetups } from './app-store'
 import { inMemory } from './memory-mark'
 import { onReload } from './reload'
 
 // What a library or an app keeps that is a value under a key and nothing else: a flag with an end, a marker, a document fetched once.
-// A key holds a string; `ttlMs` is how long it lives from the write, and a key written without one lives until it is deleted.
+// A key holds a string; `ttl` is how long it lives from the write, and a key written without one lives until it is deleted. It is a `Duration` for a store with `durations: true`, and milliseconds for one written before 1.105 (deprecated, kept until 1.108).
 export interface KvStore extends StoreBase {
   get: (key: string) => MaybePromise<string | undefined>
-  set: (key: string, value: string, ttlMs?: number) => MaybePromise<void>
+  // A store with `durations: true` is given a `Duration`; one written before 1.105 is given milliseconds, until 1.108, and still types as it did: `lengthMs(ttl)` from `kay` reads either.
+  // eslint-disable-next-line ts/method-signature-style -- method syntax keeps a store written with `number` assignable (bivariance)
+  set(key: string, value: string, ttl?: Duration | number): MaybePromise<void>
   // Resolves with whether there was a live value.
   delete: (key: string) => MaybePromise<boolean>
-  // Takes the key for `ttlMs` when no live value holds it: true for the one call that took it, however many processes ask at once.
-  once: (key: string, ttlMs: number) => MaybePromise<boolean>
+  // Takes the key for `ttl` when no live value holds it: true for the one call that took it, however many processes ask at once.
+  // eslint-disable-next-line ts/method-signature-style -- method syntax keeps a store written with `number` assignable (bivariance)
+  once(key: string, ttl: Duration | number): MaybePromise<boolean>
 }
 
 // A `KvStore` under one namespace, which every key is written under so two users of the store never meet.
 export interface Kv {
   get: (key: string) => Promise<string | undefined>
-  set: (key: string, value: string, ttlMs?: number) => Promise<void>
+  // `ttl` is a `Duration`; milliseconds as a number still work until 1.108 (`deprecated-store-ms`).
+  set: (key: string, value: string, ttl?: Duration | number) => Promise<void>
   delete: (key: string) => Promise<boolean>
-  once: (key: string, ttlMs: number) => Promise<boolean>
+  once: (key: string, ttl: Duration | number) => Promise<boolean>
 }
 
 const SWEEP_EVERY = 500
@@ -41,7 +47,9 @@ export function memoryKv(max?: number): KvStore {
 
     return entry !== undefined && (entry.until === undefined || entry.until > now) ? entry : undefined
   }
-  const write = (key: string, value: string, ttlMs: number | undefined, now: number) => {
+  const write = (key: string, value: string, ttl: Duration | number | undefined, now: number) => {
+    const ttlMs = ttl === undefined ? undefined : lengthMs(ttl, 'a kv ttl')
+
     if (++writes % SWEEP_EVERY === 0) {
       for (const [held, entry] of entries) {
         if (entry.until !== undefined && entry.until <= now)
@@ -71,7 +79,7 @@ export function memoryKv(max?: number): KvStore {
 
   return inMemory({
     get: key => live(key, Date.now())?.value,
-    set: (key, value, ttlMs) => write(key, value, ttlMs, Date.now()),
+    set: (key, value, ttl) => write(key, value, ttl, Date.now()),
     delete(key) {
       const existed = live(key, Date.now()) !== undefined
 
@@ -79,13 +87,13 @@ export function memoryKv(max?: number): KvStore {
 
       return existed
     },
-    once(key, ttlMs) {
+    once(key, ttl) {
       const now = Date.now()
 
       if (live(key, now) !== undefined)
         return false
 
-      write(key, TAKEN, ttlMs, now)
+      write(key, TAKEN, ttl, now)
 
       return true
     },
@@ -117,23 +125,23 @@ function openKv(path: string) {
   return {
     close: () => db.close(),
     get: (key: string) => select.get(key, Date.now())?.value,
-    set(key: string, value: string, ttlMs?: number) {
+    set(key: string, value: string, ttl?: Duration | number) {
       const now = Date.now()
 
       sweeping(now)
-      upsert.run(key, value, ttlMs === undefined ? null : now + ttlMs)
+      upsert.run(key, value, ttl === undefined ? null : now + lengthMs(ttl, 'a kv ttl'))
     },
     delete(key: string) {
       const row = remove.get(key)
 
       return row !== null && (row.expires_at === null || row.expires_at > Date.now())
     },
-    once(key: string, ttlMs: number) {
+    once(key: string, ttl: Duration | number) {
       const now = Date.now()
 
       sweeping(now)
 
-      return take.get(key, TAKEN, now + ttlMs, now) !== null
+      return take.get(key, TAKEN, now + lengthMs(ttl, 'a kv ttl'), now) !== null
     },
   }
 }
@@ -156,9 +164,9 @@ export function sqliteKv(path: string): KvStore {
 
   return {
     get: key => file().get(key),
-    set: (key, value, ttlMs) => file().set(key, value, ttlMs),
+    set: (key, value, ttl) => file().set(key, value, ttl),
     delete: key => file().delete(key),
-    once: (key, ttlMs) => file().once(key, ttlMs),
+    once: (key, ttl) => file().once(key, ttl),
     close() {
       closed = true
       opened?.close()
@@ -194,8 +202,16 @@ export function kv(namespace: string, store?: KvStore): Kv {
 
   return {
     get: async key => kept().get(keyed(key)),
-    set: async (key, value, ttlMs) => kept().set(keyed(key), value, ttlMs),
+    set: async (key, value, ttl) => {
+      const used = kept()
+
+      return used.set(keyed(key), value, ttl === undefined ? undefined : lengthFor(used, lengthMs(ttl, 'a kv ttl')))
+    },
     delete: async key => kept().delete(keyed(key)),
-    once: async (key, ttlMs) => kept().once(keyed(key), ttlMs),
+    once: async (key, ttl) => {
+      const used = kept()
+
+      return used.once(keyed(key), lengthFor(used, lengthMs(ttl, 'a kv ttl')))
+    },
   }
 }

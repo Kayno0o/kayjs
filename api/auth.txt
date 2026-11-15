@@ -320,7 +320,7 @@ interface AuthMailMessage extends MailContent
   html: string
   kind: AuthMailKind
   locale: string
-  maxAge?: undefined | {
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: undefined | {
   link?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
   code?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
 }
@@ -328,6 +328,10 @@ interface AuthMailMessage extends MailContent
   subject: string
   text: string
   to: string
+  ttl?: undefined | {
+  link?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
+  code?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
+}
   url?: string
 
 [.] AuthMember
@@ -435,9 +439,10 @@ interface AuthPagesOptions
 [.] AuthProofOfWorkOptions
 interface AuthProofOfWorkOptions
   difficulty?: number | undefined
-  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   on?: Partial<Record<CaptchaAction, "always" | false | number>> | undefined
   store?: RateStore | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] AuthRateLimit
 type AuthRateLimit = Omit<RateLimit, 'key'> & { hit?: never, enforce?: never }
@@ -1521,7 +1526,7 @@ function proofOfWork(options?: AuthProofOfWorkOptions): ProofOfWorkCaptcha
 [.] ProofOfWorkCaptcha
 interface ProofOfWorkCaptcha
   on: Partial<Record<CaptchaAction, "always" | false | number>>
-  proofOfWork: { difficulty: number; maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; store: RateStore | undefined; }
+  proofOfWork: { difficulty: number; ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; store: RateStore | undefined; }
 
 [.] ProviderOptions
 interface ProviderOptions

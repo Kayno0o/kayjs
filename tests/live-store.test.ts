@@ -7,6 +7,7 @@ import { Database } from 'bun:sqlite'
 import { afterAll, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { live, liveSlot, liveStoreReady, setLiveStore, watchSlot } from '../src/runtime/live-value'
 import { serverLive } from '../src/runtime/live-value.server'
+import { lengthMs } from '../src/runtime/store-base'
 import { setupStore } from '../src/server/app-store'
 import { sqliteLive } from '../src/server/sqlite-live'
 import { untilHolds } from './helpers/until-holds'
@@ -658,7 +659,7 @@ describe('a live value with a lifetime', () => {
 
   it('asks a store offering endAll once for the rows of an id, and keeps them with a local end', async () => {
     const calls: [string, number][] = []
-    const store: LiveStore = { entries: () => [['test:ttl-all', 'a', '[1]'], ['test:ttl-all', 'b', '[2]']], set: () => undefined, endAll: (id, ttl) => void calls.push([id, ttl]), delete: () => undefined, subscribe: () => undefined }
+    const store: LiveStore = { entries: () => [['test:ttl-all', 'a', '[1]'], ['test:ttl-all', 'b', '[2]']], set: () => undefined, endAll: (id, ttl) => void calls.push([id, lengthMs(ttl)]), delete: () => undefined, subscribe: () => undefined }
 
     setLiveStore(store)
 

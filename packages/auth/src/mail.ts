@@ -33,6 +33,8 @@ export interface AuthMailMessage extends MailContent {
   // The language it is written in, one of the `locales` option's.
   locale: string
   // How long its link and its code work, for the ones it carries, as durations such as `'24h'`.
+  ttl?: { link?: Duration, code?: Duration } | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
   maxAge?: { link?: Duration, code?: Duration } | undefined
 }
 
@@ -102,7 +104,7 @@ export function lifetime(duration: Duration, locale: string): string {
 
 // How long what the mail carries works, a magic link being usable once.
 function lasting(words: AuthMailWording, data: MailData, once: boolean): string {
-  const { link, code } = data.maxAge ?? {}
+  const { link, code } = data.ttl ?? data.maxAge ?? {}
   const linkWorks = data.url === undefined || link === undefined ? undefined : words.linkWorks.replace('{duration}', () => lifetime(link, data.locale) + (once ? words.once : ''))
   const codeWorks = data.code === undefined || code === undefined ? undefined : words.codeWorks.replace('{duration}', () => lifetime(code, data.locale))
 

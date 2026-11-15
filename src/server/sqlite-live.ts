@@ -5,6 +5,8 @@ import { PURGE_STALE_MS } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { pollLoop } from '../runtime/poll-backoff'
 import { openSqlite } from '../runtime/sqlite.server'
+
+import { lengthMs } from '../runtime/store-base'
 import { onReload } from './reload'
 
 // How often a process reads what the others set while there is activity, and how long a message is kept for one that reads late.
@@ -139,7 +141,7 @@ export function sqliteLive(path: string): LiveStore {
     endAll(id, ttl) {
       wake()
 
-      return open(false)?.endAll(id, Date.now() + ttl)
+      return open(false)?.endAll(id, Date.now() + lengthMs(ttl, 'a live value\'s ttl'))
     },
     delete(id, key) {
       wake()

@@ -10,6 +10,7 @@ import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { buildClient } from '../src/build/client'
 import { configuredSite, setSite } from '../src/runtime/site'
+import { lengthMs } from '../src/runtime/store-base'
 import { memorySessions, session, sqliteSessions } from '../src/server'
 import { setupStore } from '../src/server/app-store'
 import { maintenanceOverview, stopMaintenance } from '../src/server/maintenance'
@@ -483,7 +484,7 @@ process.exit(0)`)
     const lifetimes: number[] = []
     const memory = memorySessions()
     const visit = browser(counter({ store: { ...memory, async set(id, data, maxAge) {
-      lifetimes.push(maxAge / 1000)
+      lifetimes.push(lengthMs(maxAge) / 1000)
       await memory.set(id, data, maxAge)
     } } }))
     const DAY = 24 * 60 * 60
@@ -621,7 +622,7 @@ process.exit(0)`)
     const lifetimes: number[] = []
     const memory = memorySessions()
     const visit = browser(counter({ absoluteMaxAge: '30s', browserMaxAge: '50s', store: { ...memory, async set(id, data, maxAge) {
-      lifetimes.push(maxAge / 1000)
+      lifetimes.push(lengthMs(maxAge) / 1000)
       await memory.set(id, data, maxAge)
     } } }))
 
@@ -654,7 +655,7 @@ process.exit(0)`)
     const lifetimes: number[] = []
     const memory = memorySessions()
     const visit = browser(counter({ maxAge: '30d', browserMaxAge: '50s', store: { ...memory, async set(id, data, maxAge) {
-      lifetimes.push(maxAge / 1000)
+      lifetimes.push(lengthMs(maxAge) / 1000)
       await memory.set(id, data, maxAge)
     } } }))
 
@@ -743,9 +744,9 @@ process.exit(0)`)
 
   for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
     it(`refuses a maxAge that is no number ${name}, which the stores receive in milliseconds`, () => {
-      expect(async () => store.set('a', { userId: 1 }, Number.NaN)).toThrow('milliseconds since 1.88')
-      expect(async () => store.set('a', { userId: 1 }, '1h' as never)).toThrow('milliseconds since 1.88')
-      expect(async () => store.set('a', { userId: 1 }, Infinity)).toThrow('milliseconds since 1.88')
+      expect(async () => store.set('a', { userId: 1 }, Number.NaN)).toThrow('a session store')
+      expect(async () => store.set('a', { userId: 1 }, 'soon' as never)).toThrow('a session store')
+      expect(async () => store.set('a', { userId: 1 }, Infinity)).toThrow('a session store')
     })
   }
 

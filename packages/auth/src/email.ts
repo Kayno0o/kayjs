@@ -487,7 +487,7 @@ async function spendResend(state: RequestState, id: string, limit: 'resend' | 'e
 }
 
 // How long the link and the code of a mail work, for the ones it carries.
-function lifetimesOf(mail: EmailCore, type: LinkType, content: { url?: string, code?: string }): MailData['maxAge'] {
+function lifetimesOf(mail: EmailCore, type: LinkType, content: { url?: string, code?: string }): MailData['ttl'] {
   return { ...content.url === undefined ? {} : { link: `${mail.maxAge[type]}s` }, ...content.code === undefined ? {} : { code: `${mail.maxAge[CODE_OF[type as CodedLink]]}s` } }
 }
 
@@ -519,9 +519,10 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
 
   const { locale, templates } = writing(mail, [record.locale, ...state.languages])
 
-  const maxAge = lifetimesOf(mail, type, content)
+  const ttl = lifetimesOf(mail, type, content)
 
-  await mail.mailer.send({ to: email, kind: type, name: core.name, locale, ...content, maxAge, ...templates[type]({ name: core.name, email, locale, ...content, maxAge }) })
+  // `maxAge` is the old name of `ttl`, still given to a template or a mailer written with it until 1.108.
+  await mail.mailer.send({ to: email, kind: type, name: core.name, locale, ...content, ttl, maxAge: ttl, ...templates[type]({ name: core.name, email, locale, ...content, ttl, maxAge: ttl }) })
 }
 
 // The code the same mail carried is spent with its link, once the link is used: a link refused leaves both.

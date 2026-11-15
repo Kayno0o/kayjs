@@ -1,5 +1,6 @@
 import type { Action, ProofOfWorkRefusal, RateStore } from '../runtime/action'
 import { isAction, workOf } from '../runtime/action'
+import { lengthFor } from '../runtime/store-base'
 import { sha256 } from './sha256'
 import { signedText, signText, WORK_MARK, WORK_OPEN } from './stamp'
 
@@ -63,7 +64,7 @@ export async function challengeRefusal(use: string, boundTo: (difficulty: string
   if (!DIGITS.test(number) || hashOf(salt + number) !== hash)
     return 'wrong'
 
-  return (await store.hit(`${key}\n${salt}`, left)).count > 1 ? 'wrong' : undefined
+  return (await store.hit(`${key}\n${salt}`, lengthFor(store, left))).count > 1 ? 'wrong' : undefined
 }
 
 export async function workRefusal(url: string, solution: string | null, store: RateStore): Promise<ProofOfWorkRefusal | undefined> {

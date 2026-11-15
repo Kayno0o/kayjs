@@ -23,9 +23,10 @@ declare const HONEYPOT: unique symbol
 
 // Where rate limits count, shared by every process opening it: `sqliteRates` from `kay/server`, or one of an app's own.
 export interface RateStore extends StoreBase {
-  // Counts `weight` more under `key`, one attempt unless given, opening a window of `windowMs` milliseconds when none is open: the count in it so far, this hit included, and when it closes, in ms since the epoch.
-  // A store of its own adds `weight` to the count, or a weighted limit, tokens say, refuses it.
-  hit: (key: string, windowMs: number, weight?: number) => MaybePromise<RateWindow>
+  // Counts `weight` more under `key`, one attempt unless given, opening a window of `window` when none is open: the count in it so far, this hit included, and when it closes, in ms since the epoch. A store of its own adds `weight` to the count, or a weighted limit, tokens say, refuses it.
+  // `window` is a `Duration` for a store with `durations: true`, and milliseconds for one written before 1.105, until 1.108: `lengthMs(window)` from `kay` reads either.
+  // eslint-disable-next-line ts/method-signature-style -- method syntax keeps a store written with `number` assignable (bivariance)
+  hit(key: string, window: Duration | number, weight?: number): MaybePromise<RateWindow>
   // The window open under `key` without counting an attempt, undefined when none is: what a limit counting only the posts that went through reads before the handler runs. A `limiter` derives it, with a hit of weight 0, for a store without it.
   peek?: (key: string) => MaybePromise<RateWindow | undefined>
   // Takes back one attempt `hit` counted under `key` in the window closing at `resetAt`, never below zero, and does nothing once that window is gone: how kay lets a call that started no work, such as kayjs-ai's resume of a reply it keeps, not spend the limit. A store without it simply keeps the attempt counted.

@@ -3,6 +3,7 @@ import type { ServerScope } from './reactive'
 import { initialOf, keyText, writeArguments } from './live-value.shared'
 import { kayLog } from './log'
 import { currentServerScope } from './reactive'
+import { lengthFor } from './store-base'
 import { decodeServerValue, encodeValue } from './wire'
 
 // The server's half of `live()`: the values by id, their expiry, the store sharing them across processes and what a render read of them.
@@ -542,7 +543,7 @@ function datedTogether(id: string): void {
           continue
 
         try {
-          const sent = store.endAll(dated, ttl)
+          const sent = store.endAll(dated, lengthFor(store, ttl))
 
           if (sent !== undefined)
             void logged(sent, dated)

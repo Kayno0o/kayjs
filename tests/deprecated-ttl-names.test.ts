@@ -32,6 +32,17 @@ describe('deprecated-ttl-names', () => {
     expect(text['src/a.ts']).toBe('import { action } from \'kay\'\nimport { files, signed } from \'kay/server\'\n\nsigned.sign(\'a\', \'b\', { ttl: \'1h\' })\nfiles.url(\'private/x.png\', { ttl: \'1d\' })\nexport const send = action(() => 1, { protect: { minTime: { after: \'3s\', ttl: \'1h\' }, proofOfWork: { ttl: maxAge } } })\n')
   })
 
+  it('renames maxAge on workChallenge, kayjs-auth\'s proofOfWork and the mail data a template reads', async () => {
+    const { found, text } = await fixed({
+      'src/a.ts': 'import { workChallenge } from \'kay/server\'\nimport { proofOfWork } from \'@kayjs/auth\'\n\nexport const a = workChallenge(\'contact\', { difficulty: 5, maxAge: \'1h\' })\nexport const b = proofOfWork({ maxAge: \'10m\' })\nexport const c = (data: { maxAge?: { link?: string } }) => `${data.maxAge.link} ${data.maxAge?.code}`\n',
+      'src/b.ts': 'import { proofOfWork } from \'./mine\'\n\nexport const a = proofOfWork({ maxAge: \'10m\' })\nexport const c = (data: { maxAge: { link: string } }) => data.maxAge.link\n',
+    })
+
+    expect(found).toHaveLength(4)
+    expect(text['src/a.ts']).toBe('import { workChallenge } from \'kay/server\'\nimport { proofOfWork } from \'@kayjs/auth\'\n\nexport const a = workChallenge(\'contact\', { difficulty: 5, ttl: \'1h\' })\nexport const b = proofOfWork({ ttl: \'10m\' })\nexport const c = (data: { maxAge?: { link?: string } }) => `${data.ttl.link} ${data.ttl?.code}`\n')
+    expect(text['src/b.ts']).toContain('maxAge')
+  })
+
   it('leaves the HTTP and cookie maxAge, other receivers and a ttl alone, and reports a clash with no fix', async () => {
     const { found, text } = await fixed({
       'src/a.ts': 'import { signed } from \'kay/server\'\n\nsigned.sign(\'a\', \'b\', { ttl: \'1h\' })\nother.url(\'x\', { maxAge: 1 })\nctx.cookies.set(\'a\', \'b\', { maxAge: 60 })\nexport const cors = { origins: [], maxAge: \'1h\' }\nexport const other = { protect: { minTime: { maxAge: 1 } } }\nexport const again = { minTime: { maxAge: 1 }, proofOfWork: { maxAge: 1 } }\n',

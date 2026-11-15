@@ -14,6 +14,8 @@ export interface WorkChallengeOptions {
   // The highest number the browser may have to hash up to, 100,000 by default: half of it on average.
   difficulty?: number | undefined
   // How long the challenge stays good, a day by default.
+  ttl?: Duration | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
   maxAge?: Duration | undefined
 }
 
@@ -36,7 +38,7 @@ function difficultyOf(difficulty: number | undefined): number {
 // A challenge bound to `scope` rather than to an action, for a library checking it in its own code: a form field carrying it as `data-kay-work` posts its solution, which `verifyWork` checks.
 export function workChallenge(scope: string, options: WorkChallengeOptions = {}): string {
   const difficulty = difficultyOf(options.difficulty)
-  const maxAge = durationSeconds(options.maxAge ?? DAY, 'workChallenge maxAge') * 1000
+  const maxAge = durationSeconds(options.ttl ?? options.maxAge ?? DAY, 'workChallenge ttl') * 1000
 
   // A prerendered page holds a mark the server signs a fresh challenge into on every visit.
   if (prerendering())
@@ -45,7 +47,7 @@ export function workChallenge(scope: string, options: WorkChallengeOptions = {})
   return signChallenge(SCOPED_WORK, `${scope}\0${difficulty.toString(36)}`, difficulty, maxAge)
 }
 
-// Why a solution to a `workChallenge` of `scope` does not pass, or undefined when it does, once: `missing`, `expired` (past its `maxAge`, signed before a restart, for another scope or easier than `difficulty`) or `wrong`.
+// Why a solution to a `workChallenge` of `scope` does not pass, or undefined when it does, once: `missing`, `expired` (past its `ttl`, signed before a restart, for another scope or easier than `difficulty`) or `wrong`.
 export async function verifyWork(solution: string | null | undefined, scope: string, options: VerifyWorkOptions = {}): Promise<ProofOfWorkRefusal | undefined> {
   const least = options.difficulty === undefined ? 1 : difficultyOf(options.difficulty)
   const store = ratesFor(`verifyWork:${scope}`, options.store)

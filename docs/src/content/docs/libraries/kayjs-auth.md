@@ -713,7 +713,7 @@ The `email` option sends the verification, reset and magic-link mails. With [kay
 
 The mails are written in the site's `i18n.locales`, the default one first, for a reader whose language is none of them. `email.locales` names others (`['en', 'fr']`), and `email.translations` adds a language kayjs-auth does not write.
 
-Each link and code lasts a fixed time: a day for verification, an hour for a reset or an email change, 15 minutes for a magic link, 10 for a code. `email.maxAge` changes any of them, such as a week for invited users: `email: { maxAge: { 'verify-email': '7d' } }`. The built-in mails say how long the link works, in the reader's language. A template of your own gets the seconds as `maxAge.link` and `maxAge.code`, and `lifetime(seconds, locale)` words them.
+Each link and code lasts a fixed time: a day for verification, an hour for a reset or an email change, 15 minutes for a magic link, 10 for a code. `email.maxAge` changes any of them, such as a week for invited users: `email: { maxAge: { 'verify-email': '7d' } }`. The built-in mails say how long the link works, in the reader's language. A template of your own gets the durations as `ttl.link` and `ttl.code`, and `lifetime(seconds, locale)` words them.
 
 The `examples/noticeboard` project in the kay repository runs kayjs-auth on Postgres with `auth`, `mail` and `authMailer`, and no sign-in page of its own.
 

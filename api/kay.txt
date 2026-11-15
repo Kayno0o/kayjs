@@ -562,6 +562,9 @@ interface LeaveGuardOptions
   confirm?: ((to: URL) => Promise<boolean> | boolean) | undefined
   signal?: AbortSignal | undefined
 
+[.] lengthMs
+function lengthMs(value: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number, what?: string): number
+
 [.] linked
 function linked<T>(source: () => T): Signal<T>
 
@@ -1061,7 +1064,8 @@ interface RateLimitRefusal
 [.] RateStore
 interface RateStore extends StoreBase
   close?: (() => unknown) | undefined
-  hit: (key: string, windowMs: number, weight?: number | undefined) => MaybePromise<RateWindow>
+  durations?: true | undefined
+  hit: (key: string, window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number, weight?: number | undefined) => MaybePromise<RateWindow>
   peek?: (key: string) => MaybePromise<RateWindow | undefined>
   ping?: (() => unknown) | undefined
   refund?: (key: string, resetAt: number) => MaybePromise<void>
@@ -1729,6 +1733,7 @@ interface VitalsStore extends StoreBase
   add: (route: string, readings: VitalReading[], day: number) => MaybePromise<void>
   close?: (() => unknown) | undefined
   counts: (since: number) => MaybePromise<VitalCount[]>
+  durations?: true | undefined
   ping?: (() => unknown) | undefined
 
 [./analytics] VitalSummary
@@ -1781,6 +1786,7 @@ interface CacheStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (key: string) => Promise<void> | void
   dependencies?: () => Map<string, string[]> | Promise<Map<string, string[]>>
+  durations?: true | undefined
   get: (key: string) => Promise<StoredValue | undefined> | StoredValue | undefined
   keys: () => Promise<string[]> | string[]
   ping?: (() => unknown) | undefined
@@ -1817,6 +1823,7 @@ interface SyncCacheStore extends CacheStore
   close?: (() => unknown) | undefined
   delete: (key: string) => void
   dependencies: () => Map<string, string[]>
+  durations?: true | undefined
   get: (key: string) => StoredValue | undefined
   keys: () => string[]
   ping?: (() => unknown) | undefined
@@ -2693,6 +2700,7 @@ interface AppStore extends StoreBase
   cache?: CacheStore | undefined
   close?: (() => unknown) | undefined
   database?: string | undefined
+  durations?: true | undefined
   files?: FileStore | undefined
   jobs?: JobStore | undefined
   kv?: KvStore | undefined
@@ -2949,6 +2957,7 @@ const files: {
 interface FileStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (key: string) => Promise<boolean>
+  durations?: true | undefined
   list?: ((prefix?: string | undefined) => Promise<StoredFile[]>) | undefined
   onDelete?: Hook<{ key: string; }> | undefined
   onWrite?: Hook<{ key: string; size: number; private: boolean; }> | undefined
@@ -3022,6 +3031,7 @@ interface JobStore extends StoreBase
   claim: (queue: string, now: number, until: number) => MaybePromise<StoredJob | undefined>
   close?: (() => unknown) | undefined
   complete: (id: string, until?: number | undefined) => MaybePromise<void>
+  durations?: true | undefined
   fail: (id: string, error: string, payload?: string | undefined, until?: number | undefined) => MaybePromise<boolean | void>
   failed: (queue: string, limit?: number | undefined) => MaybePromise<StoredJob[]>
   jobs?: ((queue: string, options?: undefined | { limit?: number; failed?: boolean; }) => MaybePromise<StoredJob[]>) | undefined
@@ -3159,17 +3169,18 @@ function kv(namespace: string, store?: KvStore | undefined): Kv
 interface Kv
   delete: (key: string) => Promise<boolean>
   get: (key: string) => Promise<string | undefined>
-  once: (key: string, ttlMs: number) => Promise<boolean>
-  set: (key: string, value: string, ttlMs?: number | undefined) => Promise<void>
+  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => Promise<boolean>
+  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number | undefined) => Promise<void>
 
 [./server] KvStore
 interface KvStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (key: string) => MaybePromise<boolean>
+  durations?: true | undefined
   get: (key: string) => MaybePromise<string | undefined>
-  once: (key: string, ttlMs: number) => MaybePromise<boolean>
+  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => MaybePromise<boolean>
   ping?: (() => unknown) | undefined
-  set: (key: string, value: string, ttlMs?: number | undefined) => MaybePromise<void>
+  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number | undefined) => MaybePromise<void>
 
 [./server] lastEventId
 function lastEventId(request: Request): string | undefined
@@ -3202,8 +3213,9 @@ type LiveEntry = [id: string, key: string, text: string] | [id: string, key: str
 interface LiveStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (id: string, key: string) => Promise<void> | void
+  durations?: true | undefined
   end?: (id: string, key: string, expiresAt: number) => Promise<void> | void
-  endAll?: (id: string, ttl: number) => Promise<void> | void
+  endAll?: (id: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => Promise<void> | void
   entries: () => Entries | Promise<Entries>
   hold?: (held: boolean) => void
   ping?: (() => unknown) | undefined
@@ -3288,6 +3300,7 @@ const notifications: {
 interface NotificationStore extends StoreBase
   add: (user: string, note: StoredNotification, most: number) => MaybePromise<void>
   close?: (() => unknown) | undefined
+  durations?: true | undefined
   erase: (user: string) => MaybePromise<number>
   list: (user: string, limit: number, now: number) => MaybePromise<NotificationRow[]>
   markAllRead: (user: string, now: number) => MaybePromise<number>
@@ -3487,6 +3500,7 @@ interface PushStore extends StoreBase
   add: (user: string, subscription: PushSubscriptionRecord, most: number) => MaybePromise<void>
   close?: (() => unknown) | undefined
   delete: (endpoint: string, user?: string | undefined) => MaybePromise<boolean>
+  durations?: true | undefined
   erase: (user: string) => MaybePromise<number>
   list: (user: string) => MaybePromise<PushSubscriptionRecord[]>
   ping?: (() => unknown) | undefined
@@ -3651,6 +3665,7 @@ interface RoomsOptions<Message = never, State = undefined>
 interface RoomStore extends StoreBase
   add: (room: string, connection: string, member: string) => void
   close: () => unknown
+  durations?: true | undefined
   members: (room: string) => string[]
   ping?: (() => unknown) | undefined
   publish: (room: string, text: string, recipients: RoomRecipients) => void
@@ -3878,9 +3893,10 @@ interface SessionStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (id: string) => MaybePromise<void>
   deleteWhere?: ((match: (data: SessionData) => boolean) => MaybePromise<number>) | undefined
+  durations?: true | undefined
   get: (id: string) => MaybePromise<SessionData | undefined>
   ping?: (() => unknown) | undefined
-  set: (id: string, data: SessionData, maxAgeMs: number) => MaybePromise<void>
+  set: (id: string, data: SessionData, maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => MaybePromise<void>
 
 [./server] setSharedNotBefore
 function setSharedNotBefore(read: ((entry: PreviewScope) => Date | Promise<Date | number | undefined> | number | undefined) | undefined): void
@@ -3950,6 +3966,7 @@ interface StartOptions
 [./server] StoreBase
 interface StoreBase
   close?: (() => unknown) | undefined
+  durations?: true | undefined
   ping?: (() => unknown) | undefined
 
 [./server] StoredFile
@@ -4027,7 +4044,8 @@ function workChallenge(scope: string, options?: WorkChallengeOptions): string
 [./server] WorkChallengeOptions
 interface WorkChallengeOptions
   difficulty?: number | undefined
-  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] workflow
 function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (input: Input, ctx: WorkflowContext<Known>) => unknown, options?: WorkflowOptions<Input>): Workflow<Input, Known>

@@ -269,7 +269,7 @@ If the database stops answering, a call of any of these stores fails after 8 sec
 
 To put the sessions, the cached and live values, the jobs, the schedule locks, the rate limit counts and the members of presence rooms and the Web Vitals of the whole app in one place, set `store` in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`, or `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications, push, kv }` with stores of your own. A session, a `cached` call, a queue, a schedule or a limit naming its own `store` keeps it.
 
-A flag, a marker or a ticket spent once lives in `store.kv`: `const flags = kv('my-app')` from `kay/server` gives `get`, `set(key, value, ttlMs?)`, `delete` and `once(key, ttlMs)`, which resolves `true` for one caller only, however many processes ask at once.
+A flag, a marker or a ticket spent once lives in `store.kv`: `const flags = kv('my-app')` from `kay/server` gives `get`, `set(key, value, ttl?)`, `delete` and `once(key, ttl)`, `ttl` a `Duration` such as `'10m'`, which resolves `true` for one caller only, however many processes ask at once.
 
 `sqliteData` and `pgData` fill it for every process of the app. Without them it is this process's memory, capped at 500 keys, and a store of your own is a `KvStore` with those four methods.
 

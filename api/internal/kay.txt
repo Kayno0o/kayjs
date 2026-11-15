@@ -1126,17 +1126,18 @@ function kv(namespace: string, store?: KvStore | undefined): Kv
 interface Kv
   delete: (key: string) => Promise<boolean>
   get: (key: string) => Promise<string | undefined>
-  once: (key: string, ttlMs: number) => Promise<boolean>
-  set: (key: string, value: string, ttlMs?: number | undefined) => Promise<void>
+  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => Promise<boolean>
+  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number | undefined) => Promise<void>
 
 [./library] KvStore
 interface KvStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (key: string) => MaybePromise<boolean>
+  durations?: true | undefined
   get: (key: string) => MaybePromise<string | undefined>
-  once: (key: string, ttlMs: number) => MaybePromise<boolean>
+  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => MaybePromise<boolean>
   ping?: (() => unknown) | undefined
-  set: (key: string, value: string, ttlMs?: number | undefined) => MaybePromise<void>
+  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number | undefined) => MaybePromise<void>
 
 [./library] lazily
 function lazily(guard: Guard | LazyGuard): Guard
@@ -1144,6 +1145,9 @@ function lazily(guard: Guard | LazyGuard): Guard
 [./library] LazyGuard
 interface LazyGuard
   load: () => Guard | Promise<Guard>
+
+[./library] lengthMs
+function lengthMs(value: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number, what?: string): number
 
 [./library] libraryCacheSlot
 function libraryCacheSlot(root: string, library: string, id: string, inputs: string): CacheSlot
@@ -1694,11 +1698,15 @@ interface AuthMailData
   detail?: string | undefined
   email: string
   locale: string
-  maxAge?: undefined | {
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: undefined | {
   link?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
   code?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
 }
   name: string
+  ttl?: undefined | {
+  link?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
+  code?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
+}
   url?: string | undefined
 
 [./library/auth-mails] AuthMailKind

@@ -1,7 +1,7 @@
 import type { Database, InferEntity } from '@kaynooo/pg-orm'
 import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OAuthClientRecord, OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
 import { defineTable } from '@kaynooo/pg-orm'
-import { durationSeconds } from 'kay/library'
+import { durationSeconds, lengthMs } from 'kay/library'
 import { log } from './log'
 
 // Each table keeps the `renamedFrom` of its pre-1.71 `auth_*` name for good, unlike a deprecated form: an app jumping several minors at once still gets its users renamed rather than empty tables beside them, and a rename finding no old table does nothing.
@@ -482,7 +482,7 @@ export function pgAuth(db: Database): AuthStore {
 
         // One statement, so two attempts at once both count: a window still open is raised, an ended one starts over.
         const [row] = await db.raw<{ count: number, reset_at: Date | string | number }>`
-          INSERT INTO "kay_attempts" ("key", "count", "reset_at") VALUES (${key}, ${weight}, ${new Date(now.getTime() + window)})
+          INSERT INTO "kay_attempts" ("key", "count", "reset_at") VALUES (${key}, ${weight}, ${new Date(now.getTime() + lengthMs(window))})
           ON CONFLICT ("key") DO UPDATE SET
             "count" = CASE WHEN "kay_attempts"."reset_at" > ${now} THEN "kay_attempts"."count" + ${weight} ELSE ${weight} END,
             "reset_at" = CASE WHEN "kay_attempts"."reset_at" > ${now} THEN "kay_attempts"."reset_at" ELSE EXCLUDED."reset_at" END

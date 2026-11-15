@@ -4,6 +4,8 @@ import type { PgHandle } from './pg-data'
 import type { Stop } from './pg-poll'
 import { PURGE_STALE_MS } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
+
+import { lengthMs } from '../runtime/store-base'
 import { wakeOf } from './pg-notify'
 import { closeWith, DB_TIMEOUT_MS, EVENT_TTL_MS, eventWindow, OVERLAP, POLL_MS, pollerOf, timeLimited } from './pg-poll'
 import { escaped, NOW, query, unescaped } from './pg-sql'
@@ -269,7 +271,7 @@ export function pgLive(pg: PgHandle): LiveStore {
     }),
     // One statement and one event for every row of the id still without an end.
     endAll: async (id, ttl) => write('dating', id, '', async (tx) => {
-      await query(tx, `UPDATE kay_live SET expires_at = ${NOW} + $2::bigint WHERE id = $1 AND expires_at IS NULL`, [escaped(id), Math.max(0, Math.round(ttl))])
+      await query(tx, `UPDATE kay_live SET expires_at = ${NOW} + $2::bigint WHERE id = $1 AND expires_at IS NULL`, [escaped(id), Math.max(0, Math.round(lengthMs(ttl, 'a live value\'s ttl')))])
     }, WHOLE_ID + escaped(id)),
     delete: async (id, key) => write('deleting', id, escaped(key), async tx => query(tx, 'DELETE FROM kay_live WHERE id = $1 AND key = $2', [escaped(id), escaped(key)])),
     subscribe(listener) {
