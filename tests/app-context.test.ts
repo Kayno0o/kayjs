@@ -125,7 +125,7 @@ describe('the app\'s src/context.ts', () => {
     const dir = await scratchDir('app-context-twice-')
     const other = resolve(dir, 'other.ts')
 
-    await Bun.write(other, 'import { defineContext } from \'kay/library\'\n\nexport default defineContext({ plan: () => \'x\' })\n')
+    await Bun.write(other, 'import { defineContext } from \'kay/server\'\n\nexport default defineContext({ plan: () => \'x\' })\n')
     useContexts(request, [app, other], false)
 
     let failure = ''

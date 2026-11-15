@@ -25,7 +25,7 @@ Write `src/context.ts` default-exporting `defineContext(load)`: no extension, no
 
 ```ts
 // src/context.ts
-import { defineContext } from 'kay/library'
+import { defineContext } from 'kay/server'
 
 export default defineContext(async (request: Request) => ({ plan: await planOf(request) }))
 ```
@@ -49,7 +49,7 @@ export function reports(): KayExtension {
 
 ```ts
 // src/context.ts
-import { defineContext } from 'kay/library'
+import { defineContext } from 'kay/server'
 
 export default defineContext({
   cartCount: async (request: Request) => countCart(request),

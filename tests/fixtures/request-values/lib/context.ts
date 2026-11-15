@@ -1,4 +1,4 @@
-import { defineContext } from 'kay/library'
+import { defineContext } from 'kay/server'
 import { loads } from './state'
 
 // The visitor is named by a header, standing in for a session.

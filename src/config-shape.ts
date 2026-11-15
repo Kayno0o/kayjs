@@ -104,6 +104,7 @@ const CONFIG: Record<keyof ConfigInput, Rule> = {
   preview: either(bool, bag(PREVIEW)),
   store: true,
   env: true,
+  envFiles: true,
   checks: true,
   extensions: list(obj),
 }

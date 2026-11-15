@@ -463,7 +463,7 @@ The type check is Bun's own (`bun check`), on every core, and runs even when you
 | --- | --- |
 | `--deny-warnings` | Fails on warnings too, not only on errors |
 | `--watch` | Checks again on every change to the project, a change to `.kay` files alone without a new process |
-| `--fix` | Applies the fixes that change nothing else, then reports what is left. With `env` in `kay.config.ts` it also declares raw `process.env` reads |
+| `--fix` | Applies the fixes that change nothing else, then reports what is left. With `envFiles` in `kay.config.ts` it also declares raw `process.env` reads |
 | `--dry-run` | Counts the fixes `--fix` would apply and writes nothing |
 | `--only <group>` | Reports one group's lints alone, such as `seo`, as an audit |
 | `--since <minor>` | Reports, and with `--fix` fixes, the `deprecated` lints that came in that minor, such as `1.46` |
@@ -608,7 +608,7 @@ A file that reads the environment on its own is left alone, with no warning: the
 
 A variable is left with its warning when a read assigns it, destructures it, sits in a `.kay` file or in a file that already has an `env`. Two things change. An empty value now takes the default, as `defineEnv` treats it as unset. And the files you read from now import the schema, which reads and checks the environment as it loads. `kay upgrade` does not do this.
 
-`--compose` can be given several times. The files are read relative to the project, and any `--compose` or `--example` replaces the `env` in `kay.config.ts` entirely. With neither, kay compares the production compose files at the project root (`compose*.yaml` and `docker-compose*.yaml`, leaving out a name with `dev`, `development`, `test`, `local` or `override` in it) and `.env.example`, those that exist. Set `env: false` in `kay.config.ts` to compare nothing.
+`--compose` can be given several times. The files are read relative to the project, and any `--compose` or `--example` replaces the `envFiles` in `kay.config.ts` entirely. With neither, kay compares the production compose files at the project root (`compose*.yaml` and `docker-compose*.yaml`, leaving out a name with `dev`, `development`, `test`, `local` or `override` in it) and `.env.example`, those that exist. Set `env: false` in `kay.config.ts` to compare nothing.
 
 A module under `src` that does not load is reported, and nothing is then called undeclared. A variable set to an empty string counts as not set.
 
@@ -618,7 +618,7 @@ Raw reads are found in one-line forms only: `process.env.X`, `process.env['X']`,
 
 ```ts
 export default {
-  env: { compose: 'compose.prod.yaml', example: '.env.example' },
+  envFiles: { compose: 'compose.prod.yaml', example: '.env.example' },
 }
 ```
 

@@ -48,7 +48,7 @@ async function definitionOf(file: string) {
   const { default: definition } = await importModule<{ default?: unknown }>(file)
 
   if (!isContextDefinition(definition))
-    throw new TypeError(`kay: ${file} is an extension's \`context\`, so it default-exports \`defineContext(load)\` from \`kay/library\``)
+    throw new TypeError(`kay: ${file} is an extension's \`context\`, so it default-exports \`defineContext(load)\` from \`kay/server\``)
 
   return definition
 }

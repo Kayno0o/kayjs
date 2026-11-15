@@ -132,7 +132,7 @@ A provider key such as kayjs-ai's `ANTHROPIC_API_KEY`, or the password in kayjs-
 
 A secret that compose or Swarm hands over as a file needs no code. Set `<NAME>_FILE` to its path, `API_KEY_FILE: /run/secrets/api_key` for `API_KEY`, and a string variable of `defineEnv` reads the file once as the server boots, trimmed of surrounding whitespace. Setting both the variable and the file, or naming a file that is missing or empty, stops the boot and says which; an optional field is left unset instead, with a warning naming the file.
 
-`kay env` lists the variables each library reads, and which of them production requires. Name your compose file and `.env.example` in `kay.config.ts` as `env: { compose: 'compose.prod.yaml', example: '.env.example' }`, and `kay check` compares them with what the project declares ([kay env](/reference/cli#kay-env)).
+`kay env` lists the variables each library reads, and which of them production requires. Name your compose file and `.env.example` in `kay.config.ts` as `envFiles: { compose: 'compose.prod.yaml', example: '.env.example' }`, and `kay check` compares them with what the project declares ([kay env](/reference/cli#kay-env)).
 
 ## Tabs open during a deploy
 

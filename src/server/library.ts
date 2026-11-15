@@ -47,6 +47,7 @@ export { openSqlite } from '../runtime/sqlite.server'
 export { parseEvents } from '../runtime/sse'
 export type { MaybePromise } from '../runtime/store-base'
 export { lengthMs } from '../runtime/store-base'
+// Deprecated since 1.105, removed in 1.108: an app and a library import `defineContext` from `kay/server`.
 export { defineContext } from '../runtime/template-context'
 export type { ContextDefinition } from '../runtime/template-context'
 export { acceptedLocales, matchLocale, validLocale } from './accept-language'

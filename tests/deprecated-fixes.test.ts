@@ -10,14 +10,17 @@ import { authRateLimits } from '../src/check/auth-rate-limits'
 import { clientKeys } from '../src/check/client-keys'
 import { cmsOptions } from '../src/check/cms-options'
 import { configSwitches } from '../src/check/config-switches'
+import { contextImport } from '../src/check/context-import'
+import { envFiles } from '../src/check/env-files'
 import { applySafeFixes } from '../src/check/fixes'
+
 import { formatDurationNumbers } from '../src/check/format-duration'
 
 import { guardOptions } from '../src/check/guard-options'
 import { hookContext } from '../src/check/hook-context'
+
 import { hookNames } from '../src/check/hook-names'
 import { imagesKeys } from '../src/check/images-keys'
-
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
 import { liveApi } from '../src/check/live-api'
 import { mailApi } from '../src/check/mail-api'
@@ -73,6 +76,8 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-pages-options': pagesOptions,
   'deprecated-ttl-names': ttlNames,
   'deprecated-store-ms': storeMs,
+  'deprecated-env-files': envFiles,
+  'deprecated-context-import': contextImport,
   'deprecated-package-names': async (root, options) => renamedPackages(root, options.lints),
   // Its fix is safe only in a project that lists kayjs-ui, where the new form comes from.
   'deprecated-mail-form': async (root, options) => {

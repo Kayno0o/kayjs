@@ -1,4 +1,4 @@
-import { defineContext } from 'kay/library'
+import { defineContext } from 'kay/server'
 import { loads } from './state'
 
 // The app's own context: a value that is a promise and one that changes per request, the visitor named by headers.

@@ -40,26 +40,28 @@ import { authRateLimits } from './auth-rate-limits'
 import { clientKeys } from './client-keys'
 import { cmsOptions } from './cms-options'
 import { configSwitches } from './config-switches'
+import { contextImport } from './context-import'
 import { ownFile } from './diagnose'
+
 import { endpointExports } from './endpoint-exports'
+import { envFiles } from './env-files'
 
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { formatDurationNumbers } from './format-duration'
 
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { guardOptions } from './guard-options'
-
 import { unguardedRoutes, unguardedTools } from './guards'
 import { hookContext } from './hook-context'
 import { hookNames } from './hook-names'
-import { imagesKeys } from './images-keys'
-import { islandOnlyComponents } from './island-only'
 
+import { imagesKeys } from './images-keys'
+
+import { islandOnlyComponents } from './island-only'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 
 import { largePublicImages } from './large-images'
 import { liveApi } from './live-api'
-
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
 import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
@@ -214,6 +216,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => storeMs(root, options),
   async ({ root, options }) => rateEnforce(root, options),
   async ({ root, options }) => authRateLimits(root, options),
+  async ({ root, options }) => envFiles(root, options),
+  async ({ root, options }) => contextImport(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

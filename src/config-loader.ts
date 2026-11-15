@@ -162,7 +162,9 @@ function refuseInvalidValues(config: object, where: string): void {
 
 // The keys `kay check` and `kay env` read in their own way, refused when they are not the shape they take.
 function checkedConfig(config: ConfigInput & InternalConfig, where = CONFIG_FILE): void {
-  const { checks, env, publicEnv } = config
+  const { checks, publicEnv } = config
+  const env = config.envFiles ?? config.env
+  const key = config.envFiles === undefined ? 'env' : 'envFiles'
 
   if (publicEnv !== undefined)
     throw new KayError('config-invalid', `kay: \`publicEnv\` in ${where} is gone: mark the fields an island reads \`s.Public\` in \`defineEnv\` instead`)
@@ -196,7 +198,7 @@ function checkedConfig(config: ConfigInput & InternalConfig, where = CONFIG_FILE
   const files = Array.isArray(compose) ? compose : [compose]
 
   if (typeof env !== 'object' || env === null || Array.isArray(env) || files.some(file => file !== undefined && typeof file !== 'string') || (example !== undefined && typeof example !== 'string'))
-    throw new KayError('config-invalid', `kay: \`env\` in ${where} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them), \`true\` or \`false\``)
+    throw new KayError('config-invalid', `kay: \`${key}\` in ${where} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them), \`true\` or \`false\``)
 }
 
 // The config with the catalogs of the libraries the app installs listed before its own extensions, so those and the app's messages win key by key; one an extension of the same name already brings is left alone.

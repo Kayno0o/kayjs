@@ -1,4 +1,4 @@
-import { defineContext } from 'kay/library'
+import { defineContext } from 'kay/server'
 import { loads } from './state'
 
 // Each key has a loader of its own, run for the pages reaching a template that reads it; the visitor is named by headers, standing in for a session and a cart.

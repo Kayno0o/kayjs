@@ -9,7 +9,7 @@ import { scratchDir } from './scratch'
 const TIMEOUT = 120_000
 const projects: string[] = []
 
-const CONTEXT = 'import { defineContext } from \'kay/library\'\n\nexport default defineContext({ inbox: () => true })\n'
+const CONTEXT = 'import { defineContext } from \'kay/server\'\n\nexport default defineContext({ inbox: () => true })\n'
 
 // An app installing a library whose package.json declares the `context` module its components read `ctx` by, with or without the extension in its config.
 async function project(config: string, component: string): Promise<string> {

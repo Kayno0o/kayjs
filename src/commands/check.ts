@@ -403,10 +403,11 @@ async function declareRawReads(root: string, problems: CheckDiagnostic[], format
   return problems.filter(problem => !declared.names.has(UNDECLARED_READ.exec(problem.message)?.[1] ?? ''))
 }
 
-// What `env` in kay.config.ts has compared: the declared variables against the compose and example files it names, else against the project's production compose files and `.env.example`; `env: false` compares nothing.
+// What `envFiles` in kay.config.ts has compared: the declared variables against the compose and example files it names, else against the project's production compose files and `.env.example`; `env: false` compares nothing.
 async function envProblems(root: string, config: KayConfig, scope: string[]): Promise<CheckDiagnostic[]> {
   const { compareEnv, defaultEnvFiles } = await import('./env-compare')
-  const files = config.env === false ? undefined : bagOf(config.env) ?? await defaultEnvFiles(root)
+  const setting = config.envFiles ?? config.env
+  const files = setting === false ? undefined : bagOf(setting) ?? await defaultEnvFiles(root)
 
   if (files === undefined)
     return []
