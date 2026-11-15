@@ -553,6 +553,22 @@ describe('kay check', () => {
     }
   }, 60_000)
 
+  it('reports the same props mistake at each line of an entry that makes it', async () => {
+    const copy = await fixtureCopy('content')
+    const entry = join(copy, 'src/content/posts/twice.md')
+
+    try {
+      await Bun.write(entry, '---\ntitle: Twice\ndate: 2026-01-01\n---\n\n<Counter start="2" />\n\nText\n\n<Counter start="3" />\n')
+
+      const found = (await check(copy, { site: SITE, lints: { seo: 'allow' } })).filter(({ file }) => file.endsWith('twice.md')).map(({ line }) => line)
+
+      expect(found).toEqual([6, 10])
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('reports a config that cannot be loaded after a run that left the props check, and recovers on the next', async () => {
     const copy = await fixtureCopy('content')
     const config = join(copy, 'src/content.config.ts')
