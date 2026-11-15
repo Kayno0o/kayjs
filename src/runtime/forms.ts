@@ -30,7 +30,7 @@ const style = (form: HTMLFormElement): CSSStyleDeclaration => Reflect.get(HTMLEl
 
 type Swapper = typeof import('./page-swap')
 
-// Tells an island's `listen(form, ...)` how the post goes, while the form is still the one on the page: `kay:action-start` (before the post, with the fields as `data`, for an optimistic change), then `kay:action-success` or `kay:action-error`.
+// Tells an island how the post goes, while the form is still the one on the page, through the hooks of its action (`onStart`, `onData`, `onError`) that listen to these events: `kay:action-start` (before the post, with the fields as `data`, for an optimistic change), then `kay:action-success` or `kay:action-error`.
 function announce(form: HTMLFormElement, type: 'start' | 'success' | 'error', detail: object): void {
   form.dispatchEvent(new CustomEvent(`kay:action-${type}`, { bubbles: true, detail }))
 }

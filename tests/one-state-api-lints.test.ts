@@ -166,3 +166,20 @@ it('leaves an island that has a navigation of its own to the app', async () => {
   expect(found).toBe(1)
   expect(fixable).toBe(0)
 })
+
+it('keeps listen imported when a template or another call still reads it, and leaves a nested rewritable call without a fix', async () => {
+  const root = await scratchDir('one-state-api-')
+  const file = join(root, 'src/part.kay')
+
+  await Bun.write(file, `---\nimport { listen } from 'kay'\n\nlisten(() => document, 'kay:navigate', () => 1)\n---\nbutton(onClick={() => listen(() => window, 'resize', () => 2)}) x\n`)
+
+  const found = await islandEvents(root, {})
+
+  await applySafeFixes(root, found)
+  expect(await Bun.file(file).text()).toContain(`import { listen, navigation } from 'kay'`)
+
+  const nested = await fixed(islandEvents, `import { listen } from 'kay'\nlisten(() => document, 'kay:navigate', () => {\n  listen(() => document, 'kay:navigate-start', () => 1)\n})\n`)
+
+  expect(nested.found).toBe(2)
+  expect(nested.fixable).toBe(0)
+})

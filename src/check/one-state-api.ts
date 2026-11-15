@@ -311,6 +311,7 @@ const EVENT_HOOKS: Record<string, { hook: string, method?: string }> = {
 }
 
 const KAY_EVENT = /kay:(?:navigate|action|consent|install)/
+const NAVIGATION = /\bnavigation\b/
 
 // `listen(() => document, 'kay:navigate', () => ...)`: a function written in place that takes no parameter, so nothing of the event the old form handed it is read.
 function rewritable(call: Call, source: string, base: number): boolean {
@@ -324,7 +325,7 @@ function rewritable(call: Call, source: string, base: number): boolean {
 // `listen(() => document, 'kay:navigate', fn)` in an island, where a function hook says the same: `navigation.onNavigate(fn)`, `action.onStart(fn)`, the `consent` signal. A plain script keeps its listener, as it has no island to hook into.
 // The swap's events are rewritten when the handler takes no parameter, as the hook hands an object of its own where the event handed `detail`; any other listener is reported with the hook to write.
 export async function islandEvents(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return scanned(root, options, 'deprecated-island-events', KAY_EVENT, ({ source, parsed, report }) => {
+  return scanned(root, options, 'deprecated-island-events', KAY_EVENT, ({ source, parsed, unparsed, report }) => {
     for (const { ast, base } of parsed) {
       const hits: { call: Call, event: string }[] = []
 
@@ -339,9 +340,11 @@ export async function islandEvents(root: string, options: CheckOptions): Promise
         continue
 
       const fixable = hits.filter(({ call, event }) => EVENT_HOOKS[event]!.method !== undefined && rewritable(call, source, base))
-      const own = mentions([ast], 'navigation') && !importsOf(ast, FROM_KAY, 'navigation').locals.has('navigation')
-      // `listen` leaves the import when every use of it is a call rewritten here.
-      const imports = own || fixable.length === 0 ? null : importEdits(ast, base, source, reads(ast, 'listen') === fixable.length ? ['listen'] : [], 'navigation')
+      const own = (mentions(parsed.map(one => one.ast), 'navigation') || NAVIGATION.test(unparsed)) && !importsOf(ast, FROM_KAY, 'navigation').locals.has('navigation')
+      // `listen` leaves the import when every use of it, in the other spans and the template too, is a call rewritten here; a call inside another's handler overlaps its edit, so none is rewritten.
+      const nested = fixable.some(({ call }) => fixable.some(other => other.call !== call && other.call.start >= call.start && other.call.end <= call.end))
+      const dropped = !LISTEN.test(unparsed) && parsed.every(one => one.ast === ast || reads(one.ast, 'listen') === 0) && reads(ast, 'listen') === fixable.length
+      const imports = own || nested || fixable.length === 0 ? null : importEdits(ast, base, source, dropped ? ['listen'] : [], 'navigation')
       const all = imports ? [...fixable.map(({ call, event }) => ({ start: base + call.start, end: base + call.end, text: `navigation.${EVENT_HOOKS[event]!.method}(${source.slice(base + call.arguments[2]!.start, base + call.arguments[2]!.end)})` })), ...imports] : null
 
       for (const { call, event } of hits) {
