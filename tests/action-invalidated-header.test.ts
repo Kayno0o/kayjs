@@ -27,13 +27,39 @@ describe('the keys a call invalidated, named on its answer', () => {
   })
 })
 
-describe('the keys an invalidate names, followed or not', () => {
-  it('reach the keys a call gathers, so a resource naming one as a tag hears it', async () => {
-    const { gatheringInvalidated } = await import('../src/server/live')
+describe('the keys an invalidate names', () => {
+  const named = async (asked: string[], run: (invalidate: (key: string) => void) => void) => {
+    const { gatheringInvalidated, askedKeys } = await import('../src/server/live')
     const { invalidate } = await import('../src/runtime/cache')
     const keys = new Set<string>()
+    const request = new Request('http://localhost/', { headers: { 'x-kay-tags': encodeURIComponent(JSON.stringify(asked)) } })
 
-    gatheringInvalidated(keys, () => invalidate('posts'))
-    expect([...keys]).toEqual(['posts'])
+    gatheringInvalidated(keys, () => run(invalidate), askedKeys(request))
+
+    return keys
+  }
+
+  it('reach the call only when its page asked for them, so a key it never named stays out', async () => {
+    expect([...await named(['posts'], invalidate => invalidate('posts'))]).toEqual(['posts'])
+    expect([...await named(['posts'], invalidate => invalidate('admin:1'))]).toEqual([])
+    expect([...await named([], invalidate => invalidate('posts'))]).toEqual([])
+  })
+
+  it('still give the header when 25 keys were named and 2 of them were asked for', async () => {
+    const keys = await named(['k3', 'k9'], (invalidate) => {
+      for (let index = 0; index < 25; index++)
+        invalidate(`k${index}`)
+    })
+    const headers = new Headers()
+
+    invalidatedHeader(keys, headers, true)
+    expect(JSON.parse(decodeURIComponent(headers.get(INVALIDATED)!))).toEqual(['k3', 'k9'])
+  })
+
+  it('ignore a tags header that does not read', async () => {
+    const { askedKeys } = await import('../src/server/live')
+
+    expect([...askedKeys(new Request('http://localhost/', { headers: { 'x-kay-tags': '%zz' } }))]).toEqual([])
+    expect([...askedKeys(new Request('http://localhost/', { headers: { 'x-kay-tags': encodeURIComponent('{"a":1}') } }))]).toEqual([])
   })
 })

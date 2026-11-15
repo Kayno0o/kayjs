@@ -242,6 +242,7 @@ describe('what a call does once it succeeded', () => {
       await stub()({})
       await settle()
       expect(refetched).toEqual(['posts'])
+      expect(sentHeaders[0]!['x-kay-tags']).toBe(encodeURIComponent('["posts"]'))
       expect(page).toHaveBeenCalledTimes(1)
       document.head.append(marker)
       await stub()({})

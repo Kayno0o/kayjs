@@ -10,6 +10,11 @@ export function watchTags(tags: readonly string[], refetch: () => void): () => v
   return () => void watchers.delete(watcher)
 }
 
+// The tags the resources of the page name now, each once.
+export function watchedTags(): string[] {
+  return [...new Set([...watchers].flatMap(watcher => watcher.tags))]
+}
+
 // Asks again every resource naming one of `keys`, and gives back the keys none of them names.
 export function refetchTagged(keys: readonly string[]): string[] {
   const named = new Set<string>()

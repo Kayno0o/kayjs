@@ -761,10 +761,10 @@ class Entry {
     this.publish()
   }
 
-  // `inFlight` asks even while a request runs, which then answers from before what a call changed.
+  // `inFlight` asks even while a request runs, which then answers from before what a call changed; replacing a first load, it shows a failure as that load would have.
   revalidate(staleMs = 0, inFlight = false): void {
     if ((inFlight || !this.busy) && this.asked !== undefined && !this.gone && Date.now() - this.answeredAt >= staleMs)
-      void this.load(this.asked, 'quiet')
+      void this.load(this.asked, this.status === 'loading' ? 'kept' : 'quiet')
   }
 
   // Follows the cached values the route's handler read, from the proof its answer carried, or lets go of them when it carried none.

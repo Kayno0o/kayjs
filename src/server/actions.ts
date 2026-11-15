@@ -46,7 +46,7 @@ import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
 import { handlerTiming } from './handler-timing'
 import { requestLocale, stateFor } from './i18n'
-import { gatheringInvalidated, invalidatedHeader } from './live'
+import { askedKeys, gatheringInvalidated, invalidatedHeader } from './live'
 import { answeringRequest } from './log'
 import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal, requestId } from './protection'
 import { sharedContext } from './render'
@@ -625,7 +625,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     // An async iterable is taken as it is, as awaiting one that is also a thenable, a model's reply, would read it to its end before it could stream.
     const handlerStart = options.serverTiming === true ? performance.now() : undefined
     const invalidated = new Set<string>()
-    const returned = gatheringInvalidated(invalidated, () => action.handler(context.body, ctx))
+    const returned = gatheringInvalidated(invalidated, () => action.handler(context.body, ctx), askedKeys(request))
     const result = isAsyncIterable(returned) ? returned : await returned
 
     if (handlerStart !== undefined)
@@ -643,7 +643,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // A call reads a stream as it comes; a plain form post or an agent gets its last value, as a handler returning it would.
     const streams = isAsyncIterable(result) && isCall(request) && !isAgentCall(request)
-    const answer = isAsyncIterable(result) ? await (streams ? started : lastOf)(gathering(result, invalidated), requestSignal(request)) : result
+    const answer = isAsyncIterable(result) ? await (streams ? started : lastOf)(gathering(result, invalidated, askedKeys(request)), requestSignal(request)) : result
 
     await countGoneThrough(action, request, context.server, options)
     await tellSuccess(lists, run, answer)

@@ -67,14 +67,14 @@ export async function started(source: AsyncIterable<unknown>, signal: AbortSigna
 }
 
 // The iterable, each step of it run as the handler's own, so the keys it invalidates while it streams reach `keys`.
-export function gathering(source: AsyncIterable<unknown>, keys: Set<string>): AsyncIterable<unknown> {
+export function gathering(source: AsyncIterable<unknown>, keys: Set<string>, asked: ReadonlySet<string>): AsyncIterable<unknown> {
   return {
     [Symbol.asyncIterator]: () => {
       const iterator = source[Symbol.asyncIterator]()
 
       return {
-        next: async () => gatheringInvalidated(keys, async () => iterator.next()),
-        return: async (value?: unknown) => gatheringInvalidated(keys, async () => await iterator.return?.(value) ?? { done: true, value }),
+        next: async () => gatheringInvalidated(keys, async () => iterator.next(), asked),
+        return: async (value?: unknown) => gatheringInvalidated(keys, async () => await iterator.return?.(value) ?? { done: true, value }, asked),
       }
     },
   }

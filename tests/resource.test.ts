@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join, relative } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { flush, root, signal } from '../src/runtime'
+import { ApiError } from '../src/runtime/api-error'
 import { API_MOUNT, resource } from '../src/runtime/live'
 import { hydrationEnded, hydrationStarted } from '../src/runtime/reactive'
 import { refetchTagged } from '../src/runtime/resource-tags'
@@ -664,5 +665,27 @@ describe('resource() in the browser', () => {
     expect(refetchTagged(['posts'])).toEqual(['posts'])
     await Bun.sleep(10)
     expect(answers).toBe(after)
+  })
+
+  it('shows the failure of a quiet refetch that replaced a first load still out', async () => {
+    const gate = Promise.withResolvers<string>()
+    let calls = 0
+    const found = root(() => resource(async (): Promise<string> => {
+      calls++
+
+      if (calls === 1)
+        return gate.promise
+
+      throw new ApiError(500, 'broke')
+    }, { tags: ['late'] }))
+
+    await until(() => calls === 1)
+    expect(found.status()).toBe('loading')
+    refetchTagged(['late'])
+    await until(() => found.status() === 'failed')
+    expect(found.error()?.status).toBe(500)
+    gate.resolve('old')
+    await Bun.sleep(10)
+    expect(found.status()).toBe('failed')
   })
 })

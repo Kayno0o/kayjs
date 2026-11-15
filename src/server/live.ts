@@ -11,7 +11,7 @@ import { kayLog } from '../runtime/log'
 import { PRESENCE_LIVE_ID } from '../runtime/presence'
 import { JOBS_LIVE_ID } from '../runtime/queue-jobs'
 import { currentServerScope } from '../runtime/reactive'
-import { INVALIDATED_HEADER } from '../runtime/swap'
+import { INVALIDATED_HEADER, TAGS_HEADER } from '../runtime/swap'
 import { decodeServerValue, encodeValue, unsendable } from '../runtime/wire'
 import { liveLimits } from './config-limits'
 import { isCrossSite } from './cross-site'
@@ -312,11 +312,27 @@ export function followsCaches(): boolean {
 }
 
 // The followed keys the invalidations of a run dropped, which an action's call answers with.
-const invalidating = new AsyncLocalStorage<Set<string>>()
+const invalidating = new AsyncLocalStorage<{ keys: Set<string>, asked: ReadonlySet<string> }>()
 
-// Runs `run`, gathering into `keys` the followed keys it invalidates.
-export function gatheringInvalidated<T>(keys: Set<string>, run: () => T): T {
-  return invalidating.run(keys, run)
+// Runs `run`, gathering into `keys` the followed keys it invalidates, and the others only when the page that called asked for them (`asked`).
+export function gatheringInvalidated<T>(keys: Set<string>, run: () => T, asked: ReadonlySet<string> = new Set()): T {
+  return invalidating.run({ keys, asked }, run)
+}
+
+// The most tags a call names, and the longest.
+const MAX_ASKED = 50
+
+// The keys a call's page asked to hear of: the tags of its resources, in a header; none for a call without one or with a header that does not read.
+export function askedKeys(request: Request): Set<string> {
+  try {
+    const sent = request.headers.get(TAGS_HEADER)
+    const tags: unknown = sent === null ? [] : JSON.parse(decodeURIComponent(sent))
+
+    return new Set(Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === 'string' && tag.length <= MAX_KEY_LENGTH).slice(0, MAX_ASKED) : [])
+  }
+  catch {
+    return new Set()
+  }
 }
 
 // Tells the browser the page leaves its refresh after a call to its live connection, for a page whose `liveRefresh` setting is `true`.
@@ -346,7 +362,12 @@ export function invalidatedText(keys: ReadonlySet<string>): string | undefined {
 }
 
 // A key an `invalidate` names is told to the call that made it, a followed one or not: a `resource` of the page naming it in its `tags` asks its route again.
-onKeyNamed(key => invalidating.getStore()?.add(key))
+onKeyNamed((key) => {
+  const gathering = invalidating.getStore()
+
+  if (gathering?.asked.has(key) === true)
+    gathering.keys.add(key)
+})
 
 // An invalidation, this process's or another's, tells the pages following what it dropped: each key gets the time, which only grows and is never before a read another process dated with a clock ahead of this one.
 onKeysInvalidated((matches) => {
@@ -356,7 +377,7 @@ onKeysInvalidated((matches) => {
     return []
 
   const at = stampNow()
-  const into = invalidating.getStore()
+  const into = invalidating.getStore()?.keys
 
   for (const key of stamped) {
     if (matches(key) || tagged.get(key)?.some(matches) === true) {

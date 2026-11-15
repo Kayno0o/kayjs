@@ -10,7 +10,8 @@ import { skew } from './build'
 import { invalidatedKeys } from './invalidated-keys'
 import { withKeepalive } from './keepalive'
 import { prefetched } from './navigation'
-import { FAILURE_HEADER, INVALIDATED_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
+import { watchedTags } from './resource-tags'
+import { FAILURE_HEADER, INVALIDATED_HEADER, PAGE_HEADER, REDIRECT_HEADER, TAGS_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { decodeServerValue } from './wire'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
@@ -26,6 +27,12 @@ export async function post<Output>(url: string, input: unknown, onProgress: (sen
   // A test or a script calling it has no page.
   if (typeof location !== 'undefined')
     sent[PAGE_HEADER] = location.pathname + location.search
+
+  // The answer names the keys of the resources' tags the handler invalidated, and no others the page never asked for.
+  const tags = watchedTags()
+
+  if (tags.length > 0)
+    sent[TAGS_HEADER] = encodeURIComponent(JSON.stringify(tags))
 
   // The timeout of a call counts for its first answer; a stream retried later is not cut by a timer that was cleared once the call returned.
   let first = true
