@@ -15,9 +15,9 @@ const KEY_VARIABLE = 'KAY_PROXY_KEY'
 const KEY_FILE_VARIABLE = 'KAY_PROXY_KEY_FILE'
 
 // The key the proxy sends: the `secret` of `proxy.key`, else `KAY_PROXY_KEY`, else the trimmed content of the file `KAY_PROXY_KEY_FILE` names; undefined when none gives a non-empty one.
-function proxyKeyValue(secret: Secret | undefined): string | undefined {
+function proxyKeyValue(secret: Secret | undefined, root: string): string | undefined {
   if (secret !== undefined)
-    return readSecret(secret)
+    return readSecret(secret, root)
 
   const file = process.env[KEY_FILE_VARIABLE]?.trim()
 
@@ -34,13 +34,13 @@ function isOpen(path: string, open: readonly string[]): boolean {
 // Refuses with 403 every request that does not carry the proxy's shared key in the header `proxy.key` names, so a process or a container reaching the port directly skips nothing the proxy does.
 // The `endpoint` is the MCP endpoint while `mcp.token` guards it: a POST to it carries its own credential, the bearer, and so skips the check.
 // Off under `kay dev`, in a static export, and outside production while no key is given (a warning says so, except in a test run); a production server with `key` and no key to compare with does not boot.
-export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => string | undefined) | undefined, endpoint?: string | undefined, logRefused?: ((request: Request, status: number) => void) | undefined, security?: Record<string, string> | undefined }): void {
+export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { root: string, dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => string | undefined) | undefined, endpoint?: string | undefined, logRefused?: ((request: Request, status: number) => void) | undefined, security?: Record<string, string> | undefined }): void {
   const header = proxy?.key?.header
 
   if (header === undefined || options.dev || options.exported)
     return
 
-  const secret = proxyKeyValue(proxy?.key?.secret)
+  const secret = proxyKeyValue(proxy?.key?.secret, options.root)
 
   if (secret === undefined) {
     const source = proxy?.key?.secret === undefined ? `${KEY_VARIABLE} or the file ${KEY_FILE_VARIABLE} names` : secretSource(proxy.key.secret)

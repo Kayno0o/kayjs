@@ -290,7 +290,7 @@ function hostsToAnswer(setting: SecurityConfig | boolean | undefined, site: stri
 }
 
 // Who the request is from and whether it may come: the proxy it came through, the server's own mark, the proxy key, the hosts, then the security headers on every answer.
-export function trustRequests({ app, env, options, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log, health }: Boot): void {
+export function trustRequests({ app, env, options, project, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log, health }: Boot): void {
   setRequestIdHeader(options.ops?.observe?.requestIdHeader)
   trustProxy(app, options.proxy)
   defaultCookies(app, cookieDefaults(options.security, env.base))
@@ -298,7 +298,7 @@ export function trustRequests({ app, env, options, served, security, filePaths, 
   app.onRequest(({ request }) => {
     receiveInternal(request)
   })
-  requireProxyKey(app, checkProxy(options.proxy), { dev: env.dev, exported: env.exported, base: env.base, health: health?.path, endpoint: mcpKey === undefined ? undefined : mcpAt, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log), security })
+  requireProxyKey(app, checkProxy(options.proxy), { root: setup.source.runtimeRoot(project.root), dev: env.dev, exported: env.exported, base: env.base, health: health?.path, endpoint: mcpKey === undefined ? undefined : mcpAt, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log), security })
   refuseForeignHosts(app, setup.site, security)
 
   const hosts = hostsToAnswer(options.security, setup.site, env)
@@ -385,7 +385,7 @@ export function identifyRequests({ app, env, setup: { client } }: Boot): void {
 }
 
 // kay's endpoints answered ahead of the extensions: the health check, the metrics and the public env, with the jobs page's path claimed. Returns the jobs page, served after the extensions whose values its guard reads.
-export function kayEndpoints({ app, env, options, served, lifecycle, health, metrics, security }: Boot, publicModules: string[]) {
+export function kayEndpoints({ app, env, options, project, setup, served, lifecycle, health, metrics, security }: Boot, publicModules: string[]) {
   if (health) {
     served.offer(health)
     // Before the extension servers, whose hooks it answers ahead of; it answers only where the claims, known once all are in, leave it the path.
@@ -400,7 +400,7 @@ export function kayEndpoints({ app, env, options, served, lifecycle, health, met
 
   if (metrics) {
     served.offer(metrics)
-    serveMetrics(app, { path: metrics.path, base: env.base, proxy: checkProxy(options.proxy), token: metricsOf(options.ops?.metrics)?.token, health: health?.path, holds: () => served.holds(metrics), connections: liveConnections })
+    serveMetrics(app, { root: setup.source.runtimeRoot(project.root), path: metrics.path, base: env.base, proxy: checkProxy(options.proxy), token: metricsOf(options.ops?.metrics)?.token, health: health?.path, holds: () => served.holds(metrics), connections: liveConnections })
   }
 
   if (options.publicEnv)

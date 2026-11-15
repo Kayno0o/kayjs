@@ -5,7 +5,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { resolveConfig } from '../src/config-resolve'
 import { invalidConfigValues, mergeBags, unknownConfigKeys } from '../src/config-shape'
-import { checkSecret, readSecret, secretVariables } from '../src/server/secret'
+import { checkSecret, readSecret } from '../src/server/secret'
 
 describe('readSecret', () => {
   it('reads a value, a variable and a file, trimmed, and nothing from an empty or missing one', async () => {
@@ -38,10 +38,21 @@ describe('readSecret', () => {
       expect(() => checkSecret(bad, 'x.secret')).toThrow('x.secret is a string')
   })
 
-  it('names the variables a config reads secrets from', () => {
-    expect(secretVariables({ proxy: { key: { header: 'h', secret: { env: 'A' } } }, mcp: { token: { env: 'B' } }, ops: { metrics: { token: { env: 'C' } } } })).toEqual(['A', 'B', 'C'])
-    expect(secretVariables({ proxy: { key: { header: 'h', secret: 's' } }, mcp: { token: true }, ops: {} })).toEqual([])
-    expect(secretVariables({ proxy: true })).toEqual([])
+  it('stands in for a secret that gives nothing while a build verifies the executable', () => {
+    process.env.KAY_BUILD_VERIFY = '1'
+
+    try {
+      const standIn = readSecret({ env: 'KAY_SECRET_UNSET' })
+
+      expect(standIn).toHaveLength(36)
+      expect(readSecret({ file: '/nowhere/secret' })).toBe(standIn)
+      expect(readSecret('given')).toBe('given')
+    }
+    finally {
+      delete process.env.KAY_BUILD_VERIFY
+    }
+
+    expect(readSecret({ env: 'KAY_SECRET_UNSET' })).toBeUndefined()
   })
 })
 

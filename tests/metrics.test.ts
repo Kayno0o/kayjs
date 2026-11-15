@@ -164,6 +164,12 @@ describe('metrics', () => {
     await expect(listening({ ops: { metrics: { token: 5 as never } } })).rejects.toThrow('metrics.token')
   })
 
+  it('refuses to boot with `token: true` and no KAY_METRICS_TOKEN', async () => {
+    delete process.env.KAY_METRICS_TOKEN
+
+    await expect(listening({ ops: { metrics: { token: true } } })).rejects.toThrow('KAY_METRICS_TOKEN')
+  })
+
   it('reads KAY_METRICS_TOKEN for `token: true`', async () => {
     const url = await listening({ ops: { metrics: { token: true } } }, { KAY_METRICS_TOKEN: TOKEN })
 

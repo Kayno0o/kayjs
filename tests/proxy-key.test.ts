@@ -75,6 +75,23 @@ describe('proxy.key', () => {
     }
   })
 
+  it('reads a relative `{ file }` secret from the project folder, wherever the process runs', async () => {
+    const name = `.kay-proxy-secret-${process.pid}`
+    const path = join(PRODUCTION, name)
+
+    await writeFile(path, `${KEY}\n`)
+
+    try {
+      const app = await served({}, { proxy: { key: { header: HEADER, secret: { file: name } } } })
+
+      expect(await status(app, '/contact', { [HEADER]: KEY })).toBe(200)
+      expect(await status(app, '/contact')).toBe(403)
+    }
+    finally {
+      await rm(path, { force: true })
+    }
+  })
+
   it('stops a production boot whose secret gives no key, and refuses a secret of another shape', async () => {
     await expect(served({}, { proxy: { key: { header: HEADER, secret: { env: 'UPSTREAM_SECRET' } } } })).rejects.toThrow('UPSTREAM_SECRET')
     await expect(served({}, { proxy: { key: { header: HEADER, secret: { file: '/nowhere/key' } } } })).rejects.toThrow('/nowhere/key')

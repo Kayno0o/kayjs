@@ -13,7 +13,7 @@ export interface SiteKeys {
 }
 
 // The keys of a test site. A site whose config sets `mcp.token` without a value gets a generated one, and a `proxy.key.secret` given as a value turns the check on for this site alone, the environment left as it is; `mcpKey` and `proxyKey` are the forms of before 1.105 and win over the config.
-export function siteKeys(loaded: KayConfig, options: Pick<TestOptions, 'mcpKey' | 'proxyKey' | 'browser' | 'dev'>): SiteKeys {
+export function siteKeys(loaded: KayConfig, options: Pick<TestOptions, 'mcpKey' | 'proxyKey' | 'browser' | 'dev'>, root: string): SiteKeys {
   const token = typeof loaded.mcp === 'object' ? loaded.mcp.token : undefined
   const asked = mcpKeySetting(loaded.mcp) !== undefined
   const generated = asked ? crypto.randomUUID() : undefined
@@ -29,13 +29,13 @@ export function siteKeys(loaded: KayConfig, options: Pick<TestOptions, 'mcpKey' 
       throw new Error('kay: testSite({ proxyKey }) and the `secret` of `proxy.key` need a non-empty key; send no key from a call with an empty header of the name `proxy.key` gives')
 
     if (options.dev === true)
-      throw new Error('kay: testSite({ proxyKey }) checks nothing with `dev: true`, as `kay dev` does not check the key')
+      throw new Error('kay: a proxy key (testSite({ proxyKey }) or the `secret` of `proxy.key`) checks nothing with `dev: true`, as `kay dev` does not check the key')
 
     if (options.browser !== undefined && options.browser !== false)
-      throw new Error('kay: testSite({ proxyKey }) does not reach `open()`, whose browser sends no proxy key header; test the key check without `browser`')
+      throw new Error('kay: a proxy key (testSite({ proxyKey }) or the `secret` of `proxy.key`) does not reach `open()`, whose browser sends no proxy key header; test the key check without `browser`')
   }
 
-  const configured = keyConfig?.secret === undefined ? undefined : readSecret(keyConfig.secret)
+  const configured = keyConfig?.secret === undefined ? undefined : readSecret(keyConfig.secret, root)
   const proxyKey = options.proxyKey === undefined ? configured : options.proxyKey.trim()
   const mcp = mcpKey !== undefined && loaded.mcp !== undefined && loaded.mcp !== false ? { mcp: { ...loaded.mcp === true ? {} : loaded.mcp, token: mcpKey } } : {}
   const proxy = options.proxyKey !== undefined && proxyKey !== undefined && keyConfig !== undefined && typeof loaded.proxy === 'object' ? { proxy: { ...loaded.proxy, key: { ...keyConfig, secret: proxyKey } } } : {}

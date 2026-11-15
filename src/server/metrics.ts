@@ -37,23 +37,31 @@ function environmentToken(): string | undefined {
   return token === undefined || token === '' ? undefined : token
 }
 
-// The token `metrics.token` gives, read once as the route is served; a setting that gives none stops the boot, as an open route would be the other way to read it. `true` and no setting read `KAY_METRICS_TOKEN` on each request.
-function configuredToken(setting: MetricsConfig['token']): string | undefined {
-  if (setting === undefined || setting === true)
+// The token `metrics.token` gives, read once as the route is served: `true` reads `KAY_METRICS_TOKEN`, and no setting reads it on each request. A setting that gives none stops a production server, as an open route would be the other way to read it; elsewhere a warning says so and a token no request can carry refuses every one.
+function configuredToken(setting: MetricsConfig['token'], root: string): string | undefined {
+  if (setting === undefined)
     return undefined
 
-  const secret = checkSecret(setting, 'metrics.token', '`true` to read KAY_METRICS_TOKEN')
-  const token = readSecret(secret)
+  const secret = setting === true ? undefined : checkSecret(setting, 'metrics.token', '`true` to read KAY_METRICS_TOKEN')
+  const token = secret === undefined ? environmentToken() : readSecret(secret, root)
 
-  if (token === undefined)
-    throw new KayError('config-invalid', `kay: metrics.token is set, which asks for a token read from ${secretSource(secret)}, and it gives none`)
+  if (token !== undefined)
+    return token
 
-  return token
+  const from = secret === undefined ? TOKEN_VARIABLE : secretSource(secret)
+
+  if (process.env.NODE_ENV === 'production')
+    throw new KayError('config-invalid', `kay: metrics.token is set, which asks for a token read from ${from}, and it gives none`)
+
+  if (process.env.NODE_ENV !== 'test')
+    kayLog('warn', `metrics.token is set but ${from} gives none, so the metrics route refuses every request; a production server would not boot`)
+
+  return crypto.randomUUID()
 }
 
 // Whether a request may read the metrics: with a token set (`token`, else `KAY_METRICS_TOKEN`), the one carrying it from anywhere, else only one that reached the socket from this machine or a private network and carries no mark of a proxy, so a reverse proxy forwarding the path for a visitor is refused.
-export function metricsAllowed(request: Request, address: string | undefined, proxy?: ProxyConfig, given?: string): boolean {
-  const token = given ?? environmentToken()
+export function metricsAllowed(request: Request, address: string | undefined, proxy?: ProxyConfig, configured?: string): boolean {
+  const token = configured ?? environmentToken()
 
   if (token !== undefined) {
     const given = request.headers.get('authorization')
@@ -72,9 +80,9 @@ function labelled(value: string): string {
 }
 
 // Counts the requests the server answered and writes them, with the jobs, the cache and the open connections, as the Prometheus text format.
-export function serveMetrics(app: Elysia, options: { path: string, base: string, proxy: ProxyConfig | undefined, token?: MetricsConfig['token'], health: string | undefined, holds: () => boolean, connections: () => number }): void {
+export function serveMetrics(app: Elysia, options: { root: string, path: string, base: string, proxy: ProxyConfig | undefined, token?: MetricsConfig['token'], health: string | undefined, holds: () => boolean, connections: () => number }): void {
   const started = Date.now()
-  const token = configuredToken(options.token)
+  const token = configuredToken(options.token, options.root)
   const requests = new Map<string, number>()
   const durations = new Map<string, Series>()
   const timing = new WeakMap<Request, { at: number, answered?: number }>()

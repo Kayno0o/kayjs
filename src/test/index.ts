@@ -241,7 +241,7 @@ async function siteOf(options: TestOptions): Promise<TestSite> {
 
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names, and so do the sessions, jobs, rate counts, presence rooms, vitals and notifications of its `store` (sessions only when it keeps them), its cached and live values staying in the process.
-  const { mcpKey, proxyKey, keyHeader, config: keys } = siteKeys(loaded, options)
+  const { mcpKey, proxyKey, keyHeader, config: keys } = siteKeys(loaded, options, root)
   const inBrowser = options.browser !== undefined && options.browser !== false
   // Without a store of files of its own, the site serves them from memory of its own, until it closes.
   const ownFiles = options.store?.files === undefined ? memoryFiles() : undefined

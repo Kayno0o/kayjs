@@ -24,7 +24,15 @@ export function checkSecret(value: unknown, name: string, or?: string): Secret {
   throw new KayError('config-invalid', `kay: ${name} is a string, \`{ env }\` naming the variable that holds it, or \`{ file }\` naming the file that does${or === undefined ? '' : `, or ${or}`}`)
 }
 
-// The text of a secret, trimmed, or undefined when it is empty, the variable unset or the file missing or unreadable. A relative `{ file }` resolves against `root`, the working directory by default.
+// What `kay build --compile --verify` sets in the executable it starts: the secrets live on the deploy host, so a throwaway one stands in for each that gives nothing here, as the health route the verify asks is open.
+export const VERIFY_VARIABLE = 'KAY_BUILD_VERIFY'
+const STAND_IN = crypto.randomUUID()
+
+export function verifying(): string | undefined {
+  return process.env[VERIFY_VARIABLE] === '1' ? STAND_IN : undefined
+}
+
+// The text of a secret, trimmed, or undefined when it is empty, the variable unset or the file missing or unreadable, a verify's stand-in apart. A relative `{ file }` resolves against `root`, the working directory by default.
 export function readSecret(secret: Secret, root: string = process.cwd()): string | undefined {
   let text: string | undefined
 
@@ -39,23 +47,13 @@ export function readSecret(secret: Secret, root: string = process.cwd()): string
       text = readFileSync(resolve(root, secret.file), 'utf8')
     }
     catch {
-      return undefined
+      return verifying()
     }
   }
 
   const trimmed = text?.trim()
 
-  return trimmed === undefined || trimmed === '' ? undefined : trimmed
-}
-
-// The environment variables the secrets of `proxy.key`, `mcp.token` and `metrics.token` name, which a build that starts the server stands in for.
-export function secretVariables(config: { proxy?: unknown, mcp?: unknown, ops?: { metrics?: unknown } | undefined }): string[] {
-  const named = (value: unknown): string[] => isRecord(value) && typeof value.env === 'string' ? [value.env] : []
-  const proxy = isRecord(config.proxy) && isRecord(config.proxy.key) ? config.proxy.key.secret : undefined
-  const mcp = isRecord(config.mcp) ? config.mcp.token : undefined
-  const metrics = isRecord(config.ops?.metrics) ? config.ops.metrics.token : undefined
-
-  return [proxy, mcp, metrics].flatMap(named)
+  return trimmed === undefined || trimmed === '' ? verifying() : trimmed
 }
 
 const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/

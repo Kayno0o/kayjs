@@ -6,7 +6,7 @@ import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { sameText } from './seal'
-import { checkSecret, readSecret } from './secret'
+import { checkSecret, readSecret, verifying } from './secret'
 
 const KEY_VARIABLE = 'KAY_MCP_KEY'
 const KEY_FILE_VARIABLE = 'KAY_MCP_KEY_FILE'
@@ -42,7 +42,8 @@ export function resolveMcpKey(setting: McpKeySetting, options: { root: string, p
     return given === undefined ? missing(setting.env, options.production) : checked(given, setting.env)
   }
 
-  return checked(readOrMake(resolve(options.root, setting.file)), `the file ${setting.file}`)
+  // A verify stands in for a file only the deploy host holds, and makes none.
+  return checked(verifying() ?? readOrMake(resolve(options.root, setting.file)), `the file ${setting.file}`)
 }
 
 // A token the setting names and the environment does not give: a production server stops, any other refuses every request.
