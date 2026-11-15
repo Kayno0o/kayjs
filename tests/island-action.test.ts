@@ -111,6 +111,42 @@ describe('the wire of an action', () => {
     expect(() => unflattenValue([{ run: 1 }, ['Action', 2], [3, 4], '/_kay/action/a/b', ['x']], serverWritten)).toThrow(/malformed/)
   })
 
+  it('reads a call of a `with` on the action itself, as the action\'s own state', async () => {
+    const real = globalThis.fetch
+    const { promise: reached, resolve: reach } = Promise.withResolvers<(response: Response) => void>()
+
+    globalThis.fetch = (async (_url: unknown) => new Promise<Response>((resolve) => {
+      reach(resolve)
+    })) as typeof fetch
+
+    try {
+      type Stub = ((input: object) => Promise<unknown>) & { pending: () => boolean, status: () => string, with: (fields: object) => Stub }
+      const stub = actionStub('/_kay/action/a/shared') as unknown as Stub
+      const fixed = stub.with({ a: 1 })
+      const call = (async () => {
+        try {
+          await fixed({})
+        }
+        catch {
+          // The answer is no devalue; the state around the call is what is looked at.
+        }
+      })()
+
+      const answer = await reached
+
+      expect([stub.pending(), fixed.pending(), fixed.with({ b: 2 }).pending()]).toEqual([true, true, true])
+
+      answer(new Response('"ok"'))
+      await call
+
+      expect([stub.pending(), fixed.pending()]).toEqual([false, false])
+      expect(fixed.status()).toBe(stub.status())
+    }
+    finally {
+      globalThis.fetch = real
+    }
+  })
+
   it('adds the fields of a `with` on a `with` to the fixed ones on a call, `track()` and a form, and drops `__proto__`', async () => {
     const bodies: string[] = []
     const real = globalThis.fetch
