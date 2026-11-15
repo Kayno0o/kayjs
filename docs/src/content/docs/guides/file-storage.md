@@ -73,6 +73,8 @@ The link is signed with a key made from the app's secret. See [The app secret](/
 
 A route of your own can answer with `files.response(key, request)` instead. Add `{ download: 'invoice.pdf' }` as a third argument to have the browser save the file under that name instead of showing it.
 
+A file of your own, one that is not in the store, goes through `fileAnswer(file, request, { attachment: 'été.pdf' })` from `kay/server`. It takes a `Blob` or a `Bun.file(path)`, answers the `Range` a video player or a download manager asks for, and `attachment` names the download (`true` for the file's own name). A name with accents, quotes or a line break is worded so the header stays valid.
+
 A link is `/_kay/files/<key>?until=<time>&sig=<signature>`. The signature covers the key and the time it expires, so changing either breaks it. A link stays valid for an hour, and `files.url(key, { ttl: '1d' })` makes it longer.
 
 The time is rounded up to the next ten minutes at most. Pages rendered a few minutes apart then give the same link, which the browser keeps cached.

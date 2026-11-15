@@ -2978,6 +2978,16 @@ interface FailedJob<Payload>
   id: string
   payload: Payload
 
+[./server] fileAnswer
+function fileAnswer(file: Blob, request: Request | undefined, options?: FileAnswerOptions): Response
+
+[./server] FileAnswerOptions
+interface FileAnswerOptions
+  attachment?: boolean | string | undefined
+  cacheControl?: string | undefined
+  headers?: Record<string, string> | undefined
+  type?: string | undefined
+
 [./server] FileHooks
 type FileHooks = Pick<FileStore, 'onWrite' | 'onDelete'>
 

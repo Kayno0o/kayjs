@@ -4,7 +4,7 @@ import type { StoreBase } from '../runtime/store-base'
 import type { AppStore } from './app-store'
 import type { Hook } from './hooks'
 import { chmod, lstat, mkdir, readdir, rm, stat } from 'node:fs/promises'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { fileEvents } from '../runtime/counters'
@@ -12,6 +12,7 @@ import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { randomId } from '../runtime/random-id'
+import { answer, attachmentHeader } from './file-answer'
 import { typeOfName } from './file-type'
 import { dispatch } from './hooks'
 import { dominantColor, imageColors } from './image-color'
@@ -86,7 +87,6 @@ const SIZED = /^(?:png|jpe?g|webp|gif|avif)$/
 const INLINE = /^(?:image\/(?:png|jpeg|webp|gif|avif)|video\/|audio\/|application\/pdf|text\/plain)/
 // An image keeps its type, so an SVG still shows in an `img`; any other downloaded file goes as bytes of no type, so a script or stylesheet never loads into one of the site's pages.
 const IMAGE = /^image\//
-const RANGE = /^bytes=(\d*)-(\d*)$/
 const TRAILING_SLASHES = /\/+$/
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const DEFAULT_EXPIRES = '1h'
@@ -177,7 +177,7 @@ export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefine
       // The key's extension decides how the bucket serves the object, never the uploader's declared type, so a page or SVG uploaded from a browser never runs from the bucket's public URL.
       const served = servedAs(key)
 
-      await bucket.write(key, data, { type: served.type, contentDisposition: served.inline ? 'inline' : attachment(key) })
+      await bucket.write(key, data, { type: served.type, contentDisposition: served.inline ? 'inline' : attachmentHeader(key) })
     },
     async read(key) {
       return await bucket.exists(key) ? bucket.file(key) : undefined
@@ -537,22 +537,6 @@ function servedAs(key: string): { type: string, inline: boolean } {
   return { type: inline || IMAGE.test(type) ? type : 'application/octet-stream', inline }
 }
 
-const PLAIN_NAME = /^[\w. -]+$/
-const UNSAFE_NAME_CHARACTER = /[^\x20-\x7E]|["\\%;]/g
-const RFC5987_RESERVED = /['()*]/g
-
-// A download's `content-disposition`: the name as it is when plain, else an ASCII fallback beside the exact name percent-encoded, so a quote or a non-ASCII character in a key never breaks the header.
-function attachment(key: string): string {
-  const name = basename(key)
-
-  if (PLAIN_NAME.test(name))
-    return `attachment; filename="${name}"`
-
-  const encoded = encodeURIComponent(name).replace(RFC5987_RESERVED, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)
-
-  return `attachment; filename="${name.replace(UNSAFE_NAME_CHARACTER, '_')}"; filename*=UTF-8''${encoded}`
-}
-
 // `own` finishes the headers of an answer from a route, which carries the context's headers itself.
 async function fileResponse(key: string, request: Request | undefined, cacheControl: string, own: (headers: Record<string, string>) => Record<string, string> = headers => headers, download?: string | boolean): Promise<Response> {
   const data = await (await activeStore()).read(key)
@@ -566,7 +550,7 @@ async function fileResponse(key: string, request: Request | undefined, cacheCont
   const headers: Record<string, string> = {
     'content-type': type,
     'x-content-type-options': 'nosniff',
-    'content-disposition': inline ? 'inline' : attachment(typeof download === 'string' && download !== '' ? download : key),
+    'content-disposition': inline ? 'inline' : attachmentHeader(typeof download === 'string' && download !== '' ? download : key),
     'cache-control': cacheControl,
   }
 
@@ -574,27 +558,7 @@ async function fileResponse(key: string, request: Request | undefined, cacheCont
   if (!inline)
     headers['content-security-policy'] = 'sandbox'
 
-  // An S3 object's size is only known by asking for it, so its file goes whole, streamed: Bun answers an S3 file given as the body with nothing.
-  const size = Number.isFinite(data.size) ? data.size : undefined
-
-  if (size === undefined)
-    return new Response(data.stream(), { headers: own(headers) })
-
-  headers['accept-ranges'] = 'bytes'
-
-  const range = RANGE.exec(request?.headers.get('range') ?? '')
-
-  if (!range)
-    return new Response(data, { headers: own(headers) })
-
-  // `bytes=-500` asks for the last 500 bytes.
-  const start = range[1] === '' ? Math.max(0, size - Number(range[2])) : Number(range[1])
-  const end = range[1] === '' || range[2] === '' ? size - 1 : Math.min(Number(range[2]), size - 1)
-
-  if (start > end || start >= size)
-    return new Response(null, { status: 416, headers: own({ ...headers, 'content-range': `bytes */${size}` }) })
-
-  return new Response(data.slice(start, end + 1), { status: 206, headers: own({ ...headers, 'content-range': `bytes ${start}-${end}/${size}` }) })
+  return answer(data, request, headers, own)
 }
 
 // The key's last segment says what the file is, so it is served with its type: the file's own extension, else its type's, else `bin`.
