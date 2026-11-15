@@ -54,7 +54,7 @@ function resolveClient(config: ConfigInput): KayConfig['client'] {
   const { offline, search, links } = config
   const moved = without({ offline, search, links })
 
-  return config.client === undefined && Object.keys(moved).length === 0 ? undefined : { ...moved, ...config.client }
+  return config.client === undefined && Object.keys(moved).length === 0 ? undefined : { ...moved, ...without(config.client ?? {}) }
 }
 
 // The config `kay.config.ts` wrote as the `KayConfig` the server reads: each list that a function gave loaded once, the old flat keys of `images`, the `onStart` hook and `observe`'s `onError` and `log` in the places they have since 1.105. Called as the config loads, so `kay dev` calls the functions again after a change to the file.

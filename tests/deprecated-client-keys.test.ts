@@ -1,8 +1,9 @@
 import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { clientKeys } from '../src/check/client-keys'
 import { applySafeFixes } from '../src/check/fixes'
+import { withConfig } from '../src/config-loader'
 import { resolveConfig } from '../src/config-resolve'
 import { invalidConfigValues, unknownConfigKeys } from '../src/config-shape'
 import { scratchDir } from './scratch'
@@ -68,11 +69,21 @@ describe('deprecated-client-keys', () => {
 describe('the old keys of the config', () => {
   it('are read as client keys, the one written in client winning', async () => {
     expect(await resolveConfig({ search: true, offline: true, links: { outside: 'same-tab' }, client: { offline: false, prefetch: false } })).toEqual({ client: { search: true, offline: false, links: { outside: 'same-tab' }, prefetch: false } })
+    expect(await resolveConfig({ search: true, client: { search: undefined, prefetch: false } })).toEqual({ client: { search: true, prefetch: false } })
     expect(await resolveConfig({ lang: 'en' })).toEqual({ lang: 'en' })
   })
 
   it('are checked in client, and the old place still is', () => {
     expect(unknownConfigKeys({ client: { search: true, links: { outsde: 'x' } }, offline: true })).toEqual(['`client.links.outsde`, did you mean `client.links.outside`?'])
     expect(invalidConfigValues({ client: { search: 'yes' }, search: 'yes' })).toHaveLength(2)
+  })
+})
+
+describe('a top-level offline in code options', () => {
+  it('reaches the loaded config as client.offline, whole', async () => {
+    const config = await withConfig(resolve('tests/fixtures/static'), { offline: { pages: ['/'], fallback: '/offline' } })
+
+    expect(config.client?.offline).toEqual({ pages: ['/'], fallback: '/offline' })
+    expect('offline' in config).toBe(false)
   })
 })
