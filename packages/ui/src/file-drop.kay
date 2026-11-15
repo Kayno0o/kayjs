@@ -5,6 +5,8 @@ import type { FieldSize } from './field-look'
 import { byteCount, listen, recipe, signal, uid } from 'kay'
 import { sizeText, wording } from 'kay/words'
 import { acceptsFile } from './accept'
+import type { FileRejection } from './file-limits'
+import { takeFiles } from './file-limits'
 import { FIELD_MESSAGE, GROUP_INVALID } from './field-look'
 import { linkChoice } from './choice-link'
 import { onFormReset, startRef } from './form-reset'
@@ -27,8 +29,6 @@ const look = recipe({
     issue: FIELD_MESSAGE.issue,
   },
 })
-
-type Reason = 'type' | 'size' | 'count'
 
 const { accept, multiple = false, paste = false, disabled = false, invalid, name, issue, size = 'md', maxSize, maxFiles, list = false, onFiles, onChange, onReject, content, chooseLabel = wording('ui.fileDrop.choose', 'Choose files'), dropLabel = wording('ui.fileDrop.drop', 'or drop them here'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The files the zone takes, as an `accept` attribute: the picker filters on it, and dropped or pasted files that miss it are ignored.
@@ -56,7 +56,7 @@ const { accept, multiple = false, paste = false, disabled = false, invalid, name
   // The files the zone keeps, after a pick, a removal or a form reset; only a zone that keeps its files calls it.
   onChange?: ((event: { files: File[] }) => unknown) | undefined
   // The files dropped or picked that were left out, with why: `type` for those missing `accept`, `size` for those past `maxSize`, `count` for the matching ones beyond `maxFiles` or, without `multiple`, the first. One call per reason; never called for pasted files, which may be anything on the clipboard.
-  onReject?: ((event: { files: File[], reason: Reason }) => unknown) | undefined
+  onReject?: ((event: { files: File[], reason: FileRejection }) => unknown) | undefined
   // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone. Left out, the zone shows a button opening the picker beside a line about dropping.
   content?: Snippet<[zone: { open: () => void, dragging: () => boolean }]> | undefined
   chooseLabel?: string | undefined
@@ -117,29 +117,21 @@ function keep(next: File[]) {
   onChange?.({ files: next })
 }
 
-function sameFile(a: File, b: File): boolean {
-  return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
-}
-
 function take(files: Iterable<File>, reporting = true): boolean {
   if (disabled)
     return false
 
-  const limit = sizeLimit()
-  const all = [...files]
-  const wrongType = all.filter(file => !acceptsFile(accept, file))
-  const typed = all.filter(file => !wrongType.includes(file))
-  const tooBig = typed.filter(file => file.size > limit)
-  // A file already kept is not added twice.
-  const fitting = typed.filter(file => file.size <= limit && !(multiple && keeping() && chosen().some(kept => sameFile(kept, file))))
-  const room = Math.max(0, (multiple ? maxFiles ?? Number.POSITIVE_INFINITY : 1) - (multiple && keeping() ? chosen().length : 0))
-  const taken = fitting.slice(0, room)
+  const adding = multiple && keeping()
+  const { taken, rejected } = takeFiles(files, {
+    accepts: file => acceptsFile(accept, file),
+    maxBytes: sizeLimit(),
+    room: (multiple ? maxFiles ?? Number.POSITIVE_INFINITY : 1) - (adding ? chosen().length : 0),
+    kept: adding ? chosen() : undefined,
+  })
 
   if (reporting) {
-    for (const [group, reason] of [[wrongType, 'type'], [tooBig, 'size'], [fitting.slice(room), 'count']] as [File[], Reason][]) {
-      if (group.length > 0)
-        onReject?.({ files: group, reason })
-    }
+    for (const group of rejected)
+      onReject?.(group)
   }
 
   if (taken.length === 0)

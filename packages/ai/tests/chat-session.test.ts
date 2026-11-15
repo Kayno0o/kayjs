@@ -185,7 +185,7 @@ test('a suggestion leaves the draft and the files as they were', async () => {
   const file = new File(['x'], 'a.png', { type: 'image/png' })
 
   session.draft.set('typing')
-  attachments.add([file])
+  attachments.take([file])
   await session.send('a suggestion')
 
   expect(session.draft()).toBe('typing')
@@ -197,7 +197,7 @@ test('a stop before the first word takes the message back to the field with its 
   const file = new File(['x'], 'a.png', { type: 'image/png' })
 
   session.draft.set('hi')
-  attachments.add([file])
+  attachments.take([file])
 
   const sent = session.send()
 
@@ -445,7 +445,7 @@ test('a reset stops the reply and clears the log, the field, the files and the s
   await session.send('hi')
   reply.send({ text: 'Half', calls: [{ id: 'c1', name: 'search', input: {}, status: 'running' }] })
   session.draft.set('typing')
-  attachments.add([new File(['x'], 'a.png', { type: 'image/png' })])
+  attachments.take([new File(['x'], 'a.png', { type: 'image/png' })])
   session.reset()
   flush()
 
@@ -623,7 +623,7 @@ test('files past a maxSize written with a unit are left out', () => {
   const attachments = createAttachments({ accepts: () => true, maxFiles: 2, maxSize: '1kb', tooBigLabel: 'too big', fullLabel: 'full', refusedLabel: 'refused' })
   const big = new File([new Uint8Array(2000)], 'big.png', { type: 'image/png' })
 
-  attachments.add([big])
+  attachments.take([big])
   expect(attachments.attached()).toEqual([])
   expect(attachments.problem()).toBe('too big')
 })

@@ -16,8 +16,8 @@ const LOCAL_HREF = /^(?:\/(?![/\\])|#)/
 export const REL_APART = 'nofollow ugc noopener'
 export const REL_HERE = 'nofollow ugc'
 
-// Whether a link of a reply or of the sources list opens in a new tab: all do, except a link of this site when the chat's `links` is `here`.
-export const opensApart = (href: string, here: boolean) => !(here && LOCAL_HREF.test(href))
+// Whether a link of a reply or of the sources list opens in a new tab, by the chat's `newTab`: `true` for every one, `false` for none, `'auto'` for those leading to another site, as kayjs-ui's links do.
+export const opensApart = (href: string, newTab: boolean | 'auto') => newTab === 'auto' ? !LOCAL_HREF.test(href) : newTab
 
 // Whether two lists name the same sources, so a stream's next snapshot repeating them leaves the chat's own list alone.
 export function sameSources(a: readonly Source[], b: readonly Source[]): boolean {

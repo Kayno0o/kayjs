@@ -4,4 +4,4 @@ import { reply } from './echoing.kay'
 import Chat from '@kayjs/ai/chat.kay'
 ---
 h1 Citing here
-Chat(action={reply} label="Assistant" links="here")
+Chat(action={reply} label="Assistant" newTab="auto")

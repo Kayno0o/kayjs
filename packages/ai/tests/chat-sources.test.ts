@@ -77,8 +77,10 @@ test('a citation is one to four digits without a leading zero: [01] and [12345] 
   expect(linkSources('<p>[01] [12345] [0] [9999]</p>', many)).toEqual({ html: '<p>[01] [12345] [0] <a href="/c">[9999]</a></p>', cited: [many[2]!] })
 })
 
-test('a link opens apart unless it is a path or an anchor of this site and the chat keeps them in place', () => {
-  expect([['/moon', true], ['#top', true], ['//evil.example', true], ['/\\evil.example', true], ['https://example.com', true], ['/moon', false]].map(([href, here]) => opensApart(href as string, here as boolean))).toEqual([false, false, true, true, true, true])
+test('a link opens apart by newTab: all of them for true, none for false, and only those leaving this site for auto', () => {
+  expect(['/moon', '#top', '//evil.example', '/\\evil.example', 'https://example.com'].map(href => opensApart(href, 'auto'))).toEqual([false, false, true, true, true])
+  expect(['/moon', 'https://example.com'].map(href => opensApart(href, true))).toEqual([true, true])
+  expect(['/moon', 'https://example.com'].map(href => opensApart(href, false))).toEqual([false, false])
 })
 
 test('two lists are the same sources when every number, title and address matches in order', () => {

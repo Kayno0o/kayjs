@@ -1,4 +1,5 @@
 import type { ByteSize } from 'kay/library'
+import { takeFiles } from '@kayjs/ui/lib/file-limits'
 import { byteCount, signal } from 'kay'
 
 const DEFAULT_MAX_SIZE = 5 * 1024 * 1024
@@ -27,8 +28,6 @@ export interface AttachmentLimits {
   readonly refusedLabel: string
 }
 
-const sameFile = (a: File, b: File) => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
-
 export const fileKey = (file: File) => `${file.name}\n${file.size}\n${file.lastModified}`
 
 // The files chosen for the next message, and why one was left out.
@@ -37,31 +36,23 @@ export function createAttachments(limits: AttachmentLimits) {
   const problem = signal<string | undefined>(undefined)
   const { accepts } = limits
 
-  // Files the picker, a drop or a paste gave, that fit the message: a file past `maxSize` or beyond `maxFiles` is left out and says so, and one already attached is not added twice.
-  function add(chosen: File[]) {
-    const largest = fileSizeLimit(limits.maxSize)
-    const sized = chosen.filter(file => file.size <= largest && !attached().some(known => sameFile(known, file)))
-    const taken = sized.slice(0, Math.max(0, limits.maxFiles - attached().length))
-
-    attached.set([...attached(), ...taken])
-
-    if (sized.length < chosen.length && chosen.some(file => file.size > largest))
-      problem.set(limits.tooBigLabel)
-    else if (taken.length < sized.length)
-      problem.set(limits.fullLabel)
-  }
-
   return {
     attached,
     problem,
     accepts,
-    add,
-    // The files of the picker or of a drop on the form: the kinds `accept` names are taken, and any other says so.
+    // The files of the picker, a drop or a paste, split as a FileDrop splits them: a file of a kind `accept` does not name, past `maxSize` or beyond `maxFiles` is left out and says so, and one already attached is not added twice.
     take(given: File[]) {
-      add(given.filter(accepts))
+      const { taken, rejected } = takeFiles(given, { accepts, maxBytes: fileSizeLimit(limits.maxSize), room: limits.maxFiles - attached().length, kept: attached() })
+      const reasons = new Set(rejected.map(item => item.reason))
 
-      if (given.some(file => !accepts(file)))
+      attached.set([...attached(), ...taken])
+
+      if (reasons.has('type'))
         problem.set(limits.refusedLabel)
+      else if (reasons.has('size'))
+        problem.set(limits.tooBigLabel)
+      else if (reasons.has('count'))
+        problem.set(limits.fullLabel)
     },
     remove(file: File) {
       attached.set(attached().filter(known => known !== file))
