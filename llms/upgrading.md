@@ -6,6 +6,8 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### An endpoint's declared context is checked
 
+An endpoint's `ctx: EndpointContext` and an `api()` module's `ctx.guard` are now typed from the file tree without a generic, so `ctx.params.x` for a param the file's name lacks, a `ctx.guard` field no guard above returns and a `ctx.query` field outside `page.query` are type errors in `kay check`.
+
 `kay check` holds the `EndpointContext<Params, Guard>` a handler declares to its file's params and the `_guard.ts` files above it: a param the file has not, or a guard field no guard returns, is a type error. Declare what the guards return, or `any` as the guard type, where a guard fills `locals` instead; a file listing `guards` of its own is not checked.
 ### `links`, `offline` and `search` are keys of `client`
 

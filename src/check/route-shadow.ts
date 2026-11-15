@@ -1,10 +1,11 @@
 // The shadow of a plain .ts route file, which a component has by being compiled: an endpoint's `EndpointContext` and an API module's `api()` are typed from the file tree, so the app writes no generic.
-import type { PropertyKey } from 'oxc-parser'
+import type { Expression, ObjectExpression, PropertyKey } from 'oxc-parser'
+import type { Program } from '../compiler/estree'
 import type { Mapping } from '../compiler/mapping'
 import type { ApiModule } from '../server/api-modules'
 import type { Endpoint } from '../server/routes'
 import type { ShadowFile } from './shadow'
-import { dirname, join, relative } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { SCRIPT_FILE } from '../build/files'
 import { SourceMap } from '../compiler'
 import { parseProgram } from '../compiler/estree'
@@ -75,6 +76,22 @@ function renamedImport(program: ReturnType<typeof parseProgram>['program'], modu
   return undefined
 }
 
+function leavesProject(program: Program, root: string, file: string): boolean {
+  return program.body.some((statement) => {
+    const specifier = 'source' in statement && statement.source !== null && statement.source !== undefined ? statement.source.value : undefined
+
+    return typeof specifier === 'string' && specifier.startsWith('.') && relative(root, resolve(dirname(file), specifier)).startsWith('..')
+  })
+}
+
+// The object literal of `{ ... } as const` or `{ ... } satisfies X`, or of itself.
+function pageObject(node: Expression): ObjectExpression | undefined {
+  if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression')
+    return pageObject(node.expression)
+
+  return node.type === 'ObjectExpression' ? node : undefined
+}
+
 function propertyName(key: PropertyKey): unknown {
   if (key.type === 'Identifier')
     return key.name
@@ -89,8 +106,8 @@ function declaresQuery(program: ReturnType<typeof parseProgram>['program']): boo
       continue
 
     for (const declarator of statement.declaration.declarations) {
-      if (declarator.id.type === 'Identifier' && declarator.id.name === 'page' && declarator.id.typeAnnotation == null && declarator.init?.type === 'ObjectExpression')
-        return declarator.init.properties.some(property => property.type === 'Property' && !property.computed && propertyName(property.key) === 'query')
+      if (declarator.id.type === 'Identifier' && declarator.id.name === 'page' && declarator.id.typeAnnotation == null && declarator.init !== null)
+        return pageObject(declarator.init)?.properties.some(property => property.type === 'Property' && !property.computed && propertyName(property.key) === 'query') ?? false
     }
   }
 
@@ -103,6 +120,11 @@ export function routeShadow(root: string, file: string, source: string, { guards
     return undefined
 
   const { program } = parseProgram(source, { lang: 'ts', recover: true })
+
+  // `rootDirs` merges only paths inside the project, so an import leaving it would resolve from the shadow's deeper folder.
+  if (leavesProject(program, root, file))
+    return undefined
+
   const shadow = routeShadowPath(root, file)
   const specifier = (target: string) => {
     const path = relative(dirname(shadow), target).replace(SCRIPT_FILE, '').split('\\').join('/')

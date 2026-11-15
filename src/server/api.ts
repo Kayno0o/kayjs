@@ -810,7 +810,7 @@ export interface ApiOptions {
 type ApiRequest<Guarded extends object> = ApiLocals & { guard: Guarded, once: Once }
 
 // An Elysia instance for a module under `src/api` whose handlers read what the app's `derive` and `resolve` add, typed through `Register` as `ctx.locals` is, and `ctx.guard` and `ctx.once` as a page does.
-// What the module's own `guards` return is typed from the option; `Guarded` names what the guards above the module return, `api<{ org: Org }>()`, an assertion kay does not check, as a library guard's locals are.
+// What the module's own `guards` return is typed from the option; `Guarded` names what the guards above the module return, `api<{ org: Org }>()`, which the editor needs and `kay check` types from the file tree when it is left out.
 export function api<Guarded extends object = object, const Own extends GuardOption | readonly Guard[] | boolean | undefined = GuardOption | boolean | undefined>(options: Omit<ApiOptions, 'guards'> & { guards?: Own } = {}): KayPlugin<ApiRequest<Guarded & OwnGuardValues<Own>>> {
   const instance = new Elysia()
 

@@ -201,11 +201,13 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
     const shadow = files.get(diagnostic.file)
     const diagnosed = shadow && diagnoseShadow(shadow, tsgoDiagnostic(diagnostic, shadow.tsx), levelsOf(shadow), keys)
 
-    if (shadow ? !diagnosed || (shadow.route === true && !shownOutsideKay(tsgoCode(diagnostic), projectUnused)) : !shownOutsideKay(tsgoCode(diagnostic), projectUnused))
+    const unshown = !shownOutsideKay(tsgoCode(diagnostic), projectUnused)
+
+    if (shadow ? !diagnosed || (shadow.route === true && unshown) : unshown)
       continue
 
     const mapped: CheckDiagnostic = shadow && diagnosed
-      ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help, ...diagnosed.fixes && { fixes: diagnosed.fixes } }
+      ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help ?? (shadow.route === true ? helped(diagnostic).help : undefined), ...diagnosed.fixes && { fixes: diagnosed.fixes } }
       : { ...diagnostic, ...helped(diagnostic) }
     const generated = generatedProblem(root, mapped, types, content)
 

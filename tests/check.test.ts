@@ -3393,6 +3393,36 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     }
   })
 
+  it('reports a shadowed route file at its own line and column, whichever way it imports the context', async () => {
+    const guard = 'import { guard } from \'kay\'\n\nexport default guard(() => ({ org: \'acme\' }))\n'
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p hi\n',
+      'src/routes/orgs/_guard.ts': guard,
+      'src/routes/orgs/plain.json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext) {\n  const n: number = \'x\'\n\n  return Response.json([n, ctx.guard.org])\n}\n',
+      'src/routes/orgs/alias.json.ts': 'import type { EndpointContext as Ctx } from \'kay\'\n\nexport function GET(ctx: Ctx) {\n  return Response.json(ctx.guard.nobody)\n}\n',
+      'src/routes/orgs/inline.json.ts': 'import { type EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext) {\n  return Response.json(ctx.guard.nobody)\n}\n',
+      'src/routes/orgs/explicit.json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext<Record<string, never>>) {\n  return Response.json(ctx.guard.org.length)\n}\n',
+      'src/routes/orgs/satisfies.json.ts': 'import { s } from \'kay\'\nimport type { EndpointContext } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Number() }) } as const\n\nexport function GET(ctx: EndpointContext) {\n  return Response.json(ctx.query.size)\n}\n',
+      'src/routes/orgs/outside.json.ts': 'import type { EndpointContext } from \'kay\'\nimport { gone } from \'../../../../../gone\'\n\nexport function GET(ctx: EndpointContext) {\n  return Response.json([gone, ctx.guard.nobody])\n}\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code?.startsWith('TS')).map(d => [relative(root, d.file), d.line, d.column, d.message]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+
+      expect(found).toEqual([
+        ['src/routes/orgs/alias.json.ts', 4, 34, expect.stringContaining('nobody')],
+        ['src/routes/orgs/inline.json.ts', 4, 34, expect.stringContaining('nobody')],
+        ['src/routes/orgs/outside.json.ts', 2, 22, expect.stringContaining('gone')],
+        ['src/routes/orgs/outside.json.ts', 5, 41, expect.stringContaining('nobody')],
+        ['src/routes/orgs/plain.json.ts', 4, 9, expect.stringContaining('string')],
+        ['src/routes/orgs/satisfies.json.ts', 7, 34, expect.stringContaining('size')],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('checks the endpoints of an extension and reports a guard without a default export once', async () => {
     const lib = await scratchDir('check-lib-')
     const root = await scratchProject({
