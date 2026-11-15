@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.105.0
 
+### Secrets are one shape
+
+`deprecated-secret-keys` (`kay check --fix`) renames `mcp: { key }` to `mcp: { token }` and writes `proxy: { key: 'x-upstream-key' }` as `proxy: { key: { header: 'x-upstream-key' } }`; the old keys work until 1.108. The loaded `KayConfig` has `mcp.token` and `proxy.key` as `{ header, secret? }` only, so code reading `config.mcp.key` or a string `config.proxy.key` reads the new fields. A secret is a string, `{ env: 'NAME' }` or `{ file: 'path' }`. One behaviour changes with the rename: `mcp.key: { file }` read `KAY_MCP_KEY` first, and `mcp.token: { file }` reads the file alone (`token: true` still reads the environment). `testSite({ mcpKey, proxyKey })` still work until 1.108 and `kay check` reports them: set `config: { mcp: { token }, proxy: { key: { secret } } }` instead, by hand.
+
 ### An endpoint's declared context is checked
 
 An endpoint's `ctx: EndpointContext` and an `api()` module's `ctx.guard` are now typed from the file tree without a generic, so `ctx.params.x` for a param the file's name lacks, a `ctx.guard` field no guard above returns and a `ctx.query` field outside `page.query` are type errors in `kay check`.

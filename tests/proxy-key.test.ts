@@ -53,8 +53,44 @@ async function status(app: Awaited<ReturnType<typeof pages>>, path: string, head
 }
 
 describe('proxy.key', () => {
-  it('sends the security headers with its 403', async () => {
+  it('reads the key from `secret`: a value, a variable or a file, whatever KAY_PROXY_KEY holds', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-proxy-key-'))
+
+    try {
+      await writeFile(join(dir, 'key'), `${KEY}\n`)
+
+      for (const secret of [KEY, { env: 'UPSTREAM_SECRET' }, { file: join(dir, 'key') }]) {
+        process.env.UPSTREAM_SECRET = KEY
+
+        const app = await served({ KAY_PROXY_KEY: 'o'.repeat(40) }, { proxy: { key: { header: HEADER, secret } } })
+
+        expect(await status(app, '/contact', { [HEADER]: KEY })).toBe(200)
+        expect(await status(app, '/contact', { [HEADER]: 'o'.repeat(40) })).toBe(403)
+        expect(await status(app, '/contact')).toBe(403)
+      }
+    }
+    finally {
+      delete process.env.UPSTREAM_SECRET
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('stops a production boot whose secret gives no key, and refuses a secret of another shape', async () => {
+    await expect(served({}, { proxy: { key: { header: HEADER, secret: { env: 'UPSTREAM_SECRET' } } } })).rejects.toThrow('UPSTREAM_SECRET')
+    await expect(served({}, { proxy: { key: { header: HEADER, secret: { file: '/nowhere/key' } } } })).rejects.toThrow('/nowhere/key')
+    await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER, secret: 5 as never } } })).rejects.toThrow('proxy.key.secret')
+    await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER, secret: { env: 'A', file: 'b' } } } })).rejects.toThrow('proxy.key.secret')
+  })
+
+  it('still takes the header as a string, the form of before 1.105', async () => {
     const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER } })
+
+    expect(await status(app, '/contact', { [HEADER]: KEY })).toBe(200)
+    expect(await status(app, '/contact')).toBe(403)
+  })
+
+  it('sends the security headers with its 403', async () => {
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } } })
     const refused = await app.handle(new Request('http://localhost/'))
 
     expect(refused.status).toBe(403)
@@ -63,7 +99,7 @@ describe('proxy.key', () => {
   })
 
   it('refuses a request without the key, or with another, and serves the right one', async () => {
-    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER } })
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } } })
 
     expect(await status(app, '/')).toBe(403)
     expect(await status(app, '/', { [HEADER]: 'wrong' })).toBe(403)
@@ -79,7 +115,7 @@ describe('proxy.key', () => {
 
   it('logs a refused request like any other, under the id its 403 carries, without the key header', async () => {
     const lines: LogEntry[] = []
-    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER }, observe: {
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } }, observe: {
       log: (entry) => {
         lines.push(entry)
       },
@@ -96,14 +132,14 @@ describe('proxy.key', () => {
   })
 
   it('logs nothing for a refusal while requests are not logged, and still sends the id', async () => {
-    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER }, observe: { log: false } })
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } }, observe: { log: false } })
 
     expect((await app.handle(new Request('http://localhost/'))).headers.get('x-request-id')).toBeTruthy()
   })
 
   it('leaves the health route open, wherever the app puts it', async () => {
-    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER } })
-    const moved = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER }, health: { path: '/up' } })
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } } })
+    const moved = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } }, health: { path: '/up' } })
 
     expect(await status(app, '/_kay/health')).toBe(200)
     expect(await status(moved, '/up')).toBe(200)
@@ -111,7 +147,7 @@ describe('proxy.key', () => {
   })
 
   it('leaves the paths of open open, and what is under them, not a path that starts like them', async () => {
-    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER, open: ['/api/push/'] } })
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER }, open: ['/api/push/'] } })
 
     expect(await status(app, '/api/push')).not.toBe(403)
     expect(await status(app, '/api/push/')).not.toBe(403)
@@ -123,7 +159,7 @@ describe('proxy.key', () => {
   })
 
   it('reads the paths after the base, whether the proxy took it off or not', async () => {
-    const app = await served({ KAY_PROXY_KEY: KEY }, { base: '/docs', proxy: { key: HEADER, open: ['/api/push'] } })
+    const app = await served({ KAY_PROXY_KEY: KEY }, { base: '/docs', proxy: { key: { header: HEADER }, open: ['/api/push'] } })
 
     expect(await status(app, '/_kay/health')).toBe(200)
     expect(await status(app, '/docs/_kay/health')).not.toBe(403)
@@ -139,7 +175,7 @@ describe('proxy.key', () => {
     try {
       await writeFile(join(dir, 'key'), `${KEY}\n`)
 
-      const app = await served({ KAY_PROXY_KEY_FILE: join(dir, 'key') }, { proxy: { key: HEADER } })
+      const app = await served({ KAY_PROXY_KEY_FILE: join(dir, 'key') }, { proxy: { key: { header: HEADER } } })
 
       expect(await status(app, '/')).toBe(403)
       expect(await status(app, '/', { [HEADER]: KEY })).not.toBe(403)
@@ -156,7 +192,7 @@ describe('proxy.key', () => {
       await writeFile(join(dir, 'empty'), '\n')
 
       for (const env of [{}, { KAY_PROXY_KEY: '  ' }, { KAY_PROXY_KEY_FILE: join(dir, 'empty') }, { KAY_PROXY_KEY_FILE: join(dir, 'none') }])
-        await expect(served(env, { proxy: { key: HEADER } })).rejects.toThrow('KAY_PROXY_KEY')
+        await expect(served(env, { proxy: { key: { header: HEADER } } })).rejects.toThrow('KAY_PROXY_KEY')
     }
     finally {
       await rm(dir, { recursive: true })
@@ -164,8 +200,8 @@ describe('proxy.key', () => {
   })
 
   it('is off outside production without a key, and under kay dev', async () => {
-    const test = await served({ NODE_ENV: 'test' }, { proxy: { key: HEADER } })
-    const dev = await served({ NODE_ENV: 'development', KAY_PROXY_KEY: KEY }, { dev: true, proxy: { key: HEADER } })
+    const test = await served({ NODE_ENV: 'test' }, { proxy: { key: { header: HEADER } } })
+    const dev = await served({ NODE_ENV: 'development', KAY_PROXY_KEY: KEY }, { dev: true, proxy: { key: { header: HEADER } } })
 
     expect(await status(test, '/')).not.toBe(403)
     expect(await status(dev, '/')).not.toBe(403)
@@ -182,7 +218,7 @@ describe('proxy.key', () => {
 
       try {
         // The sink is read at boot, before the app's own `log` replaces it.
-        await served({ NODE_ENV }, { proxy: { key: HEADER } })
+        await served({ NODE_ENV }, { proxy: { key: { header: HEADER } } })
 
         return messages.some(message => message.includes('proxy.key is set'))
       }
@@ -196,10 +232,10 @@ describe('proxy.key', () => {
   })
 
   it('refuses a setting that names no header, or open without a key', async () => {
-    await expect(served({}, { proxy: { key: 'bad header' } })).rejects.toThrow('proxy.key')
+    await expect(served({}, { proxy: { key: { header: 'bad header' } } })).rejects.toThrow('proxy.key')
     await expect(served({}, { proxy: { hops: 1, open: ['/x'] } })).rejects.toThrow('proxy.open')
-    await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER, open: ['/'] } })).rejects.toThrow('proxy.open')
-    await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER, open: ['x'] } })).rejects.toThrow('proxy.open')
-    await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER, hops: 1, header: 'x-real-ip' } })).rejects.toThrow('kay: proxy')
+    await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER }, open: ['/'] } })).rejects.toThrow('proxy.open')
+    await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER }, open: ['x'] } })).rejects.toThrow('proxy.open')
+    await expect(served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER }, hops: 1, header: 'x-real-ip' } })).rejects.toThrow('kay: proxy')
   })
 })

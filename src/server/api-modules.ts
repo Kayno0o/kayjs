@@ -3,6 +3,7 @@ import type { KayConfig } from '../config'
 import type { RateLimit } from '../runtime/action'
 import type { RateWindowMs } from './config-limits'
 import type { RouteMount } from './routes'
+import type { Secret } from './secret'
 import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
 import { TS_FILE } from '../build/files'
@@ -56,8 +57,8 @@ export interface McpConfig {
   path?: string | undefined
   // The most requests one client may send the endpoint in a window, `{ max: 120, window: '1m' }` by default, or `false` for no limit; a tool call also meets the limits of the action or route it calls.
   rateLimit?: Omit<RateLimit, 'key'> | boolean | undefined
-  // Requires this key as a bearer token (`Authorization: Bearer <key>`) on the endpoint and so on every tool call, compared in constant time, for an agent that holds a static key instead of signing in: `true` reads `KAY_MCP_KEY`, else the file `KAY_MCP_KEY_FILE` names; a string is the key; `{ file }` reads the environment, else that file, made with a random key on first use. At least 16 characters, read once at boot. A production server with `true` and no key does not boot; elsewhere every request is refused. With the key set the endpoint is open to `proxy.key`'s check, as the bearer is its credential.
-  key?: boolean | string | { file: string } | undefined
+  // Requires this token as a bearer token (`Authorization: Bearer <token>`) on the endpoint and so on every tool call, compared in constant time, for an agent that holds a static key instead of signing in: `true` reads `KAY_MCP_KEY`, else the file `KAY_MCP_KEY_FILE` names; a string is the token; `{ env }` names the variable that holds it; `{ file }` the file, made with a random token on first use. At least 16 characters, read once at boot. A production server with a token it cannot read does not boot; elsewhere every request is refused. With a token set the endpoint is open to `proxy.key`'s check, as the bearer is its credential.
+  token?: true | Secret | undefined
   // What the server tells a model about itself on `initialize`, as the MCP spec's `instructions`: guidance spanning tools, such as which to call first, that no single tool's description carries.
   instructions?: string | undefined
 }

@@ -33,10 +33,8 @@ import { runStopHooks, shutdown } from '../server/lifecycle'
 import { forgetStamps } from '../server/live'
 import { loaderRoot } from '../server/loader'
 import { tapLogs } from '../server/log'
-import { mcpKeySetting } from '../server/mcp-key'
 import { memoryNotifications } from '../server/notifications'
-import { checkProxy, memoryRates } from '../server/protection'
-import { withProxyKey } from '../server/proxy-key'
+import { memoryRates } from '../server/protection'
 import { setPushLoose } from '../server/push-settings'
 import { drainQueues, memoryJobs } from '../server/queue'
 import { sendFrom } from '../server/rewrite'
@@ -56,6 +54,7 @@ import { readPage, settledHtml, sitemapUrls } from './page'
 import { testRoot } from './root'
 import { actionsOf, formUrl, renderedStamp } from './site-actions'
 import { apiOf } from './site-api'
+import { siteKeys } from './site-keys'
 import { mcpOf } from './site-mcp'
 import { ORIGIN, withDefaults } from './site-scope'
 import { socketsOf } from './site-socket'
@@ -242,34 +241,18 @@ async function siteOf(options: TestOptions): Promise<TestSite> {
 
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names, and so do the sessions, jobs, rate counts, presence rooms, vitals and notifications of its `store` (sessions only when it keeps them), its cached and live values staying in the process.
-  const mcpKey = options.mcpKey ?? (mcpKeySetting(loaded.mcp) === undefined ? undefined : crypto.randomUUID())
+  const { mcpKey, proxyKey, keyHeader, config: keys } = siteKeys(loaded, options)
+  const inBrowser = options.browser !== undefined && options.browser !== false
   // Without a store of files of its own, the site serves them from memory of its own, until it closes.
   const ownFiles = options.store?.files === undefined ? memoryFiles() : undefined
 
   if (ownFiles !== undefined)
     setSiteFiles(ownFiles)
 
-  const config = { ...loaded, ...mcpKey !== undefined && loaded.mcp !== undefined && loaded.mcp !== false && { mcp: { ...loaded.mcp === true ? {} : loaded.mcp, key: mcpKey } }, site: loaded.site ?? ORIGIN, store: testStore(loaded.store, options.store) }
+  const config = { ...loaded, ...keys, site: loaded.site ?? ORIGIN, store: testStore(loaded.store, options.store) }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false, devRoutes: config.dev === true })
-  const inBrowser = options.browser !== undefined && options.browser !== false
   // The client as a browser loads it, built for real: the stylesheets and island bundles pages link.
   const realClient = inBrowser || options.styles === true
-  const proxyKey = options.proxyKey?.trim()
-  const keyHeader = proxyKey === undefined ? undefined : checkProxy(config.proxy)?.key
-
-  if (proxyKey !== undefined) {
-    if (proxyKey === '')
-      throw new Error('kay: testSite({ proxyKey }) needs a non-empty key; send no key from a call with an empty header of the name `proxy.key` gives')
-
-    if (keyHeader === undefined)
-      throw new Error('kay: testSite({ proxyKey }) needs the app to set `proxy.key` in kay.config.ts, the header the key travels in')
-
-    if (config.dev === true)
-      throw new Error('kay: testSite({ proxyKey }) checks nothing with `dev: true`, as `kay dev` does not check the key')
-
-    if (inBrowser)
-      throw new Error('kay: testSite({ proxyKey }) does not reach `open()`, whose browser sends no proxy key header; test the key check without `browser`')
-  }
 
   if (realClient || options.islands !== false)
     assertKayWritable(root)
@@ -280,7 +263,7 @@ async function siteOf(options: TestOptions): Promise<TestSite> {
   const browser = typeof options.browser === 'object' ? options.browser : {}
   const jar = cookieJar()
   const boot = async (): Promise<Awaited<ReturnType<typeof servePages>>> => buildingTestSite(jar.cookies, async () => servePages(project, () => client, true))
-  const pages = await (proxyKey === undefined ? boot() : withProxyKey(proxyKey, boot))
+  const pages = await boot()
   const locals = options.locals
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)

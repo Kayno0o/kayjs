@@ -13,8 +13,8 @@ const locals = (request: Request) => ({ key: request.headers.get('authorization'
 // No `mcp`: a library calls actions as tools in-process whether or not the app serves the endpoint.
 const site = await testSite({ root: 'tests/fixtures/library-tools', islands: false, locals })
 const mounted = await testSite({ root: 'tests/fixtures/library-tools', islands: false, base: '/shop', trailingSlash: 'always', locals })
-// A library's call is the visitor's own, so an endpoint guarded by `mcp.key` asks it nothing and the visitor's Authorization still reaches the action.
-const keyed = await testSite({ root: 'tests/fixtures/library-tools', islands: false, locals, mcp: { key: true } })
+// A library's call is the visitor's own, so an endpoint guarded by `mcp.token` asks it nothing and the visitor's Authorization still reaches the action.
+const keyed = await testSite({ root: 'tests/fixtures/library-tools', islands: false, locals, mcp: { token: true } })
 const localized = await testSite({ root: 'tests/fixtures/library-tools', islands: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
 
 // Imported once a site loads `.kay` modules.

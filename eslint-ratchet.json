@@ -261,7 +261,7 @@
     "max-lines-per-function": 173
   },
   "src/test/index.ts": {
-    "max-lines-per-function": 246
+    "max-lines-per-function": 234
   },
   "src/test/network.ts": {
     "max-lines-per-function": 365

@@ -25,6 +25,7 @@ import type { PageHook } from './server/page-hook'
 import type { PluginInput } from './server/plugin'
 import type { Redirects } from './server/redirects'
 import type { Rewrite } from './server/rewrite'
+import type { Secret } from './server/secret'
 import type { Prefetch } from './server/speculation'
 import type { TraceExtractor, Tracer } from './server/trace'
 
@@ -313,6 +314,8 @@ export interface JobsConfig {
 
 export interface MetricsConfig {
   path?: string | undefined
+  // The bearer token a scrape must send, from anywhere: `true` reads `KAY_METRICS_TOKEN`, a string is the token, `{ env }` names the variable and `{ file }` the file that holds it. Left out it is `KAY_METRICS_TOKEN` when that is set; with no token only a request from this machine or a private network that no proxy forwarded is answered.
+  token?: true | Secret | undefined
 }
 
 export interface HealthConfig {
@@ -352,6 +355,11 @@ export interface CookieDefaults {
 }
 
 // `hops` or `header`, not both, and with `key` alone one proxy is in front: read only from a request coming from this machine or a private network, so a client reaching the server directly cannot forge it.
+export interface ProxyKey {
+  header: string
+  secret?: Secret | undefined
+}
+
 export interface ProxyConfig {
   // The proxies that each append to `X-Forwarded-For`: 1 for nginx or Caddy alone, 2 for Cloudflare then nginx.
   hops?: number | undefined
@@ -361,8 +369,8 @@ export interface ProxyConfig {
   trusted?: string[] | undefined
   // `false` trusts the `trusted` ranges alone, instead of this machine and private networks too: for a server whose private neighbours are not all its proxies. Goes with `trusted`.
   trustPrivate?: false | undefined
-  // The header the proxy sends with a key it shares with the server, such as `x-upstream-key`: a request without it, or with another value, is refused with 403, so a process or a container reaching the port directly skips nothing the proxy does. The key is read from `KAY_PROXY_KEY`, else from the file `KAY_PROXY_KEY_FILE` names, and compared in constant time. Off under `kay dev` and outside production without a key; a production server with none does not boot.
-  key?: string | undefined
+  // The key the proxy shares with the server, sent in the header `header` names, such as `{ header: 'x-upstream-key' }`: a request without it, or with another value, is refused with 403, so a process or a container reaching the port directly skips nothing the proxy does. `secret` is the key, `{ env }` or `{ file }`; left out it is read from `KAY_PROXY_KEY`, else from the file `KAY_PROXY_KEY_FILE` names. Compared in constant time. Off under `kay dev` and outside production without a key; a production server with none does not boot.
+  key?: ProxyKey | undefined
   // Paths, and what is under them, that need no key besides the health route: `['/api/push']`, read after the base is taken off.
   open?: string[] | undefined
 }
@@ -658,7 +666,7 @@ export type ConfigCors = Omit<CorsOptions, 'origins' | 'credentials'> & ({ origi
 type Over<Bag, Given> = Omit<Bag, keyof Given> & Given
 
 // What `kay.config.ts` may write: `KayConfig` with each list that may come from a CMS or a database loadable, and the keys of before 1.105 `kay check --fix` rewrites. Kay turns it into a `KayConfig` as it loads.
-export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'robots' | 'redirects' | 'i18n' | 'assets' | 'ops'> {
+export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'mcp' | 'robots' | 'redirects' | 'i18n' | 'assets' | 'ops'> {
   /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */
   onStart?: AppHooks['onListen']
   /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */
@@ -689,10 +697,17 @@ export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'prox
   ops?: Over<OpsConfig, { observe?: ObserveInput | undefined }> | undefined
   cors?: ConfigCors | undefined
   security?: boolean | Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined }> | undefined
-  proxy?: boolean | number | Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined }> | undefined
+  proxy?: boolean | number | Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined, key?: ProxyKey | string | undefined }> | undefined
+  mcp?: boolean | (McpConfig & DeprecatedMcp) | undefined
   robots?: boolean | Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined, allow?: Loadable<string[]> | undefined }> | undefined
   redirects?: Loadable<Redirects> | undefined
   i18n?: I18nInput | undefined
+}
+
+// `mcp` as an app written it before 1.105 may still: `key` is `token`, which works until 1.108.
+export interface DeprecatedMcp {
+  /** @deprecated Written `token`; `deprecated-secret-keys` rewrites it. Removed in 1.108. */
+  key?: boolean | string | { file: string } | undefined
 }
 
 // `i18n` as an app written it before 1.105 may still: `defaultLocale`, `prefixDefault` and `domains`, each of which works until 1.108.

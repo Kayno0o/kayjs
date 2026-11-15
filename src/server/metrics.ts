@@ -1,12 +1,14 @@
 import type { Elysia } from 'elysia'
 import type { MetricsConfig, ProxyConfig } from '../config'
 import process from 'node:process'
+import { KayError } from '../compiler/errors'
 import { cacheReads, fileEvents, jobRuns, pageRoutes, queueRuns, sessionEvents } from '../runtime/counters'
 import { kayLog } from '../runtime/log'
 import { routerPath } from './base'
 import { pathOf, statusOf } from './log'
 import { fromPrivateNetwork } from './protection'
 import { sameText } from './seal'
+import { checkSecret, readSecret, secretSource } from './secret'
 
 export const METRICS_PATH = '/metrics'
 const TOKEN_VARIABLE = 'KAY_METRICS_TOKEN'
@@ -29,15 +31,29 @@ interface Series {
 }
 
 // The bearer token the scrape must carry when `KAY_METRICS_TOKEN` is set.
-function metricsToken(): string | undefined {
+function environmentToken(): string | undefined {
   const token = process.env[TOKEN_VARIABLE]?.trim()
 
   return token === undefined || token === '' ? undefined : token
 }
 
-// Whether a request may read the metrics: with `KAY_METRICS_TOKEN` set, the one carrying it from anywhere, else only one that reached the socket from this machine or a private network and carries no mark of a proxy, so a reverse proxy forwarding the path for a visitor is refused.
-export function metricsAllowed(request: Request, address: string | undefined, proxy?: ProxyConfig): boolean {
-  const token = metricsToken()
+// The token `metrics.token` gives, read once as the route is served; a setting that gives none stops the boot, as an open route would be the other way to read it. `true` and no setting read `KAY_METRICS_TOKEN` on each request.
+function configuredToken(setting: MetricsConfig['token']): string | undefined {
+  if (setting === undefined || setting === true)
+    return undefined
+
+  const secret = checkSecret(setting, 'metrics.token', '`true` to read KAY_METRICS_TOKEN')
+  const token = readSecret(secret)
+
+  if (token === undefined)
+    throw new KayError('config-invalid', `kay: metrics.token is set, which asks for a token read from ${secretSource(secret)}, and it gives none`)
+
+  return token
+}
+
+// Whether a request may read the metrics: with a token set (`token`, else `KAY_METRICS_TOKEN`), the one carrying it from anywhere, else only one that reached the socket from this machine or a private network and carries no mark of a proxy, so a reverse proxy forwarding the path for a visitor is refused.
+export function metricsAllowed(request: Request, address: string | undefined, proxy?: ProxyConfig, given?: string): boolean {
+  const token = given ?? environmentToken()
 
   if (token !== undefined) {
     const given = request.headers.get('authorization')
@@ -48,7 +64,7 @@ export function metricsAllowed(request: Request, address: string | undefined, pr
   if (address === undefined || !fromPrivateNetwork(address))
     return false
 
-  return !FORWARDED_HEADERS.some(name => request.headers.has(name)) && [proxy?.header, proxy?.key].every(name => name === undefined || !request.headers.has(name))
+  return !FORWARDED_HEADERS.some(name => request.headers.has(name)) && [proxy?.header, proxy?.key?.header].every(name => name === undefined || !request.headers.has(name))
 }
 
 function labelled(value: string): string {
@@ -56,8 +72,9 @@ function labelled(value: string): string {
 }
 
 // Counts the requests the server answered and writes them, with the jobs, the cache and the open connections, as the Prometheus text format.
-export function serveMetrics(app: Elysia, options: { path: string, base: string, proxy: ProxyConfig | undefined, health: string | undefined, holds: () => boolean, connections: () => number }): void {
+export function serveMetrics(app: Elysia, options: { path: string, base: string, proxy: ProxyConfig | undefined, token?: MetricsConfig['token'], health: string | undefined, holds: () => boolean, connections: () => number }): void {
   const started = Date.now()
+  const token = configuredToken(options.token)
   const requests = new Map<string, number>()
   const durations = new Map<string, Series>()
   const timing = new WeakMap<Request, { at: number, answered?: number }>()
@@ -125,7 +142,7 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
   // Known once every claim is in: an app file at the path keeps it, and kay serves nothing there.
   app.onStart(() => {
     if (options.holds())
-      warnMetricsOpen(options.proxy)
+      warnMetricsOpen(options.proxy, token)
   })
 
   // Answered as the request arrives, before routing, like the health route, so no extension's hook stands between a collector and the answer.
@@ -138,7 +155,7 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
       return undefined
     }
 
-    if (!metricsAllowed(request, (server)?.requestIP(request)?.address, options.proxy))
+    if (!metricsAllowed(request, (server)?.requestIP(request)?.address, options.proxy, token))
       return new Response('Forbidden\n', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } })
 
     return new Response(request.method === 'HEAD' ? null : lines(), { headers: { 'content-type': 'text/plain; version=0.0.4; charset=utf-8', 'cache-control': 'no-store' } })
@@ -186,8 +203,8 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
 }
 
 // No token: any peer on a private network reads the metrics, and a proxy on this host that forwards the path without a mark of its own reads as a collector.
-function warnMetricsOpen(proxy: ProxyConfig | undefined): void {
-  if (metricsToken() === undefined)
+function warnMetricsOpen(proxy: ProxyConfig | undefined, token: string | undefined): void {
+  if (token === undefined && environmentToken() === undefined)
     kayLog('warn', `metrics is read by any request from this machine or a private network that carries no proxy mark${proxy === undefined ? '' : ', and a proxy is set: do not forward its path'}; set ${TOKEN_VARIABLE} so only a request with the token is answered`)
 }
 

@@ -9,6 +9,7 @@ import { appHooks } from '../src/check/app-hooks'
 import { authRateLimits } from '../src/check/auth-rate-limits'
 import { clientKeys } from '../src/check/client-keys'
 import { cmsOptions } from '../src/check/cms-options'
+import { configGroups } from '../src/check/config-groups'
 import { configSwitches } from '../src/check/config-switches'
 import { contextImport } from '../src/check/context-import'
 import { envFiles } from '../src/check/env-files'
@@ -20,6 +21,7 @@ import { guardOptions } from '../src/check/guard-options'
 import { hookContext } from '../src/check/hook-context'
 
 import { hookNames } from '../src/check/hook-names'
+import { i18nKeys } from '../src/check/i18n-keys'
 import { imagesKeys } from '../src/check/images-keys'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
 import { liveApi } from '../src/check/live-api'
@@ -29,6 +31,7 @@ import { pagesOptions } from '../src/check/pages-options'
 import { rateEnforce } from '../src/check/rate-enforce'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
+import { secretKeys } from '../src/check/secret-keys'
 import { sourceReaders } from '../src/check/source-readers'
 import { storeMs } from '../src/check/store-ms'
 import { storeNames } from '../src/check/store-names'
@@ -71,6 +74,9 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-config-switch': configSwitches,
   'deprecated-images-keys': imagesKeys,
   'deprecated-client-keys': clientKeys,
+  'deprecated-config-groups': configGroups,
+  'deprecated-i18n-keys': i18nKeys,
+  'deprecated-secret-keys': secretKeys,
   'deprecated-app-hooks': appHooks,
   'deprecated-hook-context': hookContext,
   'deprecated-pages-options': pagesOptions,

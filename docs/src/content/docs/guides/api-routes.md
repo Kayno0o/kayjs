@@ -174,21 +174,21 @@ Guidance that spans tools, such as which one to call first, goes in `mcp: { inst
 
 ### Guarding the endpoint with a key
 
-An agent on your own machine can hold a static key instead of signing in. Set `mcp: { key: true }` and every request to the endpoint must send `Authorization: Bearer <key>`. Kay reads the key from `KAY_MCP_KEY`, or from the file `KAY_MCP_KEY_FILE` names, such as a container secret. A request without it, or with another, is refused with 401 before anything is read, and the tools it would have listed stay unseen.
+An agent on your own machine can hold a static key instead of signing in. Set `mcp: { token: true }` and every request to the endpoint must send `Authorization: Bearer <token>`. Kay reads the token from `KAY_MCP_KEY`, or from the file `KAY_MCP_KEY_FILE` names, such as a container secret. A request without it, or with another, is refused with 401 before anything is read, and the tools it would have listed stay unseen.
 
 ```ts
 export default defineConfig({
-  mcp: { key: { file: 'data/mcp-key' } },
+  mcp: { token: { file: 'data/mcp-key' } },
 })
 ```
 
-With `{ file }`, kay makes a random key in that file the first time the server starts, readable by its owner alone, and the environment still wins when it is set. A string is the key itself, for one your own code reads from somewhere else. A key is at least 16 characters and is read when the server starts, so a new key takes a restart.
+With `{ file }`, kay makes a random key in that file the first time the server starts, readable by its owner alone. `{ env: 'AGENT_TOKEN' }` reads another variable, and a string is the token itself, for one your own code reads from somewhere else. A key is at least 16 characters and is read when the server starts, so a new key takes a restart.
 
 A relative `{ file }` is read from the project folder, and from the folder the server runs in when it is a compiled executable, so `data/mcp-key` sits next to the app's other data. An absolute path is used as it is.
 
-A production server with `key: true` and no key does not start. Elsewhere it refuses every request and logs a warning that names the variables. Behind `proxy.key`, the endpoint needs no entry in `proxy.open`, because the bearer is its credential. The tool a call runs does not receive the key as its `Authorization`.
+A production server with `token: true` or `{ env }` and no token does not start. Elsewhere it refuses every request and logs a warning that names the variables. Behind `proxy.key`, the endpoint needs no entry in `proxy.open`, because the bearer is its credential. The tool a call runs does not receive the key as its `Authorization`.
 
-The key is the only way in: with `mcp.key` set, an OAuth token from kayjs-auth is refused at the endpoint. Prefer a generated key, which `{ file }` makes, over a short one you choose, because a caller on your own network can retry as often as the rate limit lets it.
+The key is the only way in: with `mcp.token` set, an OAuth token from kayjs-auth is refused at the endpoint. Prefer a generated key, which `{ file }` makes, over a short one you choose, because a caller on your own network can retry as often as the rate limit lets it.
 
 ### Routes as tools
 
@@ -273,7 +273,7 @@ An agent fills in no form, so `honeypot`, `minTime` and `proofOfWork` do not app
 
 ### Telling a tool call apart
 
-A tool call reaches your app as a request, with the caller's `Authorization` header (unless the endpoint has an `mcp.key`, which is not passed on, and which makes this guard unnecessary). A front guard that only lets a local agent's key through can tell the two apart with `toolCall` from `kay/server`.
+A tool call reaches your app as a request, with the caller's `Authorization` header (unless the endpoint has an `mcp.token`, which is not passed on, and which makes this guard unnecessary). A front guard that only lets a local agent's key through can tell the two apart with `toolCall` from `kay/server`.
 
 ```ts
 import { guard } from 'kay'

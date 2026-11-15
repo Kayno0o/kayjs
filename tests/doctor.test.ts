@@ -293,7 +293,7 @@ describe('kay doctor', () => {
     })
 
     it('takes KAY_PROXY_KEY_FILE for the proxy key a production server with proxy.key needs', async () => {
-      const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, proxy: { key: "x-upstream-key" } }\n' })
+      const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, proxy: { key: { header: "x-upstream-key" } } }\n' })
       const production = { NODE_ENV: 'production' }
 
       expect((await doctor(root, [], production)).check('env').message).toContain('KAY_PROXY_KEY')
@@ -301,9 +301,9 @@ describe('kay doctor', () => {
       expect((await doctor(root, [], { ...production, KAY_PROXY_KEY: 'k' })).check('env').ok).toBe(true)
     })
 
-    it('takes KAY_MCP_KEY_FILE for the key a production server with mcp.key asks for, and asks nothing for { file }', async () => {
-      const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, mcp: { key: true } }\n' })
-      const made = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, mcp: { key: { file: "data/mcp-key" } } }\n' })
+    it('takes KAY_MCP_KEY_FILE for the key a production server with mcp.token asks for, and asks nothing for { file }', async () => {
+      const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, mcp: { token: true } }\n' })
+      const made = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, mcp: { token: { file: "data/mcp-key" } } }\n' })
       const production = { NODE_ENV: 'production' }
 
       expect((await doctor(root, [], production)).check('env').message).toContain('KAY_MCP_KEY')

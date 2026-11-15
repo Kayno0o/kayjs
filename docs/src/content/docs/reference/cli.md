@@ -575,7 +575,7 @@ kay env
 
 `kay env` lists the environment variables the project declares, without running the server entry. Each has its source, its type, whether it is required (`always`, `production` or `optional`) and its default.
 
-It reads the `defineEnv` schemas in the modules under `src`, each library in `extensions`, and kay's own `PORT`, `HOST`, `SITE_URL` and `KAY_SECRET`, plus `KAY_PROXY_KEY` and `KAY_PROXY_KEY_FILE` while `proxy.key` is set, and `KAY_MCP_KEY` and `KAY_MCP_KEY_FILE` while `mcp.key` asks for a key. A module that does not load is named as not read. See [Environment variables](/essentials/data-loading#environment-variables).
+It reads the `defineEnv` schemas in the modules under `src`, each library in `extensions`, and kay's own `PORT`, `HOST`, `SITE_URL` and `KAY_SECRET`, plus `KAY_PROXY_KEY` and `KAY_PROXY_KEY_FILE` while `proxy.key` is set, and `KAY_MCP_KEY` and `KAY_MCP_KEY_FILE` while `mcp.token` is `true`; a secret given as `{ env }` lists its variable. A module that does not load is named as not read. See [Environment variables](/essentials/data-loading#environment-variables).
 
 The modules under `src` are imported, so their top-level code runs.
 
@@ -596,7 +596,7 @@ kay env --compose compose.prod.yaml --example .env.example
 This checks your deploy files against what the project declares. It reports an error when:
 
 - a variable production needs is set by no service of the compose file, in `environment` or in an `env_file`. An `env_file` missing from the checkout, such as a gitignored `.env`, counts as setting what the `.env.example` beside it lists
-- `proxy.key` is set and no service sets `KAY_PROXY_KEY` or `KAY_PROXY_KEY_FILE` (likewise `mcp.key: true` and `KAY_MCP_KEY` or `KAY_MCP_KEY_FILE`)
+- `proxy.key` is set and no service sets `KAY_PROXY_KEY` or `KAY_PROXY_KEY_FILE` (likewise `mcp.token: true` and `KAY_MCP_KEY` or `KAY_MCP_KEY_FILE`)
 - a variable production needs is missing from the example file, unless a compose service gives it a value
 - the example file lists a variable that no schema declares, no service sets, the compose file never reads as `${VAR}`, and neither `kay.config.ts` nor a module it imports reads itself. `COMPOSE_*` and `DOCKER_*` are left to Docker Compose, which reads them
 

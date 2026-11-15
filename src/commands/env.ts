@@ -30,19 +30,19 @@ const KAY_VARIABLES: EnvVariable[] = [
   { name: 'KAY_SECRET', type: 'string', required: false, description: 'at least 32 random characters, sealing sessions and signing form stamps, links to private files, the flash cookie and preview links, each under a key of its own; commas separate a rotation list, the first sealing and signing, every one opening and verifying; unless `secret` in kay.config.ts sets it; a production server without one refuses to start unless KAY_EPHEMERAL_SECRET=1' },
 ]
 
-// What `proxy.key` reads: a production server with the setting refuses to boot without the key, given directly or as the file that holds it.
+// What `proxy.key` reads while it names no `secret`: a production server with the setting refuses to boot without the key, given directly or as the file that holds it.
 const PROXY_KEY_VARIABLES: EnvVariable[] = [
-  { name: 'KAY_PROXY_KEY', type: 'string', required: 'production', secret: true, description: 'the key the proxy sends in the header `proxy.key` names, or set `KAY_PROXY_KEY_FILE` instead' },
+  { name: 'KAY_PROXY_KEY', type: 'string', required: 'production', secret: true, description: 'the key the proxy sends in the header `proxy.key` names, unless `secret` gives it, or set `KAY_PROXY_KEY_FILE` instead' },
   { name: 'KAY_PROXY_KEY_FILE', type: 'string', required: false, description: 'the path of a file holding the proxy key, read when `KAY_PROXY_KEY` is unset' },
 ]
 
-// What `mcp.key` reads: `true` makes a production server refuse to boot without the key, given directly or as the file that holds it, while `{ file }` makes one on first use.
+// What `mcp.token: true` reads: a production server refuses to boot without the token, given directly or as the file that holds it.
 const MCP_KEY_VARIABLES: EnvVariable[] = [
   { name: 'KAY_MCP_KEY', type: 'string', required: 'production', secret: true, description: 'the key an MCP client sends as a bearer token to the endpoint (at least 16 characters), or set `KAY_MCP_KEY_FILE` instead' },
   { name: 'KAY_MCP_KEY_FILE', type: 'string', required: false, description: 'the path of a file holding the MCP key, read when `KAY_MCP_KEY` is unset' },
 ]
 
-// What `metrics` reads: with it set, only a scrape carrying it as a bearer token is answered.
+// What `metrics` reads unless `token` gives one: with it set, only a scrape carrying it as a bearer token is answered.
 const METRICS_VARIABLES: EnvVariable[] = [
   { name: 'KAY_METRICS_TOKEN', type: 'string', required: false, secret: true, description: 'the bearer token a scrape must send to `metrics`; unset, only a request from this machine or a private network that no proxy forwarded is answered' },
 ]
@@ -160,22 +160,23 @@ export async function listEnv(root: string): Promise<{ variables: Listed[], unre
     ...declared.flatMap(({ schema, file }) => described(schema, file === undefined ? 'src' : shown(file))),
     ...(config.extensions ?? []).flatMap(extension => extension.env === undefined ? [] : described(extension.env, `the extension ${extension.name}`).filter(({ name }) => !declaredNames.has(name))),
     ...KAY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })),
-    ...config.ops?.metrics !== undefined && config.ops?.metrics !== false ? METRICS_VARIABLES.map(variable => ({ ...variable, source: 'kay' })) : [],
-    ...typeof config.proxy === 'object' && config.proxy.key !== undefined ? PROXY_KEY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })) : [],
-    ...mcpKeyVariables(config.mcp).map(variable => ({ ...variable, source: 'kay' })),
+    ...keyVariables(typeof config.ops?.metrics === 'object' ? config.ops.metrics.token : undefined, config.ops?.metrics !== undefined && config.ops.metrics !== false ? METRICS_VARIABLES : [], 'metrics.token', 'the bearer token a scrape must send to `metrics`'),
+    ...keyVariables(typeof config.proxy === 'object' ? config.proxy.key?.secret : undefined, typeof config.proxy === 'object' && config.proxy.key !== undefined ? PROXY_KEY_VARIABLES : [], 'proxy.key', 'the key the proxy sends in the header `proxy.key` names'),
+    ...keyVariables(typeof config.mcp === 'object' ? config.mcp.token : undefined, typeof config.mcp === 'object' && config.mcp.token === true ? MCP_KEY_VARIABLES : [], 'mcp.token', 'the token an MCP client sends as a bearer token to the endpoint'),
   ]
 
   return { variables, unread }
 }
 
-// The variables the MCP key reads: none for a key given as a string, none required for `{ file }`, which makes the key itself.
-function mcpKeyVariables(mcp: unknown): EnvVariable[] {
-  const key = typeof mcp === 'object' && mcp !== null ? (mcp as { key?: unknown }).key : undefined
+// The variables a secret of the config reads: `defaults` while it is left to them, the one `{ env }` names, none for a value or a file.
+function keyVariables(secret: unknown, defaults: EnvVariable[], source: string, description: string): Listed[] {
+  if (secret === undefined || secret === true)
+    return defaults.map(variable => ({ ...variable, source: 'kay' }))
 
-  if (key === undefined || key === false || typeof key === 'string')
-    return []
+  if (typeof secret === 'object' && secret !== null && 'env' in secret && typeof secret.env === 'string')
+    return [{ name: secret.env, type: 'string', required: 'production', secret: true, description, source }]
 
-  return key === true ? MCP_KEY_VARIABLES : MCP_KEY_VARIABLES.map(variable => ({ ...variable, required: false }))
+  return []
 }
 
 function described(schema: EnvSchemaRecord, source: string): Listed[] {

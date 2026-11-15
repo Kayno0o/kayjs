@@ -27,7 +27,7 @@ export interface TestOptions extends PagesOptions {
   use?: PluginInput[] | undefined
   // What the app's Elysia `derive` would add for a request, such as the signed-in user, read by pages, guards and actions as `ctx.locals`.
   locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
-  // The key the site's MCP endpoint asks for as a bearer token, which `mcp: { key }` in the config otherwise reads from the environment: `site.mcp` sends it unless a call or the site's headers give an `authorization`. A site whose config sets `mcp.key` and gets none here is given a generated one, so its tests need nothing.
+  // Replaced by `config: { mcp: { token } }` in 1.105, and works until 1.108; `deprecated-secret-keys` reports it. A site whose config sets `mcp.token` and gives no value is given a generated one, which `site.mcp` sends as a bearer token unless a call or the site's headers give an `authorization`.
   mcpKey?: string | undefined
   // Loads pages in a headless Chrome with `open()`, served from the islands built for the browser.
   browser?: boolean | BrowserOptions | undefined
@@ -35,7 +35,7 @@ export interface TestOptions extends PagesOptions {
   islands?: boolean | undefined
   // Builds the client for real, as `kay build` does and without Chrome: pages link the stylesheets the app's Tailwind builds and its island bundles, `site.fetch` answers them and `visit.css()` reads them. Off by default, as it loads Tailwind's native addon and builds into `.kay/client`; on with `browser`.
   styles?: boolean | undefined
-  // The key the app's `proxy.key` header carries, turning the check on for this site alone, the environment left as it is: `fetch`, `visit`, `call`, `mcp` and `socket` send it by default, a call's own header of that name wins, and an empty one sends none; not with `dev: true` or `browser`, which skip the check or send no key.
+  // Replaced by `config: { proxy: { key: { header, secret } } }` in 1.105, and works until 1.108; `deprecated-secret-keys` reports it. A `secret` given as a value turns the check on for this site alone, the environment left as it is: `fetch`, `visit`, `call`, `mcp` and `socket` send it by default, a call's own header of that name wins, and an empty one sends none; not with `dev: true` or `browser`, which skip the check or send no key.
   proxyKey?: string | undefined
 }
 

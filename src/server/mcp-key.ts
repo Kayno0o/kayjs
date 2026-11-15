@@ -1,10 +1,12 @@
 import type { McpConfig } from './api-modules'
+import type { Secret } from './secret'
 import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { sameText } from './seal'
+import { checkSecret, readSecret } from './secret'
 
 const KEY_VARIABLE = 'KAY_MCP_KEY'
 const KEY_FILE_VARIABLE = 'KAY_MCP_KEY_FILE'
@@ -14,54 +16,54 @@ export const MCP_KEY_MIN = 16
 const VISIBLE = /^[\x21-\x7E]+$/
 const BEARER = /^bearer +(\S+)$/i
 
-// What `mcp.key` asks for: `true` reads the environment, a string is the key, `{ file }` reads the environment and else that file, made on first use.
-export type McpKeySetting = true | string | { file: string }
+// What `mcp.token` asks for: `true` reads the environment, a string is the token, `{ env }` reads that variable, `{ file }` that file, made on first use.
+export type McpKeySetting = true | Secret
 
 // The setting of `mcp`, or undefined while the endpoint is open to any client.
 export function mcpKeySetting(value: boolean | McpConfig | undefined): McpKeySetting | undefined {
-  const key = typeof value === 'object' ? value.key : undefined
+  const token = typeof value === 'object' ? value.token : undefined
 
-  if (key === undefined || key === false)
-    return undefined
-
-  if (key === true || typeof key === 'string' || (typeof key === 'object' && key !== null && typeof key.file === 'string' && key.file !== ''))
-    return key
-
-  throw new KayError('config-invalid', 'kay: mcp.key is `true` (read KAY_MCP_KEY or KAY_MCP_KEY_FILE), the key as a string, or `{ file }` naming the file that holds it and is made on first use')
+  return token === undefined || token === true ? token : checkSecret(token, 'mcp.token', '`true` to read KAY_MCP_KEY or KAY_MCP_KEY_FILE')
 }
 
-// The key every request to the endpoint must carry as a bearer token, or undefined when `mcp.key` is set and no key was given, which refuses every request.
-// Read once, at boot: a rotated key takes effect on the next start.
+// The token every request to the endpoint must carry as a bearer token, or undefined when `mcp.token` is set and none was given, which refuses every request.
+// Read once, at boot: a rotated token takes effect on the next start.
 // A relative `{ file }` resolves against `options.root`, which the caller sets to where the server runs: the working directory for a compiled one.
 export function resolveMcpKey(setting: McpKeySetting, options: { root: string, production: boolean }): string | undefined {
   if (typeof setting === 'string')
-    return checked(setting.trim(), 'mcp.key')
+    return checked(setting.trim(), 'mcp.token')
 
-  const given = fromEnvironment()
+  if (setting === true)
+    return fromEnvironment() ?? missing(`${KEY_VARIABLE} or from the file ${KEY_FILE_VARIABLE} names`, options.production)
 
-  if (given !== undefined)
-    return given
+  if ('env' in setting) {
+    const given = readSecret(setting)
 
-  if (typeof setting === 'object')
-    return checked(readOrMake(resolve(options.root, setting.file)), `the file ${setting.file}`)
+    return given === undefined ? missing(setting.env, options.production) : checked(given, setting.env)
+  }
 
-  if (options.production)
-    throw new KayError('config-invalid', `kay: mcp.key is set, which asks for a key read from ${KEY_VARIABLE} or from the file ${KEY_FILE_VARIABLE} names, and neither gives one`)
+  return checked(readOrMake(resolve(options.root, setting.file)), `the file ${setting.file}`)
+}
 
-  // A test run sets its key through `testSite({ mcpKey })`, and warning there repeats in every test file.
+// A token the setting names and the environment does not give: a production server stops, any other refuses every request.
+function missing(from: string, production: boolean): undefined {
+  if (production)
+    throw new KayError('config-invalid', `kay: mcp.token is set, which asks for a token read from ${from}, and it gives none`)
+
+  // A test run sets its token through `testSite({ config: { mcp: { token } } })`, and warning there repeats in every test file.
   if (process.env.NODE_ENV !== 'test')
-    kayLog('warn', `mcp.key is set but ${KEY_VARIABLE} and ${KEY_FILE_VARIABLE} are not, so the MCP endpoint refuses every request; a production server would not boot`)
+    kayLog('warn', `mcp.token is set but ${from} gives none, so the MCP endpoint refuses every request; a production server would not boot`)
 
   return undefined
 }
 
 function checked(key: string, source: string): string {
   if (key.length < MCP_KEY_MIN)
-    throw new KayError('config-invalid', `kay: the MCP key from ${source} must be at least ${MCP_KEY_MIN} characters`)
+    throw new KayError('config-invalid', `kay: the MCP token from ${source} must be at least ${MCP_KEY_MIN} characters`)
 
   // A bearer token is one run of visible ASCII, so any other key could never be sent.
   if (!VISIBLE.test(key))
-    throw new KayError('config-invalid', `kay: the MCP key from ${source} must be visible ASCII characters with no space`)
+    throw new KayError('config-invalid', `kay: the MCP token from ${source} must be visible ASCII characters with no space`)
 
   return key
 }

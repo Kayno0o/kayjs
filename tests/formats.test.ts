@@ -335,7 +335,7 @@ describe('kay build --format json', () => {
 
         await verifyExecutable(reporting.file, reporting.root, false)
 
-        // Long enough and visible ASCII, as `mcp.key` demands of any key.
+        // Long enough and visible ASCII, as `mcp.token` demands of any key.
         expect(await reported()).toMatch(/^[\x21-\x7E]{16,}$/)
 
         process.env.KAY_MCP_KEY = 'the-build-key-0123456789'

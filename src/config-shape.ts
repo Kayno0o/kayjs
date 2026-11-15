@@ -1,6 +1,7 @@
 import type { BudgetConfig } from './build/budget'
-import type { ActionsConfig, AssetsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DirsConfig, FaviconConfig, HealthConfig, I18nInput, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveInput, OfflineConfig, OpsConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
+import type { ActionsConfig, AssetsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DeprecatedMcp, DirsConfig, FaviconConfig, HealthConfig, I18nInput, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveInput, OfflineConfig, OpsConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
 import type { Rule } from './config-rules'
+import type { McpConfig } from './server/api-modules'
 import { bag, bool, bytes, duration, either, fn, isRecord, list, lit, map, num, numOrInfinity, obj, oneOf, str, typedKeys } from './config-rules'
 import { nearest } from './nearest'
 
@@ -28,7 +29,9 @@ const HYDRATION = bag({ visible: str, serverIslands: str })
 const CLIENT: Record<keyof ClientConfig, Rule> = { navigation: bool, inlineStyles: bool, lateStyles: bool, typography: bool, hydration: HYDRATION, prefetch: either(oneOf('conservative', 'moderate', 'eager'), lit(false)), saveData: bool, pageTimeout: duration, loadingDelay: duration, offline: either(bool, bag(OFFLINE)), search: bool, links: LINKS }
 const ACTIONS: Record<keyof ActionsConfig, Rule> = { protect: either(lit(false), obj), maxSize: bytes, messages: obj, beforeRun: fn, onSuccess: fn, onError: fn }
 const HEALTH: Record<keyof HealthConfig, Rule> = { path: str, timeout: duration, check: fn }
-const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted: either(fn, list(str)), trustPrivate: lit(false), key: str, open: list(str) }
+const SECRET = either(str, bag({ env: str, file: str }))
+const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted: either(fn, list(str)), trustPrivate: lit(false), key: either(str, bag({ header: str, secret: SECRET })), open: list(str) }
+const MCP: Record<keyof (McpConfig & DeprecatedMcp), Rule> = { path: str, rateLimit: either(bool, obj), token: either(lit(true), SECRET), key: either(bool, str, bag({ file: str })), instructions: str }
 const SITEMAP: Record<keyof SitemapConfig, Rule> = { ttl: duration }
 const ROBOTS: Record<keyof RobotsConfig, Rule> = { disallow: either(fn, list(str)), allow: either(fn, list(str)) }
 const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: duration, sharedNotBefore: fn }
@@ -36,7 +39,7 @@ const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: durati
 const KAY_ROUTE_LIMIT: Record<string, Rule> = { max: num, window: duration, store: obj, onLimit: fn }
 const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)) }
 const JOBS: Record<keyof JobsConfig, Rule> = { guards: guardOption, guard: guardOption, path: str }
-const METRICS: Record<keyof MetricsConfig, Rule> = { path: str }
+const METRICS: Record<keyof MetricsConfig, Rule> = { path: str, token: either(lit(true), SECRET) }
 const BUDGET: Record<keyof BudgetConfig, Rule> = { js: bytes, css: bytes, weight: bytes, grade: oneOf('A', 'B', 'C', 'D', 'E', 'F', 'G') }
 const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
 const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: either(str, bag({ light: str, dark: str })), backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
@@ -89,7 +92,7 @@ const CONFIG: Record<keyof ConfigInput, Rule> = {
   guards: bag({ default: oneOf('open', 'closed') }),
   cors: CORS,
   openapi: either(bool, obj),
-  mcp: either(bool, obj),
+  mcp: either(bool, bag(MCP)),
   health: either(bool, bag(HEALTH)),
   metrics: either(bool, bag(METRICS)),
   jobs: bag(JOBS),
@@ -167,6 +170,22 @@ export function mergeBags(base: object, over: object): Record<string, unknown> {
 
     if (isBag(base) && isBag(over))
       merged[group] = { ...base, ...Object.fromEntries(defined(over)) }
+  }
+
+  // `mcp` and `proxy` merge a level deep, and `proxy.key` too, so an option that gives a token or a secret keeps the path and the header the config names.
+  for (const name of ['mcp', 'proxy']) {
+    const base = config[name]
+    const over = options[name]
+
+    if (!isBag(base) || !isBag(over))
+      continue
+
+    const both: Record<string, unknown> = { ...base, ...Object.fromEntries(defined(over)) }
+
+    if (isBag(base.key) && isBag(over.key))
+      both.key = { ...base.key, ...Object.fromEntries(defined(over.key)) }
+
+    merged[name] = both
   }
 
   return merged

@@ -13,7 +13,6 @@ import { PUBLIC_ENV_PATH } from '../src/server/env-state'
 import { JOBS_PATH } from '../src/server/jobs-page'
 import { SERVICE_WORKER } from '../src/server/offline'
 import { PREVIEW_ROUTE } from '../src/server/preview'
-import { withProxyKey } from '../src/server/proxy-key'
 import { scratchBuild } from './prerendered'
 import { pages, sharedClient } from './shared-pages'
 
@@ -267,14 +266,14 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs with hosts, the jobs page, previews, kept pages, the public env, a proxy key, offline and locale hosts, in the order pinned', async () => {
-    const options: LoadedConfig = { site: 'https://x.example', i18n: { locales: ['en', 'fr'], default: 'en', mode: { domains: { en: 'x.example', fr: 'fr.x.example' } } }, security: { hosts: ['www.x.example'] }, preview: {}, publicEnv: true, proxy: { key: 'x-upstream-key' }, client: { offline: true }, ops: { jobs: { guard: () => undefined }, observe: { log: { sink: quiet } } }, extensions }
+    const options: LoadedConfig = { site: 'https://x.example', i18n: { locales: ['en', 'fr'], default: 'en', mode: { domains: { en: 'x.example', fr: 'fr.x.example' } } }, security: { hosts: ['www.x.example'] }, preview: {}, publicEnv: true, proxy: { key: { header: 'x-upstream-key', secret: 'upstream' } }, client: { offline: true }, ops: { jobs: { guard: () => undefined }, observe: { log: { sink: quiet } } }, extensions }
     // Built with its pages prerendered, which keeps the about page, a page reading nothing of its request.
     const build = await scratchBuild(options, false, fixture)
 
     try {
       await build.prerender(options)
 
-      const app = await withProxyKey('upstream', async () => build.serve(options))
+      const app = await build.serve(options)
       const { run, pinned } = recorder(app)
       const at = (path: string, headers: Record<string, string> = {}, init: RequestInit = {}) => new Request(`${SITE}${path}`, { ...init, headers: { 'host': 'x.example', 'x-upstream-key': 'upstream', ...headers } })
       const action = app.routes.find(route => route.method === 'POST' && route.path.startsWith('/_kay/action/'))?.path

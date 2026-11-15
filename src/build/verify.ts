@@ -29,6 +29,8 @@ const LISTENING = '0A'
 export interface VerifyOptions {
   startTimeoutMs?: number
   probeTimeoutMs?: number
+  // The variables the config's `{ env }` secrets name, each given a throwaway value where the build has none, as the proxy and MCP keys are.
+  secretVariables?: string[]
   // Called each time the sockets of the server are looked at, for a test to count them.
   ownershipChecked?: () => void
 }
@@ -49,9 +51,9 @@ export async function verifyExecutable(executable: string, root: string, health:
   // HOST is pinned to loopback, where the readiness check and `--health` ask, whatever the build's shell or the project's .env exports.
   // The key of `proxy.key` lives on the deploy host, so a throwaway one stands in where the build has none: the health route it asks is open. The app's secret lives there too, so the server may sign with a key of its own process.
   const keyed = process.env.KAY_PROXY_KEY === undefined && process.env.KAY_PROXY_KEY_FILE === undefined
-  // The MCP key stands in the same way, whether or not `mcp.key` asks for one.
+  // The MCP key stands in the same way, whether or not `mcp.token` asks for one.
   const mcpKeyed = process.env.KAY_MCP_KEY === undefined && process.env.KAY_MCP_KEY_FILE === undefined
-  const env = { ...process.env, ...keyed ? { KAY_PROXY_KEY: crypto.randomUUID() } : {}, ...mcpKeyed ? { KAY_MCP_KEY: crypto.randomUUID() } : {}, KAY_EPHEMERAL_SECRET: '1', NODE_ENV: 'production', PORT: port, HOST: '127.0.0.1' }
+  const env = { ...process.env, ...keyed ? { KAY_PROXY_KEY: crypto.randomUUID() } : {}, ...mcpKeyed ? { KAY_MCP_KEY: crypto.randomUUID() } : {}, KAY_EPHEMERAL_SECRET: '1', ...Object.fromEntries((options.secretVariables ?? []).filter(name => process.env[name] === undefined).map(name => [name, crypto.randomUUID()])), NODE_ENV: 'production', PORT: port, HOST: '127.0.0.1' }
   const server = Bun.spawn([executable], { cwd: root, env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
   const printed = capture(server)
   const running = () => server.exitCode === null && server.signalCode === null

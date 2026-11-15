@@ -5,7 +5,7 @@ import { testSite } from '../src/test'
 const HEADER = 'x-upstream-key'
 const root = resolve(import.meta.dir, 'fixtures/ws-body')
 const { default: rooms } = await import(resolve(root, 'src/api/rooms.ts')) as typeof import('./fixtures/ws-body/src/api/rooms')
-const site = await testSite({ root, proxy: { key: HEADER }, proxyKey: 'secret-key' })
+const site = await testSite({ root, proxy: { key: { header: HEADER } }, proxyKey: 'secret-key' })
 
 it('sends the key with a socket upgrade, and a test can send none', async () => {
   const socket = site.socket(rooms, '/')

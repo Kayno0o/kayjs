@@ -612,7 +612,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /*",
   ],
   "start": [
-    "() => { if (options.holds()) warnMetricsOpen(options.proxy); }",
+    "() => { if (options.holds()) warnMetricsOpen(options.proxy, token); }",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",

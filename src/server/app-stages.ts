@@ -400,7 +400,7 @@ export function kayEndpoints({ app, env, options, served, lifecycle, health, met
 
   if (metrics) {
     served.offer(metrics)
-    serveMetrics(app, { path: metrics.path, base: env.base, proxy: checkProxy(options.proxy), health: health?.path, holds: () => served.holds(metrics), connections: liveConnections })
+    serveMetrics(app, { path: metrics.path, base: env.base, proxy: checkProxy(options.proxy), token: metricsOf(options.ops?.metrics)?.token, health: health?.path, holds: () => served.holds(metrics), connections: liveConnections })
   }
 
   if (options.publicEnv)

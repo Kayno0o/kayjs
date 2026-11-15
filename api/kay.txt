@@ -2857,9 +2857,11 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   security?: Checked<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, Omit<SecurityConfig, "hosts"> & {
     hosts?: Loadable<string[]> | boolean | undefined;
   }, [unknown]>;
-  proxy?: Checked<"proxy" extends keyof Config ? Config[keyof Config & "proxy"] : unknown, Omit<ProxyConfig, "trusted"> & {
+  proxy?: Checked<"proxy" extends keyof Config ? Config[keyof Config & "proxy"] : unknown, Omit<ProxyConfig, "key" | "trusted"> & {
     trusted?: Loadable<string[]> | undefined;
+    key?: ProxyKey | string | undefined;
   }, [unknown]>;
+  mcp?: Checked<"mcp" extends keyof Config ? Config[keyof Config & "mcp"] : unknown, McpConfig & DeprecatedMcp, [unknown]>;
   robots?: Checked<"robots" extends keyof Config ? Config[keyof Config & "robots"] : unknown, Omit<RobotsConfig, "allow" | "disallow"> & {
     disallow?: Loadable<string[]> | undefined;
     allow?: Loadable<string[]> | undefined;
@@ -2892,7 +2894,6 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   entry?: unknown;
   requireGuards?: unknown;
   openapi?: Checked<"openapi" extends keyof Config ? Config[keyof Config & "openapi"] : unknown, OpenApiConfig, [unknown]>;
-  mcp?: Checked<"mcp" extends keyof Config ? Config[keyof Config & "mcp"] : unknown, McpConfig, [unknown]>;
   rewrite?: unknown;
   runtimeRedirects?: Checked<"runtimeRedirects" extends keyof Config ? Config[keyof Config & "runtimeRedirects"] : unknown, {
     hosts?: string[] | undefined;
@@ -3396,7 +3397,7 @@ interface PagesOptions extends ConfigInput
   live?: LiveConfig | undefined
   /** @deprecated Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
-  mcp?: McpConfig | boolean | undefined
+  mcp?: (McpConfig & DeprecatedMcp) | boolean | undefined
   /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
   /** @deprecated Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ observe?: ObserveInput | undefined
@@ -3411,7 +3412,7 @@ interface PagesOptions extends ConfigInput
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
   preview?: PreviewConfig | boolean | undefined
-  proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; }> | boolean | number | undefined
+  proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; key?: ProxyKey | string | undefined; }> | boolean | number | undefined
   /** @deprecated Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   redirects?: Loadable<Redirects> | undefined
   requireGuards?: boolean | undefined
@@ -4476,7 +4477,7 @@ interface TestOptions extends PagesOptions
   locals?: ((request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>) | undefined
   /** @deprecated Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
-  mcp?: McpConfig | boolean | undefined
+  mcp?: (McpConfig & DeprecatedMcp) | boolean | undefined
   mcpKey?: string | undefined
   /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
@@ -4493,7 +4494,7 @@ interface TestOptions extends PagesOptions
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
   preview?: PreviewConfig | boolean | undefined
-  proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; }> | boolean | number | undefined
+  proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; key?: ProxyKey | string | undefined; }> | boolean | number | undefined
   proxyKey?: string | undefined
   /** @deprecated Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   redirects?: Loadable<Redirects> | undefined

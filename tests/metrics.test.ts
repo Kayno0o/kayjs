@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
@@ -131,6 +134,43 @@ describe('metrics', () => {
     expect(await status(`${url}/metrics`, { 'authorization': `Bearer ${TOKEN}`, 'x-forwarded-for': '203.0.113.9' })).toBe(200)
   })
 
+  it('takes the token from `metrics.token`: a value, a variable or a file, and refuses to boot where it gives none', async () => {
+    const byValue = await listening({ ops: { metrics: { token: TOKEN } } })
+
+    expect(await status(`${byValue}/metrics`)).toBe(403)
+    expect(await status(`${byValue}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+
+    const byVariable = await listening({ ops: { metrics: { token: { env: 'SCRAPE_TOKEN' } } } }, { SCRAPE_TOKEN: ` ${TOKEN} ` })
+
+    expect(await status(`${byVariable}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+    delete process.env.SCRAPE_TOKEN
+
+    const dir = await mkdtemp(join(tmpdir(), 'kay-metrics-'))
+
+    try {
+      await writeFile(join(dir, 'token'), `${TOKEN}\n`)
+
+      const byFile = await listening({ ops: { metrics: { token: { file: join(dir, 'token') } } } })
+
+      expect(await status(`${byFile}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+      expect(await status(`${byFile}/metrics`, { authorization: 'Bearer other' })).toBe(403)
+      await expect(listening({ ops: { metrics: { token: { file: join(dir, 'missing') } } } })).rejects.toThrow('metrics.token')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+
+    await expect(listening({ ops: { metrics: { token: { env: 'SCRAPE_TOKEN' } } } })).rejects.toThrow('SCRAPE_TOKEN')
+    await expect(listening({ ops: { metrics: { token: 5 as never } } })).rejects.toThrow('metrics.token')
+  })
+
+  it('reads KAY_METRICS_TOKEN for `token: true`', async () => {
+    const url = await listening({ ops: { metrics: { token: true } } }, { KAY_METRICS_TOKEN: TOKEN })
+
+    expect(await status(`${url}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+    expect(await status(`${url}/metrics`)).toBe(403)
+  })
+
   it('moves to the path asked for and leaves /metrics to the app', async () => {
     const url = await listening({ metrics: { path: '/_internal/stats' } })
 
@@ -155,7 +195,7 @@ describe('metrics', () => {
   })
 
   it('lets a collector past the proxy key on the metrics path alone, by its own rule', async () => {
-    const url = await listening({ metrics: true, proxy: { key: 'x-upstream-key' } }, { KAY_PROXY_KEY: KEY })
+    const url = await listening({ metrics: true, proxy: { key: { header: 'x-upstream-key' } } }, { KAY_PROXY_KEY: KEY })
 
     expect(await status(`${url}/metrics`)).toBe(200)
     expect(await status(`${url}/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
@@ -165,7 +205,7 @@ describe('metrics', () => {
   })
 
   it('keeps the proxy key on everything under the metrics path', async () => {
-    const url = await listening({ metrics: true, proxy: { key: 'x-upstream-key' } }, { KAY_PROXY_KEY: KEY })
+    const url = await listening({ metrics: true, proxy: { key: { header: 'x-upstream-key' } } }, { KAY_PROXY_KEY: KEY })
 
     expect(await status(`${url}/metrics/anything`)).toBe(403)
     expect(await status(`${url}/metrics/`)).toBe(200)
@@ -231,7 +271,7 @@ describe('metrics', () => {
     expect(metricsAllowed(plain, '203.0.113.9')).toBe(false)
     expect(metricsAllowed(plain, '2001:db8::1')).toBe(false)
     expect(metricsAllowed(plain, undefined)).toBe(false)
-    expect(metricsAllowed(new Request('http://localhost/metrics', { headers: { 'x-upstream-key': 'k' } }), '127.0.0.1', { key: 'x-upstream-key' })).toBe(false)
+    expect(metricsAllowed(new Request('http://localhost/metrics', { headers: { 'x-upstream-key': 'k' } }), '127.0.0.1', { key: { header: 'x-upstream-key' } })).toBe(false)
     expect(metricsAllowed(new Request('http://localhost/metrics', { headers: { 'x-forwarded-for': '203.0.113.9' } }), '127.0.0.1')).toBe(false)
   })
 })

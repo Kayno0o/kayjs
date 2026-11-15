@@ -22,7 +22,7 @@ async function compile(key: string, base?: string): Promise<{ root: string, exec
 
   roots.push(root)
   await Bun.write(join(root, 'src/server.ts'), SERVER)
-  await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ ${base === undefined ? '' : `base: '${base}', `}mcp: { key: ${key}, rateLimit: false } })\n`)
+  await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ ${base === undefined ? '' : `base: '${base}', `}mcp: { token: ${key}, rateLimit: false } })\n`)
 
   const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--compile', executable], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
   const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
@@ -55,7 +55,7 @@ async function ask(executable: string, cwd: string, key: string | undefined, pat
   }
 }
 
-describe('mcp.key { file } in a compiled server', () => {
+describe('mcp.token { file } in a compiled server', () => {
   it('is made where the executable runs, not under the folder it was built in', async () => {
     const { root, executable } = await compile('{ file: \'data/mcp-key\' }')
     const cwd = resolve(await scratchDir('mcp-run-'))

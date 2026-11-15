@@ -38,8 +38,8 @@ import { aiLanguage } from './ai-language'
 import { appHooks } from './app-hooks'
 import { authRateLimits } from './auth-rate-limits'
 import { clientKeys } from './client-keys'
-import { configGroups } from './config-groups'
 import { cmsOptions } from './cms-options'
+import { configGroups } from './config-groups'
 import { configSwitches } from './config-switches'
 import { contextImport } from './context-import'
 import { ownFile } from './diagnose'
@@ -60,13 +60,13 @@ import { i18nKeys } from './i18n-keys'
 import { imagesKeys } from './images-keys'
 
 import { islandOnlyComponents } from './island-only'
-
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 
 import { largePublicImages } from './large-images'
-import { liveApi } from './live-api'
 
+import { liveApi } from './live-api'
 import { mailApi } from './mail-api'
+
 import { mcpRoutes } from './mcp-routes'
 import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
 import { unreadOpenSettings } from './open-settings'
@@ -76,6 +76,7 @@ import { rateEnforce } from './rate-enforce'
 import { removedUiTokens } from './removed-ui-tokens'
 import { routeShadow, routeShadowPath } from './route-shadow'
 import { schemaType } from './schema-type'
+import { secretKeys } from './secret-keys'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { sourceReaders } from './source-readers'
@@ -216,6 +217,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => clientKeys(root, options),
   async ({ root, options }) => configGroups(root, options),
   async ({ root, options }) => i18nKeys(root, options),
+  async ({ root, options }) => secretKeys(root, options),
   async ({ root, options }) => appHooks(root, options),
   async ({ root, options }) => hookContext(root, options),
   async ({ root, options }) => pagesOptions(root, options),

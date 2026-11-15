@@ -1,4 +1,5 @@
 import type { ConfigInput, I18nConfig, I18nInput, ImageFormats, ImageLimits, KayConfig, Loadable, ObserveConfig, ObserveInput, RemoteImages } from './config'
+import type { McpConfig } from './server/api-modules'
 import { KayError } from './compiler/errors'
 import { isRecord } from './config-rules'
 
@@ -108,6 +109,24 @@ async function resolveI18n(i18n: I18nInput | undefined): Promise<I18nConfig | un
   return { ...rest, default: first as string, ...chosen !== undefined && { mode: chosen } }
 }
 
+// `proxy` with the header a string `key` named before 1.105 as `{ header }`.
+function resolveProxy(proxy: ConfigInput['proxy']): KayConfig['proxy'] {
+  if (!isRecord(proxy) || typeof proxy.key !== 'string')
+    return proxy as KayConfig['proxy']
+
+  return { ...proxy, key: { header: proxy.key } } as KayConfig['proxy']
+}
+
+// `mcp` with the `key` of before 1.105 as `token`, a `token` already written winning over it.
+function resolveMcp(mcp: ConfigInput['mcp']): KayConfig['mcp'] {
+  if (!isRecord(mcp) || !('key' in mcp))
+    return mcp
+
+  const { key, ...rest } = mcp
+
+  return key === undefined || key === false || rest.token !== undefined ? rest : { ...rest, token: key as McpConfig['token'] }
+}
+
 // The config `kay.config.ts` wrote as the `KayConfig` the server reads: each list that a function gave loaded once, the old flat keys of `images`, the `onStart` hook and `observe`'s `onError` and `log` in the places they have since 1.105. Called as the config loads, so `kay dev` calls the functions again after a change to the file.
 export async function resolveConfig(config: ConfigInput): Promise<KayConfig> {
   const [security, proxy, robots, i18n, redirects, assets] = await Promise.all([
@@ -125,7 +144,7 @@ export async function resolveConfig(config: ConfigInput): Promise<KayConfig> {
     delete kept[key]
 
   const { ops, onError } = resolveOps(config)
-  const resolved: Record<string, unknown> = { ...kept, security, proxy, robots, i18n, redirects, assets, ops, cors, client: resolveClient(config), onListen: config.onListen ?? onStart, onError: config.onError ?? onError }
+  const resolved: Record<string, unknown> = { ...kept, security, proxy: resolveProxy(proxy), mcp: resolveMcp(config.mcp), robots, i18n, redirects, assets, ops, cors, client: resolveClient(config), onListen: config.onListen ?? onStart, onError: config.onError ?? onError }
 
   for (const key of Object.keys(resolved)) {
     if (resolved[key] === undefined)

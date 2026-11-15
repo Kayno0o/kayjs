@@ -96,7 +96,7 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Performance lints](llms/performance-lints.md): `performance`
 - [Deprecated lints](llms/deprecated-lints.md): old forms and fixes
 - [Deprecated lints of 1.105](llms/deprecated-lints-1-105.md): the 1.105 old forms and fixes
-- [Deprecated lints of the 1.105 libraries](llms/deprecated-lints-1-105-libraries.md): the 1.105 old forms of kayjs-ai, ui, cms, mail and auth
+- [Deprecated lints of the 1.105 libraries](llms/deprecated-lints-1-105-libraries.md): old forms of the libraries
 - [Errors](llms/errors.md): codes and fixes
 - [Thrown errors](llms/errors-runtime.md): `Result`
 - [Project setup](llms/project.md): `kay.config.ts`, tsconfig, Astro
@@ -109,7 +109,8 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Accessibility audit](llms/a11y-audit.md): `kay a11y`
 - [Compiling a component](llms/compiler-api.md): `kay/compiler`
 - [Editor and agent commands](llms/editor-and-agent-commands.md): `kay lsp`, `screenshot`, `mcp`, `docs`
-- [Running in production](llms/production.md): logs, health checks, shutdown, cron, jobs
+- [Running in production](llms/production.md): logs, health, shutdown, cron, jobs
+- [Metrics](llms/metrics.md): `ops.metrics`
 - [Tracing](llms/tracing.md): spans
 - [Several workers](llms/workers.md): `--workers`
 - [Hooks](llms/hooks.md): `onX`, `beforeX`, `refuse()`

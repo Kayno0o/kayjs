@@ -365,13 +365,15 @@ A process or a container that reaches the port directly skips whatever the proxy
 
 ```ts
 export default defineConfig({
-  proxy: { key: 'x-upstream-key' },
+  proxy: { key: { header: 'x-upstream-key' } },
 })
 ```
 
-The key itself is not in the config. Kay reads it from `KAY_PROXY_KEY`, or from the file `KAY_PROXY_KEY_FILE` names, such as a container secret. A request without the header, or with another value, is refused with 403, logged like any request with its request id. A production server with `key` and no key to compare with does not start. Nothing is checked under `kay dev`, and outside production with no key a warning says so, except in a test run, and `kay build --verify` uses a key of its own.
+The key itself is not in the config. Kay reads it from `KAY_PROXY_KEY`, or from the file `KAY_PROXY_KEY_FILE` names, such as a container secret.
 
-An MCP endpoint guarded by `mcp: { key }` needs no `open` entry: its bearer is its credential, and the check lets its path through.
+`secret` beside `header` names another place: a string, `{ env: 'UPSTREAM_KEY' }` or `{ file: '/run/secrets/upstream' }`. A request without the header, or with another value, is refused with 403, logged like any request with its request id. A production server with `key` and no key to compare with does not start. Nothing is checked under `kay dev`, and outside production with no key a warning says so, except in a test run, and `kay build --verify` uses a key of its own.
+
+An MCP endpoint guarded by `mcp: { token }` needs no `open` entry: its bearer is its credential, and the check lets its path through.
 
 The health route stays open, since the container asks it without the key. `open` lists other paths that need none, such as `open: ['/api/push']`, each with what is under it.
 

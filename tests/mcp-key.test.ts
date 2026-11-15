@@ -15,7 +15,7 @@ const KEY = 'a-long-secret-key-0123456789'
 const OTHER = 'another-secret-key-9876543210'
 const HEADER = 'x-upstream-key'
 const PROXY_KEY = 'p'.repeat(40)
-const VARIABLES = ['NODE_ENV', 'KAY_MCP_KEY', 'KAY_MCP_KEY_FILE', 'KAY_PROXY_KEY', 'KAY_PROXY_KEY_FILE']
+const VARIABLES = ['NODE_ENV', 'KAY_MCP_KEY', 'KAY_MCP_KEY_FILE', 'KAY_PROXY_KEY', 'KAY_PROXY_KEY_FILE', 'AGENT_TOKEN']
 
 const STORE = await scratchStore()
 
@@ -77,7 +77,7 @@ async function refused(response: Response): Promise<void> {
 
 describe('the key', () => {
   it('serves a request carrying it and refuses every other value alike', async () => {
-    const app = await served({}, { mcp: { key: KEY, rateLimit: false } })
+    const app = await served({}, { mcp: { token: KEY, rateLimit: false } })
 
     expect(await toolNames(app, bearer(KEY))).toEqual(['add', 'greet', 'seen'])
 
@@ -88,7 +88,7 @@ describe('the key', () => {
   })
 
   it('answers every kind of message with the refusal and runs nothing', async () => {
-    const app = await served({}, { mcp: { key: KEY, rateLimit: false } })
+    const app = await served({}, { mcp: { token: KEY, rateLimit: false } })
     const bodies = [message('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } }), message('ping'), message('tools/list'), message('tools/call', { name: 'greet', arguments: { name: 'x' } }), message('tools/call', { name: 'no_such_tool' }), { jsonrpc: '2.0', method: 'notifications/initialized' }, [message('tools/list')], 'not json', '', '{}']
 
     for (const body of bodies)
@@ -96,7 +96,7 @@ describe('the key', () => {
   })
 
   it('leaves GET and DELETE the 405 they are, and the sign-in metadata open', async () => {
-    const app = await served({}, { mcp: { key: KEY } })
+    const app = await served({}, { mcp: { token: KEY } })
 
     for (const method of ['GET', 'DELETE']) {
       for (const headers of [{}, bearer(KEY), bearer(OTHER)]) {
@@ -111,7 +111,7 @@ describe('the key', () => {
   })
 
   it('reads the scheme in any case and refuses anything but one bearer token', async () => {
-    const app = await served({}, { mcp: { key: KEY, rateLimit: false } })
+    const app = await served({}, { mcp: { token: KEY, rateLimit: false } })
 
     for (const authorization of [`Bearer ${KEY}`, `bearer ${KEY}`, `BEARER ${KEY}`, `BeArEr   ${KEY}`])
       expect((await post(app, message('ping'), { authorization })).status).toBe(200)
@@ -127,7 +127,7 @@ describe('the key', () => {
   })
 
   it('does not tell a missing key from a wrong one, or leak the key in the refusal', async () => {
-    const app = await served({}, { mcp: { key: KEY } })
+    const app = await served({}, { mcp: { token: KEY } })
     const missing = await post(app, message('tools/list'))
     const wrong = await post(app, message('tools/list'), bearer(OTHER))
     const text = await wrong.text()
@@ -138,7 +138,7 @@ describe('the key', () => {
   })
 
   it('counts the refused requests against the rate limit, so guessing is bounded', async () => {
-    const app = await served({}, { mcp: { key: KEY, rateLimit: { max: 3, window: '1m' } }, proxy: { hops: 1 } })
+    const app = await served({}, { mcp: { token: KEY, rateLimit: { max: 3, window: '1m' } }, proxy: { hops: 1 } })
     // A client of its own, as the counts are the process's.
     const client = { 'x-forwarded-for': '203.0.113.77' }
 
@@ -156,7 +156,7 @@ describe('the key', () => {
 
 describe('the tools it admits', () => {
   it('runs a route and an action with the key, and hands neither the bearer', async () => {
-    const app = await served({}, { mcp: { key: KEY, rateLimit: false } })
+    const app = await served({}, { mcp: { token: KEY, rateLimit: false } })
     const seen = await (await post(app, message('tools/call', { name: 'seen' }), bearer(KEY))).json() as { result: { structuredContent: unknown } }
     const greeted = await (await post(app, message('tools/call', { name: 'greet', arguments: { name: 'Ada' } }), bearer(KEY))).json() as { result: { content: { text: string }[] } }
     const added = await (await post(app, message('tools/call', { name: 'add', arguments: { name: 'Ada' } }), bearer(KEY))).json() as { result: { structuredContent: unknown } }
@@ -175,7 +175,7 @@ describe('the tools it admits', () => {
   })
 
   it('treats a header an outside client sends as no tool call, and asks no key of a route the endpoint does not serve', async () => {
-    const app = await served({}, { mcp: { key: KEY } })
+    const app = await served({}, { mcp: { token: KEY } })
     const forged = await app.handle(new Request('http://localhost/api/echo/seen', { headers: { 'x-kay-agent': 'guess', 'x-kay-agent-tool': 'seen', 'x-kay-agent-client': '1.2.3.4', 'x-kay-agent-from': 'http://localhost/mcp' } }))
 
     expect(forged.status).toBe(200)
@@ -190,9 +190,9 @@ describe('where the key comes from', () => {
 
     await writeFile(file, `${KEY}\n`)
 
-    const fromVariable = await served({ KAY_MCP_KEY: ` ${KEY} ` }, { mcp: { key: true } })
-    const fromFile = await served({ KAY_MCP_KEY_FILE: file }, { mcp: { key: true } })
-    const both = await served({ KAY_MCP_KEY: OTHER, KAY_MCP_KEY_FILE: file }, { mcp: { key: true } })
+    const fromVariable = await served({ KAY_MCP_KEY: ` ${KEY} ` }, { mcp: { token: true } })
+    const fromFile = await served({ KAY_MCP_KEY_FILE: file }, { mcp: { token: true } })
+    const both = await served({ KAY_MCP_KEY: OTHER, KAY_MCP_KEY_FILE: file }, { mcp: { token: true } })
 
     expect((await post(fromVariable, message('ping'), bearer(KEY))).status).toBe(200)
     await refused(await post(fromVariable, message('ping'), bearer(OTHER)))
@@ -207,11 +207,11 @@ describe('where the key comes from', () => {
 
     await writeFile(file, KEY)
 
-    const before = await served({ KAY_MCP_KEY_FILE: file }, { mcp: { key: true } })
+    const before = await served({ KAY_MCP_KEY_FILE: file }, { mcp: { token: true } })
 
     await writeFile(file, OTHER)
 
-    const after = await served({ KAY_MCP_KEY_FILE: file }, { mcp: { key: true } })
+    const after = await served({ KAY_MCP_KEY_FILE: file }, { mcp: { token: true } })
 
     // Read once, at boot: the server that started with the old key keeps it.
     expect((await post(before, message('ping'), bearer(KEY))).status).toBe(200)
@@ -223,7 +223,7 @@ describe('where the key comes from', () => {
   it('makes the key in { file } on first use, private, and reuses it', async () => {
     const dir = await scratchDir('mcp-key-')
     const file = join(dir, 'data', 'mcp-key')
-    const first = await served({}, { mcp: { key: { file } } })
+    const first = await served({}, { mcp: { token: { file } } })
     const made = (await readFile(file, 'utf8')).trim()
 
     expect(made.length).toBeGreaterThanOrEqual(32)
@@ -232,7 +232,7 @@ describe('where the key comes from', () => {
     expect((await post(first, message('ping'), bearer(made))).status).toBe(200)
     await refused(await post(first, message('ping'), bearer(OTHER)))
 
-    const second = await served({}, { mcp: { key: { file } } })
+    const second = await served({}, { mcp: { token: { file } } })
 
     expect((await post(second, message('ping'), bearer(made))).status).toBe(200)
     expect((await readFile(file, 'utf8')).trim()).toBe(made)
@@ -246,7 +246,7 @@ describe('where the key comes from', () => {
     })
 
     try {
-      const app = await served({}, { mcp: { key: { file } } })
+      const app = await served({}, { mcp: { token: { file } } })
       const made = (await readFile(file, 'utf8')).trim()
 
       expect(refusing).toHaveBeenCalled()
@@ -260,13 +260,22 @@ describe('where the key comes from', () => {
     }
   })
 
-  it('lets the environment win over { file }, and makes no file then', async () => {
+  it('reads { file } and { env } alone, whatever KAY_MCP_KEY holds', async () => {
     const dir = await scratchDir('mcp-key-')
     const file = join(dir, 'mcp-key')
-    const app = await served({ KAY_MCP_KEY: KEY }, { mcp: { key: { file } } })
+    const app = await served({ KAY_MCP_KEY: KEY }, { mcp: { token: { file } } })
 
-    expect((await post(app, message('ping'), bearer(KEY))).status).toBe(200)
-    expect(existsSync(file)).toBe(false)
+    expect((await post(app, message('ping'), bearer(KEY))).status).toBe(401)
+    expect(existsSync(file)).toBe(true)
+
+    const named = await served({ KAY_MCP_KEY: KEY, AGENT_TOKEN: ` ${OTHER} ` }, { mcp: { token: { env: 'AGENT_TOKEN' } } })
+
+    expect((await post(named, message('ping'), bearer(OTHER))).status).toBe(200)
+    expect((await post(named, message('ping'), bearer(KEY))).status).toBe(401)
+  })
+
+  it('stops a production boot whose { env } names a variable that gives no token', async () => {
+    await expect(served({ NODE_ENV: 'production' }, { mcp: { token: { env: 'AGENT_TOKEN' } } })).rejects.toThrow('AGENT_TOKEN')
   })
 
   it('refuses a key that is too short, empty or unreadable, wherever it comes from', async () => {
@@ -280,31 +289,31 @@ describe('where the key comes from', () => {
     await writeFile(locked, KEY)
     await chmod(locked, 0o000)
 
-    await expect(served({}, { mcp: { key: 'short' } })).rejects.toThrow('at least 16 characters')
-    await expect(served({}, { mcp: { key: '   ' } })).rejects.toThrow('at least 16 characters')
-    await expect(served({ KAY_MCP_KEY: 'short' }, { mcp: { key: true } })).rejects.toThrow('KAY_MCP_KEY')
-    await expect(served({ KAY_MCP_KEY_FILE: short }, { mcp: { key: true } })).rejects.toThrow('at least 16 characters')
-    await expect(served({ KAY_MCP_KEY_FILE: empty }, { mcp: { key: true } })).rejects.toThrow('at least 16 characters')
-    await expect(served({ KAY_MCP_KEY_FILE: join(dir, 'missing') }, { mcp: { key: true } })).rejects.toThrow('cannot be read')
-    await expect(served({}, { mcp: { key: { file: short } } })).rejects.toThrow('at least 16 characters')
-    await expect(served({}, { mcp: { key: { file: empty } } })).rejects.toThrow('at least 16 characters')
+    await expect(served({}, { mcp: { token: 'short' } })).rejects.toThrow('at least 16 characters')
+    await expect(served({}, { mcp: { token: '   ' } })).rejects.toThrow('at least 16 characters')
+    await expect(served({ KAY_MCP_KEY: 'short' }, { mcp: { token: true } })).rejects.toThrow('KAY_MCP_KEY')
+    await expect(served({ KAY_MCP_KEY_FILE: short }, { mcp: { token: true } })).rejects.toThrow('at least 16 characters')
+    await expect(served({ KAY_MCP_KEY_FILE: empty }, { mcp: { token: true } })).rejects.toThrow('at least 16 characters')
+    await expect(served({ KAY_MCP_KEY_FILE: join(dir, 'missing') }, { mcp: { token: true } })).rejects.toThrow('cannot be read')
+    await expect(served({}, { mcp: { token: { file: short } } })).rejects.toThrow('at least 16 characters')
+    await expect(served({}, { mcp: { token: { file: empty } } })).rejects.toThrow('at least 16 characters')
 
     // A file mode is no barrier to root.
     if (process.getuid?.() !== 0)
-      await expect(served({ KAY_MCP_KEY_FILE: locked }, { mcp: { key: true } })).rejects.toThrow('cannot be read')
+      await expect(served({ KAY_MCP_KEY_FILE: locked }, { mcp: { token: true } })).rejects.toThrow('cannot be read')
   })
 
   it('refuses a key no bearer token could carry', async () => {
     for (const key of ['my secret key 12345', 'clé-secrète-0123456789', 'tab\tseparated-key-1234'])
-      await expect(served({}, { mcp: { key } })).rejects.toThrow('visible ASCII')
+      await expect(served({}, { mcp: { token: key } })).rejects.toThrow('visible ASCII')
 
-    await expect(served({ KAY_MCP_KEY: 'has a space in it 123' }, { mcp: { key: true } })).rejects.toThrow('visible ASCII')
+    await expect(served({ KAY_MCP_KEY: 'has a space in it 123' }, { mcp: { token: true } })).rejects.toThrow('visible ASCII')
   })
 
   it('never lets a second boot meet a half-made key file', async () => {
     const dir = await scratchDir('mcp-key-')
     const file = join(dir, 'mcp-key')
-    const apps = await Promise.all([1, 2, 3, 4].map(async () => served({}, { mcp: { key: { file } } })))
+    const apps = await Promise.all([1, 2, 3, 4].map(async () => served({}, { mcp: { token: { file } } })))
     const made = (await readFile(file, 'utf8')).trim()
 
     for (const app of apps)
@@ -315,7 +324,7 @@ describe('where the key comes from', () => {
 
   it('refuses a setting that is none of the three', async () => {
     for (const key of [5, null, {}, { file: '' }, { file: 3 }, []])
-      await expect(served({}, { mcp: { key: key as never } })).rejects.toThrow('mcp.key is')
+      await expect(served({}, { mcp: { token: key as never } })).rejects.toThrow('mcp.token is')
   })
 
   it('leaves the endpoint open without a key setting, and with key: false', async () => {
@@ -329,13 +338,13 @@ describe('where the key comes from', () => {
 
 describe('in production and elsewhere', () => {
   it('does not boot in production with key: true and no key, and names where it is read', async () => {
-    await expect(served({ NODE_ENV: 'production' }, { mcp: { key: true } })).rejects.toThrow('KAY_MCP_KEY')
-    await expect(served({ NODE_ENV: 'production' }, { mcp: { key: true } })).rejects.toThrow('KAY_MCP_KEY_FILE')
+    await expect(served({ NODE_ENV: 'production' }, { mcp: { token: true } })).rejects.toThrow('KAY_MCP_KEY')
+    await expect(served({ NODE_ENV: 'production' }, { mcp: { token: true } })).rejects.toThrow('KAY_MCP_KEY_FILE')
   })
 
   it('refuses every request outside production while no key is given, whatever it sends', async () => {
     for (const NODE_ENV of ['test', 'development']) {
-      const app = await served({ NODE_ENV }, { mcp: { key: true } })
+      const app = await served({ NODE_ENV }, { mcp: { token: true } })
 
       await refused(await post(app, message('ping')))
       await refused(await post(app, message('ping'), bearer(KEY)))
@@ -346,7 +355,7 @@ describe('in production and elsewhere', () => {
 
   it('checks the key in production, in development and in a test run alike', async () => {
     for (const NODE_ENV of ['production', 'development', 'test']) {
-      const app = await served({ NODE_ENV, KAY_MCP_KEY: KEY }, { mcp: { key: true } })
+      const app = await served({ NODE_ENV, KAY_MCP_KEY: KEY }, { mcp: { token: true } })
 
       expect((await post(app, message('ping'), bearer(KEY))).status).toBe(200)
       await refused(await post(app, message('ping')))
@@ -355,7 +364,7 @@ describe('in production and elsewhere', () => {
   })
 
   it('checks the key under `dev`', async () => {
-    const app = await served({ NODE_ENV: 'development', KAY_MCP_KEY: KEY }, { mcp: { key: true }, dev: true })
+    const app = await served({ NODE_ENV: 'development', KAY_MCP_KEY: KEY }, { mcp: { token: true }, dev: true })
 
     expect((await post(app, message('ping'), bearer(KEY))).status).toBe(200)
     await refused(await post(app, message('ping')))
@@ -365,10 +374,10 @@ describe('in production and elsewhere', () => {
 
 describe('behind proxy.key', () => {
   const production = { NODE_ENV: 'production', KAY_PROXY_KEY: PROXY_KEY, KAY_MCP_KEY: KEY }
-  const proxy = { key: HEADER }
+  const proxy = { key: { header: HEADER } }
 
   it('needs no proxy.open for the endpoint, which the bearer guards', async () => {
-    const app = await served(production, { proxy, mcp: { key: true, rateLimit: false } })
+    const app = await served(production, { proxy, mcp: { token: true, rateLimit: false } })
 
     expect((await post(app, message('ping'), bearer(KEY))).status).toBe(200)
     expect(await toolNames(app, bearer(KEY))).toEqual(['add', 'greet', 'seen'])
@@ -383,7 +392,7 @@ describe('behind proxy.key', () => {
   })
 
   it('opens the endpoint alone, not what lies under it, nor a site without the key', async () => {
-    const keyed = await served(production, { proxy, mcp: { key: true } })
+    const keyed = await served(production, { proxy, mcp: { token: true } })
     const plain = await served(production, { proxy, mcp: true })
 
     expect((await keyed.handle(new Request('http://localhost/mcp/other', { method: 'POST', headers: bearer(KEY) }))).status).toBe(403)
@@ -392,14 +401,14 @@ describe('behind proxy.key', () => {
   })
 
   it('opens a POST alone, no other method on the path', async () => {
-    const app = await served(production, { proxy, mcp: { key: true } })
+    const app = await served(production, { proxy, mcp: { token: true } })
 
     for (const method of ['GET', 'DELETE', 'PUT', 'PATCH', 'OPTIONS', 'HEAD'])
       expect((await app.handle(new Request('http://localhost/mcp', { method, headers: bearer(KEY) }))).status).toBe(403)
   })
 
   it('opens the endpoint where mcp.path puts it', async () => {
-    const app = await served(production, { proxy, mcp: { key: true, path: '/tools' } })
+    const app = await served(production, { proxy, mcp: { token: true, path: '/tools' } })
 
     expect((await post(app, message('ping'), bearer(KEY), '/tools')).status).toBe(200)
     expect((await post(app, message('ping'), bearer(KEY), '/tools/')).status).toBe(200)
@@ -409,7 +418,7 @@ describe('behind proxy.key', () => {
   })
 
   it('opens it under a base and a trailing slash', async () => {
-    const app = await served(production, { proxy, mcp: { key: true }, base: '/shop', trailingSlash: 'always' })
+    const app = await served(production, { proxy, mcp: { token: true }, base: '/shop', trailingSlash: 'always' })
 
     // The server hands the app the path without the base, and the check reads either.
     for (const path of ['/mcp', '/mcp/', '/shop/mcp', '/shop/mcp/'])
@@ -447,8 +456,8 @@ describe('testSite', () => {
     }
   })
 
-  it('makes a key for a config that sets mcp.key, and keeps the site headers an authorization', async () => {
-    const generated = await testSite({ root: ROOT, mcp: { key: true }, islands: false })
+  it('makes a key for a config that sets mcp.token, and keeps the site headers an authorization', async () => {
+    const generated = await testSite({ root: ROOT, mcp: { token: true }, islands: false })
     const headed = await testSite({ root: ROOT, mcp: true, mcpKey: KEY, islands: false, headers: { authorization: `Bearer ${OTHER}` } })
 
     try {

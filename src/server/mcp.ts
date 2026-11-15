@@ -407,7 +407,7 @@ export interface McpOptions {
   rateLimit: RateWindowMs | undefined
   // Sent as `instructions` of `initialize`, from `mcp.instructions`.
   instructions?: string | undefined
-  // Set with `mcp.key`: the bearer token every request must carry, or `false` while no key was given, which refuses them all; undefined leaves the endpoint open.
+  // Set with `mcp.token`: the bearer token every request must carry, or `false` while no key was given, which refuses them all; undefined leaves the endpoint open.
   key?: string | false | undefined
   // Under `kay dev`: an answer that does not match the tool's `output` logs one warning.
   dev?: boolean | undefined

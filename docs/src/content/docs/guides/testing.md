@@ -78,7 +78,7 @@ An action with no input, such as a sign-out button, takes no fields: `site.submi
 
 With `mcp: true`, `site.mcp.tools()` lists the tools an agent sees. `site.mcp.call('add_note', { title: 'Milk' })` calls one and resolves with `{ isError, text, data, status }`. `site.mcp.initialize()` resolves with `{ serverInfo, instructions }`, the text of `mcp: { instructions }` being what a client is told on connecting.
 
-For an endpoint with `mcp: { key }`, `testSite({ mcpKey: 'a-test-key-0123456789' })` sets the key and `site.mcp` sends it as the bearer; a call that gives its own `authorization` header sends that one instead, such as a wrong key to see the refusal. A site whose config sets `mcp.key` and gives no `mcpKey` is given a generated one.
+For an endpoint with `mcp: { token }`, `testSite({ config: { mcp: { token: 'a-test-key-0123456789' } } })` sets the token and `site.mcp` sends it as the bearer; a call that gives its own `authorization` header sends that one instead, such as a wrong key to see the refusal. A site whose config sets `mcp.token` and gives no literal one is given a generated one. `mcpKey` and `proxyKey` are the forms of before 1.105 and work until 1.108.
 
 `isError` is true when the app refused the call, and `status` is 401 when a guard asks for a sign-in. Pass `{ headers: { authorization: 'Bearer token' } }` as the third argument to call as a signed-in agent. The cookies set so far go with a call.
 
@@ -151,7 +151,7 @@ const admin = await testSite({
 })
 ```
 
-An app behind `proxy.key` is tested with `testSite({ proxyKey: 'secret' })`, which checks the key for that site only and sends it with every request, so nothing is written to `process.env`. A call's own header of the key's name wins, and `''` sends none, to see the refusal.
+An app behind `proxy.key` is tested with `testSite({ config: { proxy: { key: { secret: 'secret' } } } })`, which checks the key for that site only and sends it with every request, so nothing is written to `process.env`. A call's own header of the key's name wins, and `''` sends none, to see the refusal.
 
 A site made with `headers` sends them with every request. `site.as()` gives the same site more of them, and a string is a `Cookie` header, such as `auth.sessionCookie` returns.
 

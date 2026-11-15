@@ -40,6 +40,7 @@ import { assetFiles, hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
 import { remoteImages, remotePatterns } from '../server/remote'
 import { contextReadsOf, routeMounts, slashedPath } from '../server/routes'
+import { secretVariables } from '../server/secret'
 import { configuredFiles, linkStoredFiles } from '../server/storage'
 import { budgetLints, checkBudget, footprintLints } from './budget'
 import { cacheCounts, clearCache, resetCacheCounts } from './cache'
@@ -296,7 +297,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
       if (options.compile.verify === 'load')
         result.compiled.verifiedMs = await loadExecutable(executable, root)
       else if (options.compile.verify)
-        result.compiled.verifiedMs = await verifyExecutable(executable, root, project.config.ops?.health)
+        result.compiled.verifiedMs = await verifyExecutable(executable, root, project.config.ops?.health, { secretVariables: secretVariables(project.config) })
 
       // Written once the executable runs, so `kay start` never runs one that failed its verify.
       await Bun.write(join(output, EXECUTABLE_RECORD), relative(root, executable))

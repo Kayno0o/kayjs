@@ -322,7 +322,7 @@ describe('kay env', () => {
     expect(listed.unread[0]!.error).toContain('missing')
   })
 
-  it('lists KAY_MCP_KEY and KAY_MCP_KEY_FILE while mcp.key asks for a key from the environment, optional for { file }, and none for a string', async () => {
+  it('lists KAY_MCP_KEY and KAY_MCP_KEY_FILE while mcp.token asks for a token from the environment, the variable { env } names, and none for a value or a file', async () => {
     const listing = async (mcp: string) => {
       const root = await project({ ...files, 'kay.config.ts': `export default { assets: { favicon: false }, mcp: ${mcp} }\n` })
       const listed = JSON.parse((await kay(['env', '--format', 'json'], root)).stdout) as { variables: { name: string, source: string, required: string | false, secret?: true }[] }
@@ -330,17 +330,17 @@ describe('kay env', () => {
       return (name: string) => listed.variables.find(variable => variable.name === name)
     }
 
-    const wanted = await listing('{ key: true }')
+    const wanted = await listing('{ token: true }')
 
     expect(wanted('KAY_MCP_KEY')).toMatchObject({ source: 'kay', required: 'production', secret: true })
     expect(wanted('KAY_MCP_KEY_FILE')).toMatchObject({ source: 'kay', required: false })
 
-    const made = await listing('{ key: { file: "data/mcp-key" } }')
+    const named = await listing('{ token: { env: "AGENT_TOKEN" } }')
 
-    expect(made('KAY_MCP_KEY')).toMatchObject({ source: 'kay', required: false, secret: true })
-    expect(made('KAY_MCP_KEY_FILE')).toMatchObject({ required: false })
+    expect(named('AGENT_TOKEN')).toMatchObject({ source: 'mcp.token', required: 'production', secret: true })
+    expect(named('KAY_MCP_KEY')).toBeUndefined()
 
-    for (const mcp of ['true', '{ key: "a-literal-key-0123456789" }', '{ key: false }', '{}']) {
+    for (const mcp of ['true', '{ token: "a-literal-key-0123456789" }', '{ token: { file: "data/mcp-key" } }', '{ key: false }', '{}']) {
       const none = await listing(mcp)
 
       expect(none('KAY_MCP_KEY')).toBeUndefined()
@@ -349,7 +349,7 @@ describe('kay env', () => {
   })
 
   it('lists KAY_PROXY_KEY and KAY_PROXY_KEY_FILE while proxy.key is set, and writes them to .env.example', async () => {
-    const root = await project({ ...files, 'kay.config.ts': 'export default { assets: { favicon: false }, proxy: { key: "x-upstream-key" } }\n' })
+    const root = await project({ ...files, 'kay.config.ts': 'export default { assets: { favicon: false }, proxy: { key: { header: "x-upstream-key" } } }\n' })
     const { stdout, code } = await kay(['env', '--format', 'json'], root)
     const listed = JSON.parse(stdout) as { variables: { name: string, source: string, required: string | false, secret?: true }[] }
     const row = (name: string) => listed.variables.find(variable => variable.name === name)
@@ -631,7 +631,7 @@ describe('kay env against compose and .env.example', () => {
   })
 
   it('names a compose file setting neither KAY_PROXY_KEY nor KAY_PROXY_KEY_FILE while proxy.key is set, and passes with either', async () => {
-    const config = 'export default { assets: { favicon: false }, proxy: { key: "x-upstream-key" } }\n'
+    const config = 'export default { assets: { favicon: false }, proxy: { key: { header: "x-upstream-key" } } }\n'
     const withKey = (line: string) => files['compose.yaml'].replace('      SESSION_SECRET', `      ${line}\n      SESSION_SECRET`)
     const messages = async (compose: string, kayConfig = config) => (await run(await project({ ...files, 'kay.config.ts': kayConfig, 'compose.yaml': compose }), ['--compose', 'compose.yaml'])).findings!.map(({ message }) => message)
 
@@ -641,15 +641,15 @@ describe('kay env against compose and .env.example', () => {
     expect(await messages(files['compose.yaml'], files['kay.config.ts'])).toEqual([])
   })
 
-  it('names a compose file setting neither KAY_MCP_KEY nor KAY_MCP_KEY_FILE while mcp.key asks for one, and passes with either, or with { file }', async () => {
-    const config = 'export default { assets: { favicon: false }, mcp: { key: true } }\n'
+  it('names a compose file setting neither KAY_MCP_KEY nor KAY_MCP_KEY_FILE while mcp.token asks for one, and passes with either, or with { file }', async () => {
+    const config = 'export default { assets: { favicon: false }, mcp: { token: true } }\n'
     const withKey = (line: string) => files['compose.yaml'].replace('      SESSION_SECRET', `      ${line}\n      SESSION_SECRET`)
     const messages = async (compose: string, kayConfig = config) => (await run(await project({ ...files, 'kay.config.ts': kayConfig, 'compose.yaml': compose }), ['--compose', 'compose.yaml'])).findings!.map(({ message }) => message)
 
-    expect(await messages(files['compose.yaml'])).toEqual(['KAY_MCP_KEY is required in production (mcp.key in kay.config.ts) and no service of compose.yaml sets it or KAY_MCP_KEY_FILE'])
+    expect(await messages(files['compose.yaml'])).toEqual(['KAY_MCP_KEY is required in production (mcp.token in kay.config.ts) and no service of compose.yaml sets it or KAY_MCP_KEY_FILE'])
     expect(await messages(withKey('KAY_MCP_KEY: abc'))).toEqual([])
     expect(await messages(withKey('KAY_MCP_KEY_FILE: /run/secrets/mcp'))).toEqual([])
-    expect(await messages(files['compose.yaml'], 'export default { assets: { favicon: false }, mcp: { key: { file: "data/mcp-key" } } }\n')).toEqual([])
+    expect(await messages(files['compose.yaml'], 'export default { assets: { favicon: false }, mcp: { token: { file: "data/mcp-key" } } }\n')).toEqual([])
   })
 
   it('names a variable no compose service sets, in the file it is missing from', async () => {

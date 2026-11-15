@@ -26,6 +26,7 @@ import { makeRoom } from './rate-windows'
 import { onReload } from './reload'
 import { recordOf, requestRecord } from './request-record'
 import { rewrittenAddress } from './rewrite'
+import { checkProxyKey } from './secret'
 import { sha256 } from './sha256'
 import { sharedKey, stampTime } from './stamp'
 import { kayWord } from './words'
@@ -46,7 +47,6 @@ export const PRETEND = 'pretend'
 const SWEEP_MS = 60_000
 const ZONE = /%.*$/
 // An HTTP header name: the token characters.
-const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 const LEADING_ZEROS = /^0+(?=.)/
 const BRACKETED_PORT = /^\[([^\]]+)\](:\d{1,5})?$/
 const V4_PORT = /^([\d.]+):\d{1,5}$/
@@ -883,8 +883,8 @@ export function checkProxy(setting: ProxyConfig | number | boolean | undefined):
   if ((hops !== undefined && header !== undefined) || (hops === undefined && header === undefined && key === undefined))
     throw new KayError('config-invalid', 'kay: proxy takes either hops, the number of proxies in front, or header, the one a proxy sets to the client\'s address')
 
-  if (key !== undefined && !HEADER_NAME.test(key))
-    throw new KayError('config-invalid', 'kay: proxy.key names the header the proxy sends its shared key in, such as x-upstream-key')
+  if (key !== undefined)
+    checkProxyKey(key)
 
   if (open !== undefined && (key === undefined || open.some(path => !path.startsWith('/') || path === '/')))
     throw new KayError('config-invalid', 'kay: proxy.open lists paths below / that need no key, such as /api/push, and goes with proxy.key')

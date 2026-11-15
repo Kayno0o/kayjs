@@ -382,9 +382,9 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
     if (variables.some(({ name }) => name === 'KAY_PROXY_KEY') && !set.has('KAY_PROXY_KEY') && !set.has('KAY_PROXY_KEY_FILE'))
       problems.push(diagnostic('error', composes[0]!, 1, `KAY_PROXY_KEY is required in production (proxy.key in kay.config.ts) and no service of ${composeNames} sets it or KAY_PROXY_KEY_FILE`))
 
-    // The same for the MCP key; the listing leaves it optional for `{ file }`, which makes its own.
+    // The same for the MCP key; a token given as `{ file }` or a value reads none of them.
     if (variables.some(({ name, required }) => name === 'KAY_MCP_KEY' && required !== false) && !set.has('KAY_MCP_KEY') && !set.has('KAY_MCP_KEY_FILE'))
-      problems.push(diagnostic('error', composes[0]!, 1, `KAY_MCP_KEY is required in production (mcp.key in kay.config.ts) and no service of ${composeNames} sets it or KAY_MCP_KEY_FILE`))
+      problems.push(diagnostic('error', composes[0]!, 1, `KAY_MCP_KEY is required in production (mcp.token in kay.config.ts) and no service of ${composeNames} sets it or KAY_MCP_KEY_FILE`))
   }
 
   if (examplePath !== undefined) {
