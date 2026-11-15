@@ -191,14 +191,17 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
   const keys = options.i18n ? await messageKeys(root, options.i18n, options.extensions) : []
   const generatedSeen = new Set<string>()
 
+  // A route file is checked through its shadow, which types it from the file tree, so what is said of the file itself would only repeat it or be the context it lacks.
+  const shadowedRoutes = new Set([...files.values()].filter(shadow => shadow.route === true).map(shadow => shadow.file))
+
   for (const diagnostic of reported) {
-    if (lintConfigTypeError(root, options.lints, diagnostic))
+    if (lintConfigTypeError(root, options.lints, diagnostic) || shadowedRoutes.has(diagnostic.file))
       continue
 
     const shadow = files.get(diagnostic.file)
     const diagnosed = shadow && diagnoseShadow(shadow, tsgoDiagnostic(diagnostic, shadow.tsx), levelsOf(shadow), keys)
 
-    if (shadow ? !diagnosed : !shownOutsideKay(tsgoCode(diagnostic), projectUnused))
+    if (shadow ? !diagnosed || (shadow.route === true && !shownOutsideKay(tsgoCode(diagnostic), projectUnused)) : !shownOutsideKay(tsgoCode(diagnostic), projectUnused))
       continue
 
     const mapped: CheckDiagnostic = shadow && diagnosed

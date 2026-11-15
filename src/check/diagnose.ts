@@ -127,6 +127,11 @@ function blockWithoutParameters(diagnostic: TsgoDiagnostic, source: string, span
 // A diagnostic in a .kay file's shadow TSX, read at the levels its source gives the lints.
 export function diagnoseShadow(shadow: ShadowFile, reported: TsgoDiagnostic, levelAt: (lint: LintName, offset: number) => LintLevel, messageKeys: readonly string[] = []): Diagnosed | undefined {
   const span = sourceSpan(shadow, reported.start, reported.end, 'loose')
+
+  // A route file is TypeScript as written: what the shadow adds around it is no error of the author's.
+  if (shadow.route)
+    return span && { message: reported.message, span }
+
   const diagnostic = lastOverload(reported, shadow.source, span)
   const offset = span?.start ?? 0
   const lint = typeLint(diagnostic.message, propBefore(shadow.source, span) ?? blockName(diagnostic.message, shadow.source, span)) ?? unkeyedRows(diagnostic.message)

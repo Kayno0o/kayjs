@@ -45,6 +45,8 @@ export interface ShadowFile {
   typeHash?: string | undefined
   // The offsets where a line of a statement copied to the module level starts, which the generated code leaves as the file has it.
   moduleLines?: number[] | undefined
+  // The shadow of a plain .ts route file, whose source is the whole file: its errors map back to the file as they are.
+  route?: true | undefined
 }
 
 export interface ShadowSettings {

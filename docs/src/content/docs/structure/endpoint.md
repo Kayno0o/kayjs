@@ -20,7 +20,7 @@ import { feedOf } from '../../data'
 
 export const page = { prerender: [{ slug: 'news' }] }
 
-export function GET({ params }: EndpointContext<{ slug: string }>) {
+export function GET({ params }: EndpointContext) {
   return Response.json(feedOf(params.slug))
 }
 ```

@@ -95,7 +95,7 @@ export async function contentChecks(root: string, options: CheckOptions, memory?
 // What the shadow tree's write and the config tell, reported ahead of the type errors.
 export function configProblems(root: string, options: CheckOptions, types: ShadowTypes): CheckDiagnostic[] {
   const source = readConfigSource(root)
-  const seo = [...configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].map(file => file.source), options.exported === true, source), ...redirectChainLints(options, { configFile: join(root, CONFIG_FILE), configSource: source, exported: options.exported })]
+  const seo = [...configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].filter(file => file.route !== true).map(file => file.source), options.exported === true, source), ...redirectChainLints(options, { configFile: join(root, CONFIG_FILE), configSource: source, exported: options.exported })]
 
   return [...types.problems, ...lintConfigProblems(root, options.lints), ...dockerfileProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code))]
 }

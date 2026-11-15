@@ -15,7 +15,7 @@ import { feedOf } from '../../data'
 
 export const page = { prerender: [{ slug: 'news' }, { slug: 'releases' }] }
 
-export function GET({ params }: EndpointContext<{ slug: string }>) {
+export function GET({ params }: EndpointContext) {
   return Response.json(feedOf(params.slug))
 }
 ```
@@ -76,7 +76,7 @@ export default defineConfig({
 
 ### Rules: Endpoint files
 
-- Each handler (`GET(ctx)`, `POST(ctx)`...) takes an `EndpointContext`, the request context of "The request context": `request`, `url`, `locale`, `params`, `query`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`, as a page's `ctx` has them; what it sets through `cookies` and `headers` goes out with its answer, `locale` is the site's `lang` as an endpoint has no locale prefix, and `redirect`, `notFound` and `deny` answer as plain text, `deny` with its message.
+- Each handler (`GET(ctx)`, `POST(ctx)`...) takes an `EndpointContext`, the request context of "The request context": `request`, `url`, `locale`, `params`, `query`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`, as a page's `ctx` has them, `params` typed from the file's name, `guard` from the `_guard.ts` files above it and `query` from `page.query` with no generic written, which `kay check` verifies; what it sets through `cookies` and `headers` goes out with its answer, `locale` is the site's `lang` as an endpoint has no locale prefix, and `redirect`, `notFound` and `deny` answer as plain text, `deny` with its message.
 - It returns a string, a `Blob` or a `Response`, or a promise of one: a string is sent as the type its extension names, `text/plain` for `.txt`, in UTF-8, a Blob with its own type or else that one, and a Response as it is, its status and headers included.
 - A handler that throws answers 500 and goes to `onError`.
 - A file with a handler for none of the methods stops the server. A method it lacks answers 405 with `Allow`, `HEAD` is the `GET`'s without its body unless the file exports `HEAD`, and `OPTIONS` answers 204 with `Allow` unless the file exports `OPTIONS`; `kay check` warns (`endpoint-export`) of an export that is no method, `post` or `handler`, apart from `page`.

@@ -68,8 +68,13 @@ export function settingsCheck(root: string, settings: Record<string, string>, di
 }
 
 // The import of a guard file kept for the type of what it returns.
-function guardAlias(file: string): string {
+export function guardAlias(file: string): string {
   return `kayGuard${Bun.hash(file).toString(36)}`
+}
+
+// The params of a route as the object its handler reads, each one a string.
+export function paramsType(params: string[]): string {
+  return `{ ${params.map(param => `${IDENTIFIER.test(param) ? param : JSON.stringify(param)}: string`).join(', ')} }`
 }
 
 const NO_VERB = `a handler for a method, ${ENDPOINT_VERBS.slice(0, -1).join(', ')} or ${ENDPOINT_VERBS.at(-1)}: export function GET(ctx: EndpointContext) { return 'text' }`
@@ -79,7 +84,7 @@ export function exportsCheck(root: string, routesDir: string, routes: Route[], a
   const guards = new Set([...routes, ...api, ...endpoints].flatMap(served => served.guards.filter(guard => guard.own !== true).map(guard => guard.file)))
   const matchers = new Set(routes.flatMap(route => Object.values(route.matchers ?? {})).map(matcher => matcherSource(routesDir, matcher)).filter((source): source is string => source !== undefined && source !== 'kay'))
   const endpointContext = (endpoint: Endpoint) => {
-    const params = `{ ${endpoint.params.map(param => `${IDENTIFIER.test(param) ? param : JSON.stringify(param)}: string`).join(', ')} }`
+    const params = paramsType(endpoint.params)
     const above = endpoint.guards.filter(guard => guard.own !== true).map(guard => `typeof ${guardAlias(guard.file)}`)
 
     // What its own `guards` return and its `page.query` schema reads are not typed here, so a handler may name them as it likes.

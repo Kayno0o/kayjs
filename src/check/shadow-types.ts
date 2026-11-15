@@ -47,11 +47,13 @@ import { endpointExports } from './endpoint-exports'
 import { envFiles } from './env-files'
 
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-import { formatDurationNumbers } from './format-duration'
 
+import { formatDurationNumbers } from './format-duration'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
+
 import { guardOptions } from './guard-options'
 import { unguardedRoutes, unguardedTools } from './guards'
+
 import { hookContext } from './hook-context'
 import { hookNames } from './hook-names'
 
@@ -61,8 +63,10 @@ import { islandOnlyComponents } from './island-only'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 
 import { largePublicImages } from './large-images'
+
 import { liveApi } from './live-api'
 import { mailApi } from './mail-api'
+
 import { mcpRoutes } from './mcp-routes'
 import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
 import { unreadOpenSettings } from './open-settings'
@@ -70,6 +74,7 @@ import { pagesOptions } from './pages-options'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { rateEnforce } from './rate-enforce'
 import { removedUiTokens } from './removed-ui-tokens'
+import { routeShadow, routeShadowPath } from './route-shadow'
 import { schemaType } from './schema-type'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
@@ -230,6 +235,7 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
   const served = await servedProject(root, options, problems, mounts)
   const libraries = await libraryShadows(root, options, own.files, tree, mounts)
 
+  await routeShadows(root, served, tree)
   await tree.write('kay-env.d.ts', await environmentTypes(root, options, served))
 
   // A types-only write discards the problems, so none of their checks run.
@@ -259,6 +265,26 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
   await tree.removeStale([CONTENT_CHECK])
 
   return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, programs: libraries.programs, settings: replaced.lines, exports: exported.lines, islandOnly: own.settings.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [], served, changed: tree.changed }
+}
+
+// The endpoint files and API modules of the project itself, each shadowed with the context its file tree gives it, which TypeScript checks in place of the file.
+async function routeShadows(root: string, { endpoints, apiModules }: ServedProject, tree: ShadowTree): Promise<void> {
+  const guardsOf = (guards: { file: string, own?: true | undefined }[]) => ({ guards: guards.filter(guard => guard.own !== true).map(guard => guard.file), hasOwnGuards: guards.some(guard => guard.own === true) })
+
+  await Promise.all([
+    ...endpoints.filter(({ file }) => ownFile(root, file)).map(async (endpoint) => {
+      const shadow = routeShadow(root, endpoint.file, await Bun.file(endpoint.file).text(), { ...guardsOf(endpoint.guards), endpoint })
+
+      if (shadow)
+        await tree.shadow(shadow, routeShadowPath(root, endpoint.file))
+    }),
+    ...apiModules.filter(({ file }) => ownFile(root, file)).map(async (module) => {
+      const shadow = routeShadow(root, module.file, await Bun.file(module.file).text(), { ...guardsOf(module.guards), api: module })
+
+      if (shadow)
+        await tree.shadow(shadow, routeShadowPath(root, module.file))
+    }),
+  ])
 }
 
 function shadowTree(dir: string): ShadowTree {

@@ -3361,6 +3361,38 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     }
   })
 
+  it('types a handler with no generic written from its params, the guards above it and its page.query', async () => {
+    const guard = 'import { guard } from \'kay\'\n\nexport default guard(() => ({ org: \'acme\' }))\n'
+    const handler = (body: string, before = '') => `import type { EndpointContext } from 'kay'\n${before}\nexport function GET(ctx: EndpointContext) {\n  return Response.json(${body})\n}\n`
+    const api = (call: string) => `import { api } from 'kay/server'\n\nexport default ${call}\n`
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p hi\n',
+      'src/routes/orgs/_guard.ts': guard,
+      'src/routes/orgs/[slug].json.ts': handler('[ctx.params.slug.length, ctx.guard.org.length]'),
+      'src/routes/orgs/[id].xml.ts': handler('ctx.params.slug'),
+      'src/routes/orgs/guarded.json.ts': handler('ctx.guard.nobody'),
+      'src/routes/orgs/own.json.ts': handler('ctx.guard.anything', 'export const page = { guards: [() => ({ anything: 1 })] }\n'),
+      'src/routes/orgs/query.json.ts': handler('ctx.query.page + 1', 'import { s } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Number() }) }\n'),
+      'src/routes/orgs/wrong-query.json.ts': handler('ctx.query.size', 'import { s } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Number() }) }\n'),
+      'src/api/_guard.ts': guard,
+      'src/api/fine.ts': api('api().get(\'/\', ({ guard }) => guard.org.length)'),
+      'src/api/wrong.ts': api('api().get(\'/\', ({ guard }) => guard.nobody)'),
+      'src/api/own.ts': api('api({ guards: [() => ({ key: 1 })] }).get(\'/\', ({ guard }) => [guard.org.length, guard.key + 1])'),
+    })
+
+    try {
+      expect((await check(root)).filter(d => d.code?.startsWith('TS')).map(d => [relative(root, d.file), d.message]).sort((a, b) => a[0]!.localeCompare(b[0]!))).toEqual([
+        ['src/api/wrong.ts', expect.stringContaining('nobody')],
+        ['src/routes/orgs/[id].xml.ts', expect.stringContaining('slug')],
+        ['src/routes/orgs/guarded.json.ts', expect.stringContaining('nobody')],
+        ['src/routes/orgs/wrong-query.json.ts', expect.stringContaining('size')],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('checks the endpoints of an extension and reports a guard without a default export once', async () => {
     const lib = await scratchDir('check-lib-')
     const root = await scratchProject({
