@@ -63,6 +63,10 @@ describe('rooms hooks', () => {
     expect(ws.closed).toEqual([[1008, 'Refused']])
     expect(chats.join(connection(), 'boom')).toBe(false)
     expect(chats.join(connection(), 'open')).toBe(true)
+
+    const asked = rooms<string>({ beforeJoin: (async () => true) as never })
+
+    expect(asked.join(connection(), 'late')).toBe(false)
   })
 
   it('tells onJoin once per new room, and onLeave on leave with the member it had', async () => {

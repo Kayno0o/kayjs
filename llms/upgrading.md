@@ -12,7 +12,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 `deprecated-client-keys` (`kay check --fix`) moves them into `client` as written; the old keys work until 1.108, and the type of the loaded `KayConfig` no longer has them, so code reading `config.offline`, `config.search` or `config.links` reads `config.client?.offline`, `.search` and `.links`. A `client` already written is kept as it is and the key is reported with no fix.
 ### `defineContext` from `kay/server`, `env` is `envFiles`
 
-`import { defineContext } from 'kay/server'`, as `defineEnv`; `kay/library` keeps it until 1.108. The `env: { compose, example }` of kay.config.ts is `envFiles`, which also takes `false`; `env` works until 1.108. `kay upgrade` rewrites both (`deprecated-context-import`, `deprecated-env-files`).
+`import { defineContext } from 'kay/server'`, as `defineEnv`; `kay/library` keeps it until 1.108. The `env: { compose, example }` of kay.config.ts is `envFiles`, which also takes `false`; `env` works until 1.108. `kay upgrade` rewrites both (`deprecated-context-import`, `deprecated-env-files`). The session cookie now takes its `SameSite` and `Secure` from `security.cookies` unless `session({ sameSite })` is set: an app that set `sameSite: 'strict'` there gets a strict session cookie, which signs a visitor out on a link from another site, so set `session({ sameSite: 'lax' })` beside it where that matters.
 
 ### Test helpers share one shape
 

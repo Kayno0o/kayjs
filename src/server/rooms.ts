@@ -129,7 +129,7 @@ const IDLE_POLLS = 40
 const KEPT = 30_000
 
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
-export function rooms<Message, Member, State = undefined>(...[options]: [options: RoomsOptions<Message, State, Member> & { member: (ws: RoomConnection) => Member }] | (undefined extends State ? never : [options: RoomsOptions<Message, State, Member> & { state: () => State, member: (ws: RoomConnection) => Member }])): Rooms<Message, Member, State> & { join: (ws: RoomConnection, room: string, member?: Member) => boolean }
+export function rooms<Message, Member, State = undefined>(...[options]: [options: RoomsOptions<Message, State, Member> & { member: (ws: RoomConnection) => Member } & (undefined extends State ? unknown : { state: () => State })]): Rooms<Message, Member, State> & { join: (ws: RoomConnection, room: string, member?: Member) => boolean }
 export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, Member>] : [options: RoomsOptions<Message, State, Member> & { state: () => State }]): Rooms<Message, Member, State>
 export function rooms<Message, Member, State>(...[options = {}]: [options?: RoomsOptions<Message, State, Member>]): Rooms<Message, Member, State> {
   const store: RoomStore = options.store ?? memoryRooms()
@@ -226,23 +226,22 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
     join(ws, room, ...[given]) {
       named(room)
 
-      const member = given === undefined ? options.member?.(ws) : given
+      let member: Member | undefined = given
+      let verdict: unknown = false
 
-      if (options.beforeJoin !== undefined) {
-        let verdict: boolean | string | void = false
+      // A hook that throws, or answers a promise, refuses: only `undefined` and `true` let a connection in.
+      try {
+        member = given === undefined ? options.member?.(ws) : given
+        verdict = options.beforeJoin?.({ room, member, ws })
+      }
+      catch (error) {
+        kayLog('error', 'rooms.beforeJoin or rooms.member failed, the connection is refused', error)
+      }
 
-        try {
-          verdict = options.beforeJoin({ room, member, ws })
-        }
-        catch (error) {
-          kayLog('error', 'rooms.beforeJoin failed, the connection is refused', error)
-        }
+      if (verdict !== undefined && verdict !== true) {
+        ws.raw.close?.(CLOSE_POLICY, typeof verdict === 'string' ? verdict : 'Refused')
 
-        if (verdict === false || typeof verdict === 'string') {
-          ws.raw.close?.(CLOSE_POLICY, typeof verdict === 'string' ? verdict : 'Refused')
-
-          return false
-        }
+        return false
       }
 
       const id = idOf(ws.raw)

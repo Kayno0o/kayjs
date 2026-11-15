@@ -365,6 +365,8 @@ class RequestSession<Data extends object> implements Session<Data> {
 
   async start(data: Partial<Data>, options: { maxAge?: Duration | 'browser' | undefined } = {}): Promise<void> {
     await this.regenerate()
+    // A new sign-in: a lifetime a past one chose does not carry over.
+    this.own = {}
 
     for (const [key, value] of Object.entries(data))
       this.data[key] = value

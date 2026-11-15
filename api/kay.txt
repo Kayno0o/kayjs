@@ -3671,18 +3671,23 @@ interface RoomConnection
   data?: unknown
   raw: object & { sendText: (text: string) => unknown; close?: (code?: number | undefined, reason?: string | undefined) => unknown; }
 
+[./server] RoomEvent
+interface RoomEvent<Member>
+  member: Member | undefined
+  room: string
+  ws: RoomConnection
+
 [./server] RoomRecipients
 interface RoomRecipients
   except?: string
   to?: string
 
 [./server] rooms
-function rooms<Message, Member, State = undefined>(...[options]: (undefined extends State ? never : [options: RoomsOptions<Message, State, Member> & {
+function rooms<Message, Member, State = undefined>(options: RoomsOptions<Message, State, Member> & {
+  member: (ws: RoomConnection) => Member;
+} & (undefined extends State ? unknown : {
   state: () => State;
-  member: (ws: RoomConnection) => Member;
-}]) | [options: RoomsOptions<Message, State, Member> & {
-  member: (ws: RoomConnection) => Member;
-}]): Rooms<Message, Member, State> & {
+})): Rooms<Message, Member, State> & {
   join: (ws: RoomConnection, room: string, member?: Member | undefined) => boolean;
 }
 function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, Member>] : [options: RoomsOptions<Message, State, Member> & {

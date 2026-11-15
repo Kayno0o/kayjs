@@ -566,7 +566,7 @@ async function fileResponse(key: string, request: Request | undefined, cacheCont
   const headers: Record<string, string> = {
     'content-type': type,
     'x-content-type-options': 'nosniff',
-    'content-disposition': inline ? 'inline' : attachment(typeof download === 'string' ? download : key),
+    'content-disposition': inline ? 'inline' : attachment(typeof download === 'string' && download !== '' ? download : key),
     'cache-control': cacheControl,
   }
 
