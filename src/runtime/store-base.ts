@@ -16,6 +16,7 @@ export interface StoreBase {
 }
 
 // The milliseconds of a length a store was given as a `Duration` or, by a store written before 1.105, as milliseconds: what a store of your own reads its window, ttl or max age with. `what` names the argument in the error a bad value throws.
+// kept: free
 export function lengthMs(value: Duration | number, what = 'a store length'): number {
   const ms = typeof value === 'number' ? value : durationMs(value)
 

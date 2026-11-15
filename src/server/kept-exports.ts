@@ -38,6 +38,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   installPrompt: 'free',
   isEmail: 'free',
   jobs: 'request',
+  lengthMs: 'free',
   linked: 'free',
   listen: 'free',
   live: 'request',
