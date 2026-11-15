@@ -15,10 +15,11 @@ import { inMemory } from './memory-mark'
 import { onReload } from './reload'
 
 // What a room sends a connection through: Elysia's `ws`, read through its raw socket, the one object that stays the same from `open` to `close`.
-export interface RoomConnection {
-  raw: object & { sendText: (text: string) => unknown, close?: (code?: number, reason?: string) => unknown }
-  // What the route's context holds, `ws.data.user` or `ws.data.params`.
-  data?: unknown
+// `Data` is what the route's context holds, `ws.data.user` or `ws.data.params`, left loose so `member: ws => ws.data.user.name` reads as written.
+// eslint-disable-next-line ts/no-explicit-any
+export interface RoomConnection<Data = any> {
+  raw: object & { sendText: (text: string) => unknown, close?: (code?: number, reason?: string) => unknown, readyState?: number }
+  data?: Data
 }
 
 // What `onJoin`, `onLeave` and `beforeJoin` are told: the room, the member, as it joined or left, and the connection.
@@ -226,6 +227,10 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
     join(ws, room, ...[given]) {
       named(room)
 
+      // A socket already closing never meets the `close` that would take it out again.
+      if ((ws.raw.readyState ?? 1) > 1)
+        return false
+
       let member: Member | undefined = given
       let verdict: unknown = false
 
@@ -237,6 +242,10 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
       catch (error) {
         kayLog('error', 'rooms.beforeJoin or rooms.member failed, the connection is refused', error)
       }
+
+      // An async hook answers a promise, which refuses; its own rejection is logged, never unhandled.
+      if (isThenable(verdict))
+        void settled('rooms.beforeJoin', verdict)
 
       if (verdict !== undefined && verdict !== true) {
         ws.raw.close?.(CLOSE_POLICY, typeof verdict === 'string' ? verdict : 'Refused')

@@ -38,6 +38,11 @@ async function until(ready: () => boolean): Promise<void> {
 }
 
 describe('a room\'s state in memory', () => {
+  it('keeps state required beside a member function', () => {
+    // @ts-expect-error `state` is required once the State type is given
+    expect(() => rooms<Message, string, State>({ member: () => 'ada' })).not.toThrow()
+  })
+
   it('sends a joiner the state as it stands, to the joiner alone, again on a rejoin', async () => {
     const live = rooms<Message, string, State>(options)
     const [ada, bob] = [connection(), connection()]

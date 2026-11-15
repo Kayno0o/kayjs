@@ -29,7 +29,7 @@ export default api()
   })
 ```
 
-A connection that joined leaves every room by itself when its socket closes, after the route's own `close` ran, so `close` needs no `leave`.
+A connection that joined leaves every room by itself when its socket closes, after the route's own `close` ran, so `close` needs no `leave`. A plain Bun socket outside Elysia gets no such call: it calls `leave(ws)` in its own `close`.
 
 ### Give a joiner the room's state
 

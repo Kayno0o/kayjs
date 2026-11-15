@@ -3667,15 +3667,15 @@ class RequestTimeoutError
 function retryLater(wait: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, reason?: string): Error
 
 [./server] RoomConnection
-interface RoomConnection
-  data?: unknown
-  raw: object & { sendText: (text: string) => unknown; close?: (code?: number | undefined, reason?: string | undefined) => unknown; }
+interface RoomConnection<Data = any>
+  data?: Data
+  raw: object & { sendText: (text: string) => unknown; close?: (code?: number | undefined, reason?: string | undefined) => unknown; readyState?: number; }
 
 [./server] RoomEvent
 interface RoomEvent<Member>
   member: Member | undefined
   room: string
-  ws: RoomConnection
+  ws: RoomConnection<any>
 
 [./server] RoomRecipients
 interface RoomRecipients
@@ -3684,11 +3684,11 @@ interface RoomRecipients
 
 [./server] rooms
 function rooms<Message, Member, State = undefined>(options: RoomsOptions<Message, State, Member> & {
-  member: (ws: RoomConnection) => Member;
+  member: (ws: RoomConnection<any>) => Member;
 } & (undefined extends State ? unknown : {
   state: () => State;
 })): Rooms<Message, Member, State> & {
-  join: (ws: RoomConnection, room: string, member?: Member | undefined) => boolean;
+  join: (ws: RoomConnection<any>, room: string, member?: Member | undefined) => boolean;
 }
 function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, Member>] : [options: RoomsOptions<Message, State, Member> & {
   state: () => State;
@@ -3697,20 +3697,20 @@ function rooms<Message, Member = undefined, State = undefined>(...[options]: und
 [./server] Rooms
 interface Rooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member>
   coalesce: (read: (room: string) => Message | Promise<Message>, options?: CoalesceOptions | undefined) => (room: string) => void
-  join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => boolean
-  leave: (ws: RoomConnection, room?: string | undefined) => void
-  memberOf: (ws: RoomConnection, room: string) => Member | undefined
+  join: (ws: RoomConnection<any>, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => boolean
+  leave: (ws: RoomConnection<any>, room?: string | undefined) => void
+  memberOf: (ws: RoomConnection<any>, room: string) => Member | undefined
   members: (room: string) => Member[]
-  publish: (room: string, message: Message, options?: undefined | { except?: RoomConnection; to?: Member; }) => void
+  publish: (room: string, message: Message, options?: undefined | { except?: RoomConnection<any>; to?: Member; }) => void
   response: TUnsafe<Message>
-  roomsOf: (ws: RoomConnection) => string[]
+  roomsOf: (ws: RoomConnection<any>) => string[]
   state: (room: string) => Promise<State>
   update: (room: string, change: (state: State) => State) => Promise<State>
 
 [./server] RoomsOptions
 interface RoomsOptions<Message = never, State = undefined, Member = undefined>
   beforeJoin?: ((event: RoomEvent<Member>) => boolean | string | void) | undefined
-  member?: ((ws: RoomConnection) => Member) | undefined
+  member?: ((ws: RoomConnection<any>) => Member) | undefined
   onJoin?: Hook<RoomEvent<Member>> | undefined
   onLeave?: Hook<RoomEvent<Member>> | undefined
   snapshot?: ((state: State, room: string) => Message) | undefined

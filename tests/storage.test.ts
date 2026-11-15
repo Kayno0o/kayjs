@@ -329,6 +329,7 @@ describe('the file route', () => {
     expect(named.headers.get('content-security-policy')).toBe('sandbox')
     expect((await files.response(key, undefined, { download: true })).headers.get('content-disposition')).toStartWith('attachment; filename="')
     expect(await named.text()).toBe('abc')
+    expect((await files.response(key, undefined, { download: '' })).headers.get('content-disposition')).toStartWith('attachment; filename="')
   })
 })
 

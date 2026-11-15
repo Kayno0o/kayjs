@@ -1,5 +1,6 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { shutdown } from '../src/server/lifecycle'
 import { rooms } from '../src/server/rooms'
@@ -67,6 +68,49 @@ describe('rooms hooks', () => {
     const asked = rooms<string>({ beforeJoin: (async () => true) as never })
 
     expect(asked.join(connection(), 'late')).toBe(false)
+  })
+
+  it('refuses when member throws, handles a rejected async beforeJoin, and never keeps a closed socket', async () => {
+    const throwing = rooms<string, string>({ member: () => {
+      throw new Error('no user')
+    } })
+    const ws = connection()
+
+    expect(throwing.join(ws, 'hall')).toBe(false)
+    expect(ws.closed).toEqual([[1008, 'Refused']])
+
+    const unhandled: unknown[] = []
+    const catcher = (reason: unknown) => void unhandled.push(reason)
+
+    process.on('unhandledRejection', catcher)
+
+    try {
+      const asked = rooms<string>({ beforeJoin: (async () => {
+        throw new Error('async')
+      }) as never })
+
+      expect(asked.join(connection(), 'hall')).toBe(false)
+      await Bun.sleep(20)
+      expect(unhandled).toEqual([])
+    }
+    finally {
+      process.off('unhandledRejection', catcher)
+    }
+
+    const chats = rooms<string>()
+    const gone = connection()
+
+    ;(gone.raw as { readyState?: number }).readyState = 3
+    expect(chats.join(gone, 'hall')).toBe(false)
+    expect(chats.members('hall')).toEqual([])
+  })
+
+  it('reads the route data as written, without a cast', () => {
+    // eslint-disable-next-line ts/no-unsafe-member-access
+    const chats = rooms<string, string>({ member: ws => ws.data.user.name as string })
+
+    expect(chats.join(connection({ user: { name: 'ada' } }), 'hall')).toBe(true)
+    expect(chats.members('hall')).toEqual(['ada'])
   })
 
   it('tells onJoin once per new room, and onLeave on leave with the member it had', async () => {

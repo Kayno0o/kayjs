@@ -761,6 +761,18 @@ process.exit(0)`)
     expect(await (await counter({ store }).handle(new Request('http://localhost/peek', { headers: { cookie: planted } }))).text()).toBe('none')
   })
 
+  it('start() with no maxAge leaves a lifetime an earlier sign-in chose behind', async () => {
+    const app = counter().get('/in/:life', async ({ session, params }) => {
+      await session.start({ count: 1 }, params.life === 'none' ? {} : { maxAge: '90s' })
+
+      return 'in'
+    })
+    const visit = browser(app)
+
+    expect((await visit('/in/long')).set).toContain('Max-Age=90')
+    expect((await visit('/in/none')).set).not.toContain('Max-Age=90')
+  })
+
   it('takes the cookie\'s SameSite and Secure from security.cookies, its own sameSite winning', async () => {
     const defaults = { httpOnly: true, sameSite: 'strict', secure: true, path: '/' } as const
     const read = async (options: Parameters<typeof counter>[0]) => {
