@@ -168,13 +168,13 @@ describe('the headers of every kind of answer', () => {
     await expectAnswer(await get(asset.replace('/nav', '/%2e%2e/nav'), { 'accept-encoding': 'br' }), 404, {})
     expect((await get('/_kay/..%2fpackage.json')).status).toBe(404)
     expect((await get('/_kay/%00')).status).toBe(404)
-    await expectAnswer(await get(files.url(key)), 200, { 'accept-ranges': 'bytes', 'cache-control': IMMUTABLE, 'content-disposition': 'inline', 'content-type': 'image/png' })
+    await expectAnswer(await get(files.url(key)), 200, { 'accept-ranges': 'bytes', 'cache-control': IMMUTABLE, 'content-disposition': 'inline', 'content-length': '2000', 'content-type': 'image/png' })
   })
 
   it('a file route carries them on a range, a missing file, a bad link and a refused method', async () => {
     const ranged = await get(files.url(key), { range: 'bytes=0-9' })
 
-    await expectAnswer(ranged, 206, { 'accept-ranges': 'bytes', 'cache-control': IMMUTABLE, 'content-disposition': 'inline', 'content-range': 'bytes 0-9/2000', 'content-type': 'image/png' })
+    await expectAnswer(ranged, 206, { 'accept-ranges': 'bytes', 'cache-control': IMMUTABLE, 'content-disposition': 'inline', 'content-length': '10', 'content-range': 'bytes 0-9/2000', 'content-type': 'image/png' })
     expect((await ranged.arrayBuffer()).byteLength).toBe(10)
     await expectAnswer(await get('/_kay/files/0123456789abcdef0123.png'), 404, { 'content-type': 'text/plain; charset=utf-8', 'vary': 'accept-encoding' })
     await expectAnswer(await get('/_kay/files/../x'), 404, {})
