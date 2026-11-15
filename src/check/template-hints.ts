@@ -46,6 +46,7 @@ const TAG_NAME = /^[\w$.:-]+$/
 const RICH_KEY_TYPE = /^Argument of type '[^']*' is not assignable to parameter of type '(?:\{ key: )?KeysOf</
 const LITERAL_ARGUMENT = /^Argument of type '"([^']*)"'/
 const QUOTED = /"[^"]*"|'[^']*'/g
+const LITERAL_KEY = /^(["'])([^"']*)\1/
 const RICH_CALL = /\bT\(\s*$/
 const NO_OVERLOAD = /^No overload matches this call\.\n {2}The last overload gave the following error\.\n {4}([\s\S]*)$/
 const UNDECLARED_PROP = /^Type '[\s\S]*?' is not assignable to type '([\s\S]*)'\.\n\s*Property '([\w$-]+)' does not exist on type '[\s\S]*'\.?$/
@@ -485,13 +486,15 @@ export function lastOverload(diagnostic: TsgoDiagnostic, source: string, span: S
 }
 
 // What `T('key')` and `T(id, values)` print of the props form's key type, `KeysOf<{...}>` with the whole catalog inlined, said in a line: the key is the first argument and a literal, and the values follow it.
-export function richCallHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined): TemplateHint | undefined {
+export function richCallHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined, keys: readonly string[] = []): TemplateHint | undefined {
   if (span === undefined || diagnostic.code !== ARGUMENT || !RICH_KEY_TYPE.test(diagnostic.message) || !RICH_CALL.test(source.slice(0, span.start)))
     return undefined
 
   const props = diagnostic.message.includes('{ key:')
-  // TypeScript prints the argument as its literal only where no overload could take the key: a key the catalog lacks, which a lone `T('key')` leaves undistinguished from a key whose values are missing.
-  const written = LITERAL_ARGUMENT.exec(diagnostic.message)?.[1]
+  // TypeScript prints the argument as its literal only where no overload could take the key: a key the catalog lacks, which a lone `T('key')` leaves undistinguished from a key whose values are missing, so the written key is held to the catalog's keys, when known.
+  const typed = LITERAL_ARGUMENT.exec(diagnostic.message)?.[1]
+  const alone = LITERAL_KEY.exec(source.slice(span.start))?.[2]
+  const written = typed ?? (alone !== undefined && keys.length > 0 && !keys.includes(alone) ? alone : undefined)
 
   if (written !== undefined)
     return { span, message: `\`T\` has no message \`${written}\``, help: 'the keys are those of the default locale\'s messages' }

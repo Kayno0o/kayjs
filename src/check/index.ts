@@ -17,6 +17,7 @@ import { pickConfig } from '../config'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
 import { generatedProblem } from './generated'
+import { messageKeys } from './messages'
 import { addImportFixes } from './missing-imports'
 import { configProblems, contentChecks, lintConfigTypeError, projectProblems, withoutMissingCaptcha } from './project'
 import { writeShadowTypes } from './shadow-types'
@@ -187,13 +188,14 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
 
   // A template expression the shadow code writes twice, as a `match` subject, is mistyped twice in one place.
   const seen = new Set<string>()
+  const keys = options.i18n ? await messageKeys(root, options.i18n, options.extensions) : []
 
   for (const diagnostic of reported) {
     if (lintConfigTypeError(root, options.lints, diagnostic))
       continue
 
     const shadow = files.get(diagnostic.file)
-    const diagnosed = shadow && diagnoseShadow(shadow, tsgoDiagnostic(diagnostic, shadow.tsx), levelsOf(shadow))
+    const diagnosed = shadow && diagnoseShadow(shadow, tsgoDiagnostic(diagnostic, shadow.tsx), levelsOf(shadow), keys)
 
     if (shadow ? !diagnosed : !shownOutsideKay(tsgoCode(diagnostic), projectUnused))
       continue

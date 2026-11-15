@@ -4,9 +4,10 @@ import type { Document, LspHost } from './host'
 import type { DocumentDiagnosticReport } from './protocol'
 import { basename, dirname, resolve } from 'node:path'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp } from '../check/diagnose'
+import { messageKeys } from '../check/messages'
 import { lintLevels } from '../compiler/lints'
 import { projectRootOf } from '../project'
-import { ERROR, guard, WARNING } from './host'
+import { ERROR, guard, remembered, WARNING } from './host'
 import { zeroRange } from './mapping'
 import { toOffset, toPosition } from './positions'
 
@@ -171,9 +172,10 @@ export class DiagnosticsQueue {
     const levelAt = lintLevels(document.source, project.options.lints)
     // A template expression the shadow code writes twice, as a `match` subject, is mistyped twice in one place.
     const seen = new Set<string>()
+    const messages = await remembered(project.lookups, 'messages', async () => project.options.i18n ? messageKeys(project.root, project.options.i18n, project.options.extensions) : [])
     const typeErrors = (report?.items ?? []).flatMap(({ relatedInformation: _related, ...diagnostic }) => {
       const start = toOffset(document.tsx, diagnostic.range.start)
-      const diagnosed = diagnoseShadow(document, { code: typeof diagnostic.code === 'number' ? diagnostic.code : undefined, message: diagnostic.message, start, end: toOffset(document.tsx, diagnostic.range.end) }, levelAt)
+      const diagnosed = diagnoseShadow(document, { code: typeof diagnostic.code === 'number' ? diagnostic.code : undefined, message: diagnostic.message, start, end: toOffset(document.tsx, diagnostic.range.end) }, levelAt, messages)
 
       if (!diagnosed || servedByTheApp(document.file, diagnosed.message, project.mounts, project.locales))
         return []

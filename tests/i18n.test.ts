@@ -779,7 +779,7 @@ describe('kay check', () => {
         [8, 'gives intro a <story>, which src/messages/fr.ts has not, so no block renders it'],
       ]))
       // A call of T with no values, or a key that is no literal, says so in a line; the object form and a union of keys are accepted; a failing call nested in a template call keeps its own overloads' message.
-      expect(found.filter(({ file }) => file === 'src/routes/scripted.kay').map(({ message }) => message)).toEqual(['`T` needs the values of its message', '`T` takes the key of a message as a literal', '`T` has no message `nope`', '`T` needs the values of its message'])
+      expect(found.filter(({ file }) => file === 'src/routes/scripted.kay').map(({ message }) => message)).toEqual(['`T` needs the values of its message', '`T` takes the key of a message as a literal', '`T` has no message `nope`', '`T` has no message `nope`'])
       expect(found.filter(({ file }) => file === 'src/routes/nested.kay').map(({ message }) => message.includes('No overload matches') ? 'wrapped' : message)).toEqual(['wrapped', '`T` does not take `nom`'])
       // A script call of T reads like its template twin: a missing placeholder, a missing block and an unknown value are each named.
       expect(found.filter(({ file, line }) => file === 'src/routes/rich.kay' && line <= 7).map(({ message }) => message.match(/Property '(\w+)' is missing|'(\w+)' does not exist/)?.slice(1).find(Boolean))).toEqual(['name', 'docs', 'nom'])

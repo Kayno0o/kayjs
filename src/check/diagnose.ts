@@ -125,7 +125,7 @@ function blockWithoutParameters(diagnostic: TsgoDiagnostic, source: string, span
 }
 
 // A diagnostic in a .kay file's shadow TSX, read at the levels its source gives the lints.
-export function diagnoseShadow(shadow: ShadowFile, reported: TsgoDiagnostic, levelAt: (lint: LintName, offset: number) => LintLevel): Diagnosed | undefined {
+export function diagnoseShadow(shadow: ShadowFile, reported: TsgoDiagnostic, levelAt: (lint: LintName, offset: number) => LintLevel, messageKeys: readonly string[] = []): Diagnosed | undefined {
   const span = sourceSpan(shadow, reported.start, reported.end, 'loose')
   const diagnostic = lastOverload(reported, shadow.source, span)
   const offset = span?.start ?? 0
@@ -164,7 +164,7 @@ export function diagnoseShadow(shadow: ShadowFile, reported: TsgoDiagnostic, lev
   if (blockHelp !== undefined)
     return { message: diagnostic.message, help: blockHelp, span }
 
-  const hint = richCallHint(diagnostic, shadow.source, span) ?? templateHint(diagnostic, shadow.source, span, shadow.tsx)
+  const hint = richCallHint(diagnostic, shadow.source, span, messageKeys) ?? templateHint(diagnostic, shadow.source, span, shadow.tsx)
 
   if (hint === 'duplicate')
     return undefined
