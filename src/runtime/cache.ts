@@ -2,6 +2,7 @@ import type { PositiveDuration } from './checks'
 import type { Duration } from './duration'
 import type { StoreBase } from './store-base'
 import { parse, stringify } from 'devalue'
+import { noteLive, noteNamed, noteRead } from './cache-hooks'
 import { cacheReads } from './counters'
 import { durationSeconds } from './duration'
 import { kayLog } from './log'
@@ -91,8 +92,6 @@ const MAX_UNSTORABLE = 100
 const pageListeners = new Set<(paths: string[]) => void>()
 // What learns of the keys a page render reads, and of the keys an invalidation drops: the server, to refresh the prerendered pages built from them.
 let tracker: Tracker | undefined
-let readListener: ((key: string) => void) | undefined
-let liveListener: ((key: string, tags: readonly string[]) => void) | undefined
 
 type KeyListener = (matches: (key: string) => boolean, dropped: (key: string) => boolean) => string[]
 
@@ -410,16 +409,6 @@ async function waited<T>(key: string, entry: Entry): Promise<T> {
   return value
 }
 
-// Tells the server a render read `key`, a cached value or a collection's entries, so the page it renders is refreshed when `invalidate` drops it.
-export function noteRead(key: string): void {
-  readListener?.(key)
-}
-
-// Tells the server a render read `key` and its page follows it: every open tab shows the page afresh once `invalidate` drops the key, or a tag the value names, even when memory no longer holds the value that knew it.
-export function noteLive(key: string, tags: readonly string[] = []): void {
-  liveListener?.(key, tags)
-}
-
 // The server hears each key a render reads; one listener at a time, which a second import replaces.
 export function trackLoads(track: Tracker): void {
   tracker = track
@@ -431,14 +420,7 @@ async function trackedLoad<T>(load: () => T | Promise<T>): Promise<{ result: T, 
   return tracker ? tracker(run) : { result: await run(), reads: [] }
 }
 
-export function onRead(listener: (key: string) => void): void {
-  readListener = listener
-}
-
-// The server hears each key read with `live: true`, to make the page that read it follow the key.
-export function onLiveRead(listener: (key: string, tags: readonly string[]) => void): void {
-  liveListener = listener
-}
+export { noteLive, noteRead, onKeyNamed, onLiveRead, onRead } from './cache-hooks'
 
 // Hears each invalidation by what it matches, and gives back the keys it refreshed pages for, which go to the other processes too.
 // `dropped` tells the keys whose own value went, which `matches` also does for a key only what is built from it went for.
@@ -495,6 +477,9 @@ export function invalidate(key: Invalidatable): void {
   const matches = typeof key === 'string' ? (name: string) => name === key : key
   const dropped = new Set<string>(typeof key === 'string' ? [key] : [])
 
+  if (typeof key === 'string')
+    noteNamed(key)
+
   dropAndTell(matches, matches, dropped)
 
   if (dropped.size > 0)
@@ -507,6 +492,7 @@ function invalidateFunction(site: string): void {
   const matches = (name: string) => name === site || name.startsWith(prefix)
   const dropped = new Set([site])
 
+  noteNamed(site)
   dropAndTell(matches, matches, dropped)
   broadcast({ keys: [...dropped], prefixes: [prefix] })
 }

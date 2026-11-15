@@ -220,6 +220,46 @@ describe('what a call does once it succeeded', () => {
     }
   })
 
+  it('asks the resources naming an invalidated key again, and leaves an opted-in page alone when they were all it named', async () => {
+    serve(() => new Response(stringify(1), { headers: { 'x-kay-invalidated': '["posts"]' } }))
+
+    const navigate = await import('../src/runtime/navigate-api')
+    const { watchTags } = await import('../src/runtime/resource-tags')
+    const page = spyOn(navigate, 'refresh').mockImplementation(async () => undefined)
+    const refetched: string[] = []
+    const stop = watchTags(['posts'], () => void refetched.push('posts'))
+    const marker = document.createElement('script')
+
+    marker.setAttribute('data-kay-live-refresh', '')
+    mocks.push(page)
+
+    const { navigation } = await import('../src/runtime/navigation')
+    const hooks = navigation.hooks
+
+    navigation.hooks = { hydrate: () => undefined, dispose: () => undefined }
+
+    try {
+      await stub()({})
+      await settle()
+      expect(refetched).toEqual(['posts'])
+      expect(page).toHaveBeenCalledTimes(1)
+      document.head.append(marker)
+      await stub()({})
+      await settle()
+      expect(refetched).toEqual(['posts', 'posts'])
+      expect(page).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      stop()
+      marker.remove()
+
+      if (hooks)
+        navigation.hooks = hooks
+      else
+        delete navigation.hooks
+    }
+  })
+
   it('leaves a call being superseded by a later one without a refresh of the resources it named', async () => {
     const server = gated()
 

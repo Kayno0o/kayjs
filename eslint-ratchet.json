@@ -153,7 +153,7 @@
     "complexity": 54
   },
   "src/runtime/cache.ts": {
-    "max-lines": 627
+    "max-lines": 618
   },
   "src/runtime/dev-inspector.ts": {
     "max-lines-per-function": 190

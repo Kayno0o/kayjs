@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { flush, root, signal } from '../src/runtime'
 import { API_MOUNT, resource } from '../src/runtime/live'
 import { hydrationEnded, hydrationStarted } from '../src/runtime/reactive'
+import { refetchTagged } from '../src/runtime/resource-tags'
 import { limits } from '../src/server/resources'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
@@ -642,5 +643,26 @@ describe('resource() in the browser', () => {
     expect(second.data()).toEqual({ n: 'fresh' })
     expect(second.data()).not.toEqual(old)
     end()
+  })
+  it('refetches a resource that names a tag when a call invalidated it, whatever its route reads, and only then', async () => {
+    const [found, dispose] = root(done => [read(fake, '/tagged', { tags: ['posts'] }), done] as const)
+
+    await until(() => found.status() === 'ready')
+
+    const before = answers
+
+    expect(refetchTagged(['other'])).toEqual(['other'])
+    await Bun.sleep(10)
+    expect(answers).toBe(before)
+    expect(refetchTagged(['posts', 'other'])).toEqual(['other'])
+    await until(() => answers > before)
+    expect(found.status()).toBe('ready')
+
+    const after = answers
+
+    dispose()
+    expect(refetchTagged(['posts'])).toEqual(['posts'])
+    await Bun.sleep(10)
+    expect(answers).toBe(after)
   })
 })

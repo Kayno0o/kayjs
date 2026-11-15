@@ -12,6 +12,7 @@ Every source has `data()`, `status()`, `pending()`, `error()` and `retry()`, and
 - `status()` says where it stands. A value read once is a `LoadStatus`: `idle`, `loading`, `ready` or `failed`, for a `resource`, a `track()` handle, an action and a `local` collection alike. A connection is a `ConnectionStatus`: `idle`, `connecting`, `open`, `done`, `failed` or `closed`, for a stream, a socket and a `live()` handle.
 - `pending()` is a boolean: whether it is loading or connecting, a quiet reload that keeps `ready` and the wait before a reconnect included.
 - `error()` is the last failure as an `ApiError`, kept until the next success. On the server `error()` is `undefined`, `pending()` false and `retry()` does nothing.
+- A `resource` reads once and asks again only for `refresh()`, a changed option, an invalidation of a key its route read with `live: true`, a key named in its `tags` that a call of the page invalidated, and the `revalidate` triggers it is given (`focus`, `reconnect`, an interval): none is the default, `stale` is 0.
 - `retry()` tries again now, skipping any backoff. It does nothing unless the source failed or waits to try again, and after the component is gone. `resource.refresh()` is the one that asks again even when ready.
 
 One block shows any source:

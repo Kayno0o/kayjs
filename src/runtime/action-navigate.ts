@@ -2,6 +2,7 @@ import type { Refreshable } from './action-shared'
 import { skew } from './build'
 import { liveCache } from './cache-live-id'
 import { leave, mayLeave, navigation } from './navigation'
+import { refetchTagged } from './resource-tags'
 import { reload } from './stale'
 
 // The code of `navigate()` and `refresh()`, loaded on first use; a chunk a deploy removed asks the server whether the build changed, which reloads the page; undefined means the code is unavailable.
@@ -36,7 +37,10 @@ export async function refreshedUnlessFollowed(keys: readonly string[] | undefine
   const [navigations, visits] = [navigation.navigations, navigation.visits]
 
   try {
-    if (keys !== undefined && liveCache.loaded && (await import('./live-cache')).follows(keys))
+    // The resources naming a key as a tag ask their route again; the page is left alone when it opted in and follows the rest.
+    const rest = keys === undefined ? undefined : refetchTagged(keys)
+
+    if (rest !== undefined && (rest.length === 0 ? document.querySelector('script[data-kay-live-refresh]') !== null : liveCache.loaded && (await import('./live-cache')).follows(rest)))
       return
   }
   catch {}

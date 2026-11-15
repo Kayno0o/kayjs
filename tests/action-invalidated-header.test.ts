@@ -26,3 +26,14 @@ describe('the keys a call invalidated, named on its answer', () => {
     expect(liveRefreshMark(undefined)).toBe('')
   })
 })
+
+describe('the keys an invalidate names, followed or not', () => {
+  it('reach the keys a call gathers, so a resource naming one as a tag hears it', async () => {
+    const { gatheringInvalidated } = await import('../src/server/live')
+    const { invalidate } = await import('../src/runtime/cache')
+    const keys = new Set<string>()
+
+    gatheringInvalidated(keys, () => invalidate('posts'))
+    expect([...keys]).toEqual(['posts'])
+  })
+})

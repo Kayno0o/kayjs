@@ -4,7 +4,7 @@ import type { LivePage, LiveRequest, LiveUpdate } from '../runtime/live-value'
 import type { ServerScope } from '../runtime/reactive'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { KayError } from '../compiler/errors'
-import { broadcast, onClockHeard, onKeysInvalidated, onLiveRead } from '../runtime/cache'
+import { broadcast, onClockHeard, onKeyNamed, onKeysInvalidated, onLiveRead } from '../runtime/cache'
 import { CACHE_LIVE_ID } from '../runtime/cache-live-id'
 import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, ownLiveDeclared, PROOF_LIFETIME_MS, readViewerWith, slotValue, watchSlot } from '../runtime/live-value'
 import { kayLog } from '../runtime/log'
@@ -344,6 +344,9 @@ export function invalidatedText(keys: ReadonlySet<string>): string | undefined {
 
   return text.length <= MAX_ROUTE_KEY_BYTES ? text : undefined
 }
+
+// A key an `invalidate` names is told to the call that made it, a followed one or not: a `resource` of the page naming it in its `tags` asks its route again.
+onKeyNamed(key => invalidating.getStore()?.add(key))
 
 // An invalidation, this process's or another's, tells the pages following what it dropped: each key gets the time, which only grows and is never before a read another process dated with a clock ahead of this one.
 onKeysInvalidated((matches) => {

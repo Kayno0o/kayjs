@@ -11,9 +11,10 @@ import { connection, connectionHooks, ended } from './connection'
 import { withKeepalive } from './keepalive'
 import { listenerSet } from './listener-set'
 import { serverResource } from './live-resource.server'
-import { revalidating } from './live-revalidate'
+import { askingAgain } from './live-revalidate'
 import { pageData } from './page-data'
 import { effect, isHydrating, onCleanup, onMount, ownSignal, untrack } from './reactive'
+
 import { parseEvents, SENDABLE_ID } from './sse'
 import { decodeServerValue } from './wire'
 
@@ -598,6 +599,8 @@ export interface ResourceExtras<T> {
   revalidate?: Revalidation | readonly Revalidation[] | undefined
   // How long an answer counts as fresh: the `focus` and `reconnect` revalidations leave it be until it is this old, so a tab switched back and forth asks the route once per window. An interval ignores it, `refresh()` and an invalidation ask regardless.
   stale?: Duration | undefined
+  // Keys an action's handler invalidates (`invalidate('posts')`): the resource asks again, quietly, when a call of this page invalidated one, whatever its route reads. A route reading a `cached(..., { live: true })` key needs none, and an invalidation from elsewhere reaches it through its live connection only.
+  tags?: readonly string[] | undefined
   // Called with `{ value }` each time the route answers, a quiet reload and `mutate()` included, not for `initial` or the value the server rendered.
   onData?: ((event: { value: T }) => void) | undefined
   // Called with `{ error }` each time a request fails, not for a quiet reload that keeps the value it has.
@@ -758,8 +761,9 @@ class Entry {
     this.publish()
   }
 
-  revalidate(staleMs = 0): void {
-    if (!this.busy && this.asked !== undefined && !this.gone && Date.now() - this.answeredAt >= staleMs)
+  // `inFlight` asks even while a request runs, which then answers from before what a call changed.
+  revalidate(staleMs = 0, inFlight = false): void {
+    if ((inFlight || !this.busy) && this.asked !== undefined && !this.gone && Date.now() - this.answeredAt >= staleMs)
       void this.load(this.asked, 'quiet')
   }
 
@@ -962,8 +966,7 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
       void next.load(read, 'first')
   })
 
-  if (first?.revalidate !== undefined)
-    revalidating(first.revalidate, first.stale, staleMs => entry?.revalidate(staleMs))
+  askingAgain(first, (staleMs, inFlight) => entry?.revalidate(staleMs, inFlight))
 
   onCleanup(() => {
     gone = true

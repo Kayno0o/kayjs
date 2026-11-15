@@ -255,6 +255,8 @@ button(onClick={add}) Add
 
 Without `revalidate` a resource asks again only for `refresh()`, an invalidation of a key its route read or a changed option, never on focus or reconnect.
 
+`tags: ['posts']` asks the route again, quietly, after a call of the page whose handler ran `invalidate('posts')`, for a route that reads no cached value to follow. An invalidation made by another visitor reaches only a route reading a [followed value](#data-from-the-cache).
+
 `stale: '30s'` counts an answer as fresh for that long: a focus or a reconnect inside the window asks nothing, so a tab switched back and forth asks the route once per window, while an interval, `refresh()` and an invalidation ask regardless. Resources reading the same route and arguments share one request and one value, so identical reads in flight are one.
 
 To send data, call a route from an event handler. See [API routes](/guides/api-routes#calling-a-route-from-an-event-handler).
