@@ -112,8 +112,14 @@ describe('a value restored from a store keeps what it was built from', () => {
     const after = await restart('hands-after')
     const seen: string[] = []
 
-    after.onRead(key => seen.push(key))
-    await after.cached('latest', '600s', () => 'two', { store })
+    const restore = after.onRead(key => seen.push(key))
+
+    try {
+      await after.cached('latest', '600s', () => 'two', { store })
+    }
+    finally {
+      restore()
+    }
     expect(seen).toEqual(['latest', 'collection:news'])
   })
 })

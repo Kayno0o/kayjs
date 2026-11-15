@@ -18,8 +18,15 @@ export function noteNamed(key: string): void {
   namedListener?.(key)
 }
 
-export function onRead(listener: (key: string) => void): void {
+// Gives back what puts the listener before it back.
+export function onRead(listener: (key: string) => void): () => void {
+  const previous = readListener
+
   readListener = listener
+
+  return () => {
+    readListener = previous
+  }
 }
 
 // The server hears each key an `invalidate` names.
