@@ -1,9 +1,10 @@
 import { resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { api } from '../src/server'
 import { testSite } from '../src/test'
 
 const root = resolve(import.meta.dir, 'fixtures/socket-protocol')
-const { default: echo, room } = await import(resolve(root, 'src/api/echo.ts')) as typeof import('./fixtures/socket-protocol/src/api/echo')
+const { default: echo, room, tally } = await import(resolve(root, 'src/api/echo.ts')) as typeof import('./fixtures/socket-protocol/src/api/echo')
 const site = await testSite({ root, islands: false })
 
 // The server the site starts with its first socket, whose port a raw socket needs.
@@ -43,6 +44,19 @@ async function until(done: () => boolean): Promise<void> {
 }
 
 describe('the frames of a websocket route', () => {
+  it('check a room\'s reply that names a model of the app by reference', async () => {
+    const { socket } = await raw('/tally')
+
+    await until(() => tally.members('only').length === 1)
+    expect(() => tally.publish('only', { n: 1 })).not.toThrow()
+    expect(() => tally.publish('only', { n: 'x' } as never)).toThrow('reply')
+    socket.close()
+  })
+
+  it('refuse a route that sets `parse`, as every frame is JSON', () => {
+    expect(() => api().ws('/', { parse: () => 1, message: () => undefined })).toThrow('parse')
+  })
+
   it('hand a handler that throws to the route\'s error hook, the socket staying open', async () => {
     const { socket, frames } = await raw('/boom')
 

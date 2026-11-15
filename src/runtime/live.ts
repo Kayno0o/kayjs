@@ -429,7 +429,7 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
 export type SocketOptions<Module, Path> = UrlOptions<SocketRoute<Module, Path>> & ConnectionHooks<Received<SocketRoute<Module, Path>>> & { onRefused?: ((event: SocketRefusal) => void) | undefined }
 export type SocketOf<Module, Path> = Socket<Sent<SocketRoute<Module, Path>>, Received<SocketRoute<Module, Path>>>
 
-// Opens a websocket route of a module under `src/api` from an island, once it is in the page: messages typed both ways from the route's `body` and `response` schemas, sent as Elysia reads them.
+// Opens a websocket route of a module under `src/api` from an island, once it is in the page: messages typed both ways from the route's `body` and `response` schemas, each message a JSON frame.
 // Reconnects after a drop, and closes with the component that opened it.
 // kept: request
 export function socket<Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path>>): SocketOf<Module, Path> {

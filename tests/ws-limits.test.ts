@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, jest } from 'bun:test'
 import { byteSize } from '../src/runtime/byte-size'
 import { socketLimits } from '../src/server/ws-limits'
 import { testSite } from '../src/test'
@@ -143,6 +143,39 @@ describe('the open sockets of one client', () => {
 
     expect(third).toBeDefined()
     await Promise.all([second!, third!, other!].map(closed))
+  })
+
+  it('hold a route made some other way, in a group, to its cap too', async () => {
+    const first = await opens('/gfew')
+    const second = await opens('/gfew')
+
+    expect(first).toBeDefined()
+    expect(await opens('/gfew')).toBeUndefined()
+    await Promise.all([first!, second!].map(closed))
+    await Bun.sleep(50)
+
+    const again = await opens('/gfew')
+
+    expect(again).toBeDefined()
+    await closed(again!)
+  })
+
+  it('frees the place of an upgrade that never opened once its hold runs out', () => {
+    jest.useFakeTimers()
+
+    try {
+      const server = { requestIP: () => ({ address: '203.0.113.9', family: 'IPv4', port: 1 }) }
+      const hook = socketLimits('/', { connections: 1 })
+      const request = () => new Request('http://localhost/', { headers: { upgrade: 'websocket' } })
+
+      expect(hook({ request: request(), server })).toBeUndefined()
+      expect(hook({ request: request(), server })?.status).toBe(429)
+      jest.advanceTimersByTime(10_001)
+      expect(hook({ request: request(), server })).toBeUndefined()
+    }
+    finally {
+      jest.useRealTimers()
+    }
   })
 
   it('are not counted as one client when the address is unknown, as on a unix socket', () => {

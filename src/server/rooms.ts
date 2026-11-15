@@ -1,4 +1,4 @@
-import type { TSchema } from 'elysia'
+import type { Elysia, TSchema } from 'elysia'
 import type { FSWatcher } from 'node:fs'
 import type { Duration } from '../runtime/duration'
 import type { StoreBase } from '../runtime/store-base'
@@ -132,15 +132,37 @@ const UNWATCHED_POLL_MS = optionMs('25ms', '')
 const IDLE_POLLS = 40
 const KEPT = 30_000
 
+const replyBinders = new WeakMap<object, (app: Elysia) => void>()
+
+// The models and modules an app registered, which a schema naming one by reference needs to check a value.
+export function modelsOf(app: Elysia): { modules: never, models: never, normalize: boolean | undefined } {
+  const { definitions } = app as unknown as { definitions: { typebox: never, type: never } }
+
+  return { modules: definitions.typebox, models: definitions.type, normalize: app.config.normalize as boolean | undefined }
+}
+
+// Hands a route's `response` schema to the rooms it is the `reply` of, along with the app that sends it.
+export function bindReply(schema: unknown, app: Elysia): void {
+  if (typeof schema === 'object' && schema !== null)
+    replyBinders.get(schema)?.(app)
+}
+
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
 export function rooms<Message, Member, State = undefined>(...[options]: [options: RoomsOptions<Message, State, Member> & { member: (ws: RoomConnection) => Member } & (undefined extends State ? unknown : { state: () => State })]): Rooms<Message, Member, State> & { join: (ws: RoomConnection, room: string, member?: Member) => boolean }
 export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, Member>] : [options: RoomsOptions<Message, State, Member> & { state: () => State }]): Rooms<Message, Member, State>
 export function rooms<Message, Member, State>(...[options = {}]: [options?: RoomsOptions<Message, State, Member>]): Rooms<Message, Member, State> {
   const store: RoomStore = options.store ?? memoryRooms()
-  const replyCheck = options.reply === undefined ? undefined : getSchemaValidator(options.reply as never, {})
+  let replyCheck: { Check: (value: unknown) => boolean } | undefined
+
+  // Rebuilds the check with the models of the app whose route sends this `reply` as its `response`, so a `t.Ref` in it resolves.
+  if (options.reply !== undefined)
+    replyBinders.set(options.reply, (app) => { replyCheck = getSchemaValidator(options.reply as never, modelsOf(app)) })
 
   // The text a message goes out as, once the room's `reply` schema has taken it.
   const textOf = (message: unknown): string => {
+    if (options.reply !== undefined)
+      replyCheck ??= getSchemaValidator(options.reply as never, {})
+
     if (replyCheck?.Check(message) === false)
       throw new KayError('socket-reply-invalid', 'kay: a room was sent a message its `reply` schema refuses')
 

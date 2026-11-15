@@ -5,12 +5,13 @@ import { underKayDev } from '../build/assets'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { refusedFields } from './field-errors'
+import { bindReply } from './rooms'
 import { kayWord } from './words'
 import { admissionOf, frameGuard } from './ws-limits'
 
 // The protocol of a websocket route: every frame is JSON, in both directions, so a string, a number, a boolean or `null` reads back as what it was.
 // A message the route refuses is answered `{ error: { key, fields } }`, `key` naming what was wrong and `fields` the words for each field, never the schema.
-export interface SocketRefusal {
+export interface SocketRefusalFrame {
   error: { key: 'kay.socket.notJson' | 'kay.socket.invalid', fields: Record<string, string> }
 }
 
@@ -107,8 +108,8 @@ function decode(frame: string | ArrayBuffer | Uint8Array): { value: unknown } | 
   }
 }
 
-function refusal(key: SocketRefusal['error']['key'], fields: Record<string, string>): string {
-  return JSON.stringify({ error: { key, fields } } satisfies SocketRefusal)
+function refusal(key: SocketRefusalFrame['error']['key'], fields: Record<string, string>): string {
+  return JSON.stringify({ error: { key, fields } } satisfies SocketRefusalFrame)
 }
 
 // A route with no admission, run outside `serveApi`: its messages are still decoded and checked, with no limits.
@@ -308,6 +309,33 @@ export function socketBody(app: Elysia, body: unknown, name: () => string): Body
   }
 }
 
+const ADOPTS = Symbol.for('kay.socketAdopts')
+
+// The `upgrade` option of a route made by the api's `.ws()`: it marks the context the route upgrades in, as its socket is adopted when it opens and is not held to the limits a second time, and marks itself, so the mount can tell the route from one made some other way.
+function adopting(given: unknown): (context: Holding) => unknown {
+  const upgrade = (context: Holding): unknown => {
+    context[ADOPTED] = true
+
+    if (typeof given === 'function')
+      return (given as (context: Holding) => unknown)(context)
+
+    if (typeof given === 'object' && given !== null)
+      Object.assign((context as unknown as { set: { headers: object } }).set.headers, given)
+
+    return undefined
+  }
+
+  Object.defineProperty(upgrade, ADOPTS, { value: true })
+
+  return upgrade
+}
+
+// The hook holding a route to its limits, none for a route the api's `.ws()` made, which adopts its own sockets.
+// Known when the module mounts, as Elysia keeps the options it was given in the route's `websocket` hook: `holdToLimits` is added only to a route that is not.
+export function holdingUnlessAdopted(hooks: unknown, app: Elysia): ((context: Holding) => void)[] {
+  return (hooks as { websocket?: { upgrade?: { [ADOPTS]?: boolean } } } | undefined)?.websocket?.upgrade?.[ADOPTS] === true ? [] : [holdToLimits(app)]
+}
+
 // What a websocket route may be given beside the handlers: the options of Elysia's `.ws()`, which reach it as written.
 export interface SocketOptions extends SocketRoute {
   body?: unknown
@@ -337,23 +365,17 @@ function failing(app: Elysia, error: unknown): NonNullable<SocketRoute['fail']> 
 // `name` is the route as the app sees it, read when a refusal is logged, once the module is mounted.
 export function socketOptions(app: Elysia, options: SocketOptions, name: () => string): SocketOptions {
   const { open, message, close, body } = options
+
+  if (options.parse !== undefined)
+    throw new KayError('config-invalid', `kay: the websocket route ${name()} sets \`parse\`, which a route of an api() module does not take: every frame is JSON`)
+
+  bindReply(options.response, app)
   const route: SocketRoute = { open, message, close, check: message === undefined ? undefined : socketBody(app, body, name)?.check, fail: failing(app, options.error) }
 
   return {
     ...options,
     ...message !== undefined && { body: undefined },
-    // Marks the context the route upgrades in: the socket is adopted when it opens, so it is not held to the limits a second time.
-    upgrade(context: Holding) {
-      context[ADOPTED] = true
-
-      if (typeof options.upgrade === 'function')
-        return (options.upgrade as (context: Holding) => unknown)(context)
-
-      if (typeof options.upgrade === 'object')
-        Object.assign((context as unknown as { set: { headers: object } }).set.headers, options.upgrade)
-
-      return undefined
-    },
+    upgrade: adopting(options.upgrade),
     async open(ws: ElysiaWS) {
       await adopt(ws, route)
     },

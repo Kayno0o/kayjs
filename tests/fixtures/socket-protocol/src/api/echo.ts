@@ -1,3 +1,4 @@
+import { t } from 'elysia'
 import { s } from 'kay'
 import { api, rooms } from 'kay/server'
 
@@ -15,7 +16,17 @@ const answers: Record<string, unknown> = {
   array: [1, 'two', null],
 }
 
+// A reply that names a model of the app by reference, which only the app's own models resolve.
+export const tally = rooms<{ n: number }>({ reply: t.Ref('tally') as never })
+
 export default api()
+  .model({ tally: s.Object({ n: s.Number() }) })
+  .ws('/tally', {
+    response: tally.response,
+    open(ws) {
+      tally.join(ws, 'only')
+    },
+  })
   .ws('/boom', {
     error: () => 'reported',
     message() {
