@@ -3318,6 +3318,26 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     }
   })
 
+  it('checks the context an endpoint declares against its params and the guards above it', async () => {
+    const guard = 'import { guard } from \'kay\'\n\nexport default guard(() => ({ org: \'acme\' }))\n'
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p hi\n',
+      'src/routes/orgs/_guard.ts': guard,
+      'src/routes/orgs/[slug].json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET({ params }: EndpointContext<{ slug: string }, { org: string }>) {\n  return Response.json([params.slug])\n}\n',
+      'src/routes/orgs/[id].xml.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext<{ slug: string }>) {\n  return Response.json(ctx.params)\n}\n',
+      'src/routes/orgs/bare.json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext) {\n  return Response.json(ctx.params)\n}\n',
+      'src/routes/orgs/more.json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext<Record<string, never>, { org: string, role: string }>) {\n  return Response.json(ctx.guard)\n}\n',
+      'src/routes/open/mine.json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport const page = { guards: [() => ({ role: 1 })] }\n\nexport function GET(ctx: EndpointContext<Record<string, never>, { role: number }>) {\n  return Response.json(ctx.guard)\n}\n',
+    })
+
+    try {
+      expect((await refusals(root)).map(([file]) => file)).toEqual(['src/routes/orgs/[id].xml.ts', 'src/routes/orgs/more.json.ts'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a feed without the site\'s URL its links need', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p hi\n',

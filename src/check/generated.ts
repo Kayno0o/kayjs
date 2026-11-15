@@ -67,33 +67,47 @@ export function settingsCheck(root: string, settings: Record<string, string>, di
   ])
 }
 
+// The import of a guard file kept for the type of what it returns.
+function guardAlias(file: string): string {
+  return `kayGuard${Bun.hash(file).toString(36)}`
+}
+
 const NO_VERB = `a handler for a method, ${ENDPOINT_VERBS.slice(0, -1).join(', ')} or ${ENDPOINT_VERBS.at(-1)}: export function GET(ctx: EndpointContext) { return 'text' }`
 
 // Each default export the server calls, a guard's, an API module's or a matcher's, assigned to the type it is called as, so a wrong one is a type error at its file rather than a refusal at boot.
 export function exportsCheck(root: string, routesDir: string, routes: Route[], api: ApiModule[], endpoints: Endpoint[]): Assertions<{ file: string, wanted: string }> {
   const guards = new Set([...routes, ...api, ...endpoints].flatMap(served => served.guards.filter(guard => guard.own !== true).map(guard => guard.file)))
   const matchers = new Set(routes.flatMap(route => Object.values(route.matchers ?? {})).map(matcher => matcherSource(routesDir, matcher)).filter((source): source is string => source !== undefined && source !== 'kay'))
+  const endpointContext = (endpoint: Endpoint) => {
+    const params = `{ ${endpoint.params.map(param => `${IDENTIFIER.test(param) ? param : JSON.stringify(param)}: string`).join(', ')} }`
+    const above = endpoint.guards.filter(guard => guard.own !== true).map(guard => `typeof ${guardAlias(guard.file)}`)
+
+    // What its own `guards` return is not typed, so a handler may name it as it likes.
+    return `EndpointContext<${params}, ${endpoint.guards.some(guard => guard.own === true) ? 'any' : `GuardValues<[${above.join(', ')}]>`}>`
+  }
   const entries: { file: string, type: string, wanted: string, named?: string }[] = [
     ...[...guards].map(file => ({ file, type: 'Guard', wanted: 'a guard by default: export default guard(ctx => ...)' })),
     ...api.map(module => module.extension === undefined
       ? { file: module.file, type: 'PluginInput', wanted: 'a KayPlugin by default: export default api().get(\'/\', () => ...)' }
       : { file: module.file, type: 'PluginInput | ((app: ExtensionApp) => PluginInput | Promise<PluginInput>)', wanted: 'a KayPlugin by default, or a function of the ExtensionApp building one: export default (app: ExtensionApp) => api().get(\'/\', () => ...)' }),
     ...[...matchers].map(file => ({ file, type: '(value: string) => unknown', wanted: 'a matcher by default: export default (value: string) => value or undefined' })),
-    // Its context is the app's to type, `EndpointContext<{ slug: string }>`; what it returns is checked.
+    // A handler is called with the file tree's context, its params and what the guards above it return, so one declaring `EndpointContext<{ slug: string }, { org: Org }>` is checked against it; what it returns is checked too.
     ...endpoints.flatMap((endpoint) => {
-      const type = '(ctx: never) => EndpointBody | Promise<EndpointBody>'
+      const type = `(ctx: ${endpointContext(endpoint)}) => EndpointBody | Promise<EndpointBody>`
       const verbs = fileVerbs(endpoint.file)
 
       // A file exporting none is reported at its import of GET, naming them all.
       return verbs.length === 0 ? [{ file: endpoint.file, type, wanted: NO_VERB, named: 'GET' }] : verbs.map(verb => ({ file: endpoint.file, type, wanted: `a ${verb} handler: export function ${verb}(ctx: EndpointContext) { return 'text' }`, named: verb }))
     }),
   ]
-  const kayTypes = [...guards.size > 0 ? ['Guard'] : [], ...endpoints.length > 0 ? ['EndpointBody'] : []]
+  const endpointGuards = [...new Set(endpoints.flatMap(endpoint => endpoint.guards.filter(guard => guard.own !== true).map(guard => guard.file)))]
+  const kayTypes = [...guards.size > 0 ? ['Guard'] : [], ...endpoints.length > 0 ? ['EndpointBody', 'EndpointContext', 'GuardValues'] : []]
 
   // An import that finds no such export is reported at the import, a wrong one at its check.
   return assertions([
     ...kayTypes.length > 0 ? [`import type { ${kayTypes.join(', ')} } from 'kay'`] : [],
     ...api.length > 0 ? [`import type { ${api.some(module => module.extension !== undefined) ? 'ExtensionApp, ' : ''}PluginInput } from 'kay/server'`] : [],
+    ...endpointGuards.map(file => ({ code: `import type ${guardAlias(file)} from ${modulePath(root, file)}`, about: { file, wanted: 'a guard by default: export default guard(ctx => ...)' } })),
     ...entries.map(({ file, wanted, named }, index) => ({ code: `import ${named === undefined ? `kayExport${index}` : `{ ${named} as kayExport${index} }`} from ${modulePath(root, file)}`, about: { file, wanted } })),
     '',
     ...entries.map(({ file, wanted, type }, index) => ({ code: `export const kayCheck${index}: ${type} = kayExport${index}`, about: { file, wanted } })),

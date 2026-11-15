@@ -83,6 +83,21 @@ describe('KayPlugin', () => {
     expect(app).toBeInstanceOf(Elysia)
   })
 
+  it('types ctx.guard of an api() module from its own guards, beside what it names for those above', () => {
+    const org = () => ({ org: 'acme' })
+    const role = async () => ({ role: 1 })
+    const one = api({ guards: org })
+    const list = api({ guards: [org, role] })
+    const named = api<{ who: string }>({ guards: [org] })
+    const none = api({ guards: false })
+
+    expect([one, list, named, none]).toHaveLength(4)
+    expectTypeOf<LocalsOf<typeof one>['guard']['org']>().toEqualTypeOf<string>()
+    expectTypeOf<LocalsOf<typeof list>['guard']>().toExtend<{ org: string, role: number }>()
+    expectTypeOf<LocalsOf<typeof named>['guard']>().toExtend<{ who: string }>()
+    expectTypeOf<LocalsOf<typeof none>['guard']>().toEqualTypeOf<object>()
+  })
+
   it('reads the locals of a plugin from its global or its scoped side', () => {
     expectTypeOf<LocalsOf<KayPlugin<{ user: string }>>['user']>().toEqualTypeOf<string>()
     expectTypeOf<LocalsOf<KayPlugin<{ user: string }, 'scoped'>>['user']>().toEqualTypeOf<string>()

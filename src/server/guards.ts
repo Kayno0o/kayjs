@@ -6,7 +6,7 @@ import { importModule } from './bundle'
 import { guardList, isGuardOption } from './lazy-guard'
 import { guardValues, handOn, startGuardValues } from './request-scope'
 
-export type { GuardOption } from './lazy-guard'
+export type { GuardOption, OwnGuardValues } from './lazy-guard'
 
 // Where `api({ guards })` keeps the module's own guards on its instance, as it keeps its `cors` and `rateLimit`.
 const API_GUARDS = Symbol('kay.api.guards')

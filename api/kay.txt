@@ -2697,7 +2697,9 @@ function siteOrigin(): string
 function siteUrl(path?: string): string
 
 [./server] api
-function api<Guarded extends object = object>(options?: ApiOptions): KayPlugin<ApiRequest<Guarded>>
+function api<Guarded extends object = object, GuardOption | boolean | const Own extends GuardOption | readonly Guard[] | undefined | undefined = boolean>(options?: Omit<ApiOptions, "guards"> & {
+  guards?: Own;
+}): KayPlugin<ApiRequest<Guarded & OwnGuardValues<Own>>>
 
 [./server] ApiModule
 interface ApiModule
@@ -2852,6 +2854,7 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   markdown?: Checked<"markdown" extends keyof Config ? Config[keyof Config & "markdown"] : unknown, MarkdownConfig, [unknown]>;
   contentConfig?: unknown;
   extensions?: unknown;
+  guards?: Checked<"guards" extends keyof Config ? Config[keyof Config & "guards"] : unknown, GuardsConfig, [unknown]>;
   store?: Checked<"store" extends keyof Config ? Config[keyof Config & "store"] : unknown, AppStore, [unknown]>;
   dirs?: Checked<"dirs" extends keyof Config ? Config[keyof Config & "dirs"] : unknown, DirsConfig, [unknown]>;
   limits?: Checked<"limits" extends keyof Config ? Config[keyof Config & "limits"] : unknown, LimitsConfig, [unknown]>;
@@ -2867,7 +2870,6 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   manifest?: Checked<"manifest" extends keyof Config ? Config[keyof Config & "manifest"] : unknown, ManifestConfig, [unknown]>;
   entry?: unknown;
   fonts?: unknown;
-  guards?: Checked<"guards" extends keyof Config ? Config[keyof Config & "guards"] : unknown, GuardsConfig, [unknown]>;
   requireGuards?: unknown;
   openapi?: Checked<"openapi" extends keyof Config ? Config[keyof Config & "openapi"] : unknown, OpenApiConfig, [unknown]>;
   mcp?: Checked<"mcp" extends keyof Config ? Config[keyof Config & "mcp"] : unknown, McpConfig, [unknown]>;

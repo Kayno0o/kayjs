@@ -50,7 +50,7 @@ A layout with a page under it that sets `guards: false` is left untyped, since i
 
 `ctx.guard` is empty on a page that sets `guards: false`, and a prerendered page has none, since its guards run when it is served. `ctx.locals` stays what the app's Elysia plugins add.
 
-An API route reads `guard` and `once` from its handler's context, the same values. The module names the type of what its guards return, `api<{ org: Org }>()`, which `kay check` does not verify against the guards.
+An API route reads `guard` and `once` from its handler's context, the same values. The module's own `guards` are typed from the option, `api({ guards: [needsKey] })`; the type of what the guards above it return is named, `api<{ org: Org }>()`, which `kay check` does not verify. An endpoint's `EndpointContext<{ slug: string }, { org: Org }>` is checked against its params and the `_guard.ts` files above it.
 
 ## Sharing a load
 

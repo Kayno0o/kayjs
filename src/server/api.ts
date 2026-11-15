@@ -1,7 +1,7 @@
 import type { Server } from 'bun'
 import type { Context, TSchema, ValidationError } from 'elysia'
 import type { ExtensionApp } from '../config'
-import type { Locals } from '../runtime'
+import type { Guard, Locals } from '../runtime'
 import type { ActionTool, RateLimit } from '../runtime/action'
 import type { ByteSize } from '../runtime/byte-size'
 import type { Once } from '../runtime/core'
@@ -10,7 +10,7 @@ import type { ActionOptions } from './actions'
 import type { ApiModule } from './api-modules'
 import type { BodyLimit, RouteBodyLimit } from './body'
 import type { CorsOptions, CorsRule } from './cors'
-import type { GuardOption, LoadedGuard } from './guards'
+import type { GuardOption, LoadedGuard, OwnGuardValues } from './guards'
 import type { MountedApi } from './openapi'
 import type { KayPlugin } from './plugin'
 import type { SocketLimits } from './ws-limits'
@@ -810,8 +810,8 @@ export interface ApiOptions {
 type ApiRequest<Guarded extends object> = ApiLocals & { guard: Guarded, once: Once }
 
 // An Elysia instance for a module under `src/api` whose handlers read what the app's `derive` and `resolve` add, typed through `Register` as `ctx.locals` is, and `ctx.guard` and `ctx.once` as a page does.
-// `Guarded` names what the guards above the module return, `api<{ org: Org }>()`; it is an assertion kay does not check, as a library guard's locals are.
-export function api<Guarded extends object = object>(options: ApiOptions = {}): KayPlugin<ApiRequest<Guarded>> {
+// What the module's own `guards` return is typed from the option; `Guarded` names what the guards above the module return, `api<{ org: Org }>()`, an assertion kay does not check, as a library guard's locals are.
+export function api<Guarded extends object = object, const Own extends GuardOption | readonly Guard[] | boolean | undefined = GuardOption | boolean | undefined>(options: Omit<ApiOptions, 'guards'> & { guards?: Own } = {}): KayPlugin<ApiRequest<Guarded & OwnGuardValues<Own>>> {
   const instance = new Elysia()
 
   // `guard` is empty until the module's guards run, which set it, so a `derive` or `resolve` of the module's own reads none; only `request` is read, so Elysia parses nothing more for it.
@@ -838,7 +838,7 @@ export function api<Guarded extends object = object>(options: ApiOptions = {}): 
   // `.ws()` returns the instance, so the chain goes on as it was written.
   instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, decoded(instance, path, socketOptions))) as typeof instance.ws
 
-  return kayPlugin(instance) as unknown as KayPlugin<ApiRequest<Guarded>>
+  return kayPlugin(instance) as unknown as KayPlugin<ApiRequest<Guarded & OwnGuardValues<Own>>>
 }
 
 // The first thing a schema finds wrong with a value, as text.

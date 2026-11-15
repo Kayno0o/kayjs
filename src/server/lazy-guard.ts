@@ -1,4 +1,4 @@
-import type { Guard } from '../runtime/core'
+import type { Guard, GuardValue, GuardValues } from '../runtime/core'
 
 // A guard built when the first request reaches it, so kay.config.ts imports nothing of the app's auth or database: `{ load: async () => (await import('./src/auth')).auth.guard({ require: 'admin' }) }`.
 export interface LazyGuard {
@@ -7,6 +7,9 @@ export interface LazyGuard {
 
 // What a `guard` option takes: one guard, a list run in order, or a lazy one.
 export type GuardOption = Guard | Guard[] | LazyGuard
+
+// What the guards an option lists hand on: a guard's return, or a list's together; a `{ load }`, `false` or an option left as a wide type adds nothing typed.
+export type OwnGuardValues<Own> = [Own] extends [readonly [unknown, ...unknown[]]] ? GuardValues<Own> : [Own] extends [(...args: never[]) => unknown] ? GuardValue<Own> : object
 
 // Whether a value is a `GuardOption`: a guard, a `{ load }`, or a list holding at least one of them.
 export function isGuardOption(value: unknown): value is GuardOption {
