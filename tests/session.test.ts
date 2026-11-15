@@ -13,6 +13,7 @@ import { configuredSite, setSite } from '../src/runtime/site'
 import { lengthMs } from '../src/runtime/store-base'
 import { memorySessions, session, sqliteSessions } from '../src/server'
 import { setupStore } from '../src/server/app-store'
+import { defaultCookies } from '../src/server/cookies'
 import { maintenanceOverview, stopMaintenance } from '../src/server/maintenance'
 import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
@@ -740,6 +741,38 @@ process.exit(0)`)
     await visit('/rotate')
     expect((await visit('/peek')).text).toBe('2')
     expect(await (await counter({ store }).handle(new Request('http://localhost/peek', { headers: { cookie: planted } }))).text()).toBe('none')
+  })
+
+  it('start() moves to a new id, holds the data and gives the session its maxAge at once', async () => {
+    const store = memorySessions()
+    const app = counter({ store }).get('/in', async ({ session }) => {
+      await session.start({ count: 7 }, { maxAge: '90s' })
+
+      return 'in'
+    })
+    const visit = browser(app)
+
+    await visit('/count')
+    const planted = (await visit('/count')).cookie()
+    const { set } = await visit('/in')
+
+    expect(Number((/Max-Age=(\d+)/i).exec(set!)?.[1])).toBe(90)
+    expect((await visit('/peek')).text).toBe('7')
+    expect(await (await counter({ store }).handle(new Request('http://localhost/peek', { headers: { cookie: planted } }))).text()).toBe('none')
+  })
+
+  it('takes the cookie\'s SameSite and Secure from security.cookies, its own sameSite winning', async () => {
+    const defaults = { httpOnly: true, sameSite: 'strict', secure: true, path: '/' } as const
+    const read = async (options: Parameters<typeof counter>[0]) => {
+      const app = new Elysia().use(counter(options))
+
+      defaultCookies(app, defaults)
+
+      return (await app.handle(new Request('http://localhost/count'))).headers.getSetCookie()[0]!
+    }
+
+    expect(await read({})).toMatch(/SameSite=Strict.*Secure|Secure.*SameSite=Strict/)
+    expect(await read({ sameSite: 'lax' })).toContain('SameSite=Lax')
   })
 
   for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {

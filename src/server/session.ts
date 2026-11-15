@@ -23,6 +23,7 @@ import { inMemory } from './memory-mark'
 import { WORKER_INDEX } from './parent'
 import { kayPlugin } from './plugin'
 import { onReload } from './reload'
+import { requestRecord } from './request-record'
 import { overHttps, requestUrl } from './request-url'
 import { readPersonally } from './scope'
 import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, warnLowEntropy, weakSecrets } from './seal'
@@ -65,7 +66,7 @@ export interface SessionOptions {
   browserMaxAge?: Duration | undefined
   // The parent domain sibling hosts share the session under, `example.com` for `app.example.com` and `auth.example.com`, the visited host or a parent of it; the cookie is the visited host's only without it.
   domain?: string | undefined
-  // Whether the browser sends the cookie along a request another site starts, a link followed or a form posted from there: `'lax'` by default sends it on a link's navigation and not on a post; `'strict'` on neither, so a visitor following a link from elsewhere arrives signed out; `'none'` on all, for a site embedded in another's page, and always `Secure`, which browsers ask of it.
+  // Whether the browser sends the cookie along a request another site starts: `security.cookies.sameSite` (`'lax'` by default) unless given here. A link followed or a form posted from there: `'lax'` by default sends it on a link's navigation and not on a post; `'strict'` on neither, so a visitor following a link from elsewhere arrives signed out; `'none'` on all, for a site embedded in another's page, and always `Secure`, which browsers ask of it.
   sameSite?: SameSite | undefined
   // Keeps the data server-side, the cookie carrying only an id: the app's `store.sessions` in kay.config.ts by default, else the SQLite file `data/app.sqlite` that kay and its libraries share (`data/sessions.sqlite` where it exists; memory under `bun test`). `false` keeps the data sealed in the cookie instead, about 3.5 KB at most and never revocable by the session itself, for a host with no disk of its own.
   store?: SessionStore | false | undefined
@@ -87,6 +88,8 @@ export interface Session<Data extends object> {
   destroy: () => Promise<void>
   // Moves the data to a new id, for right after signing in, so an id planted before it is worth nothing.
   regenerate: () => Promise<void>
+  // Signs in: moves the session to a new id, so an id planted before it is worth nothing, holds `data` in it and gives it its own `maxAge` (`'90d'`, or `'browser'`), in one call that cannot leave out `regenerate()`.
+  start: (data: Partial<Data>, options?: { maxAge?: Duration | 'browser' | undefined }) => Promise<void>
   // This session's own maxAge in place of `maxAge`, kept until it is destroyed, for "remember me": a string such as '90d', or 'browser' for a cookie the browser drops on closing, lasting `browserMaxAge` without being used.
   maxAge: (maxAge: Duration | 'browser') => Promise<void>
   // The lifetimes the plugin resolved as durations such as '2592000s', defaults included: for a library that must agree with the app's session instead of asking for them again.
@@ -216,7 +219,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
     throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
 
-  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store === false ? undefined : options.store ?? appStore()?.sessions ?? (config.revokedElsewhere ? undefined : openDefaultSessions()), get keys() {
+  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite, maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store === false ? undefined : options.store ?? appStore()?.sessions ?? (config.revokedElsewhere ? undefined : openDefaultSessions()), get keys() {
     return secrets().keys
   }, onCreate: options.onCreate, onDestroy: options.onDestroy, revokedElsewhere: false }
 
@@ -275,7 +278,7 @@ function sharedDomain(domains: string[] | undefined, request: Request): string |
 
 interface SessionConfig {
   name: string
-  sameSite: SameSite
+  sameSite: SameSite | undefined
   maxAge: number
   absoluteMaxAge: number
   browserMaxAge: number
@@ -358,6 +361,16 @@ class RequestSession<Data extends object> implements Session<Data> {
     this.id = undefined
     this.started = undefined
     this.changed = true
+  }
+
+  async start(data: Partial<Data>, options: { maxAge?: Duration | 'browser' | undefined } = {}): Promise<void> {
+    await this.regenerate()
+
+    for (const [key, value] of Object.entries(data))
+      this.data[key] = value
+
+    if (options.maxAge !== undefined)
+      await this.maxAge(options.maxAge)
   }
 
   get settings(): SessionSettings {
@@ -489,7 +502,10 @@ class RequestSession<Data extends object> implements Session<Data> {
 
   // Without `maxAge`, a cookie the browser drops on closing.
   private cookie(value: string, maxAge: number | undefined): string {
-    return new Bun.Cookie(this.name, value, { path: '/', ...this.domain === undefined ? {} : { domain: this.domain }, httpOnly: true, sameSite: this.config.sameSite, secure: this.secure || this.config.sameSite === 'none', ...maxAge === undefined ? {} : { maxAge } }).serialize()
+    const defaults = requestRecord(this.request).cookieDefaults
+    const sameSite = this.config.sameSite ?? defaults?.sameSite ?? 'lax'
+
+    return new Bun.Cookie(this.name, value, { path: '/', ...this.domain === undefined ? {} : { domain: this.domain }, httpOnly: true, sameSite, secure: this.secure || sameSite === 'none' || defaults?.secure === true, ...maxAge === undefined ? {} : { maxAge } }).serialize()
   }
 }
 

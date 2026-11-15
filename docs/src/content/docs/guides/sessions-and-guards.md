@@ -101,7 +101,7 @@ Add `deleteWhere(match)` to support ending every session of one person. It delet
 
 A session lasts `maxAge` without use, 30 days by default. It never lasts longer than `absoluteMaxAge` from its start or its last `regenerate()`, 90 days by default.
 
-So call `regenerate()` at sign-in, not on every request.
+So call `start()` (or `regenerate()`) at sign-in, not on every request.
 
 ### Knowing when a session starts or ends
 
@@ -111,11 +111,10 @@ A forged or expired cookie being cleared tells nothing, and neither does `regene
 
 ### Remember me
 
-`maxAge()` gives one session its own `maxAge` in place of the plugin's. Call it right after `regenerate()`. It takes a string such as `'90d'`, and never goes past `absoluteMaxAge`.
+`start(data, { maxAge })` gives one session its own `maxAge` in place of the plugin's. It takes a string such as `'90d'`, and never goes past `absoluteMaxAge`. `maxAge()` alone does the same for a session already started.
 
 ```ts
-await ctx.locals.session.regenerate()
-await ctx.locals.session.maxAge(input.remember ? '90d' : 'browser')
+await ctx.locals.session.start({ userId: user.id }, { maxAge: input.remember ? '90d' : 'browser' })
 ```
 
 `'browser'` sends a cookie the browser drops when it closes. The server keeps that session for `browserMaxAge` without use, one day by default.
@@ -164,7 +163,7 @@ The cookie is `HttpOnly` and `SameSite=Lax`. Over https it is `Secure` and named
 
 `cookie` changes the name from `kay_session`.
 
-`sameSite` changes what the browser does with it on a request another site starts. `'lax'`, the default, sends it on a link followed from elsewhere and not on a post.
+`security.cookies` in `kay.config.ts` sets `SameSite` and `Secure` for the session cookie as for every cookie of the app, and `sameSite` here overrides it for this plugin alone. It changes what the browser does with it on a request another site starts. `'lax'`, the default, sends it on a link followed from elsewhere and not on a post.
 
 `'strict'` sends it on neither, so a visitor arriving from another site is signed out until they navigate within yours, and a provider redirecting back to a sign-in fails.
 
@@ -184,7 +183,7 @@ Behind a proxy, every location passes `X-Forwarded-Proto`, websockets included. 
 
 ## Signing in and out
 
-Call `regenerate()` right after signing in, and `destroy()` to sign out. Both return promises.
+Call `start(data)` to sign in, which moves the session to a new id, and `destroy()` to sign out. Both return promises.
 
 ```kay
 --- server
@@ -201,8 +200,7 @@ export const signIn = action(credentials, async (input, ctx) => {
   if (!user)
     return ctx.fail(401, { message: 'Wrong email or password' })
 
-  await ctx.locals.session.regenerate()
-  await ctx.locals.session.set('userId', user.id)
+  await ctx.locals.session.start({ userId: user.id })
   ctx.redirect('/')
 })
 

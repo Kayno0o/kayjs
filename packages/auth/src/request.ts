@@ -88,6 +88,7 @@ function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, 
     settings: session.settings,
     regenerate: write(async () => session.regenerate()),
     maxAge: write(async maxAge => session.maxAge(maxAge)),
+    start: write(async (data, options) => session.start(data, options)),
   }
 }
 

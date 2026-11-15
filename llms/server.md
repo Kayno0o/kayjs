@@ -47,7 +47,7 @@ Mount it from `src/plugins/session.ts` (`export default sessions`, see above), o
 
 ### Sign a visitor in
 
-`regenerate()` moves the data to a new id right after a sign-in, then `set` stores the user, and `get` reads it back:
+`start(data)` signs a visitor in: it moves the session to a new id (so an id planted before it is worth nothing), holds `data` in it, and `get` reads it back. `regenerate()`, `set` and `maxAge()` do the same one at a time:
 
 ```kay
 --- server
@@ -64,8 +64,7 @@ export const signIn = action(credentials, async (input, ctx) => {
   if (!user)
     return ctx.fail(401, { message: 'Wrong email or password' })
 
-  await ctx.locals.session.regenerate()
-  await ctx.locals.session.set('userId', user.id)
+  await ctx.locals.session.start({ userId: user.id })
   ctx.redirect('/')
 })
 
@@ -90,7 +89,7 @@ export const signOut = action(async ctx => {
 
 ### Remember a visitor for longer
 
-`maxAge()` gives this session its own `maxAge` in place of the plugin's, right after `regenerate()`:
+`start(data, { maxAge })` gives this session its own `maxAge` in place of the plugin's (`'90d'`, or `'browser'`); `maxAge()` does it on its own:
 
 ```kay
 --- server
@@ -108,9 +107,7 @@ export const signIn = action(credentials, async (input, ctx) => {
   if (!user)
     return ctx.fail(401, { message: 'Wrong email or password' })
 
-  await ctx.locals.session.regenerate()
-  await ctx.locals.session.set('userId', user.id)
-  await ctx.locals.session.maxAge(input.remember ? '90d' : 'browser')
+  await ctx.locals.session.start({ userId: user.id }, { maxAge: input.remember ? '90d' : 'browser' })
   ctx.redirect('/')
 })
 ---
@@ -234,6 +231,7 @@ export default defineConfig({ guards: { default: 'closed' } }) // 'open' keeps e
 - `deleteWhere(match)` on `memorySessions()` and `sqliteSessions(path)` (with `store: sqliteData(path)`, `sqliteSessions` of the same path is its store, or `sqliteData(path).sessions`) deletes every session whose data `match` accepts (`{ userId }`, fields held equal and narrowed in SQL best by a string or a long number, or a function over the data, read 500 at a time), a person's once they asked to be erased or changed their password say, resolving with how many went; `sqliteSessions` also drops expired sessions every hour.
 - Values cross as island props do, Dates, Maps, Sets and bigints included.
 - The cookie, `kay_session` unless `cookie` names another, is `HttpOnly`, `SameSite=Lax`, `Path=/`, and over https `Secure` and named `__Host-kay_session`, so no other host of the site can set it; code reading kay's session cookie by hand looks for that name over https.
+- The cookie's `SameSite` and `Secure` follow `security.cookies` (`sameSite`, `secure: true`) like every cookie of the app, and `session({ sameSite })` overrides the former for this plugin alone.
 - `sameSite: 'strict'` keeps the cookie off every request another site starts, a followed link included, so a visitor arriving from elsewhere is signed out until they navigate within the site, and a provider's redirect back to a sign-in fails; `'none'` sends it on every request, for a site embedded in another's page, and is always `Secure`, which browsers ask of it, so over plain http only `localhost` keeps it; anything but `'lax'`, `'strict'` and `'none'` throws. The cross-site check on actions still refuses a post from another site whatever the cookie.
 - Over https means the request's URL or its `X-Forwarded-Proto`; a request with no `X-Forwarded-Proto` at all counts as https in production (`NODE_ENV=production`) when `site` in kay.config.ts is https.
 - The cookie is read under the name for the request's scheme, so behind a proxy every location passes `X-Forwarded-Proto`, the websocket's included: one that sends `http` where the browser came over https reads no session.
