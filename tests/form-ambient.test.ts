@@ -30,5 +30,14 @@ describe('the same lines in an island', () => {
 
     expect(tsx).toContain('KayFormHere()')
     expect(tsx).toContain('KayPendingCall(')
+    expect(tsx).toMatch(/import \{[^}]*formHere as KayFormHere[^}]*\} from 'kay\/internal'/)
+    expect(tsx).toMatch(/import \{[^}]*formError as KayFormError[^}]*\} from 'kay\/internal'/)
+  })
+
+  it('import what they read when a component given an action is the form around them', () => {
+    const { tsx } = compileKay('---\nimport Form from \'./form.kay\'\nimport { add } from \'./add\'\n---\nForm(action={add})\n  error title\n  pending\n    p Saving\n', join(process.cwd(), 'row.kay'), { output: 'dom', hydratable: true })
+
+    expect(tsx).toMatch(/import \{[^}]*formHere as KayFormHere[^}]*\} from 'kay\/internal'/)
+    expect(tsx).toMatch(/import \{[^}]*formError as KayFormError[^}]*\} from 'kay\/internal'/)
   })
 })

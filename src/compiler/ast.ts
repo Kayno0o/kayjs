@@ -533,7 +533,7 @@ export interface TemplateFacts {
   ui?: UiEntry | undefined
   // The action of the form each node sits in, from `formTargets`.
   forms: Map<Node, Span>
-  // Whether an `error` or a `pending` line sits in no `form(action)` of this file, so it follows the form it renders in, as a snippet or a component's does.
+  // Whether an `error` or a `pending` line sits in no `form(action)` of this file, or in a component given an `action`, so it follows the form it renders in, as a snippet or a component's does.
   ambientForm: boolean
   // The nodes of `forms` whose form is a component given an `action`.
   loose: Set<Node>
@@ -772,10 +772,10 @@ function factsOf(file: KayFile): TemplateFacts {
     }
     else if (node.kind === 'error') {
       facts.classes.push(...node.classes.map(text))
-      facts.ambientForm ||= !targets.has(node)
+      facts.ambientForm ||= !targets.has(node) || loose.has(node)
     }
     else if (node.kind === 'pending') {
-      facts.ambientForm ||= !targets.has(node)
+      facts.ambientForm ||= !targets.has(node) || loose.has(node)
     }
   })
 
