@@ -844,6 +844,25 @@ describe('form hooks of an action', () => {
     expect(seen).toHaveLength(3)
   })
 
+  it('hear the posts of a .with() form, whose URL carries the fixed fields as a query the event leaves out', () => {
+    const seen: string[] = []
+    const dispose = reactive.root((end) => {
+      const add = actionStub('/_kay/action/test/options?id=1') as unknown as Hooks
+
+      add.onStart(() => seen.push('start'))
+      add.onData(() => seen.push('data'))
+      add.onError(({ error }) => seen.push(`error:${error.status}`))
+
+      return end
+    })
+
+    fire('start', { data: new FormData() })
+    fire('success', { data: new FormData() })
+    fire('error', { status: 0, errors: {}, data: new FormData() })
+    expect(seen).toEqual(['start', 'data', 'error:0'])
+    dispose()
+  })
+
   it('stop sooner with the function they return, and log a listener that throws', () => {
     const seen: string[] = []
     const original = console.error

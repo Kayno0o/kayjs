@@ -35,6 +35,15 @@ function announce(form: HTMLFormElement, type: 'start' | 'success' | 'error', de
   form.dispatchEvent(new CustomEvent(`kay:action-${type}`, { bubbles: true, detail }))
 }
 
+function copyOf(data: FormData): FormData {
+  const copy = new FormData()
+
+  for (const [name, value] of data)
+    copy.append(name, value)
+
+  return copy
+}
+
 // The message per field a refused post's page carries, as an `ActionError` would: read from the outcome the server wrote into it.
 function refusedErrors(page: string): Record<string, string> {
   const script = new DOMParser().parseFromString(page, 'text/html').querySelector(`script[${OUTCOME_SCRIPT}]`)
@@ -201,7 +210,8 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     const work = document.querySelector(`[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(action, undefined, form, data) : undefined
     const body = multipart ? data : urlEncoded(data)
 
-    announce(form, 'start', { action, data })
+    // A copy, so a listener changing the fields it is told of changes nothing of what is posted.
+    announce(form, 'start', { action, data: copyOf(data) })
     response = await post(url, body, form, work, delivery)
 
     // A challenge an island's call spent, or one gone stale, is refused with a fresh one: solved, the form goes again once.
