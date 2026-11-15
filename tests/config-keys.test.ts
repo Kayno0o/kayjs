@@ -6,7 +6,7 @@ import { mergeBags, REMOVED_KEYS, unknownConfigKeys } from '../src/config-shape'
 describe('the config keys of before 1.88', () => {
   it('names the key that replaced a removed one', () => {
     expect(unknownConfigKeys({ routes: 'a', api: 'b', content: 'c', storage: 'd', maxSizes: {}, settings: {}, fileStore: undefined })).toEqual(['`routes`, moved to `dirs.routes`', '`api`, moved to `dirs.api`', '`content`, moved to `contentConfig`', '`storage`, moved to `store.files`', '`maxSizes`, moved to `limits.byPath`', '`settings`, moved to `librarySettings`', '`fileStore`, moved to `store.files`'])
-    expect(unknownConfigKeys({ routesDir: 'a', compress: false, onError: () => undefined, saveData: false })).toEqual(['`routesDir`, moved to `dirs.routes`', '`compress`, moved to `serve.compress`', '`onError`, moved to `observe.onError`', '`saveData`, moved to `client.saveData`'])
+    expect(unknownConfigKeys({ routesDir: 'a', compress: false, onError: () => undefined, saveData: false })).toEqual(['`routesDir`, moved to `dirs.routes`', '`compress`, moved to `serve.compress`', '`saveData`, moved to `client.saveData`'])
     expect(unknownConfigKeys({ prefech: 'eager', compres: false })).toEqual(['`prefech`, did you mean `prefetch`, moved to `client.prefetch`?', '`compres`, did you mean `compress`, moved to `serve.compress`?'])
     expect(unknownConfigKeys({ setting: {}, contnt: 'x' })).toEqual(['`setting`, did you mean `settings`, moved to `librarySettings`?', '`contnt`, did you mean `content`, moved to `contentConfig`?'])
   })
