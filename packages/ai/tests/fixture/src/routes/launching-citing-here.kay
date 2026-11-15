@@ -1,0 +1,8 @@
+--- server
+import { reply } from './echoing.kay'
+--- script
+import ChatLauncher from '@kayjs/ai/chat-launcher.kay'
+
+---
+h1 Launching citing here
+ChatLauncher(action={reply} label="Assistant" newTab={false})
