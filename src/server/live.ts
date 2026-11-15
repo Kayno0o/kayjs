@@ -81,6 +81,8 @@ const cacheReads = new AsyncLocalStorage<CacheReads>()
 const readers = new Set<string>()
 // Least recently read or watched first.
 const stamped = new Set<string>()
+// The tags each followed key's value names, kept here as memory may drop the value that knew them: an invalidation of one still reaches the pages following the key.
+const tagged = new Map<string, readonly string[]>()
 // The last invalidation time of each key a page followed, which a connection sends first: the declaration gives 0 to a key never invalidated.
 const stamps = (live as (initial: (key: string) => number, id: string, name: string) => { set: (key: string, value: number) => void, delete: (key: string) => void })((): number => 0, CACHE_LIVE_ID, 'cache')
 
@@ -217,7 +219,7 @@ export function routeProof(request: Request): string | undefined {
   return encodeURIComponent(encodeValue(cachePage([...reads.at])))
 }
 
-onLiveRead((key) => {
+onLiveRead((key, tags) => {
   const reads = cacheReads.getStore()
 
   if (reads === undefined || reads.at.has(key))
@@ -235,6 +237,12 @@ onLiveRead((key) => {
   reads.at.set(key, stampNow())
 
   remember(key)
+
+  if (tags.length > 0)
+    tagged.set(key, tags)
+  else
+    tagged.delete(key)
+
   announce(Date.now())
 })
 
@@ -285,6 +293,7 @@ function remember(key: string): void {
 
     stamped.delete(old)
     stamps.delete(old)
+    tagged.delete(old)
   }
 }
 
@@ -294,6 +303,7 @@ export function forgetStamps(): void {
     stamps.delete(key)
 
   stamped.clear()
+  tagged.clear()
 }
 
 // Whether the render in progress read a key with `live: true`, which its page follows.
@@ -319,13 +329,20 @@ const MAX_INVALIDATED = 20
 
 // Names the keys a call's handler invalidated on its answer, for the page to tell whether its live connection shows them; a header dropped by the cap on keys or on length makes the client refresh the page.
 export function invalidatedHeader(keys: ReadonlySet<string>, headers: Headers, called: boolean): void {
-  if (!called || keys.size === 0 || keys.size > MAX_INVALIDATED)
-    return
+  const text = called ? invalidatedText(keys) : undefined
+
+  if (text !== undefined)
+    headers.set(INVALIDATED_HEADER, text)
+}
+
+// The keys as a header or a stream's end event carries them, none when there are no keys or too many for a page to follow.
+export function invalidatedText(keys: ReadonlySet<string>): string | undefined {
+  if (keys.size === 0 || keys.size > MAX_INVALIDATED)
+    return undefined
 
   const text = encodeURIComponent(JSON.stringify([...keys]))
 
-  if (text.length <= MAX_ROUTE_KEY_BYTES)
-    headers.set(INVALIDATED_HEADER, text)
+  return text.length <= MAX_ROUTE_KEY_BYTES ? text : undefined
 }
 
 // An invalidation, this process's or another's, tells the pages following what it dropped: each key gets the time, which only grows and is never before a read another process dated with a clock ahead of this one.
@@ -339,7 +356,7 @@ onKeysInvalidated((matches) => {
   const into = invalidating.getStore()
 
   for (const key of stamped) {
-    if (matches(key)) {
+    if (matches(key) || tagged.get(key)?.some(matches) === true) {
       lastStamp = at
       stamps.set(key, at)
       into?.add(key)

@@ -594,7 +594,7 @@ export interface ResourceExtras<T> {
   key?: string | undefined
   // `false` keeps the server from asking the route: the resource renders `loading` and the browser asks it, for a route whose answer or side effects belong to the browser's own request, such as an editor reading the entry it edits.
   seed?: boolean | undefined
-  // Asks the route again quietly, the value kept and the status still `ready`, and stops with the component.
+  // Asks the route again quietly, the value kept and the status still `ready`, and stops with the component. Left out, the resource asks again only for `refresh()`, an invalidation of a key its route read or a changed option, never on focus or reconnect.
   revalidate?: Revalidation | readonly Revalidation[] | undefined
   // How long an answer counts as fresh: the `focus` and `reconnect` revalidations leave it be until it is this old, so a tab switched back and forth asks the route once per window. An interval ignores it, `refresh()` and an invalidation ask regardless.
   stale?: Duration | undefined

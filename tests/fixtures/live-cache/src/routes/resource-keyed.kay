@@ -1,0 +1,7 @@
+--- server
+import Nav from '../components/nav.kay'
+import KeyedResource from '../components/keyed-resource.kay'
+---
+Nav
+h1 Keyed
+KeyedResource

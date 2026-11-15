@@ -619,4 +619,27 @@ describe('resource() in the browser', () => {
     await until(() => answers > before)
     dispose()
   })
+  it('starts a new island loading, with no value of the one that unmounted, while its read is out', async () => {
+    const [first, dispose] = root(done => [read(fake, '/remount', {}), done] as const)
+
+    await until(() => first.status() === 'ready')
+
+    const old = first.data()
+
+    dispose()
+
+    const slow = Promise.withResolvers<unknown>()
+
+    gates.push(slow)
+
+    const [second, end] = root(done => [read(fake, '/remount', {}), done] as const)
+
+    expect(second.status()).toBe('loading')
+    expect(second.data()).toBeUndefined()
+    slow.resolve({ n: 'fresh' })
+    await until(() => second.status() === 'ready')
+    expect(second.data()).toEqual({ n: 'fresh' })
+    expect(second.data()).not.toEqual(old)
+    end()
+  })
 })

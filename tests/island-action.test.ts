@@ -245,6 +245,23 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     await page.waitFor('#answer-Go', { text: '1:Go' })
     expect(page.errors).toEqual([])
   })
+
+  it('sends them with a call made through track()', async () => {
+    const page = await site.open('/fixed-track', { path })
+
+    await page.click('button.track')
+    await page.waitFor('p.tracked', { text: 'ok 2:Go' })
+    await page.waitFor('p.state', { text: 'ready' })
+    expect(page.errors).toEqual([])
+  })
+
+  it('puts them over the fields of a FormData the call is given', async () => {
+    const page = await site.open('/fixed-form', { path })
+
+    await page.click('button.form')
+    await page.waitFor('p.formed', { text: '3:Go' })
+    expect(page.errors).toEqual([])
+  })
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island typing its prop as a plain function', () => {

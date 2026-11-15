@@ -254,6 +254,40 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a resour
     expect(second.errors).toEqual([])
   })
 
+  it('tells onData once for the answer an invalidation brought, whichever of the resources sharing a key set it', async () => {
+    change(7)
+
+    await using page = await site.open('/resource-keyed')
+
+    await page.waitUntil(() => document.querySelector('p.answer')?.textContent === '7 via ready', { timeout: '5s' })
+    expect(await page.evaluate(() => document.querySelector('p.heard')?.textContent)).toBe('')
+    change(8)
+    await page.waitUntil(() => document.querySelector('p.mirror')?.textContent === '8', { timeout: '5s' })
+    expect(await page.evaluate(() => document.querySelector('p.heard')?.textContent)).toBe('8;')
+    expect(page.errors).toEqual([])
+  })
+
+  it('shows no value from before it unmounted when the island mounts again', async () => {
+    change(30)
+
+    await using page = await site.open('/resource')
+
+    await page.waitUntil(...shows(30))
+    await page.click('a.plain')
+    await page.waitFor('h1', { text: 'Plain' })
+    change(31)
+    await page.evaluate(() => {
+      const seen: string[] = []
+
+      Object.assign(window, { seen })
+      new MutationObserver(() => seen.push(document.querySelector('p.answer')?.textContent ?? '')).observe(document.body, { subtree: true, childList: true, characterData: true })
+    })
+    await page.click('a.resource')
+    await page.waitUntil(...shows(31))
+    expect((await page.evaluate(() => (window as unknown as { seen: string[] }).seen)).some(text => text.startsWith('30 '))).toBe(false)
+    expect(page.errors).toEqual([])
+  })
+
   it('opens no connection and loads no chunk for a resource whose route reads no live key', async () => {
     await using page = await site.open('/resource-plain')
 

@@ -34,7 +34,7 @@ import { pageLocale } from '../runtime/words.server'
 import { actionClash } from './action-clash'
 import { hooksOf, refusedBeforeRun, tellError, tellSuccess, withActionDefaults } from './action-hooks'
 import { withFixedFields, withoutEmptyFiles } from './action-input'
-import { isAsyncIterable, lastOf, started, streamed } from './action-iterable'
+import { gathering, isAsyncIterable, lastOf, started, streamed } from './action-iterable'
 import { routerPath } from './base'
 import { importModule } from './bundle'
 import { timeoutMs } from './config-limits'
@@ -643,14 +643,15 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // A call reads a stream as it comes; a plain form post or an agent gets its last value, as a handler returning it would.
     const streams = isAsyncIterable(result) && isCall(request) && !isAgentCall(request)
-    const answer = isAsyncIterable(result) ? await (streams ? started(result, requestSignal(request)) : lastOf(result, requestSignal(request))) : result
+    const answer = isAsyncIterable(result) ? await (streams ? started : lastOf)(gathering(result, invalidated), requestSignal(request)) : result
 
     await countGoneThrough(action, request, context.server, options)
     await tellSuccess(lists, run, answer)
 
-    invalidatedHeader(invalidated, headers, isCall(request))
+    // A stream names its keys on its end event, as the handler goes on invalidating until then.
+    invalidatedHeader(invalidated, headers, isCall(request) && !streams)
 
-    return streams ? streamed(request, jar, headers, answer as AsyncIterable<unknown>, status, options) : succeeded(action, request, jar, headers, answer, status, options.base)
+    return streams ? streamed(request, jar, headers, answer as AsyncIterable<unknown>, status, options, invalidated) : succeeded(action, request, jar, headers, answer, status, options.base)
   }
   catch (error) {
     forgetOnces(request)

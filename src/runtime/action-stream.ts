@@ -4,6 +4,7 @@ import type { ConnectionStatus } from './live'
 import { ActionRedirectError } from './action-error'
 import { apiErrorOf } from './api-error'
 import { connection, connectionHooks, ended } from './connection'
+import { invalidatedKeys } from './invalidated-keys'
 import { listenerSet } from './listener-set'
 import { decodeServerValue } from './wire'
 
@@ -22,13 +23,17 @@ export interface Retrying<T> {
 
 // kay's own answer holds one line per value, so it is read here rather than by live.ts's reader: what this module imports of the runtime loads up front on every page, so it takes `settled` from its caller too.
 // Values arriving before the first `on()`, until the task the call resolved in ends, go to it when it comes. `failure` is what `ended()` rejects with for a stream that failed, an `ActionError` its caller makes.
-export function actionStream<T>(response: Response, settled: typeof SETTLED, failure: () => Error, retrying?: Retrying<T>): ActionStream<T> & Settles {
+// `invalidated` is told the keys the end event names, which the handler invalidated while it streamed, just before the stream is done.
+export function actionStream<T>(response: Response, settled: typeof SETTLED, failure: () => Error, retrying?: Retrying<T>, invalidated?: (keys: string[] | undefined) => void): ActionStream<T> & Settles {
   const link = connection<T>(() => undefined, false)
   const opened = listenerSet<{ reconnected: boolean }>()
   let early: T[] | undefined
   let run = 0
 
-  const end = (final: ConnectionStatus) => {
+  const end = (final: ConnectionStatus, keys?: string[]) => {
+    if (final === 'done')
+      invalidated?.(keys)
+
     if (final === 'failed')
       link.fail(failure() as ApiError)
     else
@@ -48,9 +53,9 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
 
       early?.push(value)
       link.receive(value)
-    }, (final) => {
+    }, (final, keys) => {
       if (mine === run)
-        end(final)
+        end(final, keys)
     })
     setTimeout(() => {
       early = undefined
@@ -132,16 +137,28 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
 }
 
 // A body running out before its end event, failing to read or sending a value that does not decode ends the stream as failed and stops it on the server; one already closed stays closed.
-async function read<T>(reader: ReadableStreamDefaultReader<Uint8Array>, receive: (value: T) => void, end: (final: ConnectionStatus) => void): Promise<void> {
+async function read<T>(reader: ReadableStreamDefaultReader<Uint8Array>, receive: (value: T) => void, end: (final: ConnectionStatus, keys?: string[]) => void): Promise<void> {
   const decoder = new TextDecoder()
   let buffer = ''
+  // Set once the end event's line came: its data line, the keys, follows before the blank line that closes it.
+  let ending = false
+  let keys: string[] | undefined
+
+  const finish = async () => {
+    end('done', keys)
+    await cancel(reader)
+  }
 
   try {
     for (;;) {
       const { done, value } = await reader.read()
 
-      if (done)
+      if (done) {
+        if (ending)
+          return await finish()
+
         break
+      }
 
       buffer += decoder.decode(value, { stream: true })
 
@@ -150,11 +167,26 @@ async function read<T>(reader: ReadableStreamDefaultReader<Uint8Array>, receive:
       buffer = lines.pop() ?? ''
 
       for (const line of lines) {
-        if (line === END || line === ERROR) {
-          end(line === END ? 'done' : 'failed')
+        if (line === ERROR) {
+          end('failed')
           await cancel(reader)
 
           return
+        }
+
+        if (line === END) {
+          ending = true
+
+          continue
+        }
+
+        if (ending) {
+          if (line.startsWith(DATA))
+            keys = invalidatedKeys(line.slice(DATA.length))
+          else if (line === '')
+            return await finish()
+
+          continue
         }
 
         if (line.startsWith(DATA))

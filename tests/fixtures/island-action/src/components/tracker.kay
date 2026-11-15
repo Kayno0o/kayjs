@@ -1,0 +1,17 @@
+---
+import type { Action } from 'kay'
+import { signal } from 'kay'
+
+const { run } = props<{ run: Action<{ name: string }, string> }>()
+const save = run.track()
+const shown = signal('')
+
+async function go() {
+  const result = await save({ name: 'Go' })
+
+  shown = result.ok ? `ok ${result.data}` : `refused ${result.status}`
+}
+---
+button.track(type="button" onClick={go} disabled={save.pending()}) Track
+p.tracked {shown()}
+p.state {save.status()}

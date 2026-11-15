@@ -6,6 +6,9 @@ import { t } from 'elysia'
 import { action, ActionError, ActionRedirectError, encodeCall, readActionResponse, SETTLED } from '../src/runtime/action'
 import { actionStream } from '../src/runtime/action-stream'
 import { ApiError } from '../src/runtime/api-error'
+import { cached } from '../src/runtime/cache'
+import { encodeValue } from '../src/runtime/wire'
+import { inLiveReads } from '../src/server/live'
 import { browserPath, testSite } from '../src/test'
 import { untilHolds } from './helpers/until-holds'
 
@@ -17,6 +20,7 @@ const actions = await import(join(fixture, 'routes/index.kay')) as {
   count: Action<{ to: number }, AsyncIterable<number>>
   dated: Action<Record<never, never>, AsyncIterable<{ at: Date, tags: Map<string, number> }>>
   thenable: Action<Record<never, never>, AsyncIterable<string>>
+  invalidating: Action<Record<never, never>, AsyncIterable<number>>
   empty: Action<Record<never, never>, AsyncIterable<never>>
   breaksEarly: Action<Record<never, never>, AsyncIterable<never>>
   breaksLate: Action<Record<never, never>, AsyncIterable<number>>
@@ -123,6 +127,26 @@ describe('an action returning an async iterable', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toStartWith('text/event-stream')
     expect(await response.text()).toContain('event: end')
+  })
+
+  it('names the followed keys it invalidated on its end event, not on the answer that opened it', async () => {
+    await inLiveReads(async () => Promise.all([cached('stream-first', '1m', () => 1, { live: true }), cached('stream-last', '1m', () => 1, { live: true })]))
+
+    const response = await posted(actions.invalidating)
+    const text = await response.text()
+    const end = text.slice(text.indexOf('event: end')).split('\n')
+
+    expect(response.headers.has('x-kay-invalidated')).toBe(false)
+    expect(JSON.parse(decodeURIComponent(end[1]!.slice('data: '.length)))).toEqual(['stream-first', 'stream-last'])
+  })
+
+  it('hands the keys of the end event to the call that read the stream', async () => {
+    const keys: (string[] | undefined)[] = []
+    const body = new Response(`data: ${encodeValue(1)}\n\nevent: end\ndata: %5B%22posts%22%5D\n\n`)
+    const stream = actionStream<number>(body, SETTLED, () => new Error('failed'), undefined, found => keys.push(found))
+
+    await stream.ended()
+    expect(keys).toEqual([['posts']])
   })
 
   it('carries values devalue encodes', async () => {

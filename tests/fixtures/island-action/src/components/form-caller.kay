@@ -1,0 +1,17 @@
+---
+import type { Action } from 'kay'
+import { signal } from 'kay'
+
+const { run } = props<{ run: Action<{ name: string }, string> }>()
+const answer = signal('')
+
+async function go() {
+  const form = new FormData()
+
+  form.append('name', 'Go')
+  form.append('id', '99')
+  answer = await run(form)
+}
+---
+button.form(type="button" onClick={go}) Form
+p.formed {answer()}

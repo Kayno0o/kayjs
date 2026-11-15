@@ -1,6 +1,7 @@
 import type { ActionOptions } from './actions'
 import type { CookieJar } from './cookies'
 import { eventBody } from './event-stream'
+import { gatheringInvalidated, invalidatedText } from './live'
 import { reportServerError } from './report'
 
 export function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
@@ -65,11 +66,25 @@ export async function started(source: AsyncIterable<unknown>, signal: AbortSigna
   }
 }
 
-// A call to a handler returning an async iterable gets its values as server-sent events, `readActionResponse` reading them as a stream; a throw past the first value ends it as failed.
-export function streamed(request: Request, jar: CookieJar, headers: Headers, source: AsyncIterable<unknown>, status: number, { onError }: ActionOptions): Response {
+// The iterable, each step of it run as the handler's own, so the keys it invalidates while it streams reach `keys`.
+export function gathering(source: AsyncIterable<unknown>, keys: Set<string>): AsyncIterable<unknown> {
+  return {
+    [Symbol.asyncIterator]: () => {
+      const iterator = source[Symbol.asyncIterator]()
+
+      return {
+        next: async () => gatheringInvalidated(keys, async () => iterator.next()),
+        return: async (value?: unknown) => gatheringInvalidated(keys, async () => await iterator.return?.(value) ?? { done: true, value }),
+      }
+    },
+  }
+}
+
+// A call to a handler returning an async iterable gets its values as server-sent events, `readActionResponse` reading them as a stream; a throw past the first value ends it as failed. The end event names the followed keys the handler invalidated, as an answer's header does, which the page then leaves to its live connection.
+export function streamed(request: Request, jar: CookieJar, headers: Headers, source: AsyncIterable<unknown>, status: number, { onError }: ActionOptions, invalidated: ReadonlySet<string>): Response {
   jar.writeTo(headers)
   headers.set('content-type', 'text/event-stream; charset=utf-8')
   headers.set('cache-control', 'no-cache')
 
-  return new Response(eventBody(source, error => reportServerError(error, request, onError)), { status, headers })
+  return new Response(eventBody(source, error => reportServerError(error, request, onError), undefined, () => invalidatedText(invalidated)), { status, headers })
 }

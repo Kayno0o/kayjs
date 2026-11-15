@@ -350,7 +350,9 @@ In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from an
 
 The page is loaded again after a call that went through, unless you pass `{ refresh: false }`.
 
-A page with `liveRefresh: true` in its `page` settings skips the reload when the handler invalidated only [cached values](/guides/live-and-realtime) the page follows: its live connection shows them a moment after the answer. `{ refresh: true }` always loads the page. A visitor clicking a link meanwhile is not affected: the reload waits for the link's page, and is dropped when that page shows another URL or the link ends in a full load.
+A page with `liveRefresh: true` in its `page` settings skips the reload when the handler invalidated only [cached values](/guides/live-and-realtime) the page follows: its live connection shows them a moment after the answer. A streaming handler counts the same, by what it invalidated until the stream ends.
+
+`{ refresh: true }` always loads the page. A visitor clicking a link meanwhile is not affected: the reload waits for the link's page, and is dropped when that page shows another URL or the link ends in a full load.
 
 While an island's `onSubmit` returns a promise, the form and its submit buttons are `aria-busy`, and a second submit is ignored until the promise settles.
 

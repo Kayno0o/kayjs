@@ -92,7 +92,7 @@ const pageListeners = new Set<(paths: string[]) => void>()
 // What learns of the keys a page render reads, and of the keys an invalidation drops: the server, to refresh the prerendered pages built from them.
 let tracker: Tracker | undefined
 let readListener: ((key: string) => void) | undefined
-let liveListener: ((key: string) => void) | undefined
+let liveListener: ((key: string, tags: readonly string[]) => void) | undefined
 
 type KeyListener = (matches: (key: string) => boolean, dropped: (key: string) => boolean) => string[]
 
@@ -280,7 +280,7 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
     noteRead(tag)
 
   if (options.live)
-    noteLive(key)
+    noteLive(key, tagKeys)
 
   // A visitor in preview mode sees what the load gives now, which no other visitor gets.
   if (bypass)
@@ -415,9 +415,9 @@ export function noteRead(key: string): void {
   readListener?.(key)
 }
 
-// Tells the server a render read `key` and its page follows it: every open tab shows the page afresh once `invalidate` drops the key.
-export function noteLive(key: string): void {
-  liveListener?.(key)
+// Tells the server a render read `key` and its page follows it: every open tab shows the page afresh once `invalidate` drops the key, or a tag the value names, even when memory no longer holds the value that knew it.
+export function noteLive(key: string, tags: readonly string[] = []): void {
+  liveListener?.(key, tags)
 }
 
 // The server hears each key a render reads; one listener at a time, which a second import replaces.
@@ -436,7 +436,7 @@ export function onRead(listener: (key: string) => void): void {
 }
 
 // The server hears each key read with `live: true`, to make the page that read it follow the key.
-export function onLiveRead(listener: (key: string) => void): void {
+export function onLiveRead(listener: (key: string, tags: readonly string[]) => void): void {
   liveListener = listener
 }
 

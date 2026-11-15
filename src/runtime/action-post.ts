@@ -7,6 +7,7 @@ import { goTo } from './action-navigate'
 import { closeWithCaller, SETTLED } from './action-owner'
 import { withBase } from './base'
 import { skew } from './build'
+import { invalidatedKeys } from './invalidated-keys'
 import { withKeepalive } from './keepalive'
 import { prefetched } from './navigation'
 import { FAILURE_HEADER, INVALIDATED_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
@@ -128,7 +129,10 @@ export async function readActionResponse<Output>(response: Response, action: str
         caller?.retried?.(again)
       },
     }
-    const stream = (await import('./action-stream')).actionStream(response, SETTLED, () => new ActionError(500, '', {}, undefined, `The stream of ${action} failed after its first value`), retrying)
+    const stream = (await import('./action-stream')).actionStream(response, SETTLED, () => new ActionError(500, '', {}, undefined, `The stream of ${action} failed after its first value`), retrying, (keys) => {
+      if (caller)
+        caller.invalidated = keys
+    })
 
     closeWithCaller(stream, caller)
 
@@ -148,16 +152,4 @@ export async function readActionResponse<Output>(response: Response, action: str
   }
 
   return (body === '' ? undefined : decodeServerValue(body)) as Output
-}
-
-// The keys of the header, URL-encoded JSON; one that does not read as a list of texts names none.
-function invalidatedKeys(header: string): string[] | undefined {
-  try {
-    const keys: unknown = JSON.parse(decodeURIComponent(header))
-
-    return Array.isArray(keys) && keys.every(key => typeof key === 'string') ? keys : undefined
-  }
-  catch {
-    return undefined
-  }
 }

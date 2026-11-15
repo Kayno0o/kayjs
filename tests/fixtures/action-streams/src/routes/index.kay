@@ -1,6 +1,7 @@
 --- server
 import { t } from 'elysia'
 import { action } from 'kay'
+import { invalidate } from 'kay/cache'
 import { t as translate } from 'kay/i18n'
 import { seen } from '../seen'
 
@@ -21,6 +22,14 @@ export const thenable = action(() => ({
     yield 'one two'
   },
 }))
+
+// Drops a followed key after its first value and another once the last one is out, which the call's answer names when the stream ends.
+export const invalidating = action(async function* () {
+  yield 1
+  invalidate('stream-first')
+  yield 2
+  invalidate('stream-last')
+})
 
 export const empty = action(async function* () {})
 

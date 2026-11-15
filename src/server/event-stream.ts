@@ -90,7 +90,8 @@ function localizedIterable<T>(source: AsyncIterable<T> | Iterable<T>, state: Non
 }
 
 // The body of an event stream, a source's failure handed to `report`.
-export function eventBody<T>(source: Source<T>, report: (error: unknown) => void, id?: (value: T) => string | number): ReadableStream<Uint8Array> {
+// `endData` gives the text the end event carries, read when the source is done.
+export function eventBody<T>(source: Source<T>, report: (error: unknown) => void, id?: (value: T) => string | number, endData?: () => string | undefined): ReadableStream<Uint8Array> {
   let iterator: AsyncIterator<T> | Iterator<T> | undefined
   let heartbeat: ReturnType<typeof setInterval> | undefined
   let cancelled = false
@@ -104,9 +105,11 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
   }
 
   const finish = (controller: ReadableStreamDefaultController<Uint8Array>, event: string) => {
+    const data = event === END_EVENT ? endData?.() : undefined
+
     leave()
     clearInterval(heartbeat)
-    controller.enqueue(encoder.encode(`event: ${event}\ndata:\n\n`))
+    controller.enqueue(encoder.encode(`event: ${event}\ndata:${event === END_EVENT && data !== undefined ? ` ${data}` : ''}\n\n`))
     controller.close()
   }
 
