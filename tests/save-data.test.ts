@@ -71,7 +71,7 @@ describe.each([
   ['prerendered', 'prerendered'],
 ] as const)('a page %s', (_name, kind) => {
   const served = async (config: Record<string, unknown> = {}) => {
-    const options = { dirs: { routes: ROUTES }, fonts: FONTS, security: { csp: { 'style-src': ['\'self\''] } }, ...config }
+    const options = { dirs: { routes: ROUTES }, assets: { fonts: FONTS }, security: { csp: { 'style-src': ['\'self\''] } }, ...config }
 
     if (kind === 'request')
       return { app: await pages({ ...options, prebuilt: false }), remove: async () => undefined }
@@ -210,7 +210,7 @@ describe.each([
 
 describe('a prerendered page', () => {
   it('gives a visitor saving data an uncompressed copy of its own while the others keep the compressed ones', async () => {
-    const options = { dirs: { routes: ROUTES }, fonts: FONTS }
+    const options = { dirs: { routes: ROUTES }, assets: { fonts: FONTS } }
     const build = await scratchBuild(options)
 
     try {
@@ -246,7 +246,7 @@ describe('a prerendered page', () => {
 describe('a prerendered page with server islands', () => {
   it('is spliced plain for a visitor saving data, its head lightened', async () => {
     const routes = 'tests/fixtures/server-islands/src/routes'
-    const options = { dirs: { routes }, fonts: FONTS }
+    const options = { dirs: { routes }, assets: { fonts: FONTS } }
     const build = await scratchBuild(options)
 
     try {

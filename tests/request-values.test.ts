@@ -15,7 +15,7 @@ import { pages } from './shared-pages'
 const FIXTURE = 'tests/fixtures/request-values'
 const CONTEXT = resolve(`${FIXTURE}/lib/context.ts`)
 const EXTENSION = { name: 'values', context: CONTEXT }
-const I18N = { locales: ['en', 'fr'], defaultLocale: 'en' }
+const I18N = { locales: ['en', 'fr'], default: 'en' }
 
 interface Variant { base: string, dev: boolean, locale: boolean }
 
