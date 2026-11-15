@@ -260,3 +260,26 @@ describe('onNavigate', () => {
     dispose()
   })
 })
+
+describe('onStart, onError and onStall', () => {
+  it('tell an island of the swap\'s events, as objects, until its disposer or island ends them', () => {
+    const seen: string[] = []
+    let stop: () => void = () => undefined
+    const dispose = island(() => {
+      stop = state.navigation.onStart(({ url }) => seen.push(`start ${url.href}`))
+      state.navigation.onStall(({ url }) => seen.push(`stall ${url.href}`))
+      state.navigation.onError(({ url, error }) => seen.push(`error ${url.href} ${error.status} ${error.message} ${String(error.cause)} ${error instanceof ApiError}`))
+    })
+    const fire = (type: string, detail: object) => document.dispatchEvent(new CustomEvent(`kay:navigate-${type}`, { detail }))
+
+    fire('start', { url: TARGETS[0]!.href })
+    fire('stall', { url: TARGETS[1]!.href })
+    fire('error', { url: TARGETS[0]!.href, error: Object.assign(new Error('gave up', { cause: 'offline' }), { status: 0 }) })
+    stop()
+    fire('start', { url: TARGETS[1]!.href })
+    expect(seen).toEqual([`start ${TARGETS[0]!.href}`, `stall ${TARGETS[1]!.href}`, `error ${TARGETS[0]!.href} 0 gave up offline true`])
+    dispose()
+    fire('stall', { url: TARGETS[0]!.href })
+    expect(seen).toHaveLength(3)
+  })
+})

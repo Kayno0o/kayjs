@@ -7,6 +7,9 @@ interface Action<Input = never, Output = unknown, Honeypot extends string = neve
   data: () => Final<Exclude<Output, Failure<unknown>>> | undefined
   error: (field?: "" | Extract<keyof Input, string> | Honeypot | undefined) => string | undefined
   failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
+  onData: (listener: (event: { input: FormData; }) => void) => () => void
+  onError: (listener: (event: { error: ApiError<unknown>; input: FormData; }) => void) => () => void
+  onStart: (listener: (event: { input: FormData; }) => void) => () => void
   pending: () => boolean
   progress: () => number | undefined
   refused: (error: unknown) => error is ActionError<FailureData<Output>>
@@ -58,6 +61,7 @@ class ActionError
 [.] ActionErrorDetail
 interface ActionErrorDetail
   action: string
+  data: FormData
   errors: Record<string, string>
   status: number
 
@@ -137,6 +141,7 @@ type ActionStream<T> = Connection<T>
 [.] ActionSuccessDetail
 interface ActionSuccessDetail
   action: string
+  data: FormData
 
 [.] announce
 function announce(text: string, within?: Element | null): void
@@ -758,11 +763,20 @@ function navigate<const Href extends string>(href: Href & CheckedHref<Href>, opt
 interface NavigateEvent
   url: URL
 
+[.] NavigateFailure
+interface NavigateFailure
+  error: ApiError<unknown>
+  url: URL
+
 [.] NavigateOptions
 interface NavigateOptions
   replace?: boolean | undefined
   scroll?: "keep" | "top" | undefined
   transition?: boolean | undefined
+
+[.] NavigateStart
+interface NavigateStart
+  url: URL
 
 [.] navigation
 const navigation: {
@@ -771,7 +785,10 @@ const navigation: {
   to: () => URL | undefined;
   error: () => ApiError<unknown> | undefined;
   onBeforeNavigate: (fn: (event: BeforeNavigate) => Promise<boolean | void> | boolean | void) => () => void;
+  onStart: (fn: (event: NavigateStart) => unknown) => () => void;
   onNavigate: (fn: (event: NavigateEvent) => unknown) => () => void;
+  onError: (fn: (event: NavigateFailure) => unknown) => () => void;
+  onStall: (fn: (event: NavigateStart) => unknown) => () => void;
 }
 
 [.] NavigationState
@@ -1342,6 +1359,9 @@ interface ServerAction<Spec extends Schema, Output, Honeypot extends string = ne
   error: (field?: "" | Extract<keyof Sendable<Static<Spec>>, string> | Honeypot | undefined) => string | undefined
   failed: () => FormFailure<Sendable<Static<Spec>>, FailureData<Output>, Honeypot> | undefined
   handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>
+  onData: (listener: (event: { input: FormData; }) => void) => () => void
+  onError: (listener: (event: { error: ApiError<unknown>; input: FormData; }) => void) => () => void
+  onStart: (listener: (event: { input: FormData; }) => void) => () => void
   pending: () => boolean
   progress: () => number | undefined
   protection?: ResolvedProtection

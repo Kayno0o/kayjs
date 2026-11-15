@@ -353,6 +353,8 @@ Each block replaces its branch in place as it lands, keeping the focus and the s
 
 A stream that sends nothing for `client.pageTimeout` leaves the pending branches as they are and fires `kay:navigate-stall` on `document`, with `event.detail.url`. `kay:navigate-start` fires when a swap begins, and `kay:navigate-error` when it gives up and the browser loads the page in full, with `event.detail.url` and, for the error, `event.detail.error`.
 
+These are for a plain script. An island calls `navigation.onStart`, `navigation.onStall` and `navigation.onError`, with `({ url, error })`, and `navigation.onNavigate` for `kay:navigate`; they end with the island. [Events](/reference/events) maps each event to its hook.
+
 An island can follow a navigation without listening to events. `navigation.status()` is `'loading'` while the next page is fetched, `'swapping'` while it is put in place and `'idle'` otherwise, `navigation.pending()` says whether one is under way, `navigation.to()` is the address being navigated to and `navigation.error()` is an `ApiError` (status 0, since no page answered) for why the last swap gave up. That is enough for a loading bar:
 
 ```kay
@@ -382,7 +384,7 @@ A form with `method="get"` swaps the page in place as a link does, with its fiel
 
 ### Ask before leaving unsaved changes
 
-`guardLeave` from `kay` asks before the page is left while its function returns true.
+`guardLeave` from `kay` asks before the page is left while its function returns true. It is the preset of `navigation.onBeforeNavigate` for unsaved changes, and it also covers a reload, closing the tab and a redirect after a post, which no hook is asked for.
 
 ```kay
 ---

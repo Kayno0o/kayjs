@@ -211,7 +211,7 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     }
   }
   catch {
-    announce(form, 'error', { action: withoutBase(url.pathname), status: 0, errors: {} })
+    announce(form, 'error', { action: withoutBase(url.pathname), status: 0, errors: {}, data })
 
     // A post that reached the server has run its action, only the answer was lost: the page loads rather than the form posting again.
     if (delivery.reached) {
@@ -243,9 +243,9 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
   const happened = { action: withoutBase(url.pathname), status: response.status }
 
   if (response.redirect !== null)
-    announce(form, 'success', { action: happened.action })
+    announce(form, 'success', { action: happened.action, data })
   else
-    announce(form, 'error', { ...happened, errors: response.refused ? refusedErrors(response.text) : {} })
+    announce(form, 'error', { ...happened, errors: response.refused ? refusedErrors(response.text) : {}, data })
 
   // Sent once: from here on a failure loads the page rather than posting again.
   if (response.redirect !== null) {

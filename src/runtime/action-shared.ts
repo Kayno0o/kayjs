@@ -310,12 +310,15 @@ export interface ActionStartDetail {
 
 export interface ActionSuccessDetail {
   action: string
+  // The fields the form posted, as `kay:action-start` carried them.
+  data: FormData
 }
 
 export interface ActionErrorDetail {
   action: string
   status: number
   errors: Record<string, string>
+  data: FormData
 }
 
 declare global {
@@ -406,6 +409,10 @@ export interface Action<Input = never, Output = unknown, Honeypot extends string
   readonly pending: () => boolean
   // Resolves once no call of this action is in flight, whichever way they went, so an island that did not await its writes can wait for them: `await add.settled()`. A stream counts until it ends. Never rejects.
   readonly settled: () => Promise<void>
+  // The hooks of the posts a `form(action={add})` makes in place, as functions of an island: `onStart` runs before the post (`kay:action-start`), `onData` once it went through (`kay:action-success`), `onError` when it did not (`kay:action-error`, `error` an `ApiError` with the status and the `errors` per field). Each gets the fields posted as `input` and returns what removes it, which the end of the island does too.
+  readonly onStart: (listener: (event: { input: FormData }) => void) => () => void
+  readonly onData: (listener: (event: { input: FormData }) => void) => () => void
+  readonly onError: (listener: (event: { error: ApiError, input: FormData }) => void) => () => void
   // A handle for the calls of one island, one row or one button: `const save = add.track()`, then `await save(input)` resolves with `{ ok, data }` or the refusal, and `save.pending()` reads only its own calls.
   // `track({ queue: 'latest' })` sets how the handle's own calls queue, in place of each call's `queue` option; `track({ onSuccess, onError })` takes the callbacks of every call of the handle, which `onSuccess()` and `onError()` of the handle add to.
   readonly track: (options?: { queue?: CallQueue | undefined } & TrackHooks<Answer<Success<Output>>>) => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>

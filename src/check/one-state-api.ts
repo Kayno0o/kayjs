@@ -296,3 +296,59 @@ export async function movedImports(root: string, options: CheckOptions): Promise
     }
   })
 }
+
+// What tells an island, as a function, what each DOM event of kay tells a plain script: a method of `navigation` for the swap's events, which a rewrite reaches, and for the others a hook that needs the action or the signal the code names.
+const EVENT_HOOKS: Record<string, { hook: string, method?: string }> = {
+  'kay:navigate': { hook: '`navigation.onNavigate(fn)`', method: 'onNavigate' },
+  'kay:navigate-start': { hook: '`navigation.onStart(fn)`', method: 'onStart' },
+  'kay:navigate-error': { hook: '`navigation.onError(fn)`', method: 'onError' },
+  'kay:navigate-stall': { hook: '`navigation.onStall(fn)`', method: 'onStall' },
+  'kay:action-start': { hook: '`action.onStart(fn)`' },
+  'kay:action-success': { hook: '`action.onData(fn)`' },
+  'kay:action-error': { hook: '`action.onError(fn)`' },
+  'kay:consent': { hook: 'the `consent` signal' },
+  'kay:install': { hook: '`installPrompt.available()`' },
+}
+
+const KAY_EVENT = /kay:(?:navigate|action|consent|install)/
+
+// `listen(() => document, 'kay:navigate', () => ...)`: a function written in place that takes no parameter, so nothing of the event the old form handed it is read.
+function rewritable(call: Call, source: string, base: number): boolean {
+  const [target, , handler] = call.arguments
+
+  return call.arguments.length === 3 && (handler?.type === 'ArrowFunctionExpression' || handler?.type === 'FunctionExpression') && handler.params.length === 0
+    && target?.type === 'ArrowFunctionExpression' && target.params.length === 0 && target.body.type === 'Identifier' && target.body.name === 'document'
+    && !COMMENT.test(source.slice(base + call.start, base + call.end))
+}
+
+// `listen(() => document, 'kay:navigate', fn)` in an island, where a function hook says the same: `navigation.onNavigate(fn)`, `action.onStart(fn)`, the `consent` signal. A plain script keeps its listener, as it has no island to hook into.
+// The swap's events are rewritten when the handler takes no parameter, as the hook hands an object of its own where the event handed `detail`; any other listener is reported with the hook to write.
+export async function islandEvents(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  return scanned(root, options, 'deprecated-island-events', KAY_EVENT, ({ source, parsed, report }) => {
+    for (const { ast, base } of parsed) {
+      const hits: { call: Call, event: string }[] = []
+
+      eachCall(ast, calls(ast, 'listen'), (call) => {
+        const [, type] = call.arguments
+
+        if (type?.type === 'Literal' && typeof type.value === 'string' && Object.hasOwn(EVENT_HOOKS, type.value))
+          hits.push({ call, event: type.value })
+      })
+
+      if (hits.length === 0)
+        continue
+
+      const fixable = hits.filter(({ call, event }) => EVENT_HOOKS[event]!.method !== undefined && rewritable(call, source, base))
+      const own = mentions([ast], 'navigation') && !importsOf(ast, FROM_KAY, 'navigation').locals.has('navigation')
+      // `listen` leaves the import when every use of it is a call rewritten here.
+      const imports = own || fixable.length === 0 ? null : importEdits(ast, base, source, reads(ast, 'listen') === fixable.length ? ['listen'] : [], 'navigation')
+      const all = imports ? [...fixable.map(({ call, event }) => ({ start: base + call.start, end: base + call.end, text: `navigation.${EVENT_HOOKS[event]!.method}(${source.slice(base + call.arguments[2]!.start, base + call.arguments[2]!.end)})` })), ...imports] : null
+
+      for (const { call, event } of hits) {
+        const { hook } = EVENT_HOOKS[event]!
+
+        report(base + call.callee.start, base + call.callee.end, `an island listening to \`${event}\` is deprecated since 1.105: ${hook} is the function hook, the event being for a plain script`, `use ${hook}`, fixable.some(one => one.call === call) ? all : null)
+      }
+    }
+  })
+}

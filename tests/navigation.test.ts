@@ -1372,7 +1372,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       expect(await own.value('input[name="title"]')).toBe('taken')
       expect(await sameDocument(own)).toBe(true)
       // The form announces its post to an island: the fields as it starts, then how it went.
-      expect(await own.evaluate(() => (window as { kayHeard?: string[] }).kayHeard)).toEqual(['start:abcd::', 'success:::', 'start:taken::', 'error::409:'])
+      expect(await own.evaluate(() => (window as { kayHeard?: string[] }).kayHeard)).toEqual(['start:abcd::', 'success:abcd::', 'start:taken::', 'error:taken:409:'])
     }
     finally {
       own.close()

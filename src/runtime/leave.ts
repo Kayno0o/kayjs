@@ -19,6 +19,7 @@ const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
 const dirtyGuards = new Set<LeaveGuard>()
 
 // Asks before the page is left while `dirty` holds, for as long as the island lives or until the function it returns is called or `options.signal` aborts: a link of the app, `navigate()` and going back or forward ask the guard, a reload, closing the tab or another site's link get the browser's own prompt.
+// It is the preset of `navigation.onBeforeNavigate` for unsaved changes, and answers for the leaves that hook is not asked about too: a form's or an action's redirect, a reload, closing the tab.
 // kept: free
 export function guardLeave(dirty: () => boolean, options: LeaveGuardOptions = {}): () => void {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')

@@ -798,3 +798,78 @@ describe('keepalive', () => {
     expect(sent).toEqual([true, true])
   })
 })
+
+describe('form hooks of an action', () => {
+  interface Hooks {
+    onStart: (listener: (event: { input: FormData }) => void) => () => void
+    onData: (listener: (event: { input: FormData }) => void) => () => void
+    onError: (listener: (event: { error: { status: number, errors: Record<string, string> }, input: FormData }) => void) => () => void
+  }
+
+  const hooked = () => actionStub('/_kay/action/test/options') as unknown as Hooks
+
+  // What a `form(action={...})` posting in place fires on its form, which bubbles to `document`.
+  function fire(type: string, detail: object, action = '/_kay/action/test/options'): void {
+    const form = document.createElement('form')
+
+    document.body.append(form)
+    form.dispatchEvent(new CustomEvent(`kay:action-${type}`, { bubbles: true, detail: { action, ...detail } }))
+    form.remove()
+  }
+
+  it('tell an island how a post of the action went, as the events do, and ignore another action\'s', () => {
+    const seen: string[] = []
+    const data = new FormData()
+
+    data.set('title', 'abc')
+
+    const dispose = reactive.root((end) => {
+      const add = hooked()
+
+      add.onStart(({ input }) => seen.push(`start:${String(input.get('title'))}`))
+      add.onData(({ input }) => seen.push(`data:${String(input.get('title'))}`))
+      add.onError(({ error, input }) => seen.push(`error:${error.status}:${error.errors.title}:${String(input.get('title'))}`))
+
+      return end
+    })
+
+    fire('start', { data })
+    fire('success', { data })
+    fire('error', { status: 409, errors: { title: 'Taken' }, data })
+    fire('start', { data }, '/_kay/action/other')
+    expect(seen).toEqual(['start:abc', 'data:abc', 'error:409:Taken:abc'])
+
+    dispose()
+    fire('start', { data })
+    expect(seen).toHaveLength(3)
+  })
+
+  it('stop sooner with the function they return, and log a listener that throws', () => {
+    const seen: string[] = []
+    const original = console.error
+    const logged: unknown[] = []
+
+    console.error = (...args: unknown[]) => logged.push(...args)
+
+    try {
+      reactive.root(() => {
+        const add = hooked()
+        const stop = add.onStart(() => seen.push('first'))
+
+        add.onStart(() => {
+          throw new Error('boom')
+        })
+        add.onStart(() => seen.push('last'))
+        fire('start', { data: new FormData() })
+        stop()
+        fire('start', { data: new FormData() })
+      })
+    }
+    finally {
+      console.error = original
+    }
+
+    expect(seen).toEqual(['first', 'last', 'last'])
+    expect(logged).toHaveLength(2)
+  })
+})

@@ -61,7 +61,7 @@ import { liveApi } from './live-api'
 
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
-import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
+import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
 import { unreadOpenSettings } from './open-settings'
 import { pagesOptions } from './pages-options'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
@@ -186,6 +186,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => persistedQuery(root, options),
   async ({ root, options }) => navigateQuery(root, options),
   async ({ root, options }) => navigationHooks(root, options),
+  async ({ root, options }) => islandEvents(root, options),
   async ({ root, options }) => listenTarget(root, options),
   async ({ root, options }) => movedImports(root, options),
 

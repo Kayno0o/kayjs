@@ -183,6 +183,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { onNavigate } from \'kay\'\n\nonNavigate(({ url }) => console.log(url.pathname))\n---\np x',
     right: '---\nimport { navigation } from \'kay\'\n\nnavigation.onNavigate(({ url }) => console.log(url.pathname))\n---\np x',
   },
+  'deprecated-island-events': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'An island listening to an event of kay with `listen`, `kay:navigate`, `kay:navigate-start`, `kay:navigate-error`, `kay:navigate-stall`, `kay:action-start`, `kay:action-success`, `kay:action-error`, `kay:consent` or `kay:install`, since 1.105: an island uses the function hooks, `navigation.onNavigate`, `onStart`, `onError` and `onStall`, `add.onStart`, `onData` and `onError` of an action, the `consent` signal and `installPrompt.available()`, and the events stay for a plain script, which has no island to hook into. The old form works until 1.108. Found on a `listen` imported from `kay`. The fix writes the method for the swap\'s events when the handler takes no parameter, as the hook hands an object of its own where the event handed `detail`; any other listener is reported with the hook to write and no fix.',
+    wrong: '---\nimport { listen } from \'kay\'\n\nlisten(() => document, \'kay:navigate-start\', () => console.log(\'going\'))\n---\np x',
+    right: '---\nimport { navigation } from \'kay\'\n\nnavigation.onStart(() => console.log(\'going\'))\n---\np x',
+  },
   'deprecated-listen-target': {
     level: 'warn',
     group: 'deprecated',

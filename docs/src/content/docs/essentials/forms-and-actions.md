@@ -378,7 +378,9 @@ p {column()}
 
 The call still throws when it fails. While it runs, `pending()` follows its own request. Calls over one signal can overlap: each failure puts the signal back to what it held before that call, whichever order they fail in. To order the calls themselves, see [Queuing calls](#queuing-calls).
 
-A form posting in place, `form(action={add})`, tells an island how it went through three events on the form, which bubble. `kay:action-start` comes before the post, with the action's URL and the fields in `event.detail.data`. `kay:action-success` comes when it went through, with the `action`. `kay:action-error` comes when it did not, with the `action`, the `status` (0 when there was no answer) and the `errors` per field, `''` being the whole form.
+A form posting in place, `form(action={add})`, tells an island how it went through three hooks of the action. `add.onStart` runs before the post, with the fields as `input`, `add.onData` when it went through, and `add.onError` when it did not, with an `error` holding the `status` (0 when there was no answer) and the `errors` per field, `''` being the whole form.
+
+Each returns a function that removes it, and ends with the island. A plain script hears the same three as the `kay:action-start`, `kay:action-success` and `kay:action-error` events on the form, which bubble ([events](/reference/events)).
 
 `optimistic` from `kay` runs a change and hands back `undo` and `keep`. Show the change on start, then undo it on error. Changes made one after another and undone in any order end where they began.
 
@@ -394,15 +396,15 @@ let form: HTMLFormElement | undefined
 let titles: string[] = []
 let shown: { undo: () => void, keep: () => void } | undefined
 
-listen(() => form, 'kay:action-start', (event) => {
-  const title = String(event.detail.data.get('title'))
+add.onStart(({ input }) => {
+  const title = String(input.get('title'))
 
   shown = optimistic(() => titles = [...titles, title])
 })
-listen(() => form, 'kay:action-success', () => shown?.keep())
-listen(() => form, 'kay:action-error', event => {
+add.onData(() => shown?.keep())
+add.onError(({ error }) => {
   shown?.undo()
-  console.warn(event.detail.status, event.detail.errors)
+  console.warn(error.status, error.errors)
 })
 ---
 form(ref={element => form = element} action={add})

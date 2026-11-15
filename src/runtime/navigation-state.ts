@@ -51,6 +51,40 @@ function connect(): NonNullable<typeof signals> {
   return signals = { status, to, error }
 }
 
+// What `onStart` and `onStall` are told: the page asked for.
+export interface NavigateStart {
+  url: URL
+}
+
+// What `onError` is told: the page the swap gave up on, which the browser loads in full now, and why, an `ApiError` of status 0 as `error()` reads it.
+export interface NavigateFailure {
+  url: URL
+  error: ApiError
+}
+
+// A hook over an event the swap fires on `document`: `fn` gets the event's detail made the hook's own object, a throw is logged, and what returns removes it before the island ends.
+function hook<Detail, Told>(type: string, told: (detail: Detail) => Told, fn: (event: Told) => unknown): () => void {
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
+    return () => undefined
+
+  const listener = (event: Event) => void logged((shown: Event) => fn(told((shown as CustomEvent<Detail>).detail)), event)
+  const stop = () => document.removeEventListener(type, listener)
+
+  document.addEventListener(type, listener)
+  onCleanup(stop)
+
+  return stop
+}
+
+const withUrl = ({ url }: { url: string }): NavigateStart => ({ url: new URL(url) })
+
+// `navigation.onNavigate`: calls `fn` with `{ url }`, the address of each page a swap shows, once it is in place and its islands are hydrating, for as long as the island lives: the `kay:navigate` event, which a full load does not fire either. Returns what removes it before the island ends.
+// `onStart` is `kay:navigate-start` (a swap begins), `onError` is `kay:navigate-error` (`{ url, error }`, the swap gave up and the browser loads the page) and `onStall` is `kay:navigate-stall` (a streamed page sent nothing for `pageTimeout`).
+const afterNavigate = (fn: (event: NavigateEvent) => unknown) => hook('kay:navigate', withUrl, fn)
+const started = (fn: (event: NavigateStart) => unknown) => hook('kay:navigate-start', withUrl, fn)
+const stalled = (fn: (event: NavigateStart) => unknown) => hook('kay:navigate-stall', withUrl, fn)
+const gaveUp = (fn: (event: NavigateFailure) => unknown) => hook('kay:navigate-error', ({ url, error }: { url: string, error: Error }) => ({ url: new URL(url), error: new ApiError(0, error.message, undefined, {}, { cause: error.cause }) }), fn)
+
 // Where the swap to another page stands, as values that follow it for as long as the island lives: `navigation.status()` is `'loading'` while the next page is fetched, `'swapping'` while it is put in place and `'idle'` otherwise, `pending()` whether one is under way, `to()` the URL being navigated to and `error()` an `ApiError` (status 0, as no answer came) for why the last swap gave up and let the browser load the page in full, until the next navigation starts.
 // A refresh, a post that stays on its page and the server read `'idle'`.
 // `navigation.onBeforeNavigate(fn)` and `navigation.onNavigate(fn)` are its hooks, taking one object and returning what removes the listener, as the hooks of every other source do.
@@ -61,7 +95,10 @@ export const navigation = {
   to: (): URL | undefined => connect().to(),
   error: (): ApiError | undefined => connect().error(),
   onBeforeNavigate: beforeNavigate,
+  onStart: started,
   onNavigate: afterNavigate,
+  onError: gaveUp,
+  onStall: stalled,
 }
 
 // `navigation.onBeforeNavigate`: asks `fn` with `{ url, from }` before a link of the app, `navigate()` or going back or forward leaves the page, for as long as the island lives: returning `false` (or a promise of it) keeps the page, where a handler that throws is logged and lets the visit go on.
@@ -109,21 +146,6 @@ async function logged<A, T>(fn: (argument: A) => T, argument: A): Promise<Awaite
 
     return undefined
   }
-}
-
-// `navigation.onNavigate`: calls `fn` with `{ url }`, the address of each page a swap shows, once it is in place and its islands are hydrating, for as long as the island lives: the `kay:navigate` event, which a full load does not fire either. Returns what removes it before the island ends.
-// kept: free
-function afterNavigate(fn: (event: NavigateEvent) => unknown): () => void {
-  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
-    return () => undefined
-
-  const listener = (event: Event) => void logged((shown: Event) => fn({ url: new URL((shown as CustomEvent<{ url: string }>).detail.url) }), event)
-  const stop = () => document.removeEventListener('kay:navigate', listener)
-
-  document.addEventListener('kay:navigate', listener)
-  onCleanup(stop)
-
-  return stop
 }
 
 // kept: free

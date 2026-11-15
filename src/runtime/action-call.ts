@@ -1,5 +1,5 @@
 import type { Caller } from './action-owner'
-import type { Action, ActionStream, CallOptions, CallQueue, Outcome, TrackedCall } from './action-shared'
+import type { Action, ActionErrorDetail, ActionStartDetail, ActionStream, ActionSuccessDetail, CallOptions, CallQueue, Outcome, TrackedCall } from './action-shared'
 import type { TrackHooks } from './call-result'
 import type { Duration } from './duration'
 import type { ConnectionStatus, LoadStatus } from './live'
@@ -18,7 +18,7 @@ import { navigation } from './navigation'
 import { released, undoable } from './optimistic'
 import { pageData } from './page-data'
 import { randomId } from './random-id'
-import { getOwner, liveOwner, ownSignal, untrack } from './reactive'
+import { getOwner, liveOwner, onCleanup, ownSignal, untrack } from './reactive'
 import { OUTCOME_SCRIPT } from './swap'
 import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, FIXED_FIELDS, malformed, serverWritten } from './wire'
 
@@ -26,6 +26,11 @@ import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, FIXED_FIELDS, malformed,
 declare const KAY_BROWSER: true | undefined
 
 export { OUTCOME_SCRIPT }
+
+const QUERY = /\?.*/
+
+// A property of the handle an action builds, readable and listed.
+const read = (value: unknown) => ({ value, enumerable: true })
 
 const RETRY_DELAY_MS = 500
 const CODE_RETRIES = 2
@@ -269,7 +274,6 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
 
     return found && !found.succeeded ? { status: found.status, message: messageOf({ status: found.status, errors: found.errors, data: found.data }, actionFailed(found.status)), values: found.values, errors: found.errors, data: found.data } : undefined
   }
-  const read = (value: unknown) => ({ value, enumerable: true })
 
   const run = async (lane: Lane, input: unknown, options?: CallOptions) => {
     // The page the call was made on, whose outcome it is even once the visitor went elsewhere.
@@ -462,6 +466,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
     reads: {
       pending: read(() => inFlight() > 0),
       settled: read(async () => idle.wait(flying())),
+      ...formHooks(url),
       progress: read(progress),
       failed: read(failed),
       succeeded: read(() => succeededOf(outcome())),
@@ -486,6 +491,45 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       track: read(track),
       with: read((fields: Record<string, unknown>) => withFields(call, fields)),
     },
+  }
+}
+
+// `onStart`, `onData` and `onError` of an action, for the posts its forms make in place.
+function formHooks(url: () => string): Record<string, object> {
+  return {
+    onStart: read(formHook<ActionStartDetail, { input: FormData }>(url, 'start', ({ data }) => ({ input: data }))),
+    onData: read(formHook<ActionSuccessDetail, { input: FormData }>(url, 'success', ({ data }) => ({ input: data }))),
+    onError: read(formHook<ActionErrorDetail, { input: FormData, error: ActionError }>(url, 'error', ({ data, status, errors }) => ({ input: data, error: new ActionError(status, '', errors) }))),
+  }
+}
+
+// The hook of one step of the posts a form of this action makes in place: the `kay:action-<step>` events its `form(action={...})` fires, which bubble to `document`, told as an object of the hook's own. A throw is logged, and the island's end removes it.
+function formHook<Detail extends { action: string }, Told>(url: () => string, step: 'start' | 'success' | 'error', told: (detail: Detail) => Told): (listener: (event: Told) => void) => () => void {
+  return (listener) => {
+    if (typeof document === 'undefined')
+      return () => undefined
+
+    const type = `kay:action-${step}`
+    const heard = (event: Event) => {
+      const detail = (event as CustomEvent<Detail>).detail
+
+      // The URL of an action holding fixed fields carries them as a query the event's `action` leaves out.
+      if (detail.action !== withoutBase(url()).replace(QUERY, ''))
+        return
+
+      try {
+        listener(told(detail))
+      }
+      catch (error) {
+        console.error(error)
+      }
+    }
+    const stop = () => document.removeEventListener(type, heard)
+
+    document.addEventListener(type, heard)
+    onCleanup(stop)
+
+    return stop
   }
 }
 

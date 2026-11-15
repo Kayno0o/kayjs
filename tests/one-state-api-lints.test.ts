@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { expect, it } from 'bun:test'
 
 import { applySafeFixes } from '../src/check/fixes'
-import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
+import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
 import { scratchDir } from './scratch'
 
 type Check = typeof persistedCall
@@ -131,4 +131,38 @@ it('wraps only window, document and members of them as a listen target', async (
   const signal = await fixed(listenTarget, `import { listen, signal } from 'kay'\nconst panel = signal<HTMLElement>()\nlisten(panel, 'scroll', () => 1)\n`)
 
   expect(signal.found).toBe(0)
+})
+
+it('rewrites an island listening to the swap\'s events when the handler takes no parameter, and leaves listen imported while another call needs it', async () => {
+  const { text, fixable, found } = await fixed(islandEvents, `import { listen } from 'kay'\nlisten(() => document, 'kay:navigate', () => 1)\nlisten(() => document, 'kay:navigate-start', function () {\n  return 2\n})\n`)
+
+  expect(found).toBe(2)
+  expect(fixable).toBe(2)
+  expect(text).toBe(`import { navigation } from 'kay'\nnavigation.onNavigate(() => 1)\nnavigation.onStart(function () {\n  return 2\n})\n`)
+
+  const kept = await fixed(islandEvents, `import { listen } from 'kay'\nlisten(() => document, 'kay:navigate-error', () => 1)\nlisten(() => window, 'resize', () => 2)\n`)
+
+  expect(kept.text).toBe(`import { listen, navigation } from 'kay'\nnavigation.onError(() => 1)\nlisten(() => window, 'resize', () => 2)\n`)
+})
+
+it('reports an island listening to a form or a handler reading the event with the hook to write, and no fix', async () => {
+  const { text, found, fixable } = await fixed(islandEvents, `import { listen } from 'kay'\nlisten(() => document, 'kay:navigate', event => event.detail.url)\nlisten(() => form, 'kay:action-start', () => 1)\nlisten(() => document, 'kay:consent', () => 2)\n`)
+
+  expect(found).toBe(3)
+  expect(fixable).toBe(0)
+  expect(text).toContain(`'kay:action-start'`)
+})
+
+it('leaves a plain script listening to the events of kay, and an unrelated event of an island', async () => {
+  const plain = await fixed(islandEvents, `document.addEventListener('kay:navigate', () => 1)\n`)
+  const other = await fixed(islandEvents, `import { listen } from 'kay'\nlisten(() => document, 'kay:renew', () => 1)\nlisten(() => document, 'click', () => 2)\n`)
+
+  expect(plain.found + other.found).toBe(0)
+})
+
+it('leaves an island that has a navigation of its own to the app', async () => {
+  const { found, fixable } = await fixed(islandEvents, `import { listen } from 'kay'\nconst navigation = 1\nlisten(() => document, 'kay:navigate', () => navigation)\n`)
+
+  expect(found).toBe(1)
+  expect(fixable).toBe(0)
 })

@@ -20,7 +20,7 @@ import { imagesKeys } from '../src/check/images-keys'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
 import { liveApi } from '../src/check/live-api'
 import { mailApi } from '../src/check/mail-api'
-import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
+import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
 import { pagesOptions } from '../src/check/pages-options'
 import { rateEnforce } from '../src/check/rate-enforce'
 import { renamedPackages } from '../src/check/renamed-packages'
@@ -54,6 +54,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-persisted-query': persistedQuery,
   'deprecated-navigate-query': navigateQuery,
   'deprecated-navigation-hooks': navigationHooks,
+  'deprecated-island-events': islandEvents,
   'deprecated-listen-target': listenTarget,
   'deprecated-import-path': movedImports,
   'deprecated-schema-type': schemaType,

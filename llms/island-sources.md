@@ -46,10 +46,10 @@ A failure is an `ApiError` from `kay` whatever raised it: `status`, `message`, `
 | `stream`, an action's stream | the last value | `idle`, `connecting`, `open`, `done`, `failed`, `closed` | `onOpen`, `onData`, `onError`, `onClose` |
 | `socket` | the last message | as a stream | `onOpen`, `onData`, `onError`, `onClose` |
 | `track()`, `call.track` | what the last success answered | `idle`, `loading`, `ready`, `failed` | `onData`, `onError` |
-| an action | what the last call or form post returned | `idle`, `loading`, `ready`, `failed` | none, see `track()` |
+| an action | what the last call or form post returned | `idle`, `loading`, `ready`, `failed` | `onStart`, `onData`, `onError` for its form posts in place, see `track()` for its calls |
 | `local` | the rows held | `loading`, `ready`, `failed` | `onData`, `onIssue`, `onError` |
 | `live()` handle | none, the value is the handle | `idle`, `connecting`, `open`, `failed` | `onData`, `onError` |
-| `navigation` | none | `idle`, `loading`, `swapping` | `navigation.onNavigate`, `navigation.onBeforeNavigate` |
+| `navigation` | none | `idle`, `loading`, `swapping` | `navigation.onStart`, `onNavigate`, `onError`, `onStall`, `onBeforeNavigate` |
 | `infiniteList` (kayjs-ui) | the rows loaded | `loading`, `ready`, `failed` | `load` and `onError` props, see kayjs-ui `infiniteList` |
 
 - `local` reads `loading` until the browser's copy is read, then `ready`, or `failed` while `error()` is set (a read of the server failed, or the browser keeps no IndexedDB); `pending()` is true while it loads. What a collection has more is its sync with the server, under `sync`: `sync.status()` reads `loading`, `synced`, `unsynced`, `offline`, `signed-out` or `unavailable`, `sync.queued()` the count of writes the server has not taken, and `sync()` sends the queue and reads again ([Local collections](local-collections.md)).
