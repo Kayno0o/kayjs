@@ -619,6 +619,7 @@ describe('resource() in the browser', () => {
     await until(() => answers > before)
     dispose()
   })
+
   it('starts a new island loading, with no value of the one that unmounted, while its read is out', async () => {
     const [first, dispose] = root(done => [read(fake, '/remount', {}), done] as const)
 

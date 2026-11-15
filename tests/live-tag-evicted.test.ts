@@ -29,7 +29,7 @@ describe('a tag invalidated while the cache no longer holds the value that named
 
     await inLiveReads(async () => rows(1))
 
-    const [first] = followedKeys().filter(key => key.endsWith('[1]') || key.includes('[1'))
+    const [first] = followedKeys().filter(key => key.includes('[1'))
 
     // The second argument evicts the first from memory, the only place that knew it belonged to the tag.
     await inLiveReads(async () => rows(2))

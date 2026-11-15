@@ -109,7 +109,7 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
 
     leave()
     clearInterval(heartbeat)
-    controller.enqueue(encoder.encode(`event: ${event}\ndata:${event === END_EVENT && data !== undefined ? ` ${data}` : ''}\n\n`))
+    controller.enqueue(encoder.encode(`event: ${event}\ndata:${data === undefined ? '' : ` ${data}`}\n\n`))
     controller.close()
   }
 

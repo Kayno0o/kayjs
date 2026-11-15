@@ -149,6 +149,44 @@ describe('an action returning an async iterable', () => {
     expect(keys).toEqual([['posts']])
   })
 
+  it('reads the end event whatever the chunks and line breaks, and names no keys when it carries none', async () => {
+    const one = encodeValue(1)
+    const encoder = new TextEncoder()
+    const bodyOf = (...chunks: string[]) => new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks)
+          controller.enqueue(encoder.encode(chunk))
+
+        controller.close()
+      },
+    }))
+    const cases: [string[], (string[] | undefined)][] = [
+      [[`data: ${one}\n\nevent: end\n`, 'data: %5B%22a%22', '%5D\n\n'], ['a']],
+      [[`data: ${one}\r\n\r\nevent: end\r\ndata: %5B%22a%22%5D\r\n\r\n`], ['a']],
+      [['event: end\n: comment\ndata: %5B%22a%22%5D\n\n'], ['a']],
+      [['event: end\ndata:\n\n'], undefined],
+      [['event: end\n'], undefined],
+      [['event: end\ndata: not-keys\n\n'], undefined],
+    ]
+
+    for (const [chunks, expected] of cases) {
+      const keys: (string[] | undefined)[] = []
+      const stream = actionStream<number>(bodyOf(...chunks), SETTLED, () => new Error('failed'), undefined, found => keys.push(found))
+
+      await stream.ended()
+      expect(keys).toEqual([expected])
+    }
+  })
+
+  it('sets the keys of the end event on the caller that read the stream, which its refresh decision reads', async () => {
+    const caller = { invalidated: ['stale'] } as unknown as Parameters<typeof readActionResponse>[3]
+    const response = new Response(`data: ${encodeValue(1)}\n\nevent: end\ndata: %5B%22posts%22%5D\n\n`, { headers: { 'content-type': 'text/event-stream' } })
+    const stream = await readActionResponse<ActionStream<number>>(response, '/_kay/action/a/b', undefined, caller)
+
+    await stream.ended()
+    expect(caller?.invalidated).toEqual(['posts'])
+  })
+
   it('carries values devalue encodes', async () => {
     const [value] = await site.call(actions.dated)
 
