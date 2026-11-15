@@ -7,7 +7,7 @@ const site = await testSite({ root: join(import.meta.dir, 'fixture'), browser: t
 
 afterAll(async () => site.close())
 
-// Every link of the assistant's turn and of its list of sources, by its text and where it opens. A link of the reply to another site is also opened apart by the app's `links.outside` setting, so the list's own are what `newTab` decides.
+// Every link of the assistant's turn and of its list of sources, by its text and where it opens.
 async function links(path: string) {
   await using page = await site.open(path)
 
@@ -26,6 +26,6 @@ it('opens a source of another site apart and one of this site in place by defaul
   expect(await links('/launching-citing')).toEqual(['[1]|_blank', '[2]|', 'Tides|_blank', 'Moon|'])
 }, 120_000)
 
-it('opens a source of another site in place too with newTab={false}', async () => {
-  expect((await links('/launching-citing-here')).slice(2)).toEqual(['Tides|', 'Moon|'])
+it('opens every link in place with newTab={false}, the reply\'s own to another site too, whatever the app\'s links.outside says', async () => {
+  expect(await links('/launching-citing-here')).toEqual(['[1]|_self', '[2]|', 'Tides|', 'Moon|'])
 }, 120_000)

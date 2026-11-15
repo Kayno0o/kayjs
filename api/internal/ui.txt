@@ -2418,11 +2418,7 @@ type NewTab = boolean | 'auto'
 const OUTSIDE: { readonly target: "_blank"; readonly rel: "noopener noreferrer"; readonly 'data-new-tab': ""; }
 
 [./lib/outside] tabOf
-function tabOf(href: string | undefined, newTab?: NewTab | undefined): Record<never, never> | {
-  readonly target: "_blank";
-  readonly rel: "noopener noreferrer";
-  readonly 'data-new-tab': "";
-}
+function tabOf(href: string | undefined, newTab?: NewTab | undefined): TabAttributes
 
 [./lib/overlay] closeWatcher
 function closeWatcher({ modal, docked, dirty, edited, autosave, footer, guarded }: CloseWatcherState): "any" | "closerequest" | "none"

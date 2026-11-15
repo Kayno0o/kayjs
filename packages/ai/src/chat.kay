@@ -15,7 +15,7 @@ import { isHeldMarkdown, markdownHtml, markdownLoaded } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
 import { MARK, MARKED, withoutMarker } from './marker'
-import { citedAsWritten, linkAsWritten, linkSources, opensApart, REL_APART } from './chat-sources'
+import { citedAsWritten, linkAsWritten, linkSources, mayLeave, opensApart, REL_APART, REL_HERE } from './chat-sources'
 import { conversationKey, filesOf, POSTED_CHARACTERS } from './chat-history'
 import { createAttachments, fileKey, fileSizeLimit } from './chat-attachments'
 import { chatIcon } from './chat-icon'
@@ -52,8 +52,8 @@ const REPLY_WITH_IMAGES: SanitizeOptions = { tags: [...TABLE_TAGS, 'img'], attri
 const PINNED_PX = 48
 // How long a page that announced it was leaving is waited on before it is taken to have stayed.
 const LEAVING_MS = 2000
-// The opening tag `sanitizeHtml` writes for a link, which `linksOpenApart` rewrites: the two change together. The href is captured to tell a link of this site from another.
-const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
+// The opening tag `sanitizeHtml` writes for a link, which `linksOpenApart` rewrites: the two change together. The href is captured to tell a link of this site from another, and a link the sanitizer already opened apart, as it does one leaving the site, is matched too.
+const SANITIZED_LINK = /<a href="([^"]*)"(?: target="_blank")? rel="nofollow ugc(?: noopener)?"(?: data-new-tab)?>/g
 
 // The images and documents a model reads.
 const ATTACHABLE = 'image/png,image/jpeg,image/gif,image/webp,application/pdf'
@@ -220,9 +220,14 @@ let refocus: number | undefined
 
 const opensNewTab = () => newTabProp ?? (links === 'here' ? 'auto' : true)
 
-// A link of a reply opens in a new tab, as the conversation lives in this page and a page swap would drop it, by `newTab`.
+// A link of a reply opens in a new tab, as the conversation lives in this page and a page swap would drop it, by `newTab`. One that stays in place and may leave the site writes its own `target`, so the page's `links.outside` rule does not open it in a new tab against an explicit `newTab={false}`.
 function linksOpenApart(html: string): string {
-  return html.replaceAll(SANITIZED_LINK, (tag, href: string) => opensApart(href, opensNewTab()) ? tag.replace('rel="nofollow ugc"', `target="_blank" rel="${REL_APART}" data-new-tab`) : tag)
+  return html.replaceAll(SANITIZED_LINK, (_tag, href: string) => {
+    if (opensApart(href, opensNewTab()))
+      return `<a href="${href}" target="_blank" rel="${REL_APART}" data-new-tab>`
+
+    return mayLeave(href) ? `<a href="${href}" target="_self" rel="${REL_HERE}">` : `<a href="${href}" rel="${REL_HERE}">`
+  })
 }
 
 // A table is wrapped, once sanitized, in a box that scrolls sideways and takes the keyboard's focus, except in the turn being written, which is hidden from screen readers. Several tables of one reply are numbered, so no two groups share a name.

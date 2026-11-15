@@ -12,6 +12,9 @@ const SAFE_HREF = /^(?:https?:\/\/|mailto:|\/(?![/\\])|#)[^\s"'<>`\\]*$/i
 // A path of this site or an anchor in the page: `//host` and `/\host` are another site.
 const LOCAL_HREF = /^(?:\/(?![/\\])|#)/
 
+// Whether an address may lead to another site, which the page's `links.outside` rule would open in a new tab unless the link writes a `target` of its own.
+export const mayLeave = (href: string) => !LOCAL_HREF.test(href)
+
 // The `rel` of a link that opens in a new tab, and of one that stays in the page.
 export const REL_APART = 'nofollow ugc noopener'
 export const REL_HERE = 'nofollow ugc'

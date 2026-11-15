@@ -261,7 +261,7 @@ function choose(index: number) {
   if (to === undefined || to === '')
     return
 
-  if (Object.keys(tabOf(to, newTab)).length > 0)
+  if (tabOf(to, newTab).target === '_blank')
     window.open(to, '_blank', 'noopener,noreferrer')
   else if (isExternal(to))
     location.assign(to)

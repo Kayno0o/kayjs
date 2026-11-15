@@ -1,0 +1,4 @@
+---
+import Breadcrumb from '@kayjs/ui/breadcrumb.kay'
+---
+Breadcrumb(items={[{ label: 'Docs', href: 'https://example.com/docs' }, { label: 'Here', href: 'https://example.com/here', newTab: false }, { label: 'Now' }]} label="Outside")

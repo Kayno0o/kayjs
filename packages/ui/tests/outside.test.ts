@@ -21,7 +21,13 @@ describe('tabOf', () => {
 
   test('`true` always opens a new tab, `false` never', () => {
     expect(tabOf('/orders', true)).toBe(OUTSIDE)
-    expect(tabOf('https://example.com', false)).toEqual({})
+    expect(tabOf('https://example.com', false).target).toBeUndefined()
+  })
+
+  test('an explicit `false` writes a `target` of its own, so the app\'s `links.outside` rule leaves the link in this tab', () => {
+    expect(Object.hasOwn(tabOf('https://example.com', false), 'target')).toBe(true)
+    expect(Object.hasOwn(tabOf('https://example.com'), 'target')).toBe(true)
+    expect(Object.hasOwn(tabOf('/orders'), 'target')).toBe(false)
   })
 
   test('the new tab carries noopener noreferrer', () => {

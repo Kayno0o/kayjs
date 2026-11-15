@@ -11,10 +11,15 @@ export function isExternal(href: string): boolean {
   return OTHER_SITE.test(href)
 }
 
-// The attributes of a link given its `newTab` choice, `'auto'` when left out.
-export function tabOf(href: string | undefined, newTab: NewTab | undefined = 'auto'): typeof OUTSIDE | Record<never, never> {
+// A link kept in this tab by an explicit `newTab={false}`: it writes a `target` of its own, which leaves the page's `links.outside` rule no say, as it leaves any link writing one.
+const SAME_TAB = { target: undefined } as const
+
+type TabAttributes = Partial<typeof OUTSIDE> | typeof SAME_TAB
+
+// The attributes of a link given its `newTab` choice, `'auto'` when left out: an explicit `false` is the last word, so the link stays in this tab even where the app's `links.outside` would open it in a new one.
+export function tabOf(href: string | undefined, newTab: NewTab | undefined = 'auto'): TabAttributes {
   if (newTab === 'auto')
     return href !== undefined && isExternal(href) ? OUTSIDE : {}
 
-  return newTab ? OUTSIDE : {}
+  return newTab ? OUTSIDE : SAME_TAB
 }
