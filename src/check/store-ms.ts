@@ -12,7 +12,7 @@ const FROM_LIBRARY = (source: string) => source === 'kay/library' || source === 
 const TTL_AT: Record<string, number> = { set: 2, once: 1 }
 
 // A ttl of `kv(namespace).set(key, value, ms)` or `.once(key, ms)` written as milliseconds, a `Duration` since 1.105: `once(key, 60_000)` is `once(key, '60000ms')`.
-// Found on a call chained to `kv(...)` or on a name bound to it in the same file, with a number written as a literal or arithmetic of literals; one held in a variable is a type error in the editor.
+// Found on a call chained to `kv(...)` or on a name bound once to it in the same file, with a number written as a literal or arithmetic of literals; one held in a variable is a type error in the editor.
 export async function storeMs(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-store-ms', options.lints) === 'allow')
     return []
@@ -25,12 +25,21 @@ export async function storeMs(root: string, options: CheckOptions): Promise<Chec
         continue
 
       const isKv = (node: Node): boolean => node.type === 'CallExpression' && node.callee.type === 'Identifier' && makers.has(node.callee.name)
-      const bound = new Set<string>()
+      const declared = new Map<string, number>()
+      const kvs = new Set<string>()
 
       walk(ast, (node: Node) => {
-        if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init !== null && node.init !== undefined && isKv(node.init))
-          bound.add(node.id.name)
+        if (node.type !== 'VariableDeclarator' || node.id.type !== 'Identifier')
+          return
+
+        declared.set(node.id.name, (declared.get(node.id.name) ?? 0) + 1)
+
+        if (node.init !== null && node.init !== undefined && isKv(node.init))
+          kvs.add(node.id.name)
       })
+
+      // A name declared once in the file, so a shadowing local of the same name never takes a call that is not kv's.
+      const bound = new Set([...kvs].filter(name => declared.get(name) === 1))
 
       walk(ast, (node: Node) => {
         if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier')

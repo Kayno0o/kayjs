@@ -35,4 +35,27 @@ describe('deprecated-store-ms', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('leaves a call alone on a name that is not bound once to kv', async () => {
+    const root = await scratchDir('store-ms-shadow-')
+    const source = [
+      'import { kv } from \'kay/library\'',
+      '',
+      'const marks = kv(\'sweep\')',
+      'export const a = await marks.once(\'k\', 1000)',
+      'export function other(cache: { set: (k: string, v: string, n: number) => void }) {',
+      '  const marks = cache',
+      '  marks.set(\'k\', \'v\', 5)',
+      '}',
+      '',
+    ].join('\n')
+
+    try {
+      await Bun.write(join(root, 'src/a.ts'), source)
+      expect(await storeMs(root, {})).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
