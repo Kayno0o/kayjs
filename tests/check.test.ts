@@ -3327,6 +3327,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
       'src/routes/orgs/[id].xml.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext<{ slug: string }>) {\n  return Response.json(ctx.params)\n}\n',
       'src/routes/orgs/bare.json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext) {\n  return Response.json(ctx.params)\n}\n',
       'src/routes/orgs/more.json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext<Record<string, never>, { org: string, role: string }>) {\n  return Response.json(ctx.guard)\n}\n',
+      'src/routes/orgs/typed.json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext<Record<string, never>, object, { q: string }>) {\n  return Response.json(ctx.query)\n}\n',
       'src/routes/open/mine.json.ts': 'import type { EndpointContext } from \'kay\'\n\nexport const page = { guards: [() => ({ role: 1 })] }\n\nexport function GET(ctx: EndpointContext<Record<string, never>, { role: number }>) {\n  return Response.json(ctx.guard)\n}\n',
     })
 

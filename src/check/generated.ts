@@ -82,8 +82,8 @@ export function exportsCheck(root: string, routesDir: string, routes: Route[], a
     const params = `{ ${endpoint.params.map(param => `${IDENTIFIER.test(param) ? param : JSON.stringify(param)}: string`).join(', ')} }`
     const above = endpoint.guards.filter(guard => guard.own !== true).map(guard => `typeof ${guardAlias(guard.file)}`)
 
-    // What its own `guards` return is not typed, so a handler may name it as it likes.
-    return `EndpointContext<${params}, ${endpoint.guards.some(guard => guard.own === true) ? 'any' : `GuardValues<[${above.join(', ')}]>`}>`
+    // What its own `guards` return and its `page.query` schema reads are not typed here, so a handler may name them as it likes.
+    return `EndpointContext<${params}, ${endpoint.guards.some(guard => guard.own === true) ? 'any' : `GuardValues<[${above.join(', ')}]>`}, any>`
   }
   const entries: { file: string, type: string, wanted: string, named?: string }[] = [
     ...[...guards].map(file => ({ file, type: 'Guard', wanted: 'a guard by default: export default guard(ctx => ...)' })),
