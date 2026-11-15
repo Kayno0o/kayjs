@@ -192,35 +192,35 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
   const generatedSeen = new Set<string>()
 
   for (const diagnostic of reported) {
-  if (lintConfigTypeError(root, options.lints, diagnostic))
-    continue
+    if (lintConfigTypeError(root, options.lints, diagnostic))
+      continue
 
-  const shadow = files.get(diagnostic.file)
-  const diagnosed = shadow && diagnoseShadow(shadow, tsgoDiagnostic(diagnostic, shadow.tsx), levelsOf(shadow), keys)
+    const shadow = files.get(diagnostic.file)
+    const diagnosed = shadow && diagnoseShadow(shadow, tsgoDiagnostic(diagnostic, shadow.tsx), levelsOf(shadow), keys)
 
-  if (shadow ? !diagnosed : !shownOutsideKay(tsgoCode(diagnostic), projectUnused))
-    continue
+    if (shadow ? !diagnosed : !shownOutsideKay(tsgoCode(diagnostic), projectUnused))
+      continue
 
-  const mapped: CheckDiagnostic = shadow && diagnosed
-    ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help, ...diagnosed.fixes && { fixes: diagnosed.fixes } }
-    : { ...diagnostic, ...helped(diagnostic) }
-  const generated = generatedProblem(root, mapped, types, content)
+    const mapped: CheckDiagnostic = shadow && diagnosed
+      ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help, ...diagnosed.fixes && { fixes: diagnosed.fixes } }
+      : { ...diagnostic, ...helped(diagnostic) }
+    const generated = generatedProblem(root, mapped, types, content)
 
-  // A guard file imported for two lines of the exports check is reported once.
-  if (generated) {
-    const key = JSON.stringify([generated.file, generated.line, generated.column, generated.code, generated.message])
+    // A guard file imported for two lines of the exports check is reported once.
+    if (generated) {
+      const key = JSON.stringify([generated.file, generated.line, generated.column, generated.code, generated.message])
 
-    if (!generatedSeen.has(key)) {
-      generatedSeen.add(key)
-      diagnostics.push(generated)
+      if (!generatedSeen.has(key)) {
+        generatedSeen.add(key)
+        diagnostics.push(generated)
+      }
     }
-  }
-  else if (reportsTypeErrors(mapped.file, scope) && !servedByTheApp(mapped.file, mapped.message, mounts, locales) && !seen.has(JSON.stringify([mapped.file, mapped.line, mapped.column, mapped.code, mapped.message]))) {
-    diagnostics.push(mapped)
-  }
+    else if (reportsTypeErrors(mapped.file, scope) && !servedByTheApp(mapped.file, mapped.message, mounts, locales) && !seen.has(JSON.stringify([mapped.file, mapped.line, mapped.column, mapped.code, mapped.message]))) {
+      diagnostics.push(mapped)
+    }
 
-  seen.add(JSON.stringify([mapped.file, mapped.line, mapped.column, mapped.code, mapped.message]))
-}
+    seen.add(JSON.stringify([mapped.file, mapped.line, mapped.column, mapped.code, mapped.message]))
+  }
 
   diagnostics.push(...problems)
   await addImportFixes(diagnostics)
