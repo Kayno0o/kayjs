@@ -150,16 +150,25 @@ export function setRequestOutcome(read: () => Outcome | null | undefined): void 
 
 // What a browser build exports in place of a server action.
 export function actionStub(url: string, fixed?: Record<string, unknown>): Action<unknown, unknown> {
-  const { call, reads } = callable(() => url, fixed)
+  const { reads, bound } = callable(() => url)
 
   warmCode()
 
-  // `with` adds to the fields fixed, so a call, `track()` and a form all carry them; a form posts to the URL holding them, as it does on the server.
+  return stubWith(url, reads, bound, fixed)
+}
+
+type Bound = (fields: Record<string, unknown> | undefined) => { call: (input: never, options?: CallOptions) => Promise<unknown>, track: (handle?: { queue?: CallQueue } & TrackHooks<never>) => TrackedCall<never, unknown> }
+
+// `with` adds to the fields fixed, so a call, `track()` and a form all carry them, a form posting to the URL holding them as it does on the server; its pending state and outcome stay the action's own.
+function stubWith(url: string, reads: PropertyDescriptorMap, bound: Bound, fixed: Record<string, unknown> | undefined): Action<unknown, unknown> {
+  const { call, track } = bound(fixed)
+
   return Object.defineProperties(call, {
     ...reads,
+    track: { value: track, enumerable: true },
     url: { value: url, enumerable: true },
     [ACTION]: { value: true },
-    with: { value: (fields: Record<string, unknown>) => actionStub(url, { ...fixed, ...fields }) },
+    with: { value: (fields: Record<string, unknown>) => stubWith(url, reads, bound, { ...fixed, ...fields }) },
     ...fixed && {
       formUrl: { value: `${url}?${PAYLOAD_PARAM}=${encodeURIComponent(payloadQuery(fixed))}` },
       [FIXED_FIELDS]: { value: fixed },
@@ -234,7 +243,7 @@ function withFixed(input: unknown, fixed: Record<string, unknown> | undefined): 
 
 // Posts a call, counting the ones in flight; a call that redirects rejects with `ActionRedirectError` once the browser is on its way, so the action stops being pending.
 // How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
-export function callable(url: () => string, fixed?: Record<string, unknown>): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap } {
+export function callable(url: () => string): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap, bound: Bound } {
   const [inFlight, setInFlight, flying] = lazySignal(0)
   const [last, setLast] = lazySignal<{ page: number, outcome: Outcome | null } | undefined>(undefined)
   const [progress, setProgress] = lazySignal<number | undefined>(undefined)
@@ -261,8 +270,6 @@ export function callable(url: () => string, fixed?: Record<string, unknown>): { 
     return found && !found.succeeded ? { status: found.status, message: messageOf({ status: found.status, errors: found.errors, data: found.data }, actionFailed(found.status)), values: found.values, errors: found.errors, data: found.data } : undefined
   }
   const read = (value: unknown) => ({ value, enumerable: true })
-
-  const actionLane: Lane = { tail: Promise.resolve() }
 
   const run = async (lane: Lane, input: unknown, options?: CallOptions) => {
     // The page the call was made on, whose outcome it is even once the visitor went elsewhere.
@@ -446,10 +453,12 @@ export function callable(url: () => string, fixed?: Record<string, unknown>): { 
     }
   }
 
-  const call = async (input: unknown, options?: CallOptions) => run(actionLane, withFixed(input, fixed), options)
+  const bound = binder(run, url)
+  const { call, track } = bound(undefined)
 
   return {
     call,
+    bound,
     reads: {
       pending: read(() => inFlight() > 0),
       settled: read(async () => idle.wait(flying())),
@@ -474,14 +483,24 @@ export function callable(url: () => string, fixed?: Record<string, unknown>): { 
         return field === undefined ? Object.keys(found).length === 0 : found[field] === undefined
       }),
       refused: read((error: unknown) => error instanceof ActionError && refusedAt.get(error) === url()),
-      track: read((handle?: { queue?: CallQueue } & TrackHooks<never>) => {
-        const lane: Lane = { tail: Promise.resolve(), queue: handle?.queue }
-
-        return tracked(async (input, options) => run(lane, withFixed(input, fixed), options), url, handle)
-      }),
+      track: read(track),
       with: read((fields: Record<string, unknown>) => withFields(call, fields)),
     },
   }
+}
+
+// A call and `track()` carrying the fields given, over one action's state: a `with` of the action follows the same calls.
+function binder(run: (lane: Lane, input: unknown, options?: CallOptions) => Promise<unknown>, url: () => string): Bound {
+  const actionLane: Lane = { tail: Promise.resolve() }
+
+  return fields => ({
+    call: async (input: unknown, options?: CallOptions) => run(actionLane, withFixed(input, fields), options),
+    track: (handle) => {
+      const lane: Lane = { tail: Promise.resolve(), queue: handle?.queue }
+
+      return tracked(async (input, options) => run(lane, withFixed(input, fields), options), url, handle)
+    },
+  })
 }
 
 // A handle over `call` whose refusals of this action it answers as results.
