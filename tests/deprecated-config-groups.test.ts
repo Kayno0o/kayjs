@@ -103,6 +103,7 @@ describe('the old keys of the config', () => {
     expect((await resolveConfig({ i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' } } })).i18n).toEqual({ locales: ['fr', 'en'], default: 'fr', mode: { domains: { fr: 'x.fr', en: 'x.com' } } })
     expect((await resolveConfig({ i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', default: 'en' } })).i18n?.default).toBe('en')
     await expect(resolveConfig({ i18n: { locales: ['fr'], default: 'fr', prefixDefault: true, domains: { fr: 'x.fr' } } })).rejects.toThrow('domains or prefixDefault')
+    expect((await resolveConfig({ i18n: { locales: ['fr'], default: 'fr', mode: 'always', prefixDefault: true, domains: { fr: 'x.fr' } } })).i18n?.mode).toBe('always')
   })
 
   it('are checked in their groups', () => {

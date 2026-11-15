@@ -301,7 +301,7 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
   else {
     // The stylesheets stay imported in place: listing them is all a project written over its own folder can do.
     for (const { file, target, font } of fonts)
-      note(file, target, { line: font.line, message: `${font.fontsource}${font.weight === undefined ? '' : ` ${font.weight}${font.style === 'italic' ? ' italic' : ''}`} was a Fontsource stylesheet kay migrate removed: serve it with \`fonts: [{ fontsource: '${font.fontsource}' }]\` in kay.config.ts` })
+      note(file, target, { line: font.line, message: `${font.fontsource}${font.weight === undefined ? '' : ` ${font.weight}${font.style === 'italic' ? ' italic' : ''}`} was a Fontsource stylesheet kay migrate removed: serve it with \`assets: { fonts: [{ fontsource: '${font.fontsource}' }] }\` in kay.config.ts` })
   }
 
   // `site` and `base` carry over when the Astro config writes them as strings; any other value is listed for kay.config.ts.

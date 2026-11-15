@@ -420,7 +420,7 @@ const host = import.meta.env.RCON_HOST
     expect(layout).toContain('script(src="https://unpkg.com/lib@1/dist/lib.js" defer)\n')
     expect(layout).not.toContain('fontsource')
     expect(layout).not.toContain('astro-icon')
-    expect(await Bun.file(join(out, 'kay.config.ts')).text()).toContain('  fonts: [{ fontsource: \'@fontsource/montserrat\', weights: [400, 700] }, { fontsource: \'@fontsource/montserrat\', weights: [400], styles: [\'italic\'] }],\n')
+    expect(await Bun.file(join(out, 'kay.config.ts')).text()).toContain('  assets: { fonts: [{ fontsource: \'@fontsource/montserrat\', weights: [400, 700] }, { fontsource: \'@fontsource/montserrat\', weights: [400], styles: [\'italic\'] }] },\n')
     expect(tree).toContain('import separation from \'../../public/svg/x.svg\' with { type: \'text\' }')
     expect(tree).toContain('// kay migrate: Astro.self')
     expect(Object.keys(packageJson.dependencies)).toEqual(['@fontsource/montserrat', '@kaynooo/utils', 'elysia', 'kay'])

@@ -99,11 +99,10 @@ async function resolveI18n(i18n: I18nInput | undefined): Promise<I18nConfig | un
 
   const { defaultLocale, prefixDefault, domains, default: named, mode, ...rest } = loaded as Omit<I18nInput, 'paths'> & { paths?: I18nConfig['paths'] }
 
-  if (domains !== undefined && prefixDefault === true)
+  if (mode === undefined && domains !== undefined && prefixDefault === true)
     throw new KayError('locales-invalid', 'kay: i18n gives domains or prefixDefault, not both: with domains a locale has no prefix')
 
-  const old = domains === undefined ? prefixDefault === true ? 'always' as const : undefined : { domains }
-  const chosen = mode ?? old
+  const chosen = mode ?? (domains === undefined ? prefixed(prefixDefault) : { domains })
   const first = named ?? defaultLocale
 
   return { ...rest, default: first as string, ...chosen !== undefined && { mode: chosen } }
@@ -134,4 +133,8 @@ export async function resolveConfig(config: ConfigInput): Promise<KayConfig> {
   }
 
   return resolved
+}
+
+function prefixed(prefixDefault: boolean | undefined): 'always' | undefined {
+  return prefixDefault === true ? 'always' : undefined
 }

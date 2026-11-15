@@ -1,6 +1,6 @@
 /*
  * A dark-only space skin: a near-black canvas, a starlight accent, Space Grotesk, a lifted fill and a hairline on every box, no shadows, buttons as hairline keys that light in the accent, drawn checkboxes and themed selects, and the `starfield` background utility of `starfield.css`.
- * Import it after theme.css in the app's stylesheet, or after `@import 'tailwindcss'` with `ui()`, which injects the theme before the app's CSS: its tokens are the app's `@theme`, so an override of yours after it wins. Its rules sit at one class of specificity or none, so a plain class of the app beats them. It names the family `Space Grotesk`, which the app serves with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in kay.config.ts.
+ * Import it after theme.css in the app's stylesheet, or after `@import 'tailwindcss'` with `ui()`, which injects the theme before the app's CSS: its tokens are the app's `@theme`, so an override of yours after it wins. Its rules sit at one class of specificity or none, so a plain class of the app beats them. It names the family `Space Grotesk`, which the app serves with `assets: { fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }] }` in kay.config.ts.
  */
 @import '../starfield.css';
 

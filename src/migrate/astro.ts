@@ -182,7 +182,7 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
           remove()
         }
         else {
-          note(lineOf(statement), `${from} is a stylesheet kay does not read: serve the font with \`fonts: [{ fontsource: '<package>' }]\` in kay.config.ts, which declares its faces without inlining every file into the page stylesheet`)
+          note(lineOf(statement), `${from} is a stylesheet kay does not read: serve the font with \`assets: { fonts: [{ fontsource: '<package>' }] }\` in kay.config.ts, which declares its faces without inlining every file into the page stylesheet`)
         }
       }
       else if (from.startsWith('astro:')) {
