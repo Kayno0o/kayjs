@@ -272,7 +272,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a stream
 const SETTINGS = [
   { name: 'a base', options: { base: '/repo' }, start: '/repo/', slow: '/repo/slow' },
   { name: 'trailingSlash always', options: { trailingSlash: 'always' as const }, start: '/', slow: '/slow/' },
-  { name: 'a locale prefix', options: { i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, start: '/fr', slow: '/fr/slow' },
+  { name: 'a locale prefix', options: { i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, start: '/fr', slow: '/fr/slow' },
   { name: 'kay dev', options: { dev: true }, start: '/', slow: '/slow' },
 ]
 

@@ -60,27 +60,28 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
     refused(config, () => shutdownSeconds(shutdownTimeout))
 
   refused(config, () => timeoutMs(options.serve?.timeout, 'serve.timeout'))
-  refused(config, () => loadBudgetMs(options.observe?.loadBudget))
+  refused(config, () => loadBudgetMs(options.ops?.observe?.loadBudget))
 
-  const { health } = options
+  const { health, observe } = options.ops ?? {}
+  const { favicon, manifest, images } = options.assets ?? {}
 
   if (health !== undefined && health !== false)
     refused(config, () => healthTimeoutMs(health))
 
   refused(config, () => liveLimits(options.live))
-  refused(config, () => remoteLimits(options.images))
-  refused(config, () => imageLimits(options.images))
-  refused(config, () => checkRequestIdHeader(options.observe?.requestIdHeader))
+  refused(config, () => remoteLimits(images))
+  refused(config, () => imageLimits(images))
+  refused(config, () => checkRequestIdHeader(observe?.requestIdHeader))
   refused(config, () => checkTimeZone(options.timeZone))
 
   refused(config, () => checkBudget(budget))
 
   // An SVG favicon is drawn by `kay build`, which it would fail.
-  for (const problem of await svgFaviconProblems(faviconSource(root, options.favicon, options.manifest)))
+  for (const problem of await svgFaviconProblems(faviconSource(root, favicon, manifest)))
     diagnostics.push({ line: 1, column: 1, ...problem })
 
   // So is the share cards' logo, which the boot draws and refuses.
-  const logo = options.images?.card?.logo
+  const logo = images?.card?.logo
 
   if (logo !== undefined) {
     // Loaded here alone: drawing the logo takes the image server, which no other check needs.

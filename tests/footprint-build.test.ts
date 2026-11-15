@@ -158,7 +158,7 @@ describe('kay build footprints', () => {
 
   it('weighs the same under a base path and with locales, a page of each locale counting', async () => {
     const plain = footprintOf(await built(await project('')), '/')!.footprint!
-    const root = await project('base: \'/docs\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' }')
+    const root = await project('base: \'/docs\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], default: \'fr\' }')
     const result = await built(root)
     const home = footprintOf(result, '/')!
 

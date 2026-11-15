@@ -44,7 +44,7 @@ describe('--quiet', () => {
 
   it('builds with its summary and none of the size report', async () => {
     const root = await project({
-      'kay.config.ts': 'export default { favicon: false }\n',
+      'kay.config.ts': 'export default { assets: { favicon: false } }\n',
       'src/counter.kay': counter,
       'src/routes/index.kay': '--- server\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
     })
@@ -56,7 +56,7 @@ describe('--quiet', () => {
 
   it('builds printing the size report, with no escape code in a pipe', async () => {
     const root = await project({
-      'kay.config.ts': 'export default { favicon: false }\n',
+      'kay.config.ts': 'export default { assets: { favicon: false } }\n',
       'src/counter.kay': counter,
       'src/routes/index.kay': '--- server\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
     })
@@ -117,7 +117,7 @@ describe('--quiet', () => {
 
     // The build has to be older than the sources by a file time's granularity.
     await Bun.sleep(20)
-    await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { favicon: false } }\n')
     await Bun.write(join(root, 'server.ts'), 'console.log("up")\n')
 
     const loud = await kay(['start', '--entry', 'server.ts'], root)
@@ -128,7 +128,7 @@ describe('--quiet', () => {
   })
 
   it('render leaves out the line naming a failing status', async () => {
-    const root = await project({ 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'main Home\n' })
+    const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false } }\n', 'src/routes/index.kay': 'main Home\n' })
     const loud = await kay(['render', '/nowhere'], root)
     const quiet = await kay(['render', '/nowhere', '--quiet'], root)
 
@@ -138,7 +138,7 @@ describe('--quiet', () => {
   }, 30_000)
 
   it('routes leaves out the note on the routes the server adds when it starts', async () => {
-    const root = await project({ 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'main Home\n', 'src/server.ts': 'export {}\n' })
+    const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false } }\n', 'src/routes/index.kay': 'main Home\n', 'src/server.ts': 'export {}\n' })
     const loud = await kay(['routes'], root)
     const quiet = await kay(['routes', '--quiet'], root)
 

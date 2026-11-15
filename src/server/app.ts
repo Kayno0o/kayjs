@@ -73,10 +73,10 @@ async function servedRoutes(routes: Route[], pages: ServedRoute[], required: Gua
 
 // What the server's options refuse by themselves, before the project is read.
 function refuseOptions(options: LoadedPagesOptions): void {
-  if (options.health !== false)
-    healthTimeoutMs(options.health)
+  if (options.ops?.health !== false)
+    healthTimeoutMs(options.ops?.health)
 
-  checkRequestIdHeader(options.observe?.requestIdHeader)
+  checkRequestIdHeader(options.ops?.observe?.requestIdHeader)
   checkTimeZone(options.timeZone)
   checkProxy(options.proxy)
 
@@ -128,8 +128,8 @@ function refuseScanned({ root, config }: Project<ServedOptions>, { routes, files
   refuseFeedsWithoutSite(collections, site)
 
   // A manifest something else serves is not made, so its settings are not checked either.
-  if (!served.heldByApp(MANIFEST) && faviconSource(root, config.favicon, config.manifest) !== undefined)
-    manifestJson(undefined, undefined, config.manifest, base)
+  if (!served.heldByApp(MANIFEST) && faviconSource(root, config.assets?.favicon, config.assets?.manifest) !== undefined)
+    manifestJson(undefined, undefined, config.assets?.manifest, base)
 
   return { served, routes: pages, table, publicServed, redirects, mcpAt }
 }

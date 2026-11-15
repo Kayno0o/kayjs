@@ -196,7 +196,7 @@ describe('a page that reads nothing from its request', () => {
 
   it('is kept once per locale, under a base and a trailing slash', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, requireGuards: false, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, requireGuards: false, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], default: \'fr\', messages: \'src/messages\' } })\n',
       'src/messages/fr.ts': MESSAGES.fr,
       'src/messages/en.ts': MESSAGES.en,
       'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\n---\nh1 {t(\'hello\')}\na(href="/about") About\n',
@@ -249,7 +249,7 @@ const GUESTBOOK: Record<string, string> = {
 
 const under: Record<string, string> = {
   ...GUESTBOOK,
-  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, requireGuards: false, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, requireGuards: false, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], default: \'fr\', messages: \'src/messages\' } })\n',
   'src/messages/fr.ts': MESSAGES.fr,
   'src/messages/en.ts': MESSAGES.en,
   'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\nimport { messages } from \'../guestbook\'\n---\np {t(\'hello\')} {messages.join(\',\')}\n',
@@ -1312,7 +1312,7 @@ describe('a page reading only what its path fixes', () => {
 
   it('is kept once per locale prefix and under a base, the pathname being the one the router sees', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\', i18n: { locales: [\'fr\', \'en\'], default: \'fr\', messages: \'src/messages\' } })\n',
       'src/messages/fr.ts': MESSAGES.fr,
       'src/messages/en.ts': MESSAGES.en,
       'src/routes/_layout.kay': '--- server\nimport { t } from \'kay/i18n\'\n\nconst here = ctx.url.pathname\n---\nheader {t(\'hello\')} {here}\nslot\n',

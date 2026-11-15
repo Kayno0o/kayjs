@@ -183,7 +183,7 @@ describe('the labels', () => {
 })
 
 describe('kay build and kay check', () => {
-  const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } })\n'
+  const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ i18n: { locales: [\'fr\', \'en\'], default: \'fr\' } })\n'
   const FRENCH_KEY = 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ kay: { entry: { type: \'{field} n\\\'est pas valide\' } } })\n'
 
   // The i18n-content fixture with a French default locale, and a French entry whose date is no date.

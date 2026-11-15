@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from './shared-pages'
 
-const app = new Elysia().use(await pages({ root: 'tests/fixtures/island-counts', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }))
+const app = new Elysia().use(await pages({ root: 'tests/fixtures/island-counts', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }))
 
 async function html(path: string): Promise<string> {
   return (await app.handle(new Request(`http://localhost${path}`))).text()

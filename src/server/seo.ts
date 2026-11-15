@@ -38,8 +38,8 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   const dir = join(clientDir, '..')
   let fonts: FontAssets | undefined
 
-  if (config.fonts !== undefined && config.fonts.length > 0) {
-    fonts = bundled ? await builtFonts(dir) : await prepareFonts(root, config.fonts, dir, clientDir)
+  if (config.assets?.fonts !== undefined && config.assets?.fonts.length > 0) {
+    fonts = bundled ? await builtFonts(dir) : await prepareFonts(root, config.assets?.fonts, dir, clientDir)
 
     if (!fonts)
       throw new KayError('executable-incomplete', 'kay: this executable holds no fonts; build it again with kay build --compile')
@@ -52,13 +52,13 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
       styles.push(lightFontCss(fonts.css))
   }
 
-  const favicon = switchOf(config.favicon)
+  const favicon = switchOf(config.assets?.favicon)
 
   if (favicon !== false)
     extra.push(...faviconTags(favicon))
 
   // A site linking its own icons still colours the browser around its pages.
-  extra.push(...themeColorTags(config.seo?.themeColor ?? config.manifest?.themeColor))
+  extra.push(...themeColorTags(config.seo?.themeColor ?? config.assets?.manifest?.themeColor))
 
   const mount = basePath(config.base)
 

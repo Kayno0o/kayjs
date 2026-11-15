@@ -124,7 +124,7 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   })
   const content = existsSync(paths.content) ? modulePath(paths.content) : undefined
   // `t()` reads the default locale's catalogs, or without `i18n` the site's one language's, when it has any.
-  const textLocale = options.i18n?.defaultLocale ?? options.lang ?? DEFAULT_LANG
+  const textLocale = options.i18n?.default ?? options.lang ?? DEFAULT_LANG
   const catalogs = [...extensionMessageFiles(root, options.extensions, textLocale), messagesFile(root, options.i18n ?? {}, textLocale)].filter(file => existsSync(file)).map(modulePath)
   const singleLanguage = catalogs.length > 0 ? { locales: [textLocale], prefixes: [], messages: catalogs } : undefined
   const texts = options.i18n ? settings && { locales: options.i18n.locales, prefixes, messages: catalogs } : singleLanguage

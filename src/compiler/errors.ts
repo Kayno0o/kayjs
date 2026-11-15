@@ -26,7 +26,7 @@ export const ERRORS = {
   'command-usage': {
     group: 'command',
     summary: 'A command that could not run as asked: a path that does not exist or is no project, a flag it does not take, flags that do not go together.',
-    fix: { file: 'llms/project.md', heading: 'Commands' },
+    fix: { file: 'llms/commands.md', heading: 'Commands' },
   },
   'missing-peer': {
     group: 'command',
@@ -376,7 +376,7 @@ export const ERRORS = {
   'export-no-client-build': {
     group: 'export',
     summary: 'Prerendering run with no client build to add its pages to.',
-    fix: { file: 'llms/project.md', heading: 'Commands' },
+    fix: { file: 'llms/commands.md', heading: 'Commands' },
   },
   'private-address': {
     group: 'runtime',

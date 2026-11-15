@@ -4,13 +4,13 @@
 
 ### Resize images uploaded at runtime
 
-`images.dirs` lists a directory by the URL path the app serves it at, and `image()` gets the size for the variants:
+`assets.images.dirs` lists a directory by the URL path the app serves it at, and `image()` gets the size for the variants:
 
 ```ts
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  images: { dirs: { '/uploads/': 'data/uploads' } },
+  assets: { images: { dirs: { '/uploads/': 'data/uploads' } } },
 })
 ```
 
@@ -25,13 +25,13 @@ img({...image(post.photo, { width: post.photoWidth, height: post.photoHeight })}
 
 ### Resize images from another host
 
-`images.remote` lists the hosts, each an `http` or `https` origin:
+`assets.images.remote` lists the hosts, each an `http` or `https` origin:
 
 ```ts
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  images: { remote: { hosts: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] } },
+  assets: { images: { remote: { hosts: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] } } },
 })
 ```
 
@@ -49,23 +49,23 @@ img({...image(post.cover.url, { width: post.cover.width, height: post.cover.heig
 ### Runtime and remote images
 
 - An image `files.put` stored is resized with no setting, its size read off its key: `img(src={files.url(key)})` (see [Stored files](files.md)).
-- Images added at runtime another way are resized too from a directory listed by the URL path the app serves it at: `images: { dirs: { '/uploads/': 'data/uploads' } }` in `kay.config.ts`, relative to the root, or to where an executable runs.
+- Images added at runtime another way are resized too from a directory listed by the URL path the app serves it at: `assets: { images: { dirs: { '/uploads/': 'data/uploads' } } }` in `kay.config.ts`, relative to the root, or to where an executable runs.
 - Give their size, `image(post.photo, { width: post.photoWidth, height: post.photoHeight })`, for the variants; without it the image keeps its `src` alone. kayjs-cms fills `photoWidth` and `photoHeight` in when the field is `imageField({ width: 'photoWidth', height: 'photoHeight' })` (see [Content CMS](content-cms.md)).
 - Each variant is made once per version of the file and revalidated by its ETag, since an upload can change in place; one over 50 megapixels is refused with 413 from its header alone.
 - The variants the route draws on request, for runtime, stored and remote images, are kept in `.kay/cache/images`; the server removes those nothing wrote for 30 days as it starts and once a day, and the next request draws one again.
 - A variant the server cannot write, its cache directory full or read-only, is the server's error, a 500 its error log reports, rather than the 415 of a file kay cannot resize.
 - kay does not serve the originals: the app does.
-- Images the app looks up its own way, such as by a database id, behind a session: `images.resolve: (src, ctx) => mediaPath(src)` gives the file of a `src` nothing above names, a path relative to the root, or undefined for a 404, and `images.guards: guard(ctx => { if (!ctx.locals.session.get('userId')) ctx.deny(401) })` runs before it, as a page guard does; without `guards` the route answers 403, and `guards: false` resizes for everyone.
+- Images the app looks up its own way, such as by a database id, behind a session: `assets.images.resolve: (src, ctx) => mediaPath(src)` gives the file of a `src` nothing above names, a path relative to the root, or undefined for a 404, and `assets.images.guards: guard(ctx => { if (!ctx.locals.session.get('userId')) ctx.deny(401) })` runs before it, as a page guard does; without `guards` the route answers 403, and `guards: false` resizes for everyone.
 - `ctx` is a guard's: `ctx.url.searchParams.get('src')`, the session and `deny()` or `redirect()`, in `resolve` too. A `resolve` returning something read off `ctx.locals` takes a written return type (`(src, ctx): Promise<string> => ...`): the config's own type depends on it, and `kay check` reports the cycle as `TS7023`.
 - Its `ctx.locals` holds what the app's plugins add, such as the session, but not Elysia's `cookie`, `query`, `headers` or `body`, which `ctx.cookies`, `ctx.url` and `ctx.request` give, and what the guard sets on `ctx.headers` or its cookies goes out with the image.
 - With `resolve` set, `image('/media/42', { width, height })` resizes any `src` starting with `/`, a file extension or not; these answers are `Cache-Control: private, no-cache`, revalidated by their ETag, a refusal `private, no-store`, and a static export refuses `resolve`, having no route.
 - The `src` is what any visitor typed: look it up, or `safePath('media', name)` from `kay/server`, never a plain join, as the path `resolve` returns is read as it is, `../` and symlinks followed; `resolve: src => safePath('media', src.slice('/media/'.length))` gives the real path of a file inside `media`, or undefined for a 404 (see [Files from a folder](server.md#files-from-a-folder)).
-- `images.guards` without `resolve` fails the boot.
+- `assets.images.guards` without `resolve` fails the boot.
 - A remote original and the variants of a runtime image are named after a truncated SHA-256 of their address, so none can be made to share a name with another.
-- Images on another host, such as a CMS, a CDN or an old WordPress, are resized too from a host `images.remote.hosts` lists (a list, or a function returning one, a promise of it too, for hosts a CMS or a database holds): `images: { remote: { hosts: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] } }`, or `remote: [...]` for hosts alone, each entry an `http` or `https` origin, its host starting with `*.` for any subdomain of a domain (`*.com`, `*.co.uk` and `*.vercel.app` are refused: a wildcard never covers a public suffix, by the whole Public Suffix List, which kay ships), and maybe a path every URL starts with.
+- Images on another host, such as a CMS, a CDN or an old WordPress, are resized too from a host `assets.images.remote.hosts` lists (a list, or a function returning one, a promise of it too, for hosts a CMS or a database holds): `images: { remote: { hosts: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] } }`, or `remote: [...]` for hosts alone, each entry an `http` or `https` origin, its host starting with `*.` for any subdomain of a domain (`*.com`, `*.co.uk` and `*.vercel.app` are refused: a wildcard never covers a public suffix, by the whole Public Suffix List, which kay ships), and maybe a path every URL starts with.
 - An entry may name `http:`, `localhost` or an IP, as a CMS running beside the app in development does.
 - A download goes only to public addresses: each hop, redirects included, resolves its host once and connects to the address it checked, answering 502 when any answer is loopback, private (`10/8`, `172.16/12`, `192.168/16`), link-local (`169.254.169.254`), unique-local (`fd00::/8`), reserved, or such an IPv4 address inside an IPv6 one (`::ffff:127.0.0.1`), whatever the spelling of the IP. An entry naming one address or `localhost` (`http://10.0.0.5:9000`, `http://localhost:9000`) is the app's own host and may be private; a host listed by name never may, so an internal CDN is listed by its address. The host is asked directly (`HTTP_PROXY` is not read) and a compressed answer is refused.
-- A download is cut off past 25 MB and given up on after 10 s, answering 413 and 502: `images: { remote: { hosts: [...], maxSize: '10mb', timeout: '30s' } }` changes them, a size such as `'10mb'` or bytes, a duration such as `'30s'`.
+- A download is cut off past 25 MB and given up on after 10 s, answering 413 and 502: `assets: { images: { remote: { hosts: [...], maxSize: '10mb', timeout: '30s' } } }` changes them, a size such as `'10mb'` or bytes, a duration such as `'30s'`.
 - Give their size, `image(post.cover.url, { width: post.cover.width, height: post.cover.height })`, for the variants, which the route makes from a copy it downloads into `.kay/cache/images/remote` and keeps for the host's `Cache-Control: max-age`, a minute to a week, an hour without one, then asks again with its ETag or date; a changed image gets new variants under a new ETag.
 - A host that fails leaves the last copy served, and one that never answered is asked again a minute later, the route answering 502 meanwhile.
 - A host not listed is refused with 403, as is a redirect to one, so the route is no open proxy.
@@ -78,8 +78,8 @@ img({...image(post.cover.url, { width: post.cover.width, height: post.cover.heig
 ## Limits on encoding
 
 A variant no file holds yet costs an encode, so the route bounds what a client can ask for; a variant already made, and an imported image's built ones, are never limited.
-- `images.rateLimit` (`{ max: 120, window: '1m' }` by default): the new variants one client may have encoded in a window, counted by its address, the forwarded one behind a trusted `proxy`; past it the route answers 429 with `Retry-After`.
-- `images.limits.variants` (256): the variants kept cached of one source, counted from the files in `.kay/cache/images`; past it the oldest of that source's is removed to make room for the one asked for, so no client can lock others out, and a removed one is encoded again when asked, within `rateLimit`.
+- `assets.images.rateLimit` (`{ max: 120, window: '1m' }` by default): the new variants one client may have encoded in a window, counted by its address, the forwarded one behind a trusted `proxy`; past it the route answers 429 with `Retry-After`.
+- `assets.images.limits.variants` (256): the variants kept cached of one source, counted from the files in `.kay/cache/images`; past it the oldest of that source's is removed to make room for the one asked for, so no client can lock others out, and a removed one is encoded again when asked, within `rateLimit`.
 - Requests asking for the same new variant at once count once.
-- `images.limits.queue` (128): the encodes waiting for one of the four drawn at once; past it the route answers 503 with `Retry-After: 5`.
+- `assets.images.limits.queue` (128): the encodes waiting for one of the four drawn at once; past it the route answers 503 with `Retry-After: 5`.
 - Each takes a whole number from 1 or `false` for no limit, and `kay check` refuses any other value.

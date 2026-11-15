@@ -14,11 +14,11 @@ A `path` is one route, a `prefix` a subtree, and every `guards` option takes a g
 | --- | --- | --- | --- | --- |
 | `serve.apiPrefix` | prefix of the API modules, the OpenAPI document and its reference | the API directory's `_guard.ts` | open | no guard option |
 | `openapi.path`, `openapi.referencePath`, `mcp.path` | route | the API directory's `_guard.ts` | open | no guard option |
-| `health.path`, `metrics.path` | route | none: `metrics` takes a token, `health` is open | open | no guard option |
-| `jobs.path`, `jobs.guards` | route | guard, list or `{ load }` | closed, 403 | opens the page |
+| `ops.health.path`, `ops.metrics.path` | route | none: `metrics` takes a token, `health` is open | open | no guard option |
+| `ops.jobs.path`, `ops.jobs.guards` | route | guard, list or `{ load }` | closed, 403 | opens the page |
 | `vitals({ prefix, guards })` | prefix | guard, list or `{ load }` | closed, 403 | opens the screen |
 | `cms({ prefix, access })` | prefix | role, list, `{ password }`, function or `false` | closed, 403 | admits everyone |
-| `images.guards` | before `images.resolve` | guard, list or `{ load }` | closed, 403 | resizes for everyone |
+| `assets.images.guards` | before `assets.images.resolve` | guard, list or `{ load }` | closed, 403 | resizes for everyone |
 | `extension.routes`, `extension.api` `prefix` | prefix | the library's own guards | as the library says | no guard option |
 | `page = { guards }`, `api({ guards })` | one page, endpoint or API module | guard, list or `{ load }`, run after the guards above it | under the guards above it | skips them |
 

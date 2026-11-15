@@ -11,7 +11,7 @@ import { trace } from '@opentelemetry/api'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  observe: { tracer: trace.getTracer('my-site') },
+  ops: { observe: { tracer: trace.getTracer('my-site') } },
 })
 ```
 
@@ -19,16 +19,18 @@ export default defineConfig({
 
 A request carrying a W3C `traceparent` header gets its server span under that parent, so a call from another service shows as one trace; kay reads the header itself, with no OpenTelemetry dependency. The response carries `traceresponse: 00-<trace id>-<span id>-<flags>` and the JSON log lines of the request (`observe: { log: 'json' }`) a `trace` field with the trace id. A header that is malformed or has an all-zero id is ignored and the request starts a trace of its own.
 
-To read another format (B3, a baggage rule), `observe: { extract }` takes a function from the request's `Headers` to a context, the OpenTelemetry one-liner being:
+To read another format (B3, a baggage rule), `ops.observe.extract` takes a function from the request's `Headers` to a context, the OpenTelemetry one-liner being:
 
 ```ts
 import { propagation, ROOT_CONTEXT, trace } from '@opentelemetry/api'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  observe: {
-    tracer: trace.getTracer('my-site'),
-    extract: headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers)),
+  ops: {
+    observe: {
+      tracer: trace.getTracer('my-site'),
+      extract: headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers)),
+    },
   },
 })
 ```
@@ -39,9 +41,9 @@ export default defineConfig({
 
 ### Tracing and timing
 
-- `observe: { serverTiming: true }` in kay.config.ts sends the `Server-Timing` header development sends on every page rendered per request in production too, and on every action, endpoint and API route, which carry `guards;dur=0.4, handler;dur=3.2` (the guards only when it has any; only the guards for an endpoint they refuse, none for an action or API route they refuse or a handler that throws; added to a `Server-Timing` the handler set itself). A page carries: `guards;dur=0.4, import;dur=0.2, loads;dur=12.6, load-0;desc="src/routes/_layout.kay";dur=3.1, load-1;desc="src/routes/blog/[slug].kay";dur=12.4, render;dur=1.8`: the guards (on a route that has any), the import of the page's modules and its loads as a whole, which run at once, then each load, layouts first, then the render.
+- `ops: { observe: { serverTiming: true } }` in kay.config.ts sends the `Server-Timing` header development sends on every page rendered per request in production too, and on every action, endpoint and API route, which carry `guards;dur=0.4, handler;dur=3.2` (the guards only when it has any; only the guards for an endpoint they refuse, none for an action or API route they refuse or a handler that throws; added to a `Server-Timing` the handler set itself). A page carries: `guards;dur=0.4, import;dur=0.2, loads;dur=12.6, load-0;desc="src/routes/_layout.kay";dur=3.1, load-1;desc="src/routes/blog/[slug].kay";dur=12.4, render;dur=1.8`: the guards (on a route that has any), the import of the page's modules and its loads as a whole, which run at once, then each load, layouts first, then the render.
 - Anyone loading the page reads it, page file names included; an action's, endpoint's and API route's holds none.
-- In development, `observe: { loadBudget: '500ms' }` sets how long a page's loads (the `loads` phase above) may take before kay warns in the log, the browser console and the dev tool's Request tab, naming the slowest `load-n`, and warns the same way when a layout's load outlasts the page's own loads and the budget, naming the layout file and both times; `'300ms'` by default, `false` for no warning, and it needs no `serverTiming`.
+- In development, `ops: { observe: { loadBudget: '500ms' } }` sets how long a page's loads (the `loads` phase above) may take before kay warns in the log, the browser console and the dev tool's Request tab, naming the slowest `load-n`, and warns the same way when a layout's load outlasts the page's own loads and the budget, naming the layout file and both times; `'300ms'` by default, `false` for no warning, and it needs no `serverTiming`.
 - The handler's time is exact to 0.1 ms, so keep `serverTiming` off in production for a login or lookup route whose time tells a caller whether an account exists.
 - A prerendered page has none, but one with server islands carries the timings of the loads and render that filled them.
 - `tracer` takes an OpenTelemetry tracer, which kay calls without depending on OpenTelemetry: the app installs `@opentelemetry/api` and an SDK exporting the spans, as `@opentelemetry/sdk-trace-node` with an OTLP exporter, registered before the server starts, then passes `tracer: trace.getTracer('my-site')`.

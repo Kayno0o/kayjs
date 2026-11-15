@@ -538,7 +538,7 @@ pgDescribe('kay not-found against Postgres', () => {
   async function project(database: string): Promise<string> {
     const root = await scratchDir('not-found-cli-pg-')
 
-    await Bun.write(join(root, 'kay.config.ts'), `export default {\n  favicon: false,\n  store: { database: ${JSON.stringify(database)} },\n}\n`)
+    await Bun.write(join(root, 'kay.config.ts'), `export default {\n  assets: { favicon: false },\n  store: { database: ${JSON.stringify(database)} },\n}\n`)
     await Bun.write(join(root, 'src/routes/new.kay'), 'main New\n')
 
     return root

@@ -15,7 +15,7 @@ const site = await testSite({ root: 'tests/fixtures/library-tools', islands: fal
 const mounted = await testSite({ root: 'tests/fixtures/library-tools', islands: false, base: '/shop', trailingSlash: 'always', locals })
 // A library's call is the visitor's own, so an endpoint guarded by `mcp.key` asks it nothing and the visitor's Authorization still reaches the action.
 const keyed = await testSite({ root: 'tests/fixtures/library-tools', islands: false, locals, mcp: { key: true } })
-const localized = await testSite({ root: 'tests/fixtures/library-tools', islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
+const localized = await testSite({ root: 'tests/fixtures/library-tools', islands: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
 
 // Imported once a site loads `.kay` modules.
 const { current, later, names, recorded, run, shape, unregistered } = await import(join(import.meta.dir, 'fixtures/library-tools/src/routes/index.kay')) as { current: Action<Record<never, never>, string | null>, later: Action<Record<never, never>, undefined>, names: Action<Record<never, never>, string[]>, recorded: Action<Record<never, never>, string | null | undefined>, unregistered: Action<Record<never, never>, string>, run: Action<{ name: string, args: Record<string, unknown> }, ToolResult>, shape: Action<{ name: string }, Record<string, unknown> | undefined> }

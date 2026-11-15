@@ -188,11 +188,11 @@ export function bootOf(input: BootInput) {
   const directives = dictionaryUsed ? { ...client.directives, 'connect-src': [...new Set([...client.directives?.['connect-src'] ?? [], '\'self\''])] } : client.directives
   const securityOptions = { ...options, dev: env.dev, islands: directives, scripts: client.installs !== undefined && client.installs.length > 0 ? [...scripts, INSTALL_OFFER] : scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client), ...newTabStyles(locales.translations.values()), BUTTON_FORM_STYLE].map(style => rebaseCss(style, env.base)))] }
   // Offered, so an app file at the path keeps it; only a running server counts, as `kay dev` restarts on every change and an export serves nothing.
-  const metricsConfig = env.serving ? metricsOf(options.metrics) : undefined
+  const metricsConfig = env.serving ? metricsOf(options.ops?.metrics) : undefined
   const metrics: Claim | undefined = metricsConfig && { path: metricsConfig.path ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
   // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
-  const health: Claim | undefined = options.health === false ? undefined : { path: bagOf(options.health)?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
-  const log = loggerOf(options.observe?.log, env.production)
+  const health: Claim | undefined = options.ops?.health === false ? undefined : { path: bagOf(options.ops?.health)?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
+  const log = loggerOf(options.ops?.observe?.log, env.production)
   // The routes later stages register, which the dev tool's Routes tab reads when it answers, as it registers before them.
   const registered: { extensions: OwnRoutes['extensions'], actions: boolean, api: MountedApi[] } = { extensions: [], actions: false, api: [] }
 
@@ -291,7 +291,7 @@ function hostsToAnswer(setting: SecurityConfig | boolean | undefined, site: stri
 
 // Who the request is from and whether it may come: the proxy it came through, the server's own mark, the proxy key, the hosts, then the security headers on every answer.
 export function trustRequests({ app, env, options, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log, health }: Boot): void {
-  setRequestIdHeader(options.observe?.requestIdHeader)
+  setRequestIdHeader(options.ops?.observe?.requestIdHeader)
   trustProxy(app, options.proxy)
   defaultCookies(app, cookieDefaults(options.security, env.base))
   // Before the key check reads the mark, and dropped from the request there, so no handler reads it.
@@ -389,11 +389,11 @@ export function kayEndpoints({ app, env, options, served, lifecycle, health, met
   if (health) {
     served.offer(health)
     // Before the extension servers, whose hooks it answers ahead of; it answers only where the claims, known once all are in, leave it the path.
-    serveHealth(app, lifecycle, () => served.holds(health), bagOf(options.health), security || undefined)
+    serveHealth(app, lifecycle, () => served.holds(health), bagOf(options.ops?.health), security || undefined)
   }
 
   // Read in development too, so a setting without a guard fails there; claimed, so an app file at the path stops the boot.
-  const jobsPage = jobsPageOf(options.jobs)
+  const jobsPage = jobsPageOf(options.ops?.jobs)
 
   if (jobsPage && env.serving)
     served.claim({ path: jobsPage.path, owner: 'the jobs page', kind: 'kay', method: 'ALL' }, taken => `kay: ${taken.owner} and the jobs page both serve ${jobsPage.path}: move one with \`jobs: { path }\``)
@@ -455,7 +455,7 @@ export async function serveDevRoutes(boot: Boot): Promise<void> {
   // Loaded in development only: the seo rules reach the compiler, which a production server does not load.
   const { devHead } = await import('./dev-head')
 
-  app.post(DEV_HEAD, async ({ request }) => devHead(request, { config: { site, seo: options.seo, favicon: options.favicon, lints: options.lints }, routes, base: env.base, trailingSlash: env.trailingSlash, locales: i18n?.settings }))
+  app.post(DEV_HEAD, async ({ request }) => devHead(request, { config: { site, seo: options.seo, assets: { favicon: options.assets?.favicon }, lints: options.lints }, routes, base: env.base, trailingSlash: env.trailingSlash, locales: i18n?.settings }))
   const { devSizes } = await import('./dev-sizes')
 
   app.get(DEV_SIZES, async ({ request }) => devSizes(request, { table, match: routeMatch(table, matchers, env.trailingSlash), base: env.base, reports: [paths.report, paths.report.replace(JSON_EXTENSION, '-static.json')] }))
@@ -526,7 +526,7 @@ export async function buildFiles({ app, env, setup: { client }, security, filePa
 
 // The options actions, API modules, endpoints and kay's guarded routes share.
 export function actionOptionsOf({ env, options, setup, late, project, required }: Boot, skipBroken: boolean): ActionOptions {
-  return { skipBroken, toolOutputs: setup.source.toolOutputs(project.root, project.paths.output), dev: env.dev, serverTiming: options.observe?.serverTiming ?? env.dev, onError: options.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: required, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
+  return { skipBroken, toolOutputs: setup.source.toolOutputs(project.root, project.paths.output), dev: env.dev, serverTiming: options.ops?.observe?.serverTiming ?? env.dev, onError: options.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: required, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
 }
 
 // The app's request, response and lifecycle hooks, after kay's own checks and endpoints so a refused host or the health check run none, and before the extensions so their routes run them too.
@@ -632,7 +632,7 @@ export function reports({ app, options, setup: { i18n, site, collections }, hasP
 
 // The paths the config names resolve where the server runs, and development serves WebP, so a page's first load does not wait on AVIF encoding.
 // What `images.resolve` runs behind: the `guards` given, none when they are `false`, and a refusal when the app gave none, as every feature reading private files closes.
-function imageGuard(images: KayConfig['images']): Guard | undefined {
+function imageGuard(images: NonNullable<KayConfig['assets']>['images']): Guard | undefined {
   const given = images?.guards ?? images?.guard
 
   if (given === false)
@@ -642,26 +642,26 @@ function imageGuard(images: KayConfig['images']): Guard | undefined {
 }
 
 async function imageRouteOf({ project: { root }, options, env, setup: { source, client, imageCache }, security }: Boot, actions: ActionOptions): Promise<ImageRouteOptions> {
-  const lookup = options.images?.resolve
+  const lookup = options.assets?.images?.resolve
   const runtimeRoot = source.runtimeRoot(root)
 
   return {
     clientDir: client.dir,
     cacheDir: imageCache,
-    dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(runtimeRoot, dir)])),
-    quality: webpQuality(options.images),
-    avif: env.dev ? undefined : avifQuality(options.images),
-    aspects: options.images?.aspects,
-    ttl: options.images?.ttl,
-    limits: imageLimits(options.images),
+    dirs: Object.fromEntries(Object.entries(options.assets?.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(runtimeRoot, dir)])),
+    quality: webpQuality(options.assets?.images),
+    avif: env.dev ? undefined : avifQuality(options.assets?.images),
+    aspects: options.assets?.images?.aspects,
+    ttl: options.assets?.images?.ttl,
+    limits: imageLimits(options.assets?.images),
     saveData: options.client?.saveData,
-    remote: remoteImages(join(imageCache, 'remote'), await remotePatterns(options.images?.remote?.hosts), imageCache, undefined, remoteLimits(options.images)),
+    remote: remoteImages(join(imageCache, 'remote'), await remotePatterns(options.assets?.images?.remote?.hosts), imageCache, undefined, remoteLimits(options.assets?.images)),
     security,
     resolve: lookup && { find: async (src: string, ctx: GuardContext) => {
       const path = await lookup(src, ctx)
 
       return path === undefined ? undefined : resolve(runtimeRoot, path)
-    }, guard: imageGuard(options.images), actions },
+    }, guard: imageGuard(options.assets?.images), actions },
   }
 }
 
@@ -745,10 +745,10 @@ export async function siteFiles(boot: Boot) {
   if (site !== undefined)
     serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base, sitemap: options.sitemap !== false, ttl: bagOf(options.sitemap)?.ttl })
 
-  const favicon = faviconSource(root, options.favicon, options.manifest)
+  const favicon = faviconSource(root, options.assets?.favicon, options.assets?.manifest)
 
   if (favicon !== undefined)
-    serveFavicons(app, served, { source: favicon, builtDir: env.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, cache: source.embedded ? undefined : cacheDir(root, 'favicons'), name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.manifest, appManifest, base: env.base })
+    serveFavicons(app, served, { source: favicon, builtDir: env.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, cache: source.embedded ? undefined : cacheDir(root, 'favicons'), name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.assets?.manifest, appManifest, base: env.base })
 
   const prerendered = await loadPrerendered(client, dictionaryUsed)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
@@ -776,7 +776,7 @@ function knownPaths(client: ClientBuild, table: RouteTable): () => string[] {
 export async function pageRoutes(boot: Boot, { redirects, publicServed, redirector, prerendered, writes }: { redirects: Redirect[], publicServed: ClaimedFile[], redirector: ReturnType<typeof compressAnswers>, prerendered: Awaited<ReturnType<typeof siteFiles>>, writes: Writes }): Promise<void> {
   const { app, env, options, served, table, compressing, securityOptions, security, project, setup: { client, renderOptions, i18n, locales, matchers, source, mounts } } = boot
   // Read in development too, so a duration that is none stops it there rather than in production.
-  const publicCache = publicCacheRules(options.publicCache)
+  const publicCache = publicCacheRules(options.assets?.publicCache)
 
   // The page for a path none serves is built with the page routes, after the public ones, which a file deleted since boot answers with.
   const pageFor: { unmatched?: Unmatched | undefined } = {}
@@ -794,7 +794,7 @@ export async function pageRoutes(boot: Boot, { redirects, publicServed, redirect
   // After the hooks above, which a public file deleted since boot is answered through as a path nothing serves.
   await servePublic(app, served, publicServed, env.dev ? undefined : publicCache, compressing && !env.dev, pageFor)
 
-  const pageFile = assetFiles({ clientDir: client.dir, publicDir: project.paths.public, base: env.base, aspects: options.images?.aspects })
+  const pageFile = assetFiles({ clientDir: client.dir, publicDir: project.paths.public, base: env.base, aspects: options.assets?.images?.aspects })
   const respond = withPageHeaders(withSavedData(pageResponder({ client, renderOptions: { ...renderOptions, pageHeaders: pageHeaderCopies(security || undefined) }, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), served: servedPageHooks(options.extensions), pageFile, pageSizes: pageSizes(pageFile) }), renderOptions), securityOptions, security)
 
   const fallback = await source.fallback(project, mounts)

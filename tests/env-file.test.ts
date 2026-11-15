@@ -217,7 +217,7 @@ describe('kay env and kay check with the file form', () => {
     const dir = await folder()
 
     await mkdir(join(dir, 'src'))
-    await Bun.write(join(dir, 'kay.config.ts'), 'export default { favicon: false }\n')
+    await Bun.write(join(dir, 'kay.config.ts'), 'export default { assets: { favicon: false } }\n')
     await Bun.write(join(dir, 'src/env.ts'), 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ API_KEY: s.String() }))\n')
 
     const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'env'], { cwd: dir, env: { PATH: process.env.PATH! }, stdout: 'pipe', stderr: 'pipe' })

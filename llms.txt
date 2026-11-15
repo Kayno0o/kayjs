@@ -99,8 +99,9 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Deprecated lints of the 1.105 libraries](llms/deprecated-lints-1-105-libraries.md): the 1.105 old forms of kayjs-ai, ui, cms, mail and auth
 - [Errors](llms/errors.md): codes and fixes
 - [Thrown errors](llms/errors-runtime.md): `Result`
-- [Project setup](llms/project.md): `kay.config.ts`, tsconfig, editor, from Astro
+- [Project setup](llms/project.md): `kay.config.ts`, tsconfig, Astro
 - [kay new and kay add](llms/project-new-and-add.md): presets, `kay generate`
+- [Commands](llms/commands.md): shared options, JSON output
 - [The dev server](llms/dev-server.md): `kay dev`
 - [The dev tool](llms/dev-tool.md): its tabs
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, static export, `kay start`

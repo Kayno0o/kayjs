@@ -97,7 +97,7 @@ describe('health.timeout', () => {
   })
 
   it('is read by kay check', async () => {
-    const problems = await check('tests/fixtures/production', configCheckOptions({ health: { timeout: '5 s' as never } }))
+    const problems = await check('tests/fixtures/production', configCheckOptions({ ops: { health: { timeout: '5 s' as never } } }))
 
     expect(problems.map(problem => problem.message)).toContain('kay: health.timeout is \'5 s\'; it takes a positive duration such as \'250ms\', \'5m\' or \'30d\'')
   })

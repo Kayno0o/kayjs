@@ -1,4 +1,5 @@
-import type { ConfigInput, ImageFormats, ImageLimits, KayConfig, Loadable, ObserveConfig, ObserveInput, RemoteImages } from './config'
+import type { ConfigInput, I18nConfig, I18nInput, ImageFormats, ImageLimits, KayConfig, Loadable, ObserveConfig, ObserveInput, RemoteImages } from './config'
+import { KayError } from './compiler/errors'
 import { isRecord } from './config-rules'
 
 // A list as the config gave it: itself, or what the function returns, awaited.
@@ -21,10 +22,13 @@ async function loadKeys<Bag extends object>(bag: Bag | boolean | number | undefi
   return loaded as Bag
 }
 
+// The top-level keys of before 1.105 that live in a group of the loaded config now.
+const MOVED_KEYS = ['offline', 'search', 'links', 'images', 'fonts', 'favicon', 'manifest', 'publicCache', 'observe', 'health', 'metrics', 'jobs'] as const
+
 const without = <Value extends object>(value: Value): Value => Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as Value
 
 // `images` with its remote hosts loaded and the flat keys of before 1.105 moved into their groups, a key already in its group winning over the old one.
-async function resolveImages(images: NonNullable<ConfigInput['images']>): Promise<NonNullable<KayConfig['images']>> {
+async function resolveImages(images: NonNullable<ConfigInput['images']>): Promise<NonNullable<NonNullable<KayConfig['assets']>['images']>> {
   const { remote, remoteMaxSize, remoteTimeout, maxVariants, queue, quality, webp, avif, ...rest } = images
   const given: Omit<RemoteImages, 'hosts'> & { hosts?: Loadable<string[]> | undefined } = typeof remote === 'function' || Array.isArray(remote) ? { hosts: remote } : remote ?? {}
   const hosts = given.hosts === undefined ? undefined : await load(given.hosts)
@@ -57,25 +61,72 @@ function resolveClient(config: ConfigInput): KayConfig['client'] {
   return config.client === undefined && Object.keys(moved).length === 0 ? undefined : { ...moved, ...without(config.client ?? {}) }
 }
 
+// `assets` with the `images`, `fonts`, `favicon`, `manifest` and `publicCache` the config held at its top level before 1.105, a key already in `assets` winning over the old one, and the images resolved.
+async function resolveAssets(config: ConfigInput): Promise<KayConfig['assets']> {
+  const { images, fonts, favicon, manifest, publicCache } = config
+  const moved = without({ images, fonts, favicon, manifest, publicCache })
+  const given = without(config.assets ?? {})
+  const merged = { ...moved, ...given }
+
+  if (Object.keys(merged).length === 0)
+    return config.assets === undefined ? undefined : {}
+
+  const { images: unresolved, ...rest } = merged
+
+  return { ...rest, ...unresolved !== undefined && { images: await resolveImages(unresolved) } }
+}
+
+// `ops` with the `observe`, `health`, `metrics` and `jobs` the config held at its top level before 1.105, a key already in `ops` winning over the old one, and the `onError` an `observe` held set aside.
+function resolveOps(config: ConfigInput): { ops: KayConfig['ops'], onError: ObserveInput['onError'] } {
+  const { observe, health, metrics, jobs } = config
+  const merged = { ...without({ observe, health, metrics, jobs }), ...without(config.ops ?? {}) }
+
+  if (Object.keys(merged).length === 0)
+    return { ops: config.ops === undefined ? undefined : {}, onError: undefined }
+
+  const { observe: given, ...rest } = merged
+  const resolved = given === undefined ? undefined : resolveObserve(given)
+
+  return { ops: { ...rest, ...resolved && { observe: resolved.observe } }, onError: resolved?.onError }
+}
+
+// `i18n` with its paths loaded and the `defaultLocale`, `prefixDefault` and `domains` of before 1.105 as `default` and `mode`, a key already in its new place winning over the old one.
+async function resolveI18n(i18n: I18nInput | undefined): Promise<I18nConfig | undefined> {
+  const loaded = await loadKeys(i18n, ['paths'])
+
+  if (!isRecord(loaded))
+    return loaded as undefined
+
+  const { defaultLocale, prefixDefault, domains, default: named, mode, ...rest } = loaded as Omit<I18nInput, 'paths'> & { paths?: I18nConfig['paths'] }
+
+  if (domains !== undefined && prefixDefault === true)
+    throw new KayError('locales-invalid', 'kay: i18n gives domains or prefixDefault, not both: with domains a locale has no prefix')
+
+  const old = domains === undefined ? prefixDefault === true ? 'always' as const : undefined : { domains }
+  const chosen = mode ?? old
+  const first = named ?? defaultLocale
+
+  return { ...rest, default: first as string, ...chosen !== undefined && { mode: chosen } }
+}
+
 // The config `kay.config.ts` wrote as the `KayConfig` the server reads: each list that a function gave loaded once, the old flat keys of `images`, the `onStart` hook and `observe`'s `onError` and `log` in the places they have since 1.105. Called as the config loads, so `kay dev` calls the functions again after a change to the file.
 export async function resolveConfig(config: ConfigInput): Promise<KayConfig> {
-  const [security, proxy, robots, i18n, redirects, images] = await Promise.all([
+  const [security, proxy, robots, i18n, redirects, assets] = await Promise.all([
     loadKeys(config.security, ['hosts']),
     loadKeys(config.proxy, ['trusted']),
     loadKeys(config.robots, ['disallow', 'allow']),
-    loadKeys(config.i18n, ['paths']),
+    resolveI18n(config.i18n),
     config.redirects === undefined ? undefined : load(config.redirects),
-    config.images === undefined ? undefined : resolveImages(config.images),
+    resolveAssets(config),
   ])
   const cors = config.cors === undefined ? undefined : await loadKeys(config.cors, ['origins'])
   const { onStart, ...kept } = config
 
-  delete kept.offline
-  delete kept.search
-  delete kept.links
+  for (const key of MOVED_KEYS)
+    delete kept[key]
 
-  const observed = config.observe === undefined ? undefined : resolveObserve(config.observe)
-  const resolved: Record<string, unknown> = { ...kept, security, proxy, robots, i18n, redirects, images, cors, observe: observed?.observe, client: resolveClient(config), onListen: config.onListen ?? onStart, onError: config.onError ?? observed?.onError }
+  const { ops, onError } = resolveOps(config)
+  const resolved: Record<string, unknown> = { ...kept, security, proxy, robots, i18n, redirects, assets, ops, cors, client: resolveClient(config), onListen: config.onListen ?? onStart, onError: config.onError ?? onError }
 
   for (const key of Object.keys(resolved)) {
     if (resolved[key] === undefined)

@@ -19,7 +19,7 @@ const WAYS: Way[] = ['page', 'guard', 'endpoint', 'form', 'swap', 'island']
 interface Variant { base: string, trailingSlash: Slash, locales: boolean, dev: boolean }
 
 async function serve({ base, trailingSlash, locales, dev }: Variant): Promise<Elysia> {
-  const i18n: I18nConfig | undefined = locales ? { locales: ['fr', 'en'], defaultLocale: 'fr', messages } : undefined
+  const i18n: I18nConfig | undefined = locales ? { locales: ['fr', 'en'], default: 'fr', messages } : undefined
 
   return new Elysia().use(await pages({ requireGuards: false, root: 'tests/fixtures/redirect-spelling', prebuilt: false, security: false, site: 'https://x.example', i18n, base: base || undefined, trailingSlash, dev }))
 }

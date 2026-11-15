@@ -21,7 +21,7 @@ async function project(): Promise<string> {
 
   await Bun.write(join(root, 'package.json'), '{ "name": "app", "type": "module" }')
   await Bun.write(join(root, 'tsconfig.json'), '{}')
-  await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
+  await Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { favicon: false } }\n')
   await Bun.write(join(root, 'node_modules/.bin/keslint'), '#!/bin/sh\necho "keslint $@"\n')
   await Bun.$`chmod +x ${join(root, 'node_modules/.bin/keslint')}`
   await Bun.write(join(root, 'a.test.ts'), 'import { expect, it } from \'bun:test\'\nit(\'works\', () => expect(1).toBe(1))\n')
@@ -93,7 +93,7 @@ it('prints the failure alone for kay lint --help without keslint', async () => {
   try {
     await Bun.write(join(root, 'package.json'), '{ "name": "app", "type": "module" }')
     await Bun.write(join(root, 'tsconfig.json'), '{}')
-    await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { favicon: false } }\n')
 
     const { stdout, stderr, code } = await kay(['lint', '--help'], root)
 

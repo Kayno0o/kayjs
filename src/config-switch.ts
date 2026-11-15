@@ -3,6 +3,11 @@ export function switchOf<Value>(value: Value | boolean | undefined): Exclude<Val
   return value === true ? undefined : value as Exclude<Value, boolean> | false | undefined
 }
 
+// Whether the images' placeholder is on, off or left to its default, as `assets.images` sets it.
+export function placeholderOf(config: { assets?: { images?: { placeholder?: boolean | undefined } | undefined } | undefined }): false | undefined {
+  return switchOf(config.assets?.images?.placeholder)
+}
+
 // The options of a feature key: its bag, or nothing for a key left out, `true` or `false`.
 export function bagOf<Bag extends object>(value: Bag | boolean | undefined): Bag | undefined {
   return typeof value === 'object' ? value : undefined

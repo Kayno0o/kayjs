@@ -2650,7 +2650,7 @@ describe.concurrent('kay check, edge cases', () => {
     try {
       expect((await check(bare)).filter(d => d.code?.startsWith('TS'))).toEqual([])
 
-      const typed = await check(named, { i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } })
+      const typed = await check(named, { i18n: { locales: ['fr', 'en'], default: 'fr' } })
 
       expect(typed.filter(d => d.code?.startsWith('TS')).map(d => d.file.slice(d.file.lastIndexOf('/') + 1))).toEqual(['bad.kay'])
     }
@@ -2664,7 +2664,7 @@ describe.concurrent('kay check, edge cases', () => {
     const env = 'import { t } from \'elysia\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(t.Object({ KAY_CHECK_UNSET_SECRET: t.String() }))\n'
     const root = await scratchProject({
       'src/env.ts': env,
-      'kay.config.ts': 'import \'./src/env\'\n\nexport default { i18n: { locales: [\'en\'], defaultLocale: \'en\' } }\n',
+      'kay.config.ts': 'import \'./src/env\'\n\nexport default { i18n: { locales: [\'en\'], default: \'en\' } }\n',
       'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\nimport { env } from \'./env\'\n\nexport const notes = collection(\'content/notes\', { schema: t.Object({ title: t.String() }) })\nexport const secret = () => env.KAY_CHECK_UNSET_SECRET\n',
       'src/content/notes/a.md': '---\ntitle: A\n---\nText\n',
       'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\nimport \'../env\'\n\nexport default defineMessages({ hello: \'Hello\' })\n',
@@ -2684,7 +2684,7 @@ describe.concurrent('kay check, edge cases', () => {
 
   it('reads the collections and the messages to the end though their code leaves a timer running, and stops a script that never ends', async () => {
     const root = await scratchProject({
-      'kay.config.ts': 'export default { i18n: { locales: [\'en\'], defaultLocale: \'en\' } }\n',
+      'kay.config.ts': 'export default { i18n: { locales: [\'en\'], default: \'en\' } }\n',
       'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nsetInterval(() => {}, 1000)\n\nexport const notes = collection(\'content/notes\', { schema: t.Object({ title: t.String() }) })\n',
       'src/content/notes/a.md': '---\ndate: today\n---\nText\n',
       'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nsetInterval(() => {}, 1000)\n\nexport default defineMessages({ hello: \'Hello\' })\n',
@@ -3113,7 +3113,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     })
 
     try {
-      expect(await refusals(root, { redirects: { '/about': '/' }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } })).toEqual([
+      expect(await refusals(root, { redirects: { '/about': '/' }, i18n: { locales: ['fr', 'en'], default: 'fr' } })).toEqual([
         ['kay.config.ts', 'kay: src/routes/en/team.kay serves /en/team, under the prefix of the locale en; kay serves every page there already'],
         ['kay.config.ts', 'kay: the redirect from /about takes a path a page serves; remove the redirect or the page'],
         ['public', 'kay: public/about and a page both serve /about'],
@@ -3643,7 +3643,7 @@ describe.concurrent('kay check, a redirect source is served', () => {
       await addRuntimeRedirect('/later', '/', { file: join(root, NOT_FOUND_FILE) })
 
       expect(unserved(await check(root, { redirects, base: '/app' }))).toEqual(sorted(left))
-      expect(unserved(await check(root, { redirects, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } }))).toEqual(sorted(left))
+      expect(unserved(await check(root, { redirects, i18n: { locales: ['fr', 'en'], default: 'fr' } }))).toEqual(sorted(left))
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -4143,7 +4143,7 @@ describe.concurrent('kay check, unused code', () => {
     })
 
     try {
-      const found = (await check(root, { site: 'https://example.com', favicon: false })).filter(d => d.code !== undefined && d.code !== 'missing-description')
+      const found = (await check(root, { site: 'https://example.com', assets: { favicon: false } })).filter(d => d.code !== undefined && d.code !== 'missing-description')
 
       expect(found.map(d => [basename(d.file), d.code])).toEqual([
         ['bare.kay', 'untitled-page'],
@@ -4155,10 +4155,10 @@ describe.concurrent('kay check, unused code', () => {
         ['same.kay', 'duplicate-description'],
         ['wordy.kay', 'long-title'],
       ])
-      expect(await check(root, { site: 'https://example.com', favicon: false, seo: { image: '/og.png' }, lints: { seo: 'allow' } })).toEqual([])
+      expect(await check(root, { site: 'https://example.com', assets: { favicon: false }, seo: { image: '/og.png' }, lints: { seo: 'allow' } })).toEqual([])
 
       // Defaults per locale: a page with no title takes the site's name, and one repeating a locale's description is not told of its length again.
-      const perLocale = await check(root, { site: 'https://example.com', favicon: false, seo: { name: { en: 'Site', fr: 'Site' }, description: { en: 'Fine', fr: long } } })
+      const perLocale = await check(root, { site: 'https://example.com', assets: { favicon: false }, seo: { name: { en: 'Site', fr: 'Site' }, description: { en: 'Fine', fr: long } } })
 
       expect(perLocale.filter(d => d.code !== undefined).map(d => [basename(d.file), d.code])).toEqual([
         ['kay.config.ts', 'long-description'],
@@ -4186,7 +4186,7 @@ describe.concurrent('kay check, unused code', () => {
       'src/routes/spread.kay': head([`title({...attrs}) ${'d'.repeat(room + 1)}`, description]).replace('---\nhead', 'const attrs = {}\n---\nhead'),
       'src/routes/hidden.kay': head([`title ${'e'.repeat(room + 1)}`, description, 'meta(name="robots" content="noindex")']),
     })
-    const options = { site: 'https://example.com', favicon: false as const, lints: { 'unsized-share-image': 'allow', 'duplicate-title': 'allow' } as const }
+    const options = { site: 'https://example.com', assets: { favicon: false as const }, lints: { 'unsized-share-image': 'allow', 'duplicate-title': 'allow' } as const }
     const found = async (titleTemplate: string | Record<string, string> | undefined, over: Partial<CheckOptions> = {}) => (await check(root, { ...options, ...over, seo: { description: 'The site', image: '/og.png', titleTemplate } })).filter(d => d.code === 'long-title').map(d => basename(d.file))
 
     try {
@@ -4198,7 +4198,7 @@ describe.concurrent('kay check, unused code', () => {
       // A template without `%s` replaces the title: its own length counts.
       expect(await found('x'.repeat(TITLE_LENGTH + 1))).toEqual(['exact.kay', 'over.kay', 'short.kay'])
       // A record reads the default locale's.
-      const i18n = (defaultLocale: string) => ({ i18n: { locales: ['en', 'fr'], defaultLocale } })
+      const i18n = (defaultLocale: string) => ({ i18n: { locales: ['en', 'fr'], default: defaultLocale } })
 
       expect(await found({ en: `%s${wrapped}`, fr: '%s' }, i18n('en'))).toEqual(['over.kay'])
       expect(await found({ en: `%s${wrapped}`, fr: '%s' }, i18n('fr'))).toEqual([])
@@ -4212,13 +4212,13 @@ describe.concurrent('kay check, unused code', () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'h1 Hi\n', 'kay.config.ts': 'export default {\n  redirects: {\n    \'/old\': \'/mid/\',\n    \'/mid\': \'/new\',\n  },\n}\n' })
 
     try {
-      const options = { site: 'https://example.com', favicon: false as const, redirects: { '/old': '/mid/', '/mid': '/new' } }
+      const options = { site: 'https://example.com', assets: { favicon: false as const }, redirects: { '/old': '/mid/', '/mid': '/new' } }
       const chain = async (over: Partial<CheckOptions> = {}) => (await check(root, { ...options, ...over })).filter(d => d.code === 'redirect-chain').map(d => [basename(d.file), d.line, d.severity, d.message])
       const message = 'The redirect from `/old` goes to `/mid`, which redirects to `/new`'
 
       expect(await chain()).toEqual([['kay.config.ts', 3, 'warning', message.replace('`/mid`,', '`/mid/`,')]])
       // Under a base, a trailing slash policy and locales, and as the build asks for its lints.
-      expect(await chain({ base: '/docs', i18n: { locales: ['en', 'fr'], defaultLocale: 'en' } })).toHaveLength(1)
+      expect(await chain({ base: '/docs', i18n: { locales: ['en', 'fr'], default: 'en' } })).toHaveLength(1)
       expect(await chain({ launch: true })).toHaveLength(1)
       expect(await chain({ lints: { 'redirect-chain': 'deny' } })).toEqual([['kay.config.ts', 3, 'error', message.replace('`/mid`,', '`/mid/`,')]])
       expect(await chain({ lints: { 'redirect-chain': 'allow' } })).toEqual([])
@@ -4238,7 +4238,7 @@ describe.concurrent('kay check, unused code', () => {
     })
 
     try {
-      const found = await check(root, { site: 'https://example.com', favicon: false })
+      const found = await check(root, { site: 'https://example.com', assets: { favicon: false } })
 
       expect(found.filter(d => d.code === 'noindex-in-sitemap').map(d => basename(d.file))).toEqual(['shown.kay'])
     }
@@ -4256,7 +4256,7 @@ describe.concurrent('kay check, unused code', () => {
     })
 
     try {
-      const found = await check(root, { site: 'https://example.com', favicon: false })
+      const found = await check(root, { site: 'https://example.com', assets: { favicon: false } })
 
       expect(found.filter(d => d.code === 'untitled-page').map(d => d.message)).toEqual(['`/blog/:slug` has no title'])
     }
@@ -4274,7 +4274,7 @@ describe.concurrent('kay check, unused code', () => {
     })
 
     try {
-      const options = { site: 'https://example.com', favicon: false as const }
+      const options = { site: 'https://example.com', assets: { favicon: false as const } }
       const named = (await check(root, { ...options, seo: { name: { en: 'Site', fr: 'Site' }, description: 'Fine', image: { en: '/og.png' } } })).filter(d => d.code === 'duplicate-title' || d.code === 'unsized-share-image')
 
       // The two untitled pages share the site's name, and the record's image has no size.
@@ -4569,10 +4569,10 @@ describe.concurrent('kay check, unused code', () => {
         ['kay.config.ts', 'missing-share-image', 'warning'],
         ['kay.config.ts', 'default-favicon', 'warning'],
       ])
-      expect(await seoLints({ seo: { name: 'Example', description: 'What it is', image: '/og.png' }, favicon: false, launch: true, exported: true })).toEqual([['kay.config.ts', 'missing-site', 'warning']])
-      expect(await seoLints({ site: 'https://example.com', seo: { description: 'What it is', image: '/og.png' }, favicon: false })).toEqual([])
+      expect(await seoLints({ seo: { name: 'Example', description: 'What it is', image: '/og.png' }, assets: { favicon: false }, launch: true, exported: true })).toEqual([['kay.config.ts', 'missing-site', 'warning']])
+      expect(await seoLints({ site: 'https://example.com', seo: { description: 'What it is', image: '/og.png' }, assets: { favicon: false } })).toEqual([])
       // A group's level reaches its lints, a lint's own wins, and a site that is not public gets the ones `lints` sets.
-      expect(await seoLints({ site: 'https://example.com', favicon: false, lints: { 'seo': 'deny', 'missing-share-image': 'allow' }, launch: true })).toEqual([['kay.config.ts', 'missing-description', 'error']])
+      expect(await seoLints({ site: 'https://example.com', assets: { favicon: false }, lints: { 'seo': 'deny', 'missing-share-image': 'allow' }, launch: true })).toEqual([['kay.config.ts', 'missing-description', 'error']])
       expect(await seoLints({ lints: { 'missing-description': 'warn' } })).toEqual([['kay.config.ts', 'missing-description', 'warning']])
     }
     finally {
@@ -4590,10 +4590,10 @@ describe.concurrent('kay check, unused code', () => {
 
     try {
       expect(await where({ site: 'https://example.com', seo: { description: long }, launch: true })).toEqual([['long-description', 8, 5], ['missing-share-image', 7, 3], ['default-favicon', 5, 16]])
-      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({\n  seo: { description: { en: '${long}', fr: 'court' } },\n  favicon: false,\n})\n`)
-      expect(await where({ seo: { description: { en: long, fr: 'court' } }, favicon: false })).toEqual([['long-description', 4, 25]])
-      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({\n  favicon: false,\n})\n`)
-      expect(await where({ seo: { name: 'Example' }, favicon: false })).toEqual([['missing-description', 3, 16]])
+      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({\n  seo: { description: { en: '${long}', fr: 'court' } },\n  assets: { favicon: false },\n})\n`)
+      expect(await where({ seo: { description: { en: long, fr: 'court' } }, assets: { favicon: false } })).toEqual([['long-description', 4, 25]])
+      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({\n  assets: { favicon: false },\n})\n`)
+      expect(await where({ seo: { name: 'Example' }, assets: { favicon: false } })).toEqual([['missing-description', 3, 16]])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -4603,7 +4603,7 @@ describe.concurrent('kay check, unused code', () => {
   it('reports a site description over the length search results show in kay.config.ts, where seo.description is set, once whichever pages inherit it', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'p a\n' })
     const long = 'a'.repeat(DESCRIPTION_LENGTH + 1)
-    const seo = { site: 'https://example.com', favicon: false as const, seo: { description: long, image: '/og.png' } }
+    const seo = { site: 'https://example.com', assets: { favicon: false as const }, seo: { description: long, image: '/og.png' } }
 
     try {
       expect((await check(root, seo)).map(d => [basename(d.file), d.code, d.severity, d.line])).toEqual([['kay.config.ts', 'long-description', 'warning', 1]])
@@ -4637,7 +4637,7 @@ describe.concurrent('kay check, unused code', () => {
     const root = await scratchProject({ 'src/routes/_layout.kay': 'head\n  meta(property="og:image" content="/card.png")\nslot\n' })
 
     try {
-      expect((await check(root, { site: 'https://example.com', favicon: false, seo: { description: 'What it is' } })).map(d => d.code)).toEqual([])
+      expect((await check(root, { site: 'https://example.com', assets: { favicon: false }, seo: { description: 'What it is' } })).map(d => d.code)).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -4646,7 +4646,7 @@ describe.concurrent('kay check, unused code', () => {
 
   it('prints one group\'s lints alone with --only, failing on them alone', async () => {
     const root = await scratchProject({
-      'kay.config.ts': 'export default { seo: { name: \'Example\' }, favicon: false }\n',
+      'kay.config.ts': 'export default { seo: { name: \'Example\' }, assets: { favicon: false } }\n',
       'src/routes/index.kay': 'img(src="/a.png" width="1" height="1")\n',
     })
 
@@ -4679,7 +4679,7 @@ describe.concurrent('kay check, unused code', () => {
 
   it('tells a static export with no site so once, by the lint, not again from the server it exports', async () => {
     const root = await scratchProject({
-      'kay.config.ts': 'export default { seo: { name: \'Example\', description: \'What it is\', image: \'/og.png\' }, favicon: false }\n',
+      'kay.config.ts': 'export default { seo: { name: \'Example\', description: \'What it is\', image: \'/og.png\' }, assets: { favicon: false } }\n',
       'src/routes/index.kay': 'p a\n',
     })
 

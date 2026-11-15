@@ -86,7 +86,7 @@ describe('a lenient query field of a page and its layout', () => {
     ])
     plain = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false })
     mounted = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, base: '/repo', trailingSlash: 'always' })
-    localized = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+    localized = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

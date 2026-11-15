@@ -18,10 +18,9 @@ export default defineConfig({
     description: 'A small site.',
     image: '/social.png',
   },
-  favicon: 'public/logo.png',
-  fonts: [{ fontsource: '@fontsource-variable/inter' }],
+  assets: { favicon: 'public/logo.png', fonts: [{ fontsource: '@fontsource-variable/inter' }] },
   redirects: { '/blog/:slug': '/posts/:slug' },
-  i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' },
+  i18n: { locales: ['fr', 'en'], default: 'fr' },
   security: { csp: { 'img-src': ["'self'", 'data:'] } },
   proxy: true,
   serve: { compress: false },
@@ -31,7 +30,7 @@ export default defineConfig({
 
 Every option is optional. The tables give each option's default. The full reference has the rest.
 
-A feature is switched the same way everywhere: `false` turns it off, `true` asks for its defaults and an object sets its options, as `health: false`, `client: { offline: true }` or `security: { cookies: { sameSite: 'strict' } }`. `defineConfig` also refuses a key it does not know in any of these objects, at any depth, as a type error.
+A feature is switched the same way everywhere: `false` turns it off, `true` asks for its defaults and an object sets its options, as `ops: { health: false }`, `client: { offline: true }` or `security: { cookies: { sameSite: 'strict' } }`. `defineConfig` also refuses a key it does not know in any of these objects, at any depth, as a type error.
 
 ## Site and SEO
 
@@ -42,8 +41,8 @@ A feature is switched the same way everywhere: `false` turns it off, `true` asks
 | `sitemap` | `{ ttl }`, how long the sitemap is kept before it is built again, `'1h'` by default. |
 | `robots` | Paths `/robots.txt` disallows or allows, `{ disallow: ['/admin'] }`, listed for every locale; `false` serves none. See [Head and SEO](/essentials/head-and-seo#sitemap-and-robotstxt) |
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |
-| `favicon` | A square image of 512 px or more, or a square SVG, served as the favicon and the manifest icons. `false` serves none |
-| `manifest` | The web manifest: `shortName`, `themeColor`, `backgroundColor`, `display`, `orientation`, `startUrl`, `scope`, `shortcuts`, and a `maskable` image served as its maskable icons |
+| `assets.favicon` | A square image of 512 px or more, or a square SVG, served as the favicon and the manifest icons. `false` serves none |
+| `assets.manifest` | The web manifest: `shortName`, `themeColor`, `backgroundColor`, `display`, `orientation`, `startUrl`, `scope`, `shortcuts`, and a `maskable` image served as its maskable icons |
 | `client.offline` | `true`, or what to keep: a service worker keeping the build's files and some pages for offline visitors. Off by default, as `false` is. Pages are kept under the path `trailingSlash` writes them at |
 | `client.search` | `true` indexes the pages `kay build` renders, for `searchResults` to search in the browser. Off by default. See [Site search](/guides/search) |
 | `lang` | The `lang` of the `html` element when `i18n` is not set, `en` by default |
@@ -101,12 +100,12 @@ In `observe`, what you watch the server by:
 
 | Option | Effect |
 | --- | --- |
-| `observe.log` | One line per request, and kay's own messages. On in production as text; `{ format: 'json' }` writes one JSON object each, `{ sink }` receives each `LogEntry`, `{ requests: false }` and `false` turn the request lines off |
-| `observe.serverTiming` | A `Server-Timing` header on pages rendered per request, and on actions, endpoints and API routes. On in development, off otherwise unless set |
-| `observe.loadBudget` | In development, how long a page's loads may take before kay warns in the terminal, the browser console and the dev tool, naming the slowest load: a duration, `'300ms'` by default, or `false` for no warning |
-| `observe.requestIdHeader` | The header a request's id goes out on and a trusted proxy's comes in on, `x-request-id` by default. See [Deployment](/guides/deployment) |
-| `observe.extract` | Reads a request's trace context from its headers, as `headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. Kay reads `traceparent` itself by default; `false` ignores incoming traces |
-| `observe.tracer` | An OpenTelemetry tracer, as `trace.getTracer('my-site')`, giving a span per page and API request. None by default |
+| `ops.observe.log` | One line per request, and kay's own messages. On in production as text; `{ format: 'json' }` writes one JSON object each, `{ sink }` receives each `LogEntry`, `{ requests: false }` and `false` turn the request lines off |
+| `ops.observe.serverTiming` | A `Server-Timing` header on pages rendered per request, and on actions, endpoints and API routes. On in development, off otherwise unless set |
+| `ops.observe.loadBudget` | In development, how long a page's loads may take before kay warns in the terminal, the browser console and the dev tool, naming the slowest load: a duration, `'300ms'` by default, or `false` for no warning |
+| `ops.observe.requestIdHeader` | The header a request's id goes out on and a trusted proxy's comes in on, `x-request-id` by default. See [Deployment](/guides/deployment) |
+| `ops.observe.extract` | Reads a request's trace context from its headers, as `headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. Kay reads `traceparent` itself by default; `false` ignores incoming traces |
+| `ops.observe.tracer` | An OpenTelemetry tracer, as `trace.getTracer('my-site')`, giving a span per page and API request. None by default |
 
 In `client`, what pages ship to the browser and how it behaves there:
 
@@ -126,7 +125,7 @@ In `client`, what pages ship to the browser and how it behaves there:
 | Option | Effect |
 | --- | --- |
 | `entry` | The server entry, `src/server.ts` by default. Every command reads it, and `--entry` on a command wins over it. With no file there, kay serves the pages itself |
-| `publicCache` | How long the browser keeps a public file without asking again, as globs on the served path: `{ '/fonts/**': '365d' }`. `0` revalidates. Fonts it leaves out are kept 30 days, images a day, the rest revalidates. See [Styling and assets](/essentials/styling-and-assets#public-files) |
+| `assets.publicCache` | How long the browser keeps a public file without asking again, as globs on the served path: `{ '/fonts/**': '365d' }`. `0` revalidates. Fonts it leaves out are kept 30 days, images a day, the rest revalidates. See [Styling and assets](/essentials/styling-and-assets#public-files) |
 | `redirects` | Old paths sent to new ones with a 308, or the 301, 302, 307 or 308 that `status` names; `{ status: 410 }` answers `Gone` for a path that ended. See [Routing](/essentials/routing) |
 | `runtimeRedirects` | The hosts besides the site's own that a redirect added while the site runs may send to: `{ hosts: ['example.org'] }`. None by default. See [Routing](/essentials/routing#find-the-old-urls-visitors-still-use) |
 | `rewrite` | A function returning the path to serve a request from, or `undefined` to serve it as it came. The browser keeps its URL. It runs before the alias of a path an extension moved (`api.former`), so it can rewrite such a path itself |
@@ -144,14 +143,14 @@ In `client`, what pages ship to the browser and how it behaves there:
 | `preview` | Lets an editor see drafts on the live site, `false` for none. `secret` signs the preview links; left out, a key is made from the app's `secret`. `maxAge` is how long a visitor stays in preview mode, an hour by default |
 
 | `store` | Where sessions, cached values, live values, jobs, schedule locks, rate limit counts, presence members, Web Vitals, notifications and files live for everything naming no store of its own: `sqliteData('data/app.sqlite')`, `pgData(db)` on Postgres (kayjs-auth keeps its users in the database a `sqliteData(path)` or `pgData(url)` names, as `AppStore.database`, the url, and kayjs-mail, kayjs-ai and kayjs-cms reuse the connection `pgData` works through as `AppStore.sql`, the pool it opened from a url or the one you handed in), or `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications, files }` of your own, each with an optional `ping` that `health` runs and `close` that a stop calls. `files` is only what the app writes, `diskFiles()` by default, or `s3Files()`: see [File storage](/guides/file-storage). Kay's rate limits (actions, API routes, `rateLimit()`, proof of work and kay's own routes) and kayjs-auth's count in memory while their store fails, and for ten seconds after one takes over eight seconds to answer. See [Background jobs](/guides/background-jobs) |
-| `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`, and `paths` translating a page's path per locale, and `messages`, the folder of the message files (`src/messages` by default). See [Internationalization](/guides/i18n) |
+| `i18n` | `locales`, `default`, and optionally a `mode`, `'always'` to prefix the default locale too or `{ domains }` for a host per locale, and `paths` translating a page's path per locale, and `messages`, the folder of the message files (`src/messages` by default). See [Internationalization](/guides/i18n) |
 
 ## Assets and build
 
 | Option | Effect |
 | --- | --- |
-| `images` | `formats` (`quality`, `webp`, `avif`), `widths`, the densest screen an image loads for (`maxDensity`, 2 by default), the shapes `aspect` may cut to (`aspects`), `placeholder: false` to leave out the color an image shows until it loads, how long a cut variant is kept on disk (`ttl`, 30 days), the limits on new variants (`rateLimit`, `limits`), the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`, with `hosts`, `maxSize` and `timeout`) are resized, and the app's own lookup of private images (`resolve`, `guards`). See [Styling and assets](/essentials/styling-and-assets) |
-| `fonts` | Self-hosted fonts, from files or a Fontsource package |
+| `assets.images` | `formats` (`quality`, `webp`, `avif`), `widths`, the densest screen an image loads for (`maxDensity`, 2 by default), the shapes `aspect` may cut to (`aspects`), `placeholder: false` to leave out the color an image shows until it loads, how long a cut variant is kept on disk (`ttl`, 30 days), the limits on new variants (`rateLimit`, `limits`), the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`, with `hosts`, `maxSize` and `timeout`) are resized, and the app's own lookup of private images (`resolve`, `guards`). See [Styling and assets](/essentials/styling-and-assets) |
+| `assets.fonts` | Self-hosted fonts, from files or a Fontsource package |
 | `plugins` | Bun plugins the browser build runs, such as Tailwind's |
 | `budget` | The most JavaScript (`js`), CSS (`css`) or whole page (`weight`) one page may load, compressed, as `'20kb'`, and the worst EcoIndex `grade` it may have. `kay build` warns with `over-budget` for a page over it. All are off until set. See [Set a budget](/guides/performance#set-a-budget) |
 | `timeZone` | The IANA time zone dates are written in, `Europe/Paris`: `formatDate`, a message's date and the relative time tooltip, on the server and in islands, unless a call names its own. The server's and the visitor's zone by default, and the zone a `schedule` cron is read in unless it names its own. See [Internationalization](/guides/i18n#sizes-durations-and-the-time-zone) |
@@ -166,7 +165,7 @@ In `client`, what pages ship to the browser and how it behaves there:
 | `security` | The CSP and security headers every response carries, or `false` for none; every cookie set with `ctx.cookies.set` is `HttpOnly`, `SameSite=Lax`, `Secure` over https and under the `base`, a call's own option winning, unless `cookies: false`; in production with `site` set, `hosts` (on by default, `false` turns it off, `*.example.com` answers one label under a domain) answers 421 to a `Host` that is not the site's. See [Security](/guides/security) |
 | `proxy` | How many proxies sit in front (`true` for one, `{ hops: 2 }` for more, `false` for none), or `{ header }` naming the header they set. `trusted` lists the public ranges they reach the server from. `key` names a header carrying a key shared with the proxy, and a request without it gets 403; `open` lists paths left out. See [Trust a proxy](/guides/security#trust-a-proxy) |
 | `secret` | The app's one secret, at least 32 random characters: it seals `session()`, signs form stamps, links to private files and the flash cookie, and keys `preview`. `KAY_SECRET` when left out. A list, or commas in `KAY_SECRET`, rotates it: the first seals and signs and every one opens and verifies: sessions, kayjs-auth's data, stamps, private-file links, the flash cookie and preview links. See [The app secret](/guides/sessions-and-guards#the-app-secret) |
-| `health` | The route a load balancer polls, `/_kay/health` by default. `{ path, check, timeout }` renames it and fails it with 503 when `check` returns false, throws or takes longer than `timeout` (5 seconds by default). `false` serves none |
+| `ops.health` | The route a load balancer polls, `/_kay/health` by default. `{ path, check, timeout }` renames it and fails it with 503 when `check` returns false, throws or takes longer than `timeout` (5 seconds by default). `false` serves none |
 | `checks` | Your own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report()`. See [Your own checks](/reference/cli#your-own-checks) |
 | `envFiles` | The compose file or files and the example env file, `{ compose: 'compose.prod.yaml', example: '.env.example' }`, that `kay check` and `kay env` compare with the declared variables. `false` turns the comparison off, the default one included. |
 | `guards` | `{ default }` says what a route no guard covers comes to, `requireGuards` until 1.108. Left out, a site with a guard of its own answers 403 on each page, endpoint and API module no guard covers unless it sets `guards: false`, and a site with no guard stays open. `default: 'closed'` asks it of every site and of actions too, `'open'` turns it off. `kay build --static` refuses to export such a page. A library's routes are left open. See [Sessions and guards](/guides/sessions-and-guards) |
@@ -174,8 +173,8 @@ In `client`, what pages ship to the browser and how it behaves there:
 | `mcp` | `true` serves an MCP endpoint at `/mcp`, or at `{ path }`, for AI agents, at most 120 requests a client a minute unless `{ rateLimit: { max, window } }` says otherwise (a `RateLimit` like any other, with its `store` and `onLimit`), and only to a client sending `{ key }` as a bearer token when it is set, with a tool per API route or action that sets `tool`. Off by default. See [API routes](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) |
 | `openapi` | `true` serves an OpenAPI document of the API modules at `/api/openapi.json`. `{ reference: true }` adds a page at `/api/reference`. `path` and `referencePath` move them, `title` and `version` fill the document's `info`, and `dev: true` serves both under `kay dev` alone. See [API routes](/guides/api-routes#openapi) |
 | `live` | `{ connections, rateLimit }`: how many live connections one client address holds at once (20), and how many it opens in a `rateLimit` of `{ max, window }`, with the `store` and `onLimit` of any rate limit (120 a minute, `false` for no limit). See [Live values and realtime](/guides/live-and-realtime) |
-| `metrics` | `true` serves `/metrics` in the Prometheus text format: requests by route and status, their durations, scheduled runs, cache reads and live connections. Answered only to a request straight from this machine or a private network, or carrying `KAY_METRICS_TOKEN` as a bearer token. `{ path }` moves it. Off by default |
-| `jobs` | `{ guards, path }` serves a page of the queues' jobs at `/_kay/jobs` with retry and delete buttons. The guard is a guard, a list of them or `{ load }`, run on every request, and without one the page answers 403. Off by default |
+| `ops.metrics` | `true` serves `/metrics` in the Prometheus text format: requests by route and status, their durations, scheduled runs, cache reads and live connections. Answered only to a request straight from this machine or a private network, or carrying `KAY_METRICS_TOKEN` as a bearer token. `{ path }` moves it. Off by default |
+| `ops.jobs` | `{ guards, path }` serves a page of the queues' jobs at `/_kay/jobs` with retry and delete buttons. The guard is a guard, a list of them or `{ load }`, run on every request, and without one the page answers 403. Off by default |
 
 ## Path and guard options
 
@@ -185,11 +184,11 @@ A `path` is one route and a `prefix` a subtree. Every `guards` option takes a gu
 | --- | --- | --- | --- |
 | `serve.apiPrefix` | Prefix of the API modules, the OpenAPI document and its reference | The API directory's `_guard.ts` decides | No guard option |
 | `openapi.path`, `openapi.referencePath`, `mcp.path` | One route | The API directory's `_guard.ts` decides | No guard option |
-| `health.path`, `metrics.path` | One route | Open, `metrics` takes a token | No guard option |
-| `jobs.path`, `jobs.guards` | One route | Closed, 403 | Opens the page |
+| `ops.health.path`, `ops.metrics.path` | One route | Open, `metrics` takes a token | No guard option |
+| `ops.jobs.path`, `ops.jobs.guards` | One route | Closed, 403 | Opens the page |
 | `vitals({ prefix, guards })` | Prefix | Closed, 403 | Opens the screen |
 | `cms({ prefix, access })` | Prefix | Closed, 403 | Admits everyone |
-| `images.guards` | Runs before `images.resolve` | Closed, 403 | Resizes for everyone |
+| `assets.images.guards` | Runs before `assets.images.resolve` | Closed, 403 | Resizes for everyone |
 | A page's `guards: false`, an API module's `api({ guards: false })` | One page or module | Under the guards above it | Skips them |
 
 <ReadMore href="/llms/project">Every option and its exact behaviour are in the full project reference, with the head, locales and production references for the topics above.</ReadMore>

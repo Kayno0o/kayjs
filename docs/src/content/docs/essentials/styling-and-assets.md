@@ -208,11 +208,11 @@ A public file keeps its name when its content changes, so the browser cannot kno
 
 A running server looks at the file on every request. A file you delete answers the same 404 as a path that never existed, and one you replace is sent with a tag for its new content.
 
-To choose other times, set `publicCache` in `kay.config.ts`:
+To choose other times, set `assets.publicCache` in `kay.config.ts`:
 
 ```ts
 export default {
-  publicCache: { '/fonts/**': '365d', '**/*.png': '30d' },
+  assets: { publicCache: { '/fonts/**': '365d', '**/*.png': '30d' } },
 }
 ```
 
@@ -289,9 +289,9 @@ img(src={hero} aspect="16/9" sizes="100vw" alt="The workshop")
 
 An image is an empty box until it arrives. kay fills the box with the image's average color, so a slow connection shows a patch of the right color where the photo will be. Nothing to write: it is a `style` attribute of about 35 bytes on the `img`, and no script.
 
-kay reads the color once, when it builds. That covers imported images and the relative images of a collection's Markdown. For an image in `images.dirs` or on an `images.remote` host, it reads the color the first time the image route serves the file, so a page rendered before then has none.
+kay reads the color once, when it builds. That covers imported images and the relative images of a collection's Markdown. For an image in `assets.images.dirs` or on an `assets.images.remote` host, it reads the color the first time the image route serves the file, so a page rendered before then has none.
 
-An image with any transparency gets no color, as it would show through. Neither do an SVG, an animated GIF, a stored file or an image looked up by `images.resolve`. Under `object-fit: contain` the color stays visible beside the picture, so turn it off there.
+An image with any transparency gets no color, as it would show through. Neither do an SVG, an animated GIF, a stored file or an image looked up by `assets.images.resolve`. Under `object-fit: contain` the color stays visible beside the picture, so turn it off there.
 
 ```kay
 ---
@@ -304,27 +304,27 @@ img(src={hero} placeholder={false} alt="The workshop")
 
 ### Density and shapes
 
-An image never loads at more than 2 pixels per CSS pixel, so a 3x phone gets what a 2x one does. It looks the same. `images.maxDensity` changes the cap, and `Infinity` leaves the choice to the browser.
+An image never loads at more than 2 pixels per CSS pixel, so a 3x phone gets what a 2x one does. It looks the same. `assets.images.maxDensity` changes the cap, and `Infinity` leaves the choice to the browser.
 
-`aspect` takes only the shapes `images.aspects` lists, each of which adds a variant per width. The default list is `1/1`, `3/2`, `2/3`, `4/3`, `3/4`, `16/9` and `9/16`.
+`aspect` takes only the shapes `assets.images.aspects` lists, each of which adds a variant per width. The default list is `1/1`, `3/2`, `2/3`, `4/3`, `3/4`, `16/9` and `9/16`.
 
 ```ts
 export default defineConfig({
-  images: { maxDensity: 3, aspects: ['1/1', '16/9', '21/9'] },
+  assets: { images: { maxDensity: 3, aspects: ['1/1', '16/9', '21/9'] } },
 })
 ```
 
 ### Widths and quality
 
-An image gets variants at 320, 640, 960, 1280, 1920 and 2560 pixels, those narrower than the image itself. None is wider than 2560, even for a larger photograph, which keeps the files small. A screen that needs more, a 4K display at full size, asks with `images.widths: [320, 960, 1920, 3840]`. `images.widths` sets another list, which also gets the image's own size: whole numbers from 1 to 16384, at most 16, in any order. A shorter list builds fewer files.
+An image gets variants at 320, 640, 960, 1280, 1920 and 2560 pixels, those narrower than the image itself. None is wider than 2560, even for a larger photograph, which keeps the files small. A screen that needs more, a 4K display at full size, asks with `assets.images.widths: [320, 960, 1920, 3840]`. `assets.images.widths` sets another list, which also gets the image's own size: whole numbers from 1 to 16384, at most 16, in any order. A shorter list builds fewer files.
 
-`quality={90}` on an `img` (`image(photo, { quality: 90 })` for a spread) encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.formats.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too.
+`quality={90}` on an `img` (`image(photo, { quality: 90 })` for a spread) encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `assets.images.formats.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too.
 
-`images.formats.webp: { quality }` sets the WebP variants alone, as `images.formats.avif` does the AVIF ones. The AVIF variants move the same step from `images.formats.avif`'s quality, so 90 gives WebP at 90 and AVIF at 60 by default.
+`assets.images.formats.webp: { quality }` sets the WebP variants alone, as `assets.images.formats.avif` does the AVIF ones. The AVIF variants move the same step from `assets.images.formats.avif`'s quality, so 90 gives WebP at 90 and AVIF at 60 by default.
 
 ```ts
 export default defineConfig({
-  images: { widths: [480, 960, 1440, 1920], formats: { quality: 75 } },
+  assets: { images: { widths: [480, 960, 1440, 1920], formats: { quality: 75 } } },
 })
 ```
 
@@ -334,7 +334,7 @@ An uploaded image is no import, so kay does not know where it sits. List the dir
 
 ```ts
 export default defineConfig({
-  images: { dirs: { '/uploads/': 'data/uploads' } },
+  assets: { images: { dirs: { '/uploads/': 'data/uploads' } } },
 })
 ```
 
@@ -353,13 +353,13 @@ Without the size the image keeps its `src` alone.
 
 ### Limits on new variants
 
-Each variant the server has to draw costs an encode, so the image route limits what one client can ask for. A client may have 120 new variants drawn a minute (`images.rateLimit`) before the route answers 429 with `Retry-After`, and once 128 draws are waiting (`images.limits.queue`) the route answers 503 until they clear. A variant that already exists is never limited.
+Each variant the server has to draw costs an encode, so the image route limits what one client can ask for. A client may have 120 new variants drawn a minute (`assets.images.rateLimit`) before the route answers 429 with `Retry-After`, and once 128 draws are waiting (`assets.images.limits.queue`) the route answers 503 until they clear. A variant that already exists is never limited.
 
-One image keeps at most 256 cached variants (`images.limits.variants`). Past that, the oldest is removed to make room for a new one, so nobody is refused. Each option takes a whole number, or `false` to turn the limit off.
+One image keeps at most 256 cached variants (`assets.images.limits.variants`). Past that, the oldest is removed to make room for a new one, so nobody is refused. Each option takes a whole number, or `false` to turn the limit off.
 
 ```ts
 export default defineConfig({
-  images: { rateLimit: { max: 600, window: '1m' }, limits: { variants: false } },
+  assets: { images: { rateLimit: { max: 600, window: '1m' }, limits: { variants: false } } },
 })
 ```
 
@@ -367,11 +367,11 @@ export default defineConfig({
 
 The variants the server draws on request are kept in `.kay/cache/images`. It removes the ones nothing wrote for 30 days, at start and once a day, and draws one again if it is asked for later.
 
-An image on a CMS or a CDN is resized too, once its host is in `images.remote.hosts`. Each entry is an origin, and its host can start with `*.` for any subdomain. `hosts` is a list, or a function returning one, for hosts a CMS or a database holds. A download is cut off past 25 MB and given up on after 10 s; `remote.maxSize` and `remote.timeout` change them.
+An image on a CMS or a CDN is resized too, once its host is in `assets.images.remote.hosts`. Each entry is an origin, and its host can start with `*.` for any subdomain. `hosts` is a list, or a function returning one, for hosts a CMS or a database holds. A download is cut off past 25 MB and given up on after 10 s; `remote.maxSize` and `remote.timeout` change them.
 
 ```ts
 export default defineConfig({
-  images: { remote: { hosts: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] } },
+  assets: { images: { remote: { hosts: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] } } },
 })
 ```
 
@@ -385,7 +385,7 @@ kay asks the host directly, without an `HTTP_PROXY`, and does not accept a compr
 
 ### Private images
 
-An image the app keeps behind a session, such as one looked up by a database id, goes through the same variants. `images.resolve` gives its file and `images.guards` admits the request, and without them the route answers 403.
+An image the app keeps behind a session, such as one looked up by a database id, goes through the same variants. `assets.images.resolve` gives its file and `assets.images.guards` admits the request, and without them the route answers 403.
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -393,12 +393,14 @@ import { guard } from 'kay'
 import { mediaPath } from './src/media'
 
 export default defineConfig({
-  images: {
-    guards: guard((ctx) => {
-      if (!ctx.locals.session.get('userId'))
-        ctx.deny(401)
-    }),
-    resolve: async src => src.startsWith('/media/') ? mediaPath(src.slice(7)) : undefined,
+  assets: {
+    images: {
+      guards: guard((ctx) => {
+        if (!ctx.locals.session.get('userId'))
+          ctx.deny(401)
+      }),
+      resolve: async src => src.startsWith('/media/') ? mediaPath(src.slice(7)) : undefined,
+    },
   },
 })
 ```
@@ -425,10 +427,12 @@ A name that climbs out with `../`, a symlink that leads out of the folder, an em
 
 ```ts
 export default defineConfig({
-  fonts: [
-    { fontsource: '@fontsource-variable/inter' },
-    { family: 'Lora', src: 'src/fonts/lora-italic.woff2', style: 'italic' },
-  ],
+  assets: {
+    fonts: [
+      { fontsource: '@fontsource-variable/inter' },
+      { family: 'Lora', src: 'src/fonts/lora-italic.woff2', style: 'italic' },
+    ],
+  },
 })
 ```
 
@@ -442,7 +446,7 @@ A face can cover only some characters with `unicodeRange`, passed to the `@font-
 
 ```ts
 export default defineConfig({
-  fonts: [{ fontsource: '@fontsource/inter', subsets: ['latin', 'latin-ext'] }],
+  assets: { fonts: [{ fontsource: '@fontsource/inter', subsets: ['latin', 'latin-ext'] }] },
 })
 ```
 

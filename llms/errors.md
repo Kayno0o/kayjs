@@ -24,7 +24,7 @@ kay explain template-syntax
 
 | Error | Group | Raised for | Fix |
 | --- | --- | --- | --- |
-| `command-usage` | command | A command that could not run as asked: a path that does not exist or is no project, a flag it does not take, flags that do not go together. | [Commands](project.md#commands) |
+| `command-usage` | command | A command that could not run as asked: a path that does not exist or is no project, a flag it does not take, flags that do not go together. | [Commands](commands.md#commands) |
 | `missing-peer` | command | A command that needs `typescript7` or `axe-core`, which the app did not install: the message names the `bun add -d` line to run. | [Peer packages](checks.md#peer-packages) |
 | `extension-command` | command | A command an extension adds to `kay` whose module does not load or does not export a `KayCommand` by default. | [Extensions](component-libraries.md#extensions) |
 | `template-syntax` | compile | A template line kay cannot read: indentation, an unclosed `(` or string, a malformed `for`, `const`, `await` or `match`, an attribute that is neither a quoted string nor a `{expression}`. | [Template lines](templates.md#template-lines) |
@@ -93,7 +93,7 @@ kay explain template-syntax
 | `export-action` | export | A page exporting an action, which only a server can take. | [Static export](prerendering.md#static-export) |
 | `export-path-clash` | export | Two pages that would be prerendered to the same file. | [Prerendering](prerendering.md#prerendering) |
 | `export-api-module` | export | An API module, which answers requests only a server does. | [API modules](api-routes.md#api-modules) |
-| `export-no-client-build` | export | Prerendering run with no client build to add its pages to. | [Commands](project.md#commands) |
+| `export-no-client-build` | export | Prerendering run with no client build to add its pages to. | [Commands](commands.md#commands) |
 | `private-address` | runtime | A host that answered with an address that is not public, which a download of kay refuses to fetch. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
 | `redirect-refused` | runtime | A runtime redirect an editor asked for that kay refuses, worded for the editor. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
 | `job-give-up` | runtime | A workflow run whose steps changed under it, which gives up at once instead of retrying. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |

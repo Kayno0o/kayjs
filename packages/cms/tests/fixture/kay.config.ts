@@ -12,6 +12,6 @@ export default defineConfig({
   librarySettings: { '@kayjs/cms': './src/cms-settings.ts' },
   plugins: [tailwind],
   markdown: { highlight },
-  i18n: { locales: ['en', 'fr'], defaultLocale: 'en' },
+  i18n: { locales: ['en', 'fr'], default: 'en' },
   preview: { secret: 'a-preview-secret-long-enough-for-kay-0123456789' },
 })

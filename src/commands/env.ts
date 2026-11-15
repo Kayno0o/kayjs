@@ -160,7 +160,7 @@ export async function listEnv(root: string): Promise<{ variables: Listed[], unre
     ...declared.flatMap(({ schema, file }) => described(schema, file === undefined ? 'src' : shown(file))),
     ...(config.extensions ?? []).flatMap(extension => extension.env === undefined ? [] : described(extension.env, `the extension ${extension.name}`).filter(({ name }) => !declaredNames.has(name))),
     ...KAY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })),
-    ...config.metrics !== undefined && config.metrics !== false ? METRICS_VARIABLES.map(variable => ({ ...variable, source: 'kay' })) : [],
+    ...config.ops?.metrics !== undefined && config.ops?.metrics !== false ? METRICS_VARIABLES.map(variable => ({ ...variable, source: 'kay' })) : [],
     ...typeof config.proxy === 'object' && config.proxy.key !== undefined ? PROXY_KEY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })) : [],
     ...mcpKeyVariables(config.mcp).map(variable => ({ ...variable, source: 'kay' })),
   ]

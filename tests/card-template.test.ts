@@ -375,7 +375,7 @@ const background = t('nav.home') === 'Accueil' ? 'bg-[#dc2626]' : 'bg-[#1e40af]'
 div(class={'relative h-[630px] w-[1200px] ' + background})
   h1(class="m-0 text-6xl font-black text-white") {title}
 `)
-    const app = await pages({ site: 'https://cards.example', seo: { name: 'Cards' }, plugins: [tailwind], root: copy, prebuilt: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+    const app = await pages({ site: 'https://cards.example', seo: { name: 'Cards' }, plugins: [tailwind], root: copy, prebuilt: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
 
     for (const [page, background] of [['/', [30, 64, 175]], ['/fr', [220, 38, 38]]] as const) {
       const html = await (await app.handle(new Request(`http://localhost${page}`))).text()
@@ -462,7 +462,7 @@ ${settings}
     const root = await fixtureCopy('card-template')
     const outdir = await scratchDir('card-locale-')
 
-    await Bun.write(join(root, 'kay.config.ts'), CONFIG(`  i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: ${JSON.stringify(resolve('tests/fixtures/i18n/src/messages'))} },`))
+    await Bun.write(join(root, 'kay.config.ts'), CONFIG(`  i18n: { locales: ['en', 'fr'], default: 'en', messages: ${JSON.stringify(resolve('tests/fixtures/i18n/src/messages'))} },`))
     await Bun.write(join(root, 'src/routes/_card.kay'), '--- server\nimport \'../app.css\'\nimport { t } from \'kay/i18n\'\n\nconst { title } = ctx.card\nconst background = t(\'nav.home\') === \'Accueil\' ? \'bg-[#dc2626]\' : \'bg-[#1e40af]\'\n---\ndiv(class={\'relative h-[630px] w-[1200px] \' + background})\n  h1(class="m-0 text-6xl font-black text-white") {title}\n')
 
     try {

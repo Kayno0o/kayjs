@@ -4,13 +4,13 @@
 
 ### Log requests as JSON for a log collector
 
-`observe: { log: { format: 'json' } }` in kay.config.ts writes one JSON object per line, requests included, on stdout for info and on stderr for warnings and errors; `log: { sink }` hands each entry to a function instead, and `requests: false` keeps kay's messages and logs no request line (`log: 'json'` and a bare function work until 1.108, `deprecated-app-hooks` rewrites them):
+`ops: { observe: { log: { format: 'json' } } }` in kay.config.ts writes one JSON object per line, requests included, on stdout for info and on stderr for warnings and errors; `log: { sink }` hands each entry to a function instead, and `requests: false` keeps kay's messages and logs no request line (`log: 'json'` and a bare function work until 1.108, `deprecated-app-hooks` rewrites them):
 
 ```ts
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  observe: { log: { format: 'json' } },
+  ops: { observe: { log: { format: 'json' } } },
 })
 ```
 
@@ -30,13 +30,13 @@ log.error('failed', new Error('refused'))
 
 ### Check the database in the health route
 
-`health` moves the route and adds a check, which answers 503 when it returns `false`, throws or takes over 5 s, or when the `ping` of a store ([Stores](stores.md)) rejects, and runs at most once every 3 s, probes between sharing its answer, which `timeout` changes (`health: { timeout: '10s' }`, a duration such as `'250ms'`, which `./server --health` and the build's check of the executable wait for too, though the Dockerfile `kay new` writes cuts a probe off at 6 s: raise its `--timeout` with it):
+`ops.health` moves the route and adds a check, which answers 503 when it returns `false`, throws or takes over 5 s, or when the `ping` of a store ([Stores](stores.md)) rejects, and runs at most once every 3 s, probes between sharing its answer, which `timeout` changes (`ops: { health: { timeout: '10s' } }`, a duration such as `'250ms'`, which `./server --health` and the build's check of the executable wait for too, though the Dockerfile `kay new` writes cuts a probe off at 6 s: raise its `--timeout` with it):
 
 ```ts
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  health: { path: '/up', check: async () => await db.ping() },
+  ops: { health: { path: '/up', check: async () => await db.ping() } },
 })
 ```
 
@@ -65,7 +65,7 @@ kay build --compile server --verify
 - A failed verify writes no record of the executable, so `kay start` runs the entry instead.
 - The server runs in a process group of its own and everything it started is stopped with it. On Linux an answer only counts when the listening socket belongs to the server or a process it started, so another process holding the port cannot pass the verify; where /proc cannot be read, the check is left out. An interrupted build stops the server too.
 - It costs the server's startup plus 250 ms, usually well under a second, and `--format json` carries it as `compiled.verifiedMs`.
-- `health: false` leaves no route to ask, so any answer on the port counts and `--health` is not run.
+- `ops: { health: false }` leaves no route to ask, so any answer on the port counts and `--health` is not run.
 
 ### Set a library's secrets
 
@@ -111,8 +111,8 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - A server started with no NODE_ENV warns as it boots, as it then bundles its browser code at boot and Elysia answers a request refused before kay's own check, such as a response failing its schema, with the schema it failed: set NODE_ENV=production where the app is deployed.
 - With NODE_ENV=production, a server's first line, once it listens, says where it listens and what runs: `kay: listening on http://localhost:3000, kay 1.30.0 in production, 12 pages prerendered`.
 - Then every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, the method, the path without its query string, which may carry tokens, the status, the milliseconds until the response was made, a streamed one's headers, and the request's id.
-- kay's own `/_kay/` routes, assets included (an extension's API modules served there, kayjs-cms's `/_kay/cms`, are logged), and the health route, wherever `health.path` puts it, are left out.
-- `true` in kay.config.ts's `observe.log` logs them outside production too, `false` never.
+- kay's own `/_kay/` routes, assets included (an extension's API modules served there, kayjs-cms's `/_kay/cms`, are logged), and the health route, wherever `ops.health.path` puts it, are left out.
+- `true` in kay.config.ts's `ops.observe.log` logs them outside production too, `false` never.
 - kay's own messages, an error it caught, a warning about the app, a shutdown notice, go out in any mode, as `kay: ` and the message, an error's source-mapped stack on the lines below.
 - `log` sets the format of both: `'json'` writes one JSON object per line for a log collector, on stdout for info and on stderr for warnings and errors, and a function receives each entry instead, typed `LogEntry` from `kay/server`:
   - a request, `{ type: 'request', time, level: 'info', method, path, status, duration, id }`;
@@ -126,7 +126,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 
 ### Metrics for a collector
 
-- `metrics: true` in kay.config.ts serves `/metrics` in the Prometheus text format, for Prometheus or any compatible collector (Grafana Alloy, the OpenTelemetry collector's Prometheus receiver): `metrics: { path: '/_internal/metrics' }` moves it. It is off by default, and a server run by `kay dev` or a static export serves none.
+- `ops: { metrics: true }` in kay.config.ts serves `/metrics` in the Prometheus text format, for Prometheus or any compatible collector (Grafana Alloy, the OpenTelemetry collector's Prometheus receiver): `ops: { metrics: { path: '/_internal/metrics' } }` moves it. It is off by default, and a server run by `kay dev` or a static export serves none.
 - It holds `kay_http_requests_total{method,route,status}` and the histogram `kay_http_request_duration_seconds{method,route}`, `kay_queue_runs_total{queue,result}` (`ok`, `retried`, `failed`; a workflow is `workflow:<name>`), `kay_job_runs_total{schedule,result}` (`ok`, `failed`, `skipped` when another process held the lock), `kay_session_events_total{event}` (`created`, `destroyed`), `kay_file_events_total{event}` (`written`, `deleted`), `kay_cache_reads_total{result}` (`hit` or `miss` of `cached` and `cache`), `kay_live_connections`, `kay_process_resident_memory_bytes` and `kay_process_uptime_seconds`.
 - A page counts under its pattern, `/shop/:item`, an API route under its route, and a path nothing serves under `unmatched`, so a scan adds no series; at most 500 routes are kept, the rest read `other`. The scrape itself and the health route are not counted, nor a request an earlier hook answers (a redirect, a refusal by `proxy.key`), and a method no server knows reads `OTHER`.
 - It is never public by default: only a request that reached the socket from this machine or a private network (a collector in the same compose network, a sidecar) and carries no `X-Forwarded-*`, `X-Real-IP`, `Forwarded`, `Via` or `CF-Connecting-IP` header, nor the headers `proxy.header` and `proxy.key` name, is answered; every other gets 403, a trailing slash, a query or the `base` in the path included. Do not forward the path from the reverse proxy: one that adds none of those headers cannot be told from a collector.
@@ -136,8 +136,8 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 ### Health and shutdown
 
 - `/_kay/health` answers `200 ok` while the server takes requests, for a load balancer or a container's health check.
-- `health: { path: '/up', check: async () => await db.ping() }` in kay.config.ts moves it and adds a check: one returning `false`, throwing, or taking over 5 s answers 503, the error logged.
-- `health: false` leaves the route out.
+- `ops: { health: { path: '/up', check: async () => await db.ping() } }` in kay.config.ts moves it and adds a check: one returning `false`, throwing, or taking over 5 s answers 503, the error logged.
+- `ops: { health: false }` leaves the route out.
 - An executable `kay build --compile` made checks a server it started, rather than starting one, when run as `./server --health`: it exits with 0 when the health route on `PORT`, 3000 by default, at `HOST` when it names an address and on loopback otherwise, answers 200, else 1, for a container image with no curl: `HEALTHCHECK CMD ["./server", "--health"]`.
 - On SIGTERM, SIGINT or SIGHUP, a server that listens stops taking connections, lets open requests finish, ends every open event stream (live values, presence, `stream()`) and, once no request is left, every websocket (close code 1001), so browsers reconnect to the next instance, then runs the app's `onStop` hooks, each given `serve.shutdownTimeout` at most, and exits with 0. A queue handler or schedule ignoring its signal is given 3 seconds (at most 40% of `serve.shutdownTimeout`), all of them together, then its job is handed back untouched, and the `store` config's `rooms` store is closed so a stopped replica leaves no member behind (a store given only to `rooms({ store })` is not).
 - New connections are refused from the signal on, so a load balancer stops sending any; a client on a connection kept alive gets 503 from the health route meanwhile.

@@ -50,7 +50,7 @@ describe('the unknown keys defineConfig refuses by type', () => {
     // @ts-expect-error a bag three levels down, whose own `family` is required
     expect(defineConfig({ images: { card: { font: { family: 'Inter', wieght: 400 } } } })).toBeDefined()
     // @ts-expect-error a bag with required keys
-    expect(defineConfig({ i18n: { locales: ['en'], defaultLocale: 'en', mesages: 'm' } })).toBeDefined()
+    expect(defineConfig({ i18n: { locales: ['en'], default: 'en', mesages: 'm' } })).toBeDefined()
     // @ts-expect-error the extra key of a favicon
     expect(defineConfig({ favicon: { image: 'a.png', svg: 'a.svg', sizes: [1] } })).toBeDefined()
     // @ts-expect-error a bag that takes a switch

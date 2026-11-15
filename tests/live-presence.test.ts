@@ -367,7 +367,7 @@ describe('presence with a base and a trailing slash', () => {
   })
 
   it('names it under a locale prefix as the browser is at it', async () => {
-    const site = await testSite({ root: ROOT, i18n: { locales: ['en', 'fr'], defaultLocale: 'en' } })
+    const site = await testSite({ root: ROOT, i18n: { locales: ['en', 'fr'], default: 'en' } })
 
     try {
       expect((await visit(site, '/fr/crowd')).keys).toEqual([keyOf('/fr/crowd', null)])

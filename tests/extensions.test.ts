@@ -29,7 +29,7 @@ const TSCONFIG_OPTIONS = (JSON.parse(TSCONFIG) as { compilerOptions: object }).c
 const CATALOGS: Record<string, string> = {
   'package.json': JSON.stringify({ name: 'app', dependencies: { 'kay-lib': '*' } }),
   'tsconfig.json': TSCONFIG,
-  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { authPages } from \'kay-lib\'\n\nexport default defineConfig({ i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' }, extensions: [authPages()] })\n',
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { authPages } from \'kay-lib\'\n\nexport default defineConfig({ i18n: { locales: [\'en\', \'fr\'], default: \'en\' }, extensions: [authPages()] })\n',
   'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ home: \'Home\', auth: { title: \'Log in\' } })\n',
   'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ home: \'Accueil\', auth: { title: \'Se connecter\' } })\n',
   'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', type: 'module', exports: { '.': './index.ts' }, peerDependencies: { kay: '*' } }),
@@ -117,7 +117,7 @@ const EXTENSIONS: Record<string, string> = {
   'kay.config.ts': `import { defineConfig } from 'kay/server'
 import { accounts, authPages, greeter, statsApi } from 'kay-lib'
 
-export default defineConfig({ guards: { default: 'open' }, client: { inlineStyles: false }, seo: { name: 'App' }, head: [{ tag: 'meta', props: { name: 'app', content: 'mine' } }], openapi: true, i18n: { locales: ['en', 'fr'], defaultLocale: 'en' }, extensions: [authPages(), statsApi(), greeter, accounts()] })
+export default defineConfig({ guards: { default: 'open' }, client: { inlineStyles: false }, seo: { name: 'App' }, head: [{ tag: 'meta', props: { name: 'app', content: 'mine' } }], openapi: true, i18n: { locales: ['en', 'fr'], default: 'en' }, extensions: [authPages(), statsApi(), greeter, accounts()] })
 `,
   'src/messages/en.ts': CATALOGS['src/messages/en.ts']!,
   'src/messages/fr.ts': CATALOGS['src/messages/fr.ts']!,
@@ -826,7 +826,7 @@ describe('a library\'s route tree', () => {
 
   it('leaves the app what an extension\'s routes name outside their prefix, a locale\'s prefix read past', () => {
     const mounts = [{ dir: '/nowhere/lib/routes', prefix: '/auth' }]
-    const locales = servedLocales({ locales: ['en', 'fr'], defaultLocale: 'en' })
+    const locales = servedLocales({ locales: ['en', 'fr'], default: 'en' })
     const left = (path: string) => servedByTheApp('/nowhere/lib/routes/login.kay', `${UNSERVED_MESSAGE} ${path}`, mounts, locales)
 
     expect(locales).toEqual(['fr'])

@@ -36,7 +36,7 @@ async function localizedCollection(root: string, config: Pick<KayConfig, 'i18n' 
   if (found[1].options.localized !== true)
     throw new KayError('content-api-misuse', `kay: ${collection} is not a localized collection, so its entries have no translation`)
 
-  return i18n.defaultLocale
+  return i18n.default
 }
 
 // The default locale's entry of the collection, as its source holds it, and how a translation of it would be marked.

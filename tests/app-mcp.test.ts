@@ -45,7 +45,7 @@ const keyed = await testSite({ requireGuards: false, dirs: { routes, api }, mcp:
 const keyedRewritten = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, locals, proxy: { key: 'x-upstream-key' }, headers: { 'x-upstream-key': PROXY_KEY }, rewrite: url => url.pathname === '/api/notes/who' ? '/api/notes/who?rewritten=1' : undefined })
 
 delete process.env.KAY_PROXY_KEY
-const localized = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
+const localized = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
 afterAll(async () => {
   await Promise.all([dev.close(), throttled.close(), unthrottled.close(), site.close(), keyed.close(), keyedRewritten.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])

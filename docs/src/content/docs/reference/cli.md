@@ -860,4 +860,4 @@ A command that cannot run, such as on a directory that does not exist, prints `{
 
 Code that ends the process mid-build leaves the problems so far, with one saying it ended and the stage.
 
-<ReadMore href="/llms/project#commands">Every field of the build document, and how a build that ends the process is reported.</ReadMore>
+<ReadMore href="/llms/commands#commands">Every field of the build document, and how a build that ends the process is reported.</ReadMore>

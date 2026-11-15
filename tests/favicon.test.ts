@@ -148,7 +148,7 @@ describe('favicon', () => {
 
   it('serves kay\'s mark when the project names no favicon, and none once it is turned off', async () => {
     const plain = await pages({ root: 'tests/fixtures/seo', prebuilt: false })
-    const off = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: false })
+    const off = await pages({ root: 'tests/fixtures/seo', prebuilt: false, assets: { favicon: false } })
     const icon = await plain.handle(new Request('http://localhost/icon-512.png'))
 
     const svg = await plain.handle(new Request('http://localhost/favicon.svg'))
@@ -274,7 +274,7 @@ describe('favicon', () => {
 
       expect(warned).toHaveBeenCalledWith(`kay: the favicon ${lettered} has text, which kay draws without fonts, so as nothing; turn the text into paths`)
       warned.mockClear()
-      expect((await bootProblems(scratch, { favicon: 'lettered.svg' })).filter(problem => problem.file === lettered)).toEqual([{ file: lettered, line: 1, column: 1, severity: 'warning', message: `kay: the favicon ${lettered} has text, which kay draws without fonts, so as nothing; turn the text into paths` }])
+      expect((await bootProblems(scratch, { assets: { favicon: 'lettered.svg' } })).filter(problem => problem.file === lettered)).toEqual([{ file: lettered, line: 1, column: 1, severity: 'warning', message: `kay: the favicon ${lettered} has text, which kay draws without fonts, so as nothing; turn the text into paths` }])
       // As `kay build` writes them once its check warned.
       await writeFavicons({ image: lettered, svg: lettered }, join(scratch, 'built-lettered'), () => undefined)
       expect(warned).not.toHaveBeenCalled()
@@ -296,7 +296,7 @@ describe('favicon', () => {
 
       await Bun.write(file, source)
       await expect(faviconFiles({ image: file, svg: file })).rejects.toThrow(`kay: the favicon ${file} ${message}`)
-      expect((await bootProblems(scratch, { favicon: name })).filter(problem => problem.file === file).map(problem => problem.message)).toEqual([expect.stringContaining(`kay: the favicon ${file} ${message}`)])
+      expect((await bootProblems(scratch, { assets: { favicon: name } })).filter(problem => problem.file === file).map(problem => problem.message)).toEqual([expect.stringContaining(`kay: the favicon ${file} ${message}`)])
     }
   })
 
@@ -311,7 +311,7 @@ describe('favicon', () => {
   })
 
   it('gives every page the theme colour with the favicon turned off, the site linking its own', async () => {
-    const off = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: false, manifest: { themeColor: '#1e1e2e' } })
+    const off = await pages({ root: 'tests/fixtures/seo', prebuilt: false, assets: { favicon: false }, manifest: { themeColor: '#1e1e2e' } })
 
     expect(await (await off.handle(new Request('http://localhost/about'))).text()).toContain('<meta name="theme-color" content="#1e1e2e">')
   })

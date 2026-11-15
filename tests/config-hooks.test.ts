@@ -25,13 +25,13 @@ describe('the flat hooks and the grouped log', () => {
 
     expect(old.onListen).toBe(onStart)
     expect(old.onError).toBe(onError)
-    expect(old.observe).toEqual({})
+    expect(old.ops?.observe).toEqual({})
     expect((await resolveConfig({ onStart, onListen: own })).onListen).toBe(own)
   })
 
   test('observe.log as \'json\' or a function resolves to the group', async () => {
-    expect((await resolveConfig({ observe: { log: 'json' } })).observe?.log).toEqual({ format: 'json' })
-    expect((await resolveConfig({ observe: { log: quiet } })).observe?.log).toEqual({ sink: quiet })
+    expect((await resolveConfig({ observe: { log: 'json' } })).ops?.observe?.log).toEqual({ format: 'json' })
+    expect((await resolveConfig({ observe: { log: quiet } })).ops?.observe?.log).toEqual({ sink: quiet })
   })
 
   test('loggerOf reads format, requests and sink', () => {

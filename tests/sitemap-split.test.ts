@@ -125,7 +125,7 @@ describe('a sitemap past its limits', () => {
   })
 
   it('gives each host of a site by domain its own index on its own host', async () => {
-    const served = await app({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: join(root, 'src/messages') } })
+    const served = await app({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], default: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: join(root, 'src/messages') } })
     const english = await read(served, '/sitemap.xml', 'x.com')
     const french = await read(served, '/sitemap.xml', 'x.fr')
 
@@ -135,7 +135,7 @@ describe('a sitemap past its limits', () => {
   })
 
   it('agrees on the base in the parts, the URLs and robots.txt of a site by domain', async () => {
-    const served = await app({ site: 'https://x.fr', base: '/docs', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: join(root, 'src/messages') } })
+    const served = await app({ site: 'https://x.fr', base: '/docs', i18n: { locales: ['fr', 'en'], default: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: join(root, 'src/messages') } })
     const index = await read(served, '/sitemap.xml', 'x.com')
     const robots = await read(served, '/robots.txt', 'x.com')
 

@@ -21,15 +21,17 @@ h1 {post.title}
 
 ### Set a favicon and make the site installable
 
-`favicon` names a square image, from which kay makes every icon and the web manifest:
+`assets.favicon` names a square image, from which kay makes every icon and the web manifest:
 
 ```ts
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  favicon: 'src/favicon.png',
+  assets: {
+    favicon: 'src/favicon.png',
+    manifest: { themeColor: '#1e1e2e', display: 'standalone' },
+  },
   seo: { name: 'Example' },
-  manifest: { themeColor: '#1e1e2e', display: 'standalone' },
 })
 ```
 
@@ -63,11 +65,11 @@ ul
 
 ### Self-host a font
 
-`fonts` in `kay.config.ts` serves a font file or an installed Fontsource package, and a stylesheet names its family:
+`assets.fonts` in `kay.config.ts` serves a font file or an installed Fontsource package, and a stylesheet names its family:
 
 ```ts
 export default defineConfig({
-  fonts: [{ fontsource: '@fontsource-variable/inter' }],
+  assets: { fonts: [{ fontsource: '@fontsource-variable/inter' }] },
 })
 ```
 
@@ -106,12 +108,12 @@ Past 50,000 URLs or 50 MB (the protocol's limits) `/sitemap.xml` is a sitemap in
 
 ### Favicon and web manifest
 
-`favicon` in `kay.config.ts` names a square image relative to the root, 512 pixels wide or more for sharp icons (a smaller one is enlarged, with a warning naming it): `favicon: 'src/favicon.png'`.
+`assets.favicon` in `kay.config.ts` names a square image relative to the root, 512 pixels wide or more for sharp icons (a smaller one is enlarged, with a warning naming it): `assets: { favicon: 'src/favicon.png' }`.
 
 - kay serves it as `/favicon.ico` (16, 32 and 48 pixels), `/apple-touch-icon.png` (180), `/icon-192.png` and `/icon-512.png`, plus `/manifest.webmanifest`, and links them from every page, the manifest with `crossorigin="use-credentials"` so it is fetched with the visitor's cookies, as the page was, and a login proxy in front of the app lets it through.
 - `kay build` writes them, which a server serving that build reads; any other, development and `testSite` included, makes them from the image on first request, so an older build never shows a changed favicon. The icons it draws are kept in `.kay/cache`, as the build's are, so a reload or a restart draws them again only when the image changed, and a source too small warns once.
 - Each path a public file or a page already serves is left to it.
-- `favicon: { image: 'src/favicon.png', svg: 'src/favicon.svg' }` adds an SVG of it, served as `/favicon.svg` as it is and linked after the ICO, so browsers drawing SVG icons use it, sharp at any size; the icons are still made from `image`.
+- `favicon: { image: 'src/favicon.png', svg: 'src/favicon.svg' }` (in `assets`) adds an SVG of it, served as `/favicon.svg` as it is and linked after the ICO, so browsers drawing SVG icons use it, sharp at any size; the icons are still made from `image`.
 - A square SVG named alone, `favicon: 'src/favicon.svg'`, is both: kay draws every icon from it at its own size and serves it as `/favicon.svg`, linked after the ICO.
 - Its `svg` tag needs a `viewBox`, or a `width` and `height` that are not percentages.
 - Text in it draws without fonts, so as nothing, which `kay build` and `kay check` warn of: turn text into paths.
@@ -125,19 +127,21 @@ Past 50,000 URLs or 50 MB (the protocol's limits) `/sitemap.xml` is a sitemap in
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  favicon: 'src/favicon.png',
-  seo: { name: 'Example' },
-  manifest: {
-    shortName: 'Ex',
-    themeColor: '#1e1e2e',
-    backgroundColor: '#11111b',
-    display: 'standalone',
-    orientation: 'any',
-    startUrl: '/notes',
-    scope: '/',
-    maskable: 'src/favicon-maskable.png',
-    shortcuts: [{ name: 'New note', url: '/notes/new' }],
+  assets: {
+    favicon: 'src/favicon.png',
+    manifest: {
+      shortName: 'Ex',
+      themeColor: '#1e1e2e',
+      backgroundColor: '#11111b',
+      display: 'standalone',
+      orientation: 'any',
+      startUrl: '/notes',
+      scope: '/',
+      maskable: 'src/favicon-maskable.png',
+      shortcuts: [{ name: 'New note', url: '/notes/new' }],
+    },
   },
+  seo: { name: 'Example' },
 })
 ```
 
@@ -238,21 +242,23 @@ ul
 
 ### Fonts
 
-`fonts` in `kay.config.ts` self-hosts font files: each is served as a content-named asset, declared by `@font-face` rules in a `<style>` of every page's head, which spares the first paint a request of their own at the cost of a few hundred bytes per face in every page, and preloaded only with `preload: true`.
+`assets.fonts` in `kay.config.ts` self-hosts font files: each is served as a content-named asset, declared by `@font-face` rules in a `<style>` of every page's head, which spares the first paint a request of their own at the cost of a few hundred bytes per face in every page, and preloaded only with `preload: true`.
 
 ```ts
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  fonts: [
-    {
-      family: 'Inter',
-      src: '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2',
-      weight: '100 900',
-      preload: true,
-    },
-    { family: 'Lora', src: 'src/fonts/lora-italic.woff2', style: 'italic' },
-  ],
+  assets: {
+    fonts: [
+      {
+        family: 'Inter',
+        src: '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2',
+        weight: '100 900',
+        preload: true,
+      },
+      { family: 'Lora', src: 'src/fonts/lora-italic.woff2', style: 'italic' },
+    ],
+  },
 })
 ```
 

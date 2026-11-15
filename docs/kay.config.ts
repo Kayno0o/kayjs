@@ -26,7 +26,7 @@ const chatCounts = sqliteRates(join(import.meta.dir, 'data/ai.sqlite'))
 const migrations = ['astro', 'sveltekit', 'nextjs', 'laravel']
 
 export default defineConfig({
-  observe: { log: false },
+  ops: { observe: { log: false } },
   plugins: [tailwind],
   // Behind the host's nginx, whose address every visitor would otherwise share: the chat's limits count the visitor.
   proxy: true,
@@ -37,10 +37,12 @@ export default defineConfig({
     name: 'kay',
     description: 'A Bun web framework: one .kay file per component, pages rendered to plain HTML on the server, interactive islands in the browser.',
   },
-  // Only the share cards draw with it: no stylesheet names Inter, so pages never fetch it.
-  fonts: [{ fontsource: '@fontsource/inter', weights: [700] }],
-  // kay's own mark, the kingfisher the docs' favicon shows too.
-  images: { card: { background: '#17202e', color: '#eef2f7', logo: '../src/server/favicon.svg' } },
+  assets: {
+    // Only the share cards draw with it: no stylesheet names Inter, so pages never fetch it.
+    fonts: [{ fontsource: '@fontsource/inter', weights: [700] }],
+    // kay's own mark, the kingfisher the docs' favicon shows too.
+    images: { card: { background: '#17202e', color: '#eef2f7', logo: '../src/server/favicon.svg' } },
+  },
   // Set once for every collection, and for the chat's code blocks, which the server highlights with it as well.
   markdown: { highlight },
   client: { search: true },

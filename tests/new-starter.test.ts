@@ -28,7 +28,7 @@ describe('the starter', () => {
       // A static export holds no extension's API routes, so a site imports the theme where a server mounts it.
       expect(files['kay.config.ts']!.includes('ui()')).toBe(preset.features.includes('server'))
       expect(files['src/app.css']!.includes('@import \'@kayjs/ui/theme.css\';')).toBe(!preset.features.includes('server'))
-      expect(files['kay.config.ts']).toContain('fonts: [{ fontsource: \'@fontsource-variable/space-grotesk\' }, { fontsource: \'@fontsource-variable/jetbrains-mono\' }]')
+      expect(files['kay.config.ts']).toContain('assets: { fonts: [{ fontsource: \'@fontsource-variable/space-grotesk\' }, { fontsource: \'@fontsource-variable/jetbrains-mono\' }] }')
       expect(files['src/components/header.kay']).toContain('import AppHeader from \'@kayjs/ui/app-header.kay\'')
       expect(Object.keys(manifest.dependencies)).toContain('@kayjs/ui')
       expect(Object.keys(manifest.devDependencies)).toEqual(expect.arrayContaining(['@fontsource-variable/space-grotesk', '@fontsource-variable/jetbrains-mono']))

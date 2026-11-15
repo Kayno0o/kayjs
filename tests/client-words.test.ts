@@ -18,7 +18,7 @@ import { BAD_EMAILS, GOOD_EMAILS } from './helpers/emails'
 const FIXTURE = 'tests/fixtures/client-words'
 const I18N = /<script type="application\/json" data-kay-i18n>(.*?)<\/script>/
 const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(process.cwd()), navigation: true }
-const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: `${FIXTURE}/src/messages` }
+const i18n = { locales: ['en', 'fr'], default: 'en', messages: `${FIXTURE}/src/messages` }
 const FRENCH = {
   'kay.invalid.required': 'Champ requis',
   'kay.invalid.tooShort': 'Au moins {min} caractères',

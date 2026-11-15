@@ -748,7 +748,7 @@ describe('kay lsp following the project on disk', () => {
     await symlink(real, dir)
     await Promise.all([
       Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ guards: { default: \'open\' }, lints: { \'no-such-lint\': \'deny\' }, i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } })\n'),
+      Bun.write(join(dir, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ guards: { default: \'open\' }, lints: { \'no-such-lint\': \'deny\' }, i18n: { locales: [\'fr\', \'en\'], default: \'fr\' } })\n'),
       Bun.write(join(dir, 'src/messages/fr.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ hello: \'Bonjour\' })\n'),
       Bun.write(join(dir, 'src/messages/en.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n'),
       Bun.write(join(dir, 'src/content.config.ts'), 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', { schema: t.Object({ title: t.String() }) })\n'),
@@ -785,7 +785,7 @@ describe('kay lsp following the project on disk', () => {
   it('reads the config again, and what guards export, once either changes on disk', async () => {
     const config = 'kay.config.ts'
     const messages = (diagnostics: Diagnostic[]) => diagnostics.map(diagnostic => diagnostic.message)
-    const written = async (lints: string) => Bun.write(join(dir, config), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ guards: { default: 'open' }, lints: { ${lints} }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } })\n`)
+    const written = async (lints: string) => Bun.write(join(dir, config), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ guards: { default: 'open' }, lints: { ${lints} }, i18n: { locales: ['fr', 'en'], default: 'fr' } })\n`)
 
     await written('')
     expect(await editor.filesChanged(config, [{ path: config, type: 2 }])).toEqual([])
@@ -1525,7 +1525,7 @@ describe('kay lsp on an app holding a nested project and listing an extension be
     dir = join(await scratchDir('lsp-workspace-'), 'app (v1)@x+y')
     await Promise.all([
       Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' }, extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/lib\' } }] }\n'),
+      Bun.write(join(dir, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\' }, extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/lib\' } }] }\n'),
       Bun.write(join(dir, 'src/routes/index.kay'), 'p Home\n'),
       Bun.write(join(dir, page), source),
       Bun.write(join(dir, 'src/routes/bare.kay'), '--- server\nconst title = \'x\'\n---\na({title}) go\np {title}\n'),
@@ -1683,7 +1683,7 @@ describe('kay lsp project checks after a save', () => {
     const unrelated = 'src/unrelated.kay'
     const files = {
       'tsconfig.json': await Bun.file(join(fixtures, 'site/tsconfig.json')).text(),
-      'kay.config.ts': 'export default { i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } }\n',
+      'kay.config.ts': 'export default { i18n: { locales: [\'fr\', \'en\'], default: \'fr\' } }\n',
       'src/messages/fr.ts': 'export default { hello: \'Bonjour\' }\n',
       'src/messages/en.ts': 'export default { hello: \'Hello\' }\n',
       'src/helper.ts': 'export const shape = 1\n',
@@ -1791,7 +1791,7 @@ describe('kay lsp project checks after a save', () => {
       expect(await save('src/messages/en.ts', 'export default { hello: \'Hello\' }\n')).toEqual({ content: 9, messages: 4 })
 
       // The config both scripts run under, which also names a catalog the messages newly read.
-      expect(await save('kay.config.ts', 'export default { i18n: { locales: [\'fr\', \'en\', \'es\'], defaultLocale: \'fr\' } }\n')).toEqual({ content: 10, messages: 5 })
+      expect(await save('kay.config.ts', 'export default { i18n: { locales: [\'fr\', \'en\', \'es\'], default: \'fr\' } }\n')).toEqual({ content: 10, messages: 5 })
       expect(await save('src/messages/es.ts', 'export default { hello: \'Hola\' }\n')).toEqual({ content: 11, messages: 6 })
       expect(await save('src/messages/es.ts', 'export default { hello: \'Hola!\' }\n')).toEqual({ content: 12, messages: 7 })
 

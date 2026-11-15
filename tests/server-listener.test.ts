@@ -9,7 +9,7 @@ const VARIANTS: [string, NonNullable<Parameters<typeof pages>[0]>][] = [
   ['at the root', {}],
   ['under a base', { base: '/app' }],
   ['under a base with a trailing slash', { base: '/app', trailingSlash: 'always' }],
-  ['with a locale prefix', { i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }],
+  ['with a locale prefix', { i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }],
 ]
 
 // The same site answers through the listener, where Bun routes the request, and through `app.handle`, where Elysia does.

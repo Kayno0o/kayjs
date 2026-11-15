@@ -159,7 +159,7 @@ describe('import edits of modules and bare imports', () => {
 describe('message keys', () => {
   it('reads the catalog afresh after it is edited', async () => {
     const root = await scratchDir('lsp-messages-')
-    const config = { locales: ['en'], defaultLocale: 'en' }
+    const config = { locales: ['en'], default: 'en' }
 
     await mkdir(join(root, 'src/messages'), { recursive: true })
     await writeFile(join(root, 'src/messages/en.ts'), 'export default { nav: { home: "Home" } }\n')

@@ -53,7 +53,7 @@ const PAGED: Record<string, string> = {
 const LOCALIZED: Record<string, string> = {
   'package.json': JSON.stringify({ name: 'app' }),
   'tsconfig.json': TSCONFIG,
-  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ site: \'https://example.com\', i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } })\n',
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ site: \'https://example.com\', i18n: { locales: [\'en\', \'fr\'], default: \'en\' } })\n',
   'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n',
   'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n',
   'src/content.config.ts': CONTENT.replace('LOCALIZED', 'true'),

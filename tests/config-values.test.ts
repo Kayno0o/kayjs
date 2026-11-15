@@ -43,7 +43,7 @@ describe('config values checked once at load', () => {
   })
 
   it('reports the kind of a value that is not the kind of its key, the path through bags, lists and maps', () => {
-    expect(invalidConfigValues({ lang: 5, base: true, serve: { compress: 7, timeout: 30 }, images: { webp: { quality: '90' } }, fonts: ['x'], publicCache: { '/a/**': 5 }, i18n: { locales: ['en', 3], defaultLocale: 'en' } })).toEqual([
+    expect(invalidConfigValues({ lang: 5, base: true, serve: { compress: 7, timeout: 30 }, images: { webp: { quality: '90' } }, fonts: ['x'], publicCache: { '/a/**': 5 }, i18n: { locales: ['en', 3], default: 'en' } })).toEqual([
       '`lang` is 5, expected a string',
       '`base` is true, expected a string',
       '`serve.compress` is 7, expected true or false',
@@ -65,12 +65,12 @@ describe('config values checked once at load', () => {
   })
 
   it('refuses a default locale outside the locales', () => {
-    expect(invalidConfigValues({ i18n: { locales: ['en', 'fr'], defaultLocale: 'de' } })).toEqual(['`i18n.defaultLocale` is "de", expected one of its locales: "en", "fr"'])
-    expect(invalidConfigValues({ i18n: { locales: ['en', 'fr'], defaultLocale: 'fr' } })).toEqual([])
+    expect(invalidConfigValues({ i18n: { locales: ['en', 'fr'], default: 'de' } })).toEqual(['`i18n.default` is "de", expected one of its locales: "en", "fr"'])
+    expect(invalidConfigValues({ i18n: { locales: ['en', 'fr'], default: 'fr' } })).toEqual([])
   })
 
   it('leaves a key set to undefined, the shapes the types take and the keys another check owns alone', () => {
-    expect(invalidConfigValues({ lang: undefined, offline: true, health: false, security: false, robots: false, client: { prefetch: false }, favicon: false, secret: ['a', 'b'], proxy: true, metrics: true, limits: { body: 1024 }, serve: { timeout: false, shutdownTimeout: '5s' }, observe: { log: false }, checks: [], env: { compose: 'x' }, cors: { origins: '*' } })).toEqual([])
+    expect(invalidConfigValues({ lang: undefined, offline: true, health: false, security: false, robots: false, client: { prefetch: false }, assets: { favicon: false }, secret: ['a', 'b'], proxy: true, metrics: true, limits: { body: 1024 }, serve: { timeout: false, shutdownTimeout: '5s' }, observe: { log: false }, checks: [], env: { compose: 'x' }, cors: { origins: '*' } })).toEqual([])
   })
 
   it('checks the keys of the bags 1.88 grouped', () => {
@@ -100,7 +100,7 @@ describe('config values checked once at load', () => {
   it('refuses, at load, the values the types would have refused, as config-invalid and never a TypeError', async () => {
     const trailing = await load('export default { trailingSlash: \'sometimes\', base: \'blog\', serve: { compress: 7 } } as never\n')
     const lang = await load('export default { lang: 5 } as never\n')
-    const locale = await load('export default { i18n: { locales: [\'en\'], defaultLocale: \'fr\' } }\n')
+    const locale = await load('export default { i18n: { locales: [\'en\'], default: \'fr\' } }\n')
     const fine = await load('export default { lang: \'en\', trailingSlash: \'always\', serve: { compress: false } }\n')
 
     expect(trailing).toMatchObject({ code: 'config-invalid' })
@@ -108,7 +108,7 @@ describe('config values checked once at load', () => {
     expect(String(trailing)).toContain('`serve.compress` is 7')
     expect(lang).toMatchObject({ code: 'config-invalid' })
     expect(String(lang)).toContain('`lang` is 5, expected a string')
-    expect(String(locale)).toContain('`i18n.defaultLocale` is "fr"')
+    expect(String(locale)).toContain('`i18n.default` is "fr"')
     expect(fine).toMatchObject({ lang: 'en', trailingSlash: 'always' })
   })
 

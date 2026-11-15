@@ -296,7 +296,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
       if (options.compile.verify === 'load')
         result.compiled.verifiedMs = await loadExecutable(executable, root)
       else if (options.compile.verify)
-        result.compiled.verifiedMs = await verifyExecutable(executable, root, project.config.health)
+        result.compiled.verifiedMs = await verifyExecutable(executable, root, project.config.ops?.health)
 
       // Written once the executable runs, so `kay start` never runs one that failed its verify.
       await Bun.write(join(output, EXECUTABLE_RECORD), relative(root, executable))
@@ -335,7 +335,7 @@ async function recordContextReads({ root, config, paths }: Project): Promise<voi
 
 // What the browser build bundles, the fonts the pages declare and the icon sets they inline.
 function shippedPackages({ root, config }: Project, client: ClientBuild): string[] {
-  return [...client.packages ?? [], ...packagesOf(fontFiles(root, config.fonts ?? [])), ...iconSetPackages(root)]
+  return [...client.packages ?? [], ...packagesOf(fontFiles(root, config.assets?.fonts ?? [])), ...iconSetPackages(root)]
 }
 
 // The errors fail a build; warnings are only printed unless `denyWarnings`.
@@ -406,14 +406,14 @@ async function bundleStage(project: Project, exported: boolean, analyze: boolean
   const client = await buildClient(root, clientOptionsOf(config, project.mode, { exported, report: analyze || (project.config.budget?.js !== undefined && lintLevel('over-budget', project.config.lints) !== 'allow') ? 'modules' : 'sizes' }))
 
   // A static host cannot pick a format by `Accept`, so an export links WebP alone.
-  const avif = exported ? undefined : avifQuality(config.images)
+  const avif = exported ? undefined : avifQuality(config.assets?.images)
 
   // Each AVIF holds a thread for up to a second, while WebP encodes on Bun's own.
   setAvifThreads(Math.min(4, availableParallelism()))
   // The ladder is set before the first variant is written, as the server sets it for the pages.
-  setImageWidths(config.images?.widths)
+  setImageWidths(config.assets?.images?.widths)
   // The prerender may import more images, so the cache is pruned once it has.
-  await writeImageVariants(client.dir, webpQuality(config.images), cacheDir(root, 'variants'), { prune: false, avif, onImage: imageProgress(report) })
+  await writeImageVariants(client.dir, webpQuality(config.assets?.images), cacheDir(root, 'variants'), { prune: false, avif, onImage: imageProgress(report) })
 
   return client
 }
@@ -435,7 +435,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   report({ step: 'prerendering' })
 
   setMarkdownDefaults(config.markdown)
-  setImageColors(config.images?.placeholder !== false)
+  setImageColors(config.assets?.images?.placeholder !== false)
 
   // Before prerendering, whose pages read the collections from what it writes.
   const entries = await writeContentManifests(root, paths.output, config.contentConfig)
@@ -479,15 +479,15 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...siteSeoLints(config, rendered, others, { configFile, configSource, exported, unseen: hasUnseenPages(routes, rendered, others, exported, paths.routes), skipConfigChains: true }), ...unkeptPageLints(config, [...stops.values()]), ...pageStructureLints(config, rendered)] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
 
   // Remote originals are kept between builds, revalidated as the image route does.
-  const remote = remoteImages(cacheDir(root, 'remote'), await remotePatterns(config.images?.remote?.hosts), undefined, undefined, remoteLimits(config.images))
+  const remote = remoteImages(cacheDir(root, 'remote'), await remotePatterns(config.assets?.images?.remote?.hosts), undefined, undefined, remoteLimits(config.assets?.images))
 
-  await writeImageVariants(client.dir, webpQuality(config.images), cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.images), onImage: imageProgress(report) })
+  await writeImageVariants(client.dir, webpQuality(config.assets?.images), cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.assets?.images), onImage: imageProgress(report) })
   report({ step: 'writing images, cards and favicons' })
-  await writeRemoteVariants(client.dir, remote, webpQuality(config.images))
-  await writeCards(client.dir, cacheDir(root, 'cards'), remote, { aspects: config.images?.aspects, quality: webpQuality(config.images), avif: exported ? undefined : avifQuality(config.images) })
+  await writeRemoteVariants(client.dir, remote, webpQuality(config.assets?.images))
+  await writeCards(client.dir, cacheDir(root, 'cards'), remote, { aspects: config.assets?.images?.aspects, quality: webpQuality(config.assets?.images), avif: exported ? undefined : avifQuality(config.assets?.images) })
   lap('images and cards')
 
-  const favicon = faviconSource(root, config.favicon, config.manifest)
+  const favicon = faviconSource(root, config.assets?.favicon, config.assets?.manifest)
 
   // The check warned of what an SVG draws poorly already.
   if (favicon !== undefined)
@@ -507,7 +507,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   if (hooks.length > 0)
     report({ step: 'running page hooks' })
 
-  await hookPrerendered(root, hooks, { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects, copiesOf: copies }, paths.output)
+  await hookPrerendered(root, hooks, { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.assets?.images?.aspects, copiesOf: copies }, paths.output)
   lap('page hooks')
   report({ step: 'compressing' })
 
@@ -521,7 +521,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   lap('compress')
 
   // Read from the files the build wrote, hooks included, with the image variants they link and the gzip copies a host serves.
-  const footprints = await routeFootprints(join(paths.output, PRERENDERED_DIR), client.pages, routes, assetFiles({ clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects }), !exported && avifQuality(config.images) !== undefined)
+  const footprints = await routeFootprints(join(paths.output, PRERENDERED_DIR), client.pages, routes, assetFiles({ clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.assets?.images?.aspects }), !exported && avifQuality(config.assets?.images) !== undefined)
 
   linted.push(...footprintLints(config.budget, config.lints, footprints, routes))
   lap('page footprints')

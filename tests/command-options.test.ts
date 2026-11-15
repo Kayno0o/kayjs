@@ -102,7 +102,7 @@ afterAll(async () => {
 async function project(): Promise<string> {
   const root = await scratchDir('library-command-')
   const files: Record<string, string> = {
-    'kay.config.ts': 'export default { favicon: false, extensions: [{ name: \'kay-lib\', commands: { \'lib shared\': \'./lib/shared.ts\', \'lib own\': \'./lib/own.ts\', \'lib refusing\': \'./lib/refusing.ts\' } }] }\n',
+    'kay.config.ts': 'export default { assets: { favicon: false }, extensions: [{ name: \'kay-lib\', commands: { \'lib shared\': \'./lib/shared.ts\', \'lib own\': \'./lib/own.ts\', \'lib refusing\': \'./lib/refusing.ts\' } }] }\n',
     'lib/shared.ts': 'export default { usage: \'lib shared <what>\', options: {}, positionals: 1, run: ({ positionals: [what] }, refuse, { format, quiet, dryRun, fail, result }) => {\n  if (what === \'broken\')\n    return fail(\'it broke\', null)\n\n  if (what === \'usage\')\n    return fail(\'bad input\')\n\n  result({ what, dryRun })\n\n  if (format === \'text\' && !quiet)\n    console.log(`${dryRun ? \'would do\' : \'did\'} ${what}`)\n\n  return 0\n} }\n',
     'lib/own.ts': 'export default { usage: \'lib own\', options: { format: { type: \'string\' }, quiet: { type: \'string\' }, \'dry-run\': { type: \'string\' } }, positionals: 0, run: ({ values }, refuse, { format, quiet, dryRun }) => {\n  console.log(JSON.stringify({ values, format, quiet, dryRun }))\n\n  return 0\n} }\n',
     'lib/refusing.ts': 'export default { usage: \'lib refusing\', options: {}, refuses: { \'dry-run\': \'writes nothing\' }, positionals: 0, run: () => 0 }\n',

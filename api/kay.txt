@@ -2831,9 +2831,27 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
     outside?: "new-tab" | "same-tab" | undefined;
     schemes?: string[] | undefined;
   }, [unknown]>;
+  images?: Checked<"images" extends keyof Config ? Config[keyof Config & "images"] : unknown, Omit<ImagesConfig, "remote"> & {
+    remote?: Loadable<string[]> | Over<RemoteImages, {
+      hosts?: Loadable<string[]> | undefined;
+    }> | undefined;
+  } & DeprecatedImages, [unknown]>;
+  fonts?: unknown;
+  favicon?: Checked<"favicon" extends keyof Config ? Config[keyof Config & "favicon"] : unknown, FaviconConfig, [unknown]>;
+  manifest?: Checked<"manifest" extends keyof Config ? Config[keyof Config & "manifest"] : unknown, ManifestConfig, [unknown]>;
+  publicCache?: unknown;
   observe?: Checked<"observe" extends keyof Config ? Config[keyof Config & "observe"] : unknown, Omit<ObserveConfig, "log"> & {
     log?: "json" | ((entry: LogEntry) => void) | LogConfig | boolean | undefined;
     onError?: ErrorHook | undefined;
+  }, [unknown]>;
+  health?: Checked<"health" extends keyof Config ? Config[keyof Config & "health"] : unknown, HealthConfig, [unknown]>;
+  metrics?: Checked<"metrics" extends keyof Config ? Config[keyof Config & "metrics"] : unknown, MetricsConfig, [unknown]>;
+  jobs?: Checked<"jobs" extends keyof Config ? Config[keyof Config & "jobs"] : unknown, JobsConfig, [unknown]>;
+  assets?: Checked<"assets" extends keyof Config ? Config[keyof Config & "assets"] : unknown, Omit<AssetsConfig, "images"> & {
+    images?: ImagesInput | undefined;
+  }, [unknown]>;
+  ops?: Checked<"ops" extends keyof Config ? Config[keyof Config & "ops"] : unknown, Omit<OpsConfig, "observe"> & {
+    observe?: ObserveInput | undefined;
   }, [unknown]>;
   cors?: Checked<"cors" extends keyof Config ? Config[keyof Config & "cors"] : unknown, NonNullable<ConfigCors | undefined>, [unknown]>;
   security?: Checked<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, Omit<SecurityConfig, "hosts"> & {
@@ -2847,14 +2865,10 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
     allow?: Loadable<string[]> | undefined;
   }, [unknown]>;
   redirects?: unknown;
-  i18n?: Checked<"i18n" extends keyof Config ? Config[keyof Config & "i18n"] : unknown, Omit<I18nConfig, "paths"> & {
+  i18n?: Checked<"i18n" extends keyof Config ? Config[keyof Config & "i18n"] : unknown, Omit<I18nConfig, "default" | "paths"> & {
+    default?: string | undefined;
     paths?: Loadable<Record<string, Record<string, string>>> | undefined;
-  }, [unknown]>;
-  images?: Checked<"images" extends keyof Config ? Config[keyof Config & "images"] : unknown, Omit<ImagesConfig, "remote"> & {
-    remote?: Loadable<string[]> | Over<RemoteImages, {
-      hosts?: Loadable<string[]> | undefined;
-    }> | undefined;
-  } & DeprecatedImages, [unknown]>;
+  } & DeprecatedI18n, [unknown]>;
   head?: unknown;
   client?: Checked<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig, [unknown]>;
   onError?: unknown;
@@ -2870,22 +2884,15 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   limits?: Checked<"limits" extends keyof Config ? Config[keyof Config & "limits"] : unknown, LimitsConfig, [unknown]>;
   serve?: Checked<"serve" extends keyof Config ? Config[keyof Config & "serve"] : unknown, ServeConfig, [unknown]>;
   actions?: Checked<"actions" extends keyof Config ? Config[keyof Config & "actions"] : unknown, ActionsConfig, [unknown]>;
-  publicCache?: unknown;
   minify?: unknown;
   lang?: unknown;
   site?: unknown;
   sitemap?: Checked<"sitemap" extends keyof Config ? Config[keyof Config & "sitemap"] : unknown, SitemapConfig, [unknown]>;
   budget?: Checked<"budget" extends keyof Config ? Config[keyof Config & "budget"] : unknown, BudgetConfig, [unknown]>;
-  favicon?: Checked<"favicon" extends keyof Config ? Config[keyof Config & "favicon"] : unknown, FaviconConfig, [unknown]>;
-  manifest?: Checked<"manifest" extends keyof Config ? Config[keyof Config & "manifest"] : unknown, ManifestConfig, [unknown]>;
   entry?: unknown;
-  fonts?: unknown;
   requireGuards?: unknown;
   openapi?: Checked<"openapi" extends keyof Config ? Config[keyof Config & "openapi"] : unknown, OpenApiConfig, [unknown]>;
   mcp?: Checked<"mcp" extends keyof Config ? Config[keyof Config & "mcp"] : unknown, McpConfig, [unknown]>;
-  health?: Checked<"health" extends keyof Config ? Config[keyof Config & "health"] : unknown, HealthConfig, [unknown]>;
-  metrics?: Checked<"metrics" extends keyof Config ? Config[keyof Config & "metrics"] : unknown, MetricsConfig, [unknown]>;
-  jobs?: Checked<"jobs" extends keyof Config ? Config[keyof Config & "jobs"] : unknown, JobsConfig, [unknown]>;
   rewrite?: unknown;
   runtimeRedirects?: Checked<"runtimeRedirects" extends keyof Config ? Config[keyof Config & "runtimeRedirects"] : unknown, {
     hosts?: string[] | undefined;
@@ -3106,6 +3113,7 @@ const jobTableNames: readonly ["kay_jobs", "kay_locks"]
 [./server] KayConfig
 interface KayConfig extends AppHooks
   actions?: ActionsConfig | undefined
+  assets?: AssetsConfig | undefined
   base?: string | undefined
   beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
   budget?: BudgetConfig | undefined
@@ -3118,34 +3126,26 @@ interface KayConfig extends AppHooks
   /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
-  favicon?: FaviconConfig | boolean | string | undefined
-  fonts?: (FontConfig | FontsourceConfig)[] | undefined
   guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
-  health?: HealthConfig | boolean | undefined
   i18n?: I18nConfig | undefined
-  images?: ImagesConfig | undefined
-  jobs?: JobsConfig | undefined
   lang?: string | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
-  manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
   mcp?: McpConfig | boolean | undefined
-  metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
-  observe?: ObserveConfig | undefined
   onError?: ErrorHook | undefined
   onListen?: Hook<StartEvent> | undefined
   onResponse?: Hook<ResponseEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
+  ops?: OpsConfig | undefined
   plugins?: BunPlugin[] | undefined
   preview?: PreviewConfig | boolean | undefined
   proxy?: ProxyConfig | boolean | number | undefined
-  publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   redirects?: Redirects | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
@@ -3365,6 +3365,7 @@ function pages(given?: PagesOptions): Promise<KayPlugin>
 [./server] PagesOptions
 interface PagesOptions extends ConfigInput
   actions?: ActionsConfig | undefined
+  assets?: Over<AssetsConfig, { images?: ImagesInput | undefined; }> | undefined
   base?: string | undefined
   beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
   budget?: BudgetConfig | undefined
@@ -3379,26 +3380,26 @@ interface PagesOptions extends ConfigInput
   /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
-  favicon?: FaviconConfig | boolean | string | undefined
-  fonts?: (FontConfig | FontsourceConfig)[] | undefined
+  /** @deprecated Written `assets.favicon`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ favicon?: FaviconConfig | boolean | string | undefined
+  /** @deprecated Written `assets.fonts`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ fonts?: (FontConfig | FontsourceConfig)[] | undefined
   guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
-  health?: HealthConfig | boolean | undefined
-  i18n?: Over<I18nConfig, { paths?: Loadable<Record<string, Record<string, string>>> | undefined; }> | undefined
-  images?: ImagesInput | undefined
-  jobs?: JobsConfig | undefined
+  /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ health?: HealthConfig | boolean | undefined
+  i18n?: I18nInput | undefined
+  /** @deprecated Written `assets.images`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ images?: ImagesInput | undefined
+  /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ jobs?: JobsConfig | undefined
   lang?: string | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
   /** @deprecated Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
-  manifest?: ManifestConfig | undefined
+  /** @deprecated Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
   mcp?: McpConfig | boolean | undefined
-  metrics?: MetricsConfig | boolean | undefined
+  /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
-  observe?: ObserveInput | undefined
+  /** @deprecated Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ observe?: ObserveInput | undefined
   /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ offline?: OfflineConfig | boolean | undefined
   onError?: ErrorHook | undefined
   onListen?: Hook<StartEvent> | undefined
@@ -3406,11 +3407,12 @@ interface PagesOptions extends ConfigInput
   /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */ onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
+  ops?: Over<OpsConfig, { observe?: ObserveInput | undefined; }> | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
   preview?: PreviewConfig | boolean | undefined
   proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; }> | boolean | number | undefined
-  publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
+  /** @deprecated Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   redirects?: Loadable<Redirects> | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
@@ -4439,6 +4441,7 @@ function testEntry<Data>(data: Data, members?: Partial<Omit<Entry<Data>, "data">
 [./test] TestOptions
 interface TestOptions extends PagesOptions
   actions?: ActionsConfig | undefined
+  assets?: Over<AssetsConfig, { images?: ImagesInput | undefined; }> | undefined
   base?: string | undefined
   beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
   browser?: BrowserOptions | boolean | undefined
@@ -4454,16 +4457,16 @@ interface TestOptions extends PagesOptions
   /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
-  favicon?: FaviconConfig | boolean | string | undefined
-  fonts?: (FontConfig | FontsourceConfig)[] | undefined
+  /** @deprecated Written `assets.favicon`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ favicon?: FaviconConfig | boolean | string | undefined
+  /** @deprecated Written `assets.fonts`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ fonts?: (FontConfig | FontsourceConfig)[] | undefined
   guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
   headers?: Record<string, string> | undefined
-  health?: HealthConfig | boolean | undefined
-  i18n?: Over<I18nConfig, { paths?: Loadable<Record<string, Record<string, string>>> | undefined; }> | undefined
-  images?: ImagesInput | undefined
+  /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ health?: HealthConfig | boolean | undefined
+  i18n?: I18nInput | undefined
+  /** @deprecated Written `assets.images`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ images?: ImagesInput | undefined
   islands?: boolean | undefined
-  jobs?: JobsConfig | undefined
+  /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ jobs?: JobsConfig | undefined
   lang?: string | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
@@ -4471,13 +4474,13 @@ interface TestOptions extends PagesOptions
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   locals?: ((request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>) | undefined
-  manifest?: ManifestConfig | undefined
+  /** @deprecated Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
   mcp?: McpConfig | boolean | undefined
   mcpKey?: string | undefined
-  metrics?: MetricsConfig | boolean | undefined
+  /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
-  observe?: ObserveInput | undefined
+  /** @deprecated Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ observe?: ObserveInput | undefined
   /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ offline?: OfflineConfig | boolean | undefined
   onError?: ErrorHook | undefined
   onListen?: Hook<StartEvent> | undefined
@@ -4485,13 +4488,14 @@ interface TestOptions extends PagesOptions
   /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */ onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
+  ops?: Over<OpsConfig, { observe?: ObserveInput | undefined; }> | undefined
   outgoing?: "allow" | "fail" | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
   preview?: PreviewConfig | boolean | undefined
   proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; }> | boolean | number | undefined
   proxyKey?: string | undefined
-  publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
+  /** @deprecated Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   redirects?: Loadable<Redirects> | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined

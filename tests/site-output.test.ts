@@ -58,7 +58,7 @@ describe('publicCache', () => {
     expect(['/sw.js', '/robots.txt', '/manifest.webmanifest', '/site.json', '/png', '/a.png.html', '/a.css', '/.well-known/x'].map(rules).every(control => control === revalidate)).toBe(true)
   })
 
-  const publicCache: KayConfig['publicCache'] = { '/fonts/**': '365d', '**/*.png': '1d', '/img/*': '1h' }
+  const publicCache: NonNullable<KayConfig['assets']>['publicCache'] = { '/fonts/**': '365d', '**/*.png': '1d', '/img/*': '1h' }
 
   it('gives a public file the cache of the first pattern its path matches, and keeps revalidating the others', async () => {
     const app = await appWith({ publicCache, dev: false })
@@ -145,13 +145,13 @@ describe('robots', () => {
   })
 
   it('lists a path in every locale of a site served by path', async () => {
-    const app = await appWith({ site, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }, robots: { disallow: ['/private'] } })
+    const app = await appWith({ site, i18n: { locales: ['fr', 'en'], default: 'fr', messages: 'src/messages' }, robots: { disallow: ['/private'] } })
 
     expect(await text(app)).toContain('Disallow: /private\nDisallow: /en/private\n')
   })
 
   it('lists a path in the locale of the host asking, with that host\'s sitemap', async () => {
-    const app = await appWith({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: 'src/messages' }, robots: { disallow: ['/private'] } })
+    const app = await appWith({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], default: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: 'src/messages' }, robots: { disallow: ['/private'] } })
 
     expect(await text(app, 'http://x.com/robots.txt')).toBe('User-agent: *\nAllow: /\nDisallow: /private\n\nSitemap: https://x.com/sitemap.xml\n')
     expect(await text(app, 'http://x.fr/robots.txt')).toContain('Sitemap: https://x.fr/sitemap.xml\n')
@@ -206,14 +206,14 @@ describe('sitemap lastmod', () => {
   }, 60_000)
 
   it('keeps it with the trailing slash, the base and every locale\'s copy', async () => {
-    const xml = await sitemap({ trailingSlash: 'always', base: '/docs', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' } })
+    const xml = await sitemap({ trailingSlash: 'always', base: '/docs', i18n: { locales: ['fr', 'en'], default: 'fr', messages: 'src/messages' } })
 
     expect(xml).toContain('<loc>https://x.example/docs/posts/a/</loc><lastmod>2026-03-04T10:00:00.000Z</lastmod><xhtml:link')
     expect(xml).toContain('<loc>https://x.example/docs/en/posts/a/</loc><lastmod>2026-03-04T10:00:00.000Z</lastmod>')
   })
 
   it('gives each host of a site by domain its own pages with the lastmod', async () => {
-    const xml = await sitemap({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: 'src/messages' } }, 'http://x.com/sitemap.xml')
+    const xml = await sitemap({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], default: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: 'src/messages' } }, 'http://x.com/sitemap.xml')
 
     expect(xml).toContain('<loc>https://x.com/posts/b</loc><lastmod>2026-05-06</lastmod>')
     expect(xml).not.toContain('<loc>https://x.fr')

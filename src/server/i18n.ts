@@ -79,23 +79,22 @@ export function localeSettings(config: I18nConfig): LocaleSettings {
       throw new KayError('locales-invalid', `kay: i18n lists ${locale}, which is no BCP 47 tag such as fr or en-GB`)
   }
 
-  if (!config.locales.includes(config.defaultLocale))
-    throw new KayError('locales-invalid', `kay: i18n's defaultLocale ${config.defaultLocale} is not one of its locales: ${config.locales.join(', ')}`)
+  if (!config.locales.includes(config.default))
+    throw new KayError('locales-invalid', `kay: i18n's default ${config.default} is not one of its locales: ${config.locales.join(', ')}`)
 
-  for (const locale of Object.keys(config.domains ?? {})) {
+  const domains = typeof config.mode === 'object' ? config.mode.domains : undefined
+
+  for (const locale of Object.keys(domains ?? {})) {
     if (!config.locales.includes(locale))
       throw new KayError('locales-invalid', `kay: i18n gives a domain to ${locale}, which is not one of its locales: ${config.locales.join(', ')}`)
   }
 
-  if (config.domains && config.prefixDefault)
-    throw new KayError('locales-invalid', 'kay: i18n gives domains or prefixDefault, not both: with domains a locale has no prefix')
-
-  const homeless = config.domains && config.locales.find(locale => config.domains![locale] === undefined)
+  const homeless = domains && config.locales.find(locale => domains[locale] === undefined)
 
   if (homeless !== undefined)
     throw new KayError('locales-invalid', `kay: i18n gives domains, but none to ${homeless}, which no request could then reach`)
 
-  return { locales: config.locales, defaultLocale: config.defaultLocale, prefixDefault: config.prefixDefault === true, ...config.domains && { hosts: config.domains }, ...config.paths && { paths: translatedPaths(config) } }
+  return { locales: config.locales, defaultLocale: config.default, prefixDefault: config.mode === 'always', ...domains && { hosts: domains }, ...config.paths && { paths: translatedPaths(config) } }
 }
 
 // Each translated path with the params of the page's own, its segments written as a URL carries them.

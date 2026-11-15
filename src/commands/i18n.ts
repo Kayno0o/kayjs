@@ -28,8 +28,8 @@ export const i18nMissing: Command = {
 
     const { root, config, i18n } = project
 
-    if (wanted !== undefined && (!i18n.locales.includes(wanted) || wanted === i18n.defaultLocale)) {
-      printFailure('i18n missing', `${wanted} is not one of the locales translated from ${i18n.defaultLocale}: ${i18n.locales.filter(code => code !== i18n.defaultLocale).join(', ')}`, format)
+    if (wanted !== undefined && (!i18n.locales.includes(wanted) || wanted === i18n.default)) {
+      printFailure('i18n missing', `${wanted} is not one of the locales translated from ${i18n.default}: ${i18n.locales.filter(code => code !== i18n.default).join(', ')}`, format)
 
       return 1
     }

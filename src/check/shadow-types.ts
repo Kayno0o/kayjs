@@ -38,6 +38,7 @@ import { aiLanguage } from './ai-language'
 import { appHooks } from './app-hooks'
 import { authRateLimits } from './auth-rate-limits'
 import { clientKeys } from './client-keys'
+import { configGroups } from './config-groups'
 import { cmsOptions } from './cms-options'
 import { configSwitches } from './config-switches'
 import { contextImport } from './context-import'
@@ -55,7 +56,7 @@ import { guardOptions } from './guard-options'
 import { unguardedRoutes, unguardedTools } from './guards'
 import { hookContext } from './hook-context'
 import { hookNames } from './hook-names'
-
+import { i18nKeys } from './i18n-keys'
 import { imagesKeys } from './images-keys'
 
 import { islandOnlyComponents } from './island-only'
@@ -213,6 +214,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => configSwitches(root, options),
   async ({ root, options }) => imagesKeys(root, options),
   async ({ root, options }) => clientKeys(root, options),
+  async ({ root, options }) => configGroups(root, options),
+  async ({ root, options }) => i18nKeys(root, options),
   async ({ root, options }) => appHooks(root, options),
   async ({ root, options }) => hookContext(root, options),
   async ({ root, options }) => pagesOptions(root, options),

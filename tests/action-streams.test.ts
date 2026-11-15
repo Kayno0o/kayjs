@@ -14,7 +14,7 @@ import { untilHolds } from './helpers/until-holds'
 
 const site = await testSite({ root: 'tests/fixtures/action-streams', browser: true, mcp: true })
 const mounted = await testSite({ root: 'tests/fixtures/action-streams', islands: false, base: '/blog', trailingSlash: 'always' })
-const localized = await testSite({ root: 'tests/fixtures/action-streams', islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
+const localized = await testSite({ root: 'tests/fixtures/action-streams', islands: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
 const fixture = join(import.meta.dir, 'fixtures/action-streams/src')
 const actions = await import(join(fixture, 'routes/index.kay')) as {
   count: Action<{ to: number }, AsyncIterable<number>>

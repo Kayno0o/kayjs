@@ -144,7 +144,7 @@ async function asDictionary(site: Site, pathname: string, headers: Record<string
 beforeAll(async () => {
   const [root, mounted, plain, restricted] = await Promise.all([
     project('export default {}\n'),
-    project('export default { base: \'/repo\', trailingSlash: \'always\', i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n', true),
+    project('export default { base: \'/repo\', trailingSlash: \'always\', i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }\n', true),
     project('export default { serve: { compress: false } }\n'),
     project('export default { security: { csp: { \'connect-src\': [\'https://api.example.com\'] } } }\n'),
   ])

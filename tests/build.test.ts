@@ -1068,7 +1068,7 @@ describe('kay build checks the project first', () => {
   const documentedSpawned = documentedIn(kayBuildSpawned)
 
   it('lints the heads of the pages it prerenders on a public site, failing on a lint the config denies', async () => {
-    const config = (lints: string) => `export default { site: 'https://example.com', favicon: false, seo: { image: '/og.png' }, lints: ${lints} }\n`
+    const config = (lints: string) => `export default { site: 'https://example.com', assets: { favicon: false }, seo: { image: '/og.png' }, lints: ${lints} }\n`
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
       'kay.config.ts': config('{ \'missing-description\': \'allow\', \'unsized-share-image\': \'allow\', \'unstructured-page\': \'allow\' }'),
@@ -1102,7 +1102,7 @@ describe('kay build checks the project first', () => {
   }, 60_000)
 
   it('lints what the prerendered pages say of one another: a page nothing reaches, a redirect chain, a canonical to a redirect', async () => {
-    const config = (lints: string) => `export default { site: 'https://example.com', favicon: false, seo: { description: 'The site' }, redirects: { '/old': '/mid', '/mid': '/about' }, lints: ${lints} }\n`
+    const config = (lints: string) => `export default { site: 'https://example.com', assets: { favicon: false }, seo: { description: 'The site' }, redirects: { '/old': '/mid', '/mid': '/about' }, lints: ${lints} }\n`
     const page = (title: string, body: string, head = '') => `--- server\nexport const page = { prerender: true${body.startsWith('//') ? ', seo: { sitemap: false }' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${head}${body.replace(/^\/\//, '')}`
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
@@ -1136,7 +1136,7 @@ describe('kay build checks the project first', () => {
   it('has the hreflang alternates and canonical links of a localized site point at each other', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { site: \'https://example.com\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\' }, i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', messages: \'src/messages\' } }\n',
+      'kay.config.ts': 'export default { site: \'https://example.com\', assets: { favicon: false }, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\' }, i18n: { locales: [\'en\', \'fr\'], default: \'en\', messages: \'src/messages\' } }\n',
       'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'About\' })\n',
       'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'A propos\' })\n',
       'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\n\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Home page")\na(href="/about") {t(\'title\')}\n',
@@ -1158,7 +1158,7 @@ describe('kay build checks the project first', () => {
     const page = (title: string, body: string, unlisted = false) => `--- server\nexport const page = { prerender: true${unlisted ? ', seo: { sitemap: false }' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${body}`
     const files = {
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\', \'unsized-share-image\': \'allow\' } }\n',
+      'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', assets: { favicon: false }, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\', \'unsized-share-image\': \'allow\' } }\n',
       'src/routes/index.kay': page('Home', 'a(href="/blog") Blog\n'),
       'src/routes/blog/index.kay': page('Blog', 'a(href="post") Post\n'),
       'src/routes/blog/post.kay': page('Post', 'p Post\n', true),
@@ -1183,7 +1183,7 @@ describe('kay build checks the project first', () => {
     const page = (title: string, body: string, unlisted = false) => `--- server\nexport const page = { prerender: true${unlisted ? ', seo: { sitemap: false }' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${body}`
     const files = {
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\', \'unsized-share-image\': \'allow\' }, extensions: [{ name: \'lib\', routes: { dir: \'lib/routes\', prefix: \'/auth\' } }] }\n',
+      'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', assets: { favicon: false }, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\', \'unsized-share-image\': \'allow\' }, extensions: [{ name: \'lib\', routes: { dir: \'lib/routes\', prefix: \'/auth\' } }] }\n',
       'lib/routes/sign-in.kay': 'head\n  title Sign in\n  meta(name="description" content="Sign in")\nform(method="post")\n  button Sign in\n',
       'lib/routes/account/[id].kay': 'head\n  title Account\n  meta(name="description" content="Account")\np Account\n',
       'src/routes/index.kay': page('Home', 'a(href="/blog") Blog\n'),
@@ -1231,7 +1231,7 @@ describe('kay build checks the project first', () => {
     it('gives what the check found in its shape, and the check as the stage that stopped the build', async () => {
       const root = await scratchProject({
         'tsconfig.json': tsconfig,
-        'kay.config.ts': 'export default { favicon: false }\n',
+        'kay.config.ts': 'export default { assets: { favicon: false } }\n',
         'src/routes/index.kay': '--- server\nconst n: number = \'one\'\n---\np {n}\n',
       })
 
@@ -1252,7 +1252,7 @@ describe('kay build checks the project first', () => {
     it('names the bundle as the stage a browser build plugin ended the process in under --no-check, failing an exit code 0', async () => {
       const root = await scratchProject({
         'tsconfig.json': tsconfig,
-        'kay.config.ts': 'import process from \'node:process\'\n\nexport default { favicon: false, plugins: [{ name: \'quit\', setup() { process.exit(0) } }] }\n',
+        'kay.config.ts': 'import process from \'node:process\'\n\nexport default { assets: { favicon: false }, plugins: [{ name: \'quit\', setup() { process.exit(0) } }] }\n',
         'src/routes/index.kay': 'h1 Home\n',
       })
 
@@ -1278,7 +1278,7 @@ describe('kay build checks the project first', () => {
 
     it('annotates a template that does not compile under --format github, at its place', async () => {
       const root = await scratchProject({
-        'kay.config.ts': 'export default { favicon: false }\n',
+        'kay.config.ts': 'export default { assets: { favicon: false } }\n',
         'src/routes/index.kay': 'p Home\neach x in y\n  p {x}\n',
       })
 
@@ -1444,7 +1444,7 @@ describe('kay build checks the project first', () => {
     })
     // The warnings the build answers with and the ones it logs, in a process of its own as the prerender registers the .kay loader.
     const warnings = async (options: BuildOptions) => {
-      const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\nconst { checked } = await buildProject(${JSON.stringify(root)}, { favicon: 'src/favicon.svg' }, ${JSON.stringify(options)})\n\nconsole.log(JSON.stringify(checked.map(diagnostic => diagnostic.message)))\n`
+      const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\nconst { checked } = await buildProject(${JSON.stringify(root)}, { assets: { favicon: 'src/favicon.svg' } }, ${JSON.stringify(options)})\n\nconsole.log(JSON.stringify(checked.map(diagnostic => diagnostic.message)))\n`
       const child = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
       const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
@@ -2041,7 +2041,7 @@ describe('a compiled server\'s errors', () => {
     const root = await scratchProject({
       'package.json': JSON.stringify({ name: 'exe-errors', private: true, dependencies: { elysia: '*' } }),
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { favicon: false }\n',
+      'kay.config.ts': 'export default { assets: { favicon: false } }\n',
       'node_modules/kaylib/package.json': JSON.stringify({ name: 'kaylib', version: '1.0.0', exports: { './*': './*' } }),
       'node_modules/kaylib/lib-box.kay': throwing('library'),
       'src/plain.kay': throwing('plain'),
@@ -2950,7 +2950,7 @@ describe('a compiled server\'s images', () => {
   it('encodes and decodes AVIF at run time with the coders the executable carries', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { favicon: false, images: { dirs: { \'/uploads/\': \'uploads\' } } }\n',
+      'kay.config.ts': 'export default { assets: { favicon: false }, images: { dirs: { \'/uploads/\': \'uploads\' } } }\n',
       'src/routes/index.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero, { sizes: \'100vw\' })} alt="Hero")\n',
       // 48 pixels wide is no width the build writes, so the server encodes it on the first request.
       'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\nconst src = /src=(%2F_kay%2Fassets%2F[^&]+)&amp;/.exec(page)![1]\nconst response = await app.handle(new Request(`http://localhost/_kay/images?src=${src}&w=48`, { headers: { accept: \'image/avif\' } }))\nconst bytes = new Uint8Array(await response.arrayBuffer())\nawait Bun.write(\'uploads/a.avif\', bytes)\nconst decoded = await app.handle(new Request(\'http://localhost/_kay/images?src=/uploads/a.avif&w=32\'))\n\nconsole.log(JSON.stringify({ status: response.status, type: response.headers.get(\'content-type\'), brand: new TextDecoder().decode(bytes.subarray(8, 12)), decoded: decoded.status }))\nprocess.exit(0)\n',
@@ -2977,7 +2977,7 @@ describe('a stylesheet imported as text', () => {
   it('reads the file under Bun, in the executable and in an island, types as a string in kay check, and stays out of the page\'s stylesheets', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { favicon: false }\n',
+      'kay.config.ts': 'export default { assets: { favicon: false } }\n',
       'src/theme.css': ':root { --brand: #123456 }\n.themed { color: red }\n',
       'src/app.css': '.app { color: blue }\n',
       'src/later.css': '.later { color: green }\n',

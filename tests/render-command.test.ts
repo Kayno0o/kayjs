@@ -211,7 +211,7 @@ describe('kay render with trailingSlash', () => {
 
 describe('kay render with locales', () => {
   it('renders the page in the locale its path names', async () => {
-    const dir = await project(`{ i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } }`)
+    const dir = await project(`{ i18n: { locales: ['fr', 'en'], default: 'fr' } }`)
 
     await mkdir(join(dir, 'src', 'messages'))
     await Promise.all(['fr', 'en'].map(async locale => writeFile(join(dir, 'src', 'messages', `${locale}.ts`), `import { defineMessages } from 'kay/i18n'\n\nexport default defineMessages({})\n`)))

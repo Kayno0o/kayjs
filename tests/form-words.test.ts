@@ -12,7 +12,7 @@ type Rules = Record<string, { properties: Record<string, { error?: string }> }>
 const FIXTURE = 'tests/fixtures/form-words'
 const FORMS = /<script type="application\/json" data-kay-forms>(.*?)<\/script>/
 const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(process.cwd()), navigation: true }
-const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: `${FIXTURE}/src/messages` }
+const i18n = { locales: ['en', 'fr'], default: 'en', messages: `${FIXTURE}/src/messages` }
 const app = await servePages(resolveProject(process.cwd(), { dirs: { routes: `${FIXTURE}/src/routes` }, security: false, i18n }), async () => client)
 
 async function rules(path: string): Promise<Rules[string]> {

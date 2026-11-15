@@ -66,7 +66,7 @@ A string reads as a fixed text of 32 characters, or the field's `minLength`. A s
 
 A module that cannot load fails the build with the executable's output, as `--verify` does. It cannot catch what your server entry does at startup, so keep `--verify` where the real environment is.
 
-With `health: false`, any answer on the port counts and `--health` is not run.
+With `ops: { health: false }`, any answer on the port counts and `--health` is not run.
 
 <ReadMore href="/llms/production#check-the-executable-starts">The exact failure conditions, the process group and the Linux socket check are in the full production reference.</ReadMore>
 
@@ -103,7 +103,7 @@ The runtime, Postgres and nginx images are pinned by digest (the build stage by 
 
 Its `compose.prod.yaml` drops every Linux capability of the app and forbids a privilege gain (`cap_drop: [ALL]`, `no-new-privileges`), and the Postgres `migrate` service does the same; `db` keeps only the five capabilities its entrypoint needs. It publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS, and its `kay.config.ts` sets `proxy: true` so that rate limits count each visitor.
 
-The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. It waits as long as `health.timeout` says, but the `HEALTHCHECK --timeout=6s` above cuts it off, so raise its `--timeout` yourself when you raise `health.timeout` past 5 s.
+The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. It waits as long as `ops.health.timeout` says, but the `HEALTHCHECK --timeout=6s` above cuts it off, so raise its `--timeout` yourself when you raise `ops.health.timeout` past 5 s.
 
 Its compose also requires `SITE_URL`, which `.env.example` lists. Without an https `SITE_URL` production sends no HSTS and writes no canonical URLs.
 
@@ -160,11 +160,11 @@ Keep your HTML pages revalidating in any cache in front of the server, as kay's 
 
 ```ts
 export default defineConfig({
-  health: { path: '/up', check: async () => await db.ping() },
+  ops: { health: { path: '/up', check: async () => await db.ping() } },
 })
 ```
 
-The check runs at most once every three seconds, however often the route is polled, and the probes in between get its last answer. A store in `store` that has a `ping` is checked beside it, as `pgData` is with a round trip to the database, and a store that fails or takes longer than `health.timeout` makes the route answer 503.
+The check runs at most once every three seconds, however often the route is polled, and the probes in between get its last answer. A store in `store` that has a `ping` is checked beside it, as `pgData` is with a round trip to the database, and a store that fails or takes longer than `ops.health.timeout` makes the route answer 503.
 
 On SIGTERM, SIGINT or SIGHUP the server stops taking connections, lets open requests finish and ends the event streams and websockets that never would, such as live values and presence, so browsers reconnect to the next instance. It then calls the `close` of each store, so a replica leaves no presence member and no connection behind.
 
@@ -241,7 +241,7 @@ Their lines start with their name, `kayjs-mail: ...`, and carry it as `from` in 
 
 ### Metrics
 
-`metrics: true` in `kay.config.ts` serves `/metrics` in the Prometheus text format, for Prometheus or any compatible collector. It counts requests by method, route and status with their durations, scheduled runs, cache reads and open live connections. `metrics: { path }` moves it.
+`ops: { metrics: true }` in `kay.config.ts` serves `/metrics` in the Prometheus text format, for Prometheus or any compatible collector. It counts requests by method, route and status with their durations, scheduled runs, cache reads and open live connections. `metrics: { path }` moves it.
 
 Metrics are never public by default. Only a request that reached the server from this machine or a private network, such as a collector in the same Docker network, and that no proxy forwarded is answered. Every other gets 403. Do not forward `/metrics` from your reverse proxy: one that sets no `X-Forwarded-For` cannot be told from a collector.
 
@@ -257,7 +257,7 @@ Set `tracer` to an OpenTelemetry tracer from the `@opentelemetry/api` and SDK th
 import { trace } from '@opentelemetry/api'
 
 export default defineConfig({
-  observe: { log: { format: 'json' }, tracer: trace.getTracer('my-site') },
+  ops: { observe: { log: { format: 'json' }, tracer: trace.getTracer('my-site') } },
 })
 ```
 
@@ -265,7 +265,7 @@ Each page request becomes a span named after its route, with one span per load a
 
 A request that carries a `traceparent` header joins the caller's trace, so a call from another service shows as one trace. Kay reads the header itself. The response sends `traceresponse` with the trace id, and the JSON log lines of the request carry it as `trace`, so a log line leads to its trace.
 
-To read another format, set `observe.extract` to a function from the request's headers to an OpenTelemetry context, such as `headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. Set it to `false` to ignore incoming traces, which a public edge should do, as anyone can send a `traceparent` that asks for sampling.
+To read another format, set `ops.observe.extract` to a function from the request's headers to an OpenTelemetry context, such as `headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. Set it to `false` to ignore incoming traces, which a public edge should do, as anyone can send a `traceparent` that asks for sampling.
 
 `observe: { serverTiming: true }` sends a `Server-Timing` header with the time of the guards, the module imports, the loads and the render. Development always does. It covers every page rendered per request, and the server islands of a prerendered one. Actions, endpoints and API routes send it too, with the time of their guards and their handler.
 

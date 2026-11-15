@@ -573,7 +573,7 @@ describe('renderToString', () => {
     const project = join(scratch, 'localized')
 
     await Promise.all([
-      Bun.write(join(project, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n'),
+      Bun.write(join(project, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }\n'),
       Bun.write(join(project, 'src/messages/en.ts'), 'export default { hello: \'Hello {name}\', only: \'English only\' }\n'),
       Bun.write(join(project, 'src/messages/fr.ts'), 'export default { hello: \'Bonjour {name}\' }\n'),
     ])

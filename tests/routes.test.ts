@@ -20,7 +20,7 @@ describe('kay routes', () => {
       'import { Elysia } from \'elysia\'\n',
       'const lib = { name: \'lib\', appFiles: { words: \'src/words.ts\' }, api: { dir: \'lib/api\', prefix: \'lib\' }, server: new Elysia().get(\'/hooked\', () => 1) }',
       'const built = { name: \'built\', server: () => new Elysia() }\n',
-      'export default { requireGuards: true, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', status: 307 }, \'/gone\': { to: \'/\', status: 301 }, \'/retired\': { status: 410 } } }\n',
+      'export default { requireGuards: true, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], default: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', status: 307 }, \'/gone\': { to: \'/\', status: 301 }, \'/retired\': { status: 410 } } }\n',
     ]
 
     await Promise.all([
@@ -122,7 +122,7 @@ describe('kay routes', () => {
     const root = await scratchDir('routes-domains-')
 
     await Promise.all([
-      Bun.write(join(root, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', domains: { en: \'example.com\', fr: \'example.fr\' }, paths: { \'/about\': { fr: \'/a-propos\' } } } }\n'),
+      Bun.write(join(root, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\', domains: { en: \'example.com\', fr: \'example.fr\' }, paths: { \'/about\': { fr: \'/a-propos\' } } } }\n'),
       Bun.write(join(root, 'src/routes/about.kay'), 'h1 About\n'),
     ])
 
@@ -451,7 +451,7 @@ describe('the dev tool\'s i18n tab data', () => {
     expect((await request({ i18n, base: '/shop' }, '/')).locales).toEqual([{ locale: 'en', href: '/shop/' }, { locale: 'fr', href: '/shop/fr' }])
     expect((await request({ i18n: { ...i18n, domains: { en: 'example.com', fr: 'example.fr' } } }, '/')).locales).toEqual([{ locale: 'en', href: '//example.com/' }, { locale: 'fr', href: '//example.fr/' }])
     expect((await request({}, '/')).locales).toBeUndefined()
-    expect((await request({ i18n: { locales: ['en'], defaultLocale: 'en', messages: MESSAGES } }, '/')).locales).toBeUndefined()
+    expect((await request({ i18n: { locales: ['en'], default: 'en', messages: MESSAGES } }, '/')).locales).toBeUndefined()
   })
 })
 

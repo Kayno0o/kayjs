@@ -22,7 +22,7 @@ describe('routeTable', () => {
   it('serves each route under each locale\'s path, its untranslated path sending there, and reads an action\'s params under any of them', () => {
     const org = served('orgs/[org].kay')
     const about = served('about.kay')
-    const settings = localeSettings({ locales: ['en', 'fr'], defaultLocale: 'en', paths: { '/orgs/:org': { fr: '/organisations/:org' } } })
+    const settings = localeSettings({ locales: ['en', 'fr'], default: 'en', paths: { '/orgs/:org': { fr: '/organisations/:org' } } })
     const table = routeTable([org, about], settings)
 
     expect([...table.paths.keys()].sort()).toEqual(['/about', '/fr/about', '/fr/organisations/:p3', '/fr/orgs/:p3', '/orgs/:p2'])
@@ -39,14 +39,14 @@ describe('routeTable', () => {
     expect(match.posted(about, '/orgs/acme')).toBeUndefined()
     expect(match.served(org)).toBe('/orgs/:org')
 
-    const prefixed = routeMatch(routeTable([about], localeSettings({ locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: true })), new Map())
+    const prefixed = routeMatch(routeTable([about], localeSettings({ locales: ['en', 'fr'], default: 'en', mode: 'always' })), new Map())
 
     expect(prefixed.posted(about, '/about')).toEqual({ params: {}, path: undefined })
     expect(prefixed.posted(about, '/en/about')).toEqual({ params: {}, path: '/en/about' })
     expect(prefixed.served(about)).toBe('/en/about')
 
     const rest = served('[...path].kay')
-    const caught = routeMatch(routeTable([rest], localeSettings({ locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: true })), new Map())
+    const caught = routeMatch(routeTable([rest], localeSettings({ locales: ['en', 'fr'], default: 'en', mode: 'always' })), new Map())
 
     expect(caught.posted(rest, '/en/docs/x')).toEqual({ params: { path: 'docs/x' }, path: '/en/docs/x' })
   })

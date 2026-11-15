@@ -111,7 +111,7 @@ const DISK: ProjectSource = {
 
 export function embeddedSource(bundle: Bundle): ProjectSource {
   // The modules the build found declaring `s.Public` make the executable send the browser an environment.
-  const publicConfig = (bundle.publicModules?.length ?? 0) > 0 ? { ...bundle.config, publicEnv: true } : bundle.config
+  const publicEnv = (bundle.publicModules?.length ?? 0) > 0
 
   return {
     embedded: true,
@@ -119,7 +119,9 @@ export function embeddedSource(bundle: Bundle): ProjectSource {
     root: () => bundle.root,
     // The root, routes and public files it was built with win over the options.
     config: async (_, options) => {
-      const merged = mergeConfig(publicConfig, await resolveConfig(options) as KayConfig & Omit<typeof options, keyof ConfigInput>)
+      // The config the executable imported is the file's, its keys as written, so it is resolved as a loaded one is.
+      const own = await resolveConfig(bundle.config as ConfigInput) as KayConfig
+      const merged = mergeConfig(publicEnv ? { ...own, publicEnv: true } as KayConfig : own, await resolveConfig(options) as KayConfig & Omit<typeof options, keyof ConfigInput>)
 
       return { ...merged, root: bundle.root, dirs: { ...merged.dirs, public: bundle.publicDir } }
     },

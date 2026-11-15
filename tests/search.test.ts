@@ -62,7 +62,7 @@ describe('search', () => {
   beforeAll(async () => {
     root = await scratchDir('search-')
     await Promise.all([
-      Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false, requireGuards: false, search: true, i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n'),
+      Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { favicon: false }, requireGuards: false, search: true, i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }\n'),
       Bun.write(join(root, 'src/messages/en.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ hello: \'Hello world\' })\n'),
       Bun.write(join(root, 'src/messages/fr.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ hello: \'Bonjour le monde\' })\n'),
       Bun.write(join(root, 'src/routes/_layout.kay'), 'nav\n  a(href="/") Menu everywhere\nmain\n  slot\n'),
@@ -137,7 +137,7 @@ describe('search', () => {
 
     try {
       await Promise.all([
-        Bun.write(join(bad, 'kay.config.ts'), 'export default { favicon: false, requireGuards: false, search: true }\n'),
+        Bun.write(join(bad, 'kay.config.ts'), 'export default { assets: { favicon: false }, requireGuards: false, search: true }\n'),
         Bun.write(join(bad, 'src/routes/[slug].kay'), `--- server\nexport const page = { prerender: [{ slug: 'a' }], search: () => ({ weight: -1 }) }\n---\nh1 Bad\n`),
       ])
       const child = Bun.spawn([process.execPath, CLI, 'build', bad, '--no-check'], { stdout: 'pipe', stderr: 'pipe' })
@@ -207,7 +207,7 @@ describe('search', () => {
 
     try {
       await Promise.all([
-        Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, requireGuards: false, search: true, trailingSlash: \'always\', base: \'/docs\' }\n'),
+        Bun.write(join(site, 'kay.config.ts'), 'export default { assets: { favicon: false }, requireGuards: false, search: true, trailingSlash: \'always\', base: \'/docs\' }\n'),
         Bun.write(join(site, 'src/routes/about.kay'), `--- server\n${PRERENDER}\n---\nh1 About\nh2#team The team\np Teamword\n`),
       ])
       await build(site)
@@ -228,7 +228,7 @@ describe('search', () => {
 
       try {
         await Promise.all([
-          Bun.write(join(site, 'kay.config.ts'), `export default { favicon: false, requireGuards: false, ${config} }\n`),
+          Bun.write(join(site, 'kay.config.ts'), `export default { assets: { favicon: false }, requireGuards: false, ${config} }\n`),
           Bun.write(join(site, 'src/components/counter.kay'), '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n'),
           Bun.write(join(site, 'src/routes/index.kay'), '---\nimport Counter from \'../components/counter.kay\'\n---\nh1 Home\nCounter\n'),
         ])
@@ -295,7 +295,7 @@ describe('search', () => {
 
     try {
       await Promise.all([
-        Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, search: true, requireGuards: true, trailingSlash: \'always\' }\n'),
+        Bun.write(join(site, 'kay.config.ts'), 'export default { assets: { favicon: false }, search: true, requireGuards: true, trailingSlash: \'always\' }\n'),
         Bun.write(join(site, 'src/routes/pricing.kay'), `--- server\n${PRERENDER}\n---\nh1 Pricing\np Pricingword\n`),
         Bun.write(join(site, 'src/routes/about.kay'), '--- server\nexport const page = { prerender: true, guards: false }\n---\nh1 About\np Aboutword\n'),
       ])
@@ -316,7 +316,7 @@ describe('search', () => {
 
     try {
       await Promise.all([
-        Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, requireGuards: false, search: true }\n'),
+        Bun.write(join(site, 'kay.config.ts'), 'export default { assets: { favicon: false }, requireGuards: false, search: true }\n'),
         Bun.write(join(site, 'src/components/finder.kay'), '---\nimport { searchResults, signal } from \'kay\'\n\nconst query = signal(\'\')\nconst { hits } = searchResults(query)\n---\ninput(aria-label="Search" bind:value={query})\nfor hit of hits() key={bare(hit.href)}\n  a(href={bare(hit.href)}) {hit.page}\n'),
         Bun.write(join(site, 'src/routes/index.kay'), '---\nimport Finder from \'../components/finder.kay\'\n---\nh1 Home\np Staticword\nFinder\n'),
       ])

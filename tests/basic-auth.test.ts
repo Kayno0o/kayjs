@@ -148,7 +148,7 @@ describe('basicAuth as a guard of a directory', () => {
     ])
     plain = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
     mounted = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, base: '/blog', trailingSlash: 'always' })
-    localized = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+    localized = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

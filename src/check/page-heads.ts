@@ -47,7 +47,7 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
   const found: CheckDiagnostic[] = []
   const report = lintReporter(options, exported, found)
   // A source read gives no locale, so a per-locale default reads the default locale's text.
-  const defaultLocale = options.i18n?.defaultLocale
+  const defaultLocale = options.i18n?.default
   const siteName = localizedText(options.seo?.name, undefined, defaultLocale)
   const titleTemplate = localizedText(options.seo?.titleTemplate, undefined, defaultLocale)
   const siteImage = localizedText(options.seo?.image, undefined, defaultLocale)

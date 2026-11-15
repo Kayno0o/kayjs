@@ -1,4 +1,4 @@
-import type { ExtensionApp } from '../config'
+import type { ExtensionApp, KayConfig } from '../config'
 import type { Collection } from '../content'
 import type { Project } from '../project'
 import type { LocaleSettings } from '../runtime/i18n'
@@ -108,12 +108,18 @@ export async function setupPages<Claimed = undefined>(project: Project, loadClie
   }
 }
 
+// The groups of the config the setup reads from: the images, the fonts and what `ops` observes.
+function featureSettings(config: KayConfig): NonNullable<KayConfig['assets']> & { observe?: NonNullable<KayConfig['ops']>['observe'] } {
+  return { ...config.assets, observe: config.ops?.observe }
+}
+
 async function setupWith<Claimed>(project: Project, loadClient: () => Promise<ClientBuild>, prerendering: boolean, redirectSpelling: RenderOptions['redirectSpelling'], refuse: ((scanned: Scanned) => Claimed) | undefined, exporting: boolean): Promise<PageSetup & { claimed: Claimed }> {
   const { root, config, paths, mode } = project
+  const { images, fonts: listedFonts, observe } = featureSettings(config)
   const source = projectSource()
   const mounts = routeMounts(root, config.extensions, !source.embedded)
   // Drawn while the project is scanned, unless a build or an executable holds the drawing; a logo kay cannot draw refuses the config before the build starts.
-  const logoFile = config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo)
+  const logoFile = images?.card?.logo === undefined ? undefined : resolve(root, images.card.logo)
   const logoDrawn = logoFile !== undefined && !source.embedded && !mode.prebuilt ? drawLogo(logoFile) : undefined
 
   void Promise.allSettled([logoDrawn])
@@ -145,7 +151,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   serveLocales(root, locales)
   setTimeZone(config.timeZone)
   const base = basePath(config.base)
-  const maxDensity = await applyImageConfig(config.images, config.security === false || allowsStyleAttributes(bagOf(config.security)?.csp, bagOf(config.security)?.reportOnly))
+  const maxDensity = await applyImageConfig(images, config.security === false || allowsStyleAttributes(bagOf(config.security)?.csp, bagOf(config.security)?.reportOnly))
   const site = siteWithBase(config.site, config.base)
 
   // Holds copies of private files and their variants, so only this user may enter it.
@@ -166,7 +172,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   if (!prerendering) {
     setupStampSecret(config.secret)
     setupPreview(config.preview, base)
-    setTracer(config.observe?.tracer, config.observe?.extract)
+    setTracer(observe?.tracer, observe?.extract)
     setupStorage(configuredFiles(config), join(imageCache, 'stored'), imageCache)
     setAppRoot(root)
     // An export serves nobody, so it keeps only the database url libraries read and none of the stores: a pgData store would otherwise poll, open its connection and create its tables while the build runs, and a build with no database reachable still ends.
@@ -190,7 +196,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   const [files, endpoints] = await scanning
   const ownManifest = appServesManifest(files, endpoints, routes)
 
-  checkCardConfig(config.images?.card, config.fonts)
+  checkCardConfig(images?.card, listedFonts)
   await logoDrawn
 
   const collections = await loadingCollections
@@ -224,7 +230,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   const headAndCards = async () => {
     const { fonts, ...head } = await configHead(root, config, client.dir, source.embedded, ownManifest)
 
-    return { ...head, fontCss: fonts?.css, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: logoFile, logoDrawn, name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.formats?.quality, variants: { aspects: config.images?.aspects, avif: config.images?.formats?.avif }, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering, template: cardPage && { file: cardPage.file, styles: client.styles.get(cardPage.file), root } }) }
+    return { ...head, fontCss: fonts?.css, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: images?.card, logo: logoFile, logoDrawn, name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.assets?.images?.formats?.quality, variants: { aspects: config.assets?.images?.aspects, avif: config.assets?.images?.formats?.avif }, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering, template: cardPage && { file: cardPage.file, styles: client.styles.get(cardPage.file), root } }) }
   }
 
   const { head, scripts, styles, cards, fontCss } = await headAndCards()

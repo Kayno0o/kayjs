@@ -23,7 +23,7 @@ describe('an island of an app with locales', () => {
     await Bun.write(join(copy, 'src/components/clicks.kay'), '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(type="button" onClick={() => count.set(value => value + 1)}) Clicked {count()}\n')
     await Bun.write(join(copy, 'src/routes/clicks.kay'), '---\nimport Clicks from \'../components/clicks.kay\'\n---\nh1 Clicks\nClicks\n')
 
-    const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }
+    const i18n: I18nConfig = { locales: ['fr', 'en'], default: 'fr', messages: 'src/messages' }
 
     // The French spacing of an island's text has its own budget, in tests/typography-islands.test.ts.
     site = await testSite({ root: copy, i18n, client: { typography: false }, browser: { path: chrome } })

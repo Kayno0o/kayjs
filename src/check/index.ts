@@ -1,6 +1,6 @@
 import type { Diagnostic } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
-import type { InternalConfig, KayConfig, LoadedConfig, ObserveConfig } from '../config'
+import type { InternalConfig, KayConfig, LoadedConfig, ObserveConfig, OpsConfig } from '../config'
 import type { TypeScope } from './diagnose'
 import type { ProbeMemory } from './project'
 import type { ShadowFile } from './shadow'
@@ -51,10 +51,9 @@ export const CHECK_CONFIG = [
   // Where the site is mounted and the origin it is public at, which the server refuses at boot when it cannot read them.
   'base',
   'site',
-  // The settings with a value the server refuses at boot when it cannot read it: the request id header lies in `observe`.
-  'health',
+  // The settings with a value the server refuses at boot when it cannot read it: the request id header lies in `ops.observe`, and the health route in `ops.health`.
+  'ops',
   'live',
-  'observe',
   'timeZone',
   'budget',
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
@@ -63,12 +62,9 @@ export const CHECK_CONFIG = [
   'lang',
   // The level of each lint, over its default.
   'lints',
-  // What a public site's head starts from, which the `seo` lints read, its favicon, and the maskable icon checked with it.
+  // What a public site's head starts from, which the `seo` lints read, and the favicon with the maskable icon checked with it, the manifest, and where `assets.images.card.logo` is checked as the boot draws it.
   'seo',
-  'favicon',
-  'manifest',
-  // Where `images.card.logo` is checked as the boot draws it.
-  'images',
+  'assets',
   // Reports each route of the app no guard covers, which the server refuses.
   'requireGuards',
   'guards',
@@ -78,9 +74,9 @@ export const CHECK_CONFIG = [
   'openapi',
 ] as const satisfies readonly (keyof KayConfig)[]
 
-export interface CheckOptions extends Omit<Pick<KayConfig, (typeof CHECK_CONFIG)[number]>, 'observe'>, InternalConfig {
-  // Only the request id header and the load budget are checked, so the rest of the bag is not carried.
-  observe?: Pick<ObserveConfig, 'requestIdHeader' | 'loadBudget'> | undefined
+export interface CheckOptions extends Omit<Pick<KayConfig, (typeof CHECK_CONFIG)[number]>, 'ops'>, InternalConfig {
+  // Only the health route, the request id header and the load budget are checked, so the rest of the bags is not carried.
+  ops?: { health?: OpsConfig['health'], observe?: Pick<ObserveConfig, 'requestIdHeader' | 'loadBudget'> | undefined } | undefined
   tsconfig?: string | undefined
   // The database url of the app's `store`, where the redirects added while the site runs may be kept.
   storeDatabase?: string | undefined
@@ -113,9 +109,10 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
 
 // The loaded config's `publicEnv` goes along, as no app key: `kay check` claims `/_kay/env.js` when it is set.
 export function configCheckOptions(config: LoadedConfig): CheckOptions {
-  const { observe, ...picked } = pickConfig(config, CHECK_CONFIG)
+  const { ops, ...picked } = pickConfig(config, CHECK_CONFIG)
+  const { observe } = ops ?? {}
 
-  return { ...picked, ...config.store?.database !== undefined && { storeDatabase: config.store.database }, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader, loadBudget: observe.loadBudget } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
+  return { ...picked, ...config.store?.database !== undefined && { storeDatabase: config.store.database }, ...ops !== undefined && { ops: { health: ops.health, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader, loadBudget: observe.loadBudget } } } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

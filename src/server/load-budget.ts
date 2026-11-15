@@ -23,7 +23,7 @@ export function warnAboutLoads(file: string, files: string[], timings: number[] 
 
 // In development, a layout whose load takes longer than the page's own loads, and than `observe.loadBudget`, is warned of in the log and the dev tool, naming its file and both times: the page waits for it as long as the layout does.
 function warnSlowLayout(files: string[], timings: number[] | undefined, rendering: Rendering, options: RenderOptions): void {
-  const budget = loadBudgetMs(options.observe?.loadBudget)
+  const budget = loadBudgetMs(options.ops?.observe?.loadBudget)
 
   if (budget === undefined || timings === undefined || files.length < 2)
     return
@@ -47,7 +47,7 @@ function warnSlowLayout(files: string[], timings: number[] | undefined, renderin
 
 // In development, a page whose loads together outlast `observe.loadBudget` is warned of in the log and the dev tool, naming the slowest load: the page waits for them all before anything is sent.
 export function warnSlowLoads(file: string, files: string[], timings: number[] | undefined, took: number, rendering: Rendering, options: RenderOptions): void {
-  const budget = loadBudgetMs(options.observe?.loadBudget)
+  const budget = loadBudgetMs(options.ops?.observe?.loadBudget)
 
   if (budget === undefined || timings === undefined || took <= budget)
     return

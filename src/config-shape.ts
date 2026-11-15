@@ -1,5 +1,5 @@
 import type { BudgetConfig } from './build/budget'
-import type { ActionsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DirsConfig, FaviconConfig, HealthConfig, I18nConfig, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveInput, OfflineConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
+import type { ActionsConfig, AssetsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DirsConfig, FaviconConfig, HealthConfig, I18nInput, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveInput, OfflineConfig, OpsConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
 import type { Rule } from './config-rules'
 import { bag, bool, bytes, duration, either, fn, isRecord, list, lit, map, num, numOrInfinity, obj, oneOf, str, typedKeys } from './config-rules'
 import { nearest } from './nearest'
@@ -9,10 +9,12 @@ import { nearest } from './nearest'
 const localized = either(str, map(str))
 const guardOption = either(fn, list(fn), bag({ load: fn }), lit(false))
 const SECURITY_KEYS: Record<keyof SecurityConfig, Rule> = { csp: either(bool, map(either(list(str), lit(false)))), reportOnly: map(either(list(str), lit(false))), reports: either(lit(true), str), permissions: map(either(str, list(str), lit(false))), headers: map(either(str, lit(false))), hosts: either(fn, list(str), bool), cookies: either(bool, bag({ httpOnly: bool, sameSite: oneOf('lax', 'strict', 'none'), secure: either(bool, oneOf('auto')), path: str } satisfies Record<keyof CookieDefaults, Rule>)) }
-const I18N: Record<keyof I18nConfig, Rule> = { locales: list(str), defaultLocale: str, prefixDefault: bool, domains: map(str), paths: either(fn, map(map(str))), messages: str }
-const I18N_BAG = bag(I18N, ({ locales, defaultLocale }, path, out) => {
-  if (Array.isArray(locales) && typeof defaultLocale === 'string' && !locales.includes(defaultLocale))
-    out.push(`\`${path}.defaultLocale\` is ${JSON.stringify(defaultLocale)}, expected one of its locales: ${locales.map(locale => JSON.stringify(locale)).join(', ')}`)
+const I18N: Record<keyof I18nInput, Rule> = { locales: list(str), default: str, mode: either(oneOf('prefix', 'always'), bag({ domains: map(str) })), defaultLocale: str, prefixDefault: bool, domains: map(str), paths: either(fn, map(map(str))), messages: str }
+const I18N_BAG = bag(I18N, ({ locales, default: named, defaultLocale }, path, out) => {
+  const chosen = named ?? defaultLocale
+
+  if (Array.isArray(locales) && typeof chosen === 'string' && !locales.includes(chosen))
+    out.push(`\`${path}.${named === undefined ? 'defaultLocale' : 'default'}\` is ${JSON.stringify(chosen)}, expected one of its locales: ${locales.map(locale => JSON.stringify(locale)).join(', ')}`)
 })
 const SEO: Record<keyof SeoConfig, Rule> = { name: localized, titleTemplate: localized, description: localized, image: localized, imageAlt: localized, noindex: bool, twitter: str, locale: localized, themeColor: either(str, bag({ light: str, dark: str })), jsonLd: list(obj) }
 const DIRS: Record<keyof DirsConfig, Rule> = { routes: str, api: str, public: str }
@@ -45,11 +47,15 @@ const REMOTE_IMAGES: Record<keyof RemoteImages, Rule> = { hosts: either(fn, list
 const IMAGE_FORMATS: Record<keyof ImageFormats, Rule> = { quality: num, webp: bag({ quality: num }), avif: AVIF }
 const IMAGE_LIMITS: Record<keyof ImageLimits, Rule> = { variants: either(num, lit(false)), queue: either(num, lit(false)) }
 const IMAGES: Record<keyof ImagesInput, Rule> = { ttl: duration, dirs: map(str), remote: either(fn, list(str), bag(REMOTE_IMAGES)), formats: bag(IMAGE_FORMATS), limits: bag(IMAGE_LIMITS), remoteMaxSize: bytes, remoteTimeout: duration, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: AVIF, maxDensity: numOrInfinity, placeholder: bool, aspects: list(str), card: bag(CARD), resolve: fn, guards: guardOption, guard: guardOption }
+const ASSETS: Record<keyof AssetsConfig, Rule> = { images: bag(IMAGES), fonts: list(obj), favicon: either(str, bool, bag(FAVICON)), manifest: bag(MANIFEST), publicCache: map(duration) }
+const OPS: Record<keyof OpsConfig, Rule> = { observe: bag(OBSERVE), health: either(bool, bag(HEALTH)), metrics: either(bool, bag(METRICS)), jobs: bag(JOBS) }
 const CORS = bag({ origins: either(oneOf('*'), list(str), fn), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
 const CONFIG: Record<keyof ConfigInput, Rule> = {
   dirs: bag(DIRS),
   limits: bag(LIMITS),
   serve: bag(SERVE),
+  assets: bag(ASSETS),
+  ops: bag(OPS),
   observe: bag(OBSERVE),
   client: bag(CLIENT),
   actions: bag(ACTIONS),
@@ -127,10 +133,10 @@ export const REMOVED_KEYS: Record<string, string> = {
   compress: 'serve.compress',
   compressionDictionary: 'serve.compressionDictionary',
   shutdownTimeout: 'serve.shutdownTimeout',
-  log: 'observe.log',
-  serverTiming: 'observe.serverTiming',
-  requestIdHeader: 'observe.requestIdHeader',
-  tracer: 'observe.tracer',
+  log: 'ops.observe.log',
+  serverTiming: 'ops.observe.serverTiming',
+  requestIdHeader: 'ops.observe.requestIdHeader',
+  tracer: 'ops.observe.tracer',
   navigation: 'client.navigation',
   inlineStyles: 'client.inlineStyles',
   lateStyles: 'client.lateStyles',
@@ -143,7 +149,7 @@ export const REMOVED_KEYS: Record<string, string> = {
 // The keys the config takes at its top level, which `kay check` tells from the other options of `pages()` and `testSite()`.
 export const CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(CONFIG))
 
-export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'observe', 'client'] as const
+export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'observe', 'client', 'assets', 'ops'] as const
 
 export const isBag = isRecord
 

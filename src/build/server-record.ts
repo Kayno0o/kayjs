@@ -4,7 +4,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { ISLAND_TWIN, withoutTwin } from '../compiler/twin'
-import { switchOf } from '../config-switch'
+import { placeholderOf } from '../config-switch'
 import { KAY_SOURCE, recordName, ROOT_TOKEN, SERVER_DIR, SERVER_RECORD, UP_TOKEN } from '../server/server-record'
 import { ASSET_FILE } from './assets'
 import { capturedLoads } from './captured-loads'
@@ -49,7 +49,7 @@ export async function writeServerRecord(project: Project): Promise<void> {
 
   const base = realpathSync(root)
   const settings = config.librarySettings ?? {}
-  const placeholder = switchOf(config.images?.placeholder)
+  const placeholder = placeholderOf(config)
   const { modules } = await serverParts(project)
   const pages = pageDirs(root, config)
   const { loads, modules: virtual, resolves } = await capturedLoads(kay({ target: 'ssr', root, pages, cacheDir: paths.cache, settings, placeholder, embedMaps: true, mapName: file => file }))

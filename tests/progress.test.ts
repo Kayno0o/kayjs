@@ -17,7 +17,7 @@ async function project(): Promise<string> {
 
   dirs.push(root)
   await Promise.all([
-    Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n'),
+    Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { favicon: false } }\n'),
     Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\n---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero, { sizes: \'100vw\' })} alt="Hero")\n'),
     Bun.write(join(root, 'src/routes/about.kay'), '--- server\nexport const page = { prerender: true }\n---\np About\n'),
     Bun.write(join(root, 'src/hero.png'), encodePng(new Uint8Array(96 * 64 * 4).fill(200), 96, 64)),
@@ -29,7 +29,7 @@ async function project(): Promise<string> {
 describe('kay build\'s progress', () => {
   it('goes through each step, the routes and images counted up to their total', async () => {
     const root = await project()
-    const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\nconst steps = []\nconst { failed } = await buildProject(${JSON.stringify(root)}, { favicon: false }, { check: false, onProgress: progress => steps.push(progress) })\n\nconsole.log(JSON.stringify({ failed, steps }))\n`
+    const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\nconst steps = []\nconst { failed } = await buildProject(${JSON.stringify(root)}, { assets: { favicon: false } }, { check: false, onProgress: progress => steps.push(progress) })\n\nconsole.log(JSON.stringify({ failed, steps }))\n`
     const child = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
     const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
     const { failed, steps } = JSON.parse(stdout.trim().split('\n').at(-1)!) as { failed?: unknown, steps: BuildProgress[] }

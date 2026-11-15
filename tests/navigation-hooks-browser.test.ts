@@ -13,7 +13,7 @@ const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromiu
 const SETTINGS = [
   { name: 'a base', options: { base: '/repo' }, start: '/repo/', link: ['/repo/second', '/repo/second'], navigate: ['/repo/second', '/repo/second'] },
   { name: 'trailingSlash always', options: { trailingSlash: 'always' as const }, start: '/', link: ['/second', '/second/'], navigate: ['/second', '/second/'] },
-  { name: 'a locale prefix', options: { i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, start: '/fr', link: ['/fr/second', '/fr/second'], navigate: ['/fr/second', '/fr/second'] },
+  { name: 'a locale prefix', options: { i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, start: '/fr', link: ['/fr/second', '/fr/second'], navigate: ['/fr/second', '/fr/second'] },
 ]
 
 const sites: TestSite[] = []

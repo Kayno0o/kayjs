@@ -147,7 +147,7 @@ export async function registerLoader(root: string, settings?: Record<string, str
     const project: Project = { root: at, prefixes: prefixesOf(at), settings: key, early: false, ready: Promise.resolve(), loads: [] }
 
     projects.set(at, project)
-    project.ready = register(project, chosen, switchOf(config.images?.placeholder), pages)
+    project.ready = register(project, chosen, switchOf(config.assets?.images?.placeholder), pages)
   }
 
   current = projects.get(at)

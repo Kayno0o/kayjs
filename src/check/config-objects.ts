@@ -30,6 +30,14 @@ export function propertyOf(object: ObjectExpression, name: string): Property | u
   return object.properties.find((property): property is Property => isProperty(property) && !property.computed && !property.shorthand && nameOf(property) === name)
 }
 
+// The property of a feature in a config object, at its top level or, since 1.105, inside the group it belongs to (`images` in `assets`): every one found, as a file may hold the old form and the new.
+export function featureProperties(object: ObjectExpression, bindings: ReturnType<typeof constBindings>, group: string, name: string): Property[] {
+  const inGroup = propertyOf(object, group)
+  const held = inGroup === undefined ? undefined : objectOf(inGroup.value, bindings)
+
+  return [...propertiesOf(object, name).slice(0, 1), ...held === undefined ? [] : propertiesOf(held, name).slice(0, 1)]
+}
+
 // The objects of a file that are written as config: kay.config.ts's export, and in any file the options handed to `pages()` or `testSite()` with the `config` object of each.
 export function configObjects(file: string, ast: Program): ConfigObject[] {
   const bindings = constBindings(ast)

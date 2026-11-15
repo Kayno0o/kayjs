@@ -49,9 +49,9 @@ describe('kay build --static localizes links as the server render does', () => {
     it(`on ${variant.name}`, async () => {
       const copy = await fixtureCopy('static-locales')
       const base = variant.base ?? ''
-      const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages', ...variant.prefixDefault !== undefined && { prefixDefault: variant.prefixDefault } }
+      const i18n: I18nConfig = { locales: ['fr', 'en'], default: 'fr', messages: 'src/messages', ...variant.prefixDefault !== undefined && { prefixDefault: variant.prefixDefault } }
       const options = { site: SITE, ...variant.base !== undefined && { base: variant.base }, ...variant.trailingSlash !== undefined && { trailingSlash: variant.trailingSlash } }
-      const config = `export default ${JSON.stringify({ ...options, favicon: false, i18n: { ...i18n, messages: 'src/messages' } })}\n`
+      const config = `export default ${JSON.stringify({ ...options, assets: { favicon: false }, i18n: { ...i18n, messages: 'src/messages' } })}\n`
 
       await Bun.write(join(copy, 'kay.config.ts'), config)
 

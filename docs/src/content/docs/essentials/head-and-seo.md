@@ -156,7 +156,7 @@ head
 
 `shareCard` needs a font listed in `fonts`, unless a template lays the card out.
 
-Pass `image` to draw the title over a picture, which covers the card and fades into the background below the title. It can be an imported PNG, JPEG, WebP, GIF or AVIF, or an imported SVG such as a banner kept in the repo: the SVG is drawn to cover the card, cut in the middle if its shape differs, and `kay build` keeps that drawing for an executable. Turn any text in the SVG into paths, as kay draws it without fonts. An SVG from `images.dirs` or `images.remote` is refused.
+Pass `image` to draw the title over a picture, which covers the card and fades into the background below the title. It can be an imported PNG, JPEG, WebP, GIF or AVIF, or an imported SVG such as a banner kept in the repo: the SVG is drawn to cover the card, cut in the middle if its shape differs, and `kay build` keeps that drawing for an executable. Turn any text in the SVG into paths, as kay draws it without fonts. An SVG from `assets.images.dirs` or `assets.images.remote` is refused.
 
 ### Lay the card out yourself
 
@@ -177,13 +177,13 @@ div(class="relative h-[630px] w-[1200px] bg-slate-900 text-white")
     Logo
 ```
 
-The card is 1200 by 630 pixels, with no layout around it, and the page links its stylesheet itself. The pages still call `shareCard({ title, image })` as before. `image` can be an imported image or one from `images.dirs` or `images.remote`, which the template loads for the card. An image the template imports itself loads too.
+The card is 1200 by 630 pixels, with no layout around it, and the page links its stylesheet itself. The pages still call `shareCard({ title, image })` as before. `image` can be an imported image or one from `assets.images.dirs` or `assets.images.remote`, which the template loads for the card. An image the template imports itself loads too.
 
 Chrome or Chromium draws the card, so one has to be on the machine that builds the site, and on the server for the cards no prerendered page asks for. It starts only when a card is drawn, and closes when none is waiting. At most 16 cards wait at once, and a request past that gets a 503 asking it to come back in 10 seconds. Cards are signed, cached and written at build like the others, and changing the template, a component it imports or its styles draws them again.
 
 A change to a `.ts` helper it imports or to `fonts` draws them again too. The card of a page in another locale renders the template in that locale.
 
-To use a photo as the card, `shareImage(hero)` from `kay/image` is the URL of an imported image cut to the 1200x630 card, enlarged when smaller. It takes an image from `images.dirs` or `images.remote` too.
+To use a photo as the card, `shareImage(hero)` from `kay/image` is the URL of an imported image cut to the 1200x630 card, enlarged when smaller. It takes an image from `assets.images.dirs` or `assets.images.remote` too.
 
 ```kay
 ---
@@ -194,7 +194,7 @@ head
   meta(property="og:image" content={shareImage(hero)})
 ```
 
-`images.card` in `kay.config.ts` sets the card's `background`, text `color` and `font`, as `{ family: 'Inter', weight: 800 }`. It also takes a square `logo`, drawn at the top left: `images: { card: { logo: 'src/logo.svg' } }`. `kay check` reports a logo that is missing, not square or not an image it can draw.
+`assets.images.card` in `kay.config.ts` sets the card's `background`, text `color` and `font`, as `{ family: 'Inter', weight: 800 }`. It also takes a square `logo`, drawn at the top left: `images: { card: { logo: 'src/logo.svg' } }`. `kay check` reports a logo that is missing, not square or not an image it can draw.
 
 ## Checks across the site
 
@@ -265,13 +265,15 @@ The manifest also takes the installed app's `startUrl`, `scope`, `orientation`, 
 
 ```ts
 export default defineConfig({
-  favicon: 'src/favicon.png',
-  manifest: {
-    shortName: 'Ex',
-    themeColor: '#1e1e2e',
-    display: 'standalone',
-    maskable: 'src/favicon-maskable.png',
-    shortcuts: [{ name: 'New note', url: '/notes/new' }],
+  assets: {
+    favicon: 'src/favicon.png',
+    manifest: {
+      shortName: 'Ex',
+      themeColor: '#1e1e2e',
+      display: 'standalone',
+      maskable: 'src/favicon-maskable.png',
+      shortcuts: [{ name: 'New note', url: '/notes/new' }],
+    },
   },
 })
 ```

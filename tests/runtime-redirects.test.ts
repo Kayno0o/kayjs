@@ -319,7 +319,7 @@ describe('a served app', () => {
   })
 
   it('answers a path under a locale prefix as the visitor asked for it', async () => {
-    const served = new Elysia().use(await pages({ root: 'tests/fixtures/i18n', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }))
+    const served = new Elysia().use(await pages({ root: 'tests/fixtures/i18n', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }))
 
     await addRuntimeRedirect('/en/rt-loc-old', '/en')
     await addRuntimeRedirect('/rt-loc-bare', '/en')

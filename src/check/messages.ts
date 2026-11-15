@@ -55,13 +55,13 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
     read.set(locale, { file, entries, shipped })
   }
 
-  const reference = read.get(config.defaultLocale)
+  const reference = read.get(config.default)
 
   if (!reference)
     return problems
 
   for (const [locale, { file, entries, shipped }] of read) {
-    if (locale === config.defaultLocale)
+    if (locale === config.default)
       continue
 
     for (const [key, { message, file: from }] of reference.entries) {
@@ -148,24 +148,24 @@ export async function messageProblems(root: string, config: I18nConfig, extensio
 
 // The keys `t()` can name: the default locale's, none while its catalog cannot be read. The catalogs are read afresh, as an editor asks again after editing one.
 export async function messageKeys(root: string, config: I18nConfig, extensions: KayExtension[] = []): Promise<string[]> {
-  for (const path of [messagesFile(root, config, config.defaultLocale), ...extensionMessageFiles(root, extensions, config.defaultLocale)])
+  for (const path of [messagesFile(root, config, config.default), ...extensionMessageFiles(root, extensions, config.default)])
     delete require.cache[path]
 
-  const catalog = await localeCatalog(root, config, extensions, config.defaultLocale)
+  const catalog = await localeCatalog(root, config, extensions, config.default)
 
   return 'problem' in catalog ? [] : [...catalog.entries.keys()]
 }
 
 // The keys each locale but the default lacks, with the default locale's message for each; a locale with no catalog at all lacks every key, and a default locale without one fails, as nothing says what the others lack.
 export async function missingMessages(root: string, config: I18nConfig, extensions: KayExtension[] = []): Promise<Map<string, Map<string, Message>>> {
-  const reference = await localeCatalog(root, config, extensions, config.defaultLocale)
+  const reference = await localeCatalog(root, config, extensions, config.default)
   const missing = new Map<string, Map<string, Message>>()
 
   if ('problem' in reference)
     throw new KayError('locales-invalid', `kay: ${reference.problem.file} ${reference.problem.message}`)
 
   for (const locale of config.locales) {
-    if (locale === config.defaultLocale)
+    if (locale === config.default)
       continue
 
     const catalog = await localeCatalog(root, config, extensions, locale)
@@ -190,7 +190,7 @@ async function localeCatalog(root: string, config: I18nConfig, extensions: KayEx
   const own = existsSync(path)
 
   // An extension's catalog stands in for an app with no text of its own in that locale, and the default locale needs none while a library ships one in another, as `loadI18n` reads it.
-  if (!own && libraries.length === 0 && !(locale === config.defaultLocale && config.locales.some(other => extensionMessageFiles(root, extensions, other).some(existsSync))))
+  if (!own && libraries.length === 0 && !(locale === config.default && config.locales.some(other => extensionMessageFiles(root, extensions, other).some(existsSync))))
     return { problem: { file, line: 1, message: `is missing: i18n lists ${locale}, so its messages go here, export default defineMessages({ ... })` } }
 
   const tree = own ? (await import(path) as { default?: unknown }).default : {}

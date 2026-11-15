@@ -7,7 +7,7 @@ import { markdownHtml } from '../src/runtime/markdown.server'
 import { setSite } from '../src/runtime/site'
 import { localeSettings } from '../src/server/i18n'
 
-const settings: LocaleSettings = { ...localeSettings({ locales: ['fr', 'en'], defaultLocale: 'fr', messages: '' }), pages: ['/note'] }
+const settings: LocaleSettings = { ...localeSettings({ locales: ['fr', 'en'], default: 'fr', messages: '' }), pages: ['/note'] }
 const PREFIXED = ['/en/note', '/en/note/', '/en', '/en/?a=1#top']
 
 describe('localize() under a base', () => {

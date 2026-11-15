@@ -30,7 +30,7 @@ function feedXml<Data>(entries: Entry<Data>[], options: ResolvedFeed<Data>, orig
 }
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
-const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], defaultLocale: 'en', paths: { '/notes/:slug': { fr: '/remarques/:slug' } } } })\n`
+const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], default: 'en', paths: { '/notes/:slug': { fr: '/remarques/:slug' } } } })\n`
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],

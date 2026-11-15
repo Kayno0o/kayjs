@@ -504,7 +504,7 @@ describe('a deleted public file is a path nothing serves', () => {
 
     await writeFile(path, MEDIUM)
 
-    const app = await pages({ root: 'tests/fixtures/i18n', dirs: { public: join(dir, 'public') }, serve: { compress: true }, observe: { log: false }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve(MESSAGES) } })
+    const app = await pages({ root: 'tests/fixtures/i18n', dirs: { public: join(dir, 'public') }, serve: { compress: true }, observe: { log: false }, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve(MESSAGES) } })
 
     expect((await get(app, '/locale.json')).status).toBe(200)
     await rm(path)

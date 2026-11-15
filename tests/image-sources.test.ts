@@ -328,7 +328,7 @@ describe('images.resolve and images.guard', () => {
 
   it('refuses a guard with no resolve, and a static export, which has no route to resolve on', async () => {
     await expect(applyImageConfig({ guard: () => undefined })).rejects.toThrow('images.resolve is not set')
-    expect(() => refuseStaticConfig({ images: { resolve: () => undefined } })).toThrow('no image route')
+    expect(() => refuseStaticConfig({ assets: { images: { resolve: () => undefined } } })).toThrow('no image route')
   })
 
   it('leaves imported and runtime directory images unguarded', async () => {

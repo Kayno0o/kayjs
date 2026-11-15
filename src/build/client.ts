@@ -740,7 +740,7 @@ async function bundleStyles(root: string, { pages, files, libraries, classes, sh
   // The code the entries shrank to is only a vehicle for their stylesheets.
   await Promise.all(build.outputs.filter(output => output.kind === 'entry-point' && JS_OUTPUT.test(output.path)).map(async output => rm(output.path)))
 
-  const fallbacks = options.fonts === undefined ? new Map<string, FontFallback>() : fontFallbacks(root, options.fonts)
+  const fallbacks = options.assets?.fonts === undefined ? new Map<string, FontFallback>() : fontFallbacks(root, options.assets.fonts)
   const base = options.base ?? ''
 
   await Promise.all(cssOutputs.map(async ({ path, text }) => {

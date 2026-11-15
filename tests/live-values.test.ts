@@ -462,7 +462,7 @@ describe('live values in a page', () => {
   })
 
   it('gets the same ids in each locale', async () => {
-    const site = await testSite({ root: ROOT, i18n: { locales: ['en', 'fr'], defaultLocale: 'en' } })
+    const site = await testSite({ root: ROOT, i18n: { locales: ['en', 'fr'], default: 'en' } })
 
     try {
       const english = pagesOf((await site.visit('/')).html)[0]!

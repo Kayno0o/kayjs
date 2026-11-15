@@ -10,7 +10,7 @@ import { scratchDir } from './scratch'
 
 // A config setting each key to a value of its own, which a view passing the key on carries unchanged.
 function marked(keys: readonly (keyof KayConfig)[]): KayConfig {
-  return Object.fromEntries(keys.map(key => [key, key === 'observe' ? { requestIdHeader: 'observe as configured' } : `${key} as configured`]))
+  return Object.fromEntries(keys.map(key => [key, key === 'ops' ? { observe: { requestIdHeader: 'observe as configured' } } : `${key} as configured`]))
 }
 
 describe('the views of the config', () => {

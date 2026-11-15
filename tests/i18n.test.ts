@@ -25,7 +25,7 @@ import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/i18n'
 const messages = resolve(`${FIXTURE}/src/messages`)
-const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages }
+const i18n: I18nConfig = { locales: ['fr', 'en'], default: 'fr', messages }
 const SITE = 'https://x.example'
 const chrome = browserPath()
 const app = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: 'https://x.example', i18n }))
@@ -245,9 +245,8 @@ describe('locale prefixes', () => {
       await rm(copy, { recursive: true, force: true })
     }
 
-    expect(() => localeSettings({ locales: ['fr'], defaultLocale: 'en' })).toThrow('defaultLocale en is not one of its locales')
-    expect(() => localeSettings({ locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr' } })).toThrow('none to en')
-    expect(() => localeSettings({ locales: ['fr', 'en'], defaultLocale: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, prefixDefault: true })).toThrow('domains or prefixDefault')
+    expect(() => localeSettings({ locales: ['fr'], default: 'en' })).toThrow('i18n\'s default en is not one of its locales')
+    expect(() => localeSettings({ locales: ['fr', 'en'], default: 'fr', mode: { domains: { fr: 'x.fr' } } })).toThrow('none to en')
     await expect(pages({ root: FIXTURE, prebuilt: false, i18n: { ...i18n, locales: ['fr', 'de'] } })).rejects.toThrow('so its messages go in')
   })
 })
@@ -752,7 +751,7 @@ describe('kay check', () => {
       ])
 
       // Every locale prefixed, /about translated, and /streamed given the path of the home page in en.
-      const diagnostics = await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined, prefixDefault: true, paths: { '/about': { en: '/about-us' }, '/streamed': { en: '/' } } } })
+      const diagnostics = await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined, mode: 'always', paths: { '/about': { en: '/about-us' }, '/streamed': { en: '/' } } } })
       const found = diagnostics.map(({ file, line, message }) => ({ file: file.slice(file.indexOf(fixture) + fixture.length + 1), line, message }))
       const lines = Object.fromEntries(Object.entries(Object.groupBy(found, ({ file }) => file)).map(([file, at]) => [file, at!.map(({ line }) => line).toSorted((a, b) => a - b)]))
 
@@ -791,9 +790,9 @@ describe('kay check', () => {
   })
 
   it('reports a locale config no request could be served by, at the config', async () => {
-    const diagnostics = await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { locales: ['fr'], defaultLocale: 'en' } })
+    const diagnostics = await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { locales: ['fr'], default: 'en' } })
 
-    expect(diagnostics.map(({ file, message }) => ({ file: file.slice(file.indexOf(fixture)), message }))).toContainEqual({ file: `${fixture}/kay.config.ts`, message: 'kay: i18n\'s defaultLocale en is not one of its locales: fr' })
+    expect(diagnostics.map(({ file, message }) => ({ file: file.slice(file.indexOf(fixture)), message }))).toContainEqual({ file: `${fixture}/kay.config.ts`, message: 'kay: i18n\'s default en is not one of its locales: fr' })
   })
 
   const warnings = async (paths: Record<string, Record<string, string>>, lints: Record<string, 'allow' | 'warn' | 'deny'> = {}) => (await check(fixture, { site: SITE, lints: { seo: 'allow', ...lints }, i18n: { ...i18n, paths } })).filter(({ message }) => message.includes('the default locale'))
@@ -827,7 +826,7 @@ describe('localize() on a path under a locale', () => {
 
   it('leaves it as written under each locale, a trailing slash, query and hash included', () => {
     for (const prefixDefault of [false, true]) {
-      const settings = { ...localeSettings({ ...i18n, prefixDefault }), pages: ['/note'] }
+      const settings = { ...localeSettings({ ...i18n, ...prefixDefault && { mode: 'always' } }), pages: ['/note'] }
       const paths = prefixDefault ? [...PREFIXED, ...PREFIXED.map(path => path.replace('/en', '/fr'))] : PREFIXED
 
       for (const locale of ['fr', 'en']) {
@@ -1112,7 +1111,7 @@ describe('localized seo defaults', () => {
   })
 
   it('leaves a manifest link of the app\'s own head alone in every locale', async () => {
-    const server = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: SITE, i18n, favicon: false, head: [{ tag: 'link', props: { rel: 'manifest', href: '/my-app.json' } }], seo: { name: { fr: 'Le site', en: 'The site' } } }))
+    const server = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: SITE, i18n, assets: { favicon: false }, head: [{ tag: 'link', props: { rel: 'manifest', href: '/my-app.json' } }], seo: { name: { fr: 'Le site', en: 'The site' } } }))
 
     for (const path of ['/', '/en'])
       expect(await (await server.handle(new Request(`http://localhost${path}`))).text()).toContain('<link rel="manifest" href="/my-app.json">')

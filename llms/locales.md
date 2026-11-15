@@ -8,20 +8,20 @@
 
 ```ts
 export default defineConfig({
-  i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' },
+  i18n: { locales: ['fr', 'en'], default: 'fr' },
 })
 ```
 
 ### Serve each locale on its own host
 
-`domains` replaces the prefixes with a host per locale:
+`mode: { domains }` replaces the prefixes with a host per locale:
 
 ```ts
 export default defineConfig({
   i18n: {
     locales: ['fr', 'en'],
-    defaultLocale: 'fr',
-    domains: { fr: 'example.fr', en: 'example.com' },
+    default: 'fr',
+    mode: { domains: { fr: 'example.fr', en: 'example.com' } },
   },
 })
 ```
@@ -34,7 +34,7 @@ export default defineConfig({
 export default defineConfig({
   i18n: {
     locales: ['fr', 'en'],
-    defaultLocale: 'fr',
+    default: 'fr',
     paths: { '/a-propos': { en: '/about' }, '/blog/:slug': { en: '/articles/:slug' } },
   },
 })
@@ -160,10 +160,10 @@ p {target}
 ### Configuring locales
 
 - `i18n` in kay.config.ts serves every page in each locale, the default one unprefixed and the others under their prefix: `/about` and `/en/about`.
-- `prefixDefault: true` puts the default locale under its prefix too, `/fr/about`; a path without one then redirects with a 307 to the visitor's locale: the one they last went to, kept in the `kay_locale` cookie once they follow a link of the site to it, then the best match of their browser's `Accept-Language`, then the default.
-- Without `prefixDefault` the URL alone decides.
-- `domains: { fr: 'example.fr', en: 'example.com' }` serves each locale on its own host instead, with no prefixes; a host not listed serves the default locale, and every locale needs a host.
-- `domains` and `prefixDefault` do not go together.
+- `mode: 'always'` puts the default locale under its prefix too, `/fr/about`; a path without one then redirects with a 307 to the visitor's locale: the one they last went to, kept in the `kay_locale` cookie once they follow a link of the site to it, then the best match of their browser's `Accept-Language`, then the default.
+- With the default `mode: 'prefix'` the URL alone decides.
+- `mode: { domains: { fr: 'example.fr', en: 'example.com' } }` serves each locale on its own host instead, with no prefixes; a host not listed serves the default locale, and every locale needs a host.
+- `mode` is `'prefix'`, `'always'` or `{ domains }`, one at a time.
 - A page cannot sit under a locale's prefix itself, `src/routes/en/`: kay serves every page there already.
 - A root `[slug].kay` with no `index.kay` would take `/en` as a slug, so give the site an index page.
 - `paths` names a page its own way in some locales, keyed by the pattern the page is served under: `{ '/a-propos': { en: '/about' }, '/blog/:slug': { en: '/articles/:slug' } }`, the pattern being the default locale's path (`kay check` warns on a translation of the default locale).

@@ -428,7 +428,7 @@ describe('a served app', () => {
   })
 
   it('counts a path under a locale prefix and one with dot segments as the visitor asked for it', async () => {
-    const app = new Elysia().use(await pages({ root: 'tests/fixtures/i18n', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }))
+    const app = new Elysia().use(await pages({ root: 'tests/fixtures/i18n', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }))
 
     expect((await app.handle(new Request('http://localhost/en/page-nobody-has-y'))).status).toBe(404)
     await app.handle(new Request('http://localhost/a/../page-nobody-has-z'))
@@ -483,7 +483,7 @@ describe('withRedirect', () => {
 
   it('opens redirects in the config object', () => {
     expect(withRedirect('export default defineConfig({\n  base: \'/x\',\n})\n', '/old', '/new')).toBe('export default defineConfig({\n  redirects: {\n    \'/old\': \'/new\',\n  },\n  base: \'/x\',\n})\n')
-    expect(withRedirect('export default { favicon: false }\n', '/o', '/n')).toBe('export default {\n  redirects: {\n    \'/o\': \'/n\',\n  },\nfavicon: false }\n')
+    expect(withRedirect('export default { assets: { favicon: false } }\n', '/o', '/n')).toBe('export default {\n  redirects: {\n    \'/o\': \'/n\',\n  },\nassets: { favicon: false } }\n')
   })
 
   it('escapes quotes and leaves a config it cannot read alone', () => {
@@ -508,7 +508,7 @@ describe('kay not-found', () => {
     const root = await scratchDir('not-found-cli-')
     const store = missingStore(join(root, 'data/not-found.sqlite'))
 
-    await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  favicon: false,\n  redirects: { \'/done\': \'/about\' },\n}\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {\n  assets: { favicon: false },\n  redirects: { \'/done\': \'/about\' },\n}\n')
 
     for (const [path, hits, host] of [['/old', 3, 'a.example'], ['/other', 1, undefined], ['/done', 9, undefined]] as const) {
       for (let index = 0; index < hits; index++)
@@ -539,7 +539,7 @@ describe('kay not-found', () => {
   it('says so when nothing was recorded', async () => {
     const root = await scratchDir('not-found-cli-')
 
-    await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { favicon: false } }\n')
     expect((await run(['not-found'], root)).stdout).toContain('No missing path recorded')
   })
 
@@ -585,7 +585,7 @@ describe('kay not-found', () => {
     const sqlite = join(root, 'data/not-found.sqlite')
     const before = await Bun.file(sqlite).bytes()
 
-    await Bun.write(join(root, 'kay.config.ts'), 'const redirects = {}\nexport default { favicon: false, redirects }\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'const redirects = {}\nexport default { assets: { favicon: false }, redirects }\n')
 
     const byHand = await run(['not-found', '--redirect', '/old', '--dry-run'], root)
 
@@ -604,7 +604,7 @@ describe('kay not-found', () => {
 
     const bare = await scratchDir('not-found-cli-')
 
-    await Bun.write(join(bare, 'kay.config.ts'), 'export default { favicon: false }\n')
+    await Bun.write(join(bare, 'kay.config.ts'), 'export default { assets: { favicon: false } }\n')
     await Bun.write(join(bare, 'src/routes/new.kay'), 'main New\n')
     expect((await run(['not-found', '--redirect', '/old', '--to', '/new', '--runtime', '--dry-run'], bare)).code).toBe(0)
     expect(await Bun.file(join(bare, 'data/not-found.sqlite')).exists()).toBe(false)
@@ -619,7 +619,7 @@ describe('kay not-found', () => {
       store.hit(path, undefined, () => ({ target: '/blog', reason: 'slug' }))
 
     store.close()
-    await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false, redirects: { \'/old/:id\': \'/new/:id\', \'/legacy/*\': \'/x/*\' } }\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { favicon: false }, redirects: { \'/old/:id\': \'/new/:id\', \'/legacy/*\': \'/x/*\' } }\n')
 
     const { stdout } = await run(['not-found'], root)
 
@@ -642,7 +642,7 @@ describe('kay not-found', () => {
   it('adds a redirect to a path nobody recorded, given its target', async () => {
     const root = await scratchDir('not-found-cli-')
 
-    await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { favicon: false } }\n')
     expect((await run(['not-found', '--redirect', '/legacy/x', '--to', '/blog/x'], root)).code).toBe(0)
     expect(await Bun.file(join(root, 'kay.config.ts')).text()).toContain('\'/legacy/x\': \'/blog/x\'')
   })
@@ -713,7 +713,7 @@ describe('the dev tool tab', () => {
     const root = await scratchDir('not-found-dev-')
     const store = missingStore(join(root, 'data/not-found.sqlite'), false)
 
-    await Bun.write(join(root, 'kay.config.ts'), `export default {\n  ${redirects}favicon: false,\n}\n`)
+    await Bun.write(join(root, 'kay.config.ts'), `export default {\n  ${redirects}assets: { favicon: false },\n}\n`)
 
     for (const [path, hits, host] of [['/old', 3, 'a.example'], ['/other', 1, undefined], ['/done', 9, undefined]] as const) {
       for (let index = 0; index < hits; index++)

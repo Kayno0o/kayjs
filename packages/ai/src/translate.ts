@@ -47,8 +47,8 @@ const command: KayCommand = {
     if (!i18n)
       return fail('kay.config.ts sets no i18n, so the site has no locale to translate')
 
-    if (!i18n.locales.includes(locale) || locale === i18n.defaultLocale)
-      return fail(`${locale} is not one of the locales translated from ${i18n.defaultLocale}: ${i18n.locales.filter(code => code !== i18n.defaultLocale).join(', ')}`)
+    if (!i18n.locales.includes(locale) || locale === i18n.default)
+      return fail(`${locale} is not one of the locales translated from ${i18n.default}: ${i18n.locales.filter(code => code !== i18n.default).join(', ')}`)
 
     const stop = new AbortController()
     const interrupt = () => stop.abort()
@@ -56,7 +56,7 @@ const command: KayCommand = {
     process.once('SIGINT', interrupt)
 
     try {
-      return await translateLocale({ root, config, locale, from: i18n.defaultLocale, dryRun, quiet, fail, signal: stop.signal })
+      return await translateLocale({ root, config, locale, from: i18n.default, dryRun, quiet, fail, signal: stop.signal })
     }
     catch (error) {
       return fail(error instanceof Error ? error.message : String(error), null)

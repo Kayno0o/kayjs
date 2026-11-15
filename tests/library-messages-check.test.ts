@@ -40,7 +40,7 @@ async function check(root: string): Promise<{ code: number, output: string }> {
 }
 
 const CLEAN = /checked with no problems in \d+ ms/
-const I18N = 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n'
+const I18N = 'export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }\n'
 const APP_EN = { 'src/messages/en.ts': MESSAGES('{ home: \'Home\' }') }
 const APP_FR = { 'src/messages/fr.ts': MESSAGES('{ home: \'Accueil\' }') }
 

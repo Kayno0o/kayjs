@@ -204,15 +204,15 @@ function feedRoutes(feeds: CollectionFeed[]): Listed[] {
 // What kay serves itself in production, as the config turns each on.
 function kayRoutes(root: string, config: LoadedConfig): Listed[] {
   const kay = (path: string, by: string, methods = 'GET'): Listed => ({ methods, path, kind: 'kay', by })
-  const favicon = faviconSource(root, config.favicon, config.manifest)
+  const favicon = faviconSource(root, config.assets?.favicon, config.assets?.manifest)
   const enabled = config.openapi === false ? undefined : config.openapi
   const openapi = enabled === true ? {} : enabled
   const mcpAt = mcpPath(config.mcp)
   const documented = openApiPaths(openapi, apiPathOf(config.serve?.apiPrefix))
 
   return [
-    ...config.health === false ? [] : [kay(bagOf(config.health)?.path ?? HEALTH_PATH, 'health check')],
-    ...metricsOf(config.metrics) === undefined ? [] : [kay(metricsOf(config.metrics)?.path ?? METRICS_PATH, 'metrics')],
+    ...config.ops?.health === false ? [] : [kay(bagOf(config.ops?.health)?.path ?? HEALTH_PATH, 'health check')],
+    ...metricsOf(config.ops?.metrics) === undefined ? [] : [kay(metricsOf(config.ops?.metrics)?.path ?? METRICS_PATH, 'metrics')],
     ...config.publicEnv ? [kay(PUBLIC_ENV_PATH, 'public environment')] : [],
     kay('/_kay/*', 'build files'),
     kay(IMAGE_ROUTE, 'image resizer'),
@@ -226,7 +226,7 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
     ...openapi !== undefined && openapi.dev !== true ? [kay(documented.document, 'OpenAPI document'), ...openapi.reference === true ? [kay(documented.reference, 'API reference')] : []] : [],
     ...config.site === undefined ? [] : [...config.sitemap === false ? [] : [kay(SITEMAP, 'sitemap, unless the app serves it')], kay(ROBOTS, 'robots.txt, unless the app serves it')],
     ...favicon ? FAVICON_PATHS.filter(path => (path !== SVG_ICON || favicon.svg !== undefined) && (!MASKABLE_ICON.test(path) || favicon.maskable !== undefined)).map(path => kay(path, 'favicon, unless the app serves it')) : [],
-    ...favicon ? localeManifests({ name: config.seo?.name, description: config.seo?.description }, config.i18n).map(({ path }) => kay(path, 'favicon, unless the app serves it')) : [],
+    ...favicon ? localeManifests({ name: config.seo?.name, description: config.seo?.description }, config.i18n && { locales: config.i18n.locales, defaultLocale: config.i18n.default }).map(({ path }) => kay(path, 'favicon, unless the app serves it')) : [],
     kay(SERVICE_WORKER, 'service worker'),
   ]
 }

@@ -54,7 +54,7 @@ describe('the request context', () => {
     ])
     app = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, security: false })
     mounted = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, base: '/app' })
-    translated = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: join(dir, 'messages') } })
+    translated = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: join(dir, 'messages') } })
     french = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, lang: 'fr' })
   })
 

@@ -14,7 +14,7 @@ describe('the load budget of a page in development', () => {
   const run = (timings: number[], took: number, loadBudget?: `${number}ms` | false) => {
     const rendering = {} as Rendering
 
-    warnSlowLoads('/app/src/routes/index.kay', FILES, timings, took, rendering, loadBudget === undefined ? {} : { observe: { loadBudget } })
+    warnSlowLoads('/app/src/routes/index.kay', FILES, timings, took, rendering, loadBudget === undefined ? {} : { ops: { observe: { loadBudget } } })
 
     return rendering
   }

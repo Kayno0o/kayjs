@@ -5,7 +5,7 @@ import { alternate as serverAlternate } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
 import { localeSettings, messagesScript } from '../src/server/i18n'
 
-const settings: LocaleSettings = localeSettings({ locales: ['en', 'fr'], defaultLocale: 'en', messages: '' })
+const settings: LocaleSettings = localeSettings({ locales: ['en', 'fr'], default: 'en', messages: '' })
 const entryUrls = new Map([['/blog/hello', { en: '/blog/hello', fr: '/blog/bonjour' }], ['/blog/other', { fr: '/blog/autre' }]])
 
 beforeAll(() => {

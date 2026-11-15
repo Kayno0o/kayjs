@@ -293,10 +293,10 @@ describe('share cards', () => {
         if (source !== '')
           await Bun.write(join(dir, name), source)
 
-        expect((await bootProblems(dir, { images: { card: { logo: name } } })).filter(problem => problem.file === join(dir, name))).toEqual([{ file: join(dir, name), line: 1, column: 1, message, ...severity && { severity } }])
+        expect((await bootProblems(dir, { assets: { images: { card: { logo: name } } } })).filter(problem => problem.file === join(dir, name))).toEqual([{ file: join(dir, name), line: 1, column: 1, message, ...severity && { severity } }])
       }
 
-      expect(await bootProblems(FIXTURE, { images: { card: { logo: 'src/logo.svg' } } })).toEqual([])
+      expect(await bootProblems(FIXTURE, { assets: { images: { card: { logo: 'src/logo.svg' } } } })).toEqual([])
     }
     finally {
       await rm(dir, { recursive: true, force: true })

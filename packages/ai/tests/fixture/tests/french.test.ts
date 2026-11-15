@@ -3,7 +3,7 @@ import { expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 
 const ROOT = join(import.meta.dir, '..')
-const french = await testSite({ root: ROOT, islands: false, config: { i18n: { locales: ['fr'], defaultLocale: 'fr' } } })
+const french = await testSite({ root: ROOT, islands: false, config: { i18n: { locales: ['fr'], default: 'fr' } } })
 
 test('the chat words its labels in French from the library\'s own catalog, and a label prop still overrides', async () => {
   // A French page writes a no-break space before `?`.

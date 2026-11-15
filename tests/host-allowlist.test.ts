@@ -102,7 +102,7 @@ describe('security.hosts', () => {
   it('answers the hosts of `i18n.domains` by default', async () => {
     process.env.NODE_ENV = 'production'
 
-    const app = await pages({ root: 'tests/fixtures/i18n', prebuilt: false, site: 'https://x.fr', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages'), domains: { fr: 'x.fr', en: 'x.com' } } })
+    const app = await pages({ root: 'tests/fixtures/i18n', prebuilt: false, site: 'https://x.fr', i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages'), domains: { fr: 'x.fr', en: 'x.com' } } })
     const asked = async (host: string) => (await app.handle(new Request('http://localhost/about', { headers: { host } }))).status
 
     expect(await asked('x.com')).toBe(200)

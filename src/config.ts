@@ -36,15 +36,15 @@ export interface KayConfig extends AppHooks {
   limits?: LimitsConfig | undefined
   // How the server answers: where the API is mounted, compression and the stop.
   serve?: ServeConfig | undefined
-  // What an app watches the server by: its log, timing, request ids, traces and errors.
-  observe?: ObserveConfig | undefined
   // What pages ship to the browser and how it behaves there: navigation, styles, typography, hydration, prefetching and Save-Data.
   client?: ClientConfig | undefined
+  // The files the site serves besides its pages: `images`, `fonts`, `favicon`, `manifest` and `publicCache`.
+  assets?: AssetsConfig | undefined
+  // What an app runs the server by: `observe`, `health`, `metrics` and `jobs`.
+  ops?: OpsConfig | undefined
   // What every action starts from: the `protect` checks, `maxSize` and `messages` an action's own options replace key by key, and the `beforeRun`, `onSuccess` and `onError` hooks, which run before the action's own.
   actions?: ActionsConfig | undefined
 
-  // How long a browser keeps a file of `public/` without asking again, by the path it is served at, as a glob: `{ '/fonts/**': '365d', '**/*.png': '30d' }`; the first pattern a path matches decides, and a file none names keeps revalidating through its ETag on every visit. Ignored by `kay dev`, so an edit shows at once.
-  publicCache?: Record<string, Duration> | undefined
   minify?: boolean | undefined
   lang?: string | undefined
   // The origin the site is public at, `https://example.com`: canonical links, social URLs and the sitemap are built from it. `SITE_URL` when left out, so one build serves each host it is deployed to; a `site` written here wins over `SITE_URL`.
@@ -56,17 +56,10 @@ export interface KayConfig extends AppHooks {
   sitemap?: SitemapConfig | boolean | undefined
   // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
   head?: HeadTag[] | undefined
-  images?: ImagesConfig | undefined
   // The most a page may load, compressed: `{ js: '20kb', css: '10kb' }` for its scripts and stylesheets, `weight: '500kb'` for the whole page and `grade: 'C'` for the worst EcoIndex grade it may have. `kay build` reports each page over it with `over-budget`, naming the modules weighing most for `js` and `css`; a key left out sets no limit, and with none nothing is checked.
   budget?: BudgetConfig | undefined
-  // A square image, relative to the root, 512 pixels wide or more for sharp icons, a smaller one enlarged with a warning: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page. `{ image, svg }` adds an SVG of it, served as `/favicon.svg` and linked after the ICO; a square SVG alone is both, every icon drawn from it. Defaults to kay's own mark; `false` serves none.
-  favicon?: string | FaviconConfig | boolean | undefined
-  // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
-  manifest?: ManifestConfig | undefined
   // The server entry, relative to the root, `src/server.ts` by default: what `kay dev`, `start`, `render`, `check` and `build` run and type against, unless `--entry` names another. With no file there, kay's own server of the pages.
   entry?: string | undefined
-  // Self-hosted fonts, declared on every page and preloaded where they ask for it.
-  fonts?: (FontConfig | FontsourceConfig)[] | undefined
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
   security?: SecurityConfig | boolean | undefined
   // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Left out in production, one proxy is in front for a request from a private address that carries `X-Forwarded-For`; `false` says none is, and the address the server was reached from is the client. Outside production, left out or `false`, the address the server was reached from is the client.
@@ -81,12 +74,6 @@ export interface KayConfig extends AppHooks {
   openapi?: boolean | OpenApiConfig | undefined
   // Serves an MCP endpoint at `/mcp` over Streamable HTTP, or at `mcp: { path: '/tools' }`, for an agent to call the app: a tool per API route that sets `tool` in its `detail`, and per action that sets `tool` on its protection. A call runs through the same guards, rate limits and `ctx.locals` as a fetch would.
   mcp?: boolean | McpConfig | undefined
-  // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
-  health?: HealthConfig | boolean | undefined
-  // Serves `/metrics` in the Prometheus text format for a collector: requests by method, route and status, their durations, scheduled runs, cache reads and live connections. Read only from this machine or a private network by a request no proxy forwarded, or from anywhere with the `Authorization: Bearer` token `KAY_METRICS_TOKEN` holds; `{ path }` moves it. Off by default, and under `kay dev`.
-  metrics?: boolean | MetricsConfig | undefined
-  // Serves a page of the app's queues at `/_kay/jobs` in production: each queue's waiting, running and failed jobs with payload and error, and a button to retry or delete one. It mounts only with a `guard`, a kay guard or a list of them such as `ctx => ctx.locals.auth.requireAdmin()`, which runs on every request, and without one the boot stops. `{ path }` moves it. Off by default, and under `kay dev`, whose dev tool has a Jobs tab.
-  jobs?: JobsConfig | undefined
   // Serves a request from another path, query included, such as a host's pages from a section: `url => url.hostname === 'blog.example.com' ? `/blog${url.pathname}` : undefined`. The browser keeps its URL.
   rewrite?: Rewrite | undefined
   // Old paths sent elsewhere with a 308, or the 301, 302 or 307 `status` names, and `{ status: 410 }` for a path that ended, which answers `Gone`: `{ '/blog/:slug': '/posts/:slug', '/docs/*': '/guide/*', '/old': { to: '/new', status: 301 }, '/retired': { status: 410 } }`. `kay check` reports a target no page serves and a 410 that has a `to`.
@@ -128,6 +115,29 @@ export interface KayConfig extends AppHooks {
   checks?: ProjectCheck[] | undefined
   // What libraries add to the app, each listed once: `extensions: [auth()]`.
   extensions?: KayExtension[] | undefined
+}
+
+export interface AssetsConfig {
+  images?: ImagesConfig | undefined
+  // Self-hosted fonts, declared on every page and preloaded where they ask for it.
+  fonts?: (FontConfig | FontsourceConfig)[] | undefined
+  // A square image, relative to the root, 512 pixels wide or more for sharp icons, a smaller one enlarged with a warning: kay serves it as `/favicon.ico`, `/apple-touch-icon.png` and the icons of `/manifest.webmanifest`, linked from every page. `{ image, svg }` adds an SVG of it, served as `/favicon.svg` and linked after the ICO; a square SVG alone is both, every icon drawn from it. Defaults to kay's own mark; `false` serves none.
+  favicon?: string | FaviconConfig | boolean | undefined
+  // The web manifest served with the favicon, named after `seo.name` and described by `seo.description`.
+  manifest?: ManifestConfig | undefined
+  // How long a browser keeps a file of `public/` without asking again, by the path it is served at, as a glob: `{ '/fonts/**': '365d', '**/*.png': '30d' }`; the first pattern a path matches decides, and a file none names keeps revalidating through its ETag on every visit. Ignored by `kay dev`, so an edit shows at once.
+  publicCache?: Record<string, Duration> | undefined
+}
+
+export interface OpsConfig {
+  // What an app watches the server by: its log, timing, request ids, traces and errors.
+  observe?: ObserveConfig | undefined
+  // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
+  health?: HealthConfig | boolean | undefined
+  // Serves `/metrics` in the Prometheus text format for a collector: requests by method, route and status, their durations, scheduled runs, cache reads and live connections. Read only from this machine or a private network by a request no proxy forwarded, or from anywhere with the `Authorization: Bearer` token `KAY_METRICS_TOKEN` holds; `{ path }` moves it. Off by default, and under `kay dev`.
+  metrics?: boolean | MetricsConfig | undefined
+  // Serves a page of the app's queues at `/_kay/jobs` in production: each queue's waiting, running and failed jobs with payload and error, and a button to retry or delete one. It mounts only with a `guard`, a kay guard or a list of them such as `ctx => ctx.locals.auth.requireAdmin()`, which runs on every request, and without one the boot stops. `{ path }` moves it. Off by default, and under `kay dev`, whose dev tool has a Jobs tab.
+  jobs?: JobsConfig | undefined
 }
 
 export interface ActionsConfig extends ActionHooks {
@@ -536,14 +546,15 @@ export interface CardConfig {
 
 export type TrailingSlash = 'never' | 'always' | 'ignore'
 
+// How the locales show in a URL: `'prefix'`, the default, serves the default locale's pages unprefixed and the others under `/en`; `'always'` puts the default locale under its prefix too, `/fr/about`, and an unprefixed path then redirects to the visitor's locale, from their cookie or their browser's languages; `{ domains: { fr: 'example.fr', en: 'example.com' } }` serves each locale on its own host in place of prefixes, a host not listed serving the default locale.
+export type I18nMode = 'prefix' | 'always' | { domains: Record<string, string> }
+
 export interface I18nConfig {
   // BCP 47 tags, `['fr', 'en']`.
   locales: string[]
-  defaultLocale: string
-  // The default locale under its prefix too, `/fr/about`; an unprefixed path then redirects to the visitor's locale, from their cookie or their browser's languages. Off by default, the default locale's pages unprefixed.
-  prefixDefault?: boolean | undefined
-  // Each locale's host, `{ fr: 'example.fr', en: 'example.com' }`, in place of prefixes; a host not listed serves the default locale.
-  domains?: Record<string, string> | undefined
+  // The locale a path naming none is served in, one of `locales`.
+  default: string
+  mode?: I18nMode | undefined
   // A page's path in the locales naming it their own way, by the pattern the page is served under: `{ '/about': { fr: '/a-propos' }, '/blog/:slug': { fr: '/articles/:slug' } }`; its untranslated path in that locale redirects there.
   paths?: Record<string, Record<string, string>> | undefined
   // The directory of the `<locale>.ts` message files, relative to the root: `src/messages` by default.
@@ -647,7 +658,7 @@ export type ConfigCors = Omit<CorsOptions, 'origins' | 'credentials'> & ({ origi
 type Over<Bag, Given> = Omit<Bag, keyof Given> & Given
 
 // What `kay.config.ts` may write: `KayConfig` with each list that may come from a CMS or a database loadable, and the keys of before 1.105 `kay check --fix` rewrites. Kay turns it into a `KayConfig` as it loads.
-export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'robots' | 'redirects' | 'i18n' | 'images' | 'observe'> {
+export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'robots' | 'redirects' | 'i18n' | 'assets' | 'ops'> {
   /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */
   onStart?: AppHooks['onListen']
   /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */
@@ -656,15 +667,45 @@ export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'prox
   search?: ClientConfig['search']
   /** @deprecated Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108. */
   links?: ClientConfig['links']
+  /** @deprecated Written `assets.images`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
+  images?: ImagesInput | undefined
+  /** @deprecated Written `assets.fonts`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
+  fonts?: AssetsConfig['fonts']
+  /** @deprecated Written `assets.favicon`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
+  favicon?: AssetsConfig['favicon']
+  /** @deprecated Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
+  manifest?: AssetsConfig['manifest']
+  /** @deprecated Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
+  publicCache?: AssetsConfig['publicCache']
+  /** @deprecated Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
   observe?: ObserveInput | undefined
+  /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
+  health?: OpsConfig['health']
+  /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
+  metrics?: OpsConfig['metrics']
+  /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
+  jobs?: OpsConfig['jobs']
+  assets?: Over<AssetsConfig, { images?: ImagesInput | undefined }> | undefined
+  ops?: Over<OpsConfig, { observe?: ObserveInput | undefined }> | undefined
   cors?: ConfigCors | undefined
   security?: boolean | Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined }> | undefined
   proxy?: boolean | number | Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined }> | undefined
   robots?: boolean | Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined, allow?: Loadable<string[]> | undefined }> | undefined
   redirects?: Loadable<Redirects> | undefined
-  i18n?: Over<I18nConfig, { paths?: Loadable<Record<string, Record<string, string>>> | undefined }> | undefined
-  images?: ImagesInput | undefined
+  i18n?: I18nInput | undefined
 }
+
+// `i18n` as an app written it before 1.105 may still: `defaultLocale`, `prefixDefault` and `domains`, each of which works until 1.108.
+export interface DeprecatedI18n {
+  /** @deprecated Written `default`; `deprecated-i18n-keys` rewrites it. Removed in 1.108. */
+  defaultLocale?: string | undefined
+  /** @deprecated Written `mode: 'always'`; `deprecated-i18n-keys` rewrites it. Removed in 1.108. */
+  prefixDefault?: boolean | undefined
+  /** @deprecated Written `mode: { domains }`; `deprecated-i18n-keys` rewrites it. Removed in 1.108. */
+  domains?: Record<string, string> | undefined
+}
+
+export type I18nInput = Over<I18nConfig, { default?: string | undefined, paths?: Loadable<Record<string, Record<string, string>>> | undefined }> & DeprecatedI18n
 
 // `observe` as an app written it before 1.105 may still: `onError` here, `log` as `'json'` or a function.
 export type ObserveInput = Omit<ObserveConfig, 'log'> & {

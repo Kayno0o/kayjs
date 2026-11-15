@@ -65,8 +65,12 @@ kay [./mount] mount	1.108.0	deprecated-import-path	Import `mount` from `kay`, it
 kay [./server] KayConfig.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.links	1.108	deprecated-client-keys	Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108.
+kay [./server] PagesOptions.manifest	1.108	deprecated-config-groups	Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./server] PagesOptions.metrics	1.108	deprecated-config-groups	Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./server] PagesOptions.observe	1.108	deprecated-config-groups	Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.offline	1.108	deprecated-client-keys	Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.onStart	1.108	deprecated-app-hooks	Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108.
+kay [./server] PagesOptions.publicCache	1.108	deprecated-config-groups	Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.search	1.108	deprecated-client-keys	Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./server] QueueOptions.lostAfter	1.108	deprecated-job-options	`timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it.
 kay [./server] RateLimit	1.108.0	deprecated-import-path	Import `RateLimit` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
@@ -82,8 +86,12 @@ kay [./server] schedule	1.108	deprecated-schedule-call	`schedule({ cron }, job)`
 kay [./server] sqliteCache	1.108.0	deprecated-import-path	Import `sqliteCache` from `kay/cache`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./test] TestOptions.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.links	1.108	deprecated-client-keys	Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108.
+kay [./test] TestOptions.manifest	1.108	deprecated-config-groups	Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./test] TestOptions.metrics	1.108	deprecated-config-groups	Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108.
+kay [./test] TestOptions.observe	1.108	deprecated-config-groups	Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.offline	1.108	deprecated-client-keys	Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.onStart	1.108	deprecated-app-hooks	Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108.
+kay [./test] TestOptions.publicCache	1.108	deprecated-config-groups	Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.search	1.108	deprecated-client-keys	Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./test] TestSite.refusal	1.108.0	deprecated-test-helpers	`site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 kay [./test] TestSite.socketRefusal	1.108.0	deprecated-test-helpers	`site.socket.refused`, beside the `site.socket` it refuses. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.

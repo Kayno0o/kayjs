@@ -11,7 +11,7 @@ import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '../src/cli.ts')
 const dirs: string[] = []
-const i18n = { locales: ['en', 'fr', 'de'], defaultLocale: 'en' }
+const i18n = { locales: ['en', 'fr', 'de'], default: 'en' }
 
 afterAll(async () => {
   await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))
@@ -42,7 +42,7 @@ const library = {
 }
 const site = {
   ...library,
-  'kay.config.ts': `export default { favicon: false, i18n: ${JSON.stringify(i18n)}, extensions: [{ name: 'kay-lib', messages: './lib/messages', commands: { 'hello world': './lib/hello.ts', 'i18n translate': './lib/translate.ts' } }] }\n`,
+  'kay.config.ts': `export default { assets: { favicon: false }, i18n: ${JSON.stringify(i18n)}, extensions: [{ name: 'kay-lib', messages: './lib/messages', commands: { 'hello world': './lib/hello.ts', 'i18n translate': './lib/translate.ts' } }] }\n`,
   'src/messages/en.ts': messages('{\n  nav: { home: \'Home\', about: \'About\' },\n  items: { one: \'{count} item\', other: \'{count} items\' },\n}'),
   'src/messages/fr.ts': messages('{\n  nav: {\n    home: \'Accueil\',\n    about: \'À propos\', // draft\n  },\n  items: { one: \'{count} article\', other: \'{count} articles\' }, // draft: checked by no one\n  // draft notes about nothing\n}'),
   'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nexport const news = collection(\'content/news\', { schema: t.Object({ title: t.String() }), localized: true })\nexport const pages = collection(\'content/pages\', { schema: t.Object({ title: t.String() }) })\n',
@@ -209,7 +209,7 @@ describe('draft messages', () => {
 describe('draft entries', () => {
   const config = 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nconst schema = t.Object({ title: t.String() })\n\nexport const news = collection(\'content/news\', { schema, localized: true })\nexport const notes = collection(\'content/notes\', { schema })\nexport const held = collection(\'content/held\', { schema: t.Object({ title: t.String(), draft: t.Optional(t.Boolean()) }), localized: true, draft: \'draft\' })\n'
   const entries = {
-    'kay.config.ts': `export default { favicon: false, i18n: ${JSON.stringify(i18n)} }\n`,
+    'kay.config.ts': `export default { assets: { favicon: false }, i18n: ${JSON.stringify(i18n)} }\n`,
     'src/messages/en.ts': messages('{}'),
     'src/messages/fr.ts': messages('{}'),
     'src/messages/de.ts': messages('{}'),
@@ -333,7 +333,7 @@ describe('kay i18n', () => {
   })
 
   it('fails when the default locale\'s messages do not read, rather than saying a locale lacks nothing', async () => {
-    const root = await project({ ...site, 'kay.config.ts': `export default { favicon: false, i18n: ${JSON.stringify(i18n)} }\n`, 'src/messages/en.ts': 'export default 1\n' })
+    const root = await project({ ...site, 'kay.config.ts': `export default { assets: { favicon: false }, i18n: ${JSON.stringify(i18n)} }\n`, 'src/messages/en.ts': 'export default 1\n' })
 
     await expect(missingTranslations(root, { i18n })).rejects.toThrow('kay: src/messages/en.ts must export its messages by default')
 
@@ -345,7 +345,7 @@ describe('kay i18n', () => {
   })
 
   it('refuses a site without i18n', async () => {
-    const root = await project({ 'kay.config.ts': 'export default { favicon: false }\n' })
+    const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false } }\n' })
     const { stderr, code } = await kay(['i18n', 'missing'], root)
 
     expect(code).toBe(1)
@@ -408,7 +408,7 @@ describe('commands an extension adds', () => {
   })
 
   it('list a multi-word command by its usage under its first word, reading only the modules that help lists', async () => {
-    const root = await project({ ...site, 'lib/bad.ts': 'throw new Error(\'broken module\')\n', 'kay.config.ts': `export default { favicon: false, extensions: [{ name: 'kay-lib', commands: { 'hello world': './lib/hello.ts', 'other thing': './lib/bad.ts' } }] }\n` })
+    const root = await project({ ...site, 'lib/bad.ts': 'throw new Error(\'broken module\')\n', 'kay.config.ts': `export default { assets: { favicon: false }, extensions: [{ name: 'kay-lib', commands: { 'hello world': './lib/hello.ts', 'other thing': './lib/bad.ts' } }] }\n` })
     const group = await kay(['hello', '--help'], root)
     const top = await kay(['--help'], root)
 
@@ -427,7 +427,7 @@ describe('commands an extension adds', () => {
   })
 
   it('stop at a name kay has, one under a kay command, or one two extensions give, naming both', async () => {
-    const clash = async (commands: string, more = '') => project({ ...library, 'kay.config.ts': `export default { favicon: false, extensions: [{ name: 'kay-lib', commands: ${commands} }${more}] }\n` })
+    const clash = async (commands: string, more = '') => project({ ...library, 'kay.config.ts': `export default { assets: { favicon: false }, extensions: [{ name: 'kay-lib', commands: ${commands} }${more}] }\n` })
 
     expect((await kay(['hello', 'world'], await clash('{ check: \'./lib/hello.ts\' }'))).stderr).toBe('error: kay: the extension kay-lib adds the command `kay check`, which kay has\n')
     expect((await kay(['hello', 'world'], await clash('{ \'i18n missing\': \'./lib/hello.ts\' }'))).stderr).toBe('error: kay: the extension kay-lib adds the command `kay i18n missing`, which kay has\n')
@@ -443,7 +443,7 @@ describe('commands an extension adds', () => {
   })
 
   it('leave a name no one has to the usage, and a module exporting no command said', async () => {
-    const root = await project({ ...library, 'lib/bad.ts': 'export const nothing = 1\n', 'kay.config.ts': 'export default { favicon: false, extensions: [{ name: \'kay-lib\', commands: { bad: \'./lib/bad.ts\' } }] }\n' })
+    const root = await project({ ...library, 'lib/bad.ts': 'export const nothing = 1\n', 'kay.config.ts': 'export default { assets: { favicon: false }, extensions: [{ name: \'kay-lib\', commands: { bad: \'./lib/bad.ts\' } }] }\n' })
     const unknown = await kay(['nope'], root)
 
     expect(unknown.code).toBe(2)
@@ -468,7 +468,7 @@ describe('commands an extension adds', () => {
 
 describe('commands an extension adds, nested', () => {
   it('stop at a command that begins with the words of another', async () => {
-    const root = await project({ ...library, 'kay.config.ts': 'export default { favicon: false, extensions: [{ name: \'kay-lib\', commands: { \'db\': \'./lib/hello.ts\', \'db migrate\': \'./lib/translate.ts\' } }] }\n' })
+    const root = await project({ ...library, 'kay.config.ts': 'export default { assets: { favicon: false }, extensions: [{ name: \'kay-lib\', commands: { \'db\': \'./lib/hello.ts\', \'db migrate\': \'./lib/translate.ts\' } }] }\n' })
 
     expect((await kay(['db'], root)).stderr).toContain('adds the command `kay db migrate`, which the command `kay db` of kay-lib takes as its arguments or as a group')
   })

@@ -592,7 +592,7 @@ describe.concurrent('kay mcp', () => {
 
     try {
       await Bun.write(join(site, 'package.json'), '{ "name": "site", "type": "module", "dependencies": { "kay": "*" } }\n')
-      await Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n')
+      await Bun.write(join(site, 'kay.config.ts'), 'export default { assets: { favicon: false }, i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }\n')
       await Bun.write(join(site, 'src/messages/en.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ nav: { home: \'Home\', about: \'About\' } })\n')
       await Bun.write(join(site, 'src/messages/fr.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ nav: { home: \'Accueil\' } })\n')
 

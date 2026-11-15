@@ -20,8 +20,8 @@ export async function missingTranslations(root: string, config: Pick<KayConfig, 
   const [messages, slugs] = await Promise.all([missingMessages(root, i18n, config.extensions), localizedSlugs(root, config.contentConfig)])
   const missing: Record<string, MissingTranslations> = {}
 
-  for (const locale of i18n.locales.filter(code => code !== i18n.defaultLocale)) {
-    const entries = [...slugs].map(([name, byLocale]) => [name, [...byLocale.get(i18n.defaultLocale) ?? []].filter(([key]) => !byLocale.get(locale)?.has(key)).map(([, slug]) => slug)] as const)
+  for (const locale of i18n.locales.filter(code => code !== i18n.default)) {
+    const entries = [...slugs].map(([name, byLocale]) => [name, [...byLocale.get(i18n.default) ?? []].filter(([key]) => !byLocale.get(locale)?.has(key)).map(([, slug]) => slug)] as const)
 
     missing[locale] = { messages: Object.fromEntries(messages.get(locale) ?? []), entries: Object.fromEntries(entries.filter(([, lacked]) => lacked.length > 0)) }
   }

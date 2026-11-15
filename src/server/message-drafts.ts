@@ -54,8 +54,8 @@ export async function writeDraftMessages(root: string, config: Pick<KayConfig, '
   if (!i18n)
     throw new KayError('locales-invalid', 'kay: writeDraftMessages writes a locale\'s messages, and kay.config.ts sets no i18n')
 
-  if (!i18n.locales.includes(locale) || locale === i18n.defaultLocale)
-    throw new KayError('locales-invalid', `kay: writeDraftMessages was given the locale ${JSON.stringify(locale)}, which is not one of those translated from ${i18n.defaultLocale}: ${i18n.locales.filter(code => code !== i18n.defaultLocale).join(', ')}`)
+  if (!i18n.locales.includes(locale) || locale === i18n.default)
+    throw new KayError('locales-invalid', `kay: writeDraftMessages was given the locale ${JSON.stringify(locale)}, which is not one of those translated from ${i18n.default}: ${i18n.locales.filter(code => code !== i18n.default).join(', ')}`)
 
   const file = messagesFile(root, i18n, locale)
   let source = existsSync(file) ? await Bun.file(file).text() : 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n'

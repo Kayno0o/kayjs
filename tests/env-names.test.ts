@@ -25,7 +25,7 @@ const HOST_SET = new Set(['PORT', 'HOST', 'SITE_URL', 'SITE_BASE'])
 
 describe('environment variable names', () => {
   it('start KAY_ for every variable kay reads, apart from the ones a host sets', async () => {
-    const root = await project({ 'kay.config.ts': 'export default { favicon: false, metrics: true, proxy: { key: "x-key" }, mcp: { key: true } }\n' })
+    const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, metrics: true, proxy: { key: "x-key" }, mcp: { key: true } }\n' })
 
     buildingWithoutEnv()
 

@@ -255,5 +255,5 @@ export default defineConfig({ guards: { default: 'closed' } }) // 'open' keeps e
 - `safePath(root, name)` from `kay/server` is the real path of the file `name` names inside `root`, relative to the working directory or absolute, or `undefined`: `safePath('media', name)`, never `join('media', name)`, for a `name` a visitor typed.
 - Symlinks are followed on both sides, so `../x`, a symlink leading out, a NUL byte, an empty name, a directory and a missing file all give `undefined`; a root that is itself a symlink works.
 - A leading slash reads as the root, never the filesystem's, and nothing is decoded: `%2e%2e` is a file of that name.
-- It does synchronous I/O, and the check runs when it is called, so a link swapped after it is not seen; open the returned path at once, as `images.resolve` does. A `name` that is not a string gives `undefined`.
+- It does synchronous I/O, and the check runs when it is called, so a link swapped after it is not seen; open the returned path at once, as `assets.images.resolve` does. A `name` that is not a string gives `undefined`.
 - It does not stop a hard link to a file outside the folder, which only the app creates.

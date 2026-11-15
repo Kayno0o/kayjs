@@ -207,7 +207,7 @@ describe('server islands', () => {
           const copy = await fixtureCopy('server-islands')
           const copied = join(copy, 'src/routes')
           const build = await scratchBuild()
-          const i18n = french ? { i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: join(copy, 'src/messages') } } : {}
+          const i18n = french ? { i18n: { locales: ['en', 'fr'], default: 'en', messages: join(copy, 'src/messages') } } : {}
 
           await Bun.write(join(copy, 'src/components/rows.kay'), rowsKay(nested))
           await Bun.write(join(copied, 'rows.kay'), pageKay('server '))

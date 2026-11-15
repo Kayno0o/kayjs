@@ -80,16 +80,16 @@ describe('a library\'s message catalog, declared in its package.json', () => {
   })
 
   test('stands in for the app\'s missing fr.ts, so a site in two locales loads with no catalog for fr of its own, the default locale having none of the library\'s', async () => {
-    const root = await project('export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n', { 'src/messages/en.ts': MESSAGES('{ home: \'Home\' }') })
-    const { translations } = await loadI18n(root, { locales: ['en', 'fr'], defaultLocale: 'en' }, (await loadConfig(root)).extensions)
+    const root = await project('export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }\n', { 'src/messages/en.ts': MESSAGES('{ home: \'Home\' }') })
+    const { translations } = await loadI18n(root, { locales: ['en', 'fr'], default: 'en' }, (await loadConfig(root)).extensions)
 
     expect(lookup(translations.get('fr')!, 'lib.cancel')).toBe('Annuler')
     expect(lookup(translations.get('en')!, 'lib.cancel')).toBeUndefined()
   })
 
   test('lets the default locale have no file of its own while the library ships a catalog, its English being inline in wording()', async () => {
-    const root = await project('export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n')
-    const { translations } = await loadI18n(root, { locales: ['en', 'fr'], defaultLocale: 'en' }, (await loadConfig(root)).extensions)
+    const root = await project('export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }\n')
+    const { translations } = await loadI18n(root, { locales: ['en', 'fr'], default: 'en' }, (await loadConfig(root)).extensions)
 
     expect(lookup(translations.get('fr')!, 'lib.cancel')).toBe('Annuler')
     expect(lookup(translations.get('en')!, 'lib.cancel')).toBeUndefined()
@@ -103,7 +103,7 @@ describe('a library\'s message catalog, declared in its package.json', () => {
 
   test('leaves a locale it has no catalog for to the app\'s own, then the default locale\'s', async () => {
     const root = await project('export default {}\n', { 'src/messages/en.ts': MESSAGES('{ lib: { cancel: \'Cancel\' } }'), 'src/messages/de.ts': MESSAGES('{ lib: { title: \'Titel\' } }') })
-    const config = { locales: ['en', 'de'], defaultLocale: 'en' }
+    const config = { locales: ['en', 'de'], default: 'en' }
     const { translations } = await loadI18n(root, config, (await loadConfig(root)).extensions)
     const de = translations.get('de')!
 
@@ -127,7 +127,7 @@ describe('a ui.* or cms.* key an app words under its pre-1.72 Label name', () =>
       'node_modules/kay-lib/messages/fr.ts': MESSAGES('{ ui: { table: { filter: \'Filtre\' } } }'),
       'src/messages/fr.ts': MESSAGES('{ ui: { table: { filterLabel: \'Filtrer\' } } }'),
     })
-    const { translations } = await loadI18n(root, { locales: ['fr'], defaultLocale: 'fr' }, (await loadConfig(root)).extensions)
+    const { translations } = await loadI18n(root, { locales: ['fr'], default: 'fr' }, (await loadConfig(root)).extensions)
 
     expect(lookup(translations.get('fr')!, 'ui.table.filter')).toBe('Filtre')
   })

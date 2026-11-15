@@ -1,6 +1,6 @@
 # Caching and streaming
 
-A page sends nothing until every `await` of its `--- server` fence (and its layouts' loads) has settled, so a slow load is a click that waits as long. The rule: await in the fence only what the first paint needs, start the rest unawaited so an `await` block streams it, and cache what every request shares. Independent awaits written one after the other add their times; `serial-awaits` finds them and the editor offers one `Promise.all` (not applied by `--fix`: keep a guard such as `await requireUser()` in its own statement first). In development kay warns, in the console and the dev tool's Request tab, when a page's loads pass `observe.loadBudget` (`'300ms'` by default, `false` for none), naming the slowest load.
+A page sends nothing until every `await` of its `--- server` fence (and its layouts' loads) has settled, so a slow load is a click that waits as long. The rule: await in the fence only what the first paint needs, start the rest unawaited so an `await` block streams it, and cache what every request shares. Independent awaits written one after the other add their times; `serial-awaits` finds them and the editor offers one `Promise.all` (not applied by `--fix`: keep a guard such as `await requireUser()` in its own statement first). In development kay warns, in the console and the dev tool's Request tab, when a page's loads pass `ops.observe.loadBudget` (`'300ms'` by default, `false` for none), naming the slowest load.
 
 ## Common tasks
 
@@ -125,9 +125,9 @@ const html = await renderToString(Mail, { order }, { locale: 'fr' })
 | A collection's loader | its `ttl` | `invalidate(collection)` |
 | A prerendered page | the page's `ttl` | `invalidate({ page: path })`, `invalidatePage`, or an `invalidate` of what it read |
 | The sitemap | 1 hour, `sitemap: { ttl }` in kay.config.ts | the ttl |
-| Image variants | 30 days, `images: { ttl }` in kay.config.ts | the ttl |
+| Image variants | 30 days, `assets.images.ttl` in kay.config.ts | the ttl |
 | Feeds | 1 hour, `public, max-age=3600` | the ttl |
-| Public files | `publicCache` in kay.config.ts | a new file name |
+| Public files | `assets.publicCache` in kay.config.ts | a new file name |
 | A CDN's copy of a public prerendered page | `s-maxage` of the page's `cache`, its own `cache-control` parts override it ([a CDN in front](cdn-caching.md)) | the CDN's own purge |
 
 - `invalidate(target)` takes a string key, a function over keys, a `cache()` function, a `cacheTag()`, a collection, or on the server `{ page: path }` (a path or a function over paths).

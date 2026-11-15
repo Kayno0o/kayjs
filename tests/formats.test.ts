@@ -13,7 +13,7 @@ const cli = join(import.meta.dir, '../src/cli.ts')
 const dirs: string[] = []
 const counter = '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n'
 // A config writing to stdout as it loads, as an app's may, which a document on stdout must not take in.
-const noisyConfig = 'console.log(\'loading the config\')\nprocess.stdout.write(\'written\\n\')\n\nexport default { favicon: false }\n'
+const noisyConfig = 'console.log(\'loading the config\')\nprocess.stdout.write(\'written\\n\')\n\nexport default { assets: { favicon: false } }\n'
 
 afterAll(async () => {
   await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))
@@ -121,7 +121,7 @@ describe('kay build --format json', () => {
 
   it('gives the pages a static export wrote and where', async () => {
     const root = await project({
-      'kay.config.ts': 'export default { favicon: false }\n',
+      'kay.config.ts': 'export default { assets: { favicon: false } }\n',
       'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\np Home\n',
       'src/routes/about.kay': '--- server\nexport const page = { prerender: true }\n---\np About\n',
     })
@@ -135,7 +135,7 @@ describe('kay build --format json', () => {
   }, 30_000)
 
   it('compiles a project with no server entry into an executable serving its pages on PORT', async () => {
-    const root = await project({ 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'p Home\n' })
+    const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false } }\n', 'src/routes/index.kay': 'p Home\n' })
     const built = await kay(['build', root, '--no-check', '--compile', join(root, 'server'), '--verify'])
 
     expect(built.code, built.stderr).toBe(0)
@@ -143,7 +143,7 @@ describe('kay build --format json', () => {
   }, 60_000)
 
   it('verifies an executable whose proxy.key is only on the deploy host', async () => {
-    const root = await project({ 'kay.config.ts': 'export default { favicon: false, proxy: { key: \'x-upstream-key\' } }\n', 'src/routes/index.kay': 'p Home\n' })
+    const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, proxy: { key: \'x-upstream-key\' } }\n', 'src/routes/index.kay': 'p Home\n' })
     const env = { ...process.env }
 
     delete env.KAY_PROXY_KEY
@@ -155,7 +155,7 @@ describe('kay build --format json', () => {
   }, 60_000)
 
   it('bakes the module an extension names its server plugin by into the executable', async () => {
-    const config = 'export default { favicon: false, extensions: [{ name: \'own\', serverModule: { path: \'./src/own\', export: \'own\' } }] }\n'
+    const config = 'export default { assets: { favicon: false }, extensions: [{ name: \'own\', serverModule: { path: \'./src/own\', export: \'own\' } }] }\n'
     const own = 'import { Elysia } from \'elysia\'\n\nexport const own = new Elysia().get(\'/own/ping\', () => \'pong\')\n'
     const root = await project({ 'kay.config.ts': config, 'src/routes/index.kay': 'p Home\n', 'src/own.ts': own })
     const built = await kay(['build', root, '--no-check', '--compile', join(root, 'server'), '--verify'])
@@ -190,7 +190,7 @@ describe('kay build --format json', () => {
 
   it('starts the executable it compiled under --verify, and fails the build with the server\'s own error when it cannot start', async () => {
     const serving = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nnew Elysia().use(await pages()).listen(Number(process.env.PORT))\n'
-    const files = { 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'p Home\n' }
+    const files = { 'kay.config.ts': 'export default { assets: { favicon: false } }\n', 'src/routes/index.kay': 'p Home\n' }
     const working = await project({ ...files, 'src/server.ts': serving })
     const verified = await kay(['build', working, '--no-check', '--compile', join(working, 'server'), '--verify', '--format', 'json'])
 
@@ -231,7 +231,7 @@ describe('kay build --format json', () => {
     // An API module reading the same secret at the top of its module, which loads before the entry does.
     // It reads the values at load, as `session({ secret })` does and refuses a secret under 32 characters: a string reads as a placeholder long enough for that, any other type as undefined.
     const secret = 'import { s } from \'kay\'\nimport { api, defineEnv } from \'kay/server\'\n\nconst env = defineEnv(s.Object({ KAY_TEST_SECRET: s.String({ requiredInProduction: true }), KAY_TEST_LONG: s.String({ minLength: 40 }), KAY_TEST_PORT: s.Number({ requiredInProduction: true }) }))\n\nif (env.KAY_TEST_SECRET.length < 32 || env.KAY_TEST_LONG.length < 40 || env.KAY_TEST_PORT !== undefined)\n  throw new Error(\'no placeholder\')\n\nexport default api().get(\'/\', () => \'ok\')\n'
-    const files = { 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'p Home\n', 'src/api/secret.ts': secret, 'src/server.ts': entry }
+    const files = { 'kay.config.ts': 'export default { assets: { favicon: false } }\n', 'src/routes/index.kay': 'p Home\n', 'src/api/secret.ts': secret, 'src/server.ts': entry }
     const working = await project(files)
     const env = { ...process.env }
 
@@ -492,7 +492,7 @@ describe('kay build --format json', () => {
 
   it('gives a template that does not compile as a problem at its place, and the stage it stopped', async () => {
     const root = await project({
-      'kay.config.ts': 'export default { favicon: false }\n',
+      'kay.config.ts': 'export default { assets: { favicon: false } }\n',
       'src/routes/index.kay': 'p Home\neach x in y\n  p {x}\n',
     })
     const { stdout, code } = await kay(['build', root, '--no-check', '--format', 'json'])
@@ -521,14 +521,14 @@ describe('kay build --format json', () => {
   it('gives an error kay raised its code, whether it stops the build before it starts or while it exports', async () => {
     const config = await project({ 'kay.config.ts': 'export const config = {}\n', 'src/routes/index.kay': 'p Home\n' })
     const guarded = await project({
-      'kay.config.ts': 'export default { favicon: false }\n',
+      'kay.config.ts': 'export default { assets: { favicon: false } }\n',
       'src/routes/index.kay': 'p Home\n',
       'src/routes/team/[id].kay': '--- server\nexport const page = { prerender: false }\n---\np Team\n',
     })
     const unloaded = await kay(['build', config, '--no-check', '--format', 'json'])
     const exported = await kay(['build', guarded, '--no-check', '--static', '--format', 'json'])
 
-    const globbed = await project({ 'kay.config.ts': 'export default { favicon: false }\n', 'src/components/globbed.kay': '---\nimport { signal } from \'kay\'\n\nconst pattern = \'./*.ts\'\nconst files = import.meta.glob(pattern)\nconst n = signal(Object.keys(files).length)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n', 'src/routes/index.kay': '---\nimport Globbed from \'../components/globbed.kay\'\n---\nGlobbed\n' })
+    const globbed = await project({ 'kay.config.ts': 'export default { assets: { favicon: false } }\n', 'src/components/globbed.kay': '---\nimport { signal } from \'kay\'\n\nconst pattern = \'./*.ts\'\nconst files = import.meta.glob(pattern)\nconst n = signal(Object.keys(files).length)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n', 'src/routes/index.kay': '---\nimport Globbed from \'../components/globbed.kay\'\n---\nGlobbed\n' })
     const bundled = await kay(['build', globbed, '--no-check', '--format', 'json'])
 
     expect(document<{ problems: { code: string }[] }>(bundled.stdout).problems.map(problem => problem.code)).toEqual(['glob-import'])
@@ -540,7 +540,7 @@ describe('kay build --format json', () => {
 describe('kay routes --format json', () => {
   it('gives each route with its kind, file, layouts and guards, every locale\'s copy included, what the app prints sent to stderr', async () => {
     const root = await project({
-      'kay.config.ts': noisyConfig.replace('export default { favicon: false }', 'export default { favicon: false, i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }'),
+      'kay.config.ts': noisyConfig.replace('export default { assets: { favicon: false } }', 'export default { assets: { favicon: false }, i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }'),
       'src/routes/_layout.kay': 'main\n  slot\n',
       'src/routes/index.kay': 'p Home\n',
       'src/routes/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n',

@@ -54,10 +54,10 @@ export interface StaticExport {
 
 // What a static export cannot do, checked before anything is built.
 export function refuseStaticConfig(config: KayConfig): void {
-  if (config.i18n?.domains)
-    throw new KayError('export-unsupported-config', 'kay: a static export is one directory for one host, so it cannot serve locales by domain; drop i18n.domains or deploy a server')
+  if (typeof config.i18n?.mode === 'object')
+    throw new KayError('export-unsupported-config', 'kay: a static export is one directory for one host, so it cannot serve locales by domain; drop the domains of i18n.mode or deploy a server')
 
-  if (config.images?.resolve)
+  if (config.assets?.images?.resolve)
     throw new KayError('export-unsupported-config', 'kay: a static export has no image route to resize what images.resolve looks up on each request; drop images.resolve or deploy a server')
 }
 
@@ -138,7 +138,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   // What kay serves itself comes from the app, as a server would answer it.
   // The extensions' server plugins are left out, since nothing a static site serves runs them and one may open a database.
   const extensions = config.extensions?.map(({ server: _, ...extension }) => extension)
-  const pages = await pagesApp(resolveProject(root, { ...config, extensions, observe: { ...config.observe, log: false }, serve: { ...config.serve, compress: false }, health: false, security: false }, project.mode), () => client, true)
+  const pages = await pagesApp(resolveProject(root, { ...config, extensions, ops: { ...config.ops, observe: { ...config.ops?.observe, log: false }, health: false }, serve: { ...config.serve, compress: false }, security: false }, project.mode), () => client, true)
   const app = new Elysia().use(pages.app)
 
   // Rendered a few at a time, so a page waiting on a data source or a hook does not hold the others back.
@@ -159,7 +159,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 
   // Rendered here rather than prerendered, so it goes through the page hooks as it is written.
   if (missing.status === 404 && missing.headers.get('content-type')?.startsWith('text/html')) {
-    const files = assetFiles({ clientDir: client.dir, publicDir, base: basePath(config.base), aspects: config.images?.aspects })
+    const files = assetFiles({ clientDir: client.dir, publicDir, base: basePath(config.base), aspects: config.assets?.images?.aspects })
 
     await Bun.write(join(out, '404.html'), await applyPageHooks(pageHooks(config.extensions), '/404.html', pages.locale, await missing.text(), files, pageSizes(files, { copiesOf: cachedCopies(cacheDir(root, 'compressed')), dir: client.dir })))
     written.push(join(out, '404.html'))

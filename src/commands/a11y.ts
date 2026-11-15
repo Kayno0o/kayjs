@@ -41,7 +41,7 @@ export const a11y: Command = {
       resolvePeer('axe-core', 'axe-core/axe.min.js')
 
       const config = await loadConfigWithin(root)
-      const standard = (values.standard as Standard | undefined) ?? (FRENCH.test(config.i18n?.defaultLocale ?? config.lang ?? '') ? 'rgaa' : 'wcag')
+      const standard = (values.standard as Standard | undefined) ?? (FRENCH.test(config.i18n?.default ?? config.lang ?? '') ? 'rgaa' : 'wcag')
       const quiet = values.quiet === true || format === 'json'
       const audit = await withStdoutOnStderr(async () => auditSite(root, config, (page) => {
         if (!quiet)

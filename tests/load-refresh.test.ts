@@ -7,7 +7,7 @@ const routesDir = 'tests/fixtures/load-refresh/src/routes'
 const site = await testSite({ dirs: { routes: routesDir }, islands: false })
 const based = await testSite({ dirs: { routes: routesDir }, islands: false, base: '/shop', trailingSlash: 'always' })
 const developing = await testSite({ dirs: { routes: routesDir }, islands: false, dev: true })
-const localized = await testSite({ dirs: { routes: routesDir }, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
+const localized = await testSite({ dirs: { routes: routesDir }, islands: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 const { counts, reset } = await import(join(import.meta.dir, 'fixtures/load-refresh/src/calls.ts')) as typeof import('./fixtures/load-refresh/src/calls')
 
 const LOADS = 'x-kay-loads'

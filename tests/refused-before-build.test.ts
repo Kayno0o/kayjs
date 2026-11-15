@@ -10,8 +10,8 @@ import { scratchDir } from './scratch'
 const routes = 'tests/fixtures/i18n/src/routes'
 const routing = 'tests/fixtures/routing/src/routes'
 const content = 'tests/fixtures/content/src/content.config.ts'
-const cards = { dirs: { routes: 'tests/fixtures/cards/src/routes' }, fonts: [{ family: 'Archivo Black', src: 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2' }] }
-const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' }
+const cards = { dirs: { routes: 'tests/fixtures/cards/src/routes' }, assets: { fonts: [{ family: 'Archivo Black', src: 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2' }] } }
+const i18n = { locales: ['fr', 'en'], default: 'fr', messages: 'tests/fixtures/i18n/src/messages' }
 
 // Serves `options` with a client loader that only counts, answering how many builds the server started and what it refused with.
 async function refusal(options: ServedOptions, root = process.cwd()): Promise<{ builds: number, message: string }> {
@@ -35,24 +35,24 @@ async function refusal(options: ServedOptions, root = process.cwd()): Promise<{ 
 
 describe('a refused config', () => {
   it.each([
-    ['images.maxDensity', { images: { maxDensity: 0.5 } }, 'images.maxDensity is 0.5'],
+    ['images.maxDensity', { assets: { images: { maxDensity: 0.5 } } }, 'images.maxDensity is 0.5'],
     ['markdown.readingSpeed', { markdown: { readingSpeed: 0 } }, 'readingSpeed'],
     ['an i18n locale with no messages', { i18n: { ...i18n, locales: ['fr', 'de'] } }, 'so its messages go in'],
     ['cors origins', { cors: { origins: ['example.com'] } }, 'no origin'],
     ['cors credentials', { cors: { origins: '*', credentials: true } as never }, 'credentials'],
-    ['health.timeout', { health: { timeout: 0 } }, 'health.timeout is'],
-    ['requestIdHeader', { observe: { requestIdHeader: 'x-bad header' } }, 'requestIdHeader is'],
+    ['health.timeout', { ops: { health: { timeout: 0 } } }, 'health.timeout is'],
+    ['requestIdHeader', { ops: { observe: { requestIdHeader: 'x-bad header' } } }, 'requestIdHeader is'],
     ['proxy', { proxy: {} }, 'kay: proxy'],
     ['a redirect from a page', { dirs: { routes: routing }, redirects: { '/about': '/bare' } }, 'the redirect from /about takes a path a page serves'],
-    ['the manifest startUrl', { manifest: { startUrl: 'notes' } }, 'the manifest\'s startUrl is a path of the site'],
+    ['the manifest startUrl', { assets: { manifest: { startUrl: 'notes' } } }, 'the manifest\'s startUrl is a path of the site'],
     ['an i18n path no page serves', { i18n: { ...i18n, paths: { '/contact': { en: '/reach-us' } } } }, 'translates /contact, which no page serves'],
     ['an i18n path another page takes', { i18n: { ...i18n, paths: { '/about': { en: '/' } } } }, 'are both served at / in en'],
     ['a content config that is missing', { contentConfig: 'tests/fixtures/content/src/missing.config.ts' }, 'there is no such file'],
     ['a feed without the site', { dirs: { routes: 'tests/fixtures/content/src/routes' }, contentConfig: content }, 'has a feed, whose links need the site\'s URL'],
     ['an mcp path a page serves', { dirs: { routes: 'tests/fixtures/mcp-clash/src/routes' }, mcp: true }, '`mcp` both serve /mcp'],
-    ['images.card.background', { ...cards, images: { card: { background: 'white' } } }, 'images.card.background is white'],
-    ['images.card.font', { ...cards, images: { card: { font: { family: 'Inter' } } } }, 'images.card.font names Inter'],
-    ['images.card.logo', { ...cards, images: { card: { logo: 'tests/fixtures/cards/src/none.svg' } } }, 'which does not exist'],
+    ['images.card.background', { ...cards, assets: { ...cards.assets, images: { card: { background: 'white' } } } }, 'images.card.background is white'],
+    ['images.card.font', { ...cards, assets: { ...cards.assets, images: { card: { font: { family: 'Inter' } } } } }, 'images.card.font names Inter'],
+    ['images.card.logo', { ...cards, assets: { ...cards.assets, images: { card: { logo: 'tests/fixtures/cards/src/none.svg' } } } }, 'which does not exist'],
   ] as [string, ServedOptions, string][])('starts no client build: %s', async (_, options, message) => {
     const refused = await refusal(options)
 
@@ -154,9 +154,9 @@ describe('a refused config naming files of the project', () => {
     await Bun.write(`${dir}/public/${MANIFEST.slice(1)}`, '{}')
 
     const favicon = 'tests/fixtures/cards/src/logo.svg'
-    const held = await refusal({ dirs: { public: `${dir}/public` }, favicon, manifest: { startUrl: 'notes' } })
-    const redirected = await refusal({ favicon, redirects: { [MANIFEST]: '/about' }, manifest: { startUrl: 'notes' } })
-    const made = await refusal({ favicon, manifest: { startUrl: 'notes' } })
+    const held = await refusal({ dirs: { public: `${dir}/public` }, assets: { favicon, manifest: { startUrl: 'notes' } } })
+    const redirected = await refusal({ assets: { favicon, manifest: { startUrl: 'notes' } }, redirects: { [MANIFEST]: '/about' } })
+    const made = await refusal({ assets: { favicon, manifest: { startUrl: 'notes' } } })
 
     expect(held.message).toBe('a build started')
     expect(redirected.message).toBe('a build started')

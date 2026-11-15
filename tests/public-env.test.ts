@@ -16,7 +16,7 @@ afterAll(async () => {
   await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))
 })
 
-async function project(files: Record<string, string>, config = 'export default { favicon: false }\n'): Promise<string> {
+async function project(files: Record<string, string>, config = 'export default { assets: { favicon: false } }\n'): Promise<string> {
   const root = await scratchDir('public-env-')
 
   dirs.push(root)
@@ -34,7 +34,7 @@ async function kay(args: string[], cwd: string, extra: Record<string, string> = 
 
 describe('s.Public with no publicEnv in the config', () => {
   it.each(['', '/shop'])('is served from /_kay/env.js, imported by the client entry and exported by kay build --static, under base %p', async (base) => {
-    const root = await project({ 'src/env.ts': env, 'src/map.kay': map, 'src/routes/index.kay': page }, `export default { favicon: false${base === '' ? '' : `, base: '${base}'`} }\n`)
+    const root = await project({ 'src/env.ts': env, 'src/map.kay': map, 'src/routes/index.kay': page }, `export default { assets: { favicon: false }${base === '' ? '' : `, base: '${base}'`} }\n`)
     const served = await kay(['render', `${base}/_kay/env.js`], root, { MAP_KEY: 'pk-1' })
 
     expect(served.stdout).toBe('export default {"MAP_KEY":"pk-1"}\n')

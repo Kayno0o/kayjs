@@ -3,6 +3,7 @@ import type { Edit } from './renamed-exports'
 import { basename } from 'node:path'
 import { lintLevel } from '../compiler/lints'
 import { constBindings, exportedObject, keyName, objectOf } from '../compiler/object-literal'
+import { featureProperties } from './config-objects'
 import { renamedCallOptions } from './renamed-call-options'
 import { scan } from './renamed-exports'
 
@@ -36,9 +37,10 @@ export async function guardOptions(root: string, options: CheckOptions): Promise
         report(base + required.start, base + required.end, '`requireGuards` is deprecated since 1.105: `guards: { default }` says what a route no guard covers comes to', 'write `guards: { default: \'closed\' }` for `true` and `\'open\'` for `false`', edits)
       }
 
-      for (const feature of exported?.properties ?? []) {
-        const name = feature.type === 'Property' ? keyName(feature) : undefined
-        const section = name === 'jobs' || name === 'images' ? objectOf((feature as Extract<typeof feature, { type: 'Property' }>).value, bindings) : undefined
+      const features = exported === undefined ? [] : [...featureProperties(exported, bindings, 'ops', 'jobs').map(feature => ({ name: 'jobs', feature })), ...featureProperties(exported, bindings, 'assets', 'images').map(feature => ({ name: 'images', feature }))]
+
+      for (const { name, feature } of features) {
+        const section = objectOf(feature.value, bindings)
         const properties = (section?.properties ?? []).filter((one): one is Extract<typeof one, { type: 'Property' }> => one.type === 'Property')
         const old = properties.find(one => keyName(one) === 'guard')
 

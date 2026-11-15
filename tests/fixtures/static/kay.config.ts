@@ -11,7 +11,7 @@ export default defineConfig({
   // The tests read the linked stylesheets and their files.
   client: { inlineStyles: false },
   // The test serves the remote image from a port of its own.
-  images: { maxDensity: 3, remote: process.env.KAY_TEST_REMOTE_ORIGIN ? [`${process.env.KAY_TEST_REMOTE_ORIGIN}/photos/`] : [] },
+  assets: { images: { maxDensity: 3, remote: process.env.KAY_TEST_REMOTE_ORIGIN ? [`${process.env.KAY_TEST_REMOTE_ORIGIN}/photos/`] : [] } },
   redirects: { '/old': '/about', '/blog/:slug': '/posts/:slug', '/moved': { to: '/about', status: 302 }, '/temp': { to: '/about', status: 307 }, '/kept': { to: '/about', status: 308 }, '/retired': { status: 410 }, '/retired-docs/*': { status: 410 } },
   // Lists the files each page links before its end, as a footer giving the page's weight would size them.
   extensions: [{

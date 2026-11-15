@@ -12,7 +12,7 @@ import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/kay-words'
-const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: 'src/messages' }
+const i18n = { locales: ['en', 'fr'], default: 'en', messages: 'src/messages' }
 const site = await testSite({ root: FIXTURE, i18n, limits: { body: 1024 * 1024 } })
 const { check, listed, guarded, owned, boom, slow } = await import(join(import.meta.dir, 'fixtures/kay-words/src/routes/index.kay')) as {
   check: Action<Record<string, string>, unknown>
@@ -143,7 +143,7 @@ describe('the offline page', () => {
   it('is worded in the default locale, in English without the keys', async () => {
     const keys = { root: FIXTURE, prebuilt: false, offline: true as const }
     const english = await offlinePage(await pages({ ...keys, i18n }))
-    const french = await offlinePage(await pages({ ...keys, i18n: { ...i18n, defaultLocale: 'fr' } }))
+    const french = await offlinePage(await pages({ ...keys, i18n: { ...i18n, default: 'fr' } }))
 
     expect(english).toContain('<html lang="en"')
     expect(english).toContain('<h1>Offline</h1><p>This page needs a connection, and none is open.</p>')
@@ -170,7 +170,7 @@ describe('kay check on the catalogs', () => {
   ai: { chat: { disclosure: 'Vous parlez à une IA {x}' }, other: 'Autre' },
 }`)
 
-    const problems = (await messageProblems(process.cwd(), { locales: ['en', 'fr'], defaultLocale: 'en', messages: relative(process.cwd(), messages) })).map(problem => problem.message)
+    const problems = (await messageProblems(process.cwd(), { locales: ['en', 'fr'], default: 'en', messages: relative(process.cwd(), messages) })).map(problem => problem.message)
 
     expect(problems.toSorted()).toEqual([
       'gives kay.action.bodyLimit without {size}, which its English has',
@@ -192,7 +192,7 @@ describe('kay check on the catalogs', () => {
     await write('en', '{ title: \'Words\' }')
     await write('fr', '{ title: \'Mots\', cms: { entry: { deleteMessage: \'Supprimer cette entrée ?\' }, table: { deleteMessage: \'Supprimer {title} ?\' } } }')
 
-    const problems = (await messageProblems(process.cwd(), { locales: ['en', 'fr'], defaultLocale: 'en', messages: relative(process.cwd(), messages) })).map(problem => problem.message)
+    const problems = (await messageProblems(process.cwd(), { locales: ['en', 'fr'], default: 'en', messages: relative(process.cwd(), messages) })).map(problem => problem.message)
 
     expect(problems).toHaveLength(1)
     expect(problems[0]).toContain('cms.entry.deleteMessage without {title}')
@@ -216,7 +216,7 @@ describe('kay check on the catalogs', () => {
 
       // kayjs-ui ships fr alone and kayjs-mail en and fr: de is held to the app's own keys.
       for (const defaultLocale of ['en', 'fr'])
-        expect((await messageProblems(root, { locales: ['en', 'fr', 'de'], defaultLocale }, extensions)).map(({ file, message }) => `${file}: ${message}`)).toEqual([`src/messages/de.ts: lacks bye, which src/messages/${defaultLocale}.ts has`])
+        expect((await messageProblems(root, { locales: ['en', 'fr', 'de'], default: defaultLocale }, extensions)).map(({ file, message }) => `${file}: ${message}`)).toEqual([`src/messages/de.ts: lacks bye, which src/messages/${defaultLocale}.ts has`])
     }
     finally {
       await rm(root, { recursive: true, force: true })

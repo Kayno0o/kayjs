@@ -596,7 +596,7 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
     root = await scratchDir('shot-')
     await mkdir(join(root, 'src/messages'), { recursive: true })
     await Bun.write(join(root, 'tsconfig.json'), tsconfig)
-    await Bun.write(join(root, 'kay.config.ts'), 'export default { base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }\n')
     await Bun.write(join(root, 'src/messages/en.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'Hello\' })\n')
     await Bun.write(join(root, 'src/messages/fr.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'Bonjour\' })\n')
     await route('about.kay', '--- server\nimport { t } from \'kay/i18n\'\n---\nh1 {t(\'title\')}\n')

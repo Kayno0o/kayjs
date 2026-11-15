@@ -8,7 +8,7 @@ import { buildFailure, KayError, raisedMark } from '../compiler/errors'
 import { CONFIG_FILE } from '../config'
 import { extensionAppFiles, extensionContexts, extensionServerModules, jobFiles, pluginFiles, serverExtensions } from '../config-extensions'
 import { implicitPlugins } from '../config-loader'
-import { switchOf } from '../config-switch'
+import { placeholderOf } from '../config-switch'
 import { PAGES_ENTRY } from '../dev/sources'
 import { projectApi } from '../server/api-modules'
 import { packageName } from '../server/app-identity'
@@ -135,7 +135,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     '',
     // Asks the server running beside it, rather than starting one, before any module of the app loads: a container's health check runs it every few seconds.
     'if (process.argv.includes(\'--health\'))',
-    '  process.exit(await probeHealth(config.health))',
+    '  process.exit(await probeHealth(config.ops?.health))',
     '',
     ...modules.map((file, index) => `const module${index} = await import(${JSON.stringify(file)})`),
     '',
@@ -191,7 +191,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
-    plugins: [withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, pages: pageDirs(root, config), cacheDir: paths.cache, settings: config.librarySettings, placeholder: switchOf(config.images?.placeholder), embedMaps: true, rewrite }), ...config.plugins ?? []],
+    plugins: [withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, pages: pageDirs(root, config), cacheDir: paths.cache, settings: config.librarySettings, placeholder: placeholderOf(config), embedMaps: true, rewrite }), ...config.plugins ?? []],
   })
 
   if (!build.success)

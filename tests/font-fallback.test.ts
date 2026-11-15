@@ -232,7 +232,7 @@ describe('metric-matched font fallbacks', () => {
       expect(css).toContain('@font-face{font-family:"Archivo Black Fallback";src:local("Arial")')
 
       for (const base of [undefined, '/docs']) {
-        const client = await buildClient(dir, { fonts, base })
+        const client = await buildClient(dir, { assets: { fonts }, base })
         const sheet = [...client.styles.values()].find(url => url.includes('index'))!
         const built = await Bun.file(join(client.dir, sheet.slice('/_kay/'.length))).text()
 

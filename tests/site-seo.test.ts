@@ -52,7 +52,7 @@ function other(path: string, status: number, location?: string): OtherPage {
   return { path, file: `/app/src/routes${path}.kay`, html: '', status, location }
 }
 
-const config: SiteSeo & { base?: string, redirects?: Record<string, string>, trailingSlash?: 'never' | 'always' | 'ignore' } = { site: SITE, favicon: false }
+const config: SiteSeo & { base?: string, redirects?: Record<string, string>, trailingSlash?: 'never' | 'always' | 'ignore' } = { site: SITE, assets: { favicon: false } }
 
 function lint(pages: RenderedPage[], others: OtherPage[] = [], over: Partial<typeof config> & { exported?: boolean, unseen?: boolean } = {}) {
   const { exported, unseen, ...rest } = over
@@ -101,8 +101,8 @@ describe('the head lints a page reads off the site', () => {
     expect(codes(config)).toEqual([['long-title', 'warning'], ['duplicate-description', 'warning']])
     expect(codes({ ...config, lints: { 'long-title': 'allow', 'duplicate-description': 'deny' } })).toEqual([['duplicate-description', 'error']])
     expect(codes({ ...config, lints: { seo: 'allow' } })).toEqual([])
-    expect(codes({ favicon: false })).toEqual([])
-    expect(codes({ favicon: false, lints: { seo: 'deny' } })).toEqual([['long-title', 'error'], ['duplicate-description', 'error']])
+    expect(codes({ assets: { favicon: false } })).toEqual([])
+    expect(codes({ assets: { favicon: false }, lints: { seo: 'deny' } })).toEqual([['long-title', 'error'], ['duplicate-description', 'error']])
   })
 })
 

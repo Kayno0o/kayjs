@@ -118,7 +118,7 @@ describe('a markdown block', () => {
   })
 
   it('writes its links in the locale of the page', async () => {
-    const site = await open({ i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: join(dir, 'messages') } })
+    const site = await open({ i18n: { locales: ['fr', 'en'], default: 'fr', messages: join(dir, 'messages') } })
     const links = async (path: string) => (await site.visit(path)).find('main a').map(element => element.attributes.href)
 
     expect(await links('/en')).toEqual(['/en/about', '/en/guide/about'])

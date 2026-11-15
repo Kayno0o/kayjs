@@ -63,22 +63,27 @@ export async function appHooks(root: string, options: CheckOptions): Promise<Che
           report(base + start.start, base + start.end, '`onStart` of the config is deprecated since 1.105: the hook that runs when the server listens is `onListen`, `onStart` naming where a job begins', 'write `onListen`', edits)
         }
 
-        const observe = propertyOf(object, 'observe')
-        const group = observe?.value.type === 'ObjectExpression' ? observe.value : undefined
+        const ops = propertyOf(object, 'ops')
+        const inOps = ops?.value.type === 'ObjectExpression' ? propertyOf(ops.value, 'observe') : undefined
 
-        if (observe === undefined || group === undefined)
-          continue
+        // The `onError` of an `observe` inside `ops` is reported with no fix: it moves to the top of the config, beside `ops`, which the fix of `observe` does not reach.
+        for (const [observe, nested] of [[propertyOf(object, 'observe'), false], [inOps, true]] as const) {
+          const group = observe?.value.type === 'ObjectExpression' ? observe.value : undefined
 
-        const [onError] = propertiesOf(group, 'onError')
-        const [log] = propertiesOf(group, 'log')
+          if (observe === undefined || group === undefined)
+            continue
 
-        if (onError !== undefined)
-          report(base + onError.start, base + onError.end, '`observe.onError` is deprecated since 1.105: the hooks are flat keys of the config, named by the moment they run', 'write `onError` beside `observe`', movedOnError(object, observe, group, onError, text, base) ?? null)
+          const [onError] = propertiesOf(group, 'onError')
+          const [log] = propertiesOf(group, 'log')
 
-        const grouped = log === undefined || log.shorthand ? undefined : groupedLog(log, text, base)
+          if (onError !== undefined)
+            report(base + onError.start, base + onError.end, '`observe.onError` is deprecated since 1.105: the hooks are flat keys of the config, named by the moment they run', nested ? 'write `onError` beside `ops`' : 'write `onError` beside `observe`', nested ? null : movedOnError(object, observe, group, onError, text, base) ?? null)
 
-        if (log !== undefined && grouped !== undefined)
-          report(base + log.value.start, base + log.value.end, '`observe.log` as `\'json\'` or a function is deprecated since 1.105: it is `{ format, requests, sink }`', `write \`${grouped.now}\``, grouped.edits)
+          const grouped = log === undefined || log.shorthand ? undefined : groupedLog(log, text, base)
+
+          if (log !== undefined && grouped !== undefined)
+            report(base + log.value.start, base + log.value.end, '`observe.log` as `\'json\'` or a function is deprecated since 1.105: it is `{ format, requests, sink }`', `write \`${grouped.now}\``, grouped.edits)
+        }
       }
     }
   })

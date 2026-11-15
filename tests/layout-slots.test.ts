@@ -16,7 +16,7 @@ const MAIN = /<main>([\s\S]*?)<\/main>/
 const app = await pages({ root: ROOT, prebuilt: false, security: false })
 const based = await pages({ root: ROOT, prebuilt: false, security: false, base: '/repo', trailingSlash: 'always' })
 const development = await pages({ root: ROOT, dev: true, security: false })
-const localized = await pages({ root: ROOT, prebuilt: false, security: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve(`${ROOT}/src/messages`) } })
+const localized = await pages({ root: ROOT, prebuilt: false, security: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve(`${ROOT}/src/messages`) } })
 
 async function get(server: Elysia, path: string): Promise<{ status: number, html: string, side: string, main: string }> {
   const response = await server.handle(new Request(`http://localhost${path}`))

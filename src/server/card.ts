@@ -121,7 +121,7 @@ const svgDrawings = new Map<string, Promise<Uint8Array>>()
 const requested = new Map<string, CardContent>()
 
 // What `images.card` refuses that needs no build: a colour that is none, a face the explicit `fonts` lack (a Fontsource family's faces are known once built).
-export function checkCardConfig(config: CardConfig | undefined, fonts: KayConfig['fonts']): void {
+export function checkCardConfig(config: CardConfig | undefined, fonts: NonNullable<KayConfig['assets']>['fonts']): void {
   if (config === undefined)
     return
 

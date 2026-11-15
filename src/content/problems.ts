@@ -18,7 +18,7 @@ buildingWithoutEnv()
 const loaded = await loadConfig(root!)
 
 setMarkdownDefaults(loaded.markdown)
-setImageColors(loaded.images?.placeholder !== false)
+setImageColors(loaded.assets?.images?.placeholder !== false)
 
 const { problems, uses, feeds, routes, read } = await contentProblems(root!, config === undefined || config === '' ? undefined : config, site === 'site')
 

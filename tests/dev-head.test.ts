@@ -64,7 +64,7 @@ describe('the dev tool\'s head check', () => {
     expect((await askAbout(based, '/', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
     expect((await askAbout(based, '/hidden', undefined, '/shop')).head).toMatchObject({ sitemap: 'unlisted' })
     expect((await askAbout({ ...based, trailingSlash: 'always' }, '/long/', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
-    expect((await askAbout({ ...based, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/layout-query/src/messages') } }, '/fr/long', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
+    expect((await askAbout({ ...based, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/layout-query/src/messages') } }, '/fr/long', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
 
     const dir = await scratchDir('dev-head-broken-')
 

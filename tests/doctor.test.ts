@@ -163,13 +163,13 @@ describe('kay doctor', () => {
   })
 
   it('refuses a config whose i18n default is none of its locales, as kay routes does', async () => {
-    const result = await doctor(await project({ 'kay.config.ts': 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'de\' } }\n' }))
+    const result = await doctor(await project({ 'kay.config.ts': 'export default { i18n: { locales: [\'en\', \'fr\'], default: \'de\' } }\n' }))
 
     expect(result.code).toBe(1)
     expect(result.check('config').ok).toBe(false)
-    expect(result.check('config').message).toContain('defaultLocale')
+    expect(result.check('config').message).toContain('i18n.default')
 
-    const both = await doctor(await project({ 'kay.config.ts': 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', prefixDefault: true, domains: { en: \'a.com\', fr: \'b.com\' } } }\n' }))
+    const both = await doctor(await project({ 'kay.config.ts': 'export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\', prefixDefault: true, domains: { en: \'a.com\', fr: \'b.com\' } } }\n' }))
 
     expect(both.check('config').message).toContain('not both')
   })
@@ -293,7 +293,7 @@ describe('kay doctor', () => {
     })
 
     it('takes KAY_PROXY_KEY_FILE for the proxy key a production server with proxy.key needs', async () => {
-      const root = await project({ 'kay.config.ts': 'export default { favicon: false, proxy: { key: "x-upstream-key" } }\n' })
+      const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, proxy: { key: "x-upstream-key" } }\n' })
       const production = { NODE_ENV: 'production' }
 
       expect((await doctor(root, [], production)).check('env').message).toContain('KAY_PROXY_KEY')
@@ -302,8 +302,8 @@ describe('kay doctor', () => {
     })
 
     it('takes KAY_MCP_KEY_FILE for the key a production server with mcp.key asks for, and asks nothing for { file }', async () => {
-      const root = await project({ 'kay.config.ts': 'export default { favicon: false, mcp: { key: true } }\n' })
-      const made = await project({ 'kay.config.ts': 'export default { favicon: false, mcp: { key: { file: "data/mcp-key" } } }\n' })
+      const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, mcp: { key: true } }\n' })
+      const made = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, mcp: { key: { file: "data/mcp-key" } } }\n' })
       const production = { NODE_ENV: 'production' }
 
       expect((await doctor(root, [], production)).check('env').message).toContain('KAY_MCP_KEY')

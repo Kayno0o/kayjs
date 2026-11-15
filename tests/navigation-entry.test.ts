@@ -30,7 +30,7 @@ async function sameDocument(page: TestPage): Promise<boolean> {
 // The entries of a production build: a page posting forms and holding no island loads navigation alone, which links and posts between such pages keep, a page holding islands loads in full from it, and a page running the islands' entry swaps the form-only pages in.
 const MODES: [name: string, options: TestOptions, prefix: string, slash: string][] = [
   ['at the root', {}, '', ''],
-  ['under a base with trailing slashes, in a locale', { base: '/blog', trailingSlash: 'always', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: MESSAGES } }, '/blog/en', '/'],
+  ['under a base with trailing slashes, in a locale', { base: '/blog', trailingSlash: 'always', i18n: { locales: ['fr', 'en'], default: 'fr', messages: MESSAGES } }, '/blog/en', '/'],
 ]
 
 for (const [name, options, prefix, slash] of MODES) {

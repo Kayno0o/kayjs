@@ -515,7 +515,7 @@ describe('the request hooks under a locale prefix and on a prerendered page', ()
         prebuilt: false,
         security: false,
         observe: { log: false },
-        i18n: { locales: ['en', 'fr'], defaultLocale: 'en' },
+        i18n: { locales: ['en', 'fr'], default: 'en' },
         beforeRequest: ({ request, url }) => {
           seen.push(url.pathname)
 

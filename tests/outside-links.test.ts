@@ -93,7 +93,7 @@ describe('a link leaving the site, in templates', () => {
   })
 
   it('opens the page\'s own links as on a localized page too', async () => {
-    const tags = await links({ site: 'https://x.example', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }, '/en')
+    const tags = await links({ site: 'https://x.example', i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }, '/en')
 
     expect(tags.static).toContain(OUT)
     expect(tags.root).not.toContain('target')

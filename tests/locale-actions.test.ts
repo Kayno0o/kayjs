@@ -14,7 +14,7 @@ const POSTS: Post[] = ['form', 'swap', 'island']
 interface Variant { base: string, trailingSlash: 'always' | 'never' | 'ignore', prefixDefault: boolean, dev: boolean }
 
 async function serve({ base, trailingSlash, prefixDefault, dev }: Variant): Promise<Elysia> {
-  const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages, prefixDefault }
+  const i18n: I18nConfig = { locales: ['fr', 'en'], default: 'fr', messages, ...prefixDefault && { mode: 'always' } }
 
   return new Elysia().use(await pages({ root, prebuilt: false, security: false, site: 'https://x.example', i18n, base: base || undefined, trailingSlash, dev }))
 }

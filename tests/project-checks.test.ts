@@ -33,7 +33,7 @@ async function check(root: string, ...args: string[]) {
 
 describe('checks in kay.config.ts', () => {
   it('exits 1 on a failing project check and names it with its file and line in --format json', async () => {
-    const root = await project('{\n  favicon: false,\n  checks: [async ({ root, report }) => {\n    if (!(await Bun.file(`${root}/compose.prod.yaml`).exists()))\n      report({ level: \'error\', message: \'compose.prod.yaml is missing\', file: \'compose.prod.yaml\', line: 3 })\n  }],\n}\n')
+    const root = await project('{\n  assets: { favicon: false },\n  checks: [async ({ root, report }) => {\n    if (!(await Bun.file(`${root}/compose.prod.yaml`).exists()))\n      report({ level: \'error\', message: \'compose.prod.yaml is missing\', file: \'compose.prod.yaml\', line: 3 })\n  }],\n}\n')
     const { code, errors, problems } = await check(root)
 
     expect(code).toBe(1)
@@ -42,7 +42,7 @@ describe('checks in kay.config.ts', () => {
   })
 
   it('reports a throwing check, sync or async, and still runs the others', async () => {
-    const root = await project('{\n  favicon: false,\n  checks: [\n    () => { throw new Error(\'sync boom\') },\n    async () => { throw new Error(\'async boom\') },\n    ({ report }) => report({ message: \'the third ran\' }),\n  ],\n}\n')
+    const root = await project('{\n  assets: { favicon: false },\n  checks: [\n    () => { throw new Error(\'sync boom\') },\n    async () => { throw new Error(\'async boom\') },\n    ({ report }) => report({ message: \'the third ran\' }),\n  ],\n}\n')
     const { code, problems } = await check(root)
 
     expect(code).toBe(1)
@@ -55,7 +55,7 @@ describe('checks in kay.config.ts', () => {
   })
 
   it('fails on a warning only under --deny-warnings, defaulting a finding to an error and its position to 1:1', async () => {
-    const root = await project('{ favicon: false, checks: [({ report }) => { report({ level: \'warning\', message: \'careful\', code: \'mine\' }) }] }\n')
+    const root = await project('{ assets: { favicon: false }, checks: [({ report }) => { report({ level: \'warning\', message: \'careful\', code: \'mine\' }) }] }\n')
 
     expect((await check(root)).code).toBe(0)
     expect((await check(root, '--deny-warnings')).code).toBe(1)
@@ -63,7 +63,7 @@ describe('checks in kay.config.ts', () => {
   })
 
   it('gives the project\'s routes once, when a check asks, and leaves project findings out of --only and --since', async () => {
-    const root = await project('{ favicon: false, checks: [async ({ routes, report }) => { const [a, b] = [await routes(), await routes()]; report({ message: `routes ${a.map(route => route.path).includes(\'/\')} ${a === b}` }) }] }\n')
+    const root = await project('{ assets: { favicon: false }, checks: [async ({ routes, report }) => { const [a, b] = [await routes(), await routes()]; report({ message: `routes ${a.map(route => route.path).includes(\'/\')} ${a === b}` }) }] }\n')
 
     expect((await check(root)).problems.map(({ message }) => message)).toEqual(['routes true false'])
     expect((await check(root, '--only', 'seo')).problems).toEqual([])
@@ -72,8 +72,8 @@ describe('checks in kay.config.ts', () => {
 
   it('computes the routes once however often asked, and not at all when no check asks', async () => {
     const api = 'import { appendFileSync } from \'node:fs\'\nimport { Elysia } from \'elysia\'\n\nappendFileSync(`${import.meta.dir}/../../loaded.txt`, \'x\')\nexport default new Elysia()\n'
-    const asking = await project('{ favicon: false, checks: [async ({ routes }) => { await Promise.all([routes(), routes()]); await routes() }] }\n', { 'src/api/count.ts': api })
-    const idle = await project('{ favicon: false, checks: [({ report }) => report({ level: \'warning\', message: \'idle\' })] }\n', { 'src/api/count.ts': api })
+    const asking = await project('{ assets: { favicon: false }, checks: [async ({ routes }) => { await Promise.all([routes(), routes()]); await routes() }] }\n', { 'src/api/count.ts': api })
+    const idle = await project('{ assets: { favicon: false }, checks: [({ report }) => report({ level: \'warning\', message: \'idle\' })] }\n', { 'src/api/count.ts': api })
 
     await check(asking)
     await check(idle)
@@ -82,14 +82,14 @@ describe('checks in kay.config.ts', () => {
   })
 
   it('runs the checks once with --fix, after the fixes', async () => {
-    const root = await project('{ favicon: false, checks: [async ({ root, report }) => { const { appendFileSync, readFileSync } = await import(\'node:fs\'); appendFileSync(`${root}/runs.txt`, readFileSync(`${root}/src/routes/index.kay`, \'utf8\').includes(\'onClick\') ? \'fixed\\n\' : \'unfixed\\n\') }] }\n', { 'src/routes/index.kay': 'button(onclick={() => undefined}) Hi\n' })
+    const root = await project('{ assets: { favicon: false }, checks: [async ({ root, report }) => { const { appendFileSync, readFileSync } = await import(\'node:fs\'); appendFileSync(`${root}/runs.txt`, readFileSync(`${root}/src/routes/index.kay`, \'utf8\').includes(\'onClick\') ? \'fixed\\n\' : \'unfixed\\n\') }] }\n', { 'src/routes/index.kay': 'button(onclick={() => undefined}) Hi\n' })
 
     await check(root, '--fix')
     expect(await Bun.file(join(root, 'runs.txt')).text()).toBe('fixed\n')
   })
 
   it('reports only the findings in the paths given', async () => {
-    const root = await project('{ favicon: false, checks: [({ report }) => { report({ message: \'a\', file: \'src/a.txt\' }); report({ message: \'b\', file: \'docs/b.txt\' }) }] }\n', { 'src/a.txt': '', 'docs/b.txt': '' })
+    const root = await project('{ assets: { favicon: false }, checks: [({ report }) => { report({ message: \'a\', file: \'src/a.txt\' }); report({ message: \'b\', file: \'docs/b.txt\' }) }] }\n', { 'src/a.txt': '', 'docs/b.txt': '' })
     const child = Bun.spawn([process.execPath, cli, 'check', root, 'docs', '--format', 'json'], { cwd: root, env: { PATH: process.env.PATH! }, stdout: 'pipe', stderr: 'pipe' })
     const { problems } = JSON.parse(await new Response(child.stdout).text()) as { problems: Problem[] }
 
@@ -97,7 +97,7 @@ describe('checks in kay.config.ts', () => {
   })
 
   it('refuses an entry that is not a function as a config error', async () => {
-    const root = await project('{ favicon: false, checks: [\'nope\'] }\n')
+    const root = await project('{ assets: { favicon: false }, checks: [\'nope\'] }\n')
 
     const { code, problems } = await check(root)
 

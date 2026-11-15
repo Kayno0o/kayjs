@@ -16,6 +16,10 @@ An endpoint's `ctx: EndpointContext` and an `api()` module's `ctx.guard` are now
 
 `import { defineContext } from 'kay/server'`, as `defineEnv`; `kay/library` keeps it until 1.108. The `env: { compose, example }` of kay.config.ts is `envFiles`, which also takes `false`; `env` works until 1.108. `kay upgrade` rewrites both (`deprecated-context-import`, `deprecated-env-files`). The session cookie now takes its `SameSite` and `Secure` from `security.cookies` unless `session({ sameSite })` is set: an app that set `sameSite: 'strict'` there gets a strict session cookie, which signs a visitor out on a link from another site, so set `session({ sameSite: 'lax' })` beside it where that matters.
 
+### `assets`, `ops` and `i18n` group the config's keys
+
+`images`, `fonts`, `favicon`, `manifest` and `publicCache` are keys of `assets`, `observe`, `health`, `metrics` and `jobs` are keys of `ops`, and `i18n`'s `defaultLocale` is `default`, `prefixDefault: true` is `mode: 'always'` and `domains` is `mode: { domains }`. `deprecated-config-groups` and `deprecated-i18n-keys` (`kay check --fix`) rewrite them; the old keys work until 1.108, and the loaded `KayConfig` no longer has them, so code reading `config.images` reads `config.assets?.images`, `config.observe` reads `config.ops?.observe` and `i18n.defaultLocale` reads `i18n.default`. A group already written is kept as it is and the key is reported with no fix.
+
 ### Test helpers share one shape
 
 `aiTest`, `mailTest`, `cmsTest` and `authTest` of the libraries' `/test` entries are `test(site)` in each, taking the `TestSite` and with a `reset()`; `aiTest()` needed no site, `test(site)` takes it and works without. `site.refusal(action, ...)` is `site.expectRefused(action, ...)` and `site.socketRefusal(...)` is `site.socket.refused(...)`. The old names work until 1.108, and `kay upgrade` rewrites them (`deprecated-test-helpers`): an import keeps its local name (`test as mailTest`), so `bun:test`'s own `test` is not shadowed.

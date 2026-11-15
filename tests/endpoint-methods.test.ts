@@ -49,7 +49,7 @@ beforeAll(async () => {
 
   plain = await pages(base)
   mounted = await pages({ ...base, base: '/blog', trailingSlash: 'always' })
-  localized = await pages({ ...base, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+  localized = await pages({ ...base, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
   dev = await pages({ ...base, dev: true })
   wide = await pages({ ...base, cors: { origins: '*' } })
 })
