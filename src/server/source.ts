@@ -120,7 +120,7 @@ export function embeddedSource(bundle: Bundle): ProjectSource {
     // The root, routes and public files it was built with win over the options.
     config: async (_, options) => {
       // The config the executable imported is the file's, its keys as written, so it is resolved as a loaded one is.
-      const own = await resolveConfig(bundle.config as ConfigInput) as KayConfig
+      const own = await resolveConfig(bundle.config)
       const merged = mergeConfig(publicEnv ? { ...own, publicEnv: true } as KayConfig : own, await resolveConfig(options) as KayConfig & Omit<typeof options, keyof ConfigInput>)
 
       return { ...merged, root: bundle.root, dirs: { ...merged.dirs, public: bundle.publicDir } }

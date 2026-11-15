@@ -14,7 +14,9 @@ const GROUPS: Record<string, string> = {
   jobs: 'ops',
 }
 
+const NEEDLE = /\b(?:images|fonts|favicon|manifest|publicCache|observe|health|metrics|jobs)\b/
+
 // The keys `images`, `fonts`, `favicon`, `manifest` and `publicCache` of the config, which belong to `assets` since 1.105, and `observe`, `health`, `metrics` and `jobs`, which belong to `ops`.
 export async function configGroups(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return movedKeys(root, options, { lint: 'deprecated-config-groups', needle: /\b(?:images|fonts|favicon|manifest|publicCache|observe|health|metrics|jobs)\b/, group: name => Object.hasOwn(GROUPS, name) ? GROUPS[name] : undefined, help: 'write the key in its group, `assets: { images, fonts, favicon, manifest, publicCache }` or `ops: { observe, health, metrics, jobs }`' })
+  return movedKeys(root, options, { lint: 'deprecated-config-groups', needle: NEEDLE, group: name => Object.hasOwn(GROUPS, name) ? GROUPS[name] : undefined, help: 'write the key in its group, `assets: { images, fonts, favicon, manifest, publicCache }` or `ops: { observe, health, metrics, jobs }`' })
 }
