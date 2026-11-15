@@ -319,6 +319,7 @@ export const DEPRECATED_LINTS = {
     level: 'warn',
     group: 'deprecated',
     since: '1.105',
+    site: true,
     summary: '`maxAge` where it says how long something lives, `ttl` since 1.105, `maxAge` staying for an HTTP header or a cookie: the option of `signed.sign()` and `files.url()` from `kay/server`, and the `proofOfWork` and `minTime` of an action\'s `protect`. It works until 1.108. The fix renames the key, unless a `ttl` is written too.',
     wrong: '---\nimport { signed } from \'kay/server\'\n\nconst token = signed.sign(\'shot\', \'1\', { maxAge: \'1d\' })\n---\np {token}',
     right: '---\nimport { signed } from \'kay/server\'\n\nconst token = signed.sign(\'shot\', \'1\', { ttl: \'1d\' })\n---\np {token}',
