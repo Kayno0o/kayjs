@@ -26,11 +26,10 @@ export default api()
       if (from !== undefined)
         chats.publish(room, { from, text })
     },
-    close(ws) {
-      chats.leave(ws)
-    },
   })
 ```
+
+A connection that joined leaves every room by itself when its socket closes, after the route's own `close` ran, so `close` needs no `leave`.
 
 ### Give a joiner the room's state
 
@@ -94,15 +93,15 @@ export default api()
         },
       })
     },
-    close(ws) {
-      games.leave(ws)
-    },
   })
 ```
 
 - `rooms<Message, Member, State>(options)` from `kay/server` keeps rooms of connections, `Message` what is sent to them, `Member` what each is listed as and `State` what the room remembers.
 - `join(ws, room, member)` puts a connection in a room, joining again replacing its member.
-- `leave(ws, room)` takes it out, and `leave(ws)` out of every room, as `close` does.
+- `leave(ws, room)` takes it out, and `leave(ws)` out of every room; a connection does it for every room on close by itself, after the route's own `close` ran.
+- `rooms({ member: ws => ws.data.user.name })` lists a connection that joins with no member as what the function returns, so `join(ws, room)` suffices and no route repeats it.
+- `rooms({ beforeJoin })` is asked first, `({ room, member, ws })`: `false` or a string refuses, closing the socket with 1008 (the string as its reason), `join` answering `false` with nothing sent and no `onJoin`; a throw refuses too.
+- `rooms({ onJoin, onLeave })` are told `{ room, member, ws, context }` after a connection joined a room it was not in (joining again only changes its member) and after it left, by `leave` or on close: where a presence list or a "has left" message is written. A throw is reported with source `rooms.onJoin` or `rooms.onLeave`.
 - `members(room)` lists the members, `roomsOf(ws)` the rooms a connection is in, and `memberOf(ws, room)` the member it joined `room` as, `undefined` for a room it is not in or a join with no member: who sent the message a handler is acting on.
 - A room no one is in is gone.
 - A room name is at most 256 characters: `join`, `members` and `publish` throw past it, `state` and `update` reject, a name any visitor can make up being otherwise a row and a poll each. A name may hold NUL in every store; the Postgres one reads at most 1,000 rooms nobody here holds, forgetting the ones asked about longest ago.

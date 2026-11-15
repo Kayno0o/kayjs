@@ -1,6 +1,7 @@
 import type { FSWatcher } from 'node:fs'
 import type { Duration } from '../runtime/duration'
 import type { StoreBase } from '../runtime/store-base'
+import type { Hook } from './hooks'
 import { watch } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import { t } from 'elysia'
@@ -9,12 +10,22 @@ import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { outsideRequest } from './clean-context'
+import { dispatch } from './hooks'
 import { inMemory } from './memory-mark'
 import { onReload } from './reload'
 
 // What a room sends a connection through: Elysia's `ws`, read through its raw socket, the one object that stays the same from `open` to `close`.
 export interface RoomConnection {
-  raw: object & { sendText: (text: string) => unknown }
+  raw: object & { sendText: (text: string) => unknown, close?: (code?: number, reason?: string) => unknown }
+  // What the route's context holds, `ws.data.user` or `ws.data.params`.
+  data?: unknown
+}
+
+// What `onJoin`, `onLeave` and `beforeJoin` are told: the room, the member, as it joined or left, and the connection.
+export interface RoomEvent<Member> {
+  room: string
+  member: Member | undefined
+  ws: RoomConnection
 }
 
 // Who in a room a message goes to: everyone but the connection `except` names, and only the members equal to `to`, as JSON, when given.
@@ -44,7 +55,15 @@ export interface RoomStore extends StoreBase {
   update?: (room: string, change: (current: string | undefined) => string) => Promise<string>
 }
 
-export interface RoomsOptions<Message = never, State = undefined> {
+export interface RoomsOptions<Message = never, State = undefined, Member = undefined> {
+  // What a connection is listed as when `join` gives no member, read from the connection (`ws.data` holds the route's context): the signed-in user's name, so no route repeats it.
+  member?: ((ws: RoomConnection) => Member) | undefined
+  // Asked before a connection joins, in the same turn: `false` or a reason refuses it, the socket closed with 1008 (the reason as its text) and `join` answering `false`, nothing sent and `onJoin` not told. A throw is reported and refuses too.
+  beforeJoin?: ((event: RoomEvent<Member>) => boolean | string | void) | undefined
+  // Told after a connection joined a room it was not in, `join` again only changing its member. A throw is reported with source `rooms.onJoin` and never fails the join.
+  onJoin?: Hook<RoomEvent<Member>> | undefined
+  // Told after a connection left a room, whether through `leave` or the socket closing. Source `rooms.onLeave`.
+  onLeave?: Hook<RoomEvent<Member>> | undefined
   // `sqliteRooms(path)` reaches every process of the machine; one process's memory by default. `pgData(db).rooms` does across replicas.
   store?: RoomStore | undefined
   // What a room's state is before any `update`, called each time one is read or changed while the room has none. The state is kept as JSON, whole, so a `Date` in it comes back as text.
@@ -59,9 +78,9 @@ export interface CoalesceOptions {
 }
 
 export interface RoomsBase<Message, Member = undefined> {
-  // Puts a connection in a room, with what the room lists it as; joining again changes its member.
-  join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => void
-  // Takes a connection out of a room, or out of every room it is in, as `close` does.
+  // Puts a connection in a room, with what the room lists it as; joining again changes its member. `false` when `beforeJoin` refused it.
+  join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => boolean
+  // Takes a connection out of a room, or out of every room it is in. A connection leaves every room by itself when its socket closes, so `close` needs no call.
   leave: (ws: RoomConnection, room?: string) => void
   // The rooms a connection of this process is in.
   roomsOf: (ws: RoomConnection) => string[]
@@ -85,6 +104,7 @@ export interface Rooms<Message, Member = undefined, State = undefined> extends R
 }
 
 const DEFAULT_WAIT = '50ms'
+const CLOSE_POLICY = 1008
 // The longest room name, a room being often named by a visitor's URL.
 const MAX_ROOM_NAME = 256
 
@@ -109,8 +129,9 @@ const IDLE_POLLS = 40
 const KEPT = 30_000
 
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
-export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State>] : [options: RoomsOptions<Message, State> & { state: () => State }]): Rooms<Message, Member, State>
-export function rooms<Message, Member, State>(...[options = {}]: [options?: RoomsOptions<Message, State>]): Rooms<Message, Member, State> {
+export function rooms<Message, Member, State = undefined>(...[options]: [options: RoomsOptions<Message, State, Member> & { member: (ws: RoomConnection) => Member }] | (undefined extends State ? never : [options: RoomsOptions<Message, State, Member> & { state: () => State, member: (ws: RoomConnection) => Member }])): Rooms<Message, Member, State> & { join: (ws: RoomConnection, room: string, member?: Member) => boolean }
+export function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, Member>] : [options: RoomsOptions<Message, State, Member> & { state: () => State }]): Rooms<Message, Member, State>
+export function rooms<Message, Member, State>(...[options = {}]: [options?: RoomsOptions<Message, State, Member>]): Rooms<Message, Member, State> {
   const store: RoomStore = options.store ?? memoryRooms()
 
   if ((options.state !== undefined || options.snapshot !== undefined) && (store.state === undefined || store.update === undefined))
@@ -131,6 +152,10 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
   const local = new Map<string, Map<string, { raw: RoomConnection['raw'], member: string }>>()
   const ids = new WeakMap<object, string>()
   const joined = new WeakMap<object, Set<string>>()
+  // The connection a raw socket joined as, for the hooks of a leave.
+  const wsOf = new WeakMap<object, RoomConnection>()
+  // The socket data whose `close` already leaves the rooms.
+  const closing = new WeakSet<object>()
   let subscribed = false
 
   const idOf = (raw: object) => {
@@ -149,9 +174,13 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
     }
   }
 
-  const leaveOne = (raw: object, room: string) => {
+  const parsed = (text: string | undefined): Member | undefined => (text === undefined || text === NO_MEMBER ? undefined : JSON.parse(text)) as Member | undefined
+
+  const leaveOne = (ws: RoomConnection, room: string) => {
+    const { raw } = ws
     const id = idOf(raw)
     const members = local.get(room)
+    const was = members?.get(id)
 
     members?.delete(id)
 
@@ -160,6 +189,31 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
 
     joined.get(raw)?.delete(room)
     store.remove(room, id)
+
+    if (was !== undefined)
+      void dispatch('rooms.onLeave', [options.onLeave], { room, member: parsed(was.member), ws })
+  }
+
+  // Bun calls the `close` of the socket's data when it closes, which is where Elysia keeps the route's own: a connection joined once leaves every room after it ran.
+  const leaveOnClose = (ws: RoomConnection) => {
+    const data = (ws.raw as { data?: { close?: (...args: unknown[]) => unknown } }).data
+
+    if (typeof data !== 'object' || data === null || closing.has(data))
+      return
+
+    closing.add(data)
+
+    const close = data.close
+
+    data.close = async (...args: unknown[]) => {
+      try {
+        return await close?.(...args)
+      }
+      finally {
+        for (const room of joined.get(ws.raw) ?? [])
+          leaveOne(wsOf.get(ws.raw) ?? ws, room)
+      }
+    }
   }
 
   return {
@@ -169,10 +223,30 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
 
       return written === undefined || written === NO_MEMBER ? undefined : JSON.parse(written) as Member
     },
-    join(ws, room, ...[member]) {
+    join(ws, room, ...[given]) {
       named(room)
 
+      const member = given === undefined ? options.member?.(ws) : given
+
+      if (options.beforeJoin !== undefined) {
+        let verdict: boolean | string | void = false
+
+        try {
+          verdict = options.beforeJoin({ room, member, ws })
+        }
+        catch (error) {
+          kayLog('error', 'rooms.beforeJoin failed, the connection is refused', error)
+        }
+
+        if (verdict === false || typeof verdict === 'string') {
+          ws.raw.close?.(CLOSE_POLICY, typeof verdict === 'string' ? verdict : 'Refused')
+
+          return false
+        }
+      }
+
       const id = idOf(ws.raw)
+      const had = local.get(room)?.has(id) === true
       const written = member === undefined ? NO_MEMBER : JSON.stringify(member)
 
       if (!subscribed) {
@@ -181,6 +255,8 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
       }
 
       local.set(room, (local.get(room) ?? new Map<string, { raw: RoomConnection['raw'], member: string }>()).set(id, { raw: ws.raw, member: written }))
+      wsOf.set(ws.raw, ws)
+      leaveOnClose(ws)
       joined.set(ws.raw, (joined.get(ws.raw) ?? new Set()).add(room))
       store.add(room, id, written)
 
@@ -196,10 +272,15 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
 
         void settled('sending a joiner its snapshot', send())
       }
+
+      if (!had)
+        void dispatch('rooms.onJoin', [options.onJoin], { room, member, ws })
+
+      return true
     },
     leave(ws, room) {
       for (const name of room === undefined ? [...joined.get(ws.raw) ?? []] : [room])
-        leaveOne(ws.raw, name)
+        leaveOne(ws, name)
     },
     roomsOf: ws => [...joined.get(ws.raw) ?? []],
     members: room => store.members(named(room)).map(member => (member === NO_MEMBER ? undefined : JSON.parse(member)) as Member),

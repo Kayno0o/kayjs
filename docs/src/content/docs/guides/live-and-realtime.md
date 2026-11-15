@@ -504,13 +504,12 @@ export default api()
       if (from !== undefined)
         chats.publish(room, { from, text })
     },
-    close(ws) {
-      chats.leave(ws)
-    },
   })
 ```
 
-`join(ws, room, member)` puts a connection in a room, and `member` is how it is listed. `leave(ws)` takes it out of every room, as `close` does. `members(room)` lists who is in a room, and `memberOf(ws, room)` gives the member one connection joined as, so a handler knows who sent a message. It gives `undefined` for a connection that is not in the room, so the handler checks for it.
+`join(ws, room, member)` puts a connection in a room, and `member` is how it is listed. A connection leaves every room by itself when its socket closes, so there is no `close` to write; `leave(ws)` does it sooner. `members(room)` lists who is in a room, and `memberOf(ws, room)` gives the member one connection joined as, so a handler knows who sent a message. It gives `undefined` for a connection that is not in the room, so the handler checks for it.
+
+`rooms({ member: ws => ws.data.user.name })` lists a connection that joins with no member as what the function returns. `beforeJoin({ room, member, ws })` is asked first and refuses with `false` or a reason, closing the socket with 1008, and `join` then answers `false`. `onJoin` and `onLeave` are told `{ room, member, ws }` after a connection joined a room it was not in and after it left, by `leave` or on close.
 
 `publish(room, message)` sends to everyone in the room. Pass `{ except: ws }` to skip the sender.
 
