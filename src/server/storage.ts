@@ -411,8 +411,9 @@ export const files = {
   },
 
   // The file as a response, for a route of the app's own that decides who gets it: a range a video player asks for included.
-  async response(key: string, request?: Request): Promise<Response> {
-    return fileResponse(checkedKey(key, 'files.response()'), request, 'private, no-cache')
+  // `download` has the browser save the file instead of showing it, under that name (`'été.pdf'`) or the key's own with `true`.
+  async response(key: string, request?: Request, options: { download?: string | boolean | undefined } = {}): Promise<Response> {
+    return fileResponse(checkedKey(key, 'files.response()'), request, 'private, no-cache', undefined, options.download)
   },
 }
 
@@ -553,17 +554,19 @@ function attachment(key: string): string {
 }
 
 // `own` finishes the headers of an answer from a route, which carries the context's headers itself.
-async function fileResponse(key: string, request: Request | undefined, cacheControl: string, own: (headers: Record<string, string>) => Record<string, string> = headers => headers): Promise<Response> {
+async function fileResponse(key: string, request: Request | undefined, cacheControl: string, own: (headers: Record<string, string>) => Record<string, string> = headers => headers, download?: string | boolean): Promise<Response> {
   const data = await (await activeStore()).read(key)
 
   if (!data)
     return new Response('Not Found', { status: 404, headers: own({ ...TEXT }) })
 
-  const { type, inline } = servedAs(key)
+  const served = servedAs(key)
+  const { type } = served
+  const inline = served.inline && (download === undefined || download === false)
   const headers: Record<string, string> = {
     'content-type': type,
     'x-content-type-options': 'nosniff',
-    'content-disposition': inline ? 'inline' : attachment(key),
+    'content-disposition': inline ? 'inline' : attachment(typeof download === 'string' ? download : key),
     'cache-control': cacheControl,
   }
 

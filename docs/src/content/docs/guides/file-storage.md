@@ -71,7 +71,7 @@ The page rendering the link, behind its guard, decides who gets the file. Use `f
 
 The link is signed with a key made from the app's secret. See [The app secret](/guides/sessions-and-guards#the-app-secret).
 
-A route of your own can answer with `files.response(key, request)` instead.
+A route of your own can answer with `files.response(key, request)` instead. Add `{ download: 'invoice.pdf' }` as a third argument to have the browser save the file under that name instead of showing it.
 
 A link is `/_kay/files/<key>?until=<time>&sig=<signature>`. The signature covers the key and the time it expires, so changing either breaks it. A link stays valid for an hour, and `files.url(key, { ttl: '1d' })` makes it longer.
 

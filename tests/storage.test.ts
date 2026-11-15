@@ -315,6 +315,21 @@ describe('the file route', () => {
     expect(await response.text()).toBe('bc')
     expect((await files.response(`private/${'0'.repeat(20)}.txt`)).status).toBe(404)
   })
+
+  it('names a download of a file the browser would show, or saves it under its key\'s name', async () => {
+    await serve(memoryFiles())
+
+    const key = await files.put(new File(['abc'], 'a.txt'), { private: true })
+
+    expect((await files.response(key)).headers.get('content-disposition')).toBe('inline')
+
+    const named = await files.response(key, undefined, { download: 'été.txt' })
+
+    expect(named.headers.get('content-disposition')).toBe('attachment; filename="_t_.txt"; filename*=UTF-8\'\'%C3%A9t%C3%A9.txt')
+    expect(named.headers.get('content-security-policy')).toBe('sandbox')
+    expect((await files.response(key, undefined, { download: true })).headers.get('content-disposition')).toStartWith('attachment; filename="')
+    expect(await named.text()).toBe('abc')
+  })
 })
 
 describe('stored images', () => {
