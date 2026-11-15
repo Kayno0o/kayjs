@@ -205,10 +205,14 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
       : { ...diagnostic, ...helped(diagnostic) }
     const generated = generatedProblem(root, mapped, types, content)
 
-    if (generated)
-      diagnostics.push(generated)
-    else if (reportsTypeErrors(mapped.file, scope) && !servedByTheApp(mapped.file, mapped.message, mounts, locales) && !seen.has(JSON.stringify([mapped.file, mapped.line, mapped.column, mapped.code, mapped.message])))
+    // A guard file imported for two lines of the exports check is reported once.
+    if (generated) {
+      if (!diagnostics.some(known => known.file === generated.file && known.code === generated.code && known.message === generated.message))
+        diagnostics.push(generated)
+    }
+    else if (reportsTypeErrors(mapped.file, scope) && !servedByTheApp(mapped.file, mapped.message, mounts, locales) && !seen.has(JSON.stringify([mapped.file, mapped.line, mapped.column, mapped.code, mapped.message]))) {
       diagnostics.push(mapped)
+    }
 
     seen.add(JSON.stringify([mapped.file, mapped.line, mapped.column, mapped.code, mapped.message]))
   }

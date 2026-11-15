@@ -3339,6 +3339,52 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     }
   })
 
+  it('reads the guards above an endpoint in order, and none for one that opens itself or sits under none', async () => {
+    const guard = (value: string) => `import { guard } from 'kay'\n\nexport default guard(() => (${value}))\n`
+    const handler = (context: string) => `import type { EndpointContext } from 'kay'\n\nexport function GET(ctx: ${context}) {\n  return Response.json(ctx.guard)\n}\n`
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p hi\n',
+      'src/routes/a/_guard.ts': guard('{ outer: 1, shared: 1 }'),
+      'src/routes/a/b/_guard.ts': guard('{ inner: \'x\', shared: \'two\' }'),
+      'src/routes/a/b/both.json.ts': handler('EndpointContext<Record<string, never>, { outer: number, inner: string, shared: string }>'),
+      'src/routes/a/b/wrong.json.ts': handler('EndpointContext<Record<string, never>, { shared: number }>'),
+      'src/routes/a/b/open.json.ts': `export const page = { guards: false }\n\n${handler('EndpointContext<Record<string, never>, { outer: number }>')}`,
+      'src/routes/plain/bare.json.ts': handler('EndpointContext<Record<string, never>, { outer: number }>'),
+      'src/routes/plain/none.json.ts': handler('EndpointContext'),
+    })
+
+    try {
+      expect((await refusals(root)).map(([file]) => file)).toEqual(['src/routes/a/b/open.json.ts', 'src/routes/a/b/wrong.json.ts', 'src/routes/plain/bare.json.ts'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('checks the endpoints of an extension and reports a guard without a default export once', async () => {
+    const lib = await scratchDir('check-lib-')
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p hi\n',
+      'src/routes/_guard.ts': 'export const nothing = 1\n',
+      'src/routes/hello.json.ts': 'export const GET = () => Response.json({})\n',
+    })
+
+    try {
+      await Promise.all([
+        Bun.write(join(lib, 'routes/[id].json.ts'), 'import type { EndpointContext } from \'kay\'\n\nexport function GET(ctx: EndpointContext<{ slug: string }>) {\n  return Response.json(ctx.params)\n}\n'),
+        Bun.write(join(lib, 'routes/fine.json.ts'), 'export const GET = () => Response.json({})\n'),
+      ])
+
+      const own = (await refusals(root)).filter(([file]) => file === 'src/routes/_guard.ts')
+
+      expect(own).toHaveLength(1)
+      expect((await refusals(root, { extensions: [{ name: 'lib', routes: { dir: join(lib, 'routes'), prefix: '/lib' } }] })).map(([file]) => file!.replace(/^.*check-lib-[^/]+\//, ''))).toEqual(['routes/[id].json.ts', 'src/routes/_guard.ts'])
+    }
+    finally {
+      await Promise.all([rm(root, { recursive: true, force: true }), rm(lib, { recursive: true, force: true })])
+    }
+  })
+
   it('reports a feed without the site\'s URL its links need', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p hi\n',

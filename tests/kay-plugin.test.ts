@@ -1,5 +1,5 @@
 import type { LocalsOf } from '../src/runtime/checks'
-import type { KayExtension, KayPlugin, PluginInput, Session } from '../src/server'
+import type { ApiOptions, KayExtension, KayPlugin, PluginInput, Session } from '../src/server'
 import { describe, expect, expectTypeOf, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { api, background, queue, schedule, session, shutdown, workflow } from '../src/server'
@@ -91,7 +91,15 @@ describe('KayPlugin', () => {
     const named = api<{ who: string }>({ guards: [org] })
     const none = api({ guards: false })
 
-    expect([one, list, named, none]).toHaveLength(4)
+    const lazy = api({ guards: { load: () => org } })
+    const on = api({ guards: true })
+    const held: ApiOptions = { guards: [org] }
+    const variable = api(held)
+
+    expect([one, list, named, none, lazy, on, variable]).toHaveLength(7)
+    expectTypeOf<LocalsOf<typeof lazy>['guard']>().toEqualTypeOf<object>()
+    expectTypeOf<LocalsOf<typeof on>['guard']>().toEqualTypeOf<object>()
+    expectTypeOf<LocalsOf<typeof variable>['guard']>().toEqualTypeOf<object>()
     expectTypeOf<LocalsOf<typeof one>['guard']['org']>().toEqualTypeOf<string>()
     expectTypeOf<LocalsOf<typeof list>['guard']>().toExtend<{ org: string, role: number }>()
     expectTypeOf<LocalsOf<typeof named>['guard']>().toExtend<{ who: string }>()
