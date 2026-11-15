@@ -2819,6 +2819,12 @@ const dataTableNames: readonly string[]
 [./server] defineConfig
 function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<Config, ConfigInput> & {
   onStart?: unknown;
+  offline?: Checked<"offline" extends keyof Config ? Config[keyof Config & "offline"] : unknown, OfflineConfig, [unknown]>;
+  search?: unknown;
+  links?: Checked<"links" extends keyof Config ? Config[keyof Config & "links"] : unknown, {
+    outside?: "new-tab" | "same-tab" | undefined;
+    schemes?: string[] | undefined;
+  }, [unknown]>;
   observe?: Checked<"observe" extends keyof Config ? Config[keyof Config & "observe"] : unknown, Omit<ObserveConfig, "log"> & {
     log?: "json" | ((entry: LogEntry) => void) | LogConfig | boolean | undefined;
     onError?: ErrorHook | undefined;
@@ -2844,9 +2850,7 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
     }> | undefined;
   } & DeprecatedImages, [unknown]>;
   head?: unknown;
-  search?: unknown;
   client?: Checked<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig, [unknown]>;
-  offline?: Checked<"offline" extends keyof Config ? Config[keyof Config & "offline"] : unknown, OfflineConfig, [unknown]>;
   onError?: unknown;
   base?: unknown;
   seo?: Checked<"seo" extends keyof Config ? Config[keyof Config & "seo"] : unknown, SeoConfig, [unknown]>;
@@ -2881,10 +2885,6 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
     hosts?: string[] | undefined;
   }, [unknown]>;
   timeZone?: unknown;
-  links?: Checked<"links" extends keyof Config ? Config[keyof Config & "links"] : unknown, {
-    outside?: "new-tab" | "same-tab" | undefined;
-    schemes?: string[] | undefined;
-  }, [unknown]>;
   trailingSlash?: unknown;
   plugins?: unknown;
   librarySettings?: unknown;
@@ -3111,7 +3111,6 @@ interface KayConfig extends AppHooks
   lang?: string | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
-  links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   manifest?: ManifestConfig | undefined
@@ -3120,7 +3119,6 @@ interface KayConfig extends AppHooks
   metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
   observe?: ObserveConfig | undefined
-  offline?: OfflineConfig | boolean | undefined
   onError?: ErrorHook | undefined
   onListen?: Hook<StartEvent> | undefined
   onResponse?: Hook<ResponseEvent> | undefined
@@ -3135,7 +3133,6 @@ interface KayConfig extends AppHooks
   rewrite?: Rewrite | undefined
   robots?: RobotsConfig | boolean | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
-  search?: boolean | undefined
   secret?: string | string[] | undefined
   security?: SecurityConfig | boolean | undefined
   seo?: SeoConfig | undefined
@@ -3374,7 +3371,7 @@ interface PagesOptions extends ConfigInput
   lang?: string | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
-  links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
+  /** @deprecated Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   manifest?: ManifestConfig | undefined
@@ -3383,7 +3380,7 @@ interface PagesOptions extends ConfigInput
   metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
   observe?: ObserveInput | undefined
-  offline?: OfflineConfig | boolean | undefined
+  /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ offline?: OfflineConfig | boolean | undefined
   onError?: ErrorHook | undefined
   onListen?: Hook<StartEvent> | undefined
   onResponse?: Hook<ResponseEvent> | undefined
@@ -3401,7 +3398,7 @@ interface PagesOptions extends ConfigInput
   robots?: Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined; allow?: Loadable<string[]> | undefined; }> | boolean | undefined
   root?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
-  search?: boolean | undefined
+  /** @deprecated Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ search?: boolean | undefined
   secret?: string | string[] | undefined
   security?: Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined; }> | boolean | undefined
   seo?: SeoConfig | undefined
@@ -4429,7 +4426,7 @@ interface TestOptions extends PagesOptions
   lang?: string | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
-  links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
+  /** @deprecated Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   locals?: ((request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>) | undefined
@@ -4440,7 +4437,7 @@ interface TestOptions extends PagesOptions
   metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
   observe?: ObserveInput | undefined
-  offline?: OfflineConfig | boolean | undefined
+  /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ offline?: OfflineConfig | boolean | undefined
   onError?: ErrorHook | undefined
   onListen?: Hook<StartEvent> | undefined
   onResponse?: Hook<ResponseEvent> | undefined
@@ -4460,7 +4457,7 @@ interface TestOptions extends PagesOptions
   robots?: Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined; allow?: Loadable<string[]> | undefined; }> | boolean | undefined
   root?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
-  search?: boolean | undefined
+  /** @deprecated Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ search?: boolean | undefined
   secret?: string | string[] | undefined
   security?: Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined; }> | boolean | undefined
   seo?: SeoConfig | undefined

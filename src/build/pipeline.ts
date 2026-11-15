@@ -22,7 +22,7 @@ import { CONFIG_FILE } from '../config'
 import { pageHooks } from '../config-extensions'
 import { setMarkdownDefaults } from '../content/load'
 import { writeContentManifests } from '../content/server'
-import { cacheDir, clientOptionsOf, resolveProject } from '../project'
+import { cacheDir, clientOptionsOf, resolveProject, searchOn } from '../project'
 import { linkVariantFiles, setImageWidths } from '../runtime/image'
 import { setAvifThreads } from '../server/avif'
 import { basePath } from '../server/base'
@@ -456,7 +456,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
 
   warnServerClasses(root, client, routes, exported)
 
-  if (config.search === true) {
+  if (searchOn(config)) {
     report({ step: 'indexing for search' })
     await writeSearchIndex(client.dir, rendered.flatMap(page => page.search === false ? [] : [{ path: slashedPath(page.path, config.trailingSlash), html: page.html, weight: page.search }]))
   }

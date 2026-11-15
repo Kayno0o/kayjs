@@ -31,7 +31,7 @@ export default defineConfig({
 
 Every option is optional. The tables give each option's default. The full reference has the rest.
 
-A feature is switched the same way everywhere: `false` turns it off, `true` asks for its defaults and an object sets its options, as `health: false`, `offline: true` or `security: { cookies: { sameSite: 'strict' } }`. `defineConfig` also refuses a key it does not know in any of these objects, at any depth, as a type error.
+A feature is switched the same way everywhere: `false` turns it off, `true` asks for its defaults and an object sets its options, as `health: false`, `client: { offline: true }` or `security: { cookies: { sameSite: 'strict' } }`. `defineConfig` also refuses a key it does not know in any of these objects, at any depth, as a type error.
 
 ## Site and SEO
 
@@ -44,8 +44,8 @@ A feature is switched the same way everywhere: `false` turns it off, `true` asks
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |
 | `favicon` | A square image of 512 px or more, or a square SVG, served as the favicon and the manifest icons. `false` serves none |
 | `manifest` | The web manifest: `shortName`, `themeColor`, `backgroundColor`, `display`, `orientation`, `startUrl`, `scope`, `shortcuts`, and a `maskable` image served as its maskable icons |
-| `offline` | `true`, or what to keep: a service worker keeping the build's files and some pages for offline visitors. Off by default, as `false` is. Pages are kept under the path `trailingSlash` writes them at |
-| `search` | `true` indexes the pages `kay build` renders, for `searchResults` to search in the browser. Off by default. See [Site search](/guides/search) |
+| `client.offline` | `true`, or what to keep: a service worker keeping the build's files and some pages for offline visitors. Off by default, as `false` is. Pages are kept under the path `trailingSlash` writes them at |
+| `client.search` | `true` indexes the pages `kay build` renders, for `searchResults` to search in the browser. Off by default. See [Site search](/guides/search) |
 | `lang` | The `lang` of the `html` element when `i18n` is not set, `en` by default |
 
 ## Grouped options
@@ -132,7 +132,7 @@ In `client`, what pages ship to the browser and how it behaves there:
 | `rewrite` | A function returning the path to serve a request from, or `undefined` to serve it as it came. The browser keeps its URL. It runs before the alias of a path an extension moved (`api.former`), so it can rewrite such a path itself |
 | `base` | Where the site is mounted when it is not at its host's root, such as `/docs`. Unset by default. See [Static export and base path](/guides/static-export#mount-the-site-under-a-path) |
 | `trailingSlash` | `never` (the default) redirects `/about/` to `/about`, `always` the other way, `ignore` serves both. See [Trailing slashes](/guides/static-export#trailing-slashes) |
-| `links` | `{ outside: 'same-tab' }` keeps a link to another site in the same tab. By default kay adds `target="_blank" rel="noopener"` to it. `schemes: ['webcal', 'geo']` lets a bound URL keep those schemes instead of going out as `unsafe:`, see [Security](/guides/security). See [Templates](/essentials/templates#links-to-other-sites) |
+| `client.links` | `{ outside: 'same-tab' }` keeps a link to another site in the same tab. By default kay adds `target="_blank" rel="noopener"` to it. `schemes: ['webcal', 'geo']` lets a bound URL keep those schemes instead of going out as `unsafe:`, see [Security](/guides/security). See [Templates](/essentials/templates#links-to-other-sites) |
 | `extensions` | What libraries add: their pages and API modules under a prefix, which an app file at the same path replaces, their message catalogs, config laid under the app's, page hooks, a tab for the dev tool, and a CMS's editor rendered in edit mode. See [Routing](/essentials/routing#pages-from-a-library) |
 
 ## Content and i18n

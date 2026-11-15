@@ -753,7 +753,7 @@ export async function siteFiles(boot: Boot) {
   const prerendered = await loadPrerendered(client, dictionaryUsed)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, served, { client, offline: offlineOf(options, env) && options.offline !== false ? options.offline : undefined, base: env.base, apiPath: options.serve?.apiPrefix, trailingSlash: env.trailingSlash, lang: options.lang, typography: options.client?.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path), push: pushListed(options) })
+  await serveServiceWorker(app, served, { client, offline: offlineOf(options, env) && options.client?.offline !== false ? options.client?.offline : undefined, base: env.base, apiPath: options.serve?.apiPrefix, trailingSlash: env.trailingSlash, lang: options.lang, typography: options.client?.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path), push: pushListed(options) })
   // A server answering from a build does it in its own process; a static export is written once and `kay dev` shows every entry.
   const publishing = env.serving ? await watchPublishing(collections) : NOT_PUBLISHING
 

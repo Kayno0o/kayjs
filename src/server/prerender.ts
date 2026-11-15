@@ -15,6 +15,7 @@ import { resolveFrom } from '../build/files'
 import { elementsIn, serverIslandOf } from '../compiler/ast'
 import { exportProblem, KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
+import { searchOn } from '../project'
 import { isAction } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
@@ -430,7 +431,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         if (response.status === 200 && !auto) {
           const noindex = chainSetting(chain, 'noindex') === true
-          const indexed = config.search === true && !noindex && !guardedPage(route, required)
+          const indexed = searchOn(config) && !noindex && !guardedPage(route, required)
 
           const sitemap = pageSetting(module, 'sitemap')
 

@@ -7,12 +7,13 @@ import { actionType } from '../src/check/action-type'
 import { aiLanguage } from '../src/check/ai-language'
 import { appHooks } from '../src/check/app-hooks'
 import { authRateLimits } from '../src/check/auth-rate-limits'
+import { clientKeys } from '../src/check/client-keys'
 import { cmsOptions } from '../src/check/cms-options'
 import { configSwitches } from '../src/check/config-switches'
 import { applySafeFixes } from '../src/check/fixes'
 import { formatDurationNumbers } from '../src/check/format-duration'
-import { guardOptions } from '../src/check/guard-options'
 
+import { guardOptions } from '../src/check/guard-options'
 import { hookContext } from '../src/check/hook-context'
 import { hookNames } from '../src/check/hook-names'
 import { imagesKeys } from '../src/check/images-keys'
@@ -66,6 +67,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-guard-option': guardOptions,
   'deprecated-config-switch': configSwitches,
   'deprecated-images-keys': imagesKeys,
+  'deprecated-client-keys': clientKeys,
   'deprecated-app-hooks': appHooks,
   'deprecated-hook-context': hookContext,
   'deprecated-pages-options': pagesOptions,

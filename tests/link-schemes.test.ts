@@ -92,13 +92,13 @@ describe('links: { schemes }', () => {
   })
 
   it('takes names as a browser spells them and refuses what is no scheme or may run script', () => {
-    expect(linkSchemes({ links: { schemes: ['WebCal', ' geo:', 'x-app+v1.2'] } })).toEqual(['webcal', 'geo', 'x-app+v1.2'])
+    expect(linkSchemes({ client: { links: { schemes: ['WebCal', ' geo:', 'x-app+v1.2'] } } })).toEqual(['webcal', 'geo', 'x-app+v1.2'])
     expect(linkSchemes({})).toEqual([])
 
     for (const bad of ['javascript', 'JavaScript:', 'vbscript', 'data', '', 'a b', '//x', '1app', 'web://cal'])
-      expect(() => linkSchemes({ links: { schemes: [bad] } }), bad).toThrow('links.schemes')
+      expect(() => linkSchemes({ client: { links: { schemes: [bad] } } }), bad).toThrow('links.schemes')
 
-    expect(() => linkSchemes({ links: { schemes: [3 as unknown as string] } })).toThrow('no URL scheme')
+    expect(() => linkSchemes({ client: { links: { schemes: [3 as unknown as string] } } })).toThrow('no URL scheme')
   })
 
   it('renders a trusted scheme of a bound href on a page, with a meta for the islands, and the rest as before', async () => {

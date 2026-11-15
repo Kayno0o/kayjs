@@ -161,7 +161,7 @@ describe('the navigation-only entry', () => {
     expect((await buildClient(root, { exported: true })).navEntry).toBeUndefined()
 
     // With search on, the page marks the words a hit was opened for, as the islands' entry does.
-    const searched = await buildClient(root, { search: true })
+    const searched = await buildClient(root, { client: { search: true } })
     const marking = await chunkText(searched, searched.navEntry!)
 
     expect(marking).toContain('hashchange')

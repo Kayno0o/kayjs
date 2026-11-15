@@ -248,7 +248,7 @@
     "max-lines-per-function": 196
   },
   "src/server/setup.ts": {
-    "complexity": 44
+    "complexity": 42
   },
   "src/server/workflow.ts": {
     "max-lines-per-function": 186

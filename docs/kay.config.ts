@@ -43,7 +43,7 @@ export default defineConfig({
   images: { card: { background: '#17202e', color: '#eef2f7', logo: '../src/server/favicon.svg' } },
   // Set once for every collection, and for the chat's code blocks, which the server highlights with it as well.
   markdown: { highlight },
-  search: true,
+  client: { search: true },
   // The theme picked in the header, put on the page before it paints.
   head: [{ tag: 'script', props: { children: THEME_SCRIPT } }],
   // kay's own docs wear kay's mark.

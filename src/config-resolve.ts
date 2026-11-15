@@ -49,6 +49,14 @@ function resolveObserve(observe: ObserveInput): { observe: ObserveConfig, onErro
   return { observe: { ...rest, ...grouped !== undefined && { log: grouped } }, onError }
 }
 
+// `client` with the `links`, `offline` and `search` the config held at its top level before 1.105, a key already in `client` winning over the old one.
+function resolveClient(config: ConfigInput): KayConfig['client'] {
+  const { offline, search, links } = config
+  const moved = without({ offline, search, links })
+
+  return config.client === undefined && Object.keys(moved).length === 0 ? undefined : { ...moved, ...config.client }
+}
+
 // The config `kay.config.ts` wrote as the `KayConfig` the server reads: each list that a function gave loaded once, the old flat keys of `images`, the `onStart` hook and `observe`'s `onError` and `log` in the places they have since 1.105. Called as the config loads, so `kay dev` calls the functions again after a change to the file.
 export async function resolveConfig(config: ConfigInput): Promise<KayConfig> {
   const [security, proxy, robots, i18n, redirects, images] = await Promise.all([
@@ -61,8 +69,13 @@ export async function resolveConfig(config: ConfigInput): Promise<KayConfig> {
   ])
   const cors = config.cors === undefined ? undefined : await loadKeys(config.cors, ['origins'])
   const { onStart, ...kept } = config
+
+  delete kept.offline
+  delete kept.search
+  delete kept.links
+
   const observed = config.observe === undefined ? undefined : resolveObserve(config.observe)
-  const resolved: Record<string, unknown> = { ...kept, security, proxy, robots, i18n, redirects, images, cors, observe: observed?.observe, onListen: config.onListen ?? onStart, onError: config.onError ?? observed?.onError }
+  const resolved: Record<string, unknown> = { ...kept, security, proxy, robots, i18n, redirects, images, cors, observe: observed?.observe, client: resolveClient(config), onListen: config.onListen ?? onStart, onError: config.onError ?? observed?.onError }
 
   for (const key of Object.keys(resolved)) {
     if (resolved[key] === undefined)

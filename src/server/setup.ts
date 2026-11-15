@@ -16,7 +16,7 @@ import { extensionApps, extensionContexts, extensionServers, serverExtensions } 
 import { bagOf } from '../config-switch'
 import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
-import { renderOptionsOf } from '../project'
+import { offlineSet, renderOptionsOf, sameTabOn } from '../project'
 import { setTimeZone } from '../runtime/i18n'
 import { liveStoreReady } from '../runtime/live-value'
 import { runInLocale } from '../runtime/locale-state'
@@ -154,7 +154,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   if (source.embedded)
     await dropOpenCache()
 
-  setSite(site, config.trailingSlash, prerendering, config.links?.outside === 'same-tab')
+  setSite(site, config.trailingSlash, prerendering, sameTabOn(config))
   trustSchemes(linkSchemes(config))
 
   if (mode.dev)
@@ -218,7 +218,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   const client = await loadingClient
 
   if (!mode.dev)
-    await chooseInlineStyles(client, base, config.client?.inlineStyles, [...styleChains(routes), ...cardPage === undefined ? [] : [[cardPage.file]]], config.offline === undefined || config.offline === false, config.client?.lateStyles === true)
+    await chooseInlineStyles(client, base, config.client?.inlineStyles, [...styleChains(routes), ...cardPage === undefined ? [] : [[cardPage.file]]], !offlineSet(config), config.client?.lateStyles === true)
 
   // Cards are drawn in the fonts the head just wrote, rather than those a `fonts.json` held before.
   const headAndCards = async () => {

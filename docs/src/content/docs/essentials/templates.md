@@ -125,7 +125,9 @@ A link is a template link: `kay check` tests it, and it gets the `base` and the 
 
 A link to another site opens in a new tab, and a link inside yours stays in the same one. kay adds `target="_blank" rel="noopener"` to an `a` whose `href` is on another origin, in templates, in islands, in a `markdown` block, in `markdownHtml` and in the Markdown of a collection's entries or `renderMarkdown`. The server compares with the origin you set as `site`, an island with the page's own origin. Without a `site`, every absolute `http` or `https` link counts as another site.
 
-A path, a `#hash`, `mailto:` and `tel:` are left alone, and so is a link that writes its own `target`, even an empty one. A link writing its own `rel` keeps it, and only gets the `target`. Those links also carry `data-new-tab`, and the page says "(opens in a new tab)" for them to screen readers, in the page's language when your messages have `kay.link.newTab`. To show an icon, style `a[data-new-tab]`. To keep every link in the same tab, set `links: { outside: 'same-tab' }` in `kay.config.ts`.
+A path, a `#hash`, `mailto:` and `tel:` are left alone, and so is a link that writes its own `target`, even an empty one. A link writing its own `rel` keeps it, and only gets the `target`. Those links also carry `data-new-tab`, and the page says "(opens in a new tab)" for them to screen readers, in the page's language when your messages have `kay.link.newTab`. To show an icon, style `a[data-new-tab]`.
+
+To keep every link in the same tab, set `client.links.outside` to `'same-tab'` in `kay.config.ts`.
 
 ## Conditions and lists
 
@@ -307,7 +309,7 @@ To render a string as markup, pass it through one of two helpers first. `sanitiz
 
 Call `trustHtml` where the markup is used, not once for a constant kept for hours.
 
-A link that `sanitizeHtml` keeps and that leaves your site opens in a new tab, as a template's does, with `target="_blank"`, `rel="nofollow ugc noopener"` and `data-new-tab`. `links: { outside: 'same-tab' }` in `kay.config.ts` turns that off, and a link that keeps a `target` of its own is not marked, and gets `noopener` in its `rel` unless the target is `_self`.
+A link that `sanitizeHtml` keeps and that leaves your site opens in a new tab, as a template's does, with `target="_blank"`, `rel="nofollow ugc noopener"` and `data-new-tab`. `client: { links: { outside: 'same-tab' } }` in `kay.config.ts` turns that off, and a link that keeps a `target` of its own is not marked, and gets `noopener` in its `rel` unless the target is `_self`.
 
 For markup fetched from elsewhere, such as a feed's body, pass the address it came from: `sanitizeHtml(body, { base: article.url })`. Every kept link and picture, `srcset` included, is resolved against it as a browser would, so a relative or `//host` URL points at the origin it came from.
 

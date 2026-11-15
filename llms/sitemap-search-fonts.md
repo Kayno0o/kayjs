@@ -35,17 +35,17 @@ export default defineConfig({
 
 ### Make the site work offline
 
-`offline: true` turns on a service worker keeping the site's files and some of its pages:
+`client: { offline: true }` turns on a service worker keeping the site's files and some of its pages:
 
 ```ts
 export default defineConfig({
-  offline: { pages: ['/', '/menu'], fallback: '/offline' },
+  client: { offline: { pages: ['/', '/menu'], fallback: '/offline' } },
 })
 ```
 
 ### Add a search box
 
-`search: true` in `kay.config.ts` has `kay build` index the pages, and `searchResults(query)` follows a signal holding the query:
+`client: { search: true }` in `kay.config.ts` has `kay build` index the pages, and `searchResults(query)` follows a signal holding the query:
 
 ```kay
 ---
@@ -152,16 +152,16 @@ export default defineConfig({
 
 ### Offline
 
-`offline: true` in `kay.config.ts` turns on a service worker, which keeps the site's files and some of its pages for a visitor who lost their connection or opens the installed site with none:
+`client: { offline: true }` in `kay.config.ts` turns on a service worker, which keeps the site's files and some of its pages for a visitor who lost their connection or opens the installed site with none:
 
 ```ts
 export default defineConfig({
-  offline: { pages: ['/', '/menu'], fallback: '/offline' },
+  client: { offline: { pages: ['/', '/menu'], fallback: '/offline' } },
 })
 ```
 
 - Every page carries a script registering `/sw.js`, under the site's `base`, once it has loaded; the policy allows it by hash as kay's other inline scripts.
-- Off, nothing is added to a page: `offline: false` is off, as leaving it out is.
+- Off, nothing is added to a page: `client: { offline: false }` is off, as leaving it out is.
 - Pages are kept and matched under the path `trailingSlash` writes them at, `/menu/` with `always`, and a visit to the other form finds the same copy.
 - On its install the worker fetches the build's scripts, stylesheets and fonts, every page `pages` lists, as paths of the site, every prerendered page no guard covers without it, and the `fallback` page.
 - The server warns past 100 prerendered pages, since each visitor downloads them on their first visit.
@@ -184,7 +184,7 @@ export default defineConfig({
 
 ### Site search
 
-`search: true` in `kay.config.ts` has `kay build` index the text of every page it renders, `kay build --static` included, and an island searches it in the browser, with no service: `searchResults(query)` from `kay` follows a signal holding the query, its `hits()` those of the latest query, whichever answers first, with `loading()` and `error()` beside them.
+`client: { search: true }` in `kay.config.ts` has `kay build` index the text of every page it renders, `kay build --static` included, and an island searches it in the browser, with no service: `searchResults(query)` from `kay` follows a signal holding the query, its `hits()` those of the latest query, whichever answers first, with `loading()` and `error()` beside them.
 
 ```kay
 ---

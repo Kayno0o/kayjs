@@ -324,6 +324,15 @@ export const DEPRECATED_LINTS = {
     wrong: '// kay.config.ts\nexport default { images: { remoteMaxSize: \'10mb\', remoteTimeout: \'30s\', avif: false } }',
     right: '// kay.config.ts\nexport default { images: { remote: { maxSize: \'10mb\', timeout: \'30s\' }, formats: { avif: false } } }',
   },
+  'deprecated-client-keys': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'The keys `links`, `offline` and `search` of kay.config.ts, written in `client` since 1.105 with the rest of what the browser is given: `client: { links, offline, search }`. They work until 1.108. Found in the object kay.config.ts exports and in the `config` of `pages()` and `testSite()`. The fix moves the keys into `client` as written, unless the object spreads, holds a computed key or has a `client` already.',
+    wrong: '// kay.config.ts\nexport default { search: true, offline: true }',
+    right: '// kay.config.ts\nexport default { client: { search: true, offline: true } }',
+  },
   'deprecated-ttl-names': {
     level: 'warn',
     group: 'deprecated',

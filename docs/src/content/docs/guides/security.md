@@ -397,7 +397,7 @@ A module without `cors` refuses every other origin. The module's rule is the onl
 
 A URL bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data` keeps its scheme only when it is `http`, `https`, `mailto`, `tel`, `sms` or `blob`, a `data:` image, audio or video that is not SVG, or a `data:` plain text, CSV, PDF or JSON file, or has none, as a path does. Any other, `javascript:` first, goes out as `unsafe:javascript:...`, which a browser does nothing with, on the server and in islands alike.
 
-A scheme the app trusts on purpose, such as `webcal:`, `geo:` or its own `myapp:`, goes in `links: { schemes: ['webcal', 'geo'] }` in `kay.config.ts`; `javascript`, `vbscript` and `data` are refused there. `kay dev` logs each bound URL rewritten to `unsafe:` once, with its attribute, scheme and page.
+A scheme the app trusts on purpose, such as `webcal:`, `geo:` or its own `myapp:`, goes in `client: { links: { schemes: ['webcal', 'geo'] } }` in `kay.config.ts`; `javascript`, `vbscript` and `data` are refused there. `kay dev` logs each bound URL rewritten to `unsafe:` once, with its attribute, scheme and page.
 
 An SVG `data:` image passes on `src` and `poster` only, where the browser draws it as a picture and runs none of its scripts.
 

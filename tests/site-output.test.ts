@@ -275,11 +275,11 @@ describe('layout settings', () => {
   })
 
   it('has a layout\'s noindex and search: false keep the pages under it out of the search index, and its revalidate set their period', async () => {
-    const build = await scratchBuild({ dirs: { routes: `${ROOT}/src/routes`, public: `${ROOT}/public` }, search: true })
+    const build = await scratchBuild({ dirs: { routes: `${ROOT}/src/routes`, public: `${ROOT}/public` }, client: { search: true } })
     const rendered: RenderedPage[] = []
 
     try {
-      await build.prerender({ dirs: { routes: `${ROOT}/src/routes`, public: `${ROOT}/public` }, search: true }, { rendered })
+      await build.prerender({ dirs: { routes: `${ROOT}/src/routes`, public: `${ROOT}/public` }, client: { search: true } }, { rendered })
 
       const byPath = new Map(rendered.map(page => [page.path, page]))
 

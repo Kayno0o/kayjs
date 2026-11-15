@@ -20,10 +20,11 @@ const LIMITS: Record<keyof LimitsConfig, Rule> = { body: bytes, byPath: map(byte
 const SERVE: Record<keyof ServeConfig, Rule> = { apiPrefix: str, compress: bool, compressionDictionary: bool, shutdownTimeout: duration, timeout: either(duration, lit(false)) }
 const LOG: Record<keyof LogConfig, Rule> = { format: oneOf('text', 'json'), requests: bool, sink: fn }
 const OBSERVE: Record<keyof ObserveInput, Rule> = { log: either(bool, oneOf('json'), fn, bag(LOG)), serverTiming: bool, loadBudget: either(duration, lit(false)), requestIdHeader: str, tracer: true, extract: either(fn, lit(false)), onError: fn }
-const HYDRATION = bag({ visible: str, serverIslands: str })
-const CLIENT: Record<keyof ClientConfig, Rule> = { navigation: bool, inlineStyles: bool, lateStyles: bool, typography: bool, hydration: HYDRATION, prefetch: either(oneOf('conservative', 'moderate', 'eager'), lit(false)), saveData: bool, pageTimeout: duration, loadingDelay: duration }
-const ACTIONS: Record<keyof ActionsConfig, Rule> = { protect: either(lit(false), obj), maxSize: bytes, messages: obj, beforeRun: fn, onSuccess: fn, onError: fn }
 const OFFLINE: Record<keyof OfflineConfig, Rule> = { pages: list(str), fallback: str }
+const LINKS = bag({ outside: oneOf('new-tab', 'same-tab'), schemes: list(str) })
+const HYDRATION = bag({ visible: str, serverIslands: str })
+const CLIENT: Record<keyof ClientConfig, Rule> = { navigation: bool, inlineStyles: bool, lateStyles: bool, typography: bool, hydration: HYDRATION, prefetch: either(oneOf('conservative', 'moderate', 'eager'), lit(false)), saveData: bool, pageTimeout: duration, loadingDelay: duration, offline: either(bool, bag(OFFLINE)), search: bool, links: LINKS }
+const ACTIONS: Record<keyof ActionsConfig, Rule> = { protect: either(lit(false), obj), maxSize: bytes, messages: obj, beforeRun: fn, onSuccess: fn, onError: fn }
 const HEALTH: Record<keyof HealthConfig, Rule> = { path: str, timeout: duration, check: fn }
 const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted: either(fn, list(str)), trustPrivate: lit(false), key: str, open: list(str) }
 const SITEMAP: Record<keyof SitemapConfig, Rule> = { ttl: duration }
@@ -92,7 +93,7 @@ const CONFIG: Record<keyof ConfigInput, Rule> = {
   live: bag(LIVE),
   timeZone: str,
   base: str,
-  links: bag({ outside: oneOf('new-tab', 'same-tab'), schemes: list(str) }),
+  links: LINKS,
   trailingSlash: oneOf('never', 'always', 'ignore'),
   contentConfig: str,
   markdown: bag(MARKDOWN),

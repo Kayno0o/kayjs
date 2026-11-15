@@ -267,7 +267,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs with hosts, the jobs page, previews, kept pages, the public env, a proxy key, offline and locale hosts, in the order pinned', async () => {
-    const options: LoadedConfig = { site: 'https://x.example', i18n: { locales: ['en', 'fr'], defaultLocale: 'en', domains: { en: 'x.example', fr: 'fr.x.example' } }, security: { hosts: ['www.x.example'] }, jobs: { guard: () => undefined }, preview: {}, publicEnv: true, proxy: { key: 'x-upstream-key' }, offline: true, observe: { log: { sink: quiet } }, extensions }
+    const options: LoadedConfig = { site: 'https://x.example', i18n: { locales: ['en', 'fr'], defaultLocale: 'en', domains: { en: 'x.example', fr: 'fr.x.example' } }, security: { hosts: ['www.x.example'] }, jobs: { guard: () => undefined }, preview: {}, publicEnv: true, proxy: { key: 'x-upstream-key' }, client: { offline: true }, observe: { log: { sink: quiet } }, extensions }
     // Built with its pages prerendered, which keeps the about page, a page reading nothing of its request.
     const build = await scratchBuild(options, false, fixture)
 

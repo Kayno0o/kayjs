@@ -129,7 +129,7 @@ export async function archive(scan: File) {
 - `sessionStorage` under the `remember` key of kayjs-ai's `Chat` and `ChatLauncher` (none unless named): the conversation's text, up to 200,000 characters, what the visitor wrote included; the tab's life, nothing without `remember`.
 - `localStorage` `kai:chat-conversation:<action URL>` (kayjs-ai's `ChatLauncher` with `keepOnServer` or `conversations`, or a `Chat` with `conversationIn="browser"`): the id of the conversation shown, which reads nothing without the visitor's session; necessary, until a new conversation.
 - `localStorage` under the `listWidthKey` of kayjs-ui's `SplitLayout` (none unless named): the list's width, a preference.
-- With `offline`, the service worker and its Cache Storage `kay-w<version>`: the pages `offline.pages` names (the public prerendered ones by default) and the files, and the public pages and files it fetched later that answered 200 without `private` or `no-store`; each copy changes with the build and the cache stays until `offline` is turned off or the worker's version changes. A page of `offline.pages` that holds a visitor's render is kept as it was served, so list only public ones.
+- With `offline`, the service worker and its Cache Storage `kay-w<version>`: the pages `client.offline.pages` names (the public prerendered ones by default) and the files, and the public pages and files it fetched later that answered 200 without `private` or `no-store`; each copy changes with the build and the cache stays until `offline` is turned off or the worker's version changes. A page of `offline.pages` that holds a visitor's render is kept as it was served, so list only public ones.
 
 ### What the server keeps
 

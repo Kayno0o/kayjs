@@ -6,11 +6,11 @@ description: Index the pages kay build renders and search them from an island, w
 
 ## Turning it on
 
-Set `search: true` in `kay.config.ts`:
+Set `client: { search: true }` in `kay.config.ts`:
 
 ```ts
 export default defineConfig({
-  search: true,
+  client: { search: true },
 })
 ```
 

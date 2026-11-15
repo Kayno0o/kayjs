@@ -37,6 +37,7 @@ import { actionType } from './action-type'
 import { aiLanguage } from './ai-language'
 import { appHooks } from './app-hooks'
 import { authRateLimits } from './auth-rate-limits'
+import { clientKeys } from './client-keys'
 import { cmsOptions } from './cms-options'
 import { configSwitches } from './config-switches'
 import { ownFile } from './diagnose'
@@ -205,6 +206,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => guardOptions(root, options),
   async ({ root, options }) => configSwitches(root, options),
   async ({ root, options }) => imagesKeys(root, options),
+  async ({ root, options }) => clientKeys(root, options),
   async ({ root, options }) => appHooks(root, options),
   async ({ root, options }) => hookContext(root, options),
   async ({ root, options }) => pagesOptions(root, options),

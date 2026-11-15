@@ -106,7 +106,7 @@ describe('modeOf', () => {
         process.env.NODE_ENV = previous
     }
 
-    const offline = { offline: true as const }
+    const offline = { client: { offline: true as const } }
 
     expect(renderOptionsOf(offline, { dev: true, devRoutes: false }, { head: undefined, maxDensity: 2 })).toMatchObject({ dev: true, serverTiming: true, offline: false })
     expect(renderOptionsOf({ ...offline, base: '/docs/' }, PRODUCTION, { head: undefined, maxDensity: 2 })).toMatchObject({ dev: false, serverTiming: false, offline: true, base: '/docs', maxDensity: 2 })

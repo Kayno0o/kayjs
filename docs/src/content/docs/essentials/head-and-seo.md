@@ -278,11 +278,11 @@ export default defineConfig({
 
 ## Offline
 
-`offline: true` turns on a service worker. It keeps the build's scripts, stylesheets and fonts, the pages listed in `pages` and the prerendered pages no guard covers. An installed site then still opens without a connection.
+`client: { offline: true }` turns on a service worker. It keeps the build's scripts, stylesheets and fonts, the pages listed in `pages` and the prerendered pages no guard covers. An installed site then still opens without a connection.
 
 ```ts
 export default defineConfig({
-  offline: { pages: ['/', '/menu'], fallback: '/offline' },
+  client: { offline: { pages: ['/', '/menu'], fallback: '/offline' } },
 })
 ```
 

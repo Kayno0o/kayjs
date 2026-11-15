@@ -65,10 +65,6 @@ export interface KayConfig extends AppHooks {
   manifest?: ManifestConfig | undefined
   // The server entry, relative to the root, `src/server.ts` by default: what `kay dev`, `start`, `render`, `check` and `build` run and type against, unless `--entry` names another. With no file there, kay's own server of the pages.
   entry?: string | undefined
-  // A service worker keeping the build's files and some pages for a visitor offline, `true` or what it keeps; off by default, as `false` is.
-  offline?: OfflineConfig | boolean | undefined
-  // `true` has `kay build` index the text of the pages it renders, which `searchSite()` from `kay` searches in the browser; off by default.
-  search?: boolean | undefined
   // Self-hosted fonts, declared on every page and preloaded where they ask for it.
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
@@ -105,9 +101,6 @@ export interface KayConfig extends AppHooks {
   timeZone?: string | undefined
   // Where the site is mounted when not at its host's root, `/docs`; `SITE_BASE` when left out, as `site` reads `SITE_URL`, and a `base` written here wins over it. The links, assets, forms and redirects pages render, the sitemap and the feeds carry it, links stay written without it, and a proxy in front of the server takes it off requests.
   base?: string | undefined
-  // Where a link leaving the site opens: kay adds `target="_blank" rel="noopener"` to an `a` whose href is another origin, in templates, islands, Markdown and content bodies, unless the element sets its own `target`. `{ outside: 'same-tab' }` writes none.
-  // `schemes` lists the URL schemes the app trusts in a bound `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data`, `['webcal', 'geo']`: any other scheme but the web's, mail, phone, sms and blob goes out as `unsafe:`, as `javascript:` would. `javascript`, `vbscript` and `data` are refused. `kay dev` logs each bound URL it rewrote.
-  links?: { outside?: 'new-tab' | 'same-tab' | undefined, schemes?: string[] | undefined } | undefined
   // Whether a page's URL ends with a slash: `never`, the default, redirects `/about/` to `/about`; `always` the other way; `ignore` serves both.
   trailingSlash?: TrailingSlash | undefined
   // The module exporting the project's content collections, `src/content.config.ts` by default; their folders are relative to it.
@@ -213,6 +206,13 @@ export interface ClientConfig {
   prefetch?: Prefetch | undefined
   // Whether a visitor sending `Save-Data: on` gets a lighter site by itself: image variants one width narrower, no font preloads, fonts shown only when cached, no speculation rules; `Save-Data` or `prefers-reduced-data` in the browser also stops the prefetch and has an island with no `hydrate` wait until it scrolls near. On by default, `false` serves everyone alike.
   saveData?: boolean | undefined
+  // A service worker keeping the build's files and some pages for a visitor offline, `true` or what it keeps; off by default, as `false` is.
+  offline?: OfflineConfig | boolean | undefined
+  // `true` has `kay build` index the text of the pages it renders, which `searchSite()` from `kay` searches in the browser; off by default.
+  search?: boolean | undefined
+  // Where a link leaving the site opens: kay adds `target="_blank" rel="noopener"` to an `a` whose href is another origin, in templates, islands, Markdown and content bodies, unless the element sets its own `target`. `{ outside: 'same-tab' }` writes none.
+  // `schemes` lists the URL schemes the app trusts in a bound `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data`, `['webcal', 'geo']`: any other scheme but the web's, mail, phone, sms and blob goes out as `unsafe:`, as `javascript:` would. `javascript`, `vbscript` and `data` are refused. `kay dev` logs each bound URL it rewrote.
+  links?: { outside?: 'new-tab' | 'same-tab' | undefined, schemes?: string[] | undefined } | undefined
   // The longest the browser waits for a page it swaps in place, a string such as '10s' (the default): past it the browser loads the page itself, which shows its own progress or error. A page streaming `await` blocks is shown with their pending branches once its first part is in, and this is then the longest the stream may go without a byte before the blocks still pending are left as they are; the server keeps a stream alive every 5 s, so keep it above that.
   pageTimeout?: Duration | undefined
   // How long a link or `navigate()` to another page waits before the page's `_loading.kay` shows in place of the one left, a string such as '200ms' (the default): a page answering sooner never flashes it. Only read on an app with a `_loading.kay`.
@@ -648,6 +648,12 @@ type Over<Bag, Given> = Omit<Bag, keyof Given> & Given
 export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'robots' | 'redirects' | 'i18n' | 'images' | 'observe'> {
   /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */
   onStart?: AppHooks['onListen']
+  /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */
+  offline?: ClientConfig['offline']
+  /** @deprecated Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108. */
+  search?: ClientConfig['search']
+  /** @deprecated Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108. */
+  links?: ClientConfig['links']
   observe?: ObserveInput | undefined
   cors?: ConfigCors | undefined
   security?: boolean | Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined }> | undefined

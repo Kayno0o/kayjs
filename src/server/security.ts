@@ -14,7 +14,6 @@ export interface SecurityOptions {
   // The origin the site is public at: HSTS is sent when it is https.
   site?: string | undefined
   base?: string | undefined
-  offline?: KayConfig['offline'] | undefined
   extensions?: KayConfig['extensions'] | undefined
 
   // The sources the islands need, added to kay's directives and the app's own: see ClientManifest.

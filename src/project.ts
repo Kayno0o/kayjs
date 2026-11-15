@@ -109,8 +109,6 @@ export const CLIENT_BUILD_KEYS = [
   'librarySettings',
   // `navigation` swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions. `hydration` is how far ahead of the viewport an island marked `hydrate="visible"` starts to hydrate, and a deferred server island starts to load. `lateStyles`: every page loads the whole stylesheet, so the build has no class to warn of.
   'client',
-  // A page opened from a search hit marks the words searched for.
-  'search',
   // The self-hosted fonts: each family is followed by a metric-matched fallback in the stylesheets' font stacks.
   'fonts',
   // The level of each lint the dev tool shows in development.
@@ -138,9 +136,18 @@ export function modeOf(options: { dev?: boolean | undefined, prebuilt?: boolean 
   return { dev, prebuilt: options.prebuilt ?? process.env.NODE_ENV === 'production', underKayDev: underKayDev(), devRoutes: dev && (underKayDev() || options.dev === true) }
 }
 
+// Whether `kay build` indexes the text of the pages, `client: { search: true }`.
+export const searchOn = (config: Pick<KayConfig, 'client'>): boolean => config.client?.search === true
+
+// Whether a link to another origin stays in the tab, `client: { links: { outside: 'same-tab' } }`.
+export const sameTabOn = (config: Pick<KayConfig, 'client'>): boolean => config.client?.links?.outside === 'same-tab'
+
+// Whether the config turns the service worker on, in any mode.
+export const offlineSet = (config: Pick<KayConfig, 'client'>): boolean => config.client?.offline !== undefined && config.client.offline !== false
+
 // Whether pages register the service worker: never in development, which serves one unregistering itself instead.
-export function offlineOf(config: Pick<KayConfig, 'offline'>, mode: Pick<Mode, 'dev'>): boolean {
-  return config.offline !== undefined && config.offline !== false && !mode.dev
+export function offlineOf(config: Pick<KayConfig, 'client'>, mode: Pick<Mode, 'dev'>): boolean {
+  return offlineSet(config) && !mode.dev
 }
 
 // Whether the config lists `push()`, whose worker handles pushes and is registered in every mode.
@@ -149,7 +156,7 @@ export function pushListed(config: Pick<KayConfig, 'extensions'>): boolean {
 }
 
 // Whether pages register kay's service worker: `offlineOf`, or a site with `push()`.
-export function registersWorker(config: Pick<KayConfig, 'offline' | 'extensions'>, mode: Pick<Mode, 'dev'>): boolean {
+export function registersWorker(config: Pick<KayConfig, 'client' | 'extensions'>, mode: Pick<Mode, 'dev'>): boolean {
   return offlineOf(config, mode) || pushListed(config)
 }
 
@@ -179,7 +186,7 @@ function customWidths(widths: number[] | undefined): number[] | undefined {
 
 // How every page renders, served or prerendered alike.
 export function renderOptionsOf(config: KayConfig, mode: Pick<Mode, 'dev' | 'devRoutes'>, built: { head: SeoHead | undefined, maxDensity: number, editor?: string | undefined, contexts?: string[] | undefined, fontCss?: string | undefined, islandPreloads?: RenderOptions['islandPreloads'] }): RenderOptions {
-  return { ...pickConfig(config, RENDER_CONFIG), dev: mode.dev, devTools: mode.devRoutes, serverTiming: config.observe?.serverTiming ?? mode.dev, sameTabLinks: config.links?.outside === 'same-tab', linkSchemes: linkSchemes(config), fontCss: config.client?.saveData === false ? undefined : built.fontCss, islandPreloads: config.client?.saveData === false ? undefined : built.islandPreloads, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: registersWorker(config, mode), installOffer: pushListed(config), editor: built.editor, contexts: built.contexts }
+  return { ...pickConfig(config, RENDER_CONFIG), dev: mode.dev, devTools: mode.devRoutes, serverTiming: config.observe?.serverTiming ?? mode.dev, sameTabLinks: sameTabOn(config), linkSchemes: linkSchemes(config), fontCss: config.client?.saveData === false ? undefined : built.fontCss, islandPreloads: config.client?.saveData === false ? undefined : built.islandPreloads, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: registersWorker(config, mode), installOffer: pushListed(config), editor: built.editor, contexts: built.contexts }
 }
 
 // A project as every entry point takes it: where it is, its config, where it keeps each part and how it runs.

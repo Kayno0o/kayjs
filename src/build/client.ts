@@ -17,7 +17,7 @@ import { formatDiagnostic } from '../compiler'
 import { buildFailure, errorCodeOf, KayError, raisedMark } from '../compiler/errors'
 import { gitIgnoredNames, isSource } from '../dev/sources'
 import { tailwindDesign } from '../format/tailwind'
-import { projectPaths } from '../project'
+import { projectPaths, searchOn } from '../project'
 import { kayLog } from '../runtime/log'
 import { apiStubs, apiTrees } from '../server/api-modules'
 import { rebaseCss } from '../server/base'
@@ -525,7 +525,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, files: 
   await Bun.write(bootFile, [
     ...publicEnv !== undefined ? [`import kayPublicEnv from ${JSON.stringify(publicEnv)}`] : [],
     `import { ${['disposeIslands', ...options.hot ? ['enableHotSwap'] : [], 'hydrateIslands', ...options.hot && navigation ? ['refreshForEdit'] : [], ...navigation ? ['startNavigation'] : []].join(', ')} } from 'kay/client'`,
-    ...options.search ? ['import { arrive } from \'kay/arrival\''] : [],
+    ...searchOn(options) ? ['import { arrive } from \'kay/arrival\''] : [],
     '',
     ...publicEnv !== undefined ? [`;(globalThis as Record<symbol, unknown>)[Symbol.for('kay.publicEnv')] = kayPublicEnv`, ''] : [],
     // The merge of an island's classes reads the table the server sets for its own render.
@@ -539,11 +539,11 @@ async function bundleIslands(root: string, islands: Map<string, string>, files: 
     // Development: `kay dev`'s page script refreshes the page through the swap for an edit no island swap covers.
     ...options.hot && navigation ? ['  ;(globalThis as { $kayRefresh?: () => Promise<void> }).$kayRefresh = refreshForEdit'] : [],
     '  const hydrated = hydrate()',
-    ...options.search ? ['  const at = scrollY'] : [],
+    ...searchOn(options) ? ['  const at = scrollY'] : [],
     '',
-    ...navigation ? [`  startNavigation({ hydrate, dispose: disposeIslands${options.search ? ', arrive' : ''} })`, ''] : [],
+    ...navigation ? [`  startNavigation({ hydrate, dispose: disposeIslands${searchOn(options) ? ', arrive' : ''} })`, ''] : [],
     // A jump within the page, a search hit's to another of its sections among them, marks the words there too.
-    ...options.search ? ['  await hydrated', '  void arrive(location.search, at)', '  addEventListener(\'hashchange\', () => void arrive(location.search, scrollY))'] : ['  return hydrated'],
+    ...searchOn(options) ? ['  await hydrated', '  void arrive(location.search, at)', '  addEventListener(\'hashchange\', () => void arrive(location.search, scrollY))'] : ['  return hydrated'],
     '})',
     '',
     ';(globalThis as { $kayHydrate?: unknown }).$kayHydrate = Object.assign(hydrate, { ready, dispose: disposeIslands })',
@@ -631,12 +631,12 @@ async function bundleNavigation(root: string, options: ClientOptions, config: Bu
     `import ${JSON.stringify(join(RUNTIME_DIR, 'page-errors.ts'))}`,
     `import { listenToForms } from ${JSON.stringify(join(RUNTIME_DIR, 'form-submits.ts'))}`,
     `import { startNavigation } from ${JSON.stringify(join(RUNTIME_DIR, 'navigate.ts'))}`,
-    ...options.search ? [`import { arrive } from ${JSON.stringify(join(RUNTIME_DIR, 'arrival.ts'))}`] : [],
+    ...searchOn(options) ? [`import { arrive } from ${JSON.stringify(join(RUNTIME_DIR, 'arrival.ts'))}`] : [],
     '',
-    ...options.search ? ['const at = scrollY', ''] : [],
-    `startNavigation({ hydrate: () => undefined, dispose: () => undefined${options.search ? ', arrive' : ''} })`,
+    ...searchOn(options) ? ['const at = scrollY', ''] : [],
+    `startNavigation({ hydrate: () => undefined, dispose: () => undefined${searchOn(options) ? ', arrive' : ''} })`,
     'listenToForms()',
-    ...options.search ? ['void arrive(location.search, at)', 'addEventListener(\'hashchange\', () => void arrive(location.search, scrollY))'] : [],
+    ...searchOn(options) ? ['void arrive(location.search, at)', 'addEventListener(\'hashchange\', () => void arrive(location.search, scrollY))'] : [],
     '',
   ].join('\n'))
 
