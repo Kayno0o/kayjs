@@ -10,7 +10,7 @@ const who = async (site: Awaited<ReturnType<typeof testSite>>) => (await site.vi
 
 it('signs each real test site in through its own auth()', async () => {
   const first = await testSite({ root: ROOT })
-  const second = await testSite({ root: ROOT, base: '/b' })
+  const second = await testSite({ root: ROOT, config: { base: '/b' } })
 
   const ada = await authTest(first).signInAs({ email: 'ada@example.com', username: 'Ada' })
 

@@ -8,7 +8,7 @@ const PASSWORD = 'correct horse battery'
 // Where the pages are served: the fixture's kay.config.ts gives `authPages` a prefix through the environment, and its `authCore` none.
 const PAGES_AT = process.env.FIXTURE_PREFIX ?? '/auth'
 
-const site = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { base: process.env.FIXTURE_BASE } })
+const site = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { config: { base: process.env.FIXTURE_BASE } } })
 // After the site loads, so `authPages` hands the fixture's `authCore` its prefix.
 const { mails, store } = await import('../src/auth')
 
@@ -71,7 +71,7 @@ if (process.env.FIXTURE_SWITCHES) {
 if (process.env.FIXTURE_ADMIN) {
   // The admin pages and the impersonation banner link under the base and the prefix, to the pages' own routes.
   const { impersonate } = await import(join(PAGES, 'admin', 'users', '[id].kay'))
-  const other = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { base: process.env.FIXTURE_BASE } })
+  const other = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { config: { base: process.env.FIXTURE_BASE } } })
 
   await site.submit(register, { email: 'admin-base@example.com', password: PASSWORD }, { from: await site.visit(`${PAGES_AT}/register`) })
   await other.submit(register, { email: 'acted-base@example.com', password: PASSWORD }, { from: await other.visit(`${PAGES_AT}/register`) })
@@ -143,7 +143,7 @@ if (process.env.FIXTURE_ORG) {
   await site.submit(invite, { email: 'org-guest@example.com' }, { from: detail })
 
   const link = linkOf('invitation')
-  const visitor = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { base: process.env.FIXTURE_BASE } })
+  const visitor = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { config: { base: process.env.FIXTURE_BASE } } })
   const invitation = await visitor.visit(`${PAGES_AT}/invitation${link.search}`)
 
   // The invited address joins, leaves, and the owner deletes: each redirect keeps the base and the prefix.
@@ -182,7 +182,7 @@ out.signedIn = returning.url
 out.checkedLifetime = await lifetimeOf('variant@example.com')
 
 for (const [name, prefix] of [['en', ''], ['fr', '/fr']] as const) {
-  const forgetful = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { base: process.env.FIXTURE_BASE } })
+  const forgetful = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { config: { base: process.env.FIXTURE_BASE } } })
 
   await forgetful.submit(request, { email: 'variant@example.com' }, { from: await forgetful.visit(`${prefix}${PAGES_AT}/reset-password`) })
 

@@ -42,7 +42,7 @@ A page without a `--- server` fence that has an `on*`, `bind:` or `ref`, a brows
 - `mailer()` and `mail()` take every `MAIL_*` setting as an option that wins over the variable: `url`, `smtp.insecure`, `smtp.rateLimit` and `smtp.dkim` join `from`, `to` and `events`. Nothing to change.
 ### kayjs-ai calls share one options type, and a chat takes `labels`
 
-`kay upgrade` rewrites both forms it can find (`deprecated-ai-labels`, `deprecated-ai-language`); the old forms work until 1.108, but the resolved `KayConfig` (what the server reads) no longer has `onStart` or `observe.onError`: read `onListen` and `onError`.
+`kay upgrade` rewrites both forms it can find (`deprecated-ai-labels`, `deprecated-ai-language`); the old forms work until 1.108.
 
 - `Chat`, `ChatLauncher` and `ChatPanel` take `labels={{ send: 'Go', stop: 'Halt' }}`, keyed as the messages are (`ai.chat.send`), in place of the `sendLabel` and `stopLabel` props; `waitingLabel` is `labels.thinking` and `failureLabel` `labels.error`. A flat prop still wins over `labels`.
 - `transcribe()` and `describeImage()` take `locale`, a BCP 47 tag, in place of `language`.
@@ -144,6 +144,8 @@ An app with no `store` now keeps sessions, jobs and every library in one SQLite 
 ### Hooks are flat keys named by the moment they run
 
 `onListen` replaces the config's `onStart` (a job's, queue's and workflow's `onStart` keep theirs), `onError` is a key of the config beside `observe`, and every hook event carries one `context`: an action's `beforeRun`, `onSuccess` and `onError` read `context` where they read `ctx`, which holds the action's own context besides `ip`, `userAgent` and `userId`. `observe.log` is `false`, `true` or `{ format: 'json', requests, sink }`, replacing `'json'` and a function. `deprecated-app-hooks` and `deprecated-hook-context` (`kay check --fix`) rewrite them; the old forms work until 1.108.
+
+- The resolved `KayConfig` (what the server reads) no longer has `onStart` or `observe.onError`: read `onListen` and `onError`.
 
 ### `pages()` and `testSite()` take `{ config }`
 

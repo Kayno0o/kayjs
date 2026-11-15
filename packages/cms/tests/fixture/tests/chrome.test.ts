@@ -10,7 +10,7 @@ const ROOT = join(import.meta.dir, '..')
 // The fixture's kay.config.ts calls cms() as it loads, after this one, so the settings are given again once it has.
 async function adminSite(options: Parameters<typeof cms>[0], site: Parameters<typeof testSite>[0] = {}) {
   const guard: Guard = () => undefined
-  const made = await testSite({ root: ROOT, ...site, config: { extensions: [cms({ guard, ...options })] } })
+  const made = await testSite({ root: ROOT, ...site, config: { ...site.config, extensions: [cms({ guard, ...options })] } })
 
   cms({ guard, ...options })
 
@@ -77,7 +77,7 @@ test('under a base and a trailing slash, the logo and the links carry the base, 
   branding.logo = { src: '/logo.svg', alt: '' }
 
   try {
-    const site = await adminSite({}, { base: '/cms', trailingSlash: 'always' })
+    const site = await adminSite({}, { config: { base: '/cms', trailingSlash: 'always' } })
     const page = await site.visit('/admin/collections/posts/hello/')
 
     expect(crumbs(page)).toEqual([['Content', '/cms/admin'], ['Posts', '/cms/admin/collections/posts']])
