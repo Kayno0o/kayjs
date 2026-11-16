@@ -6,12 +6,13 @@ import { BUTTON_FORM_KEY } from '../runtime/button-form'
 const MESSAGE_KEY = /(?:\b(?:t|T|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
 
 const AWAIT_LINE = /^[ \t]*await\b/m
+const KAY_IMPORT = /\bfrom\s+(['"])[^'"]+\.kay\1/
 
-// What the source words by key, and the alert an `await` of it may show, which the browser words as the server does.
+// What the source words by key, and the alert an `await` may show, its own or one in a component it renders, which the browser words as the server does.
 function messageKeys(source: string): string[] {
   const keys = Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!)
 
-  return [...new Set(AWAIT_LINE.test(source) ? [...keys, AWAIT_FAILED_KEY] : keys)]
+  return [...new Set(AWAIT_LINE.test(source) || KAY_IMPORT.test(source) ? [...keys, AWAIT_FAILED_KEY] : keys)]
 }
 
 // The `island` the `--- module` fence exports: `const` for `export const island = { hydrate, persist }`, the one form the compiler reads, `listed` for any other, `export { island }` included.

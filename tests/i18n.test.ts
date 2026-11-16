@@ -197,6 +197,9 @@ describe('locale prefixes', () => {
     expect(islandMessages('const text = T(\'intro\', { name })\nconst more = T( "rich.other")')).toBe(', ["intro","rich.other"]')
     // An island with an await block ships the key of its alert, so the browser words it as the server does.
     expect(islandMessages('p {t(\'nav.home\')}\nawait rows then list\n  p {list.length}')).toBe(', ["nav.home","kay.await.failed"]')
+    // A component it renders may hold the await, so an island importing one carries the alert's words too.
+    expect(islandMessages('---\nimport Rows from \'./rows.kay\'\n---\nRows')).toBe(', ["kay.await.failed"]')
+    expect(islandMessages('p {t(\'nav.home\')}')).toBe(', ["nav.home"]')
     expect(islandMessages('p {t(\'nav.home\')}\n')).toBe(', ["nav.home"]')
   })
 
