@@ -125,6 +125,16 @@ describe('a component with parts, on the server', () => {
     expect(html).toContain('<section class="card p-4 mt-6 mt-2"><header class="p-6" data-part="head">conditions</header>')
   })
 
+  it('tells the parts object of before 1.105 from an object of conditions by its keys, not by what its values evaluate to', async () => {
+    const user = { name: 'Ada' }
+    const card = (given: object) => render('card.kay', { title: 't', class: given })
+
+    expect(await card({ active: user && user.name })).toContain('<section class="card p-4 active"><header class="p-2" data-part="head">')
+    expect(await card({ active: true, head: 'p-4' })).toContain('<section class="card p-4 active head"><header class="p-2" data-part="head">')
+    expect(await card({ head: 'p-6' })).toContain('<section class="card p-4"><header class="p-6" data-part="head">')
+    expect(await card({ root: 'mt-4', body: 'p-8' })).toContain('<section class="card p-4 mt-4"><header class="p-2" data-part="head">t</header><div class="p-8" data-part="body">')
+  })
+
   it('leaves a component without parts alone, class prop and all', async () => {
     expect(await render('calls.kay')).toContain('<div class="base given">plain</div>')
   })

@@ -576,7 +576,7 @@ export abstract class TemplateWriter {
       items.push(() => b.add('(').addSource(expression).add(')'))
 
     for (const part of classes.parts ?? [])
-      items.push(...this.recipeItem(part), () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))
+      items.push(...this.recipeItem(part), () => b.add(this.partRead(part)))
 
     b.add('[')
 
@@ -588,6 +588,14 @@ export abstract class TemplateWriter {
     }
 
     b.add(']')
+  }
+
+  // What the component's props give a part, told the names of every part of the component, which tell the parts object of before 1.105 from an object of conditions in `class`.
+  private partRead(part: string): string {
+    const parts = this.facts.parts
+    const names = [...new Set(['root', ...parts?.names.keys() ?? [], ...parts?.handed.keys() ?? []])]
+
+    return `${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)}, ${JSON.stringify(names)})`
   }
 
   // The classes the component's recipe, then `src/ui.ts`, give a part, after the element's own and before the `class` prop's entry, so the base gives way to a variant, a variant to the app's `src/ui.ts` and that to the caller.
@@ -728,13 +736,13 @@ export abstract class TemplateWriter {
             b.add(', ')
           }
 
-          b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})])`)
+          b.add(`${this.partRead(part)}])`)
         },
       })
     }
 
     for (const part of parts)
-      items.push(...this.recipeItem(part).map(emit => ({ emit })), { emit: () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`) })
+      items.push(...this.recipeItem(part).map(emit => ({ emit })), { emit: () => b.add(this.partRead(part)) })
 
     const written = this.classTable === undefined
       ? items

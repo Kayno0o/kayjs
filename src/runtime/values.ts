@@ -202,6 +202,11 @@ export function partHanded(part: string, list: readonly unknown[]): unknown {
   return taggedParts({ [part]: partsClass(list) })
 }
 
+// Whether a part's classes can be listed beside another's: a string, an array, or an object of conditions, which the class normalizer reads inside an array as well.
+function joinable(value: unknown): boolean {
+  return typeof value === 'string' || Array.isArray(value) || (typeof value === 'object' && value !== null && !isParts(value))
+}
+
 // Several objects of parts as one, a part two of them give joined in order when both are classes, the later one replacing it when either is the parts of a component.
 function mergeParts(found: readonly Parts[]): Parts {
   const merged: Record<string, unknown> = {}
@@ -209,9 +214,7 @@ function mergeParts(found: readonly Parts[]): Parts {
   for (const parts of found) {
     for (const [name, entry] of Object.entries(parts)) {
       const earlier = Object.hasOwn(merged, name) ? merged[name] : undefined
-      const joins = (value: unknown) => typeof value === 'string' || Array.isArray(value)
-
-      merged[name] = joins(earlier) && joins(entry) ? [earlier, entry] : entry ?? earlier
+      merged[name] = joinable(earlier) && joinable(entry) ? [earlier, entry] : entry ?? earlier
     }
   }
 
@@ -231,17 +234,19 @@ function taggedParts(parts: Record<string, unknown>): Parts {
   return Object.defineProperty({ ...parts }, PARTS, { value: true })
 }
 
-// Whether a `class` object is the parts of the form before 1.105, with a string or an object among its values, rather than an object of conditions, whose values are booleans.
-function holdsParts(value: object): boolean {
-  return isParts(value) || Object.values(value).some(entry => typeof entry === 'string' || (typeof entry === 'object' && entry !== null))
+// Whether a `class` object is the parts of the form before 1.105, every key of it a part of the component, rather than an object of conditions taken by truthiness. Without the component's part names, the handed-on parts, which are tagged, are the only ones.
+function holdsParts(value: object, names: readonly string[] | undefined): boolean {
+  const keys = Object.keys(value)
+
+  return isParts(value) || (names !== undefined && keys.length > 0 && keys.every(key => names.includes(key)))
 }
 
 // What a component's `class` and `parts` props give a part, `class` winning: a `class` string, or array, is the root's, and an object holds one entry per part, its own object when that part is a component. The `class` object is the form before 1.105, still read and overridden by `parts`.
-export function partClass(props: unknown, part: string): unknown {
+export function partClass(props: unknown, part: string, names?: readonly string[]): unknown {
   const { class: value, parts } = (props ?? {}) as { class?: unknown, parts?: unknown }
   const own = (from: unknown): unknown => {
-    // A `class` that is no parts object, a string, an array or an object of conditions, is the root's.
-    if (typeof from !== 'object' || from === null || Array.isArray(from) || (from === value && !holdsParts(from)))
+    // A `class` that is no parts object, a string, an array or an object of conditions, is the root's, which the names of the component's parts tell apart.
+    if (typeof from !== 'object' || from === null || Array.isArray(from) || (from === value && !holdsParts(from, names)))
       return part === 'root' && from === value ? from : undefined
 
     const entry = Object.hasOwn(from, part) ? (from as Record<string, unknown>)[part] : undefined
@@ -258,9 +263,7 @@ export function partClass(props: unknown, part: string): unknown {
   if (isParts(given) && isParts(added))
     return mergeParts([added, given])
 
-  const joins = (entry: unknown) => typeof entry === 'string' || Array.isArray(entry) || (typeof entry === 'object' && entry !== null && !isParts(entry))
-
-  return joins(given) && joins(added) ? [added, given] : given
+  return joinable(given) && joinable(added) ? [added, given] : given
 }
 
 // Whether a property and its value make one declaration: the value holds no comment start outside its strings, and what is left once its strings and parentheses are taken out holds no `;`, `{`, `}`, quote, parenthesis or backslash, which would add declarations or swallow the next.

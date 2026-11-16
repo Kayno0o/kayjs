@@ -67,6 +67,7 @@ describe('kay check on a part handed to a called component', () => {
   it('types the handed part as the called component types it', async () => {
     expect(await problems(`${HANDS}Busy(part="root spinner")\n`, CALLER)).toEqual([])
     expect(await problems('---\nimport Hands from \'../hands.kay\'\n---\nHands(class={{ root: \'a\', spinner: \'b\' }})\n')).toEqual([])
+    expect(await problems('---\nimport Hands from \'../hands.kay\'\n---\nHands(parts={{ root: \'a\', spinner: \'b\' }})\n')).toEqual([])
     expect(await problems('---\nimport Hands from \'../hands.kay\'\n---\nHands(class={{ spinner: 5 }})\n')).toEqual([expect.stringContaining('not assignable')])
   })
 })
