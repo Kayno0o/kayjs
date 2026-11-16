@@ -23,7 +23,7 @@ nav
 
 - `SignedIn` renders its children for a signed-in user, and with `role="admin"` for one holding that role, the app's `roles` hierarchy applied. `SignedOut` renders them for a visitor.
 - `UserMenu` shows the user's username or email, a link to their account when the prebuilt pages are on (`account={false}` leaves it out), its children, and a sign-out button back to the pages' home (`redirect` names another path). A visitor gets a link to the sign-in page instead, `signIn={false}` leaving it out. The account pages' own header is one.
-- `SignOutButton` is the form posting to the sign-out route, a Button inside it: `redirect` is the path to go to after (the pages' `home` by default), `label` words the button and children follow it, and `variant`, `tone`, `size`, `icon` and attributes are the Button's. `class` styles the form, `class={{ button: '...' }}` the button. It never reads the prefix: the app writes no `features().prefix`.
+- `SignOutButton` is the form posting to the sign-out route, a Button inside it: `redirect` is the path to go to after, put in the page's locale (the pages' `home` by default), `label` words the button and children follow it, and `variant`, `tone`, `size`, `icon` and attributes are the Button's. `class` styles the form, `class={{ button: '...' }}` the button. It never reads the prefix: the app writes no `features().prefix`.
 - `SignInLink` is a link to the sign-in page leading back to the page it is on: `redirect` names another path of the site, `href` another page altogether (the app's own sign-in), `label` the wording, children following it. `button` draws it as a Button, taking `variant`, `tone`, `size` and `icon`.
 - A guest is signed out for all of them.
 - `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
@@ -50,7 +50,7 @@ With `account.deleteAfter`, `DeletionBanner` (`@kayjs/auth/components/deletion-b
 
 ### Show them with the first bytes
 
-A page reads the user before it renders when its imports reach `SignedIn`, `SignedOut`, `UserMenu` or any template reading `ctx`, through its layouts, components and helpers however deep, so they show in the first bytes, with JavaScript off too. A page not reaching them reads no session, and no option is needed.
+A page reads the user before it renders when its imports reach `SignedIn`, `SignedOut`, `UserMenu`, `SignInLink`, `SignOutButton` or any template reading `ctx`, through its layouts, components and helpers however deep, so they show in the first bytes, with JavaScript off too. A page not reaching them reads no session, and no option is needed.
 
 - A page reading the session is the visitor's own: no cache shares it between visitors, and a page kept by the build is rendered per request.
 - A read that fails there is left to the components, which read again and report it, showing nothing meanwhile.
@@ -59,4 +59,4 @@ A page reads the user before it renders when its imports reach `SignedIn`, `Sign
 ## Reference
 
 - `viewer` goes beside `module` and `pages` in `auth({ ... })`: left out, the pages reaching a template reading `ctx` read the user; `true` reads it on every page.
-- `SignedIn` takes `role`; `UserMenu` takes `account`, `signIn` and `redirect`; `SignOutButton` takes `redirect`, `label` and a Button's props; `SignInLink` takes `redirect`, `href`, `button`, `label` and a Button's props; `SignedOut`, `ImpersonationBanner` and `DeletionBanner` take none. All import from `@kayjs/auth/components/<name>.kay`.
+- `SignedIn` takes `role`; `UserMenu` takes `account`, `signIn` and `redirect`; `SignOutButton` takes `redirect`, `label` and a Button's props; `SignInLink` takes `redirect`, `href`, `button`, `label` and a Button's props (`variant`, `tone`, `size`, `icon`, `busy` and `spinner` apply only with `button`); `SignedOut`, `ImpersonationBanner` and `DeletionBanner` take none. All import from `@kayjs/auth/components/<name>.kay`.

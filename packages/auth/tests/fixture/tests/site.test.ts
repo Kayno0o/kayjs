@@ -155,6 +155,12 @@ describe('the prebuilt pages', () => {
     expect(member.find('#menu form').map(form => form.attributes.action)).toEqual(['/auth/sign-out'])
     expect(member.find('input[name=redirect]').map(input => input.attributes.value)).toEqual(['/menu', '/nav'])
     expect(member.find('button#out').map(button => [button.text, button.attributes['data-test']])).toEqual([['Leave', 'out']])
+
+    const french = await (await browser()).visit('/fr/menu')
+
+    expect(french.find('#menu a').map(link => [link.text, link.attributes.href])).toEqual([['Se connecter', '/fr/auth/sign-in?redirect=%2Ffr%2Fmenu']])
+    expect(french.find('#custom').map(link => link.attributes.href)).toEqual(['/own-sign-in'])
+    expect((await ada.visit('/fr/menu')).find('input[name=redirect]').map(input => input.attributes.value)).toEqual(['/fr/menu', '/fr/nav'])
   })
 
   test('a template reads ctx.user and ctx.can with no fence, in the first bytes, and a page reaching no template reads no session', async () => {

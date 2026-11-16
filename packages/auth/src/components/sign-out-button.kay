@@ -5,10 +5,10 @@ import type { AsButton } from '@kayjs/ui/lib/button-props'
 import Button from '@kayjs/ui/button.kay'
 import { currentViewer } from '../viewer'
 
-// `redirect` is where to go after, a path of the site (the pages' `home` by default); the rest is the Button's own (`variant`, `tone`, `size`, `icon`, `label`, attributes), and children follow the label.
+// `redirect` is where to go after, a path of the site in the page's locale (the pages' `home` by default); the rest is the Button's own (`variant`, `tone`, `size`, `icon`, `label`, attributes), and children follow the label.
 const { redirect, label, ...rest } = props<Omit<AsButton, 'href' | 'type' | 'onClick'> & { redirect?: string | undefined }>()
 const features = currentViewer().auth.features()
-const back = redirect ?? localize(features.pages?.home ?? '/')
+const back = localize(redirect ?? features.pages?.home ?? '/')
 ---
 // A sign-out is a post to the library's own route, which a link or a prefetch cannot make.
 form(part="root" method="post" action={`${features.prefix}/sign-out`})

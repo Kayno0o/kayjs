@@ -70,7 +70,7 @@ export function currentViewer(): Viewer & { request: Request } {
   const viewer = request && viewers.get(request)
 
   if (!viewer)
-    throw new KayError('outside-request', 'kayjs-auth: SignedIn, SignedOut and UserMenu read the signed-in user of the request being answered, so they cannot render in a prerendered page or outside a request; render the page per request (`prerender: false`)')
+    throw new KayError('outside-request', 'kayjs-auth: SignedIn, SignedOut, UserMenu, SignInLink and SignOutButton read the signed-in user of the request being answered, so they cannot render in a prerendered page or outside a request; render the page per request (`prerender: false`)')
 
   return { ...viewer, request }
 }

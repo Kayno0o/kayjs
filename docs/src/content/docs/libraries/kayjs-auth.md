@@ -223,8 +223,8 @@ nav
 
 - `SignedIn` renders its children for a signed-in user, and with `role="admin"` for one holding that role, the app's `roles` hierarchy applied. `SignedOut` renders them for a visitor.
 - `UserMenu` shows the username or email, a link to the account when the prebuilt pages are on (`account={false}` leaves it out), its children and a sign-out button (`redirect` names where it goes). A visitor gets a link to the sign-in page instead, `signIn={false}` leaving it out. The account pages' own header is one.
-- `SignOutButton` takes `redirect` (the pages' `home` by default), `label` (children follow it), and a Button's `variant`, `tone`, `size` and `icon`; `class` styles the form and `class={{ button: '...' }}` the button.
-- `SignInLink` leads back to the page it is on (`redirect` names another path, `href` another page), takes `label` (children follow it), and draws as a Button with `button`.
+- `SignOutButton` takes `redirect` (put in the page's locale; the pages' `home` by default), `label` (children follow it), and a Button's `variant`, `tone`, `size` and `icon`; `class` styles the form and `class={{ button: '...' }}` the button.
+- `SignInLink` (its `variant`, `tone`, `size`, `icon`, `busy` and `spinner` apply only with `button`) leads back to the page it is on (`redirect` names another path, `href` another page), takes `label` (children follow it), and draws as a Button with `button`.
 - A guest is signed out for all of them.
 - `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
 - They read the request being answered, so a page with `prerender: true` fails the build asking you to render it per request. They nest in one another and in the app's own `await` blocks.
