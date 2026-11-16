@@ -501,7 +501,7 @@ describe('kay lsp', () => {
   it('shows the signature of the call under the cursor, an action call sending an object on its typed input', async () => {
     const help = await editor.request<{ signatures: { label: string }[], activeSignature: number }>('textDocument/signatureHelp', 'site/src/components/quick-add.kay', 9, 28)
 
-    expect(help.signatures[help.activeSignature]!.label).toBe('add(input: { title: string; }, options?: CallOptions<number> | undefined): Promise<number>')
+    expect(help.signatures[help.activeSignature]!.label).toBe('add(input: { title: string; }, options?: CallOptions<number> | undefined): Called<number | Failure<{ readonly message: "Already on the list"; }>>')
   })
 
   it('formats a .kay document as one whole-document edit', async () => {
