@@ -37,6 +37,17 @@ describe('deprecated-ui-input', () => {
     expect(found('Combobox#list(label="x" options={[]})').at).toEqual([])
   })
 
+  it('writes a braced shorthand, a duplicate id and attributes on their own lines', () => {
+    expect(found('Toggle({id} label="a")').fixed).toBe('Toggle(inputProps={{ id: id }} label="a")')
+    expect(found('Toggle(label="a" {title} id="x")').fixed).toBe('Toggle(label="a" inputProps={{ title: title, id: "x" }})')
+    expect(found('Toggle#a(id="b")').fixed).toBe('Toggle(inputProps={{ id: "b" }})')
+    expect(found('Toggle(\n  label="a"\n  id="x"\n  data-y="1"\n)').fixed).toBe('Toggle(\n  label="a"\n  inputProps={{ id: "x", "data-y": "1" }}\n)')
+  })
+
+  it('leaves a tooltip with the input', () => {
+    expect(found('Toggle(label="a" data-tooltip="x" data-hint="y")').at).toEqual([])
+  })
+
   it('offers no fix beside an inputProps', () => {
     expect(found('Toggle(label="A" id="a" inputProps={{ name: "x" }})')).toEqual({ at: ['id'], safe: undefined, fixed: undefined })
   })

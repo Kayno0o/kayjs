@@ -4,7 +4,9 @@ import type { Named } from './deprecated-ui-props'
 // The kayjs-ui controls whose spread attributes went to their input before 1.105 and go to their root now, with the attributes that stay the input's own (`id` is not one on a Combobox, where it names the list).
 const CONTROLS = new Set(['ui/toggle', 'ui/checkbox', 'ui/slider', 'ui/color-input', 'ui/combobox', 'ui/date-input'])
 
-const isRootAttribute = (name: string, file: string) => (name === 'id' && file !== 'ui/combobox') || name === 'title' || name.startsWith('data-')
+// A tooltip stays with the input, which the keyboard reaches.
+const TOOLTIP = /^data-(?:tooltip|hint)/
+const isRootAttribute = (name: string, file: string) => (name === 'id' && file !== 'ui/combobox') || name === 'title' || (name.startsWith('data-') && !TOOLTIP.test(name))
 
 type Report = (span: Span, message: string, details: Details) => void
 
@@ -34,11 +36,19 @@ function insertion(element: ElementNode, object: string, others: boolean): (Span
   return at === undefined ? [] : [{ start: at, end: at, text: others ? `${object} ` : object }]
 }
 
-// The edit taking an attribute out with the space before it.
-function removal(attribute: Named, text: (span: Span) => string): Span & { text: string } {
-  const start = attribute.name.start
+// Where an attribute starts, its brace included when it is written as a shorthand.
+const attributeStart = (attribute: Named) => attribute.kind === 'expression' && attribute.shorthand ? attribute.shorthand.start : attribute.name.start
 
-  return { start: text({ start: start - 1, end: start }) === ' ' ? start - 1 : start, end: attributeEnd(attribute), text: '' }
+const SPACE = /\s/
+
+// The edit taking an attribute out with the white space before it.
+function removal(attribute: Named, text: (span: Span) => string): Span & { text: string } {
+  let start = attributeStart(attribute)
+
+  while (start > 0 && SPACE.test(text({ start: start - 1, end: start })))
+    start--
+
+  return { start, end: attributeEnd(attribute), text: '' }
 }
 
 // The `id`, `title` and `data-*` attributes of a kayjs-ui control that drew an input (Toggle, Checkbox, Slider, ColorInput, Combobox, DateInput), the `#id` shorthand among them, which reached its input before 1.105 and reach its root now, the input taking `inputProps`. The fix gathers them into one `inputProps` object, and offers none beside an `inputProps` already written.
@@ -55,12 +65,12 @@ export function deprecatedUiInput(element: ElementNode, file: string, text: (spa
 
   const written = attributes.some(one => text(one.name) === 'inputProps')
   const entries = [
-    ...shorthand ? [`id: ${JSON.stringify(text(shorthand))}`] : [],
+    ...shorthand && !moved.some(one => text(one.name) === 'id') ? [`id: ${JSON.stringify(text(shorthand))}`] : [],
     ...moved.map(one => `${propertyKey(text(one.name))}: ${propertyValue(one, text)}`),
   ]
   const object = `inputProps={{ ${entries.join(', ')} }}`
   // One fix rewrites them all, as each of the others alone would lose its attribute: the object goes where the first attribute was, or into the brackets when only `#id` is there.
-  const edits = moved.length > 0 ? [{ start: moved[0]!.name.start, end: attributeEnd(moved[0]!), text: object }, ...moved.slice(1).map(one => removal(one, text))] : insertion(element, object, attributes.length > 0)
+  const edits = moved.length > 0 ? [{ start: attributeStart(moved[0]!), end: attributeEnd(moved[0]!), text: object }, ...moved.slice(1).map(one => removal(one, text))] : insertion(element, object, attributes.length > 0)
 
   if (shorthand)
     edits.push({ start: shorthand.start - 1, end: shorthand.end, text: moved.length === 0 && !element.parens ? `(${object})` : '' })
