@@ -900,7 +900,7 @@ pgDescribe('pgRooms', () => {
     const sql = await fresh()
     const [handle] = handles(1)
     const store = pgRooms(handle!, { poll: '20ms' })
-    const live = rooms<string, undefined, { count: number }>({ store, state: () => ({ count: 0 }), snapshot: state => JSON.stringify(state) })
+    const live = rooms<string, undefined, { count: number }>({ store, state: () => ({ count: 0 }), snapshot: state => state })
     const received: string[] = []
     const ada = { raw: { sendText: (text: string) => void received.push(text) } }
 
@@ -971,7 +971,8 @@ pgDescribe('pgRooms', () => {
     await waitFor(() => received.length === 2, 'the coalesced snapshot')
     // Nothing happens: the two calls coalesced into one snapshot, and a second would follow within the wait.
     await Bun.sleep(100)
-    expect(received).toEqual(['snap0', 'now4'])
+    // Frames are JSON, so a string message reads back as a JSON string.
+    expect(received).toEqual(['"snap0"', '"now4"'])
     store.close()
   })
 
