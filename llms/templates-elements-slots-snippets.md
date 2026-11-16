@@ -72,9 +72,7 @@
 
 ```kay
 ---
-import type { Snippet } from 'kay'
-
-const { title, actions } = props<{ title: string, actions?: Snippet }>()
+const { title } = props<{ title: string }>()
 ---
 article.card
   header
@@ -84,11 +82,9 @@ article.card
     p Nothing here yet
 ```
 
-A parent fills it like this: the `@actions` block becomes the `actions` prop, which `slot actions` renders, and the other children go to `slot`.
+A parent fills it like this: the `@actions` block becomes the `actions` prop, which `slot actions` renders, and the other children go to `slot`. The template types them: a component declares neither `children` nor an optional block it only renders with `slot name`, and a call passing a block with no `slot` for it, or children to a template with no `slot`, is a `kay check` error. Declare a block to require it (`actions: Snippet`) or to type the values it is called with (`Snippet<[Item]>`).
 
 The lines under a `slot` render when it gets nothing to show.
-
-`kay check` reports a `slot name` naming no prop, as a call with the wrong arguments.
 
 In a layout, `slot name` is a slot the page below fills with a `@name` block at the root of its template: see [Fill a slot of the layout](routing.md#fill-a-slot-of-the-layout).
 

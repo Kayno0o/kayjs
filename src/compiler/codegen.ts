@@ -8,8 +8,9 @@ import type { AwaitAlert, WRITE_HELPERS } from './names'
 import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite-types'
 import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } from './script'
+import type { SlotTypes } from './slot-types'
 import { actionUrl } from '../runtime/action'
-import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, slotNames, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
+import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { addIslandShorthandTitle, addShorthandChecks, addShorthandGroup, hasShorthandTitle } from './head-shorthand'
 import { emitHeadTag, emitHeadText } from './head-tags'
@@ -26,6 +27,7 @@ import { ownMarkupOf } from './own-markup'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { reactiveValue } from './script'
 import { kayCtxImport } from './script-shared'
+import { slotTypes } from './slot-types'
 import { shadowedBinds } from './template-reads'
 import { rowsJudged, typeParameterNames } from './type-parameters'
 import { headTagProblem, sharedImports } from './validate'
@@ -196,6 +198,7 @@ class ModuleShell {
   private readonly ownMarkup: (name: string, at: number) => boolean
   // Whether `src/ui.ts` sets variants for this component, which its parts read at runtime.
   private readonly styled: boolean
+  private slots: SlotTypes | undefined
   private typedParts: { type?: string, helper: boolean, recipe: boolean } | undefined
   private readonly params: string
   // An action declared in a page reads the params of that page's route, so its `action` is read as the one taking them; a layout's has no single route, so it is typed with the guards above it and untyped params.
@@ -373,8 +376,7 @@ class ModuleShell {
         b.add(`export const ${name} = KayActionStub(${JSON.stringify(actionUrl(this.options.moduleId, name))})\n`)
     }
 
-    if (facts.childrenSlot || facts.snippet || this.outlets().length > 0)
-      b.add(`import type { JSX as KayJSX } from 'kay'\n`)
+    b.add(this.slotTypes().imports)
 
     if (mode === 'html')
       b.add(htmlHelperImport(this.options.awaitAlert, facts.await))
@@ -490,9 +492,7 @@ class ModuleShell {
   // The component function's head: its type parameters and props, read off `__props`.
   private signature(): void {
     const { b, script, server } = this
-    const outlets = this.outlets()
-    const childrenSlot = this.facts.childrenSlot || outlets.length > 0
-    const childrenType = ` & { ${[...this.facts.childrenSlot ? ['children'] : [], ...outlets].map(name => `${name}?: KayJSX.Element`).join('; ')} }`
+    const { type: childrenType } = this.slotTypes()
     const parts = this.partsType().type
     const typed = parts !== undefined
 
@@ -504,23 +504,23 @@ class ModuleShell {
     b.add('(')
 
     if (server) {
-      b.add(`${PROPS}: KayPageData<typeof ${LOAD}>${childrenSlot ? childrenType : ''}`)
+      b.add(`${PROPS}: KayPageData<typeof ${LOAD}>${childrenType}`)
     }
     else if (script.props) {
-      b.add(childrenSlot || typed ? `${PROPS}: (` : `${PROPS}: `)
+      b.add(childrenType || typed ? `${PROPS}: (` : `${PROPS}: `)
 
       if (script.props.type)
         b.addSource(script.props.type)
       else
         b.add('Record<string, unknown>')
 
-      if (childrenSlot || typed)
-        b.add(`)${typed ? ` & ${parts}` : ''}${childrenSlot ? childrenType : ''}`)
+      if (childrenType || typed)
+        b.add(`)${typed ? ` & ${parts}` : ''}${childrenType}`)
     }
     else if (typed) {
-      b.add(`${PROPS}: ${parts}${childrenSlot ? childrenType : ''}`)
+      b.add(`${PROPS}: ${parts}${childrenType}`)
     }
-    else if (childrenSlot) {
+    else if (childrenType) {
       b.add(`${PROPS}: {${childrenType.slice(' & {'.length, -1)}}`)
     }
     else if (this.facts.slot) {
@@ -570,8 +570,8 @@ class ModuleShell {
   }
 
   // The named slots a layout declares with `slot name`, in the order they are written; a slot called with arguments is a component's block prop, which a page cannot fill.
-  private outlets(): string[] {
-    return this.options.layoutFile !== true ? [] : slotNames(this.file.template, this.src)
+  private slotTypes(): SlotTypes {
+    return this.slots ??= slotTypes(this.file, { component: this.options.component === true, layout: this.options.layoutFile === true, server: this.server !== undefined }, this.script.props, this.facts.snippet)
   }
 
   // The values `src/ui.ts` adds to the variants of a component's props, as a type: a call accepts them, while the component's own body keeps the props it declares, so a library component forwarding a variant to a child that lacks the value does not fail in its own file.
@@ -600,7 +600,7 @@ class ModuleShell {
     const { b, src } = this
     const { name } = this.options
     const widened = this.widening() !== undefined
-    const outlets = this.outlets()
+    const { outlets } = this.slotTypes()
 
     // The server reads the slots a layout declares off its module, to hand it the blocks of the page below.
     if (this.mode === 'html' && outlets.length > 0)

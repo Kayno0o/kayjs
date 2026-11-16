@@ -108,9 +108,7 @@ Children of a component go to its `slot`. A `@name` block under it becomes the p
 
 ```kay
 ---
-import type { Snippet } from 'kay'
-
-const { title, actions } = props<{ title: string, actions?: Snippet }>()
+const { title } = props<{ title: string }>()
 ---
 article.card
   header
@@ -131,7 +129,7 @@ Card(title="Todos")
   p Body text
 ```
 
-To require the children, or a block, type it in `props` and destructure nothing: `const {} = props<{ children: Snippet }>()`. The component only renders it with `slot`, and a destructured name nothing reads would be reported as unused.
+The template types them: a component declares neither `children` nor a block it only renders with `slot name`, and `kay check` reports a call passing a block the component has no `slot` for. To require the children, or a block, type it in `props` and destructure nothing: `const {} = props<{ children: Snippet }>()`. The component only renders it with `slot`, and a destructured name nothing reads would be reported as unused.
 
 ### Blocks that take parameters
 

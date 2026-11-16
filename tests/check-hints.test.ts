@@ -223,3 +223,57 @@ describe('hints for the first template mistakes', () => {
     expect((await report(inline(''))).map(d => d.code)).toEqual(['hydration-mismatch'])
   })
 })
+
+describe('blocks typed from the template', () => {
+  const panel = '---\nconst { title } = props<{ title: string }>()\n---\nsection\n  h2 {title}\n  slot actions\n  slot\n'
+  const island = '---\nimport { signal } from "kay"\nconst open = signal(true)\n---\nsection\n  button(onClick={() => open = !open()}) Toggle\n  slot actions\n  slot\n'
+  const list = '---\nconst { rows } = props<{ rows: string[] }>()\n---\nul\n  for row of rows\n    li\n      slot item(row, rows.length)\n'
+
+  const used = (call: string) => `---\nimport Panel from "./panel.kay"\n---\n${call}\n  @actions\n    a(href="/x") Go\n  p body\n`
+
+  it('takes children and a block of a server component with no declaration for them', async () => {
+    expect(await report(used('Panel(title="a")'), { 'src/components/panel.kay': panel })).toEqual([])
+  })
+
+  it('takes them from an island component', async () => {
+    expect(await report(used('Panel'), { 'src/components/panel.kay': island })).toEqual([])
+  })
+
+  it('reports a block the component has no slot for, and children it has no slot for', async () => {
+    const found = await report('---\nimport Panel from "./panel.kay"\nimport Bare from "./bare.kay"\n---\nPanel(title="a")\n  @nope\n    p x\nBare(n={1})\n  p child\n', { 'src/components/panel.kay': panel, 'src/components/bare.kay': '---\nconst { n } = props<{ n: number }>()\n---\np {n}\n' })
+
+    expect(found.map(d => [d.line, d.message])).toEqual([[6, '`Panel` does not take a `nope` block'], [8, '`Bare` does not take children']])
+    expect(found[0]!.help).toContain('its blocks are `@actions`')
+  })
+
+  it('types a block called with values, and reports one passed as plain markup', async () => {
+    const calls = '---\nimport List from "./list.kay"\n---\nList(rows={["a"]})\n  @item(row, count)\n    p {row.toUpperCase()}{count.toFixed()}\n'
+
+    expect(await report(calls, { 'src/components/list.kay': list })).toEqual([])
+
+    const plain = await report('---\nimport List from "./list.kay"\n---\nList(rows={["a"]})\n  @item\n    p x\n', { 'src/components/list.kay': list })
+
+    expect(plain.map(d => d.line)).toEqual([5])
+  })
+
+  it('keeps the block a props type declares, with the arguments it gives', async () => {
+    const typed = '---\nimport type { Snippet } from "kay"\nconst { rows, item } = props<{ rows: string[], item: Snippet<[string]> }>()\n---\nul\n  for row of rows\n    li\n      slot item(row)\n'
+    const found = await report('---\nimport List from "./list.kay"\n---\nList(rows={["a"]})\n  @item(row)\n    p {row.nope}\n', { 'src/components/list.kay': typed })
+
+    expect(found.map(d => d.line)).toEqual([6])
+  })
+
+  it('passes blocks a component forwards to another on', async () => {
+    const outer = '---\nimport Panel from "./panel.kay"\n---\nPanel(title="outer")\n  @actions\n    slot actions\n  slot\n'
+    const found = await report('---\nimport Outer from "./outer.kay"\n---\nOuter()\n  @actions\n    a(href="/x") Go\n  @nope\n    p x\n  p body\n', { 'src/components/panel.kay': panel, 'src/components/outer.kay': outer })
+
+    expect(found.map(d => [d.line, d.message])).toEqual([[7, '`Outer` does not take a `nope` block']])
+  })
+
+  it('requires the block a props type declares required', async () => {
+    const required = '---\nimport type { Snippet } from "kay"\nconst {} = props<{ children: Snippet }>()\n---\nslot\n'
+    const found = await report('---\nimport Needs from "./needs.kay"\n---\nNeeds\n', { 'src/components/needs.kay': required })
+
+    expect(found.map(d => d.line)).toEqual([4])
+  })
+})

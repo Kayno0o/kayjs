@@ -53,7 +53,8 @@ const UNDECLARED_PROP = /^Type '[\s\S]*?' is not assignable to type '([\s\S]*)'\
 const PROP_MEMBER = /^\s*([\w$]+)\??:([\s\S]*)$/
 const COMPONENT_CALL = /^([A-Z][\w$.]*)\(/
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist', 'render', 'fallback'])
-const BLOCK_TYPE = /^(?:\([^)]*\) => )?Element$/
+const BLOCK_TYPE = /^(?:\([^)]*\) => )?Element$|^SlotCall$/
+const JOINER = /^ & /
 const NAME_ESCAPES = /[$.]/g
 const NAME_CHAR = /[\w:$-]/
 const CHECKBOX = /\btype\s*=\s*["']checkbox["']/
@@ -362,11 +363,27 @@ const svgAttributeName: Row = (diagnostic, source, span) => {
   return attribute && { span: attribute, help: `\`${name}\` is no SVG attribute${near === undefined ? '' : `: did you mean \`${near}\`?`}` }
 }
 
-// The first object type of the props a component call is checked against, split at its top-level `;` into `[name, type]` pairs.
+// The object types joined by `&` that the props a component call is checked against are printed as (the declared ones, then those its template adds), as `[name, type]` pairs.
 function declaredProps(type: string): [string, string][] {
+  const props: [string, string][] = []
+  let rest = type
+
+  while (rest.startsWith('{')) {
+    const [members, length] = objectMembers(rest)
+
+    props.push(...members)
+    rest = rest.slice(length).replace(JOINER, '')
+  }
+
+  return props
+}
+
+// The members of the object type starting `type`, split at its top-level `;` into `[name, type]` pairs, and where it ends.
+function objectMembers(type: string): [[string, string][], number] {
   const props: [string, string][] = []
   let depth = 0
   let from = 1
+  let end = type.length
 
   for (let index = 0; index < type.length; index++) {
     const char = type[index]!
@@ -385,11 +402,14 @@ function declaredProps(type: string): [string, string][] {
       from = index + 1
     }
 
-    if (depth === 0)
+    if (depth === 0) {
+      end = index + 1
+
       break
+    }
   }
 
-  return props
+  return [props, end]
 }
 
 // The component a props error is about: the call on its line, or for an `@block` the nearest call above at a lesser indentation.
@@ -450,7 +470,7 @@ const undeclaredProp: Row = (diagnostic, source, span) => {
     return { message, span: where, help: `${named} has no \`slot\`, so it takes no children: add a \`slot\` line where they go, or leave them out` }
 
   if (isBlock) {
-    const blocks = props?.filter(([, kind]) => BLOCK_TYPE.test(kind)).map(([prop]) => prop)
+    const blocks = props?.filter(([prop, kind]) => prop !== 'children' && BLOCK_TYPE.test(kind)).map(([prop]) => prop)
 
     return { message, span: where, help: `${named} has no \`${name}\` block${listed(blocks, ' and takes no blocks', ', its blocks are', '@')}: a block is a prop typed \`Snippet\`, read with \`slot ${name}\`` }
   }

@@ -129,6 +129,14 @@ export const DEPRECATED_LINTS = {
     wrong: 'nav(data-keep-scroll)\n  a(href="/tabs/a" data-no-prefetch) A',
     right: 'nav(data-scroll="keep")\n  a(href="/tabs/a" data-prefetch="false") A',
   },
+  'deprecated-children-prop': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: '`children?: Snippet` in a component\'s props type beside a bare `slot`, since 1.105: a `slot` takes the children of a call with no declaration, typed from the template. `children: Snippet` still says the children are required. The old declaration works until 1.108. Found in a props type written inline when the script reads no `children` prop. The fix removes the member.',
+    wrong: '---\nimport type { Snippet } from \'kay\'\n\nconst { title } = props<{ title: string, children?: Snippet }>()\n---\nsection\n  h2 {title}\n  slot',
+    right: '---\nimport type { Snippet } from \'kay\'\n\nconst { title } = props<{ title: string }>()\n---\nsection\n  h2 {title}\n  slot',
+  },
   'deprecated-mail-form': {
     level: 'warn',
     group: 'deprecated',

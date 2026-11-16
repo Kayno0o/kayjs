@@ -90,7 +90,7 @@
   },
   "src/compiler/codegen.ts": {
     "max-lines": 754,
-    "complexity": 90
+    "complexity": 87
   },
   "src/compiler/dom.ts": {
     "max-lines-per-function": 165,

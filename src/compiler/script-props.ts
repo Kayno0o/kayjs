@@ -33,7 +33,7 @@ export function propsDeclaration(statement: Statement, body: Statement[], shift:
 
   reportSignalProps(typeArgument, body, shift, diagnostics)
 
-  const declaration: PropsDeclaration = { statement: shift(statement), type: typeArgument && shift(typeArgument), bindings: [], bindable: [...bindable] }
+  const declaration: PropsDeclaration = { statement: shift(statement), type: typeArgument && shift(typeArgument), keys: declaredKeys(typeArgument, body), children: childrenMember(typeArgument, body, shift), bindings: [], bindable: [...bindable] }
 
   if (declarator.init.arguments.length > 0)
     diagnostics.push({ ...shift(declarator.init), message: '`props<T>()` takes no arguments', help: 'give defaults in the destructuring: `const { size = \'md\' } = props<T>()`' })
@@ -126,13 +126,42 @@ function kayImports(body: Statement[], wanted: Set<string>): Map<string, string>
 
 interface PropType { key: string, options: (TSType | undefined)[] }
 
-// The props of a props type, written inline or through an interface or a type alias of the script, each with the types it is written as (a union split into its members).
-function propTypes(type: TSType | undefined, body: Statement[]): PropType[] {
+// The members of a props type written inline or through an interface or a type alias of the script, none when it is written another way (imported, an intersection, a type parameter).
+function propMembers(type: TSType | undefined, body: Statement[]): NodeOfType<'TSTypeLiteral'>['members'] | undefined {
   const named = type?.type === 'TSTypeReference' && type.typeName.type === 'Identifier' && !type.typeArguments ? type.typeName.name : undefined
   const declared = named === undefined ? undefined : body.map(typeDeclaration).find(declaration => declaration?.id.name === named)
   const literal = declared?.type === 'TSTypeAliasDeclaration' ? declared.typeAnnotation : type
-  const literalMembers = literal?.type === 'TSTypeLiteral' ? literal.members : []
-  const members = declared?.type === 'TSInterfaceDeclaration' ? declared.body.body : literalMembers
+
+  if (declared?.type === 'TSInterfaceDeclaration')
+    return declared.body.body
+
+  return literal?.type === 'TSTypeLiteral' ? literal.members : undefined
+}
+
+// The names a props type declares, when it is written where the compiler reads it.
+function declaredKeys(type: TSType | undefined, body: Statement[]): string[] | undefined {
+  return propMembers(type, body)?.flatMap(member => member.type === 'TSPropertySignature' && !member.computed ? keyName(member.key) ?? [] : [])
+}
+
+// The `children?: Snippet` member of a props type written inline, with the members around it, which a fix removing it needs.
+function childrenMember(type: TSType | undefined, body: Statement[], shift: (node: Span) => Span): PropsDeclaration['children'] {
+  const members = type?.type === 'TSTypeLiteral' ? type.members : undefined
+  const index = members?.findIndex(member => member.type === 'TSPropertySignature' && !member.computed && member.optional && keyName(member.key) === 'children') ?? -1
+  const member = members?.[index]
+  const written = member?.type === 'TSPropertySignature' ? member.typeAnnotation?.typeAnnotation : undefined
+  const names = kayImports(body, new Set(['Snippet']))
+
+  if (!members || !member || kayName(written, names) !== 'Snippet' || (written?.type === 'TSTypeReference' && written.typeArguments))
+    return undefined
+
+  const around = (other: Span | undefined) => other && shift(other)
+
+  return { span: shift(member), previous: around(members[index - 1]), next: around(members[index + 1]) }
+}
+
+// The props of a props type, written inline or through an interface or a type alias of the script, each with the types it is written as (a union split into its members).
+function propTypes(type: TSType | undefined, body: Statement[]): PropType[] {
+  const members = propMembers(type, body) ?? []
   const found: PropType[] = []
 
   for (const member of members) {

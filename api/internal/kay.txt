@@ -52,6 +52,9 @@ interface IslandBrand
 [.] PlainIslandProp
 type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> : unknown
 
+[.] SlotCall
+type SlotCall = (...args: any[]) => JSX.Element
+
 [.] TemplateHelpers
 interface TemplateHelpers
   Await: <T>(props: { value: T; pending?: Element; ready?: Element; failed?: Element; }) => Element

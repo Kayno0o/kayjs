@@ -323,6 +323,10 @@ export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSe
 // What a static parent sends an island for a name its script declares as plain data written out: it serializes whatever type the declaration gives it, such as a `Column<Row>[]` whose `sortValue` could have been a function.
 export type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> : unknown
 
+// The block a component reads with `slot name(a, b)`, called with values its template does not type for the caller.
+// eslint-disable-next-line ts/no-explicit-any -- the arguments are whatever the component's template passes
+export type SlotCall = (...args: any[]) => JSX.Element
+
 // A function written in the attribute is checked apart from its value, which a wrapping call would stop a generic component from typing: `0` stands for the attribute.
 export type FunctionProp<Component> = Component extends IslandBrand ? { kayLint: 'island-prop', kayAlways: true, kayError: Unsendable } : 0
 

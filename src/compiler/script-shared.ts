@@ -27,6 +27,10 @@ export interface PropsBinding {
 export interface PropsDeclaration {
   statement: Span
   type?: Span | undefined
+  // The names the props type declares, when it is written inline or as an interface or alias of the script.
+  keys?: string[] | undefined
+  // A `children?: Snippet` member of the props type, with its neighbours.
+  children?: { span: Span, previous?: Span | undefined, next?: Span | undefined } | undefined
   // `const props = props<T>()` keeps a name; `const { a, b } = props<T>()` destructures.
   name?: Span | undefined
   bindings: PropsBinding[]
