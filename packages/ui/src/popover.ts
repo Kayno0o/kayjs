@@ -1,4 +1,5 @@
 import type { JSX } from 'kay'
+import type { Look } from './button-props'
 
 export type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 
@@ -14,11 +15,17 @@ export interface PopoverTriggerProps {
   'style': string
 }
 
-// The attributes of a component's floating panel, as its `panelProps` takes them: the panel is a `div` whose id, role, popover state and class the component owns.
-export type PopoverPanelProps = Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'style'> & {
+// The attributes of a component's floating panel, as its `panelProps` takes them: the id, role, popover state, visibility and class stay the component's. An event handler runs before the component's own for the same event.
+export type PanelProps<Tag extends 'div' | 'ul' = 'div'> = Omit<JSX.IntrinsicElements[Tag], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'hidden' | 'style'> & {
   // Written after the component's own declarations, so it wins.
   style?: string | undefined
 }
 
+// The panel of a Popover, a `div`.
+export type PopoverPanelProps = PanelProps
+
 // The attributes of the button a component draws to open its panel, as its `triggerProps` takes them: what opens the panel, says whether it shows and anchors it stays the component's.
-export type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+export type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'id' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+
+// The same for a Button or an IconButton, which also takes its `variant`, `size` and `label`: the app's win over the component's.
+export type PopoverLookButtonProps = PopoverButtonProps & Pick<Look, 'variant' | 'size' | 'label'>

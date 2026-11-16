@@ -585,6 +585,9 @@ interface Look
 [./lib/button-props] TagAttributes
 type TagAttributes = Omit<AsButton, keyof Look> | Omit<AsLink, keyof Look>
 
+[./lib/chain] chained
+function chained<Event>(app: ((event: Event) => unknown) | undefined, own: (event: Event) => unknown): (event: Event) => void
+
 [./lib/change] changeAccepted
 function changeAccepted(control: string, run: () => unknown, busy: (pending: boolean) => void): Promise<boolean>
 
@@ -1684,6 +1687,10 @@ interface PaletteLink extends PaletteBase
   newTab?: NewTab | undefined
   shortcut?: string | undefined
 
+[./lib/index] PanelProps
+type PanelProps<Tag extends 'div' | 'ul' = 'div'> = Omit<JSX.IntrinsicElements[Tag], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'hidden' | 'style'> & {
+  // Written after the component's own declarations, so it wins. style?: string | undefined }
+
 [./lib/index] Plate
 interface Plate
   scale: number
@@ -1691,11 +1698,13 @@ interface Plate
   y: number
 
 [./lib/index] PopoverButtonProps
-type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'id' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+
+[./lib/index] PopoverLookButtonProps
+type PopoverLookButtonProps = PopoverButtonProps & Pick<Look, 'variant' | 'size' | 'label'>
 
 [./lib/index] PopoverPanelProps
-type PopoverPanelProps = Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'style'> & {
-  // Written after the component's own declarations, so it wins. style?: string | undefined }
+type PopoverPanelProps = PanelProps
 
 [./lib/index] PopoverPlacement
 type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
@@ -2680,12 +2689,18 @@ function trackPointer(): void
 [./lib/pointer-held] whenReleased
 function whenReleased(show: () => void): void
 
+[./lib/popover] PanelProps
+type PanelProps<Tag extends 'div' | 'ul' = 'div'> = Omit<JSX.IntrinsicElements[Tag], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'hidden' | 'style'> & {
+  // Written after the component's own declarations, so it wins. style?: string | undefined }
+
 [./lib/popover] PopoverButtonProps
-type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'id' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+
+[./lib/popover] PopoverLookButtonProps
+type PopoverLookButtonProps = PopoverButtonProps & Pick<Look, 'variant' | 'size' | 'label'>
 
 [./lib/popover] PopoverPanelProps
-type PopoverPanelProps = Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'style'> & {
-  // Written after the component's own declarations, so it wins. style?: string | undefined }
+type PopoverPanelProps = PanelProps
 
 [./lib/popover] PopoverPlacement
 type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'

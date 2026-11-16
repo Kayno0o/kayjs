@@ -17,5 +17,5 @@ AvatarGroup(items={people} max={1} panelProps={{ 'data-panel': 'avatars' }} trig
 DateInput(aria-label="Date" panelProps={{ 'data-panel': 'date' }} triggerProps={{ 'data-trigger': 'date' }})
 MultiSelect(label="Multi" options={[{ value: 'a', label: 'A' }]} panelProps={{ 'data-panel': 'multi' }} triggerProps={{ 'data-trigger': 'multi' }})
 DateRangeInput(label="Range" panelProps={{ 'data-panel': 'range' }} triggerProps={{ 'data-trigger': 'range' }})
-Table(label="Rows" columns={[{ key: 'name', header: 'Name' }]} rows={[{ name: 'Ada' }]} rowKey="name" columnToggle panelProps={{ 'data-panel': 'table' }} triggerProps={{ 'data-trigger': 'table' }})
+Table(label="Rows" columns={[{ key: 'name', header: 'Name' }]} rows={[{ name: 'Ada' }]} rowKey="name" columnToggle panelProps={{ 'data-panel': 'table' }} triggerProps={{ 'data-trigger': 'table', 'label': 'Cols' }})
 Combobox(label="Combobox" options={[{ value: 'a', label: 'A' }]} panelProps={{ 'data-panel': 'combobox' }})

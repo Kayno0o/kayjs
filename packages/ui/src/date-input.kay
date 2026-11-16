@@ -5,6 +5,7 @@ import { effect, memo, onMount, postedValue, recipe, signal, uid, untrack } from
 import { addDays, addMonths, clampDate, dayName, firstDayOf, isDate, monthTitle, monthWeeks, sameMonth, today, weekdays, weekEdge, withinBounds } from './date'
 import { fieldRef } from './form-reset'
 import Icon from './icon.kay'
+import { chained } from './chain'
 import Popover from './popover.kay'
 import type { PopoverButtonProps, PopoverPanelProps } from './popover'
 import { controlProps } from './control-props'
@@ -279,9 +280,9 @@ div({...rootProps} ref={element => root = element})
   TextInput({...field} part="input" type="date" ref={ref} min={min} max={max} value={sent ?? value} onInput={live} onChange={heard})
   if ready()
     // The panel's click is cancelled so a FormField's label, which holds it in the DOM, does not move focus to the field and close the calendar.
-    Popover({...panelProps} part="panel" open={opened()} label={openLabel} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft} onClick={event => event.preventDefault()})
+    Popover({...panelProps} part="panel" open={opened()} label={openLabel} onOpenChange={toggled} onKeyDown={chained(panelProps.onKeyDown, keyDown)} onFocusOut={chained(panelProps.onFocusOut, focusLeft)} onClick={chained(panelProps.onClick, event => event.preventDefault())})
       @trigger(attributes)
-        button({...triggerProps} {...attributes} part="trigger" type="button" aria-label={openLabel} disabled={Boolean(field.disabled || field.readonly)})
+        button(part="trigger" type="button" aria-label={openLabel} {...triggerProps} {...attributes} disabled={Boolean(field.disabled || field.readonly)})
           Icon(icon="calendar")
       div(part="head")
         button(part="step" type="button" data-direction="previous" aria-label={previousLabel} disabled={!canStepBack()} onClick={() => go(addMonths(cursor(), -1))})

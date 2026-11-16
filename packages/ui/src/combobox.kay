@@ -10,6 +10,8 @@ import { defaultKept, fieldRef, onFormReset } from './form-reset'
 import { wording } from 'kay/words'
 import { controlProps } from './control-props'
 import { labelText } from './label-text'
+import { chained } from './chain'
+import type { PanelProps } from './popover'
 import Icon from './icon.kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
@@ -80,7 +82,7 @@ const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, 
   // Attributes of the input itself, after the ones the component names; `id`, `data-*`, `title` and the other attributes it is given go on its root.
   inputProps?: JSX.IntrinsicElements['input'] | undefined
   // Attributes of the suggestion list, a `ul`; its id, role and visibility stay the component's.
-  panelProps?: Omit<JSX.IntrinsicElements['ul'], 'id' | 'class' | 'children' | 'role' | 'hidden'> | undefined
+  panelProps?: PanelProps<'ul'> | undefined
 }>()
 
 const listId = id ?? uid()
@@ -411,7 +413,7 @@ snippet box()
         for option of known() key={option.value}
           option(value={option.label})
     // Pressing the list, its scrollbar included, keeps focus in the input.
-    ul({...panelProps} part="list" id={listId} role="listbox" aria-label={heading ? undefined : label} aria-labelledby={heading} aria-busy={waiting() ? 'true' : undefined} hidden={!shown()} onMouseDown={event => event.preventDefault()})
+    ul({...panelProps} part="list" id={listId} role="listbox" aria-label={heading ? undefined : label} aria-labelledby={heading} aria-busy={waiting() ? 'true' : undefined} hidden={!shown()} onMouseDown={chained(panelProps.onMouseDown, event => event.preventDefault())})
       for option, index of rows() key={option.value}
         li(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} aria-label={drawRow ? option.label : undefined} aria-labelledby={!drawRow && described(option) ? `${optionId(index)}-label` : undefined} aria-describedby={!drawRow && described(option) ? `${optionId(index)}-description` : undefined} data-picked={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)})
           if drawRow

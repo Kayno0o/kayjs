@@ -21,7 +21,7 @@ import { expanding } from './table-expand'
 import { downloadCsv } from './table-export'
 import { uses } from './uses'
 import Popover from './popover.kay'
-import type { PopoverButtonProps, PopoverPanelProps } from './popover'
+import type { PopoverLookButtonProps, PopoverPanelProps } from './popover'
 import Select from './select.kay'
 import { cellText, columnStyle, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sortedRows } from './table'
 import { asyncRows } from './source'
@@ -152,7 +152,7 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   columnsLabel?: string | undefined
   // Attributes of the column list's floating panel and of the button opening it; `...rest` stays on the root.
   panelProps?: PopoverPanelProps | undefined
-  triggerProps?: PopoverButtonProps | undefined
+  triggerProps?: PopoverLookButtonProps | undefined
   // The keys of the columns hidden, replacing each column's `hidden`; a table whose parent passes another list follows it.
   hiddenColumns?: string[] | undefined
   // Called with the keys of the columns hidden each time the reader shows or hides one.
@@ -431,7 +431,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
       if uses('columnToggle') && columnToggle
         Popover({...panelProps} placement="bottom-start" part="columnsPanel" label={columnsLabel})
           @trigger(attributes)
-            Button({...triggerProps} {...attributes} label={columnsLabel} variant="ghost" size="sm")
+            Button(label={columnsLabel} variant="ghost" size="sm" {...triggerProps} {...attributes})
           for column of columns() key={column.key}
             if column.header
               Checkbox(label={column.header} checked={!hiddenKeys().includes(column.key)} onChange={({ checked }) => showColumn!(column.key, checked)})

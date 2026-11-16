@@ -247,6 +247,8 @@ The attributes a component is given, `id`, `data-*` and `title` among them, land
 
 A component with a floating panel (Menu, AppSwitcher, BellInbox, AvatarGroup, DateInput, DateRangeInput, MultiSelect, Table, and Combobox for its suggestion list) takes `panelProps` for the panel, and one that draws its own button to open it (BellInbox, AvatarGroup, DateInput, DateRangeInput, MultiSelect, Table) takes `triggerProps`: `Menu(label="Actions" items={items} panelProps={{ 'data-panel': 'actions' }})`.
 
+An event handler you pass runs before the component's own, `variant`, `size` and `label` of a trigger are yours to change, and Table's two props apply with `columnToggle`.
+
 A state is the ARIA attribute where ARIA has one (`aria-expanded`, `aria-checked`, `aria-selected`, `aria-current`, `aria-pressed`, `aria-busy`, `aria-disabled` or `disabled`), and a named `data-*` attribute where it has none (`data-placement`, `data-dragging`, `data-direction`, a Steps item's `data-step`). There is no `data-state` repeating an ARIA state. Tailwind's `aria-selected:` and `data-dragging:` variants style both from `src/ui.ts`.
 
 <Callout type="warning">

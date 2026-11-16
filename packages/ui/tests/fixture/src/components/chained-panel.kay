@@ -1,0 +1,9 @@
+---
+island()
+import { signal } from 'kay'
+import Combobox from '@kayjs/ui/combobox.kay'
+
+const log = signal<string[]>([])
+---
+Combobox(label="Pick" options={[{ value: 'a', label: 'A' }]} panelProps={{ onMouseDown: () => log = [...log(), 'app'] }})
+p#log {log().join(',')}

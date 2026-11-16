@@ -3,7 +3,7 @@ import type { JSX, Snippet } from 'kay'
 import type { BellItem, BellItems, BellTriggerProps, InboxItem } from './bell'
 import { bellItem } from './bell'
 
-import type { PopoverButtonProps, PopoverPanelProps, PopoverPlacement, PopoverTriggerProps } from './popover'
+import type { PopoverLookButtonProps, PopoverPanelProps, PopoverPlacement, PopoverTriggerProps } from './popover'
 import { call, effect, memo, recipe, resource, signal } from 'kay'
 import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
@@ -50,7 +50,7 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
   // Attributes of the floating panel, which `...rest` does not reach; the panel's id, role and popover state stay the component's.
   panelProps?: PopoverPanelProps | undefined
   // Attributes of the button that opens the panel, written before the ones that open it; `...rest` stays on the root.
-  triggerProps?: PopoverButtonProps | undefined
+  triggerProps?: PopoverLookButtonProps | undefined
 }>()
 
 // The routes answer a path of the site or an http(s) URL only; checked again here, as the link is drawn.
@@ -126,7 +126,7 @@ span(part="root" {...rest})
       if trigger
         | {trigger(named(attributes), unread)}
       else
-        IconButton({...triggerProps} {...attributes} icon="bell" label={name()} variant="ghost" aria-haspopup="true")
+        IconButton(icon="bell" label={name()} variant="ghost" aria-haspopup="true" {...triggerProps} {...attributes})
     div(part="list" aria-label={label})
       if items().length === 0 && !waiting()
         p(part="empty") {wording('ui.bell.empty', 'No notifications')}
