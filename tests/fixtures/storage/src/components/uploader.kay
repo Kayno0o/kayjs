@@ -13,7 +13,7 @@ effect(() => {
 })
 
 async function send() {
-  key = await upload({ photo: new File([new Uint8Array(300_000)], 'big.bin') })
+  key = await upload({ photo: new File([new Uint8Array(300_000)], 'big.bin') }).orThrow()
 }
 ---
 button.send(onClick={send}) Send

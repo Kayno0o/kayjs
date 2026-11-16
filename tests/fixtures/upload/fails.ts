@@ -36,7 +36,7 @@ async function settled(promise: Promise<unknown>): Promise<unknown> {
 }
 
 const save = actionStub('/_kay/action/test/save') as unknown as Action<object, null>
-const json = await settled(save({ title: 'Milk' }))
+const json = await settled(save({ title: 'Milk' }).orThrow())
 const loadsAfterJson = loads
 const count = signal(0)
 const filed = await settled(save({ cover: new File(['x'], 'cover.png') }, { optimistic: () => count.set(1) }))
@@ -45,7 +45,7 @@ const progress: number[] = []
 
 form.set('cover', new File(['x'], 'cover.png'))
 
-const called = await settled(call({ [API_MOUNT]: '/api/covers' } as never, '/' as never, { method: 'post', body: form, progress: (done: number) => progress.push(done) } as never))
+const called = await settled(call({ [API_MOUNT]: '/api/covers' } as never, '/' as never, { method: 'post', body: form, progress: (done: number) => progress.push(done) } as never).orThrow())
 
 console.log(JSON.stringify({ json, loadsAfterJson, filed, pending: save.pending(), count: count(), called, progress, loaded: loads > 0 }))
 await GlobalRegistrator.unregister()

@@ -727,7 +727,7 @@ describe('the upload\'s chunk', () => {
 
     expect({ code, errors }).toEqual({ code: 0, errors: '' })
     expect(JSON.parse(output)).toEqual({
-      json: { name: 'TypeError', message: 'offline' },
+      json: { name: 'ApiError', message: 'The server could not be reached', status: 0, cause: 'offline' },
       loadsAfterJson: 0,
       filed: { name: 'Error', message: 'stale chunk' },
       pending: false,

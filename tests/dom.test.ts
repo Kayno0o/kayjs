@@ -2703,21 +2703,21 @@ describe('a stream an island starts', () => {
   const records = '(globalThis as unknown as { streams: { status: () => string }[] }).streams'
   const leaving = site({
     'page.kay': PAGE,
-    'main.kay': `---\nimport { signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst rows = signal([1])\n\nasync function go() {\n  if (rows().length > 0) {\n    rows.set([])\n\n    return\n  }\n\n  ${records}.push(await quiet())\n}\n---\nfor row of rows() key={row}\n  button(transition="fade" style="transition-duration: 200ms" onClick={go}) Go\n`,
+    'main.kay': `---\nimport { signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst rows = signal([1])\n\nasync function go() {\n  if (rows().length > 0) {\n    rows.set([])\n\n    return\n  }\n\n  ${records}.push(await quiet().orThrow())\n}\n---\nfor row of rows() key={row}\n  button(transition="fade" style="transition-duration: 200ms" onClick={go}) Go\n`,
   })
   const listening = site({
     'page.kay': PAGE,
     'main.kay': `---\nimport { signal } from 'kay'\nimport Listener from './listener.kay'\n\nconst shown = signal(true)\n---\nbutton.hide(onClick={() => shown.set(false)}) Hide\nif shown()\n  Listener\n`,
-    'listener.kay': `---\nimport { listen } from 'kay'\nimport { quiet } from './page.kay'\n\nasync function start() {\n  ${records}.push(await quiet())\n}\n\nlisten(window, 'keydown', () => void start())\n---\np Listening\n`,
+    'listener.kay': `---\nimport { listen } from 'kay'\nimport { quiet } from './page.kay'\n\nasync function start() {\n  ${records}.push(await quiet().orThrow())\n}\n\nlisten(window, 'keydown', () => void start())\n---\np Listening\n`,
   })
   const retargeted = site({
     'page.kay': PAGE,
     'main.kay': `---\nimport { signal } from 'kay'\nimport Listener from './listener.kay'\n\nconst shown = signal(true)\n---\nbutton.hide(onClick={() => shown.set(false)}) Hide\nif shown()\n  Listener\n`,
-    'listener.kay': `---\nimport { listen, signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst target = signal<EventTarget>(window)\n\nasync function start() {\n  ${records}.push(await quiet())\n}\n\nlisten(target(), 'keydown', () => void start())\n---\nbutton.move(onClick={() => target.set(document)}) Move\n`,
+    'listener.kay': `---\nimport { listen, signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst target = signal<EventTarget>(window)\n\nasync function start() {\n  ${records}.push(await quiet().orThrow())\n}\n\nlisten(target(), 'keydown', () => void start())\n---\nbutton.move(onClick={() => target.set(document)}) Move\n`,
   })
   const awaiting = site({
     'page.kay': PAGE,
-    'main.kay': `---\nimport { signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst shown = signal(true)\n\nasync function start() {\n  await Promise.resolve();\n  ${records}.push(await quiet())\n}\n---\nbutton.hide(onClick={() => shown.set(false)}) Hide\nif shown()\n  button.start(onClick={() => void start()}) Start\n`,
+    'main.kay': `---\nimport { signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst shown = signal(true)\n\nasync function start() {\n  await Promise.resolve();\n  ${records}.push(await quiet().orThrow())\n}\n---\nbutton.hide(onClick={() => shown.set(false)}) Hide\nif shown()\n  button.start(onClick={() => void start()}) Start\n`,
   })
   // Answers a call with a stream that says one value and then nothing, as `quiet` does.
   const streaming = () => spyOn(globalThis, 'fetch').mockImplementation((async () => {

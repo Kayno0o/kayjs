@@ -13,7 +13,7 @@ async function call() {
   calls.set(count => count + 1)
 
   try {
-    await join({ email: 'x' })
+    await join({ email: 'x' }).orThrow()
   }
   catch {
     calls.set(count => count + 1)
