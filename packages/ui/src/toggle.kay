@@ -51,15 +51,7 @@ const { root, field } = controlProps(without(given, 'inputProps', 'checked', 'la
 const showLabel = given.showLabel ?? true
 
 const sent = given.onChange ? undefined : postedChecked(name, field.value as string | number | undefined, given.checked ?? false)
-// Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.error('terms')}` does.
->>>>>>> 952f6a1 (feat(ui): a control keeps id and data-* on its root, the input takes inputProps)
-=======
-const sent = given.onChange ? undefined : postedChecked(name, field.value as string | number | undefined, given.checked ?? false)
 // Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.form.error('terms')}` does.
-=======
-const sent = given.onChange ? undefined : postedChecked(name, field.value as string | number | undefined, given.checked ?? false)
-// Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.error('terms')}` does.
->>>>>>> 952f6a1 (feat(ui): a control keeps id and data-* on its root, the input takes inputProps)
 const shown = name !== undefined || 'issue' in given
 const checking = shown || 'invalid' in given
 // A FormField naming the same field shows its messages itself.
