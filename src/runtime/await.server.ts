@@ -198,7 +198,7 @@ export function Await<T>(props: AwaitChannel<T>): JSX.Element {
 
   const fallback = props.fallback
 
-  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => following(notes, () => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => following(notes, () => failed(error)))), fallback: fallback && (error => runWithOwner(parent, () => following(notes, () => fallback(error)))), alert: props.alert ?? awaitFailed, site: failed ? undefined : new Error('await') })
+  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => following(notes, () => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => following(notes, () => failed(error)))), fallback: fallback && (error => runWithOwner(parent, () => following(notes, () => fallback(error)))), alert: props.alert ? error => runWithOwner(parent, () => following(notes, () => props.alert!(error))) : awaitFailed, site: failed ? undefined : new Error('await') })
   // The streamed block replaces this one whole, so an `await` inside it renders its own pending block and streams nothing.
   deferred = undefined
 

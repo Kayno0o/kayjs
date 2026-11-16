@@ -73,12 +73,20 @@ describe('the app\'s await-failed.kay, on the server', () => {
     expect(swaps(await get(plain, '/'))).toEqual([DEFAULT_ALERT])
   })
 
+  it('renders an alert with a button, which is an island, on the server too', async () => {
+    const site = await app('---\nconst { error, retry } = props<{ error: unknown, retry?: () => void }>()\n---\np.app-alert {(error as Error).message}\nif retry\n  button.retry(onClick={retry}) Again\n', { 'index.kay': `${REJECTS}await slow then text\n  p {text}\n` })
+    const html = await get(site, '/')
+
+    expect(swaps(html)[0]).toContain('<p class="app-alert">Down</p>')
+    expect(reported.map(error => (error as Error).message)).toEqual(['Down'])
+  })
+
   it('shows kay\'s alert and reports both errors when the app\'s own throws', async () => {
     const site = await app(BROKEN_ALERT, { 'index.kay': `${REJECTS}await slow then text\n  p {text}\n` })
     const html = await get(site, '/')
 
     expect(swaps(html)).toEqual([DEFAULT_ALERT])
-    expect(reported.map(error => (error as Error).message)).toEqual(['Down', 'alert: Error: Down'])
+    expect(reported.map(error => (error as Error).message)).toEqual(['Down', 'alert: [object Object]'])
   })
 
   it('does not apply to an await inside the alert itself', async () => {
@@ -101,7 +109,7 @@ describe('the compile of an await with no catch', () => {
       const browser = compileKay(source, '/a/b.kay', { output: 'dom', awaitAlert: '/a/src/await-failed.kay', inspect }).tsx
 
       expect(server).toContain('import KayAwaitFailed from "/a/src/await-failed.kay"')
-      expect(server).toContain('alert: (error) => KayComponent(KayAwaitFailed, { error })')
+      expect(server).toContain('alert: (error) => KayComponent(KayAwaitFailed, { error: error instanceof Error ? { name: error.name, message: error.message } : String(error) })')
       expect(browser).toContain('(error, retry) => KayComponent(KayAwaitFailed, { error, retry })')
     }
   })

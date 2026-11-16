@@ -163,7 +163,7 @@ if retry
   button(onClick={retry}) Try again
 ```
 
-The error is the real one, so show its message only where you would show it to a visitor. If the component throws, kay's alert is shown and that error is reported too. Without the file nothing changes.
+In the browser the error is the real one; on the server it is a plain `{ name, message }`, as a component with a button is an island and its props must serialize. Show its message only where you would show it to a visitor. If the component throws, kay's alert is shown and that error is reported too. Without the file nothing changes.
 
 On a prerendered page the block resolves at build. The page is written with the settled content, a visitor never sees `Loading comments`, and a slow value makes the build wait. `kay build` warns of such a block with its page and line, and names a page that waited a second or more. To show the pending content, put the block in a client island or a deferred server island (`server="defer"`), or render the page per request with `prerender: false`.
 

@@ -28,5 +28,5 @@ export function awaitAlertTail(file: string | undefined, target: 'html' | 'dom')
   if (file === undefined)
     return ''
 
-  return target === 'html' ? ', alert: (error) => KayComponent(KayAwaitFailed, { error })' : ', undefined, (error, retry) => KayComponent(KayAwaitFailed, { error, retry })'
+  return target === 'html' ? ', alert: (error) => KayComponent(KayAwaitFailed, { error: error instanceof Error ? { name: error.name, message: error.message } : String(error) })' : ', undefined, (error, retry) => KayComponent(KayAwaitFailed, { error, retry })'
 }
