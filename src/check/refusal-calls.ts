@@ -9,7 +9,10 @@ import { scan } from './renamed-exports'
 const FROM_KAY = (source: string) => source === 'kay' || source === 'kay/library' || source === '@kayjs/kay' || source === '@kayjs/kay/library'
 const NEEDLE = /\b(?:deny|fail|refuse)\(/
 const COMMENT = /\/[*/]/
-const BEFORE_VALUE = /(?:\breturn|=>|[?:])\s*$/
+const BEFORE_VALUE = /(?:\breturn|=>|\?)\s*$/
+const BEFORE_COLON = /:\s*$/
+const LAST_STATEMENT = /[^;{}\n]*$/
+const CASE_LABEL = /^\s*(?:case\b|default\b)/
 
 type Call = NodeOfType<'CallExpression'>
 type Part = [key: string, text: string]
@@ -52,6 +55,14 @@ function denyCalls({ parsed, report }: Found): void {
   }
 }
 
+// Whether a value is read from the call: after `return`, an arrow or a `?`, or a `:` closing a ternary, not a `case` or a label.
+function isReturned(before: string): boolean {
+  if (BEFORE_VALUE.test(before))
+    return true
+
+  return BEFORE_COLON.test(before) && !CASE_LABEL.test(LAST_STATEMENT.exec(before)?.[0] ?? '') && (LAST_STATEMENT.exec(before)?.[0] ?? '').includes('?')
+}
+
 function isDeny(callee: Node): boolean {
   return (callee.type === 'Identifier' && callee.name === 'deny') || (callee.type === 'MemberExpression' && !callee.computed && callee.property.type === 'Identifier' && callee.property.name === 'deny')
 }
@@ -77,7 +88,7 @@ function failCalls({ parsed, report }: Found): void {
       if (errors !== undefined && !isUndefined(errors))
         parts.push(['errors', text.slice(errors.start, errors.end)])
 
-      const returned = BEFORE_VALUE.test(text.slice(0, node.start))
+      const returned = isReturned(text.slice(0, node.start))
       const plain = node.arguments.length <= 3 && node.arguments.every(argument => argument.type !== 'SpreadElement') && status !== undefined && !COMMENT.test(text.slice(status.start, node.end))
       const property = node.callee.property
       const edits: Edit[] = [{ start: base + property.start, end: base + property.end, text: 'deny' }]
@@ -112,6 +123,9 @@ function refuseCalls({ parsed, report }: Found): void {
 
 function fieldsOf(errors: Node): 'none' | 'named' | 'unknown' {
   if (errors.type !== 'ObjectExpression')
+    return 'unknown'
+
+  if (errors.properties.some(property => property.type === 'SpreadElement'))
     return 'unknown'
 
   return errors.properties.length > 0 ? 'named' : 'none'

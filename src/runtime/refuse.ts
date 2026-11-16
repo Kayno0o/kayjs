@@ -1,4 +1,5 @@
 import type { ErrorShape } from './api-error'
+import { KayError } from '../compiler/errors'
 
 // What one refusal says, the same for `ctx.deny(status, options)` of a guard, a page, an action and an endpoint, and for `refuse(status, options)`: the `message` shown, a message per field in `errors`, and what the app reads from the answer in `data`.
 export interface DenyOptions<Data = unknown, Field extends string = string> {
@@ -45,7 +46,7 @@ export function refuse(first?: number | string, options: { message?: string | un
   const message = (named ? first : options.message) ?? 'Refused'
 
   if (!Number.isInteger(code) || code < 400 || code > 599)
-    throw new RangeError(`kay: refuse() takes an error status, from 400 to 599, not ${code}`)
+    throw new KayError('argument-invalid', `kay: refuse() takes an error status, from 400 to 599, not ${code}`)
 
   throw new RefusedError({ status: code, message, errors: errors as Record<string, string>, data })
 }

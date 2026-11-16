@@ -1,7 +1,12 @@
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
+import { applySafeFixes } from '../src/check/fixes'
+import { refusalCalls } from '../src/check/refusal-calls'
 import { refuse, thrownRefusal } from '../src/runtime/refuse'
 import { decodeServerValue } from '../src/runtime/wire'
+import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const ORIGIN = 'http://localhost'
@@ -45,8 +50,8 @@ describe('refuse', () => {
   })
 
   it('refuses a status outside 400 to 599', () => {
-    expect(() => refuse(200)).toThrow(RangeError)
-    expect(() => refuse('Nope', { status: 302 })).toThrow(RangeError)
+    expect(() => refuse(200)).toThrow(expect.objectContaining({ code: 'argument-invalid' }))
+    expect(() => refuse('Nope', { status: 302 })).toThrow(expect.objectContaining({ code: 'argument-invalid' }))
   })
 })
 
@@ -117,5 +122,62 @@ describe('the fixers and refuse', () => {
     const status = undefined as number | undefined
 
     expect(thrown(() => refuse(status, { message: 'Over', errors: { name: 'x' } }))).toMatchObject({ status: 422, message: 'Over' })
+  })
+})
+
+// What the three fixers make of a source: the file after the safe fixes, and how many diagnostics carried one.
+async function fixed(source: string): Promise<{ text: string, fixes: number, found: number }> {
+  const root = await scratchDir('refusal-fixers-')
+
+  try {
+    await Bun.write(join(root, 'src/mod.ts'), source)
+
+    const found = await refusalCalls(root, {})
+
+    await applySafeFixes(root, found)
+
+    return { text: await Bun.file(join(root, 'src/mod.ts')).text(), fixes: found.filter(one => one.fixes?.some(fix => fix.safe)).length, found: found.length }
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
+describe('what the refusal fixers write and leave alone', () => {
+  it('writes a parenthesised last argument whole', async () => {
+    const { text } = await fixed('export const f = (ctx: any) => ctx.fail(409, 1, ({ name: \'x\' }))\n')
+
+    expect(text).toBe('export const f = (ctx: any) => ctx.deny(409, { data: 1, errors: { name: \'x\' } })\n')
+  })
+
+  it('writes 422 for a refuse whose errors name fields, not for an empty or non-literal one', async () => {
+    const named = await fixed('import { refuse } from \'kay\'\n\nrefuse(\'x\', { errors: { name: \'y\' } })\n')
+    const spread = await fixed('import { refuse } from \'kay\'\n\nconst more = {}\nrefuse(\'x\', { errors: { ...more } })\n')
+
+    expect(named.text).toContain('refuse(422, { message: \'x\', errors: { name: \'y\' } })')
+    expect(spread.fixes).toBe(0)
+    expect(spread.found).toBe(1)
+  })
+
+  it('leaves ctx.fail(status), which would stop with plain text as ctx.deny, and a deny with data', async () => {
+    const bare = await fixed('export const f = (ctx: any) => ctx.fail(409)\n')
+    const withData = await fixed('export const f = ({ deny }: any) => deny(409, \'Taken\', { row: 7 })\n')
+
+    expect([bare.found, bare.fixes]).toEqual([1, 0])
+    expect([withData.found, withData.fixes]).toEqual([1, 0])
+  })
+
+  it('leaves a ctx.fail that is not returned: a case or a label does not read its value', async () => {
+    const switched = await fixed('export function f(ctx: any, x: number) {\n  switch (x) {\n    case 1: ctx.fail(409, 1)\n  }\n}\n')
+    const labelled = await fixed('export const f = (ctx: any, x: number) => x ? ctx.fail(409, 1) : ctx.fail(410, 2)\n')
+
+    expect(switched.fixes).toBe(0)
+    expect(labelled.fixes).toBe(2)
+  })
+
+  it('reads refuse(undefined, { message }) as the status form', () => {
+    const status = undefined as number | undefined
+
+    expect(thrown(() => refuse(status, { message: 'Over' }))).toMatchObject({ status: 403, message: 'Over' })
   })
 })

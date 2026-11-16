@@ -59,7 +59,7 @@ describe('refuse', () => {
   })
 
   it('refuses a status outside 400 to 599', () => {
-    expect(() => refuse('x', { status: 200 })).toThrow(RangeError)
+    expect(() => refuse('x', { status: 200 })).toThrow(expect.objectContaining({ code: 'argument-invalid' }))
   })
 
   it('carries its refusal under Symbol.for(kay.refused)', () => {
