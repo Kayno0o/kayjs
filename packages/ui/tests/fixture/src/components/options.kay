@@ -14,6 +14,6 @@ ChipGroup#chips(options={options} value={['a']} label="Chips")
 Segmented#segmented(options={options} value="a" label="Segmented")
 MultiSelect#multi(options={options} value={['b']} label="Multi")
 Select#select(options={options.map(({ value, label, disabled }) => ({ value, label, disabled }))} value="a" aria-label="Select")
-Tabs#tabs(tabs={options} value="a" label="Tabs" onValueChange={({ value }) => onTab(value)})
+Tabs#tabs(items={options} value="a" label="Tabs" onValueChange={({ value }) => onTab(value)})
   @panel(value)
     p {value}

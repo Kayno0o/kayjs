@@ -7,7 +7,7 @@ import SidePanel from '@kayjs/ui/side-panel.kay'
 const open = signal(true)
 const closes = signal(0)
 ---
-AppHeader(links={[{ href: '/', label: 'Home' }]} current="/" label="Main")
+AppHeader(items={[{ href: '/', label: 'Home' }]} current="/" label="Main")
 output#state {open() ? 'open' : 'shut'} {closes()}
 SidePanel#beside(open={open()} modal={false} closeHref="/list" title="Venus" onOpenChange={() => { closes = closes() + 1; open = false }})
   p Second planet

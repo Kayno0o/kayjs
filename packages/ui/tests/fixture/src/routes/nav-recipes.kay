@@ -20,7 +20,7 @@ main
   #tab-nav
     TabNav(label="Sections" current="/nav-recipes" links={links})
   #site-nav
-    SiteNav(id="recipe-links" links={links} current="/nav-recipes" label="Main")
+    SiteNav(id="recipe-links" items={links} current="/nav-recipes" label="Main")
   PlanetTabs
   #steps
-    Steps(steps={steps} current="details" done={['account']} url="/nav-recipes" label="Signup")
+    Steps(items={steps} current="details" done={['account']} url="/nav-recipes" label="Signup")

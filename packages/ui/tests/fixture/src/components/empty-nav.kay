@@ -8,14 +8,14 @@ import TabNav from '@kayjs/ui/tab-nav.kay'
 const links = [{ href: '/', label: 'Home' }]
 const none: { href: string, label: string }[] = []
 ---
-AppHeader#header-none(links={none} current="/" label="None")
+AppHeader#header-none(items={none} current="/" label="None")
   @brand
     span Brand
-AppHeader#header-some(links={links} current="/" label="Some")
-SiteNav#site-none(links={none} current="/" label="None")
-SiteNav#site-some(links={links} current="/" label="Some")
+AppHeader#header-some(items={links} current="/" label="Some")
+SiteNav#site-none(items={none} current="/" label="None")
+SiteNav#site-some(items={links} current="/" label="Some")
 TabNav#tabs-none(links={none} current="/" label="None")
-SideNav#side-none(links={none} current="/" label="None")
-SideNav#side-none-async(links={async () => none} current="/" label="None async")
-SideNav#side-broken(links={async () => { throw new Error('no') }} current="/" label="Broken")
-SideNav#side-some(links={links} current="/" label="Some")
+SideNav#side-none(items={none} current="/" label="None")
+SideNav#side-none-async(items={async () => none} current="/" label="None async")
+SideNav#side-broken(items={async () => { throw new Error('no') }} current="/" label="Broken")
+SideNav#side-some(items={links} current="/" label="Some")

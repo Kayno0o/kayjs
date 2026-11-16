@@ -21,7 +21,7 @@ form#form
   Segmented#segmented(options={days} value="a" label="Segment" param="seg" onChange={onSegment})
   ChipGroup#chips(options={days} label="Chips" onChange={onChips})
   MultiSelect#multi(options={remote} value={['a', 'ghost']} label="Multi" open onChange={onMulti})
-  IconPicker#icon(icons={icons} name="icon" onChange={onIcon})
+  IconPicker#icon(items={icons} name="icon" onChange={onIcon})
   TimeInput#time(name="time" onInput={({ value }) => onTimeInput(value)} onChange={() => undefined})
   TimeInput#required(name="required" value="10:00" required onInput={({ value }) => onRequiredInput(value)})
   DateInput#date(name="date" onInput={({ value }) => onDateInput(value)})

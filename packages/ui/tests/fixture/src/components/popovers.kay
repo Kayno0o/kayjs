@@ -5,7 +5,7 @@ import IconButton from '@kayjs/ui/icon-button.kay'
 import Popover from '@kayjs/ui/popover.kay'
 import TooltipHost from '@kayjs/ui/tooltip-host.kay'
 
-const { onToggle, showDelay, hideDelay } = props<{ onToggle: (open: boolean) => void, showDelay?: Duration | undefined, hideDelay?: Duration | undefined }>()
+const { onToggle, onTooltip, showDelay, hideDelay } = props<{ onToggle: (open: boolean) => void, onTooltip?: (event: { open: boolean, element: HTMLElement }) => void, showDelay?: Duration | undefined, hideDelay?: Duration | undefined }>()
 
 const open = signal(false)
 ---
@@ -18,4 +18,4 @@ IconButton#delete(icon="delete" label="Delete" data-tooltip-placement="bottom")
 button#copy(aria-label="Copy" data-tooltip="Copy the file to the clipboard") Copy
 span#figure(data-hint="Damage per second") 12
 button#focusable(data-hint="Only under the pointer") Focus
-TooltipHost(showDelay={showDelay} hideDelay={hideDelay})
+TooltipHost(showDelay={showDelay} hideDelay={hideDelay} onOpenChange={onTooltip})

@@ -11,7 +11,7 @@ An option is `{ value, label, disabled? }`; a `disabled` one cannot be picked. A
 `value` and `onChange` take the type of the options' values. A union of strings stays that union, and a number option hands back a number. With `emptyOption`, they take the empty string too, so hold the value as `Kind | ''`.
 
 ```kay
-Select(value={kind()} options={KINDS} onChange={({ value }) => kind = value} emptyOption="Any kind" aria-label="Kind")
+Select(value={kind()} options={KINDS} onChange={({ value }) => kind = value} emptyOption="Any kind" label="Kind")
 ```
 
 ## Loading options
@@ -25,7 +25,7 @@ When the options come from a request, set `busy` to show a disabled row in their
 `param="period"` makes the select hold a query param of the page. A pick goes to the current page with the param set to the option and every other param kept. The empty option and `paramDefault`, the value the page shows while the param is left out, leave the param out. Pass `value` as the page read it.
 
 ```kay
-Select(value={period} options={PERIODS} param="period" paramDefault="7d" aria-label="Period")
+Select(value={period} options={PERIODS} param="period" paramDefault="7d" label="Period")
 ```
 
 An `onChange` of your own runs first, and a `false` from it, a failure, or a page that stays because a leave guard declined puts the select back on the option the page shows. It is busy while the move is under way.
@@ -49,8 +49,8 @@ A pick with the mouse submits at once. Some browsers report a change on every ar
 A native select has no search box, so give it the text from one of your own: `query={text()}`. The function is asked again each time `query` changes, and only the latest answer is shown. The answer replaces the options, so it should still list the option that is picked.
 
 ```kay
-TextInput(value={text()} onInput={({ value }) => text = value} aria-label="Search planets")
-Select(options={({ q }) => findPlanets(q)} query={text()} aria-label="Planet")
+TextInput(value={text()} onInput={({ value }) => text = value} label="Search planets")
+Select(options={({ q }) => findPlanets(q)} query={text()} label="Planet")
 ```
 
 

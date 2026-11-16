@@ -14,5 +14,5 @@ const entries: PaletteEntry[] = [
   { label: 'New moon', group: 'Actions', icon: 'plus', shortcut: 'Ctrl+N', onSelect: () => onAction('new-moon') },
 ]
 ---
-CommandPalette(entries={entries} groups={['Actions', 'Pages']} recent={recent} shortcut={shortcut} onOpenChange={({ open }) => onOpenChange(open)} onRecentChange={({ recent }) => onRecentChange(recent)} siteSearch={siteSearch} search={search})
+CommandPalette(items={entries} groups={['Actions', 'Pages']} recent={recent} shortcut={shortcut} onOpenChange={({ open }) => onOpenChange(open)} onRecentChange={({ recent }) => onRecentChange(recent)} siteSearch={siteSearch} search={search})
 input#outside(aria-label="Outside")

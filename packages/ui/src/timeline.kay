@@ -18,9 +18,7 @@ const look = recipe({
   },
 })
 
-const { entries, selected, onSelectedChange, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['ol'], 'class' | 'children' | 'onSelect'> & {
-  // In the order they are shown, which is the time order: the timeline never sorts them.
-  entries: readonly TimelineEntry<Key>[]
+const { items, entries: oldEntries, selected, onSelectedChange, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['ol'], 'class' | 'children' | 'onSelect'> & {
   // The key of the picked entry, if any; a new one from the parent is followed.
   selected?: Key | undefined
   // Makes the entries buttons, one picked at a time; with `selected` alone they stay buttons too. Gets the picked key, or undefined when the picked entry is pressed again, and the entry pressed.
@@ -31,7 +29,19 @@ const { entries, selected, onSelectedChange, label, emptyLabel, empty, ...rest }
   // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
   emptyLabel?: string | undefined
   empty?: Snippet | undefined
-}>()
+} & (
+  {
+    // In the order they are shown, which is the time order: the timeline never sorts them.
+    items: readonly TimelineEntry<Key>[]
+    entries?: undefined
+  } | {
+    // @deprecated Since 1.105, `items`: `deprecated-ui-items` writes the new name, and this one works until 1.108.
+    entries: readonly TimelineEntry<Key>[]
+    items?: undefined
+  }
+)>()
+
+const all = () => (items ?? oldEntries)!
 
 if ((rest as { onSelect?: unknown }).onSelect !== undefined)
   throw new Error('kayjs-ui: a Timeline has no onSelect since 1.91; use onSelectedChange')
@@ -53,7 +63,7 @@ function pick(entry: TimelineEntry<Key>) {
   onSelectedChange?.({ key: next, entry })
 }
 ---
-if entries.length === 0
+if all().length === 0
   // The app's attributes stay on whichever element shows.
   if empty
     div.kui-timeline-empty(part="root" {...loose} role="status")
@@ -62,7 +72,7 @@ if entries.length === 0
     div.kui-timeline-empty(part="root" {...loose} role="status") {emptyLabel ?? wording('ui.timeline.empty', 'No events yet.')}
 else
   ol(part="root" {...rest} aria-label={label})
-    for entry of entries key={entry.key}
+    for entry of all() key={entry.key}
       li(part="item" data-tone={entry.tone})
         if entry.href !== undefined
           a(part="entry" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={picked() === entry.key ? 'true' : undefined})

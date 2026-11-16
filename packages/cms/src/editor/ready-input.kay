@@ -81,4 +81,4 @@ match field.kind
         TextInput(placeholder="#1a2b3c" aria-label={label} value={text()} onInput={({ value: next }) => onChange(next === '' && !required ? cleared : next)} onBlur={touch} maxlength={7})
   else
     FormField(label={label} hint={hint} issue={issue} required={required} group)
-      IconPicker(icons={({ q, limit, offset }) => findIcons(q, limit, offset)} value={text()} onChange={({ value: next }) => { onChange(next === '' && !required ? cleared : next); touch() }})
+      IconPicker(items={({ q, limit, offset }) => findIcons(q, limit, offset)} value={text()} onChange={({ value: next }) => { onChange(next === '' && !required ? cleared : next); touch() }})

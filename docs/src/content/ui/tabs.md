@@ -4,7 +4,7 @@ description: Tabs that switch between panels on the same page, with keyboard nav
 
 <Demo name="tabs/basic" />
 
-`tabs` lists the `value` and `label` of each tab, and an `icon` drawn before it or `disabled` to keep it from being shown, the arrow keys going past it, and `@panel(tab)` draws the panel for a value. The arrow keys, Home and End move between tabs. For tabs that are pages of their own, use [TabNav](/ui/tab-nav).
+`items` lists the `value` and `label` of each tab (`tabs` is its deprecated name until 1.108), and an `icon` drawn before it or `disabled` to keep it from being shown, the arrow keys going past it, and `@panel(tab)` draws the panel for a value. `disabled` on the Tabs itself holds every tab: none can be picked, and the shown one stays shown. The arrow keys, Home and End move between tabs. For tabs that are pages of their own, use [TabNav](/ui/tab-nav).
 
 ## Panels keep their state
 
@@ -17,7 +17,7 @@ Every panel is drawn once and hidden while its tab is not shown, so what it hold
 `orientation="vertical"` stacks the tabs in a column beside the panels. The list says so to screen readers, and ArrowUp and ArrowDown move between the tabs in place of ArrowLeft and ArrowRight.
 
 ```kay
-Tabs(tabs={sections} value="details" orientation="vertical" label="Product")
+Tabs(items={sections} value="details" orientation="vertical" label="Product")
   @panel(tab)
     ProductPanel(tab={tab})
 ```
@@ -31,7 +31,7 @@ With `activation="manual"` the arrows, Home and End only move the focus, and Ent
 `lazy` draws a panel when its tab is first shown and keeps it from then on, so a heavy panel, or one that fetches its data, costs nothing until it is read. Until then the panel is empty, and find in page does not see inside it.
 
 ```kay
-Tabs(tabs={sections} value="details" lazy label="Product")
+Tabs(items={sections} value="details" lazy label="Product")
   @panel(tab)
     ProductPanel(tab={tab})
 ```
@@ -49,7 +49,7 @@ A `value` that names no enabled tab, such as an unknown one read from a URL or a
 Give `param` instead of `value` to hold the shown tab in a query param of the page, with no island of your own: the server draws that tab from the first paint, and a pick rewrites the address without a navigation, as every panel is already drawn. The other params are kept and the current history entry is replaced, so Back leaves the page rather than the last tab.
 
 ```kay
-Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: 'Reviews' }]} param="tab" paramDefault="details" label="Product")
+Tabs(items={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: 'Reviews' }]} param="tab" paramDefault="details" label="Product")
   @panel(tab)
     ProductPanel(tab={tab})
 ```
@@ -58,10 +58,10 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
 
 ## Tabs from a source
 
-`tabs` can be a promise or a function returning one, such as an action, in place of a list. The tabs are asked in the browser: the component says "Loading…" (`loadingLabel`) meanwhile, and `failureLabel` with a "Try again" button (`retryLabel`) when the function rejects. `onLoad({ options })` and `onError({ error })` follow the answer. The `@panel` block is still yours, drawn once for each tab that arrives.
+`items` can be a promise or a function returning one, such as an action, in place of a list. The tabs are asked in the browser: the component says "Loading…" (`loadingLabel`) meanwhile, and `failureLabel` with a "Try again" button (`retryLabel`) when the function rejects. `onLoad({ options })` and `onError({ error })` follow the answer. The `@panel` block is still yours, drawn once for each tab that arrives.
 
 ```kay
-Tabs(tabs={() => loadSections()} value="details" label="Product")
+Tabs(items={() => loadSections()} value="details" label="Product")
   @panel(tab)
     ProductPanel(tab={tab})
 ```

@@ -5,5 +5,5 @@ import DateInput from '@kayjs/ui/date-input.kay'
 const due = signal('2026-10-21')
 ---
 .flex.flex-col.items-start.gap-2
-  DateInput(aria-label="Due date" value={due()} onChange={({ value }) => due = value})
+  DateInput(label="Due date" value={due()} onChange={({ value }) => due = value})
   p.text-muted Due on {due() || 'no date'}.

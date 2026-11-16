@@ -10,11 +10,13 @@ const look = recipe({
   parts: { root: `${FIELD_LOOK} ${FIELD_BOX}` },
 })
 
-const { size = 'md', invalid, value, onInput, onChange, onBlur, writeFocused = false, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
+const { size = 'md', invalid, label, value, onInput, onChange, onBlur, writeFocused = false, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // The box's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
+  // Names the box for screen readers, as an `aria-label`: a FormField draws the visible label, and `aria-label` still wins where both are written.
+  label?: string | undefined
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
   onInput?: ((event: { value: string }) => unknown) | undefined
@@ -52,4 +54,4 @@ const ref = fieldRef<HTMLTextAreaElement>((element) => {
 }, rest.ref)
 
 ---
-textarea({...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={sent ?? untrack(() => value)} onInput={event => { heard(event.currentTarget.value); onInput?.({ value: event.currentTarget.value }) }} onChange={event => { heard(event.currentTarget.value); onChange?.({ value: event.currentTarget.value }) }} onBlur={event => { sync(true); onBlur?.(event) }})
+textarea(aria-label={label} {...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={sent ?? untrack(() => value)} onInput={event => { heard(event.currentTarget.value); onInput?.({ value: event.currentTarget.value }) }} onChange={event => { heard(event.currentTarget.value); onChange?.({ value: event.currentTarget.value }) }} onBlur={event => { sync(true); onBlur?.(event) }})

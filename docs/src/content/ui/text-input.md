@@ -25,7 +25,7 @@ description: A text field that reports each keystroke and the committed value.
 
 ## Naming a field
 
-A screen reader announces a box nothing names by its type alone. Give it a `label` through a FormField, or an `aria-label`, `aria-labelledby` or wrapping `label` of your own. In development, the browser logs one console warning for each kind of field drawn with no name, for TextInput and the other field components alike.
+A screen reader announces a box nothing names by its type alone. Give it a `label` through a FormField, or a `label` prop on the box itself (an `aria-label`, which TextInput, Textarea, Select, DateInput, DateTimeInput, TimeInput, MarkdownEditor, FileDrop and MultiSelect all take), or an `aria-labelledby` or wrapping `label` of your own. In development, the browser logs one console warning for each kind of field drawn with no name, for TextInput and the other field components alike.
 
 ## After a refused post
 

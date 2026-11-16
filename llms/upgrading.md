@@ -62,6 +62,10 @@ Every transition callback of a kayjs-ui, kayjs-ai or kayjs-cms component takes o
 
 Four callbacks are renamed to say what they report, and the old names keep working with their positional arguments until 1.108: `onChange` of Accordion, Tabs and ThemeToggle is `onValueChange`, ZoomPane's is `onPlateChange({ plate })`, Table's `onSort` is `onSortChange({ sort })` and a chart's `onActive` is `onActiveChange({ index })`. `kay check` reports them as `deprecated-ui-callbacks` and `kay upgrade` rewrites an inline arrow function, any other value getting the new name only.
 
+### kayjs-ui lists are `items`
+
+The prop holding the list a component draws is `items` on every one: `tabs` on Tabs, `avatars` on AvatarGroup, `entries` on CommandPalette and Timeline, `links` on SideNav, SiteNav and AppHeader, `steps` on Steps and `icons` on IconPicker. `rows` of a Table and `options` of the choice controls keep their names, as do TabNav (its `tabs` and `links` are two shapes picked by `param`), the `links` of a SideNav group and the infinite `list` of Table, Carousel, Masonry, MediaGallery, VirtualList and LoadMore. The old names work until 1.108, and `deprecated-ui-items` (`kay check --fix`) writes `items`; a template written under both reads `items`. Nothing else breaks: `label` on TextInput, Textarea, Select, DateInput, DateTimeInput, TimeInput, MarkdownEditor and FileDrop names the control (an `aria-label`, which still wins), Tabs takes `disabled` and TooltipHost `onOpenChange`.
+
 ### A page is never an island
 
 A page without a `--- server` fence that has an `on*`, `bind:` or `ref`, a browser value of `kay` such as `signal`, or a live or persisted import used to become an island. It still does through 1.107, and `kay check` warns with `deprecated-page-island` at that line; 1.108 refuses it. Move what needs the browser into a component of its own and render it from the page: the component is the island. No `kay upgrade` fix exists, as the fix moves code into a new file.

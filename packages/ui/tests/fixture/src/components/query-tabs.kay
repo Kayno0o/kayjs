@@ -7,6 +7,6 @@ const { onChange, paramDefault } = props<{ onChange?: (value: string) => void, p
 
 const tabs = [{ value: 'details', label: 'Details' }, { value: 'reviews', label: 'Reviews' }, { value: 'shipping', label: 'Shipping' }] as const
 ---
-Tabs#tabs(tabs={tabs} param="tab" paramDefault={paramDefault} label="Product" onValueChange={({ value }) => onChange?.(value)})
+Tabs#tabs(items={tabs} param="tab" paramDefault={paramDefault} label="Product" onValueChange={({ value }) => onChange?.(value)})
   @panel(tab)
     p {tab}

@@ -1,6 +1,6 @@
 ---
 import type { Duration, JSX } from 'kay'
-import { durationMs, effect, onCleanup, recipe, signal } from 'kay'
+import { durationMs, effect, onCleanup, recipe, signal, untrack } from 'kay'
 import { claim } from './claim'
 
 // An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default. `data-hint` is a tooltip for the pointer alone, for text the keyboard has no stop on. `data-tooltip-content` names, by id, a hidden element whose children the tooltip shows in place of a string, which `Tooltip`'s `@content` block draws.
@@ -16,13 +16,15 @@ const PANEL_ID = 'kui-tooltip'
 // 'kui-tooltip' stays as the component's name for an app's CSS. Anchored to whichever element TooltipHost names --tooltip-anchor.
 const look = recipe({ parts: { content: 'contents', root: 'kui-tooltip inset-auto m-1.5 max-w-xs overflow-visible border-solid border-[length:var(--border-width)] border-border-strong bg-surface-strong px-2 py-1 text-2xs text-foreground [position-anchor:--tooltip-anchor] [position-try-fallbacks:flip-block,flip-inline]' } })
 
-const { showDelay = '80ms', hideDelay = '150ms', fallback = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'id' | 'popover' | 'role'> & {
+const { showDelay = '80ms', hideDelay = '150ms', fallback = false, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'id' | 'popover' | 'role'> & {
   // How long the pointer or focus rests on an element before its tooltip shows.
   showDelay?: Duration | undefined
   // How long a tooltip lingers once the pointer leaves, long enough by default for it to cross the gap onto the tooltip, which stays while hovered.
   hideDelay?: Duration | undefined
   // For an extension's own host only (the one `ui()` mounts): it gives way to every other TooltipHost, whichever hydrates first, so an app setting it on its own loses it.
   fallback?: boolean | undefined
+  // Called as a tooltip shows and as it hides, with the element carrying it: for a count of what was read, or to close a card the tooltip would cover.
+  onOpenChange?: ((event: { open: boolean, element: HTMLElement }) => unknown) | undefined
 }>()
 
 interface Aim { element: HTMLElement, text: string, content?: HTMLElement | undefined }
@@ -165,6 +167,26 @@ effect(() => {
     window.removeEventListener('blur', hide)
     document.removeEventListener('toggle', toggled, true)
   })
+})
+
+// The element whose tooltip is showing, kept to name it when the tooltip hides.
+let shownFor: HTMLElement | undefined
+
+effect(() => {
+  const target = aimed()
+  const was = shownFor
+
+  shownFor = target?.element
+
+  if (onOpenChange && owns() && target?.element !== was) {
+    untrack(() => {
+      if (was)
+        onOpenChange?.({ open: false, element: was })
+
+      if (target)
+        onOpenChange?.({ open: true, element: target.element })
+    })
+  }
 })
 
 effect(() => {

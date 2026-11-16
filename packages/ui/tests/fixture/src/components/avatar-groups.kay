@@ -14,21 +14,21 @@ const ask = async () => {
   return people
 }
 ---
-AvatarGroup#popover(avatars={people} max={2} size="sm" label="Team" onOpenChange={({ open }) => onOpenChange(open)})
-AvatarGroup#linked(avatars={people} max={3} moreHref="/team" moreLabel={count => `See ${count} more`})
-AvatarGroup#fractional(avatars={people} max={2.7})
-AvatarGroup#nan(avatars={people} max={Number.NaN})
-AvatarGroup#twins(avatars={[{ key: 1, name: 'Ada' }, { key: 2, name: 'Ada' }]} max={5})
-AvatarGroup#under(avatars={people} max={9})
-AvatarGroup#exact(avatars={people} max={5})
-AvatarGroup#custom(avatars={people} max={1})
+AvatarGroup#popover(items={people} max={2} size="sm" label="Team" onOpenChange={({ open }) => onOpenChange(open)})
+AvatarGroup#linked(items={people} max={3} moreHref="/team" moreLabel={count => `See ${count} more`})
+AvatarGroup#fractional(items={people} max={2.7})
+AvatarGroup#nan(items={people} max={Number.NaN})
+AvatarGroup#twins(items={[{ key: 1, name: 'Ada' }, { key: 2, name: 'Ada' }]} max={5})
+AvatarGroup#under(items={people} max={9})
+AvatarGroup#exact(items={people} max={5})
+AvatarGroup#custom(items={people} max={1})
   @avatar(person)
     b.mine {person.name}
   @rest(rest)
     p.rest {rest.length} others
-AvatarGroup#remote(avatars={async () => people} max={2} onLoad={({ options: list }) => onLoad(list.length)})
-AvatarGroup#failing(avatars={ask} max={2} onError={failure => onError(failure.error)})
-AvatarGroup#pending(avatars={new Promise<typeof people>(() => undefined)} loadingLabel="Un instant")
+AvatarGroup#remote(items={async () => people} max={2} onLoad={({ options: list }) => onLoad(list.length)})
+AvatarGroup#failing(items={ask} max={2} onError={failure => onError(failure.error)})
+AvatarGroup#pending(items={new Promise<typeof people>(() => undefined)} loadingLabel="Un instant")
 button#heal(onClick={() => failing = false}) Heal
 Avatar#dot-online(name="Ada" status="online")
 Avatar#dot-offline(name="Ada" status="offline" label="Ada L.")

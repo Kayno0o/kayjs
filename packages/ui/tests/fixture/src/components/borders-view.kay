@@ -43,4 +43,4 @@ main
   ScatterChart#scatter(label="Games" points={[{ key: 1, label: 'Hades', x: 10, y: 90 }]})
   ImageCropper#cropper(src="/photo.png")
   Pagination#pager(page={2} pages={3} url="/borders")
-  SiteNav(id="recipe-list" links={[{ href: '/', label: 'Home' }]} current="/" label="Recipe")
+  SiteNav(id="recipe-list" items={[{ href: '/', label: 'Home' }]} current="/" label="Recipe")

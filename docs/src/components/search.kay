@@ -29,4 +29,4 @@ button.search-trigger(type="button" aria-haspopup="dialog" onClick={() => open =
   SearchIcon
   span Search
   kbd {hint()}
-CommandPalette(entries={entries()} open={open()} onOpenChange={({ open: next }) => open = next} siteSearch={{ limit: 40 }} label="Search the documentation" placeholder="Search the docs")
+CommandPalette(items={entries()} open={open()} onOpenChange={({ open: next }) => open = next} siteSearch={{ limit: 40 }} label="Search the documentation" placeholder="Search the docs")

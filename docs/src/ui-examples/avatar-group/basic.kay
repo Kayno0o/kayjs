@@ -9,4 +9,4 @@ const team = [
   { name: 'Dennis Ritchie' },
 ]
 ---
-AvatarGroup(avatars={team} max={3} label="Team")
+AvatarGroup(items={team} max={3} label="Team")

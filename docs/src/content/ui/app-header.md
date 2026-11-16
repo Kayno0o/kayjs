@@ -4,7 +4,7 @@ description: The bar across the top of an app, with its brand, main links and an
 
 <Demo name="app-header/basic" />
 
-`AppHeader` takes the props of [SiteNav](/ui/site-nav), `links`, `current` and `label`, and writes its brand and its end area as blocks. It draws a `header` holding the brand, the navigation and the end area, in one row. The brand sits at the start, the links follow it, and the end area, such as a user menu or a theme toggle, is held at the far end.
+`AppHeader` takes the props of [SiteNav](/ui/site-nav), `items`, `current` and `label`, and writes its brand and its end area as blocks. It draws a `header` holding the brand, the navigation and the end area, in one row. The brand sits at the start, the links follow it, and the end area, such as a user menu or a theme toggle, is held at the far end.
 
 ## Brand and end area
 

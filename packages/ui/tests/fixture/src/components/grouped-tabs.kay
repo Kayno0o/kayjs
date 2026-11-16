@@ -10,7 +10,7 @@ const tabs = [{ value: 'profile', label: 'Profile' }, { value: 'access', label: 
 ---
 button#refuse(type="button" onClick={() => issue = 'Pick at least one'}) Refuse
 button#clear(type="button" onClick={() => issue = undefined}) Clear
-Tabs#tabs(tabs={tabs} value="profile" label="Settings")
+Tabs#tabs(items={tabs} value="profile" label="Settings")
   @panel(tab)
     if tab === 'access'
       FormField(label="Access" group issue={issue()})

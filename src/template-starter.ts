@@ -14,7 +14,7 @@ function header({ has, tw }: Setup): string {
       'const { current } = props<{ current: string }>()',
       `const links = ${links}`,
       '---',
-      'AppHeader(links={links} current={current} label="Main navigation")',
+      'AppHeader(items={links} current={current} label="Main navigation")',
       '  @brand',
       '    a.text-xl.font-semibold.no-underline(href="/") __NAME__',
       has('accents') && '  @actions',

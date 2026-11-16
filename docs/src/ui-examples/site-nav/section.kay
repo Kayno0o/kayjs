@@ -11,4 +11,4 @@ header.flex.items-center.gap-4.rounded.border(
   class="border-muted bg-surface px-3 py-2"
 )
   strong kay
-  SiteNav(links={links} current="/guides/tutorial" label="Main")
+  SiteNav(items={links} current="/guides/tutorial" label="Main")

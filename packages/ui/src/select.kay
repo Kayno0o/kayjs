@@ -17,11 +17,13 @@ const look = recipe({
   parts: { root: `${FIELD_LOOK} ${FIELD_SELECT_BOX} min-h-(--_field-height)` },
 })
 
-const { size = 'md', invalid, value, options, onChange, param, paramDefault, name, submit = false, emptyOption, query = '', busy = false, loadingLabel = wording('ui.select.loading', 'Loading…'), failureLabel = wording('ui.select.failure', 'Could not load the options'), onLoad, onError, onBlur, onKeyDown, onPointerDown, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'size' | 'value' | 'options' | 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
+const { size = 'md', invalid, label, value, options, onChange, param, paramDefault, name, submit = false, emptyOption, query = '', busy = false, loadingLabel = wording('ui.select.loading', 'Loading…'), failureLabel = wording('ui.select.failure', 'Could not load the options'), onLoad, onError, onBlur, onKeyDown, onPointerDown, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'size' | 'value' | 'options' | 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
   // The box's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
+  // Names the box for screen readers, as an `aria-label`: a FormField draws the visible label, and `aria-label` still wins where both are written.
+  label?: string | undefined
   // One of the options' values, or the empty string once there is an `emptyOption`. Left out, the select keeps its pick and starts on its first option, which a form reset goes back to.
   value?: Value | (Empty extends string | true ? '' : never) | undefined
   // `disabled` keeps that option from being picked. A native option draws no icon, so it has none.
@@ -185,7 +187,7 @@ const ref = fieldRef<HTMLSelectElement>((element) => {
 }, rest.ref)
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
-select(aria-busy={busy || asking() || moving() ? 'true' : undefined} {...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} name={name ?? param} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
+select(aria-busy={busy || asking() || moving() ? 'true' : undefined} aria-label={label} {...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} name={name ?? param} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
   if emptyOption !== undefined && emptyOption !== false
     option(value="") {typeof emptyOption === 'string' ? emptyOption : ''}
   if busy || asking()

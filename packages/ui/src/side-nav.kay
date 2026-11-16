@@ -36,10 +36,12 @@ const look = recipe({
   },
 })
 
-const { id, links, groups, link, heading, header, footer, current, label, collapsed, collapsedKey, collapsible = true, onCollapsedChange, collapseLabel = wording('ui.sideNav.collapse', 'Collapse the menu'), expandLabel = wording('ui.sideNav.expand', 'Expand the menu'), panel = true, menuLabel = wording('ui.sideNav.menu', 'Menu'), loadingLabel = wording('ui.sideNav.loading', 'Loading…'), failureLabel = wording('ui.sideNav.failure', 'Could not load.'), retryLabel = wording('ui.sideNav.retry', 'Try again'), open, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children'> & {
+const { id, items, links: oldLinks, groups, link, heading, header, footer, current, label, collapsed, collapsedKey, collapsible = true, onCollapsedChange, collapseLabel = wording('ui.sideNav.collapse', 'Collapse the menu'), expandLabel = wording('ui.sideNav.expand', 'Expand the menu'), panel = true, menuLabel = wording('ui.sideNav.menu', 'Menu'), loadingLabel = wording('ui.sideNav.loading', 'Loading…'), failureLabel = wording('ui.sideNav.failure', 'Could not load.'), retryLabel = wording('ui.sideNav.retry', 'Try again'), open, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children'> & {
   // The id of the nav, unique on the page; one is drawn when none is given.
   id?: string | undefined
   // Links with no heading, before the `groups`; a link may hold `children`, one level of links under it.
+  items?: readonly NavLink[] | (() => readonly NavLink[] | Promise<readonly NavLink[]>) | Promise<readonly NavLink[]> | undefined
+  // @deprecated Since 1.105, `items`: `deprecated-ui-items` writes the new name, and this one works until 1.108.
   links?: readonly NavLink[] | (() => readonly NavLink[] | Promise<readonly NavLink[]>) | Promise<readonly NavLink[]> | undefined
   // Either list may also be a function returning it, or a promise of it, loaded once the island runs, with a loading row meanwhile and a failure row with a retry if it throws or rejects.
   // Titled runs of links, each with its own heading and list.
@@ -92,11 +94,12 @@ const shown = signal(false)
 const folded = () => collapsible && (collapsed ?? (kept ? kept() : own()))
 const panelOpen = () => open ?? shown()
 const waits = (source: unknown) => typeof source === 'function' || source instanceof Promise
+const given = () => items ?? oldLinks
 const askedLinks = signal<readonly NavLink[] | undefined>(undefined)
 const askedGroups = signal<readonly SideNavGroup[] | undefined>(undefined)
 const failed = signal(false)
-const pending = () => !failed() && ((waits(links) && askedLinks() === undefined) || (waits(groups) && askedGroups() === undefined))
-const flat = () => waits(links) ? askedLinks() : links as readonly NavLink[] | undefined
+const pending = () => !failed() && ((waits(given()) && askedLinks() === undefined) || (waits(groups) && askedGroups() === undefined))
+const flat = () => waits(given()) ? askedLinks() : given() as readonly NavLink[] | undefined
 const titled = () => waits(groups) ? askedGroups() : groups as readonly SideNavGroup[] | undefined
 const all = (): SideNavGroup[] => [...flat() && flat()!.length > 0 ? [{ links: flat()! }] : [], ...titled() ?? []]
 
@@ -114,7 +117,8 @@ async function load() {
   failed = false
 
   try {
-    const nextLinks = waits(links) ? await (typeof links === 'function' ? links() : links) : undefined
+    const source = given()
+    const nextLinks = waits(source) ? await (typeof source === 'function' ? source() : source) : undefined
     const nextGroups = waits(groups) ? await (typeof groups === 'function' ? groups() : groups) : undefined
 
     if (mine !== latest)

@@ -11,6 +11,8 @@ const { value, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
+  // Names the box for screen readers, as an `aria-label`: a FormField draws the visible label, and `aria-label` still wins where both are written.
+  label?: string | undefined
   // The time as `HH:MM`, or `HH:MM:SS` with a `step` under a minute, and `''` for none. Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
   // Called with the box's time on every edit, `''` and a half-typed one included: the live value.

@@ -79,6 +79,6 @@ div#rows
 div#markdown
   MarkdownEditor(invalid)
 div#icons
-  IconPicker(invalid icons={icons})
+  IconPicker(invalid items={icons})
 div#iconsoff
-  IconPicker(disabled icons={icons})
+  IconPicker(disabled items={icons})

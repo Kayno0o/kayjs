@@ -35,6 +35,6 @@ const entries: PaletteEntry[] = [
 CommandPalette(
   open={open()}
   onOpenChange={({ open: next }) => open = next}
-  entries={entries}
+  items={entries}
   groups={['Actions', 'Pages']}
 )

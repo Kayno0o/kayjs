@@ -7,15 +7,17 @@ import { click, clock } from './dom'
 
 let mounted: Mounted | undefined
 const toggles: boolean[] = []
+const tooltips: string[] = []
 
 afterEach(() => {
   clock.stop()
   mounted?.unmount()
   toggles.length = 0
+  tooltips.length = 0
 })
 
 async function popovers(delays: { showDelay?: string, hideDelay?: string } = {}) {
-  mounted = await mountComponent(Popovers, { onToggle: (open: boolean) => toggles.push(open), ...delays })
+  mounted = await mountComponent(Popovers, { onToggle: (open: boolean) => toggles.push(open), onTooltip: ({ open, element }: { open: boolean, element: HTMLElement }) => tooltips.push(`${open ? 'open' : 'close'} ${element.id}`), ...delays })
 
   clock.start()
 
@@ -74,6 +76,20 @@ describe('Popover', () => {
 })
 
 describe('TooltipHost', () => {
+  test('tells onOpenChange which element its tooltip opened and closed for', async () => {
+    const root = await popovers()
+    const button = root.querySelector<HTMLElement>('#delete')!
+
+    button.querySelector('svg')!.dispatchEvent(new Event('pointerover', { bubbles: true }))
+    await clock.elapse(100)
+    await clock.settle()
+    expect(tooltips).toEqual(['open delete'])
+
+    document.dispatchEvent(new Event('pointerdown'))
+    await clock.settle()
+    expect(tooltips).toEqual(['open delete', 'close delete'])
+  })
+
   test('shows an element\'s tooltip a moment after the pointer lands on it, anchored to it, until a press', async () => {
     const root = await popovers()
     const button = root.querySelector<HTMLElement>('#delete')!

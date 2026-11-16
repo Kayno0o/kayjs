@@ -36,10 +36,10 @@ const look = recipe({
   },
 })
 
-const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('ui.tabs.loading', 'Loading…'), retryLabel = wording('ui.tabs.retry', 'Try again'), failureLabel = wording('ui.tabs.failure', 'Could not load the tabs'), orientation = 'horizontal', activation = 'auto', lazy = false, onLoad, onError, onValueChange, onChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onValueChange' | 'onChange' | 'onLoad' | 'onError'> & {
+const { items, tabs: oldTabs, disabled = false, value, param, paramDefault, label, loadingLabel = wording('ui.tabs.loading', 'Loading…'), retryLabel = wording('ui.tabs.retry', 'Try again'), failureLabel = wording('ui.tabs.failure', 'Could not load the tabs'), orientation = 'horizontal', activation = 'auto', lazy = false, onLoad, onError, onValueChange, onChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onValueChange' | 'onChange' | 'onLoad' | 'onError'> & {
   // `icon` sits before the label and `badge` after it; `disabled` keeps that tab from being shown, and the arrow keys skip it.
-  // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the tabs busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
-  tabs: OptionsSource<{ value: Value } & NavItem>
+  // Keeps the tabs from being picked, the shown one staying shown: the buttons are disabled and the arrow keys do nothing. A tab's own `disabled` holds back that tab alone.
+  disabled?: boolean | undefined
   loadingLabel?: string | undefined
   retryLabel?: string | undefined
   failureLabel?: string | undefined
@@ -65,6 +65,16 @@ const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('
   panel: Snippet<[value: Value]>
 } & (
   {
+    // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the tabs busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
+    items: OptionsSource<{ value: Value } & NavItem>
+    tabs?: undefined
+  } | {
+    // @deprecated Since 1.105, `items`: `deprecated-ui-items` writes the new name, and this one works until 1.108.
+    tabs: OptionsSource<{ value: Value } & NavItem>
+    items?: undefined
+  }
+) & (
+  {
     // The tab shown to start with; tabs whose parent passes another follow it. A value naming no enabled tab shows the first enabled one, with no `onValueChange` for the fallback.
     value: Value
     param?: undefined
@@ -78,7 +88,7 @@ const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('
   }
 )>()
 
-const source = loadOptions<{ value: Value } & NavItem>(() => given, { onLoad, onError, label: 'Tabs' })
+const source = loadOptions<{ value: Value } & NavItem>(() => (items ?? oldTabs)!, { onLoad, onError, label: 'Tabs' })
 // The loaded tabs, empty until a source answers.
 const tabs = source.options
 const id = uid()
@@ -118,6 +128,9 @@ effect(() => {
 const drawn = (tabValue: string) => !lazy || tabValue === active() || opened().includes(tabValue)
 
 function show(next: Value) {
+  if (disabled)
+    return
+
   // Picking the tab a fallback shows still writes it, so a stale value gives way to the pick.
   if (next === asked() && next === active())
     return
@@ -141,7 +154,7 @@ function keyDown(event: KeyboardEvent) {
   const move = ENDS[key] ?? (key === along.next ? (index: number, count: number) => stepIndex(index, 1, count) : key === along.previous ? (index: number, count: number) => stepIndex(index, -1, count) : undefined)
 
   // A chord is the browser's, such as Alt with an arrow going back a page.
-  if (!move || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+  if (disabled || !move || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
     return
 
   event.preventDefault()
@@ -173,7 +186,7 @@ function keyDown(event: KeyboardEvent) {
 div(part="root" {...rest} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={source.loading() ? 'true' : undefined})
   div(part="list" ref={element => list = element} role="tablist" aria-label={label} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} onKeyDown={keyDown})
     for entry, index of tabs() key={entry.value}
-      button(part="tab" type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={active() === entry.value ? 'true' : 'false'} tabindex={active() === entry.value ? 0 : -1} disabled={entry.disabled} onClick={() => show(entry.value)})
+      button(part="tab" type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={active() === entry.value ? 'true' : 'false'} tabindex={active() === entry.value ? 0 : -1} disabled={disabled || entry.disabled} onClick={() => show(entry.value)})
         if entry.icon
           Icon(icon={entry.icon} part="icon")
         if tab

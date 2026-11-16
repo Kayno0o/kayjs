@@ -32,4 +32,4 @@ CardRow#row-link(href="https://example.com/io")
   | Io
 CardRow#row-plain
   | Europa
-Timeline#timeline(entries={entries} selected="c" onSelectedChange={({ key }) => onSelect(key)} label="Day")
+Timeline#timeline(items={entries} selected="c" onSelectedChange={({ key }) => onSelect(key)} label="Day")

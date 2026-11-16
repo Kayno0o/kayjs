@@ -4,7 +4,7 @@ description: A vertical navigation with group headings, a collapsible rail and a
 
 <Demo name="side-nav/basic" />
 
-`groups` are titled runs of links, `links` a run with no heading before them. A link is the same `NavLink` SiteNav takes: an `icon`, a `badge`, `disabled` (a text, not a link) and `children`, one level of links under it. `current` marks the page on screen the way [SiteNav](/ui/site-nav) does: the page itself, and a link to a section holding it.
+`groups` are titled runs of links, `items` a run with no heading before them. A link is the same `NavLink` SiteNav takes: an `icon`, a `badge`, `disabled` (a text, not a link) and `children`, one level of links under it. `current` marks the page on screen the way [SiteNav](/ui/site-nav) does: the page itself, and a link to a section holding it.
 
 ## Collapsing
 
@@ -20,4 +20,4 @@ Below `lg` the nav gives way to a menu button opening the same lists in a [SideP
 
 SideNav is an island: it holds the collapsed and open state.
 
-`links` and `groups` may be a function or a promise of the list, loaded once the island runs, with a loading row and a failure row with a retry; pass the array to have it drawn from the first paint.
+`items` and `groups` may be a function or a promise of the list, loaded once the island runs, with a loading row and a failure row with a retry; pass the array to have it drawn from the first paint.

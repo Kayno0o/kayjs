@@ -115,6 +115,8 @@ slot
 
 `ui()` renders one `Toaster`, one `TooltipHost` and one `ConfirmHost` (which answers `confirm()`) after every page's layouts. Alt and T moves focus to the toasts on screen, and Escape dismisses the focused one. A layout that renders its own, as below, keeps working: only one shows toasts and tooltips, the app's own before the extension's whichever hydrates first.
 
+A tooltip has one entry, the `data-tooltip` attribute (with `data-tooltip-placement`); `Tooltip` and an `IconButton`'s `label` write it for you, and `TooltipHost(onOpenChange)` hears each one show and hide.
+
 For a hover explanation of read-only text, such as a stat, write `data-hint="Damage per second"` instead of `data-tooltip`: the host shows it under the pointer only, and `kay check` does not report it as an `unreachable-tooltip`. A hint only adds to what the element already says, as the keyboard and screen readers never reach it.
 
 A touch screen has no hover, so a tap shows a hint, or the `data-tooltip` of an element the tap does not act on (anything but a link, a button, a field or a control role). A second tap on it, or a tap anywhere else, hides it again.

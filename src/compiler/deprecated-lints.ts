@@ -146,6 +146,14 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Tabs from \'@kayjs/ui/tabs.kay\'\n---\nTabs(tabs={[{ value: \'a\', label: \'A\' }]} label="Product" onChange={value => console.log(value)})',
     right: '---\nimport Tabs from \'@kayjs/ui/tabs.kay\'\n---\nTabs(tabs={[{ value: \'a\', label: \'A\' }]} label="Product" onValueChange={({ value }) => console.log(value)})',
   },
+  'deprecated-ui-items': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: 'The prop holding the list a kayjs-ui component draws, `items` since 1.105 on every one: `tabs` on a Tabs, `avatars` on an AvatarGroup, `entries` on a CommandPalette or a Timeline, `links` on a SideNav, SiteNav or AppHeader, `steps` on Steps and `icons` on an IconPicker. `rows` of a Table and `options` of a choice control keep their names. The old names work until 1.108. Found on a component bound to the library\'s file in a template. The fix writes `items`; it offers none where `items` is already written. TabNav\'s `tabs` and `links` are two shapes picked by `param`, and the `links` of a SideNav group are data: both keep their names.',
+    wrong: '---\nimport Tabs from \'@kayjs/ui/tabs.kay\'\n---\nTabs(tabs={[{ value: \'a\', label: \'A\' }]} label="Product" value="a")',
+    right: '---\nimport Tabs from \'@kayjs/ui/tabs.kay\'\n---\nTabs(items={[{ value: \'a\', label: \'A\' }]} label="Product" value="a")',
+  },
   'deprecated-ai-language': {
     level: 'warn',
     group: 'deprecated',

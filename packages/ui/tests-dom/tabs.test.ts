@@ -51,6 +51,23 @@ test('shows a clicked tab\'s panel alone, keeping what the others hold', async (
   expect(root.querySelector<HTMLInputElement>('input[name="venus"]')?.value).toBe('typed')
 })
 
+test('a disabled group holds every tab: no click or arrow picks one, and the shown tab stays shown', async () => {
+  mounted = await mountComponent(PlanetTabs, { disabled: true, onChange: (value: string) => changes.push(value) })
+
+  const { root } = mounted
+  const buttons = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+
+  expect(buttons.map(tab => tab.disabled)).toEqual([true, true, true])
+  expect(buttons.filter(tab => tab.getAttribute('aria-selected') === 'true').map(tab => tab.textContent)).toEqual(['Venus'])
+
+  click(buttons[2]!)
+  root.querySelector('[role="tablist"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+  await settle()
+
+  expect(changes).toEqual([])
+  expect(buttons.filter(tab => tab.getAttribute('aria-selected') === 'true').map(tab => tab.textContent)).toEqual(['Venus'])
+})
+
 test('moves between tabs with the arrows, wrapping, and Home and End, focus going with the tab shown', async () => {
   const { root, shown } = await tabs()
 

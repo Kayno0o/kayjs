@@ -53,4 +53,4 @@ RadioGroup#plans(options={[{ value: 'free', label: 'Free' }, { value: 'pro', lab
   @option(plan)
     b.title {plan.label}
     i.price 9
-IconPicker#icons(icons={icons} onChange={({ value: name }) => calls.push(`icon ${name}`)})
+IconPicker#icons(items={icons} onChange={({ value: name }) => calls.push(`icon ${name}`)})

@@ -26,7 +26,7 @@ Button(label="Open the palette" onClick={() => open = true})
 CommandPalette(
   open={open()}
   onOpenChange={({ open: next }) => open = next}
-  entries={entries}
+  items={entries}
   recent={recent()}
   onRecentChange={({ recent: next }) => recent = next}
 )

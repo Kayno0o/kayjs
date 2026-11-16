@@ -1,0 +1,25 @@
+---
+island()
+import AppHeader from '@kayjs/ui/app-header.kay'
+import AvatarGroup from '@kayjs/ui/avatar-group.kay'
+import CommandPalette from '@kayjs/ui/command-palette.kay'
+import SideNav from '@kayjs/ui/side-nav.kay'
+import SiteNav from '@kayjs/ui/site-nav.kay'
+import Steps from '@kayjs/ui/steps.kay'
+import Tabs from '@kayjs/ui/tabs.kay'
+import Timeline from '@kayjs/ui/timeline.kay'
+
+// The names the lists had before 1.105, which still work until 1.108.
+const links = [{ href: '/', label: 'Home' }, { href: '/rooms', label: 'Rooms' }]
+---
+// kay-allow-file deprecated-ui-items
+Tabs#tabs(tabs={[{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]} value="a" label="Letters")
+  @panel(value)
+    p {value}
+AvatarGroup#avatars(avatars={[{ name: 'Ada' }, { name: 'Linus' }]} label="Team")
+Timeline#entries(entries={[{ key: 'a', time: '08:00', label: 'Home' }]} label="Day")
+SiteNav#site(links={links} current="/" label="Main")
+AppHeader#header(links={links} current="/" label="Header")
+SideNav#side(links={links} current="/" label="Side")
+Steps#steps(steps={[{ key: 'one', label: 'One' }, { key: 'two', label: 'Two' }]} current="one" label="Steps")
+CommandPalette#palette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }]} open={true} label="Search")

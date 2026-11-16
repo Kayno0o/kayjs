@@ -10,7 +10,7 @@ const links = [{ href: '/nav-locale', label: 'Here' }, { href: '/nav-locale-sub'
 const nodes = [{ key: 'here', label: 'Here', href: '/nav-locale' }, { key: 'sub', label: 'Sub', href: '/nav-locale-sub' }]
 ---
 main
-  SiteNav#site(links={links} current={here} label="Site")
+  SiteNav#site(items={links} current={here} label="Site")
   TabNav#tabs(links={links} current={here} label="Tabs")
   TabNav#tabs-string(links={links} current={here.pathname} label="Tabs string")
   TreeView#tree(nodes={nodes} label="Tree")

@@ -9,5 +9,5 @@ const { icons, value, onChange, onSearch, onLoad, onError } = props<{ onSearch?:
 const chosen = signal(value)
 ---
 form#form
-  IconPicker#picker(icons={icons} onLoad={({ options, query }) => onLoad?.(options, query)} value={chosen()} name="icon" onChange={({ value }) => onChange(value)} onSearch={({ query }) => onSearch?.(query)} onError={onError})
+  IconPicker#picker(items={icons} onLoad={({ options, query }) => onLoad?.(options, query)} value={chosen()} name="icon" onChange={({ value }) => onChange(value)} onSearch={({ query }) => onSearch?.(query)} onError={onError})
   button#choose(type="button" onClick={() => chosen = 'tabler:shape-3'}) Choose

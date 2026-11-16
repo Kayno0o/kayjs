@@ -8,7 +8,7 @@ const links = [
   { href: '/ui/app-header', label: 'AppHeader' },
 ] as const
 ---
-AppHeader(links={links} current="/ui/app-header" label="Main" sticky={false})
+AppHeader(items={links} current="/ui/app-header" label="Main" sticky={false})
   @brand
     strong kay
   @actions

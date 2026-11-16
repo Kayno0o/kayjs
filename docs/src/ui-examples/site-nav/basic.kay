@@ -9,4 +9,4 @@ const links = [
 ---
 header.flex.items-center.gap-4
   strong kay
-  SiteNav(links={links} current="/ui/site-nav" label="Main")
+  SiteNav(items={links} current="/ui/site-nav" label="Main")

@@ -4,7 +4,11 @@ description: Renders the tooltip of any element carrying a data-tooltip attribut
 
 <Demo name="tooltip-host/basic" />
 
-Render one `TooltipHost` in the root layout, then add `data-tooltip` to any element. It shows on hover and on keyboard focus. The pointer can cross onto the tooltip to read it, and Escape closes it until the pointer or the focus moves on. While a tooltip shows, its element points at it with `aria-describedby`, so a screen reader reads the tooltip too. A tooltip on an element the keyboard never reaches is not read this way, and the `unreachable-tooltip` check says so.
+Render one `TooltipHost` in the root layout, then add `data-tooltip` to any element.
+
+That attribute is the one way to write a tooltip: [Tooltip](/ui/tooltip) and an `IconButton`'s `label` are shortcuts that write it.
+
+It shows on hover and on keyboard focus. The pointer can cross onto the tooltip to read it, and Escape closes it until the pointer or the focus moves on. While a tooltip shows, its element points at it with `aria-describedby`, so a screen reader reads the tooltip too. A tooltip on an element the keyboard never reaches is not read this way, and the `unreachable-tooltip` check says so.
 
 <Callout type="note">
 
@@ -36,4 +40,4 @@ An `IconButton` sets `data-tooltip` to its `label`, so an icon-only button names
 
 ## Attributes
 
-TooltipHost takes only `showDelay` and `hideDelay`. Its tooltip's `id` is the one every tooltip's element points at with `aria-describedby`, so an `id` of your own, or any other attribute, has nowhere to go.
+TooltipHost takes `showDelay`, `hideDelay` and `onOpenChange({ open, element })`, called as a tooltip shows and as it hides, with the element carrying it. Its tooltip's `id` is the one every tooltip's element points at with `aria-describedby`, so an `id` of your own, or any other attribute, has nowhere to go.

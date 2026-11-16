@@ -37,7 +37,7 @@ import DateInput from '@kayjs/ui/date-input.kay'
 const closed = new Set(['2026-12-24', '2026-12-25'])
 const prices: Record<string, number> = { '2026-12-23': 90 }
 ---
-DateInput(aria-label="Arrival" name="arrival" disabledDay={iso => closed.has(iso)} onMonthChange={({ month }) => console.log(month)})
+DateInput(label="Arrival" name="arrival" disabledDay={iso => closed.has(iso)} onMonthChange={({ month }) => console.log(month)})
   @day(iso, state)
     span {Number(iso.slice(8))}
     if !state.disabled

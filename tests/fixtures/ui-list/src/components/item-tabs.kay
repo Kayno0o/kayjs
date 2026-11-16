@@ -4,7 +4,7 @@ import Badge from '@kayjs/ui/badge.kay'
 import Popover from '@kayjs/ui/popover.kay'
 import Tabs from '@kayjs/ui/tabs.kay'
 ---
-Tabs(tabs={[{ value: 'recent', label: 'Recent' }, { value: 'flagged', label: 'Flagged' }]} value="recent" label="Items")
+Tabs(items={[{ value: 'recent', label: 'Recent' }, { value: 'flagged', label: 'Flagged' }]} value="recent" label="Items")
   @panel(value)
     if value === 'recent'
       Badge(label="3 new")

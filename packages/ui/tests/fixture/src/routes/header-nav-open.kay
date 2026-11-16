@@ -4,4 +4,4 @@ import SiteNav from '@kayjs/ui/site-nav.kay'
 const links = [{ href: '/', label: 'Home' }] as const
 ---
 //- A bare SiteNav whose page sets `open` follows it as an island.
-SiteNav(links={links} current="/" label="Open" open={true})
+SiteNav(items={links} current="/" label="Open" open={true})

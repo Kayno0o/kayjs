@@ -5,5 +5,5 @@ import TimeInput from '@kayjs/ui/time-input.kay'
 const start = signal('09:30')
 ---
 .flex.flex-col.items-start.gap-2
-  TimeInput(aria-label="Start time" value={start()} onChange={({ value }) => start = value})
+  TimeInput(label="Start time" value={start()} onChange={({ value }) => start = value})
   p.text-muted Starts at {start() || 'no time'}.

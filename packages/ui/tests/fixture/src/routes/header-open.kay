@@ -5,4 +5,4 @@ const links = [{ href: '/', label: 'Home' }, { href: '/data', label: 'Data' }] a
 ---
 //- The page sets the menu, so the header is an island following it.
 h1 Open header
-AppHeader(links={links} current="/" label="Main" open={false})
+AppHeader(items={links} current="/" label="Main" open={false})

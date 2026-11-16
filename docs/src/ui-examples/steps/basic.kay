@@ -7,4 +7,4 @@ const steps = [
   { key: 'review', label: 'Review' },
 ]
 ---
-Steps(steps={steps} current="profile" done={['account']} url="/ui/steps" label="Signup")
+Steps(items={steps} current="profile" done={['account']} url="/ui/steps" label="Signup")

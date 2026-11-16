@@ -20,10 +20,10 @@ TabNav#plain-nav(links={links} current="https://example.com/a" label="Sections")
 TabNav#block-nav(links={links} current="https://example.com/a" label="Sections")
   @tab(tab)
     em {tab.label}!
-Tabs#plain-tabs(tabs={tabs} value="a" label="Planets")
+Tabs#plain-tabs(items={tabs} value="a" label="Planets")
   @panel(value)
     p {value}
-Tabs#block-tabs(tabs={tabs} value="a" label="Planets")
+Tabs#block-tabs(items={tabs} value="a" label="Planets")
   @tab(tab)
     em {tab.label}!
   @panel(value)

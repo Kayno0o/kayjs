@@ -40,7 +40,7 @@ PageSection(title="Moons")
 ### CommandPalette
 
 ```kay
-CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { label: 'New moon', group: 'Actions', icon: 'plus', shortcut: 'Ctrl+N', onSelect: () => creating = true }]} groups={['Actions', 'Pages']} recent={recent()} onRecentChange={keepRecent})
+CommandPalette(items={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { label: 'New moon', group: 'Actions', icon: 'plus', shortcut: 'Ctrl+N', onSelect: () => creating = true }]} groups={['Actions', 'Pages']} recent={recent()} onRecentChange={keepRecent})
 ```
 
 - A modal search over places to go and things to do, opened and closed by Cmd on macOS and Ctrl elsewhere with `shortcut` (`mod+k` by default) from anywhere, unless something handled the key first; `shortcut={false}` or `{null}` leaves opening to the app through `open`, and `onOpenChange({ open })` reports each change.
@@ -84,7 +84,7 @@ TreeView(nodes={[{ key: 'work', label: 'Work', children: [{ key: 'specs', label:
 ### Timeline
 
 ```kay
-Timeline(entries={[{ key: 'home', time: '08:00 - 09:10', label: 'At home', icon: 'info' }, { key: 'gap', time: '09:10 - 09:40', label: 'No data', tone: 'neutral', pickable: false }]} label="Today" selected={picked()} onSelectedChange={({ key }) => picked = key})
+Timeline(items={[{ key: 'home', time: '08:00 - 09:10', label: 'At home', icon: 'info' }, { key: 'gap', time: '09:10 - 09:40', label: 'No data', tone: 'neutral', pickable: false }]} label="Today" selected={picked()} onSelectedChange={({ key }) => picked = key})
 ```
 
 - Entries in time order, as given (the timeline never sorts): a `TimelineEntry` (from the package) has a `key`, a `time` (the time or range as the app words it), a `label`, an optional `icon` and `tone`, and `pickable`. `tone: 'neutral'` greys a gap; the other `Tone`s colour the icon. `label` names the list for screen readers.

@@ -54,22 +54,22 @@ main
         a(href="/form") Edit
       | Mars
   article#site-nav
-    SiteNav(id="main-links" links={[{ href: '/', label: 'Home' }, { href: '/chart', label: 'Chart' }, { href: '/charts', label: 'Charts' }, { href: '/charts/moons', label: 'Moons' }, { href: '/data', label: 'Data' }]} current="/charts/moons/" label="Main" menuLabel="Ouvrir le menu")
+    SiteNav(id="main-links" items={[{ href: '/', label: 'Home' }, { href: '/chart', label: 'Chart' }, { href: '/charts', label: 'Charts' }, { href: '/charts/moons', label: 'Moons' }, { href: '/data', label: 'Data' }]} current="/charts/moons/" label="Main" menuLabel="Ouvrir le menu")
   article#app-header
-    AppHeader(links={[{ href: '/', label: 'Home', icon: 'info' }, { href: '/data', label: '<b>Data</b>' }]} current="/data/" label="Site")
+    AppHeader(items={[{ href: '/', label: 'Home', icon: 'info' }, { href: '/data', label: '<b>Data</b>' }]} current="/data/" label="Site")
       @brand
         a(href="/") Moons
       @actions
         a(href="/form") Sign in
   article#url-nav
-    SiteNav(id="url-links" links={[{ href: '/', label: 'Home' }, { href: '/data', label: 'Data' }]} current={new URL('https://example.com/data/?view=1')} label="By URL")
+    SiteNav(id="url-links" items={[{ href: '/', label: 'Home' }, { href: '/data', label: 'Data' }]} current={new URL('https://example.com/data/?view=1')} label="By URL")
   article#busy-select
     Select#busy-new(value="a" options={[{ value: 'a', label: 'A' }]} busy aria-busy="false")
     Select#busy-new-plain(value="a" options={[{ value: 'a', label: 'A' }]} busy)
     Select#idle(value="a" options={[{ value: 'a', label: 'A' }]})
   article#app-header-bare
-    AppHeader(links={[{ href: '/', label: 'Home' }]} current="/" label="Bare" sticky={false})
+    AppHeader(items={[{ href: '/', label: 'Home' }]} current="/" label="Bare" sticky={false})
   article#app-switcher
-    AppHeader(links={[{ href: '/', label: 'Home' }]} current="/" label="Switch")
+    AppHeader(items={[{ href: '/', label: 'Home' }]} current="/" label="Switch")
       @actions
         AppSwitcher(id="family" apps={[{ key: 'atlas', href: 'https://atlas.example.com/', label: 'Atlas', icon: 'globe', description: 'Maps' }, { key: 'hubble', href: 'https://hubble.example.com/', label: 'Hubble' }, { key: 'relay', href: 'https://relay.example.com/', label: 'Relay', newTab: true, rel: 'noopener noreferrer' }]} current="hubble")

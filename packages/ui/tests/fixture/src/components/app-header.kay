@@ -3,9 +3,9 @@ import AppHeader from '@kayjs/ui/app-header.kay'
 
 const links = [{ href: '/', label: 'Home', icon: 'info' }, { href: '/data', label: '<b>Data</b>' }, { href: '/charts', label: 'Charts', icon: 'info' }] as const
 ---
-AppHeader#header(links={links} current="/charts/moons" label="Main")
+AppHeader#header(items={links} current="/charts/moons" label="Main")
   @brand
     a#brand(href="/") Moons
   @actions
     button#user(type="button") Ada
-AppHeader#bare(links={links} current="/" label="Bare" sticky={false})
+AppHeader#bare(items={links} current="/" label="Bare" sticky={false})

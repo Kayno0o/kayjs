@@ -32,6 +32,8 @@ const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Cho
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
+  // Names the box for screen readers, as an `aria-label`: a FormField draws the visible label, and `aria-label` still wins where both are written.
+  label?: string | undefined
   // The date as `YYYY-MM-DD`, or `''` for none. Without it, the box starts empty and keeps what is picked, for a form posting it by its `name`.
   value?: string | undefined
   // The earliest and latest date allowed, as `YYYY-MM-DD`; the calendar greys out the days outside them.
@@ -86,7 +88,7 @@ const ref = fieldRef<HTMLInputElement>(element => box = element, rest.ref)
 
 // A FormField wraps the control in its label, so the calendar button's name would join the input's: the input is named by the label's own text instead.
 effect(() => {
-  if (!ready() || rest['aria-label'] !== undefined || rest['aria-labelledby'] !== undefined)
+  if (!ready() || rest['aria-label'] !== undefined || rest.label !== undefined || rest['aria-labelledby'] !== undefined)
     return
 
   const labelText = box?.closest('label')?.querySelector('.kui-label-text')

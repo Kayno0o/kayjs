@@ -35,6 +35,6 @@ SaveForm(action={save} failureLabel="Could not save")
   Select#level(name="level" options={levels} value={level()} onChange={({ value }) => level = value})
   MultiSelect(label="Tags" name="tags" options={choices} value={tags()} search onChange={({ value }) => tags = value})
   Combobox#planet(name="planet" label="Planet" options={planets} value="mars")
-  IconPicker(name="icon" value="star" icons={({ q, limit }) => find(q, limit)})
+  IconPicker(name="icon" value="star" items={({ q, limit }) => find(q, limit)})
   TextInput#title(name="title" value={title()} onInput={({ value }) => title = value})
 p#state {JSON.stringify({ agree: agree(), power: power(), decks: decks(), level: level(), tags: tags(), title: title() })}
