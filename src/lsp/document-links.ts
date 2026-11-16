@@ -17,7 +17,7 @@ import { mentionsRoute, routeLinks } from './route-links'
 export async function links(host: LspHost, uri: string): Promise<DocumentLink[]> {
   const document = host.documents.get(uri)
 
-  if (!document)
+  if (!document || document.route)
     return []
 
   const range = (span: Span) => ({ start: toPosition(document.source, span.start), end: toPosition(document.source, span.end) })

@@ -10,7 +10,7 @@ export async function codeActions(host: LspHost, params: CodeActionParams): Prom
   const document = host.documents.get(params.textDocument.uri)
   const only = params.context.only
 
-  if (!document)
+  if (!document || document.route)
     return null
 
   const fixAll = only === undefined || only.some(kind => FIX_ALL.startsWith(kind)) ? safeFixes(document) : []

@@ -36,6 +36,7 @@ import { toOffset, toPosition } from './positions'
 import { ProjectChecks } from './project-checks'
 import { formatRange } from './range-format'
 import { prepareRename, rename, renamedFiles } from './rename'
+import { ROUTE_CANDIDATE, routeDocument } from './route-documents'
 import { Connection } from './rpc'
 import { semanticTokens, TOKEN_MODIFIERS, TOKEN_TYPES } from './semantic-tokens'
 
@@ -80,6 +81,8 @@ export class KayLanguageServer implements LspHost {
   readonly uiFiles = new Map<string, string>()
   // Numbers the probe documents, so two asked at once never share one.
   private probeCount = 0
+  // The open plain `.ts` files, whose text and version the editor last sent: each that is an endpoint or an API module is a document too, once the shadow tree knows it.
+  private readonly tsFiles = new Map<string, { text: string, version: number }>()
   private readonly diagnostics = new DiagnosticsQueue(this)
   private readonly checks = new ProjectChecks(this, this.diagnostics)
   // The save waiting for its other events to come, whether any of them changed a module, and the shadow tree's write in flight.
@@ -229,6 +232,11 @@ export class KayLanguageServer implements LspHost {
     if (UI_DOCUMENT.test(item.uri))
       this.uiFiles.set(item.uri, item.text)
 
+    if (ROUTE_CANDIDATE.test(item.uri)) {
+      this.tsFiles.set(item.uri, { text: item.text, version: item.version })
+      this.syncRoute(item.uri)
+    }
+
     if (!KAY_FILE.test(item.uri))
       return
 
@@ -247,6 +255,15 @@ export class KayLanguageServer implements LspHost {
       return
     }
 
+    const ts = this.tsFiles.get(textDocument.uri)
+
+    if (ts) {
+      this.tsFiles.set(textDocument.uri, { text: contentChanges.reduce((source, change) => 'range' in change ? applyEdit(source, change.range, change.text) : change.text, ts.text), version: textDocument.version })
+      this.syncRoute(textDocument.uri)
+
+      return
+    }
+
     const previous = this.documents.get(textDocument.uri)
 
     if (!previous)
@@ -260,9 +277,36 @@ export class KayLanguageServer implements LspHost {
     this.diagnostics.scheduleDependents(document)
   }
 
+  // The document of an open `.ts` file as the shadow tree knows it now: opened in tsgo when it became an endpoint or an API module, changed when its shadow did, closed when it stopped being one.
+  private syncRoute(uri: string) {
+    const held = this.tsFiles.get(uri)
+    const previous = this.documents.get(uri)
+    const document = held && routeDocument(this, uri, held.text, held.version)
+
+    if (!document) {
+      if (previous?.route)
+        this.drop(uri)
+
+      return
+    }
+
+    this.documents.set(uri, document)
+
+    if (!previous?.route)
+      this.server.notify('textDocument/didOpen', { textDocument: { uri: document.shadowUri, languageId: 'typescript', version: document.version, text: document.tsx } })
+    else if (previous.tsx !== document.tsx)
+      this.server.notify('textDocument/didChange', { textDocument: { uri: document.shadowUri, version: document.version }, contentChanges: [{ text: document.tsx }] })
+
+    this.diagnostics.scheduleDiagnostics([uri])
+  }
+
   private close(uri: string) {
     this.uiFiles.delete(uri)
+    this.tsFiles.delete(uri)
+    this.drop(uri)
+  }
 
+  private drop(uri: string) {
     const document = this.documents.get(uri)
 
     if (!document)
@@ -317,8 +361,11 @@ export class KayLanguageServer implements LspHost {
 
     this.server.notify('workspace/didChangeWatchedFiles', { changes })
     // An open component that came to be rendered only by islands, or stopped being, whose project read its config again, or that takes as signals those a changed module now exports, or stops, or whose layouts above gain or drop a `query` or a named slot, compiles again before the files are checked.
+    for (const uri of this.tsFiles.keys())
+      this.syncRoute(uri)
+
     for (const previous of this.documents.values()) {
-      if (this.needsCompile(previous, options, modulesChanged, layoutsChanged))
+      if (!previous.route && this.needsCompile(previous, options, modulesChanged, layoutsChanged))
         this.refresh(previous)
     }
     this.diagnostics.scheduleDiagnostics()
@@ -455,13 +502,13 @@ export class KayLanguageServer implements LspHost {
   private symbols(uri: string): DocumentSymbol[] {
     const document = this.documents.get(uri)
 
-    return document ? documentSymbols(document.source) : []
+    return document && !document.route ? documentSymbols(document.source) : []
   }
 
   private lenses(uri: string): CodeLens[] {
     const document = this.documents.get(uri)
 
-    if (!document)
+    if (!document || document.route)
       return []
 
     const path = filePath(uri)
@@ -491,20 +538,24 @@ export class KayLanguageServer implements LspHost {
   private tokens(uri: string): { data: number[] } {
     const document = this.documents.get(uri)
 
-    return { data: document ? semanticTokens(document.source, importedSignals(document.file, document.source)) : [] }
+    return { data: document && !document.route ? semanticTokens(document.source, importedSignals(document.file, document.source)) : [] }
   }
 
   private folds(uri: string): FoldingRange[] {
     const document = this.documents.get(uri)
 
-    return document ? foldingRanges(document.source) : []
+    return document && !document.route ? foldingRanges(document.source) : []
   }
 
   private async format(uri: string): Promise<TextEdit[]> {
     const document = this.documents.get(uri)
-    const formatted = document && formatKay(document.source, { sortClasses: await tailwindSorter(projectRootOf(document.file, this.root)) })
 
-    if (!document || !formatted || formatted.diagnostics.length > 0 || formatted.code === document.source)
+    if (!document || document.route)
+      return []
+
+    const formatted = formatKay(document.source, { sortClasses: await tailwindSorter(projectRootOf(document.file, this.root)) })
+
+    if (formatted.diagnostics.length > 0 || formatted.code === document.source)
       return []
 
     return [{ range: { start: { line: 0, character: 0 }, end: toPosition(document.source, document.source.length) }, newText: formatted.code }]
@@ -514,7 +565,7 @@ export class KayLanguageServer implements LspHost {
   private async formatSelection({ textDocument, range }: { textDocument: TextDocumentIdentifier, range: Range }): Promise<TextEdit[]> {
     const document = this.documents.get(textDocument.uri)
 
-    if (!document)
+    if (!document || document.route)
       return []
 
     const edits = formatRange(document.source, { start: toOffset(document.source, range.start), end: toOffset(document.source, range.end) }, { sortClasses: await tailwindSorter(projectRootOf(document.file, this.root)) })

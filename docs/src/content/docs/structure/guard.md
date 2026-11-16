@@ -52,7 +52,7 @@ A layout with a page under it that sets `guards: false` is left untyped, since i
 
 An API route reads `guard` and `once` from its handler's context, the same values. The module's own `guards` are typed from the option, `api({ guards: [needsKey] })`, and `kay check` types what the guards above it return with nothing written.
 
-An endpoint's `ctx: EndpointContext` is typed the same way, from its params, the `_guard.ts` files above it and its `page.query`. The editor's TypeScript server reads the plain file, so there a handler is typed only from what it names: `EndpointContext<{ slug: string }, { org: Org }>` and `api<{ org: Org }>()`.
+An endpoint's `ctx: EndpointContext` is typed the same way, from its params, the `_guard.ts` files above it and its `page.query`, in `kay check` and in the editor, so hover, completion and errors on a handler read the same types with no generic written. The same goes for `api()`.
 
 ## Sharing a load
 

@@ -177,7 +177,7 @@ export async function across<Spot extends { uri: string, range: Range }>(host: L
 export async function inlayHints(host: LspHost, params: { textDocument: TextDocumentIdentifier, range: Range }): Promise<InlayHint[]> {
   const document = host.documents.get(params.textDocument.uri)
 
-  if (!document)
+  if (!document || document.route)
     return []
 
   const wanted = { start: toOffset(document.source, params.range.start), end: toOffset(document.source, params.range.end) }

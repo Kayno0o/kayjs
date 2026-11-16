@@ -275,24 +275,30 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
   return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, programs: libraries.programs, settings: replaced.lines, exports: exported.lines, islandOnly: own.settings.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [], served, changed: tree.changed }
 }
 
-// The endpoint files and API modules of the project itself, each shadowed with the context its file tree gives it, which TypeScript checks in place of the file.
-async function routeShadows(root: string, { endpoints, apiModules }: ServedProject, tree: ShadowTree): Promise<void> {
+// The shadow of an endpoint file or an API module of the project, from the text given for it, which the editor holds unsaved; undefined when the file is neither or nothing in it is typed from the file tree.
+export function routeShadowOf(root: string, { endpoints, apiModules }: Pick<ServedProject, 'endpoints' | 'apiModules'>, file: string, source: string): ShadowFile | undefined {
+  if (!ownFile(root, file))
+    return undefined
+
   const guardsOf = (guards: { file: string, own?: true | undefined }[]) => ({ guards: guards.filter(guard => guard.own !== true).map(guard => guard.file), hasOwnGuards: guards.some(guard => guard.own === true) })
+  const endpoint = endpoints.find(candidate => candidate.file === file)
 
-  await Promise.all([
-    ...endpoints.filter(({ file }) => ownFile(root, file)).map(async (endpoint) => {
-      const shadow = routeShadow(root, endpoint.file, await Bun.file(endpoint.file).text(), { ...guardsOf(endpoint.guards), endpoint })
+  if (endpoint)
+    return routeShadow(root, file, source, { ...guardsOf(endpoint.guards), endpoint })
 
-      if (shadow)
-        await tree.shadow(shadow, routeShadowPath(root, endpoint.file))
-    }),
-    ...apiModules.filter(({ file }) => ownFile(root, file)).map(async (module) => {
-      const shadow = routeShadow(root, module.file, await Bun.file(module.file).text(), { ...guardsOf(module.guards), api: module })
+  const module = apiModules.find(candidate => candidate.file === file)
 
-      if (shadow)
-        await tree.shadow(shadow, routeShadowPath(root, module.file))
-    }),
-  ])
+  return module && routeShadow(root, file, source, { ...guardsOf(module.guards), api: module })
+}
+
+// The endpoint files and API modules of the project itself, each shadowed with the context its file tree gives it, which TypeScript checks in place of the file.
+async function routeShadows(root: string, served: ServedProject, tree: ShadowTree): Promise<void> {
+  await Promise.all([...served.endpoints, ...served.apiModules].map(async ({ file }) => {
+    const shadow = routeShadowOf(root, served, file, await Bun.file(file).text())
+
+    if (shadow)
+      await tree.shadow(shadow, routeShadowPath(root, file))
+  }))
 }
 
 function shadowTree(dir: string): ShadowTree {

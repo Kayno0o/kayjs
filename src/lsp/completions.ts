@@ -68,7 +68,7 @@ export async function completion(host: LspHost, params: TextDocumentPositionPara
 export async function templateCompletion(host: LspHost, { textDocument, position }: TextDocumentPositionParams): Promise<CompletionList | undefined> {
   const document = host.documents.get(textDocument.uri)
 
-  if (!document)
+  if (!document || document.route)
     return undefined
 
   const context = templateContext(document.source, toOffset(document.source, position), parseKay(document.source).templateStart)
