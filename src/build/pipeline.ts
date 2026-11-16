@@ -296,7 +296,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
       if (options.compile.verify === 'load')
         result.compiled.verifiedMs = await loadExecutable(executable, root)
       else if (options.compile.verify)
-        result.compiled.verifiedMs = await verifyExecutable(executable, root, project.config.ops?.health)
+        result.compiled.verifiedMs = await verifyExecutable(executable, root, project.config.ops?.health, { healthPath: project.config.endpoints?.health })
 
       // Written once the executable runs, so `kay start` never runs one that failed its verify.
       await Bun.write(join(output, EXECUTABLE_RECORD), relative(root, executable))

@@ -70,8 +70,8 @@ describe('testSite({ headers }) reaches every method', () => {
     expect((await stream.finished())[0]!['x-test']).toBe('default')
 
     await site.mcp.tools()
-    expect(lastTo('/mcp').headers.get('x-test')).toBe('default')
-    expect(lastTo('/mcp').headers.get('content-type')).toBe('application/json')
+    expect(lastTo('/_kay/mcp').headers.get('x-test')).toBe('default')
+    expect(lastTo('/_kay/mcp').headers.get('content-type')).toBe('application/json')
   })
 
   it('leaves an accept the site sets over the api\'s own', async () => {

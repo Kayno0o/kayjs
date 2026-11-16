@@ -3518,7 +3518,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     })
 
     try {
-      const unserved = (await check(root, { openapi: { path: '/spec.json', reference: true, referencePath: '/docs/api' }, lints: { seo: 'allow' } })).filter(d => d.code !== undefined).map(d => [d.line, d.message])
+      const unserved = (await check(root, { endpoints: { openapi: '/spec.json' }, openapi: { reference: { path: '/docs/api' } }, lints: { seo: 'allow' } })).filter(d => d.code !== undefined).map(d => [d.line, d.message])
 
       expect(unserved).toEqual([[3, expect.stringContaining('No page, public file or app route serves /api/openapi.json')]])
     }

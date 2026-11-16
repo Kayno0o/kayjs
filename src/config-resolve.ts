@@ -1,5 +1,6 @@
-import type { ConfigInput, I18nConfig, I18nInput, ImageFormats, ImageLimits, KayConfig, Loadable, ObserveConfig, ObserveInput, RemoteImages } from './config'
+import type { ConfigInput, EndpointsConfig, I18nConfig, I18nInput, ImageFormats, ImageLimits, KayConfig, Loadable, ObserveConfig, ObserveInput, RemoteImages } from './config'
 import type { McpConfig } from './server/api-modules'
+import type { OpenApiConfig } from './server/openapi'
 import { KayError } from './compiler/errors'
 import { isRecord } from './config-rules'
 
@@ -78,17 +79,50 @@ async function resolveAssets(config: ConfigInput): Promise<KayConfig['assets']> 
 }
 
 // `ops` with the `observe`, `health`, `metrics` and `jobs` the config held at its top level before 1.105, a key already in `ops` winning over the old one, and the `onError` an `observe` held set aside.
-function resolveOps(config: ConfigInput): { ops: KayConfig['ops'], onError: ObserveInput['onError'] } {
-  const { observe, health, metrics, jobs } = config
-  const merged = { ...without({ observe, health, metrics, jobs }), ...without(config.ops ?? {}) }
+function resolveOps(config: ConfigInput): { ops: KayConfig['ops'], onError: ObserveInput['onError'], paths: EndpointsConfig } {
+  const merged = { ...without({ observe: config.observe, health: config.health, metrics: config.metrics, jobs: config.jobs }), ...without(config.ops ?? {}) }
 
   if (Object.keys(merged).length === 0)
-    return { ops: config.ops === undefined ? undefined : {}, onError: undefined }
+    return { ops: config.ops === undefined ? undefined : {}, onError: undefined, paths: {} }
 
-  const { observe: given, ...rest } = merged
+  const { observe: given, health, metrics, jobs, ...rest } = merged
   const resolved = given === undefined ? undefined : resolveObserve(given)
+  const [kept, paths] = [takePath(health), takePath(metrics), takePath(jobs)].reduce<[Record<string, unknown>, EndpointsConfig]>(([bags, at], [bag, path], index) => {
+    const name = (['health', 'metrics', 'jobs'] as const)[index]!
 
-  return { ops: { ...rest, ...resolved && { observe: resolved.observe } }, onError: resolved?.onError }
+    return [{ ...bags, ...bag !== undefined && { [name]: bag } }, { ...at, ...path !== undefined && { [name]: path } }]
+  }, [{}, {}])
+
+  return { ops: { ...rest, ...kept, ...resolved && { observe: resolved.observe } }, onError: resolved?.onError, paths }
+}
+
+// A bag without the `path` it held before 1.105, which is a key of `endpoints` since, and that path.
+function takePath<Bag>(bag: Bag): [Bag, string | undefined] {
+  if (!isRecord(bag) || !('path' in bag))
+    return [bag, undefined]
+
+  const { path, ...rest } = bag
+
+  // Whatever it is, so the boot refuses one that is no path.
+  return [rest as Bag, path as string | undefined]
+}
+
+// `endpoints` with the paths the bags held before 1.105 (`serve.apiPrefix`, the `path` of `openapi`, `mcp`, `health`, `metrics` and `jobs`, the `referencePath` of `openapi`), a key already in `endpoints` winning over the old one, and the bags without them.
+function resolveEndpoints(config: ConfigInput, opsPaths: EndpointsConfig, mcp: ConfigInput['mcp']): { endpoints: KayConfig['endpoints'], serve: KayConfig['serve'], openapi: KayConfig['openapi'], mcp: KayConfig['mcp'] } {
+  const { apiPrefix, ...serve } = config.serve ?? {}
+  const [bareMcp, mcpAt] = takePath(mcp)
+  const { path: openapiAt, referencePath, ...openapi } = isRecord(config.openapi) ? config.openapi : {} as Record<string, never>
+  const written = isRecord(config.openapi)
+  const reference = referencePath !== undefined && openapi.reference === true ? { path: referencePath } : openapi.reference
+  const moved: EndpointsConfig = without({ api: apiPrefix, openapi: openapiAt as string | undefined, mcp: mcpAt, ...opsPaths })
+  const merged = { ...moved, ...without(config.endpoints ?? {}) }
+
+  return {
+    endpoints: Object.keys(merged).length === 0 ? config.endpoints : merged,
+    serve: config.serve === undefined ? undefined : serve,
+    openapi: written ? { ...openapi, ...reference !== undefined && { reference } } as OpenApiConfig : config.openapi,
+    mcp: bareMcp,
+  }
 }
 
 // `i18n` with its paths loaded and the `defaultLocale`, `prefixDefault` and `domains` of before 1.105 as `default` and `mode`, a key already in its new place winning over the old one.
@@ -143,8 +177,9 @@ export async function resolveConfig(config: ConfigInput): Promise<KayConfig> {
   for (const key of MOVED_KEYS)
     delete kept[key]
 
-  const { ops, onError } = resolveOps(config)
-  const resolved: Record<string, unknown> = { ...kept, security, proxy: resolveProxy(proxy), mcp: resolveMcp(config.mcp), robots, i18n, redirects, assets, ops, cors, client: resolveClient(config), onListen: config.onListen ?? onStart, onError: config.onError ?? onError }
+  const { ops, onError, paths } = resolveOps(config)
+  const routes = resolveEndpoints(config, paths, resolveMcp(config.mcp))
+  const resolved: Record<string, unknown> = { ...kept, security, proxy: resolveProxy(proxy), ...routes, robots, i18n, redirects, assets, ops, cors, client: resolveClient(config), onListen: config.onListen ?? onStart, onError: config.onError ?? onError }
 
   for (const key of Object.keys(resolved)) {
     if (resolved[key] === undefined)

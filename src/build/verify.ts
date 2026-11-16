@@ -3,7 +3,6 @@ import { readdir, readlink } from 'node:fs/promises'
 import process from 'node:process'
 import { within } from '@kaynooo/utils/promise'
 import { KayError } from '../compiler/errors'
-import { bagOf } from '../config-switch'
 import { healthTimeoutMs } from '../server/config-limits'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { VERIFY_VARIABLE } from '../server/secret'
@@ -30,6 +29,8 @@ const LISTENING = '0A'
 export interface VerifyOptions {
   startTimeoutMs?: number
   probeTimeoutMs?: number
+  // Where the health route is served, `endpoints.health`.
+  healthPath?: string | undefined
   // Called each time the sockets of the server are looked at, for a test to count them.
   ownershipChecked?: () => void
 }
@@ -60,7 +61,7 @@ export async function verifyExecutable(executable: string, root: string, health:
   const release = onInterrupt(live)
 
   try {
-    const url = `http://127.0.0.1:${port}${health === false ? '/' : bagOf(health)?.path ?? HEALTH_PATH}`
+    const url = `http://127.0.0.1:${port}${health === false ? '/' : options.healthPath ?? HEALTH_PATH}`
     let ready = false
     // While another process answers in the server's place, its sockets are looked at again only now and then.
     let foreignUntil = 0

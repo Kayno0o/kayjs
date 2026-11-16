@@ -88,8 +88,8 @@ describe('health.timeout', () => {
     const [patient, hurried] = [await serve(), await serve()]
 
     try {
-      expect(await probeHealth({ path: '/up', timeout: '1s' }, String(patient.server!.port))).toBe(0)
-      expect(await probeHealth({ path: '/up', timeout: '50ms' }, String(hurried.server!.port))).toBe(1)
+      expect(await probeHealth({ timeout: '1s' }, String(patient.server!.port), undefined, '/up')).toBe(0)
+      expect(await probeHealth({ timeout: '50ms' }, String(hurried.server!.port), undefined, '/up')).toBe(1)
     }
     finally {
       await Promise.all([patient.stop(true), hurried.stop(true)])

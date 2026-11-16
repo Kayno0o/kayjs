@@ -34,7 +34,7 @@ function isOpen(path: string, open: readonly string[]): boolean {
 // Refuses with 403 every request that does not carry the proxy's shared key in the header `proxy.key` names, so a process or a container reaching the port directly skips nothing the proxy does.
 // The `endpoint` is the MCP endpoint while `mcp.token` guards it: a POST to it carries its own credential, the bearer, and so skips the check.
 // Off under `kay dev`, in a static export, and outside production while no key is given (a warning says so, except in a test run); a production server with `key` and no key to compare with does not boot.
-export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { root: string, dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => string | undefined) | undefined, endpoint?: string | undefined, logRefused?: ((request: Request, status: number) => void) | undefined, security?: Record<string, string> | undefined }): void {
+export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { root: string, dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => readonly string[]) | undefined, endpoint?: (() => readonly string[]) | undefined, logRefused?: ((request: Request, status: number) => void) | undefined, security?: Record<string, string> | undefined }): void {
   const header = proxy?.key?.header
 
   if (header === undefined || options.dev || options.exported)
@@ -60,10 +60,10 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
 
   app.onRequest(({ request }) => {
     const path = routerPath(pathOf(request.url), options.base)
-    const metrics = options.metrics?.()
+    const metrics = options.metrics?.() ?? []
 
     // The metrics route answers by its own rule, so a collector on the private network needs no key.
-    if (isInternal(request) || isOpen(path, open) || (metrics !== undefined && (path === metrics || path === `${metrics}/`)) || (options.endpoint !== undefined && request.method === 'POST' && (path === options.endpoint || path === `${options.endpoint}/`)))
+    if (isInternal(request) || isOpen(path, open) || metrics.some(at => path === at || path === `${at}/`) || (request.method === 'POST' && options.endpoint?.().some(at => path === at || path === `${at}/`) === true))
       return
 
     const given = request.headers.get(header)

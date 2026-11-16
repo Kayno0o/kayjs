@@ -1,7 +1,8 @@
 import type { BudgetConfig } from './build/budget'
-import type { ActionsConfig, AssetsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DeprecatedMcp, DirsConfig, FaviconConfig, HealthConfig, I18nInput, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveInput, OfflineConfig, OpsConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
+import type { ActionsConfig, AssetsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DeprecatedMcp, DeprecatedOpenApi, DeprecatedPath, DeprecatedServe, DirsConfig, EndpointsConfig, FaviconConfig, HealthConfig, I18nInput, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveInput, OfflineConfig, OpsConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
 import type { Rule } from './config-rules'
 import type { McpConfig } from './server/api-modules'
+import type { OpenApiConfig } from './server/openapi'
 import { bag, bool, bytes, duration, either, fn, isRecord, list, lit, map, num, numOrInfinity, obj, oneOf, str, typedKeys } from './config-rules'
 import { nearest } from './nearest'
 
@@ -20,7 +21,7 @@ const I18N_BAG = bag(I18N, ({ locales, default: named, defaultLocale }, path, ou
 const SEO: Record<keyof SeoConfig, Rule> = { name: localized, titleTemplate: localized, description: localized, image: localized, imageAlt: localized, noindex: bool, twitter: str, locale: localized, themeColor: either(str, bag({ light: str, dark: str })), jsonLd: list(obj) }
 const DIRS: Record<keyof DirsConfig, Rule> = { routes: str, api: str, public: str }
 const LIMITS: Record<keyof LimitsConfig, Rule> = { body: bytes, byPath: map(bytes) }
-const SERVE: Record<keyof ServeConfig, Rule> = { apiPrefix: str, compress: bool, compressionDictionary: bool, shutdownTimeout: duration, timeout: either(duration, lit(false)) }
+const SERVE: Record<keyof (ServeConfig & DeprecatedServe), Rule> = { apiPrefix: str, compress: bool, compressionDictionary: bool, shutdownTimeout: duration, timeout: either(duration, lit(false)) }
 const LOG: Record<keyof LogConfig, Rule> = { format: oneOf('text', 'json'), requests: bool, sink: fn }
 const OBSERVE: Record<keyof ObserveInput, Rule> = { log: either(bool, oneOf('json'), fn, bag(LOG)), serverTiming: bool, loadBudget: either(duration, lit(false)), requestIdHeader: str, tracer: true, extract: either(fn, lit(false)), onError: fn }
 const OFFLINE: Record<keyof OfflineConfig, Rule> = { pages: list(str), fallback: str }
@@ -28,9 +29,11 @@ const LINKS = bag({ outside: oneOf('new-tab', 'same-tab'), schemes: list(str) })
 const HYDRATION = bag({ visible: str, serverIslands: str })
 const CLIENT: Record<keyof ClientConfig, Rule> = { navigation: bool, inlineStyles: bool, lateStyles: bool, typography: bool, hydration: HYDRATION, prefetch: either(oneOf('conservative', 'moderate', 'eager'), lit(false)), saveData: bool, pageTimeout: duration, loadingDelay: duration, offline: either(bool, bag(OFFLINE)), search: bool, links: LINKS }
 const ACTIONS: Record<keyof ActionsConfig, Rule> = { protect: either(lit(false), obj), maxSize: bytes, messages: obj, beforeRun: fn, onSuccess: fn, onError: fn }
-const HEALTH: Record<keyof HealthConfig, Rule> = { path: str, timeout: duration, check: fn }
+const HEALTH: Record<keyof (HealthConfig & DeprecatedPath), Rule> = { path: str, timeout: duration, check: fn }
 const SECRET = either(str, bag({ env: str, file: str }))
 const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted: either(fn, list(str)), trustPrivate: lit(false), key: either(str, bag({ header: str, secret: SECRET })), open: list(str) }
+const ENDPOINTS: Record<keyof EndpointsConfig, Rule> = { api: str, openapi: str, mcp: str, health: str, metrics: str, jobs: str }
+const OPENAPI: Record<keyof (OpenApiConfig & DeprecatedOpenApi), Rule> = { title: str, version: str, path: str, reference: either(bool, bag({ path: str })), referencePath: str, dev: bool }
 const MCP: Record<keyof (McpConfig & DeprecatedMcp), Rule> = { path: str, rateLimit: either(bool, obj), token: either(lit(true), SECRET), key: either(bool, str, bag({ file: str })), instructions: str }
 const SITEMAP: Record<keyof SitemapConfig, Rule> = { ttl: duration }
 const ROBOTS: Record<keyof RobotsConfig, Rule> = { disallow: either(fn, list(str)), allow: either(fn, list(str)) }
@@ -38,8 +41,8 @@ const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: durati
 // The limit of kay's own routes: `RateLimit` but for `key`, as they count the client's address.
 const KAY_ROUTE_LIMIT: Record<string, Rule> = { max: num, window: duration, store: obj, onLimit: fn }
 const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)) }
-const JOBS: Record<keyof JobsConfig, Rule> = { guards: guardOption, guard: guardOption, path: str }
-const METRICS: Record<keyof MetricsConfig, Rule> = { path: str, token: either(lit(true), SECRET) }
+const JOBS: Record<keyof (JobsConfig & DeprecatedPath), Rule> = { guards: guardOption, guard: guardOption, path: str }
+const METRICS: Record<keyof (MetricsConfig & DeprecatedPath), Rule> = { path: str, token: either(lit(true), SECRET) }
 const BUDGET: Record<keyof BudgetConfig, Rule> = { js: bytes, css: bytes, weight: bytes, grade: oneOf('A', 'B', 'C', 'D', 'E', 'F', 'G') }
 const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
 const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: either(str, bag({ light: str, dark: str })), backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
@@ -57,6 +60,7 @@ const CONFIG: Record<keyof ConfigInput, Rule> = {
   dirs: bag(DIRS),
   limits: bag(LIMITS),
   serve: bag(SERVE),
+  endpoints: bag(ENDPOINTS),
   assets: bag(ASSETS),
   ops: bag(OPS),
   observe: bag(OBSERVE),
@@ -91,7 +95,7 @@ const CONFIG: Record<keyof ConfigInput, Rule> = {
   requireGuards: bool,
   guards: bag({ default: oneOf('open', 'closed') }),
   cors: CORS,
-  openapi: either(bool, obj),
+  openapi: either(bool, bag(OPENAPI)),
   mcp: either(bool, bag(MCP)),
   health: either(bool, bag(HEALTH)),
   metrics: either(bool, bag(METRICS)),
@@ -152,7 +156,7 @@ export const REMOVED_KEYS: Record<string, string> = {
 // The keys the config takes at its top level, which `kay check` tells from the other options of `pages()` and `testSite()`.
 export const CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(CONFIG))
 
-export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'observe', 'client', 'assets', 'ops'] as const
+export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'endpoints', 'observe', 'client', 'assets', 'ops'] as const
 
 export const isBag = isRecord
 

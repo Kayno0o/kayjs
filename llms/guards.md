@@ -12,10 +12,10 @@ A `path` is one route, a `prefix` a subtree, and every `guards` option takes a g
 
 | Option | Reads as | Guard | Without a guard | `false` |
 | --- | --- | --- | --- | --- |
-| `serve.apiPrefix` | prefix of the API modules, the OpenAPI document and its reference | the API directory's `_guard.ts` | open | no guard option |
-| `openapi.path`, `openapi.referencePath`, `mcp.path` | route | the API directory's `_guard.ts` | open | no guard option |
-| `ops.health.path`, `ops.metrics.path` | route | none: `metrics` takes a token, `health` is open | open | no guard option |
-| `ops.jobs.path`, `ops.jobs.guards` | route | guard, list or `{ load }` | closed, 403 | opens the page |
+| `endpoints.api` | prefix of the API modules, the OpenAPI document and its reference | the API directory's `_guard.ts` | open | no guard option |
+| `endpoints.openapi`, `openapi.reference.path`, `endpoints.mcp` | route | the API directory's `_guard.ts` | open | no guard option |
+| `endpoints.health`, `endpoints.metrics` | route | none: `metrics` takes a token, `health` is open | open | no guard option |
+| `endpoints.jobs`, `ops.jobs.guards` | route | guard, list or `{ load }` | closed, 403 | opens the page |
 | `vitals({ prefix, guards })` | prefix | guard, list or `{ load }` | closed, 403 | opens the screen |
 | `cms({ prefix, access })` | prefix | role, list, `{ password }`, function or `false` | closed, 403 | admits everyone |
 | `assets.images.guards` | before `assets.images.resolve` | guard, list or `{ load }` | closed, 403 | resizes for everyone |

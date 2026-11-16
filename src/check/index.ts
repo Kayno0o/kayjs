@@ -40,8 +40,10 @@ export const CHECK_CONFIG = [
   'dirs',
   // The libraries whose routes the app mounts, which links may point at too.
   'extensions',
-  // Where the API is mounted, `/api` by default, and how long a stopping server waits, which the server refuses at boot when it cannot read it.
+  // How long a stopping server waits, which the server refuses at boot when it cannot read it.
   'serve',
+  // Where the API, the OpenAPI document and the MCP endpoint are served, which links to them are checked against.
+  'endpoints',
   // The app's own modules for its libraries' settings, checked against the defaults they replace.
   'librarySettings',
   // The content config relative to the root, whose collections' entries are read against their schemas.

@@ -116,7 +116,7 @@ function refuseScanned({ root, config }: Project<ServedOptions>, { routes, files
 
   claimRedirects(served, redirects)
 
-  const mcpAt = mcpPath(config.mcp)
+  const mcpAt = mcpPath(config.mcp, config.endpoints?.mcp)
 
   // Refused here with the other settings, not when the endpoint is first mounted.
   mcpRateLimit(config.mcp)

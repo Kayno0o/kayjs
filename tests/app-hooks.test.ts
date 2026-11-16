@@ -176,7 +176,7 @@ describe('the hooks pagesApp registers', () => {
       'GET /api/items/broken, which throws': new Request(`${SITE}/api/items/broken`),
       'OPTIONS /api/items, a preflight': new Request(`${SITE}/api/items`, { method: 'OPTIONS', headers: { 'origin': 'https://other.example', 'access-control-request-method': 'POST' } }),
       'POST an action': new Request(`${SITE}${action}`, { method: 'POST', headers: form, body: 'title=one' }),
-      'POST /mcp': new Request(`${SITE}/mcp`, { method: 'POST', headers: json, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) }),
+      'POST /mcp': new Request(`${SITE}/_kay/mcp`, { method: 'POST', headers: json, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) }),
       'GET /ext, an extension\'s route': new Request(`${SITE}/ext`),
       'GET /_kay/health': new Request(`${SITE}/_kay/health`),
       'GET /metrics': new Request(`${SITE}/metrics`),

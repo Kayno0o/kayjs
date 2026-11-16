@@ -71,7 +71,7 @@ describe('the config\'s secrets', () => {
   it('reads the forms of before 1.105: a header as proxy.key and mcp.key as the token', async () => {
     expect((await resolveConfig({ proxy: { key: 'x-upstream-key', hops: 1 } })).proxy).toEqual({ key: { header: 'x-upstream-key' }, hops: 1 })
     expect((await resolveConfig({ proxy: { key: { header: 'h', secret: 's' } } })).proxy).toEqual({ key: { header: 'h', secret: 's' } })
-    expect((await resolveConfig({ mcp: { key: true, path: '/tools' } })).mcp).toEqual({ token: true, path: '/tools' })
+    expect(await resolveConfig({ mcp: { key: true, path: '/tools' } })).toMatchObject({ mcp: { token: true }, endpoints: { mcp: '/tools' } })
     expect((await resolveConfig({ mcp: { key: { file: 'data/key' } } })).mcp).toEqual({ token: { file: 'data/key' } })
     expect((await resolveConfig({ mcp: { key: false } })).mcp).toEqual({})
     expect((await resolveConfig({ mcp: { key: 'old-key-0123456789', token: 'new-key-0123456789' } })).mcp).toEqual({ token: 'new-key-0123456789' })

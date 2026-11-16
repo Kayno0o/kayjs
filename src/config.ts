@@ -35,8 +35,10 @@ export interface KayConfig extends AppHooks {
   dirs?: DirsConfig | undefined
   // What a request may carry.
   limits?: LimitsConfig | undefined
-  // How the server answers: where the API is mounted, compression and the stop.
+  // How the server answers: compression and the stop.
   serve?: ServeConfig | undefined
+  // Where the app's API and kay's own features are served, in one place: `api` (`/api`), `openapi` (`/api/openapi.json`), `mcp` (`/_kay/mcp`), `health` (`/_kay/health`), `metrics` (`/_kay/metrics`) and `jobs` (`/_kay/jobs`). Every default but the API's sits under `/_kay`; the options of each feature stay in its own key.
+  endpoints?: EndpointsConfig | undefined
   // What pages ship to the browser and how it behaves there: navigation, styles, typography, hydration, prefetching and Save-Data.
   client?: ClientConfig | undefined
   // The files the site serves besides its pages: `images`, `fonts`, `favicon`, `manifest` and `publicCache`.
@@ -71,9 +73,9 @@ export interface KayConfig extends AppHooks {
   requireGuards?: boolean | undefined
   // Lets other sites' pages call every API module's routes from the browser, as `api({ cors })` does for one, an endpoint file setting its own in `page.cors`: `cors: { origins: ['https://app.example.com'], credentials: true }`. A module setting its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
   cors?: CorsOptions | undefined
-  // Serves an OpenAPI 3.1 document of the API modules' routes at `/api/openapi.json`, or at `openapi: { path }`, read from their schemas, behind the API directory's own `_guard.ts`; `{ reference: true }` adds a page listing them at `/api/reference`, or at `referencePath`, `{ dev: true }` keeps both to `kay dev`.
+  // Serves an OpenAPI 3.1 document of the API modules' routes at `/api/openapi.json`, or at `endpoints.openapi`, read from their schemas, behind the API directory's own `_guard.ts`; `{ reference: true }` adds a page listing them at `/api/reference`, or at `reference: { path }`, `{ dev: true }` keeps both to `kay dev`.
   openapi?: boolean | OpenApiConfig | undefined
-  // Serves an MCP endpoint at `/mcp` over Streamable HTTP, or at `mcp: { path: '/tools' }`, for an agent to call the app: a tool per API route that sets `tool` in its `detail`, and per action that sets `tool` on its protection. A call runs through the same guards, rate limits and `ctx.locals` as a fetch would.
+  // Serves an MCP endpoint at `/_kay/mcp` over Streamable HTTP, or at `endpoints.mcp`, for an agent to call the app: a tool per API route that sets `tool` in its `detail`, and per action that sets `tool` on its protection. A call runs through the same guards, rate limits and `ctx.locals` as a fetch would.
   mcp?: boolean | McpConfig | undefined
   // Serves a request from another path, query included, such as a host's pages from a section: `url => url.hostname === 'blog.example.com' ? `/blog${url.pathname}` : undefined`. The browser keeps its URL.
   rewrite?: Rewrite | undefined
@@ -133,11 +135,11 @@ export interface AssetsConfig {
 export interface OpsConfig {
   // What an app watches the server by: its log, timing, request ids, traces and errors.
   observe?: ObserveConfig | undefined
-  // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
+  // The route a load balancer or a container polls, at `/_kay/health` unless `endpoints.health` names another, or `false` for none.
   health?: HealthConfig | boolean | undefined
-  // Serves `/metrics` in the Prometheus text format for a collector: requests by method, route and status, their durations, scheduled runs, cache reads and live connections. Read only from this machine or a private network by a request no proxy forwarded, or from anywhere with the `Authorization: Bearer` token `KAY_METRICS_TOKEN` holds; `{ path }` moves it. Off by default, and under `kay dev`.
+  // Serves `/_kay/metrics` in the Prometheus text format for a collector: requests by method, route and status, their durations, scheduled runs, cache reads and live connections. Read only from this machine or a private network by a request no proxy forwarded, or from anywhere with the `Authorization: Bearer` token `KAY_METRICS_TOKEN` holds; `endpoints.metrics` moves it. Off by default, and under `kay dev`.
   metrics?: boolean | MetricsConfig | undefined
-  // Serves a page of the app's queues at `/_kay/jobs` in production: each queue's waiting, running and failed jobs with payload and error, and a button to retry or delete one. It mounts only with a `guard`, a kay guard or a list of them such as `ctx => ctx.locals.auth.requireAdmin()`, which runs on every request, and without one the boot stops. `{ path }` moves it. Off by default, and under `kay dev`, whose dev tool has a Jobs tab.
+  // Serves a page of the app's queues at `/_kay/jobs` in production: each queue's waiting, running and failed jobs with payload and error, and a button to retry or delete one. It mounts only with a `guard`, a kay guard or a list of them such as `ctx => ctx.locals.auth.requireAdmin()`, which runs on every request, and without one the boot stops. `endpoints.jobs` moves it. Off by default, and under `kay dev`, whose dev tool has a Jobs tab.
   jobs?: JobsConfig | undefined
 }
 
@@ -167,8 +169,6 @@ export interface LimitsConfig {
 }
 
 export interface ServeConfig {
-  // The prefix the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `serve: { apiPrefix: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
-  apiPrefix?: string | undefined
   // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip. On by default when NODE_ENV is production; `false` behind a proxy or CDN that compresses already.
   compress?: boolean | undefined
   // A server build with a prerendered page uses its 404 page as a compression dictionary, sending a page to a browser that fetched it as the difference from it; `false` builds none, so no page names it and the build writes no `.dcz` copy.
@@ -304,22 +304,35 @@ export interface LiveConfig {
   rateLimit?: Omit<RateLimit, 'key'> | boolean | undefined
 }
 
+// Where the app's API and kay's own features are served, each an absolute path of plain segments without a trailing slash, none under `/_kay`.
+export interface EndpointsConfig {
+  // The prefix the API modules are served under, `/api` by default: `endpoints: { api: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Libraries read it through `apiUrl()`.
+  api?: string | undefined
+  // Where the OpenAPI document is served, `/api/openapi.json` under the API prefix by default; its reference page is set in `openapi.reference`.
+  openapi?: string | undefined
+  // Where the MCP endpoint is served, `/_kay/mcp` by default. `/mcp`, where it was served before 1.105, redirects there with a 308 until 1.108 when this is not set.
+  mcp?: string | undefined
+  // Where the health check is served, `/_kay/health` by default.
+  health?: string | undefined
+  // Where the metrics are served, `/_kay/metrics` by default. `/metrics`, where they were served before 1.105, answers as well until 1.108 when this is not set.
+  metrics?: string | undefined
+  // Where the page of the queues is served, `/_kay/jobs` by default.
+  jobs?: string | undefined
+}
+
 export interface JobsConfig {
   // Who may open the page: a guard, a list of them run in order, or `{ load }` returning one. Left out the page answers 403, as every feature that lists or changes private data does; `false` opens it to everyone.
   guards?: GuardOption | false | undefined
   // Replaced by `guards` in 1.105, and works until 1.108.
   guard?: GuardOption | false | undefined
-  path?: string | undefined
 }
 
 export interface MetricsConfig {
-  path?: string | undefined
   // The bearer token a scrape must send, from anywhere: `true` reads `KAY_METRICS_TOKEN`, a string is the token, `{ env }` names the variable and `{ file }` the file that holds it. Left out it is `KAY_METRICS_TOKEN` when that is set; with no token only a request from this machine or a private network that no proxy forwarded is answered.
   token?: true | Secret | undefined
 }
 
 export interface HealthConfig {
-  path?: string | undefined
   // How long `check` may take before the route fails with 503, and how long `--health` waits for the route: a string such as `'250ms'` or `'10s'`; 5 seconds by default.
   timeout?: Duration | undefined
   // Fails the route with 503 when it returns false or throws, such as a database that does not answer.
@@ -625,7 +638,7 @@ export interface KayExtension<Server extends PluginInput = AnyElysia> {
   // A module whose default export is `defineContext(load)` from `kay/server`, absolute or relative to the project root: `load(request)` returns the request values the extension gives every template as `ctx`, `ctx.user` or `ctx.can('admin')`, with no `--- server` fence. It runs at most once per request, ahead of the render of each page whose imports reach a template that reads `ctx`, and of no other, which is then the visitor's own as a page reading `ctx.locals` is. `defineContext({ key: load })` gives one loader per key instead, each run only for a page whose templates read that key. `kay check` and the editor type `ctx` off the module itself; two extensions giving one key stop the page.
   context?: string | undefined
   // A directory of API modules laid over the app's under `prefix`, the root by default, as `routes` is over its pages: `{ dir: 'api', prefix: 'auth' }` serves `api/session.ts` at `/api/auth/session`, unless the app has `src/api/auth/session.ts`.
-  // A prefix starting with `/_kay/` is absolute, served there whatever `serve.apiPrefix` is. `former` is the prefix it had under `serve.apiPrefix` before it moved: that path still answers, as the new one, for the releases the library says.
+  // A prefix starting with `/_kay/` is absolute, served there whatever `endpoints.api` is. `former` is the prefix it had under `endpoints.api` before it moved: that path still answers, as the new one, for the releases the library says.
   // A module may default-export a function of the `ExtensionApp` building its instance, `({ modules }) => api({ cors }).get('/', () => modules.features)`, called as the app is built, so it serves the app's `appFiles`.
   api?: { dir: string, prefix?: string | undefined, former?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.
@@ -666,7 +679,7 @@ export type ConfigCors = Omit<CorsOptions, 'origins' | 'credentials'> & ({ origi
 type Over<Bag, Given> = Omit<Bag, keyof Given> & Given
 
 // What `kay.config.ts` may write: `KayConfig` with each list that may come from a CMS or a database loadable, and the keys of before 1.105 `kay check --fix` rewrites. Kay turns it into a `KayConfig` as it loads.
-export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'mcp' | 'robots' | 'redirects' | 'i18n' | 'assets' | 'ops'> {
+export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'mcp' | 'robots' | 'redirects' | 'i18n' | 'assets' | 'ops' | 'serve' | 'openapi'> {
   /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */
   onStart?: AppHooks['onListen']
   /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */
@@ -688,13 +701,15 @@ export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'prox
   /** @deprecated Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
   observe?: ObserveInput | undefined
   /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  health?: OpsConfig['health']
+  health?: OpsInput['health']
   /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  metrics?: OpsConfig['metrics']
+  metrics?: OpsInput['metrics']
   /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  jobs?: OpsConfig['jobs']
+  jobs?: OpsInput['jobs']
   assets?: Over<AssetsConfig, { images?: ImagesInput | undefined }> | undefined
-  ops?: Over<OpsConfig, { observe?: ObserveInput | undefined }> | undefined
+  ops?: OpsInput | undefined
+  serve?: (ServeConfig & DeprecatedServe) | undefined
+  openapi?: boolean | (OpenApiConfig & DeprecatedOpenApi) | undefined
   cors?: ConfigCors | undefined
   security?: boolean | Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined }> | undefined
   proxy?: boolean | number | Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined, key?: ProxyKey | string | undefined }> | undefined
@@ -704,8 +719,32 @@ export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'prox
   i18n?: I18nInput | undefined
 }
 
+// `serve` as an app written it before 1.105 may still: `apiPrefix` is `endpoints.api`, which works until 1.108.
+export interface DeprecatedServe {
+  /** @deprecated Written `endpoints.api`; `deprecated-route-keys` rewrites it. Removed in 1.108. */
+  apiPrefix?: string | undefined
+}
+
+// `openapi` as an app written it before 1.105 may still: `path` is `endpoints.openapi` and `referencePath` is `reference: { path }`, which work until 1.108.
+export interface DeprecatedOpenApi {
+  /** @deprecated Written `endpoints.openapi`; `deprecated-route-keys` rewrites it. Removed in 1.108. */
+  path?: string | undefined
+  /** @deprecated Written `reference: { path }`; `deprecated-route-keys` rewrites it. Removed in 1.108. */
+  referencePath?: string | undefined
+}
+
+// The `path` the bags of `ops` and `mcp` had before 1.105, which is a key of `endpoints` since and works until 1.108.
+export interface DeprecatedPath {
+  /** @deprecated Written `endpoints` and the feature's name; `deprecated-route-keys` rewrites it. Removed in 1.108. */
+  path?: string | undefined
+}
+
+export type OpsInput = Over<OpsConfig, { observe?: ObserveInput | undefined, health?: boolean | (HealthConfig & DeprecatedPath) | undefined, metrics?: boolean | (MetricsConfig & DeprecatedPath) | undefined, jobs?: (JobsConfig & DeprecatedPath) | undefined }>
+
 // `mcp` as an app written it before 1.105 may still: `key` is `token`, which works until 1.108.
 export interface DeprecatedMcp {
+  /** @deprecated Written `endpoints.mcp`; `deprecated-route-keys` rewrites it. Removed in 1.108. */
+  path?: string | undefined
   /** @deprecated Written `token`; `deprecated-secret-keys` rewrites it. Removed in 1.108. */
   key?: boolean | string | { file: string } | undefined
 }

@@ -412,7 +412,7 @@ async function siteOf(options: TestOptions): Promise<TestSite> {
       }
     }
 
-    const scope: SiteScope = { defaults, keyHeader, base, jar, send, follow, shown, listening, connections, answeredAt, mcpKey, mcpUrl: () => mcpPath(config.mcp) ?? MCP_PATH }
+    const scope: SiteScope = { defaults, keyHeader, base, jar, send, follow, shown, listening, connections, answeredAt, mcpKey, mcpUrl: () => mcpPath(config.mcp, config.endpoints?.mcp) ?? MCP_PATH }
 
     return {
       cookies: jar.cookies,

@@ -14,13 +14,13 @@ import { configSwitches } from '../src/check/config-switches'
 import { contextImport } from '../src/check/context-import'
 import { envFiles } from '../src/check/env-files'
 import { applySafeFixes } from '../src/check/fixes'
-
 import { formatDurationNumbers } from '../src/check/format-duration'
 
 import { guardOptions } from '../src/check/guard-options'
-import { hookContext } from '../src/check/hook-context'
 
+import { hookContext } from '../src/check/hook-context'
 import { hookNames } from '../src/check/hook-names'
+
 import { i18nKeys } from '../src/check/i18n-keys'
 import { imagesKeys } from '../src/check/images-keys'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
@@ -31,6 +31,7 @@ import { pagesOptions } from '../src/check/pages-options'
 import { rateEnforce } from '../src/check/rate-enforce'
 import { refusalCalls } from '../src/check/refusal-calls'
 import { renamedPackages } from '../src/check/renamed-packages'
+import { routeKeys } from '../src/check/route-keys'
 import { schemaType } from '../src/check/schema-type'
 import { secretKeys } from '../src/check/secret-keys'
 import { socketFrames } from '../src/check/socket-frames'
@@ -83,6 +84,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-config-groups': configGroups,
   'deprecated-i18n-keys': i18nKeys,
   'deprecated-secret-keys': secretKeys,
+  'deprecated-route-keys': routeKeys,
   'deprecated-app-hooks': appHooks,
   'deprecated-hook-context': hookContext,
   'deprecated-pages-options': pagesOptions,

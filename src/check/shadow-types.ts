@@ -76,6 +76,7 @@ import { rateEnforce } from './rate-enforce'
 import { refusalCalls } from './refusal-calls'
 import { removedUiTokens } from './removed-ui-tokens'
 import { retiredLintLevels } from './retired-lints'
+import { routeKeys } from './route-keys'
 import { routeShadow, routeShadowPath } from './route-shadow'
 import { schemaType } from './schema-type'
 import { secretKeys } from './secret-keys'
@@ -223,6 +224,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => configGroups(root, options),
   async ({ root, options }) => i18nKeys(root, options),
   async ({ root, options }) => secretKeys(root, options),
+  async ({ root, options }) => routeKeys(root, options),
   async ({ root, options }) => appHooks(root, options),
   async ({ root, options }) => hookContext(root, options),
   async ({ root, options }) => pagesOptions(root, options),

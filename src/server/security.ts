@@ -1,4 +1,4 @@
-import type { ClientConfig, KayConfig, SecurityConfig, ServeConfig } from '../config'
+import type { ClientConfig, EndpointsConfig, KayConfig, SecurityConfig } from '../config'
 import type { PageSecurity } from '../runtime'
 import { switchOf } from '../config-switch'
 import { pushListed, registersWorker } from '../project'
@@ -9,7 +9,7 @@ import { CSP_ENDPOINT, CSP_REPORTS } from './violations'
 export interface SecurityOptions {
   security?: SecurityConfig | boolean | undefined
   client?: ClientConfig | undefined
-  serve?: ServeConfig | undefined
+  endpoints?: EndpointsConfig | undefined
   dev?: boolean | undefined
   // The origin the site is public at: HSTS is sent when it is https.
   site?: string | undefined
@@ -102,7 +102,7 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
   const { reports, reportOnly } = security ?? {}
   const csp = switchOf(security?.csp)
   const base = basePath(options.base)
-  const hashes = [...inlineScriptHashes({ prefetch: options.client?.prefetch, apiPath: options.serve?.apiPrefix, dev: options.dev, base, offline: registersWorker(options, { dev: options.dev === true }), installOffer: pushListed(options), lateStyles: options.client?.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
+  const hashes = [...inlineScriptHashes({ prefetch: options.client?.prefetch, apiPath: options.endpoints?.api, dev: options.dev, base, offline: registersWorker(options, { dev: options.dev === true }), installOffer: pushListed(options), lateStyles: options.client?.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
   const styles = [...new Set((options.styles ?? []).map(sourceHash))]
   const reportTo = reports === true ? `${base}${CSP_REPORTS}` : reports
 

@@ -26,7 +26,7 @@ export default api()
 
 `api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed. A `_guard.ts` in `src/api/` protects its routes the way it protects pages. A handler runs in the locale of the page that called it, by its `Referer` or the browser's `Accept-Language`, so `t()` and `wording()` answer in it. A websocket's `open` and `message` callbacks run outside it.
 
-To serve the API somewhere else, set `serve: { apiPrefix: '/v1' }` in `kay.config.ts`: every module, the OpenAPI document and the reference page move under it, and islands, the service worker, link prefetching and the libraries follow. `apiUrl(module, path)` from `kay` gives where a route is served when code needs the URL rather than a call; a page using it renders per request, as the module is mounted only by a running server.
+To serve the API somewhere else, set `endpoints: { api: '/v1' }` in `kay.config.ts`: every module, the OpenAPI document and the reference page move under it, and islands, the service worker, link prefetching and the libraries follow. `apiUrl(module, path)` from `kay` gives where a route is served when code needs the URL rather than a call; a page using it renders per request, as the module is mounted only by a running server.
 
 The path is one of the module's routes, completed in the editor, and its params are typed as `route()` types a page's: an unknown path or a missing param is a type error.
 
@@ -156,7 +156,7 @@ export default defineConfig({
 })
 ```
 
-Give a route `detail: { summary, tags }` to describe it, or `detail: { hide: true }` to leave it out. `reference: true` adds a page listing the routes at `/api/reference`. `dev: true` keeps both to `kay dev`. `path` and `referencePath` move them, such as `openapi: { path: '/spec.json' }`.
+Give a route `detail: { summary, tags }` to describe it, or `detail: { hide: true }` to leave it out. `reference: true` adds a page listing the routes at `/api/reference`. `dev: true` keeps both to `kay dev`. `reference: { path: '/docs/api' }` moves the page, and `endpoints: { openapi: '/spec.json' }` the document.
 
 The document sits behind `src/api/_guard.ts` when there is one, and marks the routes that run a guard. Without that guard the document is open to anyone, so it leaves the guarded routes out. Its title is `openapi.title`, else the site's `seo.name`.
 
@@ -168,7 +168,7 @@ Actions that set `tool` are listed too, as `POST` operations.
 
 ## Letting an agent call the app over MCP
 
-Set `mcp: true` in kay.config.ts to let an AI agent use your app. Kay serves an MCP endpoint at `/mcp`, or at the path of `mcp: { path: '/tools' }`, and an agent pointed at it can list and call your tools. You write no MCP server. A client may send the endpoint 120 requests a minute; `mcp: { rateLimit: { max: 60, window: '1m' } }` changes that and `false` removes it. With a `store.rates`, replicas count together.
+Set `mcp: true` in kay.config.ts to let an AI agent use your app. Kay serves an MCP endpoint at `/_kay/mcp`, or at the path of `endpoints: { mcp: '/tools' }`, and an agent pointed at it can list and call your tools. You write no MCP server. A client may send the endpoint 120 requests a minute; `mcp: { rateLimit: { max: 60, window: '1m' } }` changes that and `false` removes it. With a `store.rates`, replicas count together.
 
 Guidance that spans tools, such as which one to call first, goes in `mcp: { instructions: 'Read French text through resolve first.' }`. The client receives it when it connects, before it looks at any tool description.
 

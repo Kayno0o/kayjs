@@ -31,12 +31,12 @@ const REDIRECT_PARAM = /(?<=\/):[^/]+(?=\/|$)/g
 const LOCALE_MANIFESTS = `\`/manifest.\${string}.webmanifest\``
 
 // What kay serves itself, whether or not the project turns it on.
-const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH]
+const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS]
 
 // The paths of the OpenAPI document and its reference page, where `openapi` moved them; an invalid path is the boot's to refuse, so the defaults stand for it here.
-function openApiServed(openapi: CheckOptions['openapi'], apiPath: string | undefined): string[] {
+function openApiServed(openapi: CheckOptions['openapi'], endpoints: CheckOptions['endpoints']): string[] {
   try {
-    const { document, reference } = openApiPaths(typeof openapi === 'object' ? openapi : undefined, apiPathOf(apiPath))
+    const { document, reference } = openApiPaths(typeof openapi === 'object' ? openapi : undefined, apiPathOf(endpoints?.api), endpoints?.openapi)
 
     return [document, reference]
   }
@@ -46,7 +46,7 @@ function openApiServed(openapi: CheckOptions['openapi'], apiPath: string | undef
 }
 
 export function kayPaths(options: CheckOptions): string[] {
-  return [...KAY_PATHS, ...openApiServed(options.openapi, options.serve?.apiPrefix)]
+  return [...KAY_PATHS, options.endpoints?.health ?? HEALTH_PATH, ...openApiServed(options.openapi, options.endpoints)]
 }
 const UNWRITABLE = /[%?#]/
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.

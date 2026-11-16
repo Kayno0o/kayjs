@@ -48,7 +48,7 @@ describe('the default paths', () => {
   it('stay when the config names none', async () => {
     expect((await defaults.fetch('/api/openapi.json', { headers: KEY })).status).toBe(200)
     expect((await defaults.fetch('/api/reference', { headers: KEY })).status).toBe(200)
-    expect((await defaults.fetch('/mcp', { method: 'GET' })).status).toBe(405)
+    expect((await defaults.fetch('/_kay/mcp', { method: 'GET' })).status).toBe(405)
   })
 })
 
@@ -56,17 +56,17 @@ describe('a path that cannot be served', () => {
   const boot = async (extra: object) => pages({ requireGuards: false, dirs: { routes, api }, prebuilt: false, security: false, ...extra })
 
   it.each([
-    ['mcp', { mcp: { path: 'tools' } }, 'mcp({ path })'],
-    ['mcp', { mcp: { path: '' } }, 'mcp({ path })'],
-    ['mcp', { mcp: { path: '/' } }, 'mcp({ path })'],
-    ['mcp', { mcp: { path: '/tools/' } }, 'mcp({ path })'],
-    ['mcp', { mcp: { path: '/a/:id' } }, 'mcp({ path })'],
-    ['mcp', { mcp: { path: '/a/*' } }, 'mcp({ path })'],
-    ['mcp', { mcp: { path: '/a//b' } }, 'mcp({ path })'],
-    ['mcp', { mcp: { path: '/a/../b' } }, 'mcp({ path })'],
-    ['mcp', { mcp: { path: '/a?x=1' } }, 'mcp({ path })'],
-    ['mcp', { mcp: { path: 42 } }, 'mcp({ path })'],
-    ['openapi', { openapi: { path: 'spec.json' } }, 'openapi.path'],
+    ['mcp', { mcp: { path: 'tools' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: { path: '' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: { path: '/' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: { path: '/tools/' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: { path: '/a/:id' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: { path: '/a/*' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: { path: '/a//b' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: { path: '/a/../b' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: { path: '/a?x=1' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: { path: 42 } }, 'endpoints.mcp'],
+    ['openapi', { openapi: { path: 'spec.json' } }, 'endpoints.openapi'],
     ['openapi', { openapi: { path: '/spec.json', reference: true, referencePath: '/spec.json' } }, 'both'],
     ['openapi', { openapi: { path: '/api/openapi.json', reference: true, referencePath: '/api/openapi.json' } }, 'both'],
   ])('refuses %s %j', async (_kind, extra, message) => {

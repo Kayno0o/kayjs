@@ -52,7 +52,7 @@ afterAll(async () => {
 })
 
 async function post(target: typeof site, body: unknown, headers: Record<string, string> = {}) {
-  return target.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: typeof body === 'string' ? body : JSON.stringify(body) })
+  return target.fetch('/_kay/mcp', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: typeof body === 'string' ? body : JSON.stringify(body) })
 }
 
 async function rpc(target: typeof site, method: string, params: object = {}, headers: Record<string, string> = {}) {
@@ -138,7 +138,7 @@ describe('the endpoint', () => {
 
   it('refuses GET and DELETE, as it keeps no stream and no session', async () => {
     for (const method of ['GET', 'DELETE']) {
-      const response = await site.fetch('/mcp', { method })
+      const response = await site.fetch('/_kay/mcp', { method })
 
       expect(response.status).toBe(405)
       expect(response.headers.get('allow')).toBe('POST')
@@ -190,7 +190,7 @@ describe('the endpoint', () => {
       },
     })
 
-    const response = await site.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body, duplex: 'half' } as Parameters<typeof site.fetch>[1])
+    const response = await site.fetch('/_kay/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body, duplex: 'half' } as Parameters<typeof site.fetch>[1])
 
     expect(response.status).toBe(413)
   })
@@ -203,7 +203,13 @@ describe('the endpoint', () => {
   })
 
   it('stops the boot when a page serves its path', async () => {
-    await expect(testSite({ requireGuards: false, dirs: { routes: 'tests/fixtures/mcp-clash/src/routes', api }, mcp: true, islands: false })).rejects.toThrow('`mcp` both serve /mcp')
+    await expect(testSite({ requireGuards: false, dirs: { routes: 'tests/fixtures/mcp-clash/src/routes', api }, mcp: true, endpoints: { mcp: '/mcp' }, islands: false })).rejects.toThrow('`mcp` both serve /mcp')
+  })
+
+  it('keeps a page at the former /mcp, which then redirects nowhere', async () => {
+    const kept = await testSite({ requireGuards: false, dirs: { routes: 'tests/fixtures/mcp-clash/src/routes', api }, mcp: true, islands: false })
+
+    expect((await kept.fetch('/mcp')).status).toBe(200)
   })
 })
 
@@ -348,11 +354,11 @@ describe('behind proxy.key', () => {
     const called = await rpc(keyed, 'tools/call', { name: 'create_note', arguments: { title: 'Milk' } })
 
     expect(called.body.result).toMatchObject({ structuredContent: { created: 'Milk' } })
-    expect((await keyed.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', 'x-upstream-key': '' }, body: '{}' })).status).toBe(403)
+    expect((await keyed.fetch('/_kay/mcp', { method: 'POST', headers: { 'content-type': 'application/json', 'x-upstream-key': '' }, body: '{}' })).status).toBe(403)
     // The marks that let it by are dropped from the request, so a handler echoing its headers cannot expose them.
     expect((await rpc(keyed, 'tools/call', { name: 'get_notes_who' }, BEARER)).body.result).toMatchObject({ structuredContent: { tool: 'get_notes_who', leaked: [] } })
     expect((await rpc(keyedRewritten, 'tools/call', { name: 'get_notes_who' }, BEARER)).body.result).toMatchObject({ structuredContent: { tool: 'get_notes_who', leaked: [] } })
-    expect((await keyed.fetch('/mcp', { method: 'POST', headers: { 'x-kay-internal': 'guess', 'x-upstream-key': '' }, body: '{}' })).status).toBe(403)
+    expect((await keyed.fetch('/_kay/mcp', { method: 'POST', headers: { 'x-kay-internal': 'guess', 'x-upstream-key': '' }, body: '{}' })).status).toBe(403)
   })
 })
 
@@ -563,7 +569,7 @@ describe('calling an action', () => {
 
 describe('sign-in metadata', () => {
   it('is a 404 while no auth library names an authorization server, as no client can sign in by OAuth', async () => {
-    for (const path of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'])
+    for (const path of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/_kay/mcp'])
       expect((await site.fetch(path)).status).toBe(404)
 
     expect((await off.fetch('/.well-known/oauth-protected-resource')).status).toBe(404)
@@ -577,15 +583,15 @@ describe('sign-in metadata', () => {
       return { resource: `https://app.example${path}`, authorization_servers: ['https://app.example'] }
     } } }) })
 
-    for (const path of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp']) {
+    for (const path of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/_kay/mcp']) {
       const response = await oauth.fetch(path)
 
       expect(response.status).toBe(200)
       expect(response.headers.get('access-control-allow-origin')).toBe('*')
-      expect(await response.json()).toEqual({ resource: 'https://app.example/mcp', authorization_servers: ['https://app.example'] })
+      expect(await response.json()).toEqual({ resource: 'https://app.example/_kay/mcp', authorization_servers: ['https://app.example'] })
     }
 
-    expect(asked).toEqual([['/mcp', expect.any(String)], ['/mcp', expect.any(String)]])
+    expect(asked).toEqual([['/_kay/mcp', expect.any(String)], ['/_kay/mcp', expect.any(String)]])
     expect((await oauth.fetch('/.well-known/oauth-protected-resource', { method: 'OPTIONS' })).status).toBe(204)
     await oauth.close()
   })
@@ -651,7 +657,7 @@ describe('sign-in metadata an app serves itself', () => {
 
     expect(response.status).toBe(308)
     expect(response.headers.get('location')).toBe('/elsewhere')
-    expect((await own.fetch('/.well-known/oauth-protected-resource/mcp')).status).toBe(404)
+    expect((await own.fetch('/.well-known/oauth-protected-resource/_kay/mcp')).status).toBe(404)
     await own.close()
   })
 })
@@ -995,7 +1001,7 @@ describe('kay check', () => {
 
   it('refuses a page at the endpoint\'s path', async () => {
     const dir = await fixtureCopy('mcp-clash')
-    const problems = await bootProblems(dir, { dirs: { routes: 'src/routes' }, mcp: true })
+    const problems = await bootProblems(dir, { dirs: { routes: 'src/routes' }, mcp: true, endpoints: { mcp: '/mcp' } })
 
     expect(problems.some(problem => problem.message.includes('`mcp` both serve /mcp'))).toBe(true)
   })
@@ -1081,7 +1087,7 @@ describe('routes opt in to being tools', () => {
 describe('a tool call an app can tell', () => {
   const calls: (ReturnType<typeof toolCall>)[] = []
   const seen = new Elysia().onRequest(({ request }) => {
-    if (new URL(request.url).pathname !== '/mcp')
+    if (new URL(request.url).pathname !== '/_kay/mcp')
       calls.push(toolCall(request))
   })
   const front = testSite({ requireGuards: false, dirs: { routes: 'tests/fixtures/mcp-seen/src/routes', api: 'tests/fixtures/mcp-seen/src/api' }, mcp: true, islands: false, use: [seen] })
@@ -1099,7 +1105,7 @@ describe('a tool call an app can tell', () => {
     expect(calls.map(call => call?.tool)).toEqual(['ping', 'get_seen'])
     expect(calls.every(call => typeof call?.client === 'string')).toBe(true)
     // The address the agent called, which a token bound to the endpoint is checked against rather than the route each tool dispatches to.
-    expect(calls.map(call => call === undefined ? undefined : new URL(call.from).pathname)).toEqual(['/mcp', '/mcp'])
+    expect(calls.map(call => call === undefined ? undefined : new URL(call.from).pathname)).toEqual(['/_kay/mcp', '/_kay/mcp'])
   })
 
   it('is seen from a kay guard, so a bearer key reaches the tools and nothing else', async () => {

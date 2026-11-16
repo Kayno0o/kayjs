@@ -132,7 +132,7 @@ describe('HOST', () => {
         const app = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { path: '/up' } })).listen({ port: 0, hostname: bound })
 
         try {
-          expect({ bound, host, status: await probeHealth({ path: '/up' }, String(app.server!.port), host) }).toEqual({ bound, host, status: expected })
+          expect({ bound, host, status: await probeHealth(true, String(app.server!.port), host, '/up') }).toEqual({ bound, host, status: expected })
         }
         finally {
           await app.stop()

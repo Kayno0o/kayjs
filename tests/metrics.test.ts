@@ -346,3 +346,29 @@ describe('counters', () => {
     expect(text).toMatch(/^kay_file_events_total\{event="written"\} \d+$/m)
   })
 })
+
+describe('the metrics path', () => {
+  it('is /_kay/metrics, and /metrics answers as well until 1.108', async () => {
+    const url = await listening({ metrics: true })
+
+    expect(await status(`${url}/_kay/metrics`)).toBe(200)
+    expect(await status(`${url}/metrics`)).toBe(200)
+    expect(await status(`${url}/_kay/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect(await status(`${url}/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+  })
+
+  it('moves to endpoints.metrics, which leaves /metrics and the default unserved', async () => {
+    const url = await listening({ metrics: true, endpoints: { metrics: '/stats' } })
+
+    expect(await status(`${url}/stats`)).toBe(200)
+    expect(await status(`${url}/metrics`)).toBe(404)
+    expect(await status(`${url}/_kay/metrics`)).toBe(404)
+  })
+
+  it('still reads the path of the old key', async () => {
+    const url = await listening({ metrics: { path: '/old-stats' } })
+
+    expect(await status(`${url}/old-stats`)).toBe(200)
+    expect(await status(`${url}/_kay/metrics`)).toBe(404)
+  })
+})

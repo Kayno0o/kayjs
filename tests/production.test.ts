@@ -1751,7 +1751,7 @@ describe('lifecycle', () => {
     const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      expect(await probeHealth({ path: '/up' }, String(app.server!.port))).toBe(0)
+      expect(await probeHealth(true, String(app.server!.port), undefined, '/up')).toBe(0)
       expect(await probeHealth(undefined, String(app.server!.port))).toBe(1)
       expect(await probeHealth(false, String(app.server!.port))).toBe(1)
     }

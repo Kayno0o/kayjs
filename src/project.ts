@@ -104,7 +104,7 @@ export const CLIENT_BUILD_KEYS = [
   // The libraries whose routes the app mounts, built as its own pages are.
   'extensions',
   // Where the API is mounted, `/api` by default: the stubs an island imports hold it.
-  'serve',
+  'endpoints',
   // The app's own modules for its libraries' settings, as `kay.config.ts` gives them.
   'librarySettings',
   // `navigation` swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions. `hydration` is how far ahead of the viewport an island marked `hydrate="visible"` starts to hydrate, and a deferred server island starts to load. `lateStyles`: every page loads the whole stylesheet, so the build has no class to warn of.
@@ -164,7 +164,7 @@ export function registersWorker(config: Pick<KayConfig, 'client' | 'extensions'>
 export const RENDER_CONFIG = [
   'lang',
   // Where the API is mounted, which pages are never prefetched under.
-  'serve',
+  'endpoints',
   'ops',
   // Told every error a render reports.
   'onError',

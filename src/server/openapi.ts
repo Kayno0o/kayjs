@@ -8,7 +8,7 @@ import { posix } from 'node:path'
 import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
-import { API_PREFIX, KAY_PREFIX, openApiPaths } from './api-modules'
+import { API_PREFIX, KAY_PREFIX, openApiPaths, referenced } from './api-modules'
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
 import { compiledCheck, refusals } from './schema-check'
@@ -20,12 +20,8 @@ export interface OpenApiConfig {
   // The document's `info`, the site's `seo.name` and `1.0.0` by default.
   title?: string | undefined
   version?: string | undefined
-  // Where the document is served, `/api/openapi.json` by default.
-  path?: string | undefined
-  // Also serves a page listing the routes, at `/api/reference`.
-  reference?: boolean | undefined
-  // Where the reference page is served, `/api/reference` by default.
-  referencePath?: string | undefined
+  // Also serves a page listing the routes, at `/api/reference`, or at `{ path }`.
+  reference?: boolean | { path?: string | undefined } | undefined
   // Served by `kay dev` alone.
   dev?: boolean | undefined
 }
@@ -138,9 +134,9 @@ function routePaths(module: MountedApi, route: Route): string[] {
 }
 
 // Each module's routes claim their paths, after the document and the reference page when `config` serves them, which a module would hide without a word.
-export function claimApi(served: ServedPaths, modules: MountedApi[], config: OpenApiConfig | undefined, apiPath?: string): void {
-  const paths = openApiPaths(config, apiPath)
-  const own = new Map<string, string>(config ? [[paths.document, 'its document'], ...config.reference === true ? [[paths.reference, 'its reference page'] as const] : []] : [])
+export function claimApi(served: ServedPaths, modules: MountedApi[], config: OpenApiConfig | undefined, apiPath?: string, at?: string): void {
+  const paths = openApiPaths(config, apiPath, at)
+  const own = new Map<string, string>(config ? [[paths.document, 'its document'], ...referenced(config) ? [[paths.reference, 'its reference page'] as const] : []] : [])
 
   for (const path of own.keys())
     served.claim({ path, owner: '`openapi`', kind: 'kay' })
@@ -456,7 +452,7 @@ export async function guardRefusal(guards: LoadedGuard[], context: { request: Re
 }
 
 // The document at `/api/openapi.json` (under the API path), and the reference page when asked for, behind the guard of the API directory itself when it has one.
-export function serveOpenApi(app: Elysia, full: Schema, config: OpenApiConfig, guards: LoadedGuard[], options: ActionOptions, apiPath?: string): void {
+export function serveOpenApi(app: Elysia, full: Schema, config: OpenApiConfig, guards: LoadedGuard[], options: ActionOptions, apiPath?: string, at?: string): void {
   // With no guard on the API directory the document is open to anyone, so the routes behind a guard of their own are left out of it.
   const document = guards.length > 0 ? full : withoutGuarded(full)
   const json = JSON.stringify(document)
@@ -470,11 +466,11 @@ export function serveOpenApi(app: Elysia, full: Schema, config: OpenApiConfig, g
     return response
   }
 
-  const paths = openApiPaths(config, apiPath)
+  const paths = openApiPaths(config, apiPath, at)
 
   app.get(paths.document, async context => admitted(context, () => new Response(json, { headers: { 'content-type': 'application/json; charset=utf-8' } })))
 
-  if (config.reference === true) {
+  if (referenced(config)) {
     const html = referencePage(document, posix.relative(posix.dirname(paths.reference), paths.document))
 
     app.get(paths.reference, async context => admitted(context, () => new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })))

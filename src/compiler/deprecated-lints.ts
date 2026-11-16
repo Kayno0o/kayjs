@@ -375,6 +375,15 @@ export const DEPRECATED_LINTS = {
     wrong: '// kay.config.ts\nexport default { i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', prefixDefault: true } }',
     right: '// kay.config.ts\nexport default { i18n: { locales: [\'fr\', \'en\'], default: \'fr\', mode: \'always\' } }',
   },
+  'deprecated-route-keys': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'The keys that name where a feature is served, written in `endpoints` since 1.105, where every default but the API\'s sits under `/_kay`: `serve.apiPrefix` is `endpoints.api`, the `path` of `openapi`, `mcp`, `health`, `metrics` and `jobs` is `endpoints.openapi`, `.mcp`, `.health`, `.metrics` and `.jobs`, and `openapi.referencePath` is `openapi.reference: { path }`. They work until 1.108. Found in the object kay.config.ts exports and in the `config` of `pages()` and `testSite()`. The fix writes the paths in a new `endpoints` and removes them where they were, unless the object spreads, holds a computed key or has an `endpoints` already, or a comment would be lost; `openapi.referencePath` is rewritten beside `reference: true` alone.',
+    wrong: '// kay.config.ts\nexport default { mcp: { path: \'/tools\' }, health: { path: \'/up\' } }',
+    right: '// kay.config.ts\nexport default { endpoints: { mcp: \'/tools\', health: \'/up\' }, mcp: {}, health: {} }',
+  },
   'deprecated-secret-keys': {
     level: 'warn',
     group: 'deprecated',

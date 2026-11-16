@@ -6,7 +6,6 @@ import type { PluginInput } from './plugin'
 import process from 'node:process'
 import { within } from '@kaynooo/utils/promise'
 import { KayError } from '../compiler/errors'
-import { bagOf } from '../config-switch'
 import { kayLog } from '../runtime/log'
 import { appStore, storesOf } from './app-store'
 import { wholeResponse } from './compress'
@@ -40,10 +39,9 @@ let signalsTaken = false
 
 // Answers 200 while the server takes requests and its check passes, 503 otherwise, for a load balancer or a container's health check.
 // Answered as the request arrives, before routing, so no global hook of an extension (an auth check, say) stands between a probe and the answer; `holds` is asked per request, as an app's own route at the path wins.
-export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => boolean, config: HealthConfig = {}, security?: Record<string, string>): void {
+export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => boolean, config: HealthConfig = {}, security?: Record<string, string>, path = HEALTH_PATH): void {
   // The security headers ride the response itself, so Elysia has no header on the context to copy it for.
   const copies = headerCopies({ 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }, security)
-  const path = config.path ?? HEALTH_PATH
   const timeoutMs = healthTimeoutMs(config)
   let checked: { at: number, healthy: Promise<boolean>, settled: boolean } | undefined
 
@@ -362,7 +360,7 @@ function probeHost(host: string | undefined): string {
 }
 
 // What `<executable> --health` exits with: 0 when the server running beside it answers its health route, on `PORT` or 3000 and at `HOST` when it is set, else 1, for a container image with no curl.
-export async function probeHealth(config: HealthConfig | boolean | undefined, port = process.env.PORT ?? '3000', host = process.env.HOST): Promise<number> {
+export async function probeHealth(config: HealthConfig | boolean | undefined, port = process.env.PORT ?? '3000', host = process.env.HOST, path = HEALTH_PATH): Promise<number> {
   if (config === false) {
     kayLog('error', 'health is false in kay.config.ts, so the server has no health route to ask')
 
@@ -370,7 +368,7 @@ export async function probeHealth(config: HealthConfig | boolean | undefined, po
   }
 
   try {
-    const response = await fetch(`http://${probeHost(host)}:${port}${bagOf(config)?.path ?? HEALTH_PATH}`, { signal: AbortSignal.timeout(healthTimeoutMs(config)) })
+    const response = await fetch(`http://${probeHost(host)}:${port}${path}`, { signal: AbortSignal.timeout(healthTimeoutMs(config)) })
 
     return response.ok ? 0 : 1
   }

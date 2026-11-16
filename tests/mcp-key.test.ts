@@ -53,7 +53,7 @@ async function served(env: Record<string, string | undefined>, options: Options)
 
 const message = (method: string, params: object = {}) => ({ jsonrpc: '2.0', id: 1, method, params })
 
-async function post(app: App, body: unknown, headers: Record<string, string> = {}, path = '/mcp'): Promise<Response> {
+async function post(app: App, body: unknown, headers: Record<string, string> = {}, path = '/_kay/mcp'): Promise<Response> {
   const text = typeof body === 'string' ? body : JSON.stringify(body)
 
   return app.handle(new Request(`http://localhost${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: text }))
@@ -100,7 +100,7 @@ describe('the key', () => {
 
     for (const method of ['GET', 'DELETE']) {
       for (const headers of [{}, bearer(KEY), bearer(OTHER)]) {
-        const response = await app.handle(new Request('http://localhost/mcp', { method, headers }))
+        const response = await app.handle(new Request('http://localhost/_kay/mcp', { method, headers }))
 
         expect(response.status).toBe(405)
         expect(response.headers.get('allow')).toBe('POST')
@@ -123,7 +123,7 @@ describe('the key', () => {
 
     // Neither another header nor the query is the key.
     await refused(await post(app, message('ping'), { 'x-api-key': KEY, 'x-mcp-key': KEY, 'cookie': `key=${KEY}` }))
-    await refused(await post(app, message('ping'), {}, `/mcp?key=${KEY}&access_token=${KEY}`))
+    await refused(await post(app, message('ping'), {}, `/_kay/mcp?key=${KEY}&access_token=${KEY}`))
   })
 
   it('does not tell a missing key from a wrong one, or leak the key in the refusal', async () => {
@@ -176,7 +176,7 @@ describe('the tools it admits', () => {
 
   it('treats a header an outside client sends as no tool call, and asks no key of a route the endpoint does not serve', async () => {
     const app = await served({}, { mcp: { token: KEY } })
-    const forged = await app.handle(new Request('http://localhost/api/echo/seen', { headers: { 'x-kay-agent': 'guess', 'x-kay-agent-tool': 'seen', 'x-kay-agent-client': '1.2.3.4', 'x-kay-agent-from': 'http://localhost/mcp' } }))
+    const forged = await app.handle(new Request('http://localhost/api/echo/seen', { headers: { 'x-kay-agent': 'guess', 'x-kay-agent-tool': 'seen', 'x-kay-agent-client': '1.2.3.4', 'x-kay-agent-from': 'http://localhost/_kay/mcp' } }))
 
     expect(forged.status).toBe(200)
     expect(await forged.json()).toEqual({ authorization: null, tool: null })
@@ -395,7 +395,7 @@ describe('behind proxy.key', () => {
     const keyed = await served(production, { proxy, mcp: { token: true } })
     const plain = await served(production, { proxy, mcp: true })
 
-    expect((await keyed.handle(new Request('http://localhost/mcp/other', { method: 'POST', headers: bearer(KEY) }))).status).toBe(403)
+    expect((await keyed.handle(new Request('http://localhost/_kay/mcp/other', { method: 'POST', headers: bearer(KEY) }))).status).toBe(403)
     expect((await keyed.handle(new Request('http://localhost/mcpx', { method: 'POST', headers: bearer(KEY) }))).status).toBe(403)
     expect((await post(plain, message('ping'), bearer(KEY))).status).toBe(403)
   })
@@ -404,7 +404,7 @@ describe('behind proxy.key', () => {
     const app = await served(production, { proxy, mcp: { token: true } })
 
     for (const method of ['GET', 'DELETE', 'PUT', 'PATCH', 'OPTIONS', 'HEAD'])
-      expect((await app.handle(new Request('http://localhost/mcp', { method, headers: bearer(KEY) }))).status).toBe(403)
+      expect((await app.handle(new Request('http://localhost/_kay/mcp', { method, headers: bearer(KEY) }))).status).toBe(403)
   })
 
   it('opens the endpoint where mcp.path puts it', async () => {
@@ -413,7 +413,7 @@ describe('behind proxy.key', () => {
     expect((await post(app, message('ping'), bearer(KEY), '/tools')).status).toBe(200)
     expect((await post(app, message('ping'), bearer(KEY), '/tools/')).status).toBe(200)
     await refused(await post(app, message('ping'), {}, '/tools/'))
-    expect((await post(app, message('ping'), bearer(KEY), '/mcp')).status).toBe(403)
+    expect((await post(app, message('ping'), bearer(KEY), '/_kay/mcp')).status).toBe(403)
     await refused(await post(app, message('ping'), {}, '/tools'))
   })
 
@@ -421,11 +421,11 @@ describe('behind proxy.key', () => {
     const app = await served(production, { proxy, mcp: { token: true }, base: '/shop', trailingSlash: 'always' })
 
     // The server hands the app the path without the base, and the check reads either.
-    for (const path of ['/mcp', '/mcp/', '/shop/mcp', '/shop/mcp/'])
+    for (const path of ['/_kay/mcp', '/_kay/mcp/', '/shop/_kay/mcp', '/shop/_kay/mcp/'])
       expect((await post(app, message('ping'), bearer(KEY), path)).status).not.toBe(403)
 
     // The slash variant answers as the endpoint does, or is no route at all, never a page past the key.
-    const slashed = await post(app, message('ping'), {}, '/mcp/')
+    const slashed = await post(app, message('ping'), {}, '/_kay/mcp/')
 
     expect([401, 404]).toContain(slashed.status)
 
@@ -447,7 +447,7 @@ describe('testSite', () => {
       await expect(site.mcp.call('add', { name: 'Ada' }, { headers: { authorization: 'Bearer ' } })).rejects.toThrow('MCP key')
       expect((await site.mcp.tools({ headers: { AUTHORIZATION: `bearer ${KEY}` } })).length).toBe(3)
 
-      const raw = await site.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(message('ping')) })
+      const raw = await site.fetch('/_kay/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(message('ping')) })
 
       await refused(raw)
     }

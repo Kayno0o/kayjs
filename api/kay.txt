@@ -2855,15 +2855,20 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
     log?: "json" | ((entry: LogEntry) => void) | LogConfig | boolean | undefined;
     onError?: ErrorHook | undefined;
   }, [unknown]>;
-  health?: Checked<"health" extends keyof Config ? Config[keyof Config & "health"] : unknown, HealthConfig, [unknown]>;
-  metrics?: Checked<"metrics" extends keyof Config ? Config[keyof Config & "metrics"] : unknown, MetricsConfig, [unknown]>;
-  jobs?: Checked<"jobs" extends keyof Config ? Config[keyof Config & "jobs"] : unknown, JobsConfig, [unknown]>;
+  health?: Checked<"health" extends keyof Config ? Config[keyof Config & "health"] : unknown, HealthConfig & DeprecatedPath, [unknown]>;
+  metrics?: Checked<"metrics" extends keyof Config ? Config[keyof Config & "metrics"] : unknown, MetricsConfig & DeprecatedPath, [unknown]>;
+  jobs?: Checked<"jobs" extends keyof Config ? Config[keyof Config & "jobs"] : unknown, JobsConfig & DeprecatedPath, [unknown]>;
   assets?: Checked<"assets" extends keyof Config ? Config[keyof Config & "assets"] : unknown, Omit<AssetsConfig, "images"> & {
     images?: ImagesInput | undefined;
   }, [unknown]>;
-  ops?: Checked<"ops" extends keyof Config ? Config[keyof Config & "ops"] : unknown, Omit<OpsConfig, "observe"> & {
+  ops?: Checked<"ops" extends keyof Config ? Config[keyof Config & "ops"] : unknown, Omit<OpsConfig, "health" | "jobs" | "metrics" | "observe"> & {
     observe?: ObserveInput | undefined;
+    health?: (HealthConfig & DeprecatedPath) | boolean | undefined;
+    metrics?: (MetricsConfig & DeprecatedPath) | boolean | undefined;
+    jobs?: (JobsConfig & DeprecatedPath) | undefined;
   }, [unknown]>;
+  serve?: Checked<"serve" extends keyof Config ? Config[keyof Config & "serve"] : unknown, ServeConfig & DeprecatedServe, [unknown]>;
+  openapi?: Checked<"openapi" extends keyof Config ? Config[keyof Config & "openapi"] : unknown, OpenApiConfig & DeprecatedOpenApi, [unknown]>;
   cors?: Checked<"cors" extends keyof Config ? Config[keyof Config & "cors"] : unknown, NonNullable<ConfigCors | undefined>, [unknown]>;
   security?: Checked<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, Omit<SecurityConfig, "hosts"> & {
     hosts?: Loadable<string[]> | boolean | undefined;
@@ -2895,7 +2900,7 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   store?: Checked<"store" extends keyof Config ? Config[keyof Config & "store"] : unknown, AppStore, [unknown]>;
   dirs?: Checked<"dirs" extends keyof Config ? Config[keyof Config & "dirs"] : unknown, DirsConfig, [unknown]>;
   limits?: Checked<"limits" extends keyof Config ? Config[keyof Config & "limits"] : unknown, LimitsConfig, [unknown]>;
-  serve?: Checked<"serve" extends keyof Config ? Config[keyof Config & "serve"] : unknown, ServeConfig, [unknown]>;
+  endpoints?: Checked<"endpoints" extends keyof Config ? Config[keyof Config & "endpoints"] : unknown, EndpointsConfig, [unknown]>;
   actions?: Checked<"actions" extends keyof Config ? Config[keyof Config & "actions"] : unknown, ActionsConfig, [unknown]>;
   minify?: unknown;
   lang?: unknown;
@@ -2904,7 +2909,6 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   budget?: Checked<"budget" extends keyof Config ? Config[keyof Config & "budget"] : unknown, BudgetConfig, [unknown]>;
   entry?: unknown;
   requireGuards?: unknown;
-  openapi?: Checked<"openapi" extends keyof Config ? Config[keyof Config & "openapi"] : unknown, OpenApiConfig, [unknown]>;
   rewrite?: unknown;
   runtimeRedirects?: Checked<"runtimeRedirects" extends keyof Config ? Config[keyof Config & "runtimeRedirects"] : unknown, {
     hosts?: string[] | undefined;
@@ -3139,6 +3143,7 @@ interface KayConfig extends AppHooks
   contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dirs?: DirsConfig | undefined
+  endpoints?: EndpointsConfig | undefined
   entry?: string | undefined
   /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
@@ -3393,6 +3398,7 @@ interface PagesOptions extends ConfigInput
   cors?: ConfigCors | undefined
   dev?: boolean | undefined
   dirs?: DirsConfig | undefined
+  endpoints?: EndpointsConfig | undefined
   entry?: string | undefined
   /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
@@ -3401,10 +3407,10 @@ interface PagesOptions extends ConfigInput
   /** @deprecated Written `assets.fonts`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ fonts?: (FontConfig | FontsourceConfig)[] | undefined
   guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
-  /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ health?: HealthConfig | boolean | undefined
+  /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ health?: (HealthConfig & DeprecatedPath) | boolean | undefined
   i18n?: I18nInput | undefined
   /** @deprecated Written `assets.images`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ images?: ImagesInput | undefined
-  /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ jobs?: JobsConfig | undefined
+  /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ jobs?: (JobsConfig & DeprecatedPath) | undefined
   lang?: string | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
@@ -3414,7 +3420,7 @@ interface PagesOptions extends ConfigInput
   /** @deprecated Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
   mcp?: (McpConfig & DeprecatedMcp) | boolean | undefined
-  /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ metrics?: MetricsConfig | boolean | undefined
+  /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ metrics?: (MetricsConfig & DeprecatedPath) | boolean | undefined
   minify?: boolean | undefined
   /** @deprecated Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ observe?: ObserveInput | undefined
   /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ offline?: OfflineConfig | boolean | undefined
@@ -3423,8 +3429,8 @@ interface PagesOptions extends ConfigInput
   onResponse?: Hook<ResponseEvent> | undefined
   /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */ onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
-  openapi?: OpenApiConfig | boolean | undefined
-  ops?: Over<OpsConfig, { observe?: ObserveInput | undefined; }> | undefined
+  openapi?: (OpenApiConfig & DeprecatedOpenApi) | boolean | undefined
+  ops?: OpsInput | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
   preview?: PreviewConfig | boolean | undefined
@@ -3440,7 +3446,7 @@ interface PagesOptions extends ConfigInput
   secret?: string | string[] | undefined
   security?: Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined; }> | boolean | undefined
   seo?: SeoConfig | undefined
-  serve?: ServeConfig | undefined
+  serve?: (ServeConfig & DeprecatedServe) | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | boolean | undefined
   store?: AppStore | undefined
@@ -4471,6 +4477,7 @@ interface TestOptions extends PagesOptions
   cors?: ConfigCors | undefined
   dev?: boolean | undefined
   dirs?: DirsConfig | undefined
+  endpoints?: EndpointsConfig | undefined
   entry?: string | undefined
   /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
@@ -4480,11 +4487,11 @@ interface TestOptions extends PagesOptions
   guards?: GuardsConfig | undefined
   head?: HeadTag[] | undefined
   headers?: Record<string, string> | undefined
-  /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ health?: HealthConfig | boolean | undefined
+  /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ health?: (HealthConfig & DeprecatedPath) | boolean | undefined
   i18n?: I18nInput | undefined
   /** @deprecated Written `assets.images`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ images?: ImagesInput | undefined
   islands?: boolean | undefined
-  /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ jobs?: JobsConfig | undefined
+  /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ jobs?: (JobsConfig & DeprecatedPath) | undefined
   lang?: string | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
@@ -4496,7 +4503,7 @@ interface TestOptions extends PagesOptions
   markdown?: MarkdownConfig | undefined
   mcp?: (McpConfig & DeprecatedMcp) | boolean | undefined
   mcpKey?: string | undefined
-  /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ metrics?: MetricsConfig | boolean | undefined
+  /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ metrics?: (MetricsConfig & DeprecatedPath) | boolean | undefined
   minify?: boolean | undefined
   /** @deprecated Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ observe?: ObserveInput | undefined
   /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ offline?: OfflineConfig | boolean | undefined
@@ -4505,8 +4512,8 @@ interface TestOptions extends PagesOptions
   onResponse?: Hook<ResponseEvent> | undefined
   /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */ onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
-  openapi?: OpenApiConfig | boolean | undefined
-  ops?: Over<OpsConfig, { observe?: ObserveInput | undefined; }> | undefined
+  openapi?: (OpenApiConfig & DeprecatedOpenApi) | boolean | undefined
+  ops?: OpsInput | undefined
   outgoing?: "allow" | "fail" | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
@@ -4524,7 +4531,7 @@ interface TestOptions extends PagesOptions
   secret?: string | string[] | undefined
   security?: Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined; }> | boolean | undefined
   seo?: SeoConfig | undefined
-  serve?: ServeConfig | undefined
+  serve?: (ServeConfig & DeprecatedServe) | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | boolean | undefined
   store?: AppStore | undefined

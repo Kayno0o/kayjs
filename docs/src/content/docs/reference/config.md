@@ -80,7 +80,7 @@ In `serve`, how the server answers:
 
 | Option | Effect |
 | --- | --- |
-| `serve.apiPrefix` | Where the API modules, the OpenAPI document and its reference page are served, `/api` by default: `serve: { apiPrefix: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash. See [API routes](/guides/api-routes), and [Path and guard options](/reference/config#path-and-guard-options) for how every prefix, path and guard option reads |
+| `endpoints` | Where the app's API and kay's features are served, in one place: `api` (`/api`), `openapi` (`/api/openapi.json`), `mcp` (`/_kay/mcp`), `health` (`/_kay/health`), `metrics` (`/_kay/metrics`) and `jobs` (`/_kay/jobs`). `endpoints: { api: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`, with the OpenAPI document and its reference page under it. Each is an absolute path of plain segments without a trailing slash, and none may be under `/_kay`. `serve.apiPrefix` and the `path` keys of the features worked the same until 1.108. See [API routes](/guides/api-routes), and [Path and guard options](/reference/config#path-and-guard-options) for how every prefix, path and guard option reads |
 | `serve.compress` | Compresses responses rendered per request. On in production; `false` when a proxy or CDN does it |
 | `serve.compressionDictionary` | A server build with a prerendered page uses its 404 page as a dictionary and sends a page to a browser holding it as the difference from it. On by default; `false` builds none, so no page names one. See [Pages that send only their difference](/guides/deployment#pages-that-send-only-their-difference) |
 | `serve.shutdownTimeout` | How long a stopping server lets open requests finish, as seconds or `'30s'`. 10 seconds by default |
@@ -170,11 +170,11 @@ In `client`, what pages ship to the browser and how it behaves there:
 | `envFiles` | The compose file or files and the example env file, `{ compose: 'compose.prod.yaml', example: '.env.example' }`, that `kay check` and `kay env` compare with the declared variables. `false` turns the comparison off, the default one included. |
 | `guards` | `{ default }` says what a route no guard covers comes to, `requireGuards` until 1.108. Left out, a site with a guard of its own answers 403 on each page, endpoint and API module no guard covers unless it sets `guards: false`, and a site with no guard stays open. `default: 'closed'` asks it of every site and of actions too, `'open'` turns it off. `kay build --static` refuses to export such a page. A library's routes are left open. See [Sessions and guards](/guides/sessions-and-guards) |
 | `cors` | The origins every API module accepts that sets no `cors` of its own, as `api({ cors })` takes them. `api({ cors: false })` opts a module out. An endpoint file sets its own in `page.cors`. See [Calls from other sites](/guides/api-routes#calls-from-other-sites) |
-| `mcp` | `true` serves an MCP endpoint at `/mcp`, or at `{ path }`, for AI agents, at most 120 requests a client a minute unless `{ rateLimit: { max, window } }` says otherwise (a `RateLimit` like any other, with its `store` and `onLimit`), and only to a client sending `{ key }` as a bearer token when it is set, with a tool per API route or action that sets `tool`. Off by default. See [API routes](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) |
-| `openapi` | `true` serves an OpenAPI document of the API modules at `/api/openapi.json`. `{ reference: true }` adds a page at `/api/reference`. `path` and `referencePath` move them, `title` and `version` fill the document's `info`, and `dev: true` serves both under `kay dev` alone. See [API routes](/guides/api-routes#openapi) |
+| `mcp` | `true` serves an MCP endpoint at `/_kay/mcp`, or at `endpoints.mcp`, for AI agents, at most 120 requests a client a minute unless `{ rateLimit: { max, window } }` says otherwise (a `RateLimit` like any other, with its `store` and `onLimit`), and only to a client sending `{ key }` as a bearer token when it is set, with a tool per API route or action that sets `tool`. Off by default. See [API routes](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) |
+| `openapi` | `true` serves an OpenAPI document of the API modules at `/api/openapi.json`. `{ reference: true }` adds a page at `/api/reference`, `{ reference: { path } }` at another path. `endpoints.openapi` moves the document, `title` and `version` fill the document's `info`, and `dev: true` serves both under `kay dev` alone. See [API routes](/guides/api-routes#openapi) |
 | `live` | `{ connections, rateLimit }`: how many live connections one client address holds at once (20), and how many it opens in a `rateLimit` of `{ max, window }`, with the `store` and `onLimit` of any rate limit (120 a minute, `false` for no limit). See [Live values and realtime](/guides/live-and-realtime) |
-| `ops.metrics` | `true` serves `/metrics` in the Prometheus text format: requests by route and status, their durations, scheduled runs, cache reads and live connections. Answered only to a request straight from this machine or a private network, or carrying a bearer token: `{ token: true }` reads `KAY_METRICS_TOKEN`, and `token` takes a string, `{ env }` or `{ file }` as well. `{ path }` moves it. Off by default |
-| `ops.jobs` | `{ guards, path }` serves a page of the queues' jobs at `/_kay/jobs` with retry and delete buttons. The guard is a guard, a list of them or `{ load }`, run on every request, and without one the page answers 403. Off by default |
+| `ops.metrics` | `true` serves `/_kay/metrics` in the Prometheus text format: requests by route and status, their durations, scheduled runs, cache reads and live connections. Answered only to a request straight from this machine or a private network, or carrying a bearer token: `{ token: true }` reads `KAY_METRICS_TOKEN`, and `token` takes a string, `{ env }` or `{ file }` as well. `endpoints.metrics` moves it. Off by default |
+| `ops.jobs` | `{ guards }` serves a page of the queues' jobs at `/_kay/jobs` with retry and delete buttons. The guard is a guard, a list of them or `{ load }`, run on every request, and without one the page answers 403. Off by default |
 
 ## Path and guard options
 
@@ -182,10 +182,10 @@ A `path` is one route and a `prefix` a subtree. Every `guards` option takes a gu
 
 | Option | Reads as | Without a guard | `false` |
 | --- | --- | --- | --- |
-| `serve.apiPrefix` | Prefix of the API modules, the OpenAPI document and its reference | The API directory's `_guard.ts` decides | No guard option |
-| `openapi.path`, `openapi.referencePath`, `mcp.path` | One route | The API directory's `_guard.ts` decides | No guard option |
-| `ops.health.path`, `ops.metrics.path` | One route | Open, `metrics` takes a token | No guard option |
-| `ops.jobs.path`, `ops.jobs.guards` | One route | Closed, 403 | Opens the page |
+| `endpoints.api` | Prefix of the API modules, the OpenAPI document and its reference | The API directory's `_guard.ts` decides | No guard option |
+| `endpoints.openapi`, `openapi.reference.path`, `endpoints.mcp` | One route | The API directory's `_guard.ts` decides | No guard option |
+| `endpoints.health`, `endpoints.metrics` | One route | Open, `metrics` takes a token | No guard option |
+| `endpoints.jobs`, `ops.jobs.guards` | One route | Closed, 403 | Opens the page |
 | `vitals({ prefix, guards })` | Prefix | Closed, 403 | Opens the screen |
 | `cms({ prefix, access })` | Prefix | Closed, 403 | Admits everyone |
 | `assets.images.guards` | Runs before `assets.images.resolve` | Closed, 403 | Resizes for everyone |

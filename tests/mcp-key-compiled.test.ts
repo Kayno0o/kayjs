@@ -62,12 +62,12 @@ describe('mcp.token { file } in a compiled server', () => {
 
     roots.push(cwd)
 
-    expect(await ask(executable, cwd, undefined, '/mcp')).toBe(401)
+    expect(await ask(executable, cwd, undefined, '/_kay/mcp')).toBe(401)
 
     const key = (await readFile(join(cwd, 'data/mcp-key'), 'utf8')).trim()
 
     expect(existsSync(join(root, 'data'))).toBe(false)
-    expect(await ask(executable, cwd, key, '/mcp')).toBe(200)
+    expect(await ask(executable, cwd, key, '/_kay/mcp')).toBe(200)
   }, 300_000)
 
   it('does the same under a base path', async () => {
@@ -75,7 +75,7 @@ describe('mcp.token { file } in a compiled server', () => {
     const cwd = resolve(await scratchDir('mcp-run-'))
 
     roots.push(cwd)
-    await ask(executable, cwd, undefined, '/app/mcp')
+    await ask(executable, cwd, undefined, '/app/_kay/mcp')
 
     expect(existsSync(join(cwd, 'data/mcp-key'))).toBe(true)
     expect(existsSync(join(root, 'data'))).toBe(false)
@@ -89,7 +89,7 @@ describe('mcp.token { file } in a compiled server', () => {
 
     const { executable } = await compile(`{ file: ${JSON.stringify(file)} }`)
 
-    await ask(executable, cwd, undefined, '/mcp')
+    await ask(executable, cwd, undefined, '/_kay/mcp')
 
     expect(existsSync(file)).toBe(true)
     expect(existsSync(join(cwd, 'data'))).toBe(false)

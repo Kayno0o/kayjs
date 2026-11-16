@@ -25,7 +25,7 @@ export interface JobsPage {
 }
 
 // The guards the setting names. The page lists payloads and deletes jobs, so with none it answers 403 rather than open; `guards: false` opens it.
-export function jobsPageOf(setting: JobsConfig | undefined): JobsPage | undefined {
+export function jobsPageOf(setting: JobsConfig | undefined, at?: string): JobsPage | undefined {
   if (setting === undefined)
     return undefined
 
@@ -35,10 +35,10 @@ export function jobsPageOf(setting: JobsConfig | undefined): JobsPage | undefine
   if (given !== undefined && given !== false && !isGuardOption(given))
     throw new KayError('config-invalid', 'kay: `jobs.guards` takes a guard function, a list of them, `{ load }` returning one, or `false`, such as `jobs: { guards: ctx => ctx.locals.auth.requireAdmin() }`')
 
-  const path = setting.path ?? JOBS_PATH
+  const path = at ?? JOBS_PATH
 
   if (!path.startsWith('/') || (path.length > 1 && path.endsWith('/')))
-    throw new KayError('config-invalid', `kay: \`jobs.path\` is an absolute path without a trailing slash, not ${JSON.stringify(path)}`)
+    throw new KayError('config-invalid', `kay: \`endpoints.jobs\` is an absolute path without a trailing slash, not ${JSON.stringify(path)}`)
 
   const checks = given === false ? [] : guardList(given ?? refuseUnguarded)
 

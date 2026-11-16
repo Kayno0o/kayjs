@@ -77,7 +77,7 @@ function headStart(head: RenderedHead): string {
 
 // What the islands read off the page: the mount point, where the API is when `serve.apiPrefix` moved it (for a script that imports no API module, as a library's loader), and the image settings that are not the default.
 function kayMetas(options: RenderOptions, hasIslands: boolean): string {
-  const apiAt = options.serve?.apiPrefix
+  const apiAt = options.endpoints?.api
   const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (apiAt !== undefined && apiAt !== '/api' ? `<meta name="kay-api" content="${escapeAttribute(apiAt)}">` : '') + (options.client?.saveData === false ? '<meta name="kay-save-data" content="off">' : '') + (options.client?.pageTimeout === undefined ? '' : `<meta name="kay-page-timeout" content="${durationMs(options.client.pageTimeout)}">`) + (options.client?.loadingDelay === undefined ? '' : `<meta name="${LOADING_META}" content="${durationMs(options.client.loadingDelay)}">`) + (options.sameTabLinks === true ? '<meta name="kay-same-tab-links">' : '') + (options.linkSchemes !== undefined && options.linkSchemes.length > 0 ? `<meta name="${LINK_SCHEMES_META}" content="${escapeAttribute(options.linkSchemes.join(','))}">` : '')
 
   if (!hasIslands)
@@ -88,7 +88,7 @@ function kayMetas(options: RenderOptions, hasIslands: boolean): string {
 
 // Split out of `documentOf` to hold its complexity under the ratchet.
 function pageSpeculation(options: RenderOptions, nearest: boolean): string {
-  return speculationRules(options.client?.prefetch, options.base, options.serve?.apiPrefix, nearest)
+  return speculationRules(options.client?.prefetch, options.base, options.endpoints?.api, nearest)
 }
 
 function devScripts(client: ClientBuild, files: string[], late: boolean): string {

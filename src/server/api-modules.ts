@@ -42,19 +42,18 @@ export const KAY_PREFIX = '/_kay/'
 export const OPENAPI_PATH = `${API_PREFIX}/openapi.json`
 export const REFERENCE_PATH = `${API_PREFIX}/reference`
 
-// The path the API modules, the OpenAPI document and its reference page are served under: `/api` by default, `serve.apiPrefix` in kay.config.ts otherwise.
+// The path the API modules, the OpenAPI document and its reference page are served under: `/api` by default, `endpoints.api` in kay.config.ts otherwise.
 export function apiPathOf(value: string | undefined): string {
-  return value === undefined ? API_PREFIX : servedPath(value, 'serve.apiPrefix')
+  return value === undefined ? API_PREFIX : servedPath(value, 'endpoints.api')
 }
-// Where `mcp` serves the app's tools.
-export const MCP_PATH = '/mcp'
+// Where `mcp` serves the app's tools, and where it did before 1.105, which redirects there until 1.108.
+export const MCP_PATH = '/_kay/mcp'
+export const FORMER_MCP_PATH = '/mcp'
 // Where an MCP client finds how to sign in, which the endpoint's 401 points to.
 export const RESOURCE_METADATA = '/.well-known/oauth-protected-resource'
 const SERVED_PATH = /^\/[\w.~-]+(?:\/[\w.~-]+)*$/
 
 export interface McpConfig {
-  // Where the endpoint is served, `/mcp` by default.
-  path?: string | undefined
   // The most requests one client may send the endpoint in a window, `{ max: 120, window: '1m' }` by default, or `false` for no limit; a tool call also meets the limits of the action or route it calls.
   rateLimit?: Omit<RateLimit, 'key'> | boolean | undefined
   // Requires this token as a bearer token (`Authorization: Bearer <token>`) on the endpoint and so on every tool call, compared in constant time, for an agent that holds a static key instead of signing in: `true` reads `KAY_MCP_KEY`, else the file `KAY_MCP_KEY_FILE` names; a string is the token; `{ env }` names the variable that holds it; `{ file }` the file, made with a random token on first use. At least 16 characters, read once at boot. A production server with a token it cannot read does not boot; elsewhere every request is refused. With a token set the endpoint is open to `proxy.key`'s check, as the bearer is its credential.
@@ -72,11 +71,11 @@ export function mcpRateLimit(value: boolean | McpConfig | undefined): RateWindow
 }
 
 // The path an MCP endpoint is served at, or undefined while `mcp` is off.
-export function mcpPath(value: boolean | McpConfig | undefined): string | undefined {
+export function mcpPath(value: boolean | McpConfig | undefined, at?: string): string | undefined {
   if (value === undefined || value === false)
     return undefined
 
-  return value === true || value.path === undefined ? MCP_PATH : servedPath(value.path, 'mcp({ path })')
+  return at === undefined ? MCP_PATH : servedPath(at, 'endpoints.mcp')
 }
 
 // The server instructions `initialize` answers with, or undefined for none.
@@ -90,14 +89,20 @@ export function mcpInstructions(value: boolean | McpConfig | undefined): string 
 }
 
 // The paths the OpenAPI document and its reference page are served at.
-export function openApiPaths(config: { path?: string | undefined, referencePath?: string | undefined, reference?: boolean | undefined } | undefined, apiPath = API_PREFIX): { document: string, reference: string } {
-  const document = config?.path === undefined ? `${apiPath}/openapi.json` : servedPath(config.path, 'openapi.path')
-  const reference = config?.referencePath === undefined ? `${apiPath}/reference` : servedPath(config.referencePath, 'openapi.referencePath')
+export function openApiPaths(config: { reference?: boolean | { path?: string | undefined } | undefined } | undefined, apiPath = API_PREFIX, at?: string): { document: string, reference: string } {
+  const document = at === undefined ? `${apiPath}/openapi.json` : servedPath(at, 'endpoints.openapi')
+  const given = typeof config?.reference === 'object' ? config.reference.path : undefined
+  const reference = given === undefined ? `${apiPath}/reference` : servedPath(given, 'openapi.reference.path')
 
-  if (config?.reference === true && document === reference)
-    throw new KayError('config-invalid', `kay: openapi.path and openapi.referencePath are both ${document}; give the reference page a path of its own`)
+  if (referenced(config) && document === reference)
+    throw new KayError('config-invalid', `kay: endpoints.openapi and openapi.reference.path are both ${document}; give the reference page a path of its own`)
 
   return { document, reference }
+}
+
+// Whether the reference page is served: `reference: true`, or `reference: { path }`.
+export function referenced(config: { reference?: boolean | object | undefined } | undefined): boolean {
+  return config?.reference === true || (typeof config?.reference === 'object' && config.reference !== null)
 }
 
 // A path kay serves a route at: absolute, one segment at least, with nothing the router reads as a parameter and nothing under kay's own `/_kay`.
@@ -125,15 +130,15 @@ const ROUTER_SYNTAX = /[:*']/
 const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g
 
 // The app's API modules and its extensions', as `pages()` serves them.
-export async function projectApi(root: string, config: Pick<KayConfig, 'dirs' | 'extensions' | 'serve'>): Promise<ApiModule[]> {
+export async function projectApi(root: string, config: Pick<KayConfig, 'dirs' | 'extensions' | 'endpoints'>): Promise<ApiModule[]> {
   const [app, ...mounts] = apiTrees(root, config)
 
-  return scanApi(app!.dir, mounts, apiPathOf(config.serve?.apiPrefix))
+  return scanApi(app!.dir, mounts, apiPathOf(config.endpoints?.api))
 }
 
 // The app's API directory at the root of the API tree, then each extension's under its prefix.
-export function apiTrees(root: string, config: Pick<KayConfig, 'dirs' | 'extensions' | 'serve'>): RouteMount[] {
-  const apiPath = apiPathOf(config.serve?.apiPrefix)
+export function apiTrees(root: string, config: Pick<KayConfig, 'dirs' | 'extensions' | 'endpoints'>): RouteMount[] {
+  const apiPath = apiPathOf(config.endpoints?.api)
 
   return [{ dir: projectPaths(root, config).api, prefix: '' }, ...apiMounts(root, config.extensions)].map(tree => ({ ...tree, apiPath }))
 }

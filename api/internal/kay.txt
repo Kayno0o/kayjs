@@ -789,7 +789,7 @@ function listenIdleApps(): void
 function loadingWithoutEnv(): void
 
 [./internal/server] probeHealth
-function probeHealth(config: HealthConfig | boolean | undefined, port?: string, host?: string | undefined): Promise<number>
+function probeHealth(config: HealthConfig | boolean | undefined, port?: string, host?: string | undefined, path?: string): Promise<number>
 
 [./internal/server] registerBundle
 function registerBundle(value: Bundle): void

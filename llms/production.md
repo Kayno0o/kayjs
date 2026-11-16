@@ -36,7 +36,8 @@ log.error('failed', new Error('refused'))
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  ops: { health: { path: '/up', check: async () => await db.ping() } },
+  endpoints: { health: '/up' },
+  ops: { health: { check: async () => await db.ping() } },
 })
 ```
 
@@ -127,7 +128,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 ### Health and shutdown
 
 - `/_kay/health` answers `200 ok` while the server takes requests, for a load balancer or a container's health check.
-- `ops: { health: { path: '/up', check: async () => await db.ping() } }` in kay.config.ts moves it and adds a check: one returning `false`, throwing, or taking over 5 s answers 503, the error logged.
+- `endpoints: { health: '/up' }` in kay.config.ts moves it, and `ops: { health: { check: async () => await db.ping() } }` adds a check: one returning `false`, throwing, or taking over 5 s answers 503, the error logged.
 - `ops: { health: false }` leaves the route out.
 - An executable `kay build --compile` made checks a server it started, rather than starting one, when run as `./server --health`: it exits with 0 when the health route on `PORT`, 3000 by default, at `HOST` when it names an address and on loopback otherwise, answers 200, else 1, for a container image with no curl: `HEALTHCHECK CMD ["./server", "--health"]`.
 - On SIGTERM, SIGINT or SIGHUP, a server that listens stops taking connections, lets open requests finish, ends every open event stream (live values, presence, `stream()`) and, once no request is left, every websocket (close code 1001), so browsers reconnect to the next instance, then runs the app's `onStop` hooks, each given `serve.shutdownTimeout` at most, and exits with 0. A queue handler or schedule ignoring its signal is given 3 seconds (at most 40% of `serve.shutdownTimeout`), all of them together, then its job is handed back untouched, and the `store` config's `rooms` store is closed so a stopped replica leaves no member behind (a store given only to `rooms({ store })` is not).

@@ -21,7 +21,7 @@ import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { CARD_ROUTE, FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
 import { LIVE_ROUTE } from '../runtime/live-value'
-import { apiPathOf, mcpPath, openApiPaths, projectApi, RESOURCE_METADATA } from '../server/api-modules'
+import { apiPathOf, mcpPath, openApiPaths, projectApi, referenced, RESOURCE_METADATA } from '../server/api-modules'
 import { buildingWithoutEnv, PUBLIC_ENV_PATH } from '../server/env-state'
 import { ERROR_REPORTS } from '../server/errors'
 import { FAVICON_PATHS, faviconSource, localeManifests } from '../server/favicon'
@@ -207,12 +207,12 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
   const favicon = faviconSource(root, config.assets?.favicon, config.assets?.manifest)
   const enabled = config.openapi === false ? undefined : config.openapi
   const openapi = enabled === true ? {} : enabled
-  const mcpAt = mcpPath(config.mcp)
-  const documented = openApiPaths(openapi, apiPathOf(config.serve?.apiPrefix))
+  const mcpAt = mcpPath(config.mcp, config.endpoints?.mcp)
+  const documented = openApiPaths(openapi, apiPathOf(config.endpoints?.api), config.endpoints?.openapi)
 
   return [
-    ...config.ops?.health === false ? [] : [kay(bagOf(config.ops?.health)?.path ?? HEALTH_PATH, 'health check')],
-    ...metricsOf(config.ops?.metrics) === undefined ? [] : [kay(metricsOf(config.ops?.metrics)?.path ?? METRICS_PATH, 'metrics')],
+    ...config.ops?.health === false ? [] : [kay(config.endpoints?.health ?? HEALTH_PATH, 'health check')],
+    ...metricsOf(config.ops?.metrics) === undefined ? [] : [kay(config.endpoints?.metrics ?? METRICS_PATH, 'metrics')],
     ...config.publicEnv ? [kay(PUBLIC_ENV_PATH, 'public environment')] : [],
     kay('/_kay/*', 'build files'),
     kay(IMAGE_ROUTE, 'image resizer'),
@@ -223,7 +223,7 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
     ...bagOf(config.security)?.reports === true ? [kay(CSP_REPORTS, 'CSP violation reports', 'POST')] : [],
     ...config.preview !== undefined && config.preview !== false ? [kay(PREVIEW_ROUTE, 'preview mode')] : [],
     ...mcpAt === undefined ? [] : [kay(mcpAt, 'MCP endpoint', 'POST'), kay(RESOURCE_METADATA, 'MCP sign-in metadata'), kay(`${RESOURCE_METADATA}${mcpAt}`, 'MCP sign-in metadata')],
-    ...openapi !== undefined && openapi.dev !== true ? [kay(documented.document, 'OpenAPI document'), ...openapi.reference === true ? [kay(documented.reference, 'API reference')] : []] : [],
+    ...openapi !== undefined && openapi.dev !== true ? [kay(documented.document, 'OpenAPI document'), ...referenced(openapi) ? [kay(documented.reference, 'API reference')] : []] : [],
     ...config.site === undefined ? [] : [...config.sitemap === false ? [] : [kay(SITEMAP, 'sitemap, unless the app serves it')], kay(ROBOTS, 'robots.txt, unless the app serves it')],
     ...favicon ? FAVICON_PATHS.filter(path => (path !== SVG_ICON || favicon.svg !== undefined) && (!MASKABLE_ICON.test(path) || favicon.maskable !== undefined)).map(path => kay(path, 'favicon, unless the app serves it')) : [],
     ...favicon ? localeManifests({ name: config.seo?.name, description: config.seo?.description }, config.i18n && { locales: config.i18n.locales, defaultLocale: config.i18n.default }).map(({ path }) => kay(path, 'favicon, unless the app serves it')) : [],

@@ -43,7 +43,7 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
   if (!pagesVary(options))
     return respond
 
-  const rules = [true, false].map(nearest => speculationRules(options.client?.prefetch, options.base, options.serve?.apiPrefix, nearest))
+  const rules = [true, false].map(nearest => speculationRules(options.client?.prefetch, options.base, options.endpoints?.api, nearest))
   const meta = prefetchMeta(options.client?.prefetch)
   const fonts = options.fontCss === undefined ? undefined : { full: options.fontCss, light: lightFontCss(options.fontCss) }
   // The chunks as the page names them, under the mount point.

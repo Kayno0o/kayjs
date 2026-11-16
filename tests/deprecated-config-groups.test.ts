@@ -94,7 +94,7 @@ describe('deprecated-i18n-keys', () => {
 
 describe('the old keys of the config', () => {
   it('are read into assets and ops, the key written in the group winning', async () => {
-    expect(await resolveConfig({ favicon: 'a.svg', health: false, metrics: true, assets: { favicon: 'b.svg' }, ops: { jobs: { path: '/j' } } })).toEqual({ assets: { favicon: 'b.svg' }, ops: { health: false, metrics: true, jobs: { path: '/j' } } })
+    expect(await resolveConfig({ favicon: 'a.svg', health: false, metrics: true, assets: { favicon: 'b.svg' }, ops: { jobs: { guards: [] } } })).toEqual({ assets: { favicon: 'b.svg' }, ops: { health: false, metrics: true, jobs: { guards: [] } } })
     expect((await resolveConfig({ observe: { onError: () => undefined, loadBudget: false } })).ops).toEqual({ observe: { loadBudget: false } })
   })
 
@@ -113,10 +113,10 @@ describe('the old keys of the config', () => {
   })
 
   it('reach the loaded config of code options, whole', async () => {
-    const config = await withConfig(resolve('tests/fixtures/static'), { favicon: false, jobs: { path: '/j' } } as never)
+    const config = await withConfig(resolve('tests/fixtures/static'), { favicon: false, jobs: { guards: [] } } as never)
 
     expect(config.assets?.favicon).toBe(false)
-    expect(config.ops?.jobs).toEqual({ path: '/j' })
+    expect(config.ops?.jobs).toEqual({ guards: [] })
     expect('favicon' in config).toBe(false)
   })
 })

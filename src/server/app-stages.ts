@@ -34,7 +34,7 @@ import { kayLog } from '../runtime/log'
 import { BUILD_HEADER, DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
-import { apiPathOf, mcpInstructions, mcpRateLimit, RESOURCE_METADATA, sharedGuards } from './api-modules'
+import { apiPathOf, FORMER_MCP_PATH, mcpInstructions, mcpRateLimit, RESOURCE_METADATA, sharedGuards } from './api-modules'
 import { hookLifecycle, hookRequests } from './app-hooks'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
@@ -64,8 +64,8 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { liveConnections, serveLive } from './live'
 import { warnOfLocalFiles } from './local-files'
 import { announceStart, loggerOf, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
-import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
-import { METRICS_PATH, metricsOf, serveMetrics } from './metrics'
+import { mcpBodyLimit, receiveDispatched, redirectFormerMcp, serveMcp, serveToolCallsThrough } from './mcp'
+import { FORMER_METRICS_PATH, METRICS_PATH, metricsOf, serveMetrics } from './metrics'
 import { newTabStyles } from './new-tab'
 import { countMissing, knowRedirects } from './not-found'
 import { INSTALL_OFFER, serveServiceWorker } from './offline'
@@ -178,6 +178,11 @@ interface BootInput {
   required: GuardRequirement
 }
 
+// The paths a request for the MCP endpoint may come in at: its own, and the former one while it redirects.
+function mcpEndpoints(at: string | undefined, former: Claim | undefined, served: ServedPaths): string[] {
+  return [...at === undefined ? [] : [at], ...former !== undefined && served.holds(former) ? [former.path] : []]
+}
+
 // What every stage shares, worked out from the setup before the first hook.
 export function bootOf(input: BootInput) {
   const { env, project: { config: options }, setup: { client, scripts, styles, locales } } = input
@@ -189,9 +194,11 @@ export function bootOf(input: BootInput) {
   const securityOptions = { ...options, dev: env.dev, islands: directives, scripts: client.installs !== undefined && client.installs.length > 0 ? [...scripts, INSTALL_OFFER] : scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client), ...newTabStyles(locales.translations.values()), BUTTON_FORM_STYLE].map(style => rebaseCss(style, env.base)))] }
   // Offered, so an app file at the path keeps it; only a running server counts, as `kay dev` restarts on every change and an export serves nothing.
   const metricsConfig = env.serving ? metricsOf(options.ops?.metrics) : undefined
-  const metrics: Claim | undefined = metricsConfig && { path: metricsConfig.path ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
+  const metrics: Claim | undefined = metricsConfig && { path: options.endpoints?.metrics ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
+  // Where the metrics were served before 1.105, answered as well until 1.108 by an app that did not move them, unless an app file serves something there.
+  const formerMetrics: Claim | undefined = metrics && options.endpoints?.metrics === undefined ? { path: FORMER_METRICS_PATH, owner: 'the metrics route', kind: 'kay' } : undefined
   // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
-  const health: Claim | undefined = options.ops?.health === false ? undefined : { path: bagOf(options.ops?.health)?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
+  const health: Claim | undefined = options.ops?.health === false ? undefined : { path: options.endpoints?.health ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
   const log = loggerOf(options.ops?.observe?.log, env.production)
   // The routes later stages register, which the dev tool's Routes tab reads when it answers, as it registers before them.
   const registered: { extensions: OwnRoutes['extensions'], actions: boolean, api: MountedApi[] } = { extensions: [], actions: false, api: [] }
@@ -209,6 +216,9 @@ export function bootOf(input: BootInput) {
     lifecycle: { draining: false },
     hasPreview: options.preview !== undefined && options.preview !== false,
     metrics,
+    formerMetrics,
+    // Where the MCP endpoint was served before 1.105, redirected to its path now until 1.108 by an app that did not move it, unless an app file serves something there.
+    formerMcp: input.mcpAt !== undefined && options.endpoints?.mcp === undefined ? { path: FORMER_MCP_PATH, owner: '`mcp`', kind: 'kay', method: 'ALL' } as Claim : undefined,
     health,
     registered,
     // Maps a browser's stack back to the source, for the error reports and the dev tool.
@@ -290,7 +300,7 @@ function hostsToAnswer(setting: SecurityConfig | boolean | undefined, site: stri
 }
 
 // Who the request is from and whether it may come: the proxy it came through, the server's own mark, the proxy key, the hosts, then the security headers on every answer.
-export function trustRequests({ app, env, options, project, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log, health }: Boot): void {
+export function trustRequests({ app, env, options, project, served, security, filePaths, setup, mcpAt, mcpKey, metrics, formerMetrics, formerMcp, log, health }: Boot): void {
   setRequestIdHeader(options.ops?.observe?.requestIdHeader)
   trustProxy(app, options.proxy)
   defaultCookies(app, cookieDefaults(options.security, env.base))
@@ -298,7 +308,7 @@ export function trustRequests({ app, env, options, project, served, security, fi
   app.onRequest(({ request }) => {
     receiveInternal(request)
   })
-  requireProxyKey(app, checkProxy(options.proxy), { root: setup.source.runtimeRoot(project.root), dev: env.dev, exported: env.exported, base: env.base, health: health?.path, endpoint: mcpKey === undefined ? undefined : mcpAt, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log), security })
+  requireProxyKey(app, checkProxy(options.proxy), { root: setup.source.runtimeRoot(project.root), dev: env.dev, exported: env.exported, base: env.base, health: health?.path, endpoint: mcpKey === undefined ? undefined : () => mcpEndpoints(mcpAt, formerMcp, served), metrics: () => [metrics, formerMetrics].flatMap(claim => claim !== undefined && served.holds(claim) ? [claim.path] : []), logRefused: requestRefusalLogger(log), security })
   refuseForeignHosts(app, setup.site, security)
 
   const hosts = hostsToAnswer(options.security, setup.site, env)
@@ -358,7 +368,7 @@ export function logAnswers({ app, options, log, health }: Boot): void {
 // The app's rewrite, with the API paths a library moved; returns the mounts it reads, which the API modules fill once they are served.
 export function rewriteAnswers({ app, env, options }: Boot): string[] {
   const apiMountsServed: string[] = []
-  const rewrite = withMovedApi(options.rewrite, movedApiPrefixes(options.extensions), apiPathOf(options.serve?.apiPrefix), env.base, apiMountsServed)
+  const rewrite = withMovedApi(options.rewrite, movedApiPrefixes(options.extensions), apiPathOf(options.endpoints?.api), env.base, apiMountsServed)
 
   if (rewrite)
     rewriteRequests(app, rewrite, app)
@@ -385,22 +395,26 @@ export function identifyRequests({ app, env, setup: { client } }: Boot): void {
 }
 
 // kay's endpoints answered ahead of the extensions: the health check, the metrics and the public env, with the jobs page's path claimed. Returns the jobs page, served after the extensions whose values its guard reads.
-export function kayEndpoints({ app, env, options, project, setup, served, lifecycle, health, metrics, security }: Boot, publicModules: string[]) {
+export function kayEndpoints({ app, env, options, project, setup, served, lifecycle, health, metrics, formerMetrics, security }: Boot, publicModules: string[]) {
   if (health) {
     served.offer(health)
     // Before the extension servers, whose hooks it answers ahead of; it answers only where the claims, known once all are in, leave it the path.
-    serveHealth(app, lifecycle, () => served.holds(health), bagOf(options.ops?.health), security || undefined)
+    serveHealth(app, lifecycle, () => served.holds(health), bagOf(options.ops?.health), security || undefined, health.path)
   }
 
   // Read in development too, so a setting without a guard fails there; claimed, so an app file at the path stops the boot.
-  const jobsPage = jobsPageOf(options.ops?.jobs)
+  const jobsPage = jobsPageOf(options.ops?.jobs, options.endpoints?.jobs)
 
   if (jobsPage && env.serving)
-    served.claim({ path: jobsPage.path, owner: 'the jobs page', kind: 'kay', method: 'ALL' }, taken => `kay: ${taken.owner} and the jobs page both serve ${jobsPage.path}: move one with \`jobs: { path }\``)
+    served.claim({ path: jobsPage.path, owner: 'the jobs page', kind: 'kay', method: 'ALL' }, taken => `kay: ${taken.owner} and the jobs page both serve ${jobsPage.path}: move one with \`endpoints: { jobs }\``)
 
   if (metrics) {
     served.offer(metrics)
-    serveMetrics(app, { root: setup.source.runtimeRoot(project.root), path: metrics.path, base: env.base, proxy: checkProxy(options.proxy), token: metricsOf(options.ops?.metrics)?.token, health: health?.path, holds: () => served.holds(metrics), connections: liveConnections })
+
+    if (formerMetrics)
+      served.offer(formerMetrics)
+
+    serveMetrics(app, { root: setup.source.runtimeRoot(project.root), path: metrics.path, base: env.base, proxy: checkProxy(options.proxy), token: metricsOf(options.ops?.metrics)?.token, health: health?.path, holds: () => served.holds(metrics), former: formerMetrics && { path: formerMetrics.path, holds: () => served.holds(formerMetrics) }, connections: liveConnections })
   }
 
   if (options.publicEnv)
@@ -565,7 +579,7 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api, endpoint
   const { app, env, options, served, setup: { client }, table, hasPreview, mcpAt } = boot
   // Claimed before kay's own files, which give way to them.
   const openapi = openApiSettings(options.openapi)
-  const apiAt = apiPathOf(options.serve?.apiPrefix)
+  const apiAt = apiPathOf(options.endpoints?.api)
   const servesOpenApi = openapi !== undefined && (openapi.dev !== true || env.devRoutes)
 
   knowRedirects(Object.keys(options.redirects ?? {}))
@@ -577,7 +591,7 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api, endpoint
     pages: () => [...client.pages.keys(), ...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path)),
     base: env.base,
   })
-  claimApi(served, api.mounted, servesOpenApi ? openapi : undefined, apiAt)
+  claimApi(served, api.mounted, servesOpenApi ? openapi : undefined, apiAt, options.endpoints?.openapi)
 
   const metadataPaths: string[] = []
 
@@ -596,7 +610,7 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api, endpoint
 
 // The OpenAPI document and the MCP endpoint, registered last before the pages.
 export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }: Served, actionOptions: ActionOptions, { openapi, apiAt, servesOpenApi, metadataPaths }: ReturnType<typeof limitBodiesAndClaimApi>): Promise<void> {
-  const { app, env, options, required, setup: { locales }, project: { paths }, mcpAt, mcpKey } = boot
+  const { app, env, options, required, served, formerMcp, setup: { locales }, project: { paths }, mcpAt, mcpKey } = boot
 
   // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
   const document = servesOpenApi || mcpAt !== undefined
@@ -608,10 +622,15 @@ export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }:
   const covering = async (empty: boolean) => requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: (apiModules.length > 0 || empty) && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, required === true)
 
   if (servesOpenApi && document && openapi !== undefined)
-    serveOpenApi(app, document, openapi, await covering(false), actionOptions, apiAt)
+    serveOpenApi(app, document, openapi, await covering(false), actionOptions, apiAt, options.endpoints?.openapi)
 
-  if (mcpAt !== undefined && document)
+  if (mcpAt !== undefined && document) {
     serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base: env.base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt, rateLimit: mcpRateLimit(options.mcp), instructions: mcpInstructions(options.mcp), key: mcpKey, dev: env.dev, outputs: actionOptions.toolOutputs })
+
+    // Where the endpoint was served before 1.105, sent to the new path with a 308 until 1.108 by an app that did not move it, unless the app serves something there.
+    if (formerMcp && served.offer(formerMcp))
+      redirectFormerMcp(app, mcpAt)
+  }
 }
 
 // The routes the browser reports to: errors, with their stack mapped back to the source, then live values, policy violations and previews.
@@ -753,7 +772,7 @@ export async function siteFiles(boot: Boot) {
   const prerendered = await loadPrerendered(client, dictionaryUsed)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, served, { client, offline: offlineOf(options, env) && options.client?.offline !== false ? options.client?.offline : undefined, base: env.base, apiPath: options.serve?.apiPrefix, trailingSlash: env.trailingSlash, lang: options.lang, typography: options.client?.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path), push: pushListed(options) })
+  await serveServiceWorker(app, served, { client, offline: offlineOf(options, env) && options.client?.offline !== false ? options.client?.offline : undefined, base: env.base, apiPath: options.endpoints?.api, trailingSlash: env.trailingSlash, lang: options.lang, typography: options.client?.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path), push: pushListed(options) })
   // A server answering from a build does it in its own process; a static export is written once and `kay dev` shows every entry.
   const publishing = env.serving ? await watchPublishing(collections) : NOT_PUBLISHING
 

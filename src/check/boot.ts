@@ -133,7 +133,7 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   let mcpAt: string | undefined
 
   refused(config, () => {
-    mcpAt = mcpPath(options.mcp)
+    mcpAt = mcpPath(options.mcp, options.endpoints?.mcp)
     mcpKeySetting(options.mcp)
   })
 

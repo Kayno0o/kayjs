@@ -82,7 +82,7 @@ export default defineConfig({
 
 ### Let an agent call the app
 
-`mcp: true` in `kay.config.ts` serves an MCP endpoint at `/mcp`, a tool per action and per API route that sets `tool`:
+`mcp: true` in `kay.config.ts` serves an MCP endpoint at `/_kay/mcp`, a tool per action and per API route that sets `tool`:
 
 ```ts
 // kay.config.ts
@@ -109,7 +109,7 @@ export default api()
   .get('/:id', ({ params }) => find(params.id), { detail: { tool: 'Read a note by its id' } })
 ```
 
-Point an MCP client at `https://example.com/mcp`. `addNote` is the tool `add_note`; a route is named by its `operationId`, `get_notes_id` for `GET /api/notes/{id}`.
+Point an MCP client at `https://example.com/_kay/mcp`. `addNote` is the tool `add_note`; a route is named by its `operationId`, `get_notes_id` for `GET /api/notes/{id}`.
 
 ## Reference
 
@@ -119,7 +119,7 @@ Each `.ts` module under `src/api/`, the `dirs.api` option of `kay.config.ts` nam
 
 Files and directories starting with `_`, and `.test.ts` files, are left out.
 
-`serve: { apiPrefix: '/v1' }` in `kay.config.ts` mounts every module, the OpenAPI document and the reference page under `/v1` instead of `/api` (an absolute path of plain segments, no trailing slash, outside `/_kay`; `mcp.path` and the `openapi` paths keep their own), and islands, the service worker's network list, the prefetch rules and the libraries follow it. `apiUrl(module, path, options)` from `kay` gives where a route is served, its path one of the module's routes (completed in the editor) and its params typed as `route()` types a page's, a number filling one (`apiUrl(items, '/:id', { params: { id: 7 } })`), under `base` in the browser (on the server the module must be mounted, so a page using it renders per request, never prerendered), for code that needs a URL rather than a call (a handler passes its `request` instead of the module, `apiUrl(request, '/image')`, to name a route of the module it runs in, which a reference inside its own chain cannot). An unknown path (one no route answers at, a segment above deeper routes included) or a missing param is a type error. A script importing no module reads the `kay-api` meta every page carries once `serve.apiPrefix` moves it.
+`endpoints: { api: '/v1' }` in `kay.config.ts` mounts every module, the OpenAPI document and the reference page under `/v1` instead of `/api` (an absolute path of plain segments, no trailing slash, outside `/_kay`; `endpoints.mcp` and `endpoints.openapi` keep their own; `serve.apiPrefix` works until 1.108), and islands, the service worker's network list, the prefetch rules and the libraries follow it. `apiUrl(module, path, options)` from `kay` gives where a route is served, its path one of the module's routes (completed in the editor) and its params typed as `route()` types a page's, a number filling one (`apiUrl(items, '/:id', { params: { id: 7 } })`), under `base` in the browser (on the server the module must be mounted, so a page using it renders per request, never prerendered), for code that needs a URL rather than a call (a handler passes its `request` instead of the module, `apiUrl(request, '/image')`, to name a route of the module it runs in, which a reference inside its own chain cannot). An unknown path (one no route answers at, a segment above deeper routes included) or a missing param is a type error. A script importing no module reads the `kay-api` meta every page carries once `serve.apiPrefix` moves it.
 
 ```ts
 import { s } from 'kay'
@@ -214,7 +214,7 @@ export default api()
 - Without a `_guard.ts` of the API directory itself, the document is public, guarded modules included.
 - Schemas are read as TypeBox writes them: a model's name or another library's validator documents nothing.
 - An optional param lists the path with and without it, and a wildcard is `{wildcard}`.
-- `openapi: { path: '/spec.json', referencePath: '/docs/api' }` moves the document and the reference page; a path is absolute, of plain segments, without a trailing slash and outside `/_kay`, and the two differ.
+- `endpoints: { openapi: '/spec.json' }` and `openapi: { reference: { path: '/docs/api' } }` move the document and the reference page (`openapi.path` and `referencePath` work until 1.108); a path is absolute, of plain segments, without a trailing slash and outside `/_kay`, and the two differ.
 - A module, page or file serving the document's path, or the reference page's with the page on, stops the server.
 - Every operation has an `operationId`: the route's `detail.operationId` as written (`users.list` stays so), else its method and path, `get_notes_id`; a clash gets `_2`. A route answering every method, `.all()`, gets its id with the method as a suffix, `echo_get`, `echo_post`.
 - An action that sets `tool` is a `POST` operation at its URL under the tag `actions`, `x-kay-action` set, marked `x-kay-guarded` when guards cover it, as the document and the MCP tools say the same. It is called as `action()` calls are, its input encoded as kay writes it, not as a plain JSON body.

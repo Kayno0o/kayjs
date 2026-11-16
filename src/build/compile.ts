@@ -135,7 +135,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     '',
     // Asks the server running beside it, rather than starting one, before any module of the app loads: a container's health check runs it every few seconds.
     'if (process.argv.includes(\'--health\'))',
-    '  process.exit(await probeHealth(config.ops?.health))',
+    '  process.exit(await probeHealth(config.ops?.health, undefined, undefined, config.endpoints?.health))',
     '',
     ...modules.map((file, index) => `const module${index} = await import(${JSON.stringify(file)})`),
     '',
