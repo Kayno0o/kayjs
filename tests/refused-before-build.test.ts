@@ -49,7 +49,7 @@ describe('a refused config', () => {
     ['an i18n path another page takes', { i18n: { ...i18n, paths: { '/about': { en: '/' } } } }, 'are both served at / in en'],
     ['a content config that is missing', { contentConfig: 'tests/fixtures/content/src/missing.config.ts' }, 'there is no such file'],
     ['a feed without the site', { dirs: { routes: 'tests/fixtures/content/src/routes' }, contentConfig: content }, 'has a feed, whose links need the site\'s URL'],
-    ['an mcp path a page serves', { dirs: { routes: 'tests/fixtures/mcp-clash/src/routes' }, mcp: true }, '`mcp` both serve /mcp'],
+    ['an mcp path a page serves', { dirs: { routes: 'tests/fixtures/mcp-clash/src/routes' }, mcp: true, endpoints: { mcp: '/mcp' } }, '`mcp` both serve /mcp'],
     ['images.card.background', { ...cards, assets: { ...cards.assets, images: { card: { background: 'white' } } } }, 'images.card.background is white'],
     ['images.card.font', { ...cards, assets: { ...cards.assets, images: { card: { font: { family: 'Inter' } } } } }, 'images.card.font names Inter'],
     ['images.card.logo', { ...cards, assets: { ...cards.assets, images: { card: { logo: 'tests/fixtures/cards/src/none.svg' } } } }, 'which does not exist'],
