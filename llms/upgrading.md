@@ -47,7 +47,7 @@ A component no longer declares `children?: Snippet`, nor an optional block it re
 
 ### A component's parts are the `parts` attribute
 
-`Card(class={{ head: 'p-6' }})` is `Card(parts={{ head: 'p-6' }})`: `class` keeps strings, arrays and objects of conditions, and `parts` holds an entry per part, `root` included, so a shorthand or a spread can sit beside it (`Card.mt-4(parts={{ head: 'p-6' }})`). A component with parts takes both props, and `parts` leaves `...rest` as `class` does. The old form works until 1.108 and `kay check --fix` writes the new one (`deprecated-parts-class`).
+`Card(class={{ head: 'p-6' }})` is `Card(parts={{ head: 'p-6' }})`: `class` keeps strings, arrays and objects of conditions, and `parts` holds an entry per part, `root` included, so a shorthand or a spread can sit beside it, and a component declaring its own `parts` prop is refused as one declaring `class` is (`Card.mt-4(parts={{ head: 'p-6' }})`). A component with parts takes both props, and `parts` leaves `...rest` as `class` does. Until 1.108 a component with parts types `class` as a string or the old parts object, and `kay check --fix` writes the new form (`deprecated-parts-class`); a parts object held in a variable is not found, so check any `class={{ part: variable }}` by hand.
 
 ### Websocket frames are always JSON
 

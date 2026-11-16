@@ -125,7 +125,7 @@ section.rounded.border
 
 `Card(title="Hi" class="mt-4")` styles the root, `Card(title="Hi" parts={{ root: 'mt-4', head: 'p-6' }})` the root and the head. A part renders `data-part="head"`, for selectors and `data-[part=head]:` utilities, and one name may sit on several elements.
 
-A part that is a component, `Button(part="action")`, hands its entry to that component's own `parts`, a string or an object of its parts: `parts={{ action: { icon: 'size-5' } }}`. Names after the first, `Busy(part="root spinner")`, hand the entries of those parts of this component on too, under the same names. A parts object cannot sit beside a shorthand or a spread on the call, `Card.mt-4(parts={{ head: 'p-6' }})`: `kay check` reports it, so write the root's classes as `root`.
+A part that is a component, `Button(part="action")`, hands its entry to that component, a string or an object of its parts: `parts={{ action: { icon: 'size-5' } }}`. Names after the first, `Busy(part="root spinner")`, hand the entries of those parts of this component on too, under the same names. A parts object cannot sit beside a shorthand or a spread on the call, `Card.mt-4(parts={{ head: 'p-6' }})`: `kay check` reports it, so write the root's classes as `root`.
 
 `kay check` reports a handed part the called component does not name, and a page or a layout, which has no class to hand from, refuses them.
 
