@@ -99,21 +99,6 @@ The prop holding the list a component draws is `items` on every one: `tabs` on T
 ### A page is never an island
 
 A page without a `--- server` fence that has an `on*`, `bind:` or `ref`, a browser value of `kay` such as `signal`, or a live or persisted import used to become an island. It still does through 1.107, and `kay check` warns with `deprecated-page-island` at that line; 1.108 refuses it. Move what needs the browser into a component of its own and render it from the page: the component is the island. No `kay upgrade` fix exists, as the fix moves code into a new file.
-### kayjs-mail: one way to send, the forms in kayjs-ui
-
-- A page, an action or a guard sends through `ctx.locals.mail` (`send`, `enqueue`, `list`, `suppress`...), the mailer of the site answering the request; a job or a script uses the mailer `src/mail.ts` exports. `send` and `enqueue` imported from `@kayjs/mail` use the latest site started and work until 1.108 (`deprecated-mail-send`, no fix: a call has no request to read the mailer from), and `registeredMailer()` is gone: read `ctx.locals.mail`, or the mailer you made.
-- `@kayjs/mail/subscribe-form.kay` is gone: import `SubscribeForm` from `@kayjs/ui/subscribe-form.kay`, which takes the same props and reads the list's `privacy` from the action. Its `kmail-subscribe*` classes are replaced by the themed form's own, and `kay upgrade` rewrites the import (`deprecated-mail-form`).
-- `contactForm(options)` takes no mailer and sends through `ctx.locals.mail`; `contactForm(mail, options)` still works.
-- `mailer()` and `mail()` take every `MAIL_*` setting as an option that wins over the variable: `url`, `smtp.insecure`, `smtp.rateLimit` and `smtp.dkim` join `from`, `to` and `events`. Nothing to change.
-### kayjs-ai calls share one options type, and a chat takes `labels`
-
-`kay upgrade` rewrites the forms it can find (`deprecated-ai-labels`, `deprecated-ai-language`, `deprecated-ai-links`); the old forms work until 1.108.
-
-- `Chat`, `ChatLauncher` and `ChatPanel` take `labels={{ send: 'Go', stop: 'Halt' }}`, keyed as the messages are (`ai.chat.send`), in place of the `sendLabel` and `stopLabel` props; `waitingLabel` is `labels.thinking` and `failureLabel` `labels.error`. A flat prop still wins over `labels`.
-- `Chat` takes `newTab` (`true`, `false` or `'auto'`, as kayjs-ui's links do) in place of `links`: `links="apart"` is `newTab={true}`, `links="here"` is `newTab="auto"`; `Sources` takes `newTab` in place of `here`. `ChatLauncher` takes `newTab` too, `'auto'` by default.
-- The launcher's panel and button are kayjs-ui's `SidePanel` now, so a restyle of `@kayjs/ai/chat-panel.kay` changes: its parts `panel`, `button` and `glyph` are `root` and `launcher` of `'@kayjs/ui/side-panel.kay'` (the glyph is the button's icon), `head` and `title` are the same parts of `'@kayjs/ui/side-panel.kay'`, `body` is its `body`, and `actions` and `action` are gone: the header's buttons are the `new`, `expand` and `close` parts of `chat-panel.kay`. `kay check` already reports a part a component no longer has, listing the ones it has, which is why there is no lint for them. The `.kai-launcher` wrapper is no longer a fixed container and `.kai-launcher-panel` is a `dialog` that is `display: none` unless `[open]` (no `[hidden]`): a rule of an app's own on `.kai-launcher-head`, `-title`, `-actions`, `-glyph` or `.kai-launcher-panel[hidden]` moves to those parts and to `[open]`.
-- `transcribe()` and `describeImage()` take `locale`, a BCP 47 tag, in place of `language`.
-- `ask`, `describeImage`, `transcribe`, `speak` and `embed` take one `CallOptions`, so `retry`, `fallback`, `timeout`, `signal` and the `ai()` hooks reach each of them. `timeout` also takes a single duration for the whole call.
 
 The rest of this release is in [Upgrading, older releases](upgrading-archive.md).
 
