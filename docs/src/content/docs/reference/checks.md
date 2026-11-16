@@ -39,6 +39,8 @@ The editor shows each problem of an open file with the same message, note and he
 
 Each lint has a level. `deny` is an error (the nine that ship a broken page, such as `brace-in-attribute` and `uncaught-await`, are, since 1.105), `warn` a warning, `allow` hides it. Warnings fail the check only with `--deny-warnings`. The `check` script of a new project leaves it out, so a warning shows on the diff without failing CI. Add it to the script to fail on warnings too. `kay build` and `kay dev` never fail on one.
 
+`kay build` fails on an error, as it runs the check first; `--no-check` skips it.
+
 | Lint | Default | Group | Reports |
 | --- | --- | --- | --- |
 | `unread-name` | deny | code | A prop, import or declaration nothing reads |
