@@ -56,11 +56,25 @@ describe('a top-level const derived from a prop or a signal', () => {
     expect(shorthand).toContain('const box = KayMemo(() => ({ twice: twice() }))')
   })
 
-  it('stays a plain value for a function, a read once on purpose or a value computed without reading either', () => {
+  it('stays a plain value for a function, a read once on purpose, a value computed without reading either', () => {
     const dom = code('const fn = () => items.length\nconst fixed = 3\nconst mode = size === \'md\' ? 1 : 2\nconst made = make(items, size)\nconst start = initialOpen\nconst id = size ?? uid()\nconst show = () => [fn, fixed, mode, made, start, id]', 'dom', 'items, size, initialOpen')
 
     expect(dom).not.toContain('KayMemo(() => (')
     expect(dom).toContain('const fn = () => __props.items.length')
+  })
+
+  it('follows a props object read by name, and starts a signal from its first value', () => {
+    expect(code('const first = signal(items.length)', 'dom')).toContain('const first = signal(__props.items.length)')
+
+    const named = compileKay('---\nconst all = props<{ items: string[] }>()\nconst total = all.items.length\n---\np {total}\n', 'test.kay', { output: 'dom' }).tsx
+
+    expect(named).toContain('const total = KayMemo(() => (all.items.length))')
+  })
+
+  it('does not call a const named like a module name a clash', () => {
+    const result = compileKay('---\nconst { items } = props<{ items: string[] }>()\nconst test = items.length\n---\np {test}\n', 'test.kay', { output: 'dom' })
+
+    expect(result.diagnostics.map(d => d.code)).not.toContain('name-clash')
   })
 
   it('wraps an object and an array as the one value they are, read through the call', () => {
@@ -97,7 +111,7 @@ describe('a top-level const derived from a prop or a signal', () => {
   it('refuses a write to it, which it has no signal to take', () => {
     const messages = compileKay(component('const last = items.length\nlast = 3'), 'test.kay', { output: 'dom' }).diagnostics.map(d => d.message)
 
-    expect(messages).toContain('`last` is a const computed from a prop or a signal, which cannot be reassigned')
+    expect(messages).toContain('`last` is computed from a prop or a signal, so it cannot be reassigned')
   })
 })
 

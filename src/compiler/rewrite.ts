@@ -585,7 +585,7 @@ class RewriteFinder {
     this.live.add(found.binding)
     this.open(found.start, 'KayMemo(() => (')
     this.insert(found.end, '))')
-    this.templateConst(path, true, false, 'const computed from a prop or a signal')
+    this.visitBinding(path.scope, found.binding.identifier.name, reference => withShorthand(reference, found.binding.identifier.name, { after: '()' }), { message: `\`${found.binding.identifier.name}\` is computed from a prop or a signal, so it cannot be reassigned`, help: 'keep a value that changes in a signal of the script' }, `ReturnType<typeof ${found.binding.identifier.name}>`)
   }
 
   private madeSignal(path: Path<VariableDeclarator>, id: Identifier, init: CallExpression) {

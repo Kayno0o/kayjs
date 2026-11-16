@@ -5,7 +5,7 @@ import type { Binding, Path } from './scope'
 import { eachNode } from './each-node'
 import { isFunction } from './fence-nodes'
 import { lintLevels } from './lints'
-import { SELF } from './names'
+import { PROPS, SELF } from './names'
 import { sourceEnds } from './rewrite-reads'
 
 // A prop named like an initial value is read once on purpose, and so is a callback (`onChange`), which a component reads to tell whether one was given.
@@ -26,6 +26,7 @@ function isReference(node: NodeOfType<'Identifier'>, parent: Node | undefined): 
 
 // The reads of a value a top-level declaration derives from: the identifiers `isLive` accepts that its initializer reads as a value.
 // The test of a condition, the arguments of a call or `new`, a write target, a class and a function's body choose or build something once and are left out, as is `id ?? uid()`; so a declaration reading none of them is no derivation.
+// The reads of a value a top-level declaration derives from: the identifiers `isLive` accepts that its initializer reads as a value.
 export function derivedReads(init: Node, isLive: (name: string) => boolean): NodeOfType<'Identifier'>[] {
   const found: NodeOfType<'Identifier'>[] = []
   const seen = new Set<number>()
@@ -110,7 +111,10 @@ export function derivedSpan(path: Path<NodeOfType<'VariableDeclarator'>>, live: 
   const reads = derivedReads(init, (name) => {
     const binding = path.scope.getBinding(name)
 
-    return binding !== undefined && live.has(binding)
+    // The props object read by its name is live as the destructured props are.
+    const node = binding?.path.node
+
+    return binding !== undefined && (live.has(binding) || (node?.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init?.type === 'Identifier' && node.init.name === PROPS))
   })
 
   const span = sourceEnds(map, init)
