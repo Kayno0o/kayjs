@@ -4,7 +4,7 @@ import type { RenderedIslands } from '../runtime/island.server'
 import type { SnapshotReader } from '../runtime/snapshots'
 import type { ClientBuild } from './client'
 import { collectForms } from '../runtime/action'
-import { collectDeferred, rejectedAt } from '../runtime/await.server'
+import { awaitFailed, collectDeferred, rejectedAt } from '../runtime/await.server'
 import { child } from '../runtime/html'
 import { collectIslands, unrevivableAction } from '../runtime/island.server'
 import { LATE_PART_END, SHELL_END } from '../runtime/markers'
@@ -215,7 +215,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           if (!failed && shown)
             return
 
-          const rendered = renderOrReport(() => (failed ?? block.alert)(error), report, render, block.id)
+          const rendered = failed ? renderOrReport(() => failed(error), report, render, block.id) : renderAlert(block, error, report, render)
 
           write(block.id, rendered, false)
           await Promise.all(rendered.deferred.map(send))
@@ -271,9 +271,9 @@ export async function settle(block: PendingBlock, cancelled: () => boolean, repo
     if (!block.failed)
       report(rejectedAt(block, error))
 
-    const failed = block.failed ?? block.fallback ?? block.alert
+    const failed = block.failed ?? block.fallback
 
-    return renderOrReport(() => failed(error), report, render, block.id)
+    return failed ? renderOrReport(() => failed(error), report, render, block.id) : renderAlert(block, error, report, render)
   }
 
   if (cancelled() || value === undefined)
@@ -289,6 +289,18 @@ function drop(blocks: PendingBlock[]): void {
   for (const block of blocks) {
     if (block.value instanceof Promise)
       void Promise.allSettled([block.value])
+  }
+}
+
+// The alert of a block with no `catch` and no `try`: the app's `await-failed.kay`, or kay's own when that throws, its error reported.
+function renderAlert(block: PendingBlock, error: unknown, report: (error: unknown) => void, render: (view: () => unknown, salt?: string) => Rendered): Rendered {
+  try {
+    return render(() => block.alert(error), block.id)
+  }
+  catch (thrown) {
+    report(thrown)
+
+    return renderOrReport(awaitFailed, report, render, block.id)
   }
 }
 

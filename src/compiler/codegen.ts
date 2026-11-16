@@ -13,7 +13,7 @@ import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredR
 import { domHelperImport, DomTemplate } from './dom'
 import { addIslandShorthandTitle, addShorthandChecks, addShorthandGroup, hasShorthandTitle } from './head-shorthand'
 import { emitHeadTag, emitHeadText } from './head-tags'
-import { htmlHelperImport, HtmlTemplate } from './html'
+import { awaitAlertTail, htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
 import { asksOf, exportsIslandOptions, islandMessages } from './island-arguments'
 import { ambientHelpers, constDeclaration } from './items'
@@ -38,6 +38,7 @@ export interface GenerateOptions {
   name: string
   classTable?: ClassTable | undefined
   classMerge?: boolean | undefined
+  awaitAlert?: string | undefined
   // The write helpers the rewrites call, imported from the runtime.
   writes?: ReadonlySet<keyof typeof WRITE_HELPERS> | undefined
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
@@ -376,13 +377,13 @@ class ModuleShell {
       b.add(`import type { JSX as KayJSX } from 'kay'\n`)
 
     if (mode === 'html')
-      b.add(htmlHelperImport())
+      b.add(htmlHelperImport(this.options.awaitAlert, facts.await))
 
     if (this.loadPlan)
       b.add(`import { loadScope as ${helperName('loadScope')} } from 'kay/html'\n`)
 
     if (mode === 'dom')
-      b.add(domHelperImport())
+      b.add(domHelperImport(this.options.awaitAlert, facts.await))
 
     // Apart from the DOM helpers, which the entry shares with every page, so only a site using it ships its code.
     if (mode === 'dom' && this.kind === 'island' && titled)
@@ -537,13 +538,11 @@ class ModuleShell {
     const located = this.options.inspect === true ? sourceLocator(this.options.inspectSource?.text ?? src, this.options.moduleId, this.options.inspectSource?.real) : undefined
 
     if (mode === 'html') {
-      const server = new HtmlTemplate(b, src, this.facts, this.ownMarkup, { classMerge: this.options.classMerge, hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { groups: this.loadPlan.groups } })
-
-      server.value(visible)
+      new HtmlTemplate(b, src, this.facts, this.ownMarkup, { classMerge: this.options.classMerge, awaitAlert: awaitAlertTail(this.options.awaitAlert, 'html'), hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { groups: this.loadPlan.groups } }).value(visible)
       b.add('\n}\n')
     }
     else if (mode === 'dom') {
-      const dom = new DomTemplate(b, src, this.facts, this.ownMarkup, errors, located, this.options.classTable)
+      const dom = new DomTemplate(b, src, this.facts, this.ownMarkup, errors, located, this.options.classTable, awaitAlertTail(this.options.awaitAlert, 'dom'))
 
       dom.block(visible)
       b.add('\n}\n')

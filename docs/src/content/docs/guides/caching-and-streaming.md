@@ -152,6 +152,19 @@ Without `catch`, a rejection renders the `catch` of the nearest `try` around the
 
 The alert is `<span class="kay-await-failed" role="alert" data-kay-await-failed>`, which you style by its class or attribute. Word it under the `kay.await.failed` message; an island that has an `await` carries the message too. `renderToString` has no page to show it on, so it fails instead.
 
+To replace that alert for the whole app, put a component in `src/await-failed.kay` and it is drawn in place of that alert, wherever an `await` with no `catch` and no `try` fails, on a page or in an island. It receives the `error`, and in the browser a `retry` that evaluates the awaited expression again, so `await load()` fetches once more while a promise held in a variable rejects the same way.
+
+```kay
+---
+const { error, retry } = props<{ error: unknown, retry?: () => void }>()
+---
+p.alert Could not load this part.
+if retry
+  button(onClick={retry}) Try again
+```
+
+The error is the real one, so show its message only where you would show it to a visitor. If the component throws, kay's alert is shown and that error is reported too. Without the file nothing changes.
+
 On a prerendered page the block resolves at build. The page is written with the settled content, a visitor never sees `Loading comments`, and a slow value makes the build wait. `kay build` warns of such a block with its page and line, and names a page that waited a second or more. To show the pending content, put the block in a client island or a deferred server island (`server="defer"`), or render the page per request with `prerender: false`.
 
 Islands inside a streamed block hydrate when it lands. A form inside one is checked and sent by kay as one in the page is, with the page's locale words and its proof-of-work challenge.

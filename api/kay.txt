@@ -1867,6 +1867,7 @@ function compileKay(original: string, filename: string, options?: CompileOptions
 
 [./compiler] CompileOptions
 interface CompileOptions
+  awaitAlert?: string | undefined
   check?: boolean | undefined
   classMerge?: boolean | undefined
   classTable?: ClassTable | undefined

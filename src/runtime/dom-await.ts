@@ -1,6 +1,6 @@
 import { AWAIT_FAILED, AWAIT_FAILED_KEY } from './await-failed'
 import { blockIn, islandOf, Region, release, swap } from './dom'
-import { getOwner, onCleanup, renderEffect, reportError, runWithOwner, unrecorded, untrack } from './reactive'
+import { createSignal, getOwner, onCleanup, renderEffect, reportError, runWithOwner, unrecorded, untrack } from './reactive'
 import { isSnapshots, readSnapshots } from './snapshots'
 import { wording } from './words.client'
 
@@ -21,13 +21,32 @@ function failure(): HTMLElement {
   return alert
 }
 
+// The app's alert, or kay's own when it throws, the error reported.
+function shown(alert: ((error: unknown, retry?: () => void) => unknown) | undefined, error: unknown, retry: () => void, island: string | undefined): unknown {
+  if (alert === undefined)
+    return failure()
+
+  try {
+    return alert(error, retry)
+  }
+  catch (thrown) {
+    reportError(thrown, island)
+
+    return failure()
+  }
+}
+
 // An `await` block: the pending block while the value is a promise, then the `then` or `catch` block once it settles, or with no `catch` the enclosing `try`'s as `fallback`, or an alert; a plain value renders `then` at once, and an async iterable renders `then` again with each part, at most once a frame.
-export function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined): void {
+export function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined, alert?: ((error: unknown, retry?: () => void) => unknown) | undefined): void {
   const region = new Region(element, start, end)
   const block = blockIn(region)
   let version = 0
+  // Read by the block, so the app's alert running it again evaluates its value afresh; a block with no alert of the app's keeps no signal.
+  const [attempt, retry] = alert === undefined ? [() => 0, () => undefined] : createSignal(0)
 
   renderEffect(() => {
+    attempt()
+
     const settled = value()
     const own = ++version
 
@@ -93,7 +112,7 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
             if (own === version)
               reportError(error, islandOf(region.parent))
 
-            land(() => fallback ? fallback(error) : failure())
+            land(() => fallback ? fallback(error) : shown(alert, error, () => retry(attempt() + 1), islandOf(region.parent)))
           }
 
           return

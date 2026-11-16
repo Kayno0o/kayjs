@@ -15,16 +15,7 @@ import { addGroupChecked, checksMarkup, groupValue, staticAttributeText } from '
 import { addStyleArguments } from './style-arguments'
 import { bindEvent } from './validate'
 
-// The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attribute', 'branches', 'checkedMarkup', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'listenSubmitWith', 'listenWith', 'markers', 'memo', 'merge', 'omit', 'outside', 'part', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
-// The helpers in modules of their own, as their runtimes weigh on a page whose islands use none of them: the module of each is only loaded by a page with an island that compiles to it.
-const APART = [['kay/dom-loop', ['loop', 'rowKey']], ['kay/dom-await', ['awaited']], ['kay/dom-try', ['attempt']], ['kay/dom-spread', ['dynamic', 'spread']], ['kay/dom-image', ['image']], ['kay/pending', ['pendingCall']]] as const
-
-export function domHelperImport(): string {
-  const named = (helpers: readonly string[]) => helpers.map(helper => `${helper} as ${helperName(helper)}`).join(', ')
-
-  return `import { ${named(DOM_HELPERS)} } from 'kay/dom'\n${APART.map(([module, helpers]) => `import { ${named(helpers)} } from '${module}'\n`).join('')}`
-}
+export { domHelperImport } from './helper-imports'
 
 // A node of a template, so the code can reach the ones it binds: through `firstChild` and `nextSibling`, and past a dynamic part through its end marker.
 interface TemplateNode {
@@ -56,7 +47,7 @@ export class DomTemplate extends TemplateWriter {
 
   // `errors`: what a refused form's fields are described by.
   // `located`, in development: the source position each element carries for `kay dev`'s inspector.
-  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, ownMarkup: (name: string, at: number) => boolean, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined, classTable?: ClassTable) {
+  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, ownMarkup: (name: string, at: number) => boolean, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined, classTable?: ClassTable, private readonly awaitAlert = '') {
     super(b, src, facts, ownMarkup)
     this.classTable = classTable
   }
@@ -375,8 +366,8 @@ export class DomTemplate extends TemplateWriter {
     }
 
     // With no `catch` of its own, a rejection renders the enclosing `try`'s, or nothing when that has none.
-    if (!node.rejected && this.catches.length > 0)
-      b.add(`, ${this.catches.at(-1)!}`)
+    if (!node.rejected)
+      b.add(this.catches.length > 0 ? `, ${this.catches.at(-1)!}` : this.awaitAlert)
 
     b.add(');')
   }

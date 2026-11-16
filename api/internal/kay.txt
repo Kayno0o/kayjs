@@ -143,6 +143,9 @@ function arrives(search: string): boolean
 [./await] Await
 function Await<T>(props: AwaitChannel<T>): Element
 
+[./await] awaitFailed
+function awaitFailed(): Html
+
 [./await] collectDeferred
 function collectDeferred<T>(render: () => T, within?: string | undefined): { result: T; deferred: PendingBlock[]; }
 
@@ -151,7 +154,7 @@ const earlyRejections: Pick<EarlyRejections, "graceMs">
 
 [./await] PendingBlock
 interface PendingBlock
-  alert: () => unknown
+  alert: (error: unknown) => unknown
   failed?: ((error: unknown) => unknown) | undefined
   fallback?: ((error: unknown) => unknown) | undefined
   id: string
@@ -436,7 +439,7 @@ function untrack<T>(fn: () => T): T
 function within<T>(parent: Node, value: T): T
 
 [./dom-await] awaited
-function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined): void
+function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined, alert?: ((error: unknown, retry?: (() => void) | undefined) => unknown) | undefined): void
 
 [./dom-image] image
 function image(element: Element, src: unknown, sized: boolean, sizes?: unknown, aspect?: unknown, quality?: unknown): void

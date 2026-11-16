@@ -21,8 +21,6 @@ import { addStyleArguments } from './style-arguments'
 const WRITTEN_AS = { image: 'src', selected: 'value' } as const
 // A number written in the template, `0` or `-1.5`, as an attribute's whole expression.
 const NUMBER_LITERAL = /^\s*-?\d+(?:\.\d+)?\s*$/
-// The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'checkedMarkup', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'formKey', 'head', 'html', 'imageAttributes', 'innerMarkup', 'leadingNewline', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'rawData', 'rawTyped', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
 
 // The helper writing an element's content expression that is not raw text: an `innerHTML` as the markup it is, anything else as text.
 function contentHelper(content: { property: string, raw: boolean } | undefined): string {
@@ -50,13 +48,10 @@ function mayStartWithNewline(children: Node[], fill: string | undefined, plan: E
   return first.kind !== 'text' || NEWLINE_START.test(decodeEntities(first.text))
 }
 
-export function htmlHelperImport(): string {
-  return `import { ${HTML_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/html'\n`
-}
-
 export interface HtmlOptions {
   // The app has Tailwind, so a class table may merge classes while rendering.
   classMerge?: boolean | undefined
+  awaitAlert?: string | undefined
   // An island or a twin: dynamic parts carry markers for hydration.
   hydratable?: boolean | undefined
   // Loop rows read their item, and a keyed row its index, through functions, as the island build of the same template does.
@@ -68,6 +63,8 @@ export interface HtmlOptions {
   // A refresh naming some of the page's loads leaves an element reading none of them to the page as it is: the group of each such element by where it starts, with the id it carries.
   kept?: { groups: ReadonlyMap<number, { group: number, id: string }> } | undefined
 }
+
+export { awaitAlertTail, htmlHelperImport } from './helper-imports'
 
 // A template as code building its markup: what pages, layouts and static components render to outside islands, with no reactive runtime.
 export class HtmlTemplate extends TemplateWriter {
@@ -422,8 +419,8 @@ export class HtmlTemplate extends TemplateWriter {
       }
 
       // With no `catch` of its own, a rejection renders the enclosing `try`'s, or nothing when that has none.
-      if (!node.rejected && this.catches.length > 0)
-        b.add(`, fallback: (error) => ${helperName('html')}(${this.catches.at(-1)!}(error))`)
+      if (!node.rejected)
+        b.add(this.catches.length > 0 ? `, fallback: (error) => ${helperName('html')}(${this.catches.at(-1)!}(error))` : this.options.awaitAlert ?? '')
 
       b.add(' }))')
     })

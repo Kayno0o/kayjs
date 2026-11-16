@@ -19,14 +19,14 @@ export interface PendingBlock {
   failed?: ((error: unknown) => unknown) | undefined
   // The `catch` of the `try` around the block, rendered, and the error reported, when the block has no `catch` of its own.
   fallback?: AwaitChannel<never>['fallback']
-  // What a page shows when the block has neither; a mail fails instead, as it would go out with the content missing.
-  alert: () => unknown
+  // What a page shows when the block has neither, the app's `await-failed.kay` or kay's alert; a mail fails instead, as it would go out with the content missing.
+  alert: (error: unknown) => unknown
   // Where the block was rendered, for the error of a block with no `catch` to name its line.
   site?: Error | undefined
 }
 
 // What a block with no `catch` and no `try` around it shows once its value rejects: a plain alert in the page's locale.
-function awaitFailed(): Html {
+export function awaitFailed(): Html {
   return html(`<span class="kay-await-failed" role="alert" data-kay-await-failed>${escape(wording(AWAIT_FAILED_KEY, AWAIT_FAILED))}</span>`)
 }
 
@@ -198,7 +198,7 @@ export function Await<T>(props: AwaitChannel<T>): JSX.Element {
 
   const fallback = props.fallback
 
-  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => following(notes, () => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => following(notes, () => failed(error)))), fallback: fallback && (error => runWithOwner(parent, () => following(notes, () => fallback(error)))), alert: awaitFailed, site: failed ? undefined : new Error('await') })
+  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => following(notes, () => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => following(notes, () => failed(error)))), fallback: fallback && (error => runWithOwner(parent, () => following(notes, () => fallback(error)))), alert: props.alert ?? awaitFailed, site: failed ? undefined : new Error('await') })
   // The streamed block replaces this one whole, so an `await` inside it renders its own pending block and streams nothing.
   deferred = undefined
 
