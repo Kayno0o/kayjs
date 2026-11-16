@@ -4,6 +4,7 @@ import type { Duration } from './duration'
 import type { JSX } from './jsx'
 import { byteCount } from './byte-count'
 import { durationMs } from './duration'
+import { KayError } from './kay-error'
 import { kayLog } from './log'
 
 // What the server and the browser share of i18n: message lookup, formatting through `Intl`, and locale paths.
@@ -256,7 +257,7 @@ function missingMessage(key: string): string {
     return key
 
   if (typeof window === 'undefined')
-    throw new Error(`kay: no locale has the message ${JSON.stringify(key)}; production would show the key itself`)
+    throw new KayError('helper-failed', `kay: no locale has the message ${JSON.stringify(key)}; production would show the key itself`)
 
   kayLog('error', `no locale has the message ${JSON.stringify(key)}; production shows the key itself`)
 

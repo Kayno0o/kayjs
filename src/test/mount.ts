@@ -9,6 +9,7 @@ import { kay } from '../build/plugin'
 import { refuseBuiltinImports } from '../build/server-only'
 import { loadConfig } from '../config-loader'
 import { projectPaths, writesFrench } from '../project'
+import { KayError } from '../runtime/kay-error'
 import { COOKIE_NAME } from '../runtime/persist'
 import { sendValue } from '../runtime/send'
 import { decodeValue } from '../runtime/wire'
@@ -48,7 +49,7 @@ export function writePersisted(key: string, value: unknown, storage: WebStorage 
 // A `Cookie` header value setting the cookie a `persisted.cookie(name, initial)` signal keeps its value in, for `site.as(persistedCookie('scheme', 'light'))`: the first render of a page reads it.
 export function persistedCookie(name: string, value: unknown): string {
   if (!COOKIE_NAME.test(name))
-    throw new TypeError(`kay: ${JSON.stringify(name)} cannot name a cookie; give persistedCookie() a name of letters, digits and - _ .`)
+    throw new KayError('argument-invalid', `kay: ${JSON.stringify(name)} cannot name a cookie; give persistedCookie() a name of letters, digits and - _ .`)
 
   return `${name}=${encodeURIComponent(sendValue(value))}`
 }
@@ -71,7 +72,7 @@ async function registerDom(): Promise<void> {
   }
   catch (error) {
     if (error instanceof Error && error.message.includes('@happy-dom/global-registrator'))
-      throw new Error('kay: mountComponent renders into a DOM that happy-dom provides: add it with `bun add -d @happy-dom/global-registrator`', { cause: error })
+      throw new KayError('config-invalid', 'kay: mountComponent renders into a DOM that happy-dom provides: add it with `bun add -d @happy-dom/global-registrator`', { cause: error })
 
     throw error
   }
@@ -96,7 +97,7 @@ export async function mountComponent(source: (props: never) => unknown, ...given
   const file = componentFiles()?.get(source)
 
   if (file === undefined)
-    throw new TypeError('kay: mountComponent takes a .kay component imported in a test; this function was not built from a .kay file the test loader loaded (the loader notes components under NODE_ENV=test, which `bun test` sets)')
+    throw new KayError('argument-invalid', 'kay: mountComponent takes a .kay component imported in a test; this function was not built from a .kay file the test loader loaded (the loader notes components under NODE_ENV=test, which `bun test` sets)')
 
   const props = (given[0] ?? {}) as Record<string, unknown>
   const path = resolve(root, file)

@@ -1,5 +1,6 @@
 import type { Register } from './checks'
 import type { Schema, Static } from './schema'
+import { KayError } from './kay-error'
 
 // Where the server, as it boots, and the island entry, as it loads, keep the values `publicEnv` reads.
 export const PUBLIC_ENV = /* @__PURE__ */ Symbol.for('kay.publicEnv')
@@ -25,7 +26,7 @@ function values(): Record<string, unknown> {
   const held = (globalThis as { [PUBLIC_ENV]?: Record<string, unknown> })[PUBLIC_ENV]
 
   if (!held)
-    throw new Error('kay: the app declares no public environment variable, with s.Public in defineEnv')
+    throw new KayError('config-invalid', 'kay: the app declares no public environment variable, with s.Public in defineEnv')
 
   return held
 }

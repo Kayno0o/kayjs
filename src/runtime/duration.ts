@@ -1,3 +1,5 @@
+import { KayError } from './kay-error'
+
 // A length of time written with its unit, never a bare number: `'250ms'`, `'30s'`, `'5m'`, `'12h'`, `'30d'` or `'2w'`.
 export type Duration = `${number}${'ms' | keyof typeof UNIT_SECONDS}`
 
@@ -27,7 +29,7 @@ export function durationSeconds(value: unknown, what: string): number {
   const parsed = text ? inSeconds(Number(text[1]), text[2]!) : Number.NaN
 
   if (!Number.isFinite(parsed) || parsed <= 0)
-    throw new Error(`kay: ${what} is ${typeof value === 'string' ? `'${value}'` : String(value)}; it takes a positive duration such as '250ms', '5m' or '30d'`)
+    throw new KayError('argument-invalid', `kay: ${what} is ${typeof value === 'string' ? `'${value}'` : String(value)}; it takes a positive duration such as '250ms', '5m' or '30d'`)
 
   return parsed
 }
@@ -42,7 +44,7 @@ export function wholeSeconds(value: unknown, what: string): number {
 // kept: free
 export function durationMs(value: Duration): number {
   if (typeof value !== 'string')
-    throw new Error(`kay: a duration here takes its unit, such as '3s' or '250ms', not ${String(value)}${typeof value === 'number' ? '; a store\'s `maxAge` and `window` are milliseconds since 1.88, so use the number as it is' : ''}`)
+    throw new KayError('argument-invalid', `kay: a duration here takes its unit, such as '3s' or '250ms', not ${String(value)}${typeof value === 'number' ? '; a store\'s `maxAge` and `window` are milliseconds since 1.88, so use the number as it is' : ''}`)
 
   const text = DURATION_TEXT.exec(value)
 
@@ -52,7 +54,7 @@ export function durationMs(value: Duration): number {
 // The same for a server or library option: a bare number throws naming the option, and a string must be a positive duration or it throws too.
 export function optionMs(value: Duration, what: string): number {
   if (typeof value !== 'string')
-    throw new Error(`kay: ${what} is ${String(value)}; it takes a duration with its unit, such as '3s' or '250ms'`)
+    throw new KayError('argument-invalid', `kay: ${what} is ${String(value)}; it takes a duration with its unit, such as '3s' or '250ms'`)
 
   durationSeconds(value, what)
 

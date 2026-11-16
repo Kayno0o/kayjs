@@ -195,7 +195,7 @@ export async function bounded<T>(read: () => T | Promise<T>): Promise<T> {
     return await Promise.race([
       (async () => read())(),
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`the store did not answer in ${storeTimeoutMs} ms`)), storeTimeoutMs)
+        timer = setTimeout(() => reject(new KayError('helper-failed', `the store did not answer within its timeout of ${storeTimeoutMs} ms`)), storeTimeoutMs)
       }),
     ])
   }

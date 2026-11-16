@@ -10,6 +10,7 @@ import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { flush, root, signal } from '../src/runtime'
 import { ActionError, ActionRedirectError } from '../src/runtime/action'
+import { KayError } from '../src/runtime/kay-error'
 import { ApiError, call, dispatch, openSocket, readEvents, resource, routeUrl, socket, stream } from '../src/runtime/live'
 import { encodeValue } from '../src/runtime/wire'
 import { apiStubs, scanApi } from '../src/server/api-modules'
@@ -1749,7 +1750,7 @@ describe('routeUrl', () => {
 
   it('refuses a param that is a dot segment, which would reach the parent route', () => {
     for (const id of ['.', '..'])
-      expect(() => routeUrl(users, '/:id', { params: { id } })).toThrow(TypeError)
+      expect(() => routeUrl(users, '/:id', { params: { id } })).toThrow(KayError)
   })
 
   it('encodes a dot-like param so it stays one segment', () => {
@@ -1763,14 +1764,14 @@ describe('routeUrl', () => {
     expect(routeUrl(users, '/files/*', { params: { '*': '' } })).toBe('/api/users/files/')
 
     for (const rest of ['..', '.', 'a/../b', 'a/./b', '../b', 'a/..'])
-      expect(() => routeUrl(users, '/files/*', { params: { '*': rest } })).toThrow(TypeError)
+      expect(() => routeUrl(users, '/files/*', { params: { '*': rest } })).toThrow(KayError)
 
     expect(routeUrl(users, '/files/*', { params: { '*': '%2e%2e/b' } })).toBe('/api/users/files/%252e%252e/b')
   })
 
   it('refuses an empty param, which would reach the collection route, and lets a wildcard stay empty', () => {
-    expect(() => routeUrl(users, '/:id', { params: { id: '' } })).toThrow(TypeError)
-    expect(() => routeUrl(users, '/:org/:id', { params: { org: 'a', id: '' } })).toThrow(TypeError)
+    expect(() => routeUrl(users, '/:id', { params: { id: '' } })).toThrow(KayError)
+    expect(() => routeUrl(users, '/:org/:id', { params: { org: 'a', id: '' } })).toThrow(KayError)
     expect(routeUrl(users, '/:id', { params: { id: 0 } })).toBe('/api/users/0')
     expect(routeUrl(users, '/:id', { params: { id: ' ' } })).toBe('/api/users/%20')
   })
@@ -1779,7 +1780,7 @@ describe('routeUrl', () => {
     const fetched = spyOn(globalThis, 'fetch')
 
     try {
-      await expect(call(users as never, '/:id' as never, { method: 'delete', params: { id: '' } } as never)).rejects.toThrow(TypeError)
+      await expect(call(users as never, '/:id' as never, { method: 'delete', params: { id: '' } } as never)).rejects.toThrow(KayError)
       expect(fetched).not.toHaveBeenCalled()
     }
     finally {
@@ -1794,9 +1795,9 @@ describe('routeUrl', () => {
       expect(() => root(() => stream(users as never, '/:id' as never, { start: false } as never))).not.toThrow()
 
       for (const id of ['', '..']) {
-        expect(() => root(() => stream(users as never, '/:id' as never, { params: { id } } as never))).toThrow(TypeError)
-        expect(() => root(() => stream(users as never, '/:id' as never, { start: false } as never).start({ params: { id } } as never))).toThrow(TypeError)
-        expect(() => root(() => socket(users as never, '/:id' as never, { params: { id } }))).toThrow(TypeError)
+        expect(() => root(() => stream(users as never, '/:id' as never, { params: { id } } as never))).toThrow(KayError)
+        expect(() => root(() => stream(users as never, '/:id' as never, { start: false } as never).start({ params: { id } } as never))).toThrow(KayError)
+        expect(() => root(() => socket(users as never, '/:id' as never, { params: { id } }))).toThrow(KayError)
       }
     }
     finally {
@@ -1805,7 +1806,7 @@ describe('routeUrl', () => {
   })
 
   it('rejects a call whose param is a dot segment before any fetch', async () => {
-    await expect(call(users as never, '/:id' as never, { params: { id: '..' } } as never)).rejects.toThrow(TypeError)
+    await expect(call(users as never, '/:id' as never, { params: { id: '..' } } as never)).rejects.toThrow(KayError)
   })
 })
 
@@ -1844,8 +1845,8 @@ describe('site.api, default headers and socket.refused', () => {
   })
 
   it('encodes a param as one segment and refuses one reaching another route', async () => {
-    await expect(site.api(chat, '/rooms/:name', { params: { name: '..' } })).rejects.toThrow(TypeError)
-    await expect(site.api(chat, '/rooms/:name', { params: { name: '' } })).rejects.toThrow(TypeError)
+    await expect(site.api(chat, '/rooms/:name', { params: { name: '..' } })).rejects.toThrow(KayError)
+    await expect(site.api(chat, '/rooms/:name', { params: { name: '' } })).rejects.toThrow(KayError)
     expect((await site.api(chat, '/rooms/:name', { params: { name: 'a/b' } })).status).toBe(404)
   })
 

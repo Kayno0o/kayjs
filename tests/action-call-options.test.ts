@@ -2,6 +2,7 @@ import type { CallOptions } from '../src/runtime/action'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
+import { KayError } from '../src/runtime/kay-error'
 import { turn } from './helpers/eventually'
 
 let reactive: typeof import('../src/runtime/reactive')
@@ -429,7 +430,7 @@ describe('the retries of a call', () => {
   it('never retries what is no failure of the post: a refused redirect, or an error thrown encoding the input', async () => {
     const redirect = serve(() => new Response(null, { status: 200, headers: { 'x-kay-redirect': 'javascript:alert(1)' } }))
 
-    await expect(stub()({}, { retry: { times: 2, delay: '1ms', when: () => true } })).rejects.toBeInstanceOf(TypeError)
+    await expect(stub()({}, { retry: { times: 2, delay: '1ms', when: () => true } })).rejects.toBeInstanceOf(KayError)
     expect(redirect.posts()).toBe(1)
     mocks.pop()!.mockRestore()
 

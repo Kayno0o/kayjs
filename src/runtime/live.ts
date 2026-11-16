@@ -9,6 +9,7 @@ import { withBase } from './base'
 import { callBody } from './call-body'
 import { trackCalls } from './call-result'
 import { connection, connectionHooks, ended } from './connection'
+import { KayError } from './kay-error'
 import { withKeepalive } from './keepalive'
 import { listenerSet } from './listener-set'
 import { serverResource } from './live-resource.server'
@@ -20,6 +21,7 @@ import { parseEvents, SENDABLE_ID } from './sse'
 import { decodeServerValue } from './wire'
 
 export { API_MOUNT, apiUrl, routeUrl } from './api-url'
+export { dispatch } from './dispatch'
 
 // Defined by the browser build, which never runs the server's half: tested where it is read, so the bundler drops it.
 declare const KAY_BROWSER: true | undefined
@@ -159,16 +161,6 @@ export interface Connection<T> extends Reader<T, ConnectionStatus> {
   close: () => void
   // Resolves with the last value once the stream ran to its end, undefined when it sent none; rejects with an `ApiError` when it failed, and an `AbortError` when it was closed first.
   ended: () => Promise<T | undefined>
-}
-
-// The handler a message's `type` names, given the message: one function per type in place of a `switch`, every type handled, as the compiler checks.
-// A type no handler names, such as one a newer server sends, throws, saying which.
-// kept: request
-export function dispatch<Message extends { type: string }, Handlers extends { [Type in Message['type']]: (message: Extract<Message, { type: Type }>) => unknown }>(message: Message, handlers: Handlers): ReturnType<Handlers[Message['type']]> {
-  if (!Object.hasOwn(handlers, message.type))
-    throw new TypeError(`kay: dispatch() has no handler for a message of type ${message.type}`)
-
-  return (handlers[message.type as Message['type']] as unknown as (message: Message) => ReturnType<Handlers[Message['type']]>)(message)
 }
 
 // A websocket that reconnects after a drop, waiting longer each time, until `close()`; `connect` gives none where there is nothing to connect from.
@@ -535,7 +527,7 @@ export function stream(module: unknown, path?: string | ConnectionHooks<unknown>
     return iterate(module as (signal: AbortSignal) => AsyncIterable<unknown>, path as ConnectionHooks<unknown> | undefined)
 
   if (typeof path !== 'string')
-    throw new TypeError('kay: stream() takes the default export of a module under src/api and a path, or a function returning an async iterable')
+    throw new KayError('argument-invalid', 'kay: stream() takes the default export of a module under src/api and a path, or a function returning an async iterable')
 
   const lazy = options?.start === false
   const opened = (given: UrlInput | undefined) => {

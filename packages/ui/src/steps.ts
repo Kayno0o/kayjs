@@ -4,6 +4,7 @@ import type { Duration } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import { durationMs } from 'kay'
+import { KayError } from 'kay/internal'
 import { ORIGIN } from './tab-nav'
 
 export interface StepItem<Key extends string = string> {
@@ -31,7 +32,7 @@ function cookieSeconds(value: Duration): number {
   const ms = durationMs(value)
 
   if (!(ms > 0))
-    throw new Error(`kay: stepDraft maxAge is '${value}'; it takes a positive duration such as '30m' or '7d'`)
+    throw new KayError('argument-invalid', `kay: stepDraft maxAge is '${value}'; it takes a positive duration such as '30m' or '7d'`)
 
   return Math.ceil(ms / 1000)
 }
@@ -122,7 +123,7 @@ export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = 
       const text = JSON.stringify({ ...read(), [step]: held })
 
       if (encodeURIComponent(text).length > DRAFT_LIMIT)
-        throw new RangeError(`The draft of ${name} is over ${DRAFT_LIMIT} bytes once encoded, too much for a cookie`)
+        throw new KayError('helper-failed', `The draft of ${name} is over ${DRAFT_LIMIT} bytes once encoded, too much for a cookie`)
 
       cookies.set(cookie, text, { path, httpOnly: true, sameSite: 'lax', secure, maxAge: seconds })
     },

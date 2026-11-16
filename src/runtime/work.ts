@@ -1,3 +1,5 @@
+import { KayError } from './kay-error'
+
 // SHA-256's constants, the fractional parts of the cube roots of the first 64 primes and the square roots of the first 8, worked out rather than written out.
 const PRIMES = Array.from({ length: 312 }, (_, n) => n).filter(n => n > 1 && Array.from({ length: n - 2 }, (_, d) => d + 2).every(d => n % d !== 0))
 const ROUNDS = Uint32Array.from(PRIMES, prime => (Math.cbrt(prime) % 1) * 2 ** 32)
@@ -8,7 +10,7 @@ const START = Uint32Array.from(FIRST_PRIMES, prime => (Math.sqrt(prime) % 1) * 2
 // The SHA-256 of an ASCII text shorter than 56 characters, which fits one block: all a challenge hashes, and in plain script as `crypto.subtle` costs a promise per hash and is missing outside HTTPS.
 export function digest(text: string, words = new Uint32Array(64), into = new Uint32Array(8)): Uint32Array {
   if (text.length > 55)
-    throw new RangeError(`kay: digest hashes one block, under 56 characters, not ${text.length}`)
+    throw new KayError('argument-invalid', `kay: digest hashes one block, under 56 characters, not ${text.length}`)
 
   words.fill(0, 0, 16)
 
@@ -16,7 +18,7 @@ export function digest(text: string, words = new Uint32Array(64), into = new Uin
     const code = text.charCodeAt(index)
 
     if (code > 127)
-      throw new RangeError('kay: digest hashes ASCII text only')
+      throw new KayError('argument-invalid', 'kay: digest hashes ASCII text only')
 
     words[index >> 2]! |= code << (24 - (index & 3) * 8)
   }

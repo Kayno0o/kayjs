@@ -1,6 +1,7 @@
 import type { NodeAt, Nodes, Optional, RouteKey, RoutesOf, UrlOptions } from './live'
 import { withBase } from './base'
 import { fieldText } from './call-body'
+import { KayError } from './kay-error'
 
 // Set by the server on every module it mounts under `/api`, and by the browser build on the stub standing in for one: where the module's routes are served.
 export const API_MOUNT = Symbol.for('kay.api')
@@ -17,7 +18,7 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
   const mount = (module as { [API_MOUNT]?: string } | undefined)?.[API_MOUNT]
 
   if (mount === undefined)
-    throw new TypeError('kay: socket(), stream(), resource(), call() and apiUrl() take the default export of a module under src/api')
+    throw new KayError('argument-invalid', 'kay: socket(), stream(), resource(), call() and apiUrl() take the default export of a module under src/api')
 
   const segments = path.split('/').map((segment) => {
     if (segment === '*')
@@ -31,10 +32,10 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
     const value = options.params?.[param]
 
     if (value === undefined)
-      throw new TypeError(`kay: ${path} takes the param ${param}`)
+      throw new KayError('argument-invalid', `kay: ${path} takes the param ${param}`)
 
     if (value === '')
-      throw new TypeError(`kay: ${path} cannot take an empty ${param}, it would reach the collection route`)
+      throw new KayError('argument-invalid', `kay: ${path} cannot take an empty ${param}, it would reach the collection route`)
 
     return encodeSegment(String(value), path)
   })
@@ -76,7 +77,7 @@ export function apiUrl(module: unknown, path = '/', options: UrlInput = {}): str
 // A dot segment would be resolved by the URL parser and reach the parent route.
 function encodeSegment(value: string, path: string): string {
   if (value === '.' || value === '..')
-    throw new TypeError(`kay: ${path} cannot take "${value}" as a param, it would reach the parent route`)
+    throw new KayError('argument-invalid', `kay: ${path} cannot take "${value}" as a param, it would reach the parent route`)
 
   return encodeURIComponent(value)
 }

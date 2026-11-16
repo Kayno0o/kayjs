@@ -1,6 +1,7 @@
 // How both renderers read the values a template gives, kay/html into markup and kay/dom into nodes, so a page hydrates into what the server wrote.
 
 import { resolveClasses } from './class-table'
+import { KayError } from './kay-error'
 import { kayLog } from './log'
 import { isVouched } from './safe-html'
 
@@ -33,10 +34,10 @@ export function attributeName(name: string): boolean {
 // The tag a dynamic tag names, refused when HTML would read it as something else, such as `img src=x onerror=...`, or when it names an element that loads or runs something.
 export function elementName(tag: string): string {
   if (!ELEMENT_NAME.test(tag))
-    throw new Error(`kay: ${JSON.stringify(tag)} is not an element name`)
+    throw new KayError('argument-invalid', `kay: ${JSON.stringify(tag)} is not an element name`)
 
   if (UNSAFE_ELEMENTS.has(tag.toLowerCase()))
-    throw new Error(`kay: a dynamic tag cannot be ${JSON.stringify(tag)}, write the element in the template`)
+    throw new KayError('argument-invalid', `kay: a dynamic tag cannot be ${JSON.stringify(tag)}, write the element in the template`)
 
   return tag
 }

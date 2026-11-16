@@ -6,6 +6,7 @@ import { callable } from './action-call'
 import { minTimeOf, resolveProtection, workOf } from './action-protection'
 import { ACTION, isAction } from './action-shared'
 import { durationSeconds } from './duration'
+import { KayError } from './kay-error'
 import { ACTION_PREFIX } from './wire'
 
 export { actionStub, OUTCOME_SCRIPT, setRequestOutcome } from './action-call'
@@ -74,10 +75,10 @@ export function declare(schema: Schema, handler: (input: unknown, ctx: ActionCon
     durationSeconds(limit.window, 'rateLimit.window')
 
     if (limit.onLimit !== undefined && typeof limit.onLimit !== 'function')
-      throw new Error('kay: a rateLimit has an onLimit that is not a function; it takes a function of the refusal')
+      throw new KayError('config-invalid', 'kay: a rateLimit has an onLimit that is not a function; it takes a function of the refusal')
 
     if (limit.count === 'succeeded' && limit.store && !limit.store.peek)
-      throw new Error('kay: a rateLimit counting only the posts that went through reads its count before the handler runs, so its store needs a peek(key) method')
+      throw new KayError('config-invalid', 'kay: a rateLimit counting only the posts that went through reads its count before the handler runs, so its store needs a peek(key) method')
   }
 
   const state = { url: '' }

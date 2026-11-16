@@ -1,3 +1,4 @@
+import { KayError } from './kay-error'
 import { live } from './live-value'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
@@ -41,7 +42,7 @@ export function readJobsWith(read: Read): void {
 export function jobs<Payload = unknown, Progress = unknown>(queue: string): QueuedJob<Payload, Progress>[] {
   handle ??= (live as (initial: Read, id: string, name: string) => Read)((name: string) => {
     if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' && readJobs === undefined)
-      throw new Error(`kay: jobs('${name}') names no queue declared with \`live\`: give queue('${name}', handler, { live: true }) the option, and import its module in the server`)
+      throw new KayError('config-invalid', `kay: jobs('${name}') names no queue declared with \`live\`: give queue('${name}', handler, { live: true }) the option, and import its module in the server`)
 
     return readJobs?.(name) ?? []
   }, JOBS_LIVE_ID, 'jobs')

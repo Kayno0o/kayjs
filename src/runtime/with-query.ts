@@ -1,5 +1,6 @@
 import type { QueryChanges } from './navigate-api'
 import { withoutBase } from './base'
+import { KayError } from './kay-error'
 import { mergeQuery } from './navigate-api'
 import { ownDep } from './reactive'
 
@@ -39,7 +40,7 @@ export function withQuery(changes: QueryChanges): string {
     const url = serverUrl?.()
 
     if (url === undefined)
-      throw new Error('kay: withQuery() reads the query of the request being rendered, and a page rendered once at build time has none; render the page per request, or build the link in an island')
+      throw new KayError('outside-request', 'kay: withQuery() reads the query of the request being rendered, and a page rendered once at build time has none; render the page per request, or build the link in an island')
 
     path = url.pathname
 

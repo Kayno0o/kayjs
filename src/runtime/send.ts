@@ -1,3 +1,4 @@
+import { KayError } from './kay-error'
 import { CONSTANTS, isIndex, SPARSE } from './wire'
 
 // Writes a custom type the reducer of its name recognizes, returning what stands for it or a falsy value for any other.
@@ -110,5 +111,5 @@ function writeArray(array: unknown[], flatten: (thing: unknown) => number): stri
 }
 
 function refuse(what: string): never {
-  throw new TypeError(`kay: ${what} cannot be sent to the server or kept by a persisted signal`)
+  throw new KayError('argument-invalid', `kay: ${what} cannot be sent to the server or kept by a persisted signal`)
 }

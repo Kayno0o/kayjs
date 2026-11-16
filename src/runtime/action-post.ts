@@ -8,6 +8,7 @@ import { closeWithCaller, SETTLED } from './action-owner'
 import { withBase } from './base'
 import { skew } from './build'
 import { invalidatedKeys } from './invalidated-keys'
+import { KayError } from './kay-error'
 import { withKeepalive } from './keepalive'
 import { prefetched } from './navigation'
 import { watchedTags } from './resource-tags'
@@ -114,7 +115,7 @@ export async function readActionResponse<Output>(response: Response, action: str
 
     // Only a page goes there: a `javascript:` target would run in this one.
     if (!HTTP_PROTOCOLS.has(new URL(target, window.location.href).protocol))
-      throw new TypeError(`kay: the action redirected to ${JSON.stringify(target)}, which is no page`)
+      throw new KayError('helper-failed', `kay: the action redirected to ${JSON.stringify(target)}, which is no page`)
 
     if (left?.() === true)
       throw new ActionRedirectError(response.status, target)

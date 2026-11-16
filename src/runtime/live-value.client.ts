@@ -1,6 +1,7 @@
 import type { ApiError } from './api-error'
 import type { Handle, LiveKey, LivePage, LiveRequest, LiveUpdate } from './live-value.shared'
 import { withBase } from './base'
+import { KayError } from './kay-error'
 import { listenerSet } from './listener-set'
 import { readEvents } from './live'
 import { initialOf, keyText, LIVE_ROUTE, LIVE_SCRIPT, PROOF_LIFETIME_MS } from './live-value.shared'
@@ -408,7 +409,7 @@ export function browserLive(id: string, initial: unknown): Handle {
   }
 
   const refuse = (): never => {
-    throw new TypeError(`kay: the live value ${id} is changed on the server, not in a browser`)
+    throw new KayError('helper-failed', `kay: the live value ${id} is changed on the server, not in a browser`)
   }
 
   return Object.assign(keyed ? (key: LiveKey) => read(keyText(key)) : () => read(''), { set: refuse, ...keyed && { delete: refuse } }, connectionOf, { onData: slot.data.on, onError: (listener: (event: { error: ApiError }) => void) => failures().on(listener) }) as unknown as Handle

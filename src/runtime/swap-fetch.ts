@@ -1,4 +1,5 @@
 import type { FetchedPage, LateParts } from './navigation'
+import { KayError } from './kay-error'
 import { LATE_PART_END, SHELL_END, STREAMED_HEADER } from './markers'
 import { pageKey, prefetched } from './navigation'
 import { LOADS_HEADER, NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
@@ -158,7 +159,7 @@ async function shellOf(reader: ReadableStreamDefaultReader<Uint8Array>): Promise
             const next = await bounded(reader.read(), limit)
 
             if (next === LATE)
-              throw new Error(`kay: the page stopped streaming for ${limit} ms`)
+              throw new KayError('helper-failed', `kay: the page stopped streaming for the pageTimeout of ${limit} ms`)
 
             if (next.done)
               return undefined

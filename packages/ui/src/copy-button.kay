@@ -1,4 +1,5 @@
 ---
+import { KayError } from 'kay/internal'
 import type { Duration, JSX } from 'kay'
 import type { Size } from './size'
 import { copyToClipboard } from '@kaynooo/utils/browser/clipboard'
@@ -55,7 +56,7 @@ async function write(): Promise<string> {
 
       // An empty blob would wipe the clipboard, so an empty answer fails the write instead.
       if (!resolved)
-        throw new Error('kayjs-ui: nothing to copy')
+        throw new KayError('helper-failed', 'kayjs-ui: nothing to copy')
 
       return new Blob([resolved], { type: 'text/plain' })
     })()

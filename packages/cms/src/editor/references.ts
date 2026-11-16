@@ -1,4 +1,5 @@
 import { call } from 'kay'
+import { KayError } from 'kay/internal'
 import entriesApi from '../api/entries'
 
 export interface Choice {
@@ -21,7 +22,7 @@ export async function referenceChoices(collection: string): Promise<Choice[]> {
     const { choices, complete } = await call(entriesApi, '/:collection', { params: { collection } })
 
     if (!complete)
-      throw new Error('too many entries to list')
+      throw new KayError('helper-failed', 'too many entries to list')
 
     return choices.map(({ slug, title }) => ({ value: slug, label: title === slug ? slug : `${title} (${slug})` }))
   })()

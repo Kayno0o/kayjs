@@ -1,5 +1,6 @@
 import type { Signal } from './core'
 import { TRAILING_SLASH, withBase } from './base'
+import { KayError } from './kay-error'
 import { createSignal, currentServerScope, markSignal } from './reactive'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
@@ -70,13 +71,13 @@ const reader = Object.assign(
   {
     set: (next: Consent | ((current: Consent) => Consent)): void => {
       if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
-        throw new TypeError('kay: consent.set() answers from the browser, in an event handler or an effect; the server can only read the answer')
+        throw new KayError('argument-invalid', 'kay: consent.set() answers from the browser, in an event handler or an effect; the server can only read the answer')
 
       const current = browserState()
       const value = typeof next === 'function' ? next(current.read()) : next
 
       if (value !== 'yes' && value !== 'no' && value !== '')
-        throw new TypeError(`kay: consent takes 'yes', 'no' or '', got ${JSON.stringify(value)}`)
+        throw new KayError('argument-invalid', `kay: consent takes 'yes', 'no' or '', got ${JSON.stringify(value)}`)
 
       current.write(value)
       save(value)

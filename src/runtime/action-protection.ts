@@ -1,5 +1,6 @@
 import type { ActionProtection, ProofOfWorkOptions, RateStore, ResolvedProtection } from './action-shared'
 import { durationSeconds } from './duration'
+import { KayError } from './kay-error'
 
 const DAY = '1d'
 
@@ -25,7 +26,7 @@ export function workOf(protection: ResolvedProtection): { difficulty: number, ma
   const difficulty = options.difficulty ?? 100_000
 
   if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 1e9)
-    throw new Error(`kay: proofOfWork's difficulty is ${difficulty}; it takes a whole number from 1 to 1,000,000,000`)
+    throw new KayError('config-invalid', `kay: proofOfWork's difficulty is ${difficulty}; it takes a whole number from 1 to 1,000,000,000`)
 
   return { difficulty, maxAge: durationSeconds(options.ttl ?? options.maxAge ?? DAY, 'proofOfWork.ttl') * 1000, pretend: options.pretend === true, store: options.store }
 }

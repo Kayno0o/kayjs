@@ -1,3 +1,4 @@
+import { KayError } from './kay-error'
 import { kayLog } from './log'
 
 declare const KAY_BROWSER: true | undefined
@@ -108,14 +109,14 @@ export function setMaxDensity(density: number): void {
 // The widths `images.widths` lists, sorted and without repeats; throws for anything but a list of whole numbers from 1 to 16384, at most 16 of them.
 export function parseWidths(widths: unknown): number[] {
   if (!Array.isArray(widths) || widths.length === 0)
-    throw new Error('images.widths is a list of widths in pixels, such as `[480, 960, 1920]`, with at least one')
+    throw new KayError('config-invalid', 'images.widths is a list of widths in pixels, such as `[480, 960, 1920]`, with at least one')
 
   if (widths.length > MOST_WIDTHS)
-    throw new Error(`images.widths lists ${widths.length} widths, at most ${MOST_WIDTHS}: each one adds a file per image`)
+    throw new KayError('config-invalid', `images.widths lists ${widths.length} widths, at most ${MOST_WIDTHS}: each one adds a file per image`)
 
   for (const width of widths as unknown[]) {
     if (typeof width !== 'number' || !Number.isInteger(width) || width < 1 || width > WIDEST)
-      throw new Error(`images.widths holds ${String(width)}: a width is a whole number of pixels from 1 to ${WIDEST}`)
+      throw new KayError('config-invalid', `images.widths holds ${String(width)}: a width is a whole number of pixels from 1 to ${WIDEST}`)
   }
 
   return [...new Set(widths as number[])].sort((a, b) => a - b)
@@ -195,14 +196,14 @@ export function setAspects(allowed: readonly string[]): void {
     const aspect = parseAspect(text)
 
     if (!aspect)
-      throw new Error(`images.aspects holds ${text}: an aspect ratio is two whole numbers from 1 to 100, \`16/9\``)
+      throw new KayError('config-invalid', `images.aspects holds ${text}: an aspect ratio is two whole numbers from 1 to 100, \`16/9\``)
 
     return aspectKey(aspect)
   }))
 
   aspectCheck = (aspect, text) => {
     if (!aspects.has(aspectKey(aspect)))
-      throw new Error(`kay: image() was given aspect ${text}, which images.aspects in kay.config.ts does not list`)
+      throw new KayError('argument-invalid', `kay: image() was given aspect ${text}, which images.aspects in kay.config.ts does not list`)
   }
 }
 
@@ -396,7 +397,7 @@ export function validQuality(quality: number): boolean {
 
 export function allowedQuality(quality: number): number {
   if (!validQuality(quality))
-    throw new Error(`kay: image() was given quality ${String(quality)}: a quality is a multiple of ${QUALITY_STEP} from ${QUALITY_STEP} to 100, which bounds the files one image can turn into`)
+    throw new KayError('argument-invalid', `kay: image() was given quality ${String(quality)}: a quality is a multiple of ${QUALITY_STEP} from ${QUALITY_STEP} to 100, which bounds the files one image can turn into`)
 
   return quality
 }
@@ -405,7 +406,7 @@ function allowedAspect(text: string): Aspect {
   const aspect = parseAspect(text)
 
   if (!aspect)
-    throw new Error(`kay: image() was given aspect ${text}: an aspect ratio is two whole numbers from 1 to 100, \`16/9\``)
+    throw new KayError('argument-invalid', `kay: image() was given aspect ${text}: an aspect ratio is two whole numbers from 1 to 100, \`16/9\``)
 
   aspectCheck?.(aspect, text)
 
@@ -416,7 +417,7 @@ function allowedAspect(text: string): Aspect {
 // kept: free
 export function shareImage(src: string): string {
   if (!RESIZABLE.test(src))
-    throw new Error(`kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG, WebP, GIF or AVIF`)
+    throw new KayError('argument-invalid', `kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG, WebP, GIF or AVIF`)
 
   return unlistedCheck?.(src, 'shareImage()') === true ? src : variantUrl(src, 'card')
 }
@@ -546,16 +547,16 @@ export function setCardMaker(maker: typeof cardMaker): void {
 // kept: free, it signs its URL with the build's own key and reads the page's locale, which a kept copy is stored per.
 export function shareCard(card: ShareCardOptions): string {
   if (card.image !== undefined && SVG_IMAGE.test(card.image) && !card.image.startsWith(IMPORTED))
-    throw new Error(`kay: shareCard() cannot draw on ${card.image}: an SVG is taken only when imported, not from images.dirs, images.remote or a stored file`)
+    throw new KayError('argument-invalid', `kay: shareCard() cannot draw on ${card.image}: an SVG is taken only when imported, not from images.dirs, images.remote or a stored file`)
 
   if (card.image !== undefined && !RESIZABLE.test(card.image) && !SVG_IMAGE.test(card.image))
-    throw new Error(`kay: shareCard() cannot draw on ${card.image}: it takes a PNG, JPEG, WebP, GIF, AVIF or an imported SVG`)
+    throw new KayError('argument-invalid', `kay: shareCard() cannot draw on ${card.image}: it takes a PNG, JPEG, WebP, GIF, AVIF or an imported SVG`)
 
   if (card.image !== undefined && remoteListed && REMOTE.test(card.image) && !remoteListed(card.image))
-    throw new Error(`kay: shareCard() was given ${card.image}, on a host images.remote in kay.config.ts does not list, so the card cannot be drawn on it`)
+    throw new KayError('argument-invalid', `kay: shareCard() was given ${card.image}, on a host images.remote in kay.config.ts does not list, so the card cannot be drawn on it`)
 
   if (!cardMaker)
-    throw new Error('kay: shareCard() draws on the server, in a page\'s head')
+    throw new KayError('argument-invalid', 'kay: shareCard() draws on the server, in a page\'s head')
 
   return cardMaker(card.title, card.image)
 }

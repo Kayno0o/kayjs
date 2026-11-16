@@ -1,4 +1,5 @@
 ---
+import { KayError } from 'kay/internal'
 import type { JSX, Snippet } from 'kay'
 import type { ByteSize } from 'kay/library'
 import type { FieldSize } from './field-look'
@@ -88,7 +89,7 @@ function sizeLimit(): number {
   const bytes = byteCount(maxSize)
 
   if (bytes === undefined)
-    throw new Error(`kay: the maxSize of FileDrop is ${JSON.stringify(maxSize)}; it takes a positive size, bytes or a string such as '2mb'`)
+    throw new KayError('config-invalid', `kay: the maxSize of FileDrop is ${JSON.stringify(maxSize)}; it takes a positive size, bytes or a string such as '2mb'`)
 
   return bytes
 }

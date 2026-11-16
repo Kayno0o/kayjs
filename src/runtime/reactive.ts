@@ -209,7 +209,7 @@ export function scope<T>(fn: () => T, detached = false): T {
 
 export function provideContext(key: symbol, value: unknown): void {
   if (!owner) {
-    throw new KayError('outside-request', 'kay: provide() runs in a component\'s script, as it renders')
+    throw new KayError('argument-invalid', 'kay: provide() runs in a component\'s script, as it renders')
   }
 
   (owner.context ??= new Map()).set(key, value)

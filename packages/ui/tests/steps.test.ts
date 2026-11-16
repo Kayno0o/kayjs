@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { KayError } from 'kay/internal'
 import { currentStep, stepDraft, stepHref } from '../src/steps'
 
 const KEYS = ['account', 'details', 'review']
@@ -88,7 +89,7 @@ describe('stepDraft', () => {
     // Under 3,800 characters of JSON, over 3,800 bytes once encoded.
     const values = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`field${index}`, 'é']))
 
-    expect(() => stepDraft(jar(), 'signup', ANY).save('account', values)).toThrow(RangeError)
+    expect(() => stepDraft(jar(), 'signup', ANY).save('account', values)).toThrow(KayError)
   })
 
   it('drops keys that would reach the prototype, and a step kept as a list', () => {
@@ -102,7 +103,7 @@ describe('stepDraft', () => {
   })
 
   it('refuses a draft too big for a cookie', () => {
-    expect(() => stepDraft(jar(), 'signup', ANY).save('account', { bio: 'x'.repeat(4000) })).toThrow(RangeError)
+    expect(() => stepDraft(jar(), 'signup', ANY).save('account', { bio: 'x'.repeat(4000) })).toThrow(KayError)
   })
 })
 

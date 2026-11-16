@@ -1,3 +1,6 @@
+import type { CacheTag } from './cache'
+import { KayError } from './kay-error'
+
 // What learns of the keys a render reads and of the keys an invalidation names: the server, one listener each, which a second import replaces.
 let readListener: ((key: string) => void) | undefined
 let liveListener: ((key: string, tags: readonly string[]) => void) | undefined
@@ -37,4 +40,15 @@ export function onKeyNamed(listener: (key: string) => void): void {
 // The server hears each key read with `live: true`, to make the page that read it follow the key.
 export function onLiveRead(listener: (key: string, tags: readonly string[]) => void): void {
   liveListener = listener
+}
+
+export const tagNames = new WeakMap<CacheTag, string>()
+
+export function tagKey(tag: CacheTag): string {
+  const key = tagNames.get(tag)
+
+  if (key === undefined)
+    throw new KayError('argument-invalid', 'kay: `tags` takes what `cacheTag()` gives')
+
+  return key
 }

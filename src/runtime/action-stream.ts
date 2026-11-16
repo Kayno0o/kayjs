@@ -5,6 +5,7 @@ import { ActionRedirectError } from './action-error'
 import { apiErrorOf } from './api-error'
 import { connection, connectionHooks, ended } from './connection'
 import { invalidatedKeys } from './invalidated-keys'
+import { KayError } from './kay-error'
 import { listenerSet } from './listener-set'
 import { decodeServerValue } from './wire'
 
@@ -73,7 +74,7 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
       if (!next.ok || next.headers.get('content-type')?.startsWith('text/event-stream') !== true) {
         await retrying!.read(next)
 
-        throw new TypeError('kay: the action did not stream when it was called again')
+        throw new KayError('helper-failed', 'kay: the action did not stream when it was called again')
       }
 
       if (link.status() !== 'connecting') {

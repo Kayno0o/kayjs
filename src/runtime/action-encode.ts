@@ -1,3 +1,4 @@
+import { KayError } from './kay-error'
 import { sendValue } from './send'
 import { decodeValue, unflattenValue } from './wire'
 
@@ -45,7 +46,7 @@ export function decodeCall(body: unknown): unknown {
       const file = parts[`${FILE_MARK}${index}`]
 
       if (!(file instanceof Blob))
-        throw new TypeError(`kay: the call names file ${index}, which it did not send`)
+        throw new KayError('helper-failed', `kay: the call names file ${index}, which it did not send`)
 
       return file
     },

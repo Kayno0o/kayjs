@@ -2,6 +2,7 @@ import type { Duration } from './duration'
 import type { Live, LiveByKey, LiveKey, LiveOptions, LiveOwn } from './live-value.shared'
 import type { PlainValue } from './reactive'
 import { durationSeconds } from './duration'
+import { KayError } from './kay-error'
 import { browserLive } from './live-value.client'
 import { serverLive } from './live-value.server'
 
@@ -27,13 +28,13 @@ export function live<K extends LiveKey, T, const Ttl extends Duration = Duration
 // The build adds the id and the name after the value, before the options when there are some, so a browser reads the id second without looking for the options it has no use for.
 export function live(initial: unknown, id?: unknown, name?: unknown, options?: unknown): unknown {
   if (typeof id !== 'string')
-    throw new TypeError('kay: live() is declared as `export const name = live(...)` at the top of a module in the project, where the build names it')
+    throw new KayError('argument-invalid', 'kay: live() is declared as `export const name = live(...)` at the top of a module in the project, where the build names it')
 
   const declared = declaredOptions(name, options)
   const own = declared?.user === true
 
   if (own && declared?.key === true)
-    throw new TypeError('kay: live() with `user: true` is one value for each user, so it takes no `key`')
+    throw new KayError('argument-invalid', 'kay: live() with `user: true` is one value for each user, so it takes no `key`')
 
   // A value per key declared with a plain starting value starts every key from a copy of it.
   const start = declared?.key === true && typeof initial !== 'function' ? () => (typeof initial === 'object' && initial !== null ? structuredClone(initial) : initial) : initial

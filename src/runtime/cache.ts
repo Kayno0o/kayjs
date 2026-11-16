@@ -2,9 +2,10 @@ import type { PositiveDuration } from './checks'
 import type { Duration } from './duration'
 import type { StoreBase } from './store-base'
 import { parse, stringify } from 'devalue'
-import { noteLive, noteNamed, noteRead } from './cache-hooks'
+import { noteLive, noteNamed, noteRead, tagKey, tagNames } from './cache-hooks'
 import { cacheReads } from './counters'
 import { durationSeconds } from './duration'
+import { KayError } from './kay-error'
 import { kayLog } from './log'
 import { previewing, renderingForVisitor } from './preview'
 
@@ -175,7 +176,7 @@ function callSite(kind: string, caller: (...args: never[]) => unknown): string {
   const found = (holder.stack ?? '').split('\n').slice(1).map(frameAt).find(frame => frame !== undefined)
 
   if (!found)
-    throw new Error(`kay: ${kind} could not tell which module calls it`)
+    throw new KayError('helper-failed', `kay: ${kind} could not tell which module calls it`)
 
   const cwd = `${globalThis.process?.cwd() ?? ''}/`
   const path = found.path.startsWith(cwd) ? found.path.slice(cwd.length) : found.path
@@ -194,7 +195,7 @@ export function cache<A extends unknown[], T>(load: (...args: A) => T | Promise<
   const seconds = durationSeconds(ttl, `${site}'s ttl`)
 
   if (max !== undefined && !(Number.isInteger(max) && max > 0))
-    throw new Error(`kay: ${site}'s max must be a positive whole number`)
+    throw new KayError('argument-invalid', `kay: ${site}'s max must be a positive whole number`)
 
   const tagKeys = tags.map(tag => tagKey(tag))
   const keyOf = (args: unknown[]) => args.length === 0 ? site : `${site}${argumentsText(site, args)}`
@@ -243,19 +244,8 @@ function argumentsText(site: string, args: unknown[]): string {
     return stringify(args)
   }
   catch (error) {
-    throw new Error(`kay: ${site} takes arguments devalue can write, plain values: ${error instanceof Error ? error.message : String(error)}`)
+    throw new KayError('argument-invalid', `kay: ${site} takes arguments devalue can write, plain values: ${error instanceof Error ? error.message : String(error)}`)
   }
-}
-
-const tagNames = new WeakMap<CacheTag, string>()
-
-function tagKey(tag: CacheTag): string {
-  const key = tagNames.get(tag)
-
-  if (key === undefined)
-    throw new Error('kay: `tags` takes what `cacheTag()` gives')
-
-  return key
 }
 
 // A group of cached values, for the `tags` of `cache`: `invalidate()` drops all of them with no key typed anywhere.
@@ -795,7 +785,7 @@ function storedText(key: string, value: unknown, inherited: boolean): string | u
     const reason = error instanceof Error ? error.message : String(error)
 
     if (!inherited)
-      throw new Error(`kay: cached('${key}') cannot keep its value in a store: ${reason}`)
+      throw new KayError('helper-failed', `kay: cached('${key}') cannot keep its value in a store: ${reason}`)
 
     if (!unstorable.has(key) && unstorable.size < MAX_UNSTORABLE) {
       unstorable.add(key)

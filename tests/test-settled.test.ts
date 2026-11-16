@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test'
+import { KayError } from '../src/runtime/kay-error'
 import { persistedCookie, testSite } from '../src/test'
 import { settledHtml } from '../src/test/page'
 
@@ -101,7 +102,7 @@ describe('persistedCookie', () => {
   })
 
   it('refuses a name no persisted signal reads', () => {
-    expect(() => persistedCookie('a b', 1)).toThrow(TypeError)
+    expect(() => persistedCookie('a b', 1)).toThrow(KayError)
   })
 
   it('encodes values that are not strings', () => {
