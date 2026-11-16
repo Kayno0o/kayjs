@@ -102,7 +102,7 @@ Each lint has a level. `deny` is an error (the eight that ship a broken page, su
 | `literal-tag` | deny | code | An HTML tag written in template text, shown as written |
 | `brace-in-attribute` | deny | code | A quoted attribute value holding `{name}`, which ships as written: write `title={name}` or a template literal |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |
-| `once-read-prop` | deny | code | A destructured prop read into a top-level `const` or `let` that a function or the template reads later, in a browser script, so it keeps its first value |
+| `once-read-prop` | deny | code | A destructured prop read into a top-level `let`, a destructured `const`, one that awaits or a declaration nested in a block, that a function or the template reads later, in a browser script, so it keeps its first value |
 | `public-env-outside-src` | warn | code | An `s.Public` field in a `.ts` file outside `src`, which kay does not read, so an island types it as a string |
 | `browser-global-at-load` | deny | code | A module a page imports reading `window`, `document` or another browser-only name as it loads, so the page throws on the server; read it in a function or after a `typeof window` check |
 | `unmounted-jobs` | warn | code | A `src/jobs.ts` that no plugin and no `src/server.ts` imports, so its queues run nowhere; jobs live in `src/jobs/*.ts` |

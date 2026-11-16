@@ -7,9 +7,10 @@ import type { Read } from './rewrite-reads'
 import type { ConstantSignal, FoundRewrites, RewriteInput, Rewrites } from './rewrite-types'
 import type { Binding, Path, Scope } from './scope'
 import { parseProgram } from './estree'
+import { derivedSpan, INITIAL_PROP } from './live-reads'
 import { PERSISTED_ENTRIES } from './module-signals'
 import { CURRENT, HANDED, LOAD, PROBE, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
-import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, rowReadOnly, signatureNames, sourceSpan, syntaxError, tagPosition, typeQueryOf, uncalledSignal, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
+import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, LIVE_STATE, LIVE_WRITES, LOGICAL, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, readOutside, rowReadOnly, signatureNames, sourceEnds, sourceSpan, syntaxError, tagPosition, typeQueryOf, uncalledSignal, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
 import { Scanner } from './rewrite-scan'
 import { markTagValue } from './rewrite-tags'
 import { analyze } from './scope'
@@ -24,14 +25,8 @@ type TSTypeQuery = NodeOfType<'TSTypeQuery'>
 type UpdateExpression = NodeOfType<'UpdateExpression'>
 type VariableDeclarator = NodeOfType<'VariableDeclarator'>
 
-const LIVE_WRITES = new Set(['set', 'delete'])
-// The members of a live value that are not its value: the state of the page's connection.
-const LIVE_STATE = new Set(['status', 'pending', 'error', 'retry'])
-
 // What `kay` exports that is read by calling it, in the template as in the script, and whether it is written too.
 const ACCESSORS: Record<string, 'signal' | 'memo'> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', selection: 'signal', memo: 'memo', debounced: 'memo', throttled: 'memo' }
-// The compound assignments that write only when the value changes.
-const LOGICAL = new Set(['||', '&&', '??'])
 // The signals the modules of `kay` export.
 const KAY_SIGNAL_EXPORTS = new Map([['kay/analytics', new Set(['consent'])]])
 const CHECKED_WRITE: Rewrite = { before: WRITABLE, after: ')' }
@@ -66,6 +61,8 @@ class RewriteFinder {
   private readonly globalReads = new Set<string>()
   // The names whose writes are handled: written as signals, or reported as read-only.
   private readonly known = new Set<Binding>()
+  // What a top-level `const` follows when it reads one: the props, the signals and the memos, and the `const`s made from them.
+  private readonly live = new Set<Binding>()
   // Writes to a constant or an import, handled once every name kay knows is found.
   private readonly assigned: { binding: Binding, path: Path<AssignmentExpression | UpdateExpression> }[] = []
   // Writes to a property, an element or a `let` that may hold a signal, which only the runtime can tell from a plain write.
@@ -158,11 +155,9 @@ class RewriteFinder {
   // A signal `kay` exports is written through `.set` as the ones a module declares are, though reads and writes of it are left to the types.
   private reportKaySignalSet(binding: Binding) {
     const specifier = binding.path.node
+    const from = binding.path.parent
 
-    if (binding.kind !== 'module' || specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type' || specifier.imported.type !== 'Identifier' || binding.path.parent.type !== 'ImportDeclaration')
-      return
-
-    if (!KAY_SIGNAL_EXPORTS.get(binding.path.parent.source.value)?.has(specifier.imported.name))
+    if (binding.kind !== 'module' || specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type' || specifier.imported.type !== 'Identifier' || from.type !== 'ImportDeclaration' || !KAY_SIGNAL_EXPORTS.get(from.source.value)?.has(specifier.imported.name))
       return
 
     for (const reference of valueReferences(binding))
@@ -462,6 +457,7 @@ class RewriteFinder {
   // A signal or memo kay sees made: an assignment to a signal writes it, and a read the template leaves uncalled is reported.
   private signalBinding(binding: Binding, name: string, kind: SignalKind) {
     this.known.add(binding)
+    this.live.add(binding)
 
     for (const reference of valueReferences(binding)) {
       const values = this.input.values && !this.deferred(reference)
@@ -568,6 +564,8 @@ class RewriteFinder {
     if (id.type === 'Identifier' && init?.type === 'CallExpression')
       this.madeSignal(path, id, init)
 
+    this.derived(path)
+
     if (id.type !== 'ObjectPattern' || init?.type !== 'Identifier' || init.name !== PROPS)
       return
 
@@ -575,6 +573,19 @@ class RewriteFinder {
       if (property.type === 'Property' && property.value.type === 'Identifier')
         this.prop(path, property.value)
     }
+  }
+
+  // In the browser, a top-level `const` computed from a prop or a signal is a memo, read through a call, so it follows what it reads rather than keeping the value of the first run; the server renders once and keeps it plain.
+  private derived(path: Path<VariableDeclarator>) {
+    const found = this.input.dom ? derivedSpan(path, this.live, this.input) : undefined
+
+    if (!found)
+      return
+
+    this.live.add(found.binding)
+    this.open(found.start, 'KayMemo(() => (')
+    this.insert(found.end, '))')
+    this.templateConst(path, true, false, 'const computed from a prop or a signal')
   }
 
   private madeSignal(path: Path<VariableDeclarator>, id: Identifier, init: CallExpression) {
@@ -610,6 +621,9 @@ class RewriteFinder {
 
     const binding = path.scope.getBinding(name)
 
+    if (binding && !INITIAL_PROP.test(prop.binding.key))
+      this.live.add(binding)
+
     // A `Bindable` prop is assigned on the props object, whose setter writes what a parent bound or keeps the value in the component; a default is read, never assigned.
     if (bindable) {
       const target = propRead({ ...prop.binding, fallback: undefined }, prop.index, name, this.input.check === true)
@@ -624,20 +638,14 @@ class RewriteFinder {
 
   // `listen(window, ...)` takes its target as a function, so a server render never reads `window`.
   private listenTarget(path: Path<CallExpression>) {
-    const { map } = this.input
     const target = path.node.arguments[0]
+    const span = !target || target.type === 'ArrowFunctionExpression' || target.type === 'FunctionExpression' || target.type === 'SpreadElement' || importedFromKay(path.scope, path.node.callee) !== 'listen' ? undefined : sourceEnds(this.input.map, target)
 
-    if (!target || target.type === 'ArrowFunctionExpression' || target.type === 'FunctionExpression' || target.type === 'SpreadElement' || importedFromKay(path.scope, path.node.callee) !== 'listen' || !map.isExact(target.start) || !map.isExact(target.end - 1))
+    if (!span)
       return
 
-    const start = map.toSource(target.start)
-    const last = map.toSource(target.end - 1)
-
-    if (start === undefined || last === undefined)
-      return
-
-    this.insert(start, '() => (')
-    this.insert(last + 1, ')')
+    this.insert(span.start, '() => (')
+    this.insert(span.end, ')')
   }
 
   private assignment(path: Path<AssignmentExpression | UpdateExpression>) {
@@ -653,16 +661,10 @@ class RewriteFinder {
   // `load` ends handing the fence's names to the template; any other read of one is the fence's own.
   private loadReads(path: Path<FunctionDeclaration>) {
     const handOver = this.input.sites.handOver
-    const { start, end } = path.node
 
-    if (!handOver || start > handOver.start || end < handOver.end)
-      return
-
-    for (const { binding } of this.input.sites.props.values()) {
-      const scoped = path.scope.getBinding(binding.key)
-
-      if (scoped && valueReferences(scoped).some(reference => reference.node.start < handOver.start || reference.node.start >= handOver.end))
-        this.serverReads.add(binding.key)
+    if (handOver && path.node.start <= handOver.start && path.node.end >= handOver.end) {
+      for (const key of readOutside(path, handOver, this.input.sites.props.values()))
+        this.serverReads.add(key)
     }
   }
 

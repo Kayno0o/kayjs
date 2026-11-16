@@ -7,6 +7,12 @@ import type { Binding, Path } from './scope'
 import type { PropsBinding } from './script'
 import { DEFAULTED, defaultName, PROPS } from './names'
 
+export const LIVE_WRITES = new Set(['set', 'delete'])
+// The members of a live value that are not its value: the state of the page's connection.
+export const LIVE_STATE = new Set(['status', 'pending', 'error', 'retry'])
+// The compound assignments that write only when the value changes.
+export const LOGICAL = new Set(['||', '&&', '??'])
+
 // The names the compiler gives its own helpers and tags, `KayRow` or `KayLoopFor`.
 const COMPILER_NAME = /^Kay[A-Z]/
 
@@ -21,6 +27,7 @@ export type Read = Rewrite & { length?: number | undefined }
 type ArrowFunctionExpression = NodeOfType<'ArrowFunctionExpression'>
 type AssignmentExpression = NodeOfType<'AssignmentExpression'>
 type CallExpression = NodeOfType<'CallExpression'>
+type FunctionDeclaration = NodeOfType<'FunctionDeclaration'>
 type Identifier = NodeOfType<'Identifier'>
 type NewExpression = NodeOfType<'NewExpression'>
 type TSTypeQuery = NodeOfType<'TSTypeQuery'>
@@ -186,6 +193,28 @@ export function sourceSpan(map: SourceMap, node: Node | undefined): Span | undef
   const start = node && map.isExact(node.start) ? map.toSource(node.start) : undefined
 
   return start === undefined ? undefined : { start, end: start + node!.end - node!.start }
+}
+
+// Where a node of the generated code starts and ends in the source, when its first and last characters were both written there: the end is one past the last.
+export function sourceEnds(map: SourceMap, node: Node): Span | undefined {
+  const start = map.isExact(node.start) ? map.toSource(node.start) : undefined
+  const last = map.isExact(node.end - 1) ? map.toSource(node.end - 1) : undefined
+
+  return start === undefined || last === undefined ? undefined : { start, end: last + 1 }
+}
+
+// The props of `load` that the function reads outside the span that hands them over.
+export function readOutside(path: Path<FunctionDeclaration>, handOver: Span, props: Iterable<{ binding: PropsBinding }>): string[] {
+  const keys: string[] = []
+
+  for (const { binding } of props) {
+    const scoped = path.scope.getBinding(binding.key)
+
+    if (scoped && valueReferences(scoped).some(reference => reference.node.start < handOver.start || reference.node.start >= handOver.end))
+      keys.push(binding.key)
+  }
+
+  return keys
 }
 
 // What a scope gives of a name, which Babel's scope and kay's both do.

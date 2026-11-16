@@ -39,6 +39,8 @@ export interface RewriteInput {
   component?: string | undefined
   // A page with a server fence, a layout or a special page, which renders once on the server and is no island, so a live value read in its template would not follow the server.
   fixedPage?: boolean | undefined
+  // The source of the file, which a `// kay-allow once-read-prop` comment is read from.
+  source?: string | undefined
   // Type checking a project: a write to a name kay sees no signal made in asserts it holds one, through `KayWritable`.
   check?: boolean | undefined
 }

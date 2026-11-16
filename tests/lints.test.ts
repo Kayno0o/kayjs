@@ -1470,29 +1470,29 @@ describe('once-read-prop', () => {
   const used = '\nconst show = () => [last, other]'
 
   it('reports a prop read into a const that a function or the template reads later', () => {
-    expect(found(`const last = items.length - 1${used}`)).toEqual([{ code: 'once-read-prop', severity: 'error', at: 'items' }])
-    expect(found('const last = items.length - 1', undefined, 'p {last}')).toHaveLength(1)
+    expect(found(`let last = items.length - 1${used}`)).toEqual([{ code: 'once-read-prop', severity: 'error', at: 'items' }])
+    expect(found('let last = items.length - 1', undefined, 'p {last}')).toHaveLength(1)
     expect(found('let last = items.length\nconst other = 1\nconst show = memo(() => last)')).toHaveLength(1)
-    expect(found(`const last = items[0] + items[1]${used}`)).toHaveLength(2)
-    expect(found(`const last = { size }${used}`)).toHaveLength(1)
-    expect(found(`const last = \`\${size}!\`${used}`)).toHaveLength(1)
-    expect(found(`const last = await items${used}`)).toHaveLength(1)
+    expect(found(`let last = items[0] + items[1]${used}`)).toHaveLength(2)
+    expect(found(`let last = { size }${used}`)).toHaveLength(1)
+    expect(found(`let last = \`\${size}!\`${used}`)).toHaveLength(1)
+    expect(found(`let last = await items${used}`)).toHaveLength(1)
     expect(found(`const { first: last } = items${used}`)).toHaveLength(1)
-    expect(found(`const last = items.map(item => item)${used}`)).toHaveLength(1)
+    expect(found(`let last = items.map(item => item)${used}`)).toHaveLength(1)
   })
 
   it('leaves a const nothing reads later alone', () => {
-    expect(found('const last = items.length - 1')).toEqual([])
-    expect(found('const last = items.length - 1\nconst after = last + 1')).toEqual([])
+    expect(found('let last = items.length - 1')).toEqual([])
+    expect(found('let last = items.length - 1\nconst after = last + 1')).toEqual([])
   })
 
   it('leaves a read in a test, a call argument, a statement or a write alone', () => {
-    expect(found(`const last = size === 'md' ? 1 : 2${used}`)).toEqual([])
-    expect(found(`const last = items ? 1 : 2${used}`)).toEqual([])
-    expect(found(`const last = size ? items : size${used}`)).toHaveLength(2)
-    expect(found(`const last = make(items, { size })${used}`)).toEqual([])
-    expect(found(`const last = new Set(items)${used}`)).toEqual([])
-    expect(found(`if (items.length > 1) console.log(1)\nif (size) throw new Error(size)\nconst last = 1${used}`)).toEqual([])
+    expect(found(`let last = size === 'md' ? 1 : 2${used}`)).toEqual([])
+    expect(found(`let last = items ? 1 : 2${used}`)).toEqual([])
+    expect(found(`let last = size ? items : size${used}`)).toHaveLength(2)
+    expect(found(`let last = make(items, { size })${used}`)).toEqual([])
+    expect(found(`let last = new Set(items)${used}`)).toEqual([])
+    expect(found(`if (items.length > 1) console.log(1)\nif (size) throw new Error(size)\nlet last = 1${used}`)).toEqual([])
     expect(found(`let last = 0\nlast = items.length${used}`)).toEqual([])
     expect(found(`let last = 0\nlast += items.length${used}`)).toEqual([])
     expect(found(`let last = 0\nitems++${used}`)).toEqual([])
@@ -1501,43 +1501,43 @@ describe('once-read-prop', () => {
   })
 
   it('leaves a read inside a function, a memo, an effect, a handler, a class and a type alone', () => {
-    expect(found('const last = memo(() => items.length - 1)\nconst show = () => last')).toEqual([])
-    expect(found('const last = effect(() => console.log(items))\nconst show = () => last')).toEqual([])
+    expect(found('let last = memo(() => items.length - 1)\nconst show = () => last')).toEqual([])
+    expect(found('let last = effect(() => console.log(items))\nconst show = () => last')).toEqual([])
     expect(found('function last() {\n  return items[0]\n}\nconst show = () => last')).toEqual([])
-    expect(found(`const last = { onClick() { return items } }${used}`)).toEqual([])
-    expect(found(`const last = class { field = items }${used}`)).toEqual([])
-    expect(found(`type Row = typeof items\nconst last = 1 as unknown as typeof items${used}`)).toEqual([])
+    expect(found(`let last = { onClick() { return items } }${used}`)).toEqual([])
+    expect(found(`let last = class { field = items }${used}`)).toEqual([])
+    expect(found(`type Row = typeof items\nlet last = 1 as unknown as typeof items${used}`)).toEqual([])
   })
 
   it('leaves signal() and persisted() initial values, a posted reader and an id made once alone', () => {
-    expect(found(`const last = signal(items.length > 0)${used}`)).toEqual([])
-    expect(found(`const last = persisted(size, items.length)${used}`)).toEqual([])
-    expect(found(`const last = postedValue(size, items)${used}`)).toEqual([])
-    expect(found(`const last = size ?? uid()${used}`)).toEqual([])
-    expect(found(`const last = size || uid()${used}`)).toHaveLength(1)
-    expect(found(`const last = foo(items) ?? uid()${used}`)).toEqual([])
-    expect(found(`const last = items.at(0) ?? uid()${used}`)).toHaveLength(1)
+    expect(found(`let last = signal(items.length > 0)${used}`)).toEqual([])
+    expect(found(`let last = persisted(size, items.length)${used}`)).toEqual([])
+    expect(found(`let last = postedValue(size, items)${used}`)).toEqual([])
+    expect(found(`let last = size ?? uid()${used}`)).toEqual([])
+    expect(found(`let last = size || uid()${used}`)).toHaveLength(1)
+    expect(found(`let last = foo(items) ?? uid()${used}`)).toEqual([])
+    expect(found(`let last = items.at(0) ?? uid()${used}`)).toHaveLength(1)
   })
 
   it('reports a renamed prop under its local name, keeps watching one with a default, and skips the default itself', () => {
-    expect(found(`const last = heading.length${used}`, 'items: heading')).toEqual([{ code: 'once-read-prop', severity: 'error', at: 'heading' }])
-    expect(found(`const last = size.length${used}`)).toHaveLength(1)
-    expect(found(`const last = 1${used}`, 'items, size = items[0]')).toEqual([])
+    expect(found(`let last = heading.length${used}`, 'items: heading')).toEqual([{ code: 'once-read-prop', severity: 'error', at: 'heading' }])
+    expect(found(`let last = size.length${used}`)).toHaveLength(1)
+    expect(found(`let last = 1${used}`, 'items, size = items[0]')).toEqual([])
   })
 
   it('watches nothing for a rest element, a whole props name or an initial*, default*, on* prop', () => {
-    expect(found(`const last = rest.length${used}`, '...rest')).toEqual([])
-    expect(lints(`---\nimport { signal } from 'kay'\n\nconst props = props<{ items: string[] }>()\nconst last = props.items.length\nconst show = () => last\n---\np x`).filter(d => d.code === 'once-read-prop')).toEqual([])
-    expect(found(`const last = initialOpen\nconst other = defaultValue + onPick${used}`, 'initialOpen, defaultValue, onPick')).toEqual([])
+    expect(found(`let last = rest.length${used}`, '...rest')).toEqual([])
+    expect(lints(`---\nimport { signal } from 'kay'\n\nconst props = props<{ items: string[] }>()\nlet last = props.items.length\nconst show = () => last\n---\np x`).filter(d => d.code === 'once-read-prop')).toEqual([])
+    expect(found(`let last = initialOpen\nconst other = defaultValue + onPick${used}`, 'initialOpen, defaultValue, onPick')).toEqual([])
   })
 
   it('leaves a name declared again anywhere in the script, a member name and an object key alone', () => {
-    expect(found(`for (const items of [[1]])\n  console.log(items)\nconst last = items.length${used}`)).toEqual([])
-    expect(found(`const last = other.items + { items: 1 }.items + other?.size${used}`)).toEqual([])
+    expect(found(`for (const items of [[1]])\n  console.log(items)\nlet last = items.length${used}`)).toEqual([])
+    expect(found(`let last = other.items + { items: 1 }.items + other?.size${used}`)).toEqual([])
   })
 
   it('reports only where the script runs in the browser', () => {
-    const plain = '---\nconst { items } = props<{ items: string[] }>()\nconst last = items.length - 1\n---\np {last}'
+    const plain = '---\nconst { items } = props<{ items: string[] }>()\nlet last = items.length - 1\n---\np {last}'
 
     expect(lints(plain).filter(d => d.code === 'once-read-prop')).toEqual([])
     expect(lints(plain, { insideIsland: true }).filter(d => d.code === 'once-read-prop')).toHaveLength(1)
@@ -1550,10 +1550,10 @@ describe('once-read-prop', () => {
   })
 
   it('is allowed by a kay-allow comment, with or without a reason, and by a lints level', () => {
-    expect(found(`// kay-allow once-read-prop\nconst last = items.length - 1${used}`)).toEqual([])
-    expect(found(`const last = items.length - 1 // kay-allow once-read-prop: the first one is meant${used}`)).toEqual([])
-    expect(found(`// kay-allow-file once-read-prop\nconst last = items.length - 1${used}`)).toEqual([])
-    expect(lints(island(`const last = items.length - 1${used}`), { lints: { 'once-read-prop': 'deny' } }).filter(d => d.code === 'once-read-prop')[0]?.severity).toBe('error')
-    expect(lints(island(`const last = items.length - 1${used}`), { lints: { 'once-read-prop': 'allow' } }).filter(d => d.code === 'once-read-prop')).toEqual([])
+    expect(found(`// kay-allow once-read-prop\nlet last = items.length - 1${used}`)).toEqual([])
+    expect(found(`let last = items.length - 1 // kay-allow once-read-prop: the first one is meant${used}`)).toEqual([])
+    expect(found(`// kay-allow-file once-read-prop\nlet last = items.length - 1${used}`)).toEqual([])
+    expect(lints(island(`let last = items.length - 1${used}`), { lints: { 'once-read-prop': 'deny' } }).filter(d => d.code === 'once-read-prop')[0]?.severity).toBe('error')
+    expect(lints(island(`let last = items.length - 1${used}`), { lints: { 'once-read-prop': 'allow' } }).filter(d => d.code === 'once-read-prop')).toEqual([])
   })
 })

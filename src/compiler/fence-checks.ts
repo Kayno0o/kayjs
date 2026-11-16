@@ -10,6 +10,7 @@ import { eachNode } from './each-node'
 import { isPlainProperty } from './estree'
 import { isFunction, optionalParts } from './fence-nodes'
 import { openRedirects } from './fence-redirects'
+import { derivable, derivedReads, INITIAL_PROP, VALUE_TS } from './live-reads'
 import { PAGE, SEO_SETTINGS } from './page-settings'
 import { patternNames } from './pattern-names'
 import { parseFence } from './script'
@@ -625,22 +626,6 @@ export function unreturnedFails(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
-// A prop named like an initial value is read once on purpose, and so is a callback (`onChange`), which a component reads to tell whether one was given.
-const INITIAL_PROP = /^(?:(?:initial|default)(?![a-z])|on[A-Z])/
-// The TypeScript nodes that wrap a value rather than describe a type.
-const VALUE_TS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
-
-// Whether an identifier names a variable at its parent, rather than a member, a key or a label.
-function isReference(node: NodeOfType<'Identifier'>, parent: Node | undefined): boolean {
-  if (parent?.type === 'MemberExpression')
-    return parent.object === node || parent.computed
-
-  if (parent?.type === 'Property' || parent?.type === 'PropertyDefinition' || parent?.type === 'MethodDefinition')
-    return parent.value === node || parent.computed
-
-  return parent?.type !== 'LabeledStatement' && parent?.type !== 'BreakStatement' && parent?.type !== 'ContinueStatement' && parent?.type !== 'ExportSpecifier'
-}
-
 // A destructured prop read into a top-level `const` or `let` that a function or the template reads later: the declaration runs once, when the component is created, so the value keeps the prop's first value after the parent changes it.
 // A prop read as the test of a condition, as an argument of a call or `new`, as a write target or inside a class is left alone: those choose or build something once, and a name declared again anywhere in the script is left alone too.
 export function onceReadProps(fence: ParsedFence, props: PropsDeclaration | undefined, templateNames: readonly string[]): Diagnostic[] {
@@ -681,61 +666,26 @@ export function onceReadProps(fence: ParsedFence, props: PropsDeclaration | unde
   })
 
   const diagnostics: Diagnostic[] = []
-  const seen = new Set<number>()
-  const reads = (node: Node, parent: Node | undefined): boolean | void => {
-    if (isFunction(node) || node.type === 'ClassBody' || (node.type.startsWith('TS') && !VALUE_TS.has(node.type)))
-      return false
-
-    // Only the callee of a call and the target of `new` are read; the arguments choose what is built.
-    if (node.type === 'CallExpression' || node.type === 'NewExpression') {
-      eachNode(node.callee, reads, node)
-
-      return false
-    }
-
-    if (node.type === 'ConditionalExpression') {
-      eachNode(node.consequent, reads, node)
-      eachNode(node.alternate, reads, node)
-
-      return false
-    }
-
-    if (node.type === 'AssignmentExpression') {
-      eachNode(node.right, reads, node)
-
-      return false
-    }
-
-    if (node.type === 'UpdateExpression')
-      return false
-
-    // `id ?? uid()`: an id is made once.
-    if (node.type === 'LogicalExpression' && node.operator === '??' && node.left.type === 'Identifier' && node.right.type === 'CallExpression' && node.right.callee.type === 'Identifier' && node.right.callee.name === 'uid')
-      return false
-
-    if (node.type !== 'Identifier' || !watched.has(node.name) || !isReference(node, parent) || seen.has(node.start))
-      return true
-
-    seen.add(node.start)
-    diagnostics.push({
-      ...fence.shift(node),
-      code: 'once-read-prop',
-      message: `\`${node.name}\` is read once, when the component is created, so it keeps its first value after the parent changes it`,
-      note: 'a destructured prop is live in the template and in a function, but the value of a `const` computed from it at the top of the script is set a single time',
-      help: 'compute it where it is used, in the template or a `memo(() => ...)`, or write `// kay-allow once-read-prop` when the first value is meant',
-      checkOnly: true,
-    })
-
-    return true
-  }
+  // The `const`s the compiler makes live in the browser need no word from the lint.
+  const live = new Set<Node>(fence.ast.body.flatMap(statement => statement.type === 'VariableDeclaration' ? statement.declarations.filter(declarator => derivable(statement, declarator)) : []))
 
   // The declarations of the script, nested ones included.
   eachNode(fence.ast, (node) => {
     if (isFunction(node) || isDeclaration(node) || (node.type.startsWith('TS') && !VALUE_TS.has(node.type)))
       return false
 
-    if (node.type === 'VariableDeclarator' && node.init && patternNames(node.id).some(name => closureReads.has(name)))
-      eachNode(node.init, reads, node)
+    if (node.type === 'VariableDeclarator' && node.init && !live.has(node) && patternNames(node.id).some(name => closureReads.has(name))) {
+      for (const read of derivedReads(node.init, name => watched.has(name))) {
+        diagnostics.push({
+          ...fence.shift(read),
+          code: 'once-read-prop',
+          message: `\`${read.name}\` is read once, when the component is created, so it keeps its first value after the parent changes it`,
+          note: 'a destructured prop is live in the template and in a function, but the value of a `let`, a destructuring or an `await` computed from it at the top of the script is set a single time',
+          help: 'compute it where it is used, in the template or a `memo(() => ...)`, or write `// kay-allow once-read-prop` when the first value is meant',
+          checkOnly: true,
+        })
+      }
+    }
 
     return true
   })

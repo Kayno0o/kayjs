@@ -62,7 +62,9 @@ A name a component uses with no import is a type error, and `kay check --fix` wr
 
 Declare props once with `props<T>()`. Destructure them, with defaults, and they stay reactive.
 
-A read at the top of the script runs once. If `const last = items.length - 1` keeps the first length, write it as a function, `const last = () => items.length - 1`, and read `last()`.
+A top-level `const` computed from a prop or a signal follows it: `const last = items.length - 1` shows the new length when the parent passes other items, and `const twice = count() * 2` follows `count`. Read it as a plain value, in the template and in a handler, and do not assign it.
+
+A few reads are a choice made once and keep their first value: the test of an `if` or a ternary, the arguments of a call such as `createStore(items)`, and props named `initial*` or `default*`. A `let`, a destructured `const` and one that uses `await` are computed once too, and `once-read-prop` reports a prop read there: write `memo(() => ...)` for them, or `// kay-allow once-read-prop: why` where the first value is meant.
 
 A page has no props. Its data comes from its `--- server` fence.
 

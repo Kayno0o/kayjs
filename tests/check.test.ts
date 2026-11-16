@@ -919,7 +919,7 @@ describe.concurrent('kay check, edge cases', () => {
   })
 
   it('reports a prop read once in a component an island renders, even when a page renders it too', async () => {
-    const script = (extra: string) => `---\nconst { items } = props<{ items: string[] }>()\n${extra}const last = items.length - 1\n---\np {last}\n`
+    const script = (extra: string) => `---\nconst { items } = props<{ items: string[] }>()\n${extra}let last = items.length - 1\n---\np {last}\n`
     const root = await scratchProject({
       'src/routes/index.kay': '---\nimport Card from \'../components/card.kay\'\nimport Island from \'../components/island.kay\'\nimport Allowed from \'../components/allowed.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nCard(items={[]})\nIsland\nAllowed(items={[]})\nPlain(items={[]})\n',
       'src/components/island.kay': '---\nimport Card from \'./card.kay\'\nimport Allowed from \'./allowed.kay\'\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}\nCard(items={[]})\nAllowed(items={[]})\n',

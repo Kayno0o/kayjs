@@ -1,0 +1,8 @@
+---
+import { signal } from 'kay'
+import Child from './derived-child.kay'
+
+const n = signal(1)
+---
+button.up(onClick={() => n = n() + 1}) up
+Child(n={n()})

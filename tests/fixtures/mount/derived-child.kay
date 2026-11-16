@@ -1,0 +1,25 @@
+---
+import { signal } from 'kay'
+
+const { n, label = 'x' } = props<{ n: number, label?: string }>()
+const clicks = signal(1)
+const twice = n * 2
+const triple = clicks() * 3
+const both = twice + triple
+const info = { twice, label }
+const describe = (value: number) => `${value}:${n}`
+const mode = n > 5 ? 'big' : 'small'
+const seen = signal(0)
+// kay-allow once-read-prop: the first value is what this case checks
+let snapshot = n
+---
+button.add(onClick={() => clicks = clicks() + 1}) add
+button.log(onClick={() => seen = twice}) log
+p.twice {twice}
+p.triple {triple}
+p.both {both}
+p.info {info.twice}-{info.label}
+p.describe {describe(twice)}
+p.mode {mode}
+p.seen {seen()}
+p.snapshot {snapshot}
