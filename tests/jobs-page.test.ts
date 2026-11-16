@@ -16,7 +16,7 @@ spyOn(console, 'warn').mockImplementation(() => undefined)
 const allow: Guard = () => undefined
 const admin: Guard = ({ request, deny }) => {
   if (request.headers.get('x-admin') !== 'yes')
-    deny(403, 'admins only')
+    deny(403, { message: 'admins only' })
 }
 
 const toLogin: Guard = ({ redirect }) => redirect('/login')

@@ -124,7 +124,7 @@ describe('_loading.kay', () => {
     const { get, loaded } = await site({
       '_loading.kay': 'p.loading Loading\n',
       '_error.kay': 'h1.error Error\n',
-      'admin/_guard.ts': guard('({ deny }) => deny(403, \'Admins only\')'),
+      'admin/_guard.ts': guard('({ deny }) => deny(403, { message: \'Admins only\' })'),
       'admin/index.kay': page('admin'),
       'login.kay': page('login'),
       'old.kay': '--- server\nctx.redirect(\'/login\')\n---\nh1 Old\n',

@@ -5,7 +5,7 @@ import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 // Reads a header and nothing else: `x-deny` refuses, `x-go` redirects.
-const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny, redirect }) => {\n  request.headers.get(\'authorization\')\n\n  if (request.headers.has(\'x-deny\'))\n    deny(401, \'Sign in\')\n\n  if (request.headers.has(\'x-go\'))\n    redirect(\'/login\')\n})\n'
+const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny, redirect }) => {\n  request.headers.get(\'authorization\')\n\n  if (request.headers.has(\'x-deny\'))\n    deny(401, { message: \'Sign in\' })\n\n  if (request.headers.has(\'x-go\'))\n    redirect(\'/login\')\n})\n'
 const ENDPOINT = 'export function GET({ headers, request }) {\n  if (request.headers.has(\'x-cache\'))\n    headers.set(\'cache-control\', \'public, max-age=60\')\n\n  return \'ok\'\n}\n'
 const API = 'import { api } from \'kay/server\'\n\nexport default api()\n  .get(\'/\', () => ({ ok: true }))\n  .get(\'/own\', () => new Response(\'own\', { headers: { \'cache-control\': \'public, max-age=60\' } }))\n  .get(\'/text\', () => \'text\')\n  .get(\'/cased\', ({ set }) => {\n    set.headers[\'Cache-Control\'] = \'public, max-age=60\'\n\n    return \'cased\'\n  })\n  .get(\'/missing\', ({ status }) => status(404, \'none\'))\n'
 const PAGE = '--- server\nif (ctx.request.headers.has(\'x-cache\')) ctx.headers.set(\'cache-control\', \'public, max-age=60\')\n---\nh1 Page\n'

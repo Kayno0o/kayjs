@@ -27,7 +27,7 @@ function filesOf(variant: string): Record<string, string> {
     [`routes/${variant}/section/two.kay`]: 'h1 Two\n',
     [`routes/${variant}/section/roomy.kay`]: FENCE(LIMIT(3), 'h1 Roomy'),
     [`routes/${variant}/section/open.kay`]: FENCE('{ rateLimit: false }', 'h1 Open'),
-    [`routes/${variant}/gated/_guard.ts`]: 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'authorization\'))\n    deny(401, \'Sign in first\')\n})\n',
+    [`routes/${variant}/gated/_guard.ts`]: 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'authorization\'))\n    deny(401, { message: \'Sign in first\' })\n})\n',
     [`routes/${variant}/gated/index.kay`]: FENCE(LIMIT(2), 'h1 Gated'),
     [`routes/${variant}/gated/open.kay`]: FENCE(LIMIT(5), 'h1 Signed in'),
     [`routes/${variant}/shared.txt.ts`]: 'export const page = { rateLimit: { max: 1, window: \'1m\' } }\n\nexport const GET = () => \'ok\'\n',

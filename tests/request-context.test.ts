@@ -6,7 +6,7 @@ import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 // What a guard, an endpoint and an action do from the `x-do` header, so one handler answers every case.
-const STOP = `  const todo = request.headers.get('x-do')\n\n  if (todo === 'redirect')\n    redirect('/elsewhere')\n\n  if (todo === 'redirect-301')\n    redirect('/moved', 301)\n\n  if (todo === 'deny')\n    deny(402, 'Pay first')\n\n  if (todo === 'not-found')\n    notFound()\n`
+const STOP = `  const todo = request.headers.get('x-do')\n\n  if (todo === 'redirect')\n    redirect('/elsewhere')\n\n  if (todo === 'redirect-301')\n    redirect('/moved', 301)\n\n  if (todo === 'deny')\n    deny(402, { message: 'Pay first' })\n\n  if (todo === 'not-found')\n    notFound()\n`
 const GUARD = `import { guard } from 'kay'\n\nexport default guard(({ request, url, locale, params, cookies, headers, redirect, deny, notFound }) => {\n${STOP}\n  headers.set('x-seen', \`\${locale}|\${url.pathname}|\${JSON.stringify(params)}|\${cookies.get('theme') ?? ''}\`)\n})\n`
 const ENDPOINT = `export function GET({ request, url, locale, params, cookies, headers, redirect, deny, notFound }) {\n${STOP}\n  cookies.set('seen', '1')\n  headers.set('x-seen', \`\${locale}|\${url.pathname}|\${JSON.stringify(params)}|\${cookies.get('theme') ?? ''}\`)\n\n  return 'ok'\n}\n`
 // Reads the cookies, then stops, and `x-cache` sets its own caching first.

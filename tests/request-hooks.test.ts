@@ -19,7 +19,7 @@ async function until(done: () => boolean): Promise<void> {
     await Bun.sleep(5)
 }
 
-const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (request.headers.has(\'x-blocked\'))\n    deny(403, \'Blocked\')\n})\n'
+const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (request.headers.has(\'x-blocked\'))\n    deny(403, { message: \'Blocked\' })\n})\n'
 
 describe('the app-wide request hooks', () => {
   let dir = ''

@@ -309,7 +309,7 @@ describe('the dev tool\'s routes served by kay', () => {
     const routes = 'routes'
     const at = relative(process.cwd(), join(dir, 'routes'))
     const members = 'import { guard } from \'kay\'\n\nexport default guard(({ request, redirect, deny }) => {\n  if (request.headers.has(\'x-banned\'))\n    deny(403)\n\n  if (!request.headers.has(\'x-member\'))\n    redirect(\'/login\')\n})\n'
-    const vip = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-vip\'))\n    deny(403, \'VIPs only\')\n})\n'
+    const vip = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-vip\'))\n    deny(403, { message: \'VIPs only\' })\n})\n'
 
     await Promise.all([
       Bun.write(join(dir, 'routes/index.kay'), 'p Home\n'),

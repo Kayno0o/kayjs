@@ -12,7 +12,7 @@ if (ctx.url.searchParams.has('next'))
   ctx.redirect(ctx.url.searchParams.get('next')!)
 
 if (ctx.url.searchParams.has('deny'))
-  ctx.deny(403, 'Members only')
+  ctx.deny(403, { message: 'Members only' })
 
 const title = ctx.url.searchParams.get('title') ?? 'Home'
 ---

@@ -573,7 +573,7 @@ describe('the screen', () => {
   })
 
   it('is refused to whom the guard refuses, and opened to whom it admits', async () => {
-    const refused = await screen({ guard: ctx => ctx.deny(403, 'not you') })
+    const refused = await screen({ guard: ctx => ctx.deny(403, { message: 'not you' }) })
     const admitted = await screen({ guard: () => undefined })
 
     expect(refused.status).toBe(403)
@@ -581,7 +581,7 @@ describe('the screen', () => {
   })
 
   it('takes a list of guards run in order, and false to open the screen', async () => {
-    expect((await screen({ guard: [() => undefined, ctx => ctx.deny(403, 'not you')] })).status).toBe(403)
+    expect((await screen({ guard: [() => undefined, ctx => ctx.deny(403, { message: 'not you' })] })).status).toBe(403)
     expect((await screen({ guard: [() => undefined, () => undefined] })).status).toBe(200)
     expect((await screen({ guard: false })).status).toBe(200)
     expect(() => vitals({ guard: [] })).toThrow('takes `guards`')
@@ -589,7 +589,7 @@ describe('the screen', () => {
   })
 
   it('takes `guards`, the name every guard option has, `guard` working beside it', async () => {
-    expect((await screen({ guards: ctx => ctx.deny(403, 'not you') })).status).toBe(403)
+    expect((await screen({ guards: ctx => ctx.deny(403, { message: 'not you' }) })).status).toBe(403)
     expect((await screen({ guards: [() => undefined] })).status).toBe(200)
     expect((await screen({ guards: false })).status).toBe(200)
   })

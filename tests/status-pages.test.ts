@@ -33,11 +33,11 @@ describe('status pages', () => {
       '_429.kay': special('limited'),
       '_503.kay': special('down'),
       '_401.kay': special('signin'),
-      'a.kay': gated('ctx.deny(403, \'Members only\')'),
+      'a.kay': gated('ctx.deny(403, { message: \'Members only\' })'),
       'b.kay': gated('ctx.deny(429)'),
-      'c.kay': gated('ctx.deny(503, \'Back soon\')'),
+      'c.kay': gated('ctx.deny(503, { message: \'Back soon\' })'),
       'd.kay': gated('ctx.deny(401)'),
-      'e.kay': gated('ctx.deny(418, \'Teapot\')'),
+      'e.kay': gated('ctx.deny(418, { message: \'Teapot\' })'),
       'f.kay': gated('ctx.notFound()'),
     })
 
@@ -56,7 +56,7 @@ describe('status pages', () => {
       '_403.kay': special('root403'),
       'admin/_403.kay': special('admin403'),
       'admin/index.kay': 'h1 Admin\n',
-      'admin/_guard.ts': guard('({ deny }) => deny(403, \'Admins only\')'),
+      'admin/_guard.ts': guard('({ deny }) => deny(403, { message: \'Admins only\' })'),
       'admin/team/_error.kay': special('team'),
       'admin/team/index.kay': gated('ctx.deny(403)'),
       'shop/index.kay': gated('ctx.deny(403)'),
@@ -75,9 +75,9 @@ describe('status pages', () => {
     const get = await site({
       '_403.kay': special('forbidden'),
       '_error.kay': special('error'),
-      'paid.kay': gated('ctx.deny(403, \'Upgrade\', { plan: \'pro\' })'),
+      'paid.kay': gated('ctx.deny(403, { message: \'Upgrade\', data: { plan: \'pro\' } })'),
       'free.kay': gated('ctx.deny(403)'),
-      'other.kay': gated('ctx.deny(418, \'Teapot\', { plan: \'tea\' })'),
+      'other.kay': gated('ctx.deny(418, { message: \'Teapot\', data: { plan: \'tea\' } })'),
     })
 
     expect((await get('/paid')).html).toContain('<p class="plan">pro</p>')
@@ -91,7 +91,7 @@ describe('a status page that fails', () => {
     const get = await site({
       '_error.kay': special('error'),
       '_403.kay': '--- server\nthrow new Error(\'broken page\')\n---\nh1 Never\n',
-      'a.kay': gated('ctx.deny(403, \'Members only\')'),
+      'a.kay': gated('ctx.deny(403, { message: \'Members only\' })'),
     })
 
     expect(await get('/a')).toMatchObject({ status: 403, html: expect.stringContaining('<h1 class="error">error 403 Members only</h1>') })
@@ -132,8 +132,8 @@ describe('status pages in a build', () => {
       const files: Record<string, string> = {
         'src/routes/_error.kay': special('error'),
         'src/routes/_403.kay': special('forbidden'),
-        'src/routes/a.kay': gated('ctx.deny(403, \'Members only\')'),
-        'src/routes/e.kay': gated('ctx.deny(418, \'Teapot\')'),
+        'src/routes/a.kay': gated('ctx.deny(403, { message: \'Members only\' })'),
+        'src/routes/e.kay': gated('ctx.deny(418, { message: \'Teapot\' })'),
         'serve.ts': serve,
       }
 

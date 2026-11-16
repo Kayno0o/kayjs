@@ -189,7 +189,7 @@ describe.skipIf(skipBrowser)('kay a11y on a site', () => {
       'items/[id].kay': '--- server\nexport const page = { prerender: [{ id: \'1\' }, { id: \'2\' }] }\n---\nhead\n  title Item\nmain\n  h1 Item\n',
       'tags/[tag].kay': 'head\n  title Tag\nmain\n  h1 Tag\n',
       'private.kay': '--- server\nctx.redirect(\'/login\')\n---\nmain\n  h1 Private\n',
-      'members/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => {\n  deny(403, \'Members only\')\n})\n',
+      'members/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => {\n  deny(403, { message: \'Members only\' })\n})\n',
       'members/index.kay': 'head\n  title Members\nmain\n  h1 Members\n',
       'boom.kay': '--- server\nthrow new Error(\'server boom\')\n---\nmain\n  h1 Never\n',
     })

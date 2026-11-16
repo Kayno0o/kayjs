@@ -2921,7 +2921,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({
       'src/errors.ts': 'declare module \'kay\' {\n  interface Register {\n    errorData: { plan: string }\n  }\n}\n\nexport {}\n',
       'src/routes/_403.kay': '--- server\nconst plan: string | undefined = ctx.error.data?.plan\nconst nope: number = ctx.error.data?.plan\n---\np {plan} {nope}\n',
-      'src/routes/index.kay': '--- server\nexport const page = { guards: false }\n\nctx.deny(403, \'Upgrade\', { plan: \'pro\' })\nctx.deny(403, \'Upgrade\', { plan: 1 })\n---\np x\n',
+      'src/routes/index.kay': '--- server\nexport const page = { guards: false }\n\nctx.deny(403, { message: \'Upgrade\', data: { plan: \'pro\' } })\nctx.deny(403, { message: \'Upgrade\', data: { plan: 1 } })\n---\np x\n',
     })
 
     try {

@@ -41,7 +41,7 @@ describe('what a guard hands on', () => {
       Bun.write(join(dir, 'routes/hostile/index.kay'), '--- server\nconst seen = JSON.stringify({ own: Object.keys(ctx.guard), polluted: ({} as any).polluted === true, proto: Object.getPrototypeOf(ctx.guard) === Object.prototype })\n---\np.page {seen}\n'),
       // An open page runs none of the guards above it, so it hands nothing on.
       Bun.write(join(dir, 'routes/open.kay'), '--- server\nexport const page = { guards: false }\nconst seen = JSON.stringify(ctx.guard)\n---\np.page {seen}\n'),
-      Bun.write(join(dir, 'routes/denied/_guard.ts'), GUARD('({ deny }) => deny(403, \'No\')')),
+      Bun.write(join(dir, 'routes/denied/_guard.ts'), GUARD('({ deny }) => deny(403, { message: \'No\' })')),
       Bun.write(join(dir, 'routes/denied/index.kay'), '--- server\nconst seen = JSON.stringify(ctx.guard)\n---\np.page {seen}\n'),
       Bun.write(join(dir, 'routes/acts/index.kay'), '--- server\nimport { action } from \'kay\'\n\nexport const who = action((ctx) => (ctx as any).guard.who as string)\n---\nh1 Acts\n'),
       Bun.write(join(dir, 'routes/ends.json.ts'), 'export function GET(ctx: { guard: object }) {\n  return JSON.stringify(ctx.guard)\n}\n'),

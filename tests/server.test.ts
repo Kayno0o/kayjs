@@ -945,7 +945,7 @@ describe('route params in guards and actions', () => {
 })
 
 describe('the url an action\'s guards see', () => {
-  const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ url, request, headers, deny }) => {\n  headers.set(\'x-url\', url.pathname + url.search)\n\n  if (url.pathname.startsWith(\'/admin\') && !request.headers.has(\'x-admin\'))\n    deny(403, \'Admins only\')\n})\n'
+  const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ url, request, headers, deny }) => {\n  headers.set(\'x-url\', url.pathname + url.search)\n\n  if (url.pathname.startsWith(\'/admin\') && !request.headers.has(\'x-admin\'))\n    deny(403, { message: \'Admins only\' })\n})\n'
   const ACTION = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const ping = action(t.Object({}), () => \'pong\')\n---\n'
   const root = process.cwd()
   let dir = ''
@@ -2226,7 +2226,7 @@ describe('action input', () => {
       await Bun.write(join(dir, '_layout.kay'), action)
       await Bun.write(join(dir, 'index.kay'), 'p Home\n')
       await Bun.write(join(dir, 'inner/_layout.kay'), action)
-      await Bun.write(join(dir, 'inner/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Inner only\'))\n')
+      await Bun.write(join(dir, 'inner/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, { message: \'Inner only\' }))\n')
       await Bun.write(join(dir, 'inner/index.kay'), 'p Inner\n')
 
       const served = await pages({ requireGuards: false, dirs: { routes: dir }, prebuilt: true })
@@ -2254,7 +2254,7 @@ describe('action input', () => {
       await Bun.write(join(dir, '_actions.kay'), module('export const leave = action(() => \'left\')'))
       await Bun.write(join(dir, 'index.kay'), '---\nimport { leave } from \'./_actions.kay\'\n---\nform(action={leave}) button Leave\n')
       await Bun.write(join(dir, 'orgs/[org]/_actions.kay'), module('export const rename = action(t.Object({}), (_, ctx) => ctx.params)'))
-      await Bun.write(join(dir, 'orgs/[org]/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ params, deny }) => params.org === \'acme\' ? undefined : deny(403, \'Not yours\'))\n')
+      await Bun.write(join(dir, 'orgs/[org]/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ params, deny }) => params.org === \'acme\' ? undefined : deny(403, { message: \'Not yours\' }))\n')
       await Bun.write(join(dir, 'orgs/[org]/index.kay'), 'p Org\n')
 
       const served = await pages({ requireGuards: false, dirs: { routes: dir }, prebuilt: true })

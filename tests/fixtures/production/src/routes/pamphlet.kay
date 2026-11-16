@@ -9,7 +9,7 @@ export const page = { prerender: true }
 export const join = action(t.Object({ proof: t.String({ maxLength: 512 }) }), async ({ proof }, ctx) => {
   const refused = await verifyWork(proof, 'pamphlet', { difficulty: 50 })
 
-  return refused === undefined ? 'joined' : ctx.fail(422, { refused })
+  return refused === undefined ? 'joined' : ctx.deny(422, { data: { refused } })
 })
 ---
 form(action={join})

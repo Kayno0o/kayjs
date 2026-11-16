@@ -4,5 +4,5 @@ import { guard } from 'kay'
 export default guard(({ cookies, headers, deny }) => {
   cookies.set('seen', 'locked')
   headers.set('x-guard', 'locked')
-  deny(403, 'Locked')
+  deny(403, { message: 'Locked' })
 })

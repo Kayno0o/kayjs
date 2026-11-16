@@ -1,5 +1,5 @@
 import { guard } from 'kay'
 
 export default guard(({ deny }) => {
-  deny(403, 'Members only')
+  deny(403, { message: 'Members only' })
 })

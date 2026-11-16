@@ -11,7 +11,7 @@ import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const ACTION = (name: string, settings: string, body: string) => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\n${settings}export const ${name} = action(t.Object({}), () => '${name}')\n---\n${body}\n`
-const ADMINS = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(403, \'Admins only\')\n})\n'
+const ADMINS = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(403, { message: \'Admins only\' })\n})\n'
 const OPEN = 'export const page = { guards: false }\n'
 
 describe('requireGuards', () => {

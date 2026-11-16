@@ -166,7 +166,7 @@ describe('pageResponder', () => {
 
     await Promise.all([
       Bun.write(join(dir, 'vip/index.kay'), 'h1 VIP\n'),
-      Bun.write(join(dir, 'vip/_guard.ts'), guard('({ deny }) => deny(403, \'Members only\')')),
+      Bun.write(join(dir, 'vip/_guard.ts'), guard('({ deny }) => deny(403, { message: \'Members only\' })')),
       Bun.write(join(dir, 'gone/index.kay'), 'h1 Gone\n'),
       Bun.write(join(dir, 'gone/_guard.ts'), guard('({ notFound }) => notFound()')),
       Bun.write(join(dir, '_error.kay'), '--- server\nconst { status } = ctx.error\n---\nh1 Error {status}\na(href="/home") Home\n'),
@@ -201,7 +201,7 @@ describe('over a listening server', () => {
       Bun.write(join(routes, 'docs/[...rest].kay'), '--- server\nconst rest = ctx.params.rest\n---\np.docs {rest}\n'),
       Bun.write(join(routes, '[z]/files/[...q].kay'), '--- server\nconst q = ctx.params.q\n---\np.files {q}\n'),
       Bun.write(join(routes, 'counter.kay'), '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) Clicked {count()}\n'),
-      Bun.write(join(dir, 'api/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(401, \'Admins only\')\n})\n'),
+      Bun.write(join(dir, 'api/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(401, { message: \'Admins only\' })\n})\n'),
       Bun.write(join(dir, 'api/files.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/*\', ({ params }) => \'<p class="api">\' + params[\'*\'])\n'),
     ])
 

@@ -58,7 +58,7 @@ export default api().get('/me', ({ request }) => ({ user: request.headers.get('x
 
 export default guard(({ request, deny }) => {
   if (request.headers.get('x-user') === null)
-    deny(401, 'Sign in first')
+    deny(401, { message: 'Sign in first' })
 })
 `,
   'src/components/Items.kay': `---

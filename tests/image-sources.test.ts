@@ -40,7 +40,7 @@ const app = await pages({
     dirs: { '/uploads/': uploads },
     guard: (ctx) => {
       if (ctx.cookies.get('user') === null)
-        ctx.deny(401, 'Sign in')
+        ctx.deny(401, { message: 'Sign in' })
 
       ctx.headers.set('x-guarded', 'yes')
       ctx.headers.append('set-cookie', 'a=1')
@@ -282,7 +282,7 @@ describe('images.resolve and images.guard', () => {
       ctx.headers.set('x-first', 'yes')
     }, (ctx) => {
       if (ctx.cookies.get('user') === null)
-        ctx.deny(401, 'Sign in')
+        ctx.deny(401, { message: 'Sign in' })
     }] } })
     const ask = async (headers: Record<string, string> = {}) => listed.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/media/7')}&w=320`, { headers }))
 
@@ -294,7 +294,7 @@ describe('images.resolve and images.guard', () => {
     const ask = async (images: ImagesConfig) => (await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { resolve: () => HERO, ...images } })).handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/media/7')}&w=320`))
 
     expect((await ask({})).status).toBe(403)
-    expect((await ask({ guards: ctx => ctx.deny(401, 'Sign in') })).status).toBe(401)
+    expect((await ask({ guards: ctx => ctx.deny(401, { message: 'Sign in' }) })).status).toBe(401)
     expect((await ask({ guards: [() => undefined] })).status).toBe(200)
     expect((await ask({ guards: false })).status).toBe(200)
   })

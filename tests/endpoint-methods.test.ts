@@ -28,7 +28,7 @@ const FILES: Record<string, string> = {
   'routes/big.txt.ts': `${HEADER}export const page = { maxSize: 10 }\n\nexport const POST = async ({ request }: EndpointContext) => \`read \${(await request.text()).length}\`\n`,
   'routes/shared.txt.ts': `${HEADER}export const page = { cors: { origins: ['${ORIGIN}'] } }\n\nexport const GET = () => 'shared'\nexport const POST = () => 'shared post'\n`,
   'routes/missing.txt.ts': `${HEADER}export const GET = ({ notFound }: EndpointContext) => notFound()\n`,
-  'routes/guarded/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny, cookies }) => {\n  cookies.set(\'seen\', \'1\')\n\n  if (!request.headers.has(\'authorization\'))\n    deny(401, \'Sign in first\')\n})\n',
+  'routes/guarded/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny, cookies }) => {\n  cookies.set(\'seen\', \'1\')\n\n  if (!request.headers.has(\'authorization\'))\n    deny(401, { message: \'Sign in first\' })\n})\n',
   'routes/guarded/data.txt.ts': `${HEADER}export const POST = () => 'data'\n`,
   'routes/guarded/gone.txt.ts': `${HEADER}export const GET = ({ notFound }: EndpointContext) => notFound()\n`,
   'routes/guarded/limited.txt.ts': `${HEADER}export const page = { rateLimit: { max: 1, window: '1m' } }\n\nexport const POST = () => 'counted'\n`,
