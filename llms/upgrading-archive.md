@@ -127,6 +127,22 @@ Every old form below works until 1.108, `kay check` reports it as a `deprecated-
 - `transcribe()` and `describeImage()` take `locale`, a BCP 47 tag, in place of `language`.
 - `ask`, `describeImage`, `transcribe`, `speak` and `embed` take one `CallOptions`, so `retry`, `fallback`, `timeout`, `signal` and the `ai()` hooks reach each of them. `timeout` also takes a single duration for the whole call.
 
+### kayjs-ui lists are `items`
+
+The prop holding the list a component draws is `items` on every one: `tabs` on Tabs, `avatars` on AvatarGroup, `entries` on CommandPalette and Timeline, `links` on SideNav, SiteNav and AppHeader, `steps` on Steps, `icons` on IconPicker and `slides` on Carousel. The infinite `list` of Table, Carousel, Masonry, MediaGallery, VirtualList and LoadMore is `items` too (`items={feed}`, an `infiniteList`; on a Table `rows` stays the array and `items` the infinite source). `rows` of a Table and `options` of the choice controls keep their names, as do TabNav (its `tabs` and `links` are two shapes picked by `param`) and the `links` of a SideNav group. The old names work until 1.108, and `deprecated-ui-items` (`kay check --fix`) writes `items`; a template written under both reads `items`. Nothing else breaks: `label` on TextInput, Textarea, Select, DateInput, DateTimeInput, TimeInput, MarkdownEditor and FileDrop names the control (an `aria-label`, which still wins), Tabs takes `disabled` and TooltipHost `onOpenChange`.
+
+### A control's `id`, `title` and `data-*` are its root's
+
+Toggle, Checkbox, Slider, ColorInput, Combobox and DateInput put the attributes they are given that no control owns (`id`, `title`, `data-*`) on their root element, as every kayjs-ui component does; they reached the input before. The input takes `inputProps`, typed as an input's attributes: `Toggle(label="Alerts" inputProps={{ id: 'alerts' }})`. `name`, `disabled`, `required`, `value`, `aria-*`, `data-tooltip`, `ref` and the `on*` handlers still reach the input. `deprecated-ui-input` (`kay check --fix`) writes the `id`, `title` and `data-*` of a component in a template into `inputProps`, which keeps the old markup; a Combobox's `id`, the list's, stays. Something that reads the input through the `id` of a spread (a stylesheet, a script, a `label(for)`) needs the `inputProps` form, or the root's `id`.
+
+### SidePanel is a Dialog with a side `placement`
+
+`SidePanel` draws a `Dialog` with `placement="right"`, so the head, title, body and footer are the Dialog's. Nothing changes in its props, and its `class` still takes `head`, `title`, `body` and `footer`, handed to the Dialog. A `src/ui.ts` entry for `'@kayjs/ui/side-panel.kay'` with `head`, `title`, `body` or `footer` moves to `'@kayjs/ui/dialog.kay'` (which then restyles centred dialogs too: a part restyled for one placement only is `class` on the call); `kay check` reports the entry left behind, as a part the component no longer has.
+
+### A page is never an island
+
+A page without a `--- server` fence that has an `on*`, `bind:` or `ref`, a browser value of `kay` such as `signal`, or a live or persisted import used to become an island. It still does through 1.107, and `kay check` warns with `deprecated-page-island` at that line; 1.108 refuses it. Move what needs the browser into a component of its own and render it from the page: the component is the island. No `kay upgrade` fix exists, as the fix moves code into a new file.
+
 ## 1.104.0
 
 ### Rate limits are one type and one check
