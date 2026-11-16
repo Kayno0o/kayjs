@@ -28,4 +28,4 @@ Find-in-page only sees the rows drawn, and a focused control in a row that scrol
 
 ## Loaded page by page
 
-It takes `list`, an `infiniteList`, in place of the array.`LoadMore` follows the rows inside the box, so the next page loads as the reader nears the end, and a failed page shows its alert with a retry. See [Infinite lists](/ui/load-more).
+It takes `items` as an `infiniteList` too, in place of the array. `LoadMore` follows the rows inside the box, so the next page loads as the reader nears the end, and a failed page shows its alert with a retry. See [Infinite lists](/ui/load-more).

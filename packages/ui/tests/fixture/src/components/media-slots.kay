@@ -22,8 +22,8 @@ const slides = [
   { src: '/c.png', alt: 'Third' },
 ]
 ---
-Carousel#plain-carousel(slides={slides})
-Carousel#block-carousel(slides={slides})
+Carousel#plain-carousel(items={slides})
+Carousel#block-carousel(items={slides})
   @slide(slide, index)
     p.caption {index}: {slide.alt}
 MediaGallery#plain-gallery(items={items})

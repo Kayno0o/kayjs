@@ -28,4 +28,4 @@ const feed = infiniteList(rowsOf(0, first), {
   else
     for row of feed.data() key={row.id}
       p.row {row.name}
-    LoadMore(list={feed})
+    LoadMore(items={feed})

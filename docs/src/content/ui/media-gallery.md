@@ -22,4 +22,4 @@ An item has a `key`, a `kind` of `image` or `video`, a `thumb` for the strip, a 
 
 ## Loaded page by page
 
-It takes `list`, an `infiniteList`, in place of the array.The next page loads when the reader reaches the last items, and a failed page shows `LoadMore`'s alert with its retry under the strip. See [Infinite lists](/ui/load-more).
+It takes `items` as an `infiniteList` too, in place of the array. The next page loads when the reader reaches the last items, and a failed page shows `LoadMore`'s alert with its retry under the strip. See [Infinite lists](/ui/load-more).

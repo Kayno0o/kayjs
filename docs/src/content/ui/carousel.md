@@ -4,7 +4,7 @@ description: One image at a time sliding in, with arrows and dots, for a marketi
 
 <Demo name="carousel/basic" />
 
-`slides` is a list of `{ src, alt }`. The previous and next buttons wrap at either end, a dot per slide jumps to it, and a single slide draws no controls.
+`items` is a list of `{ src, alt }`. The previous and next buttons wrap at either end, a dot per slide jumps to it, and a single slide draws no controls.
 
 ## Swipe and keys
 
@@ -15,7 +15,7 @@ A swipe along the slides turns the carousel: 40 px or more, clearly more across 
 `loop` is on by default. `loop={false}` stops at either end, with the button of that side disabled. `perView` shows that many slides at once, each its share of the width: a turn moves one slide, `index` is the first one in view, and a dot stands for each place the first one can be. A looping carousel wraps around, and with every slide in view no controls are drawn.
 
 ```kay
-Carousel(slides={photos} perView={3} loop={false} label="Photos")
+Carousel(items={photos} perView={3} loop={false} label="Photos")
 ```
 
 ## Slides of your own
@@ -23,7 +23,7 @@ Carousel(slides={photos} perView={3} loop={false} label="Photos")
 With a `@slide` block a slide needs no `src` or `alt`; give it a `key` to tell it apart.
 
 ```kay
-Carousel(slides={[{ key: 'a', title: 'First' }, { key: 'b', title: 'Second' }]})
+Carousel(items={[{ key: 'a', title: 'First' }, { key: 'b', title: 'Second' }]})
   @slide(card)
     p {card.title}
 ```
@@ -52,4 +52,4 @@ Set `label` to name the carousel for screen readers.
 
 ## Loaded page by page
 
-It takes `list`, an `infiniteList`, in place of the array.The next page loads when the reader reaches the last slides, and a failed page shows `LoadMore`'s alert with its retry under the controls. See [Infinite lists](/ui/load-more).
+It takes `items` as an `infiniteList` too, in place of the array. The next page loads when the reader reaches the last slides, and a failed page shows `LoadMore`'s alert with its retry under the controls. See [Infinite lists](/ui/load-more).

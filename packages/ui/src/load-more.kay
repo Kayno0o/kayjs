@@ -9,9 +9,11 @@ import { labelText } from './label-text'
 
 const look = recipe({ parts: { root: 'kui-load-more', failed: 'kui-load-more-failed', loading: 'kui-load-more-loading', announced: 'sr-only' } })
 
-const { list, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading more…'), failureLabel = wording('ui.loadMore.failure', 'Could not load more.'), retryLabel = wording('ui.loadMore.retry', 'Try again'), button = false, moreLabel = wording('ui.loadMore.more', 'Load more'), loadedLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { items, list: legacy, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading more…'), failureLabel = wording('ui.loadMore.failure', 'Could not load more.'), retryLabel = wording('ui.loadMore.retry', 'Try again'), button = false, moreLabel = wording('ui.loadMore.more', 'Load more'), loadedLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // The list this draws the end of: an `infiniteList`, or anything with its `data`, `ended` and `more` that is a Source, so its `pending`, `error` and `retry` drive the status and the retry.
-  list: LoadMoreSource
+  items?: LoadMoreSource | undefined
+  /** @deprecated Write `items`. Removed in 1.108.0. */
+  list?: LoadMoreSource | undefined
   // How far outside the scroll box counts as in view already, in pixels: see WhenVisible.
   margin?: number | undefined
   loadingLabel?: string | undefined
@@ -22,7 +24,9 @@ const { list, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading mor
   moreLabel?: string | undefined
   // What a screen reader hears once rows were added, from how many: "3 more loaded" by default.
   loadedLabel?: string | ((count: number) => string) | undefined
-}>()
+} & ({ items: LoadMoreSource, list?: undefined } | { items?: undefined, list: LoadMoreSource })>()
+
+const list = (items ?? legacy)!
 
 // Rows added by the last page, told to screen readers beside the visible status.
 const added = signal(0)

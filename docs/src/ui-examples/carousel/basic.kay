@@ -17,4 +17,4 @@ const slides = [
 ]
 ---
 .max-w-md
-  Carousel(slides={slides} label="Panels")
+  Carousel(items={slides} label="Panels")

@@ -4,11 +4,11 @@ description: The end of an infinite-scroll list that loads its pages by offset o
 
 <Demo name="load-more/basic" />
 
-`infiniteList(firstRows, { limit, key, load })` owns the rows: pass it the first page the server rendered, and draw `list.data()` however you like, in a `Table`, a `Masonry` or a plain `for`. `LoadMore(list={list})` goes after them: it draws the sentinel while there are more rows, a "Loading more…" status while a page is on its way, and nothing once the list has ended.
+`infiniteList(firstRows, { limit, key, load })` owns the rows: pass it the first page the server rendered, and draw `list.data()` however you like, in a `Table`, a `Masonry` or a plain `for`. `LoadMore(items={list})` goes after them: it draws the sentinel while there are more rows, a "Loading more…" status while a page is on its way, and nothing once the list has ended.
 
 `load({ offset, last })` resolves to the next page. A source paging by offset skips `offset` rows, which counts every row fetched so far, duplicates included; one paging by cursor continues after `last`, the last row fetched. A page of fewer than `size` rows ends the list, and a list whose last page was exactly `size` ends on the one empty page after it. One page loads at a time, however often the sentinel fires.
 
-A `Table` takes the list as `list={list}` in place of `rows`: it draws `list.data()`, puts `LoadMore` after them, and sorts on the server. A header click calls `list.sortBy(sort)`, which starts the list over from offset 0: `load` receives the sort as `sort` beside `offset` and `last`, and the rows on screen stay until the first page in the new order lands.
+A `Table` takes the list as `items={list}` in place of `rows`: it draws `list.data()`, puts `LoadMore` after them, and sorts on the server. A header click calls `list.sortBy(sort)`, which starts the list over from offset 0: `load` receives the sort as `sort` beside `offset` and `last`, and the rows on screen stay until the first page in the new order lands.
 
 The list also starts over on mount when the table's sort, from `sort` or the URL, differs from the `sort` the list was made with, so give both the same one to keep the first page. A sort drops the picked rows that are not in the new first page, as a row leaving the table always does.
 
@@ -56,4 +56,4 @@ A `load` that throws, or resolves `undefined` as an `attempt` does once it toast
 
 `infiniteList` is a source like a `resource` or a `stream`: `list.status()` is `loading`, `failed` or `ready`, and `list.error()` is the last page's failure as an `ApiError`, kept until a page lands. `list.retry()` loads the page again, and `failed()` still reads `error() !== undefined`.
 
-`LoadMore(list={...})` takes any object with `rows`, `ended` and `more` that is also a source, so a list of your own draws the same sentinel, status and alert. `Notice(source={list})` shows the error with its retry anywhere on the page.
+`LoadMore(items={...})` takes any object with `rows`, `ended` and `more` that is also a source, so a list of your own draws the same sentinel, status and alert. `Notice(source={list})` shows the error with its retry anywhere on the page.

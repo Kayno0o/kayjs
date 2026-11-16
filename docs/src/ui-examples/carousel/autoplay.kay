@@ -16,4 +16,4 @@ const slides = [
 ]
 ---
 .max-w-md
-  Carousel(slides={slides} autoplay="3s" ratio="4 / 3" label="Panels")
+  Carousel(items={slides} autoplay="3s" ratio="4 / 3" label="Panels")

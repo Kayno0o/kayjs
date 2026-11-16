@@ -7,6 +7,9 @@ const IMPORTS = [
   'import AppHeader from \'@kayjs/ui/app-header.kay\'',
   'import Timeline from \'@kayjs/ui/timeline.kay\'',
   'import TabNav from \'@kayjs/ui/tab-nav.kay\'',
+  'import Table from \'@kayjs/ui/table.kay\'',
+  'import Carousel from \'@kayjs/ui/carousel.kay\'',
+  'import LoadMore from \'@kayjs/ui/load-more.kay\'',
   'import Other from \'./other.kay\'',
 ].join('\n')
 
@@ -29,6 +32,13 @@ describe('deprecated-ui-items', () => {
     expect(found('SideNav(links={LINKS} current="/")')[0]?.fixed).toBe('SideNav(items={LINKS} current="/")')
     expect(found('AppHeader(links={LINKS} current="/")')[0]?.fixed).toBe('AppHeader(items={LINKS} current="/")')
     expect(found('Timeline(entries={EVENTS} label="x")')[0]?.fixed).toBe('Timeline(items={EVENTS} label="x")')
+  })
+
+  it('writes items for an infinite source and a Carousel\'s slides', () => {
+    expect(found('Table(list={FEED} columns={COLUMNS} rowKey="id")')[0]?.fixed).toBe('Table(items={FEED} columns={COLUMNS} rowKey="id")')
+    expect(found('LoadMore(list={FEED})')[0]?.fixed).toBe('LoadMore(items={FEED})')
+    expect(found('Carousel(slides={SLIDES} list={FEED})').map(one => one.at)).toEqual(['slides', 'list'])
+    expect(found('Carousel(slides={SLIDES})')[0]?.fixed).toBe('Carousel(items={SLIDES})')
   })
 
   it('writes a shorthand out', () => {

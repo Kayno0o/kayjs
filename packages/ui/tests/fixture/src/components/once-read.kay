@@ -18,7 +18,7 @@ const consenting = stub({ properties: { consent: { 'x-kay-consent': true } } })
 ---
 button#go(type="button" onClick={() => later = true}) Go
 div#carousel
-  Carousel(slides={slides} autoplay={later() ? '40ms' : undefined} onIndexChange={({ index }) => onIndexChange(index)})
+  Carousel(items={slides} autoplay={later() ? '40ms' : undefined} onIndexChange={({ index }) => onIndexChange(index)})
 div#virtual
   VirtualList(items={rows} itemKey={row => row.id} label="Rows" estimate={later() ? 100 : 20} overscan={later() ? 10 : 2})
     @item(row)

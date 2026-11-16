@@ -20,4 +20,4 @@ expose?.(feed)
 ---
 for row of feed.data() key={row.id}
   p.row {row.id}
-LoadMore(list={feed} loadingLabel={loadingLabel} failureLabel={failureLabel} retryLabel={retryLabel} button={button})
+LoadMore(items={feed} loadingLabel={loadingLabel} failureLabel={failureLabel} retryLabel={retryLabel} button={button})

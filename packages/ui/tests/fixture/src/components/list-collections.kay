@@ -17,14 +17,14 @@ const feed = infiniteList([0, 1, 2].map(row), { limit: 3, key: one => one.id, lo
 } })
 ---
 if kind === 'virtual'
-  VirtualList#collection(list={feed} itemKey={one => one.id} label="Rows" estimate={20})
+  VirtualList#collection(items={feed} itemKey={one => one.id} label="Rows" estimate={20})
     @item(one)
       p.cell {one.title}
 else if kind === 'masonry'
-  Masonry#collection(list={feed} key={one => one.id})
+  Masonry#collection(items={feed} key={one => one.id})
     @tile(one)
       p.cell {one.title}
 else if kind === 'gallery'
-  MediaGallery#collection(list={feed})
+  MediaGallery#collection(items={feed})
 else
-  Carousel#collection(list={feed})
+  Carousel#collection(items={feed})

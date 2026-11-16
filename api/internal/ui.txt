@@ -2004,6 +2004,9 @@ type InfiniteListOptions<Row, Target extends Action = never> = InfiniteListBase<
 [./lib/infinite-list] InfinitePage
 type InfinitePage<Row> = Row[] | undefined
 
+[./lib/infinite-list] isInfiniteList
+function isInfiniteList<Row>(value: unknown): value is InfiniteList<Row>
+
 [./lib/infinite-list] ListFilter
 interface ListFilter
   fields: Record<string, string>

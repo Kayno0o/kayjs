@@ -75,4 +75,4 @@ The names before 1.105 work until 1.108 and `kay check` rewrites them (`deprecat
 
 ### kayjs-ui components
 
-`Notice(source={list})` shows `list.error()` while it is set, says its message, and has a retry button calling `list.retry` that is disabled while `list.pending()`. `LoadMore(list={people})` takes an `infiniteList` or any object with `data`, `ended` and `more` that is a Source. Both take a `resource`, `stream`, `track()` handle, `local` or `infiniteList` as they are, so an app wires no state between them (kayjs-ui's `Notice` and `infiniteList` pages).
+`Notice(source={list})` shows `list.error()` while it is set, says its message, and has a retry button calling `list.retry` that is disabled while `list.pending()`. `LoadMore(items={people})` takes an `infiniteList` or any object with `data`, `ended` and `more` that is a Source. Both take a `resource`, `stream`, `track()` handle, `local` or `infiniteList` as they are, so an app wires no state between them (kayjs-ui's `Notice` and `infiniteList` pages).

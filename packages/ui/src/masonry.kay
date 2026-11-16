@@ -2,6 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import { effect, elementSize, memo, onCleanup, onMount, recipe, signal, untrack } from 'kay'
 import type { InfiniteList } from './infinite-list'
+import { isInfiniteList } from './infinite-list'
 import LoadMore from './load-more.kay'
 import { laneCount, masonryLayout } from './masonry'
 
@@ -15,10 +16,10 @@ const look = recipe({
   },
 })
 
-const { items: given, list, key, minWidth = 256, gap = 12, tile, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
-  // The items to lay out. Left out when `list` holds them: one of the two is required.
-  items?: readonly Item[] | undefined
-  // Items loaded page by page, from `infiniteList`: `LoadMore` follows the tiles, loading the next page as the reader nears the end and showing a failed page's alert with its retry.
+const { items: given, list: legacy, key, minWidth = 256, gap = 12, tile, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
+  // The items to lay out: an array, or items loaded page by page, from `infiniteList`: `LoadMore` follows the tiles, loading the next page as the reader nears the end and showing a failed page's alert with its retry.
+  items?: readonly Item[] | InfiniteList<Item> | undefined
+  /** @deprecated Write `items`. Removed in 1.108.0. */
   list?: InfiniteList<Item> | undefined
   // Names an item across updates, so its tile keeps its place and its measured height.
   key: (item: Item) => Key
@@ -29,7 +30,7 @@ const { items: given, list, key, minWidth = 256, gap = 12, tile, style, ...rest 
   // Draws each tile: `@tile(item)`.
   tile: Snippet<[item: Item]>
   style?: string | undefined
-} & ({ items: readonly Item[], list?: undefined } | { items?: undefined, list: InfiniteList<Item> })>()
+} & ({ items: readonly Item[] | InfiniteList<Item>, list?: undefined } | { items?: undefined, list: InfiniteList<Item> })>()
 
 const rootSize = elementSize()
 // A height stays known while the item is in the list, and goes with it when the item leaves.
@@ -38,7 +39,8 @@ const keys = new WeakMap<Element, Key>()
 let root: HTMLElement | undefined
 let observer: ResizeObserver | undefined
 
-const all = () => list ? list.data() : given ?? []
+const list = isInfiniteList<Item>(given) ? given : legacy
+const all = () => list ? list.data() : isInfiniteList<Item>(given) ? [] : given ?? []
 const lanes = memo(() => laneCount(rootSize.width(), minWidth, gap))
 // Until the width is known, as on the server, the tiles stay in a plain grid of the same lanes.
 const layout = memo(() => rootSize.width() > 0 ? masonryLayout(all().map(item => heights().get(key(item))), lanes(), gap) : null)
@@ -90,4 +92,4 @@ div(part="root" {...rest} ref={element => { root = element; rootSize.ref(element
     div(part="tile" ref={element => measure(element, key(item))} style={place(index) ? `--_masonry-lane: ${place(index)!.lane}; --_masonry-top: ${place(index)!.top}px;` : undefined} data-placed={place(index) ? '' : undefined} data-pending={place(index) && !heights().has(key(item)) ? '' : undefined})
       | {tile(item)}
 if list
-  LoadMore(list={list})
+  LoadMore(items={list})

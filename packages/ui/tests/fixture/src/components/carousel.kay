@@ -9,6 +9,6 @@ const { onIndexChange, autoplay, loop, perView, count = 3 } = props<{ onIndexCha
 const slides = ['a', 'b', 'c', 'd', 'e'].slice(0, count).map(name => ({ src: `/${name}.png`, alt: name }))
 const index = signal(0)
 ---
-Carousel#carousel(slides={slides} index={index()} autoplay={autoplay} loop={loop} perView={perView} onIndexChange={({ index }) => onIndexChange(index)})
+Carousel#carousel(items={slides} index={index()} autoplay={autoplay} loop={loop} perView={perView} onIndexChange={({ index }) => onIndexChange(index)})
 button#outside(type="button") Outside
 button#jump(type="button" onClick={() => index = 2}) Jump

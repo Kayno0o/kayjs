@@ -1,6 +1,6 @@
 --- <Row, Key extends RowKey<Row>>
 // What turns a use of the Table into an island, each prop with whether it is on when left out: a page or a server component drawing it with none of them on, and passing no function, gets plain markup and no script. Sorting is not one: a plain Table's sortable headers are links that put the sort in the URL (`sortParam`, `sort` by default) and the server sorts the rows.
-island({ plain: true, interactive: { filter: false, filterParam: false, fields: false, selectable: false, exportable: false, columnToggle: false, expandable: false, pageSize: false, rowHref: false, onRowClick: false, virtual: false, list: false } })
+island({ plain: true, interactive: { filter: false, filterParam: false, fields: false, selectable: false, exportable: false, columnToggle: false, expandable: false, pageSize: false, rowHref: false, onRowClick: false, virtual: false, items: false, list: false } })
 import { KayError } from 'kay/internal'
 import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
@@ -118,11 +118,13 @@ const look = recipe({
   },
 })
 
-const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, plain = false, sortable = true, serverSort = false, onSortChange, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
+const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, items: infinite, list: legacy, rowKey, sort, plain = false, sortable = true, serverSort = false, onSortChange, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
   columns: Column<Row>[]
-  // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
+  // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `items` holds them: one of the two is required.
   rows?: RowsSource<Row> | undefined
-  // Rows loaded page by page, from `infiniteList`: the table draws its rows with `LoadMore` after them, and a header click sorts on the server, the list starting over from offset 0 with the sort passed to its `load` (and to `onSortChange` too). The columns to sort by carry a `sortValue` (`numeric` ones have it), which only marks them sortable here. The table's own sort, from `sort` or the URL, is sent to the list too. A sort restarts the list, so a selected row outside the first page leaves the selection. The list loads again from offset 0 when the table's sort differs from the `sort` the list was made with, on mount included, so give `infiniteList` the same `sort` the table starts from to keep the first page. `exportable` as `true` exports the rows loaded so far; give it an endpoint to export them all.
+  // Rows loaded page by page, in place of `rows`, from `infiniteList`: the table draws its rows with `LoadMore` after them, and a header click sorts on the server, the list starting over from offset 0 with the sort passed to its `load` (and to `onSortChange` too). The columns to sort by carry a `sortValue` (`numeric` ones have it), which only marks them sortable here. The table's own sort, from `sort` or the URL, is sent to the list too. A sort restarts the list, so a selected row outside the first page leaves the selection. The list loads again from offset 0 when the table's sort differs from the `sort` the list was made with, on mount included, so give `infiniteList` the same `sort` the table starts from to keep the first page. `exportable` as `true` exports the rows loaded so far; give it an endpoint to export them all.
+  items?: InfiniteList<Row> | undefined
+  /** @deprecated Write `items`. Removed in 1.108.0. */
   list?: InfiniteList<Row> | undefined
   rowKey: Key
   // The sort to start from; a table whose parent passes a new one follows it.
@@ -239,13 +241,15 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   onPageChange?: ((event: { page: number, size: number }) => unknown) | undefined
   // Names a row's link or button: `Open <first column's text>`.
   openRowLabel?: ((row: Row) => string) | undefined
-} & ({ rows: RowsSource<Row>, list?: undefined } | { rows?: undefined, list: InfiniteList<Row> })>()
+} & ({ rows: RowsSource<Row>, items?: undefined, list?: undefined } | { rows?: undefined, items: InfiniteList<Row>, list?: undefined } | { rows?: undefined, items?: undefined, list: InfiniteList<Row> })>()
 
 if ((rest as { onSelect?: unknown }).onSelect !== undefined)
   throw new KayError('argument-invalid', 'kayjs-ui: a Table has no onSelect since 1.91; use onSelectedChange')
 
 if (expandable && virtual)
   throw new KayError('argument-invalid', 'kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
+
+const list = infinite ?? legacy
 
 if (pageSize !== undefined && (virtual || list))
   throw new KayError('argument-invalid', 'kayjs-ui: a Table with a pageSize cannot be virtual or take a list, which already hold their rows by the window or by the page')
@@ -280,7 +284,7 @@ effect(() => {
   following = true
 })
 
-if (uses('list'))
+if (uses('items') || uses('list'))
   followList(() => list, current, () => search?.asked() ?? { text: '', fields: {} })
 
 // The rows the filter keeps, all of them without one.
@@ -544,5 +548,5 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 | {column.footer ?? ''}
   if uses('pageSize') && pager!.paged() && !skeleton()
     Pagination(part="pager" page={pager!.pageShown()} total={shown().length} pageSize={pager!.sizeNow()} sizes={pageSizes} param={pageParam} limitParam={limitParam} onPage={({ page }) => pager!.goTo(page)} onSize={({ size }) => pager!.resize(size)})
-  if uses('list') && list
-    LoadMore(list={list})
+  if (uses('items') || uses('list')) && list
+    LoadMore(items={list})

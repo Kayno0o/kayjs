@@ -10,12 +10,12 @@ const FIXTURE = join(import.meta.dir, 'fixture')
 // One scratch copy of the fixture holds a Table per case, checked in one `kay check` run, so the shared fixture never meets a type error.
 const CASES = [
   { name: 'rows', props: 'rows={[{ id: 1 }]}', feed: false },
-  { name: 'list', props: 'list={feed}', feed: true },
+  { name: 'items', props: 'items={feed}', feed: true },
   { name: 'neither', props: '', feed: false },
-  { name: 'both', props: 'rows={[{ id: 1 }]} list={feed}', feed: true },
+  { name: 'both', props: 'rows={[{ id: 1 }]} items={feed}', feed: true },
 ]
 
-test('a Table takes rows or a list, and fails kay check with neither or both', async () => {
+test('a Table takes rows or items, and fails kay check with neither or both', async () => {
   const dir = await appCopy(FIXTURE, 'table-source-')
 
   await symlink(join(FIXTURE, 'node_modules'), join(dir, 'node_modules'))
@@ -37,7 +37,7 @@ Table(columns={[{ key: 'id', header: 'Id' }]} rowKey="id" ${item.props})
   await run.exited
 
   expect(errorsOf('rows')).toBe('')
-  expect(errorsOf('list')).toBe('')
+  expect(errorsOf('items')).toBe('')
   expect(errorsOf('neither')).toContain('TS2322')
   expect(errorsOf('both')).toContain('TS2322')
 }, 300_000)

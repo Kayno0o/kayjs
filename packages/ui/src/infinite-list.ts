@@ -112,6 +112,11 @@ export interface LoadMoreSource extends Source<LoadStatus> {
   more: () => unknown
 }
 
+// Whether a list prop holds an `infiniteList` (or a source of your own with its `data` and `more`) rather than the rows themselves, which is how `items` takes either.
+export function isInfiniteList<Row>(value: unknown): value is InfiniteList<Row> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && typeof Reflect.get(value, 'data') === 'function' && typeof Reflect.get(value, 'more') === 'function'
+}
+
 // What `patch` applies to a row: the fields to merge over it, or a function of the row returning the row.
 export type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
 

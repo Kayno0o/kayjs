@@ -12,4 +12,4 @@ const feed = infiniteList([{ id: 1, name: 'Io' }, { id: 2, name: 'Europa' }], { 
 ---
 button.more(type="button" onClick={feed.more}) More
 Table(columns={[{ key: 'name', header: 'Name' }]} rows={feed.data()} rowKey="id" selectable onSelectedChange={({ keys }) => onSelect(keys)})
-LoadMore(list={feed})
+LoadMore(items={feed})

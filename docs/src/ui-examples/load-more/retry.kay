@@ -21,4 +21,4 @@ const rows = infiniteList(Array.from({ length: SIZE }, (_, index) => ({ id: inde
 .h-48.overflow-y-auto.rounded-lg.border.border-border
   for row of rows.data() key={row.id}
     p.px-3.py-1 Row {row.id}
-  LoadMore(list={rows} failureLabel="Could not load more rows.")
+  LoadMore(items={rows} failureLabel="Could not load more rows.")
