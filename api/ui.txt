@@ -381,6 +381,10 @@ interface PaletteLink extends PaletteBase
   newTab?: NewTab | undefined
   shortcut?: string | undefined
 
+[.] PanelProps
+type PanelProps<Tag extends 'div' | 'ul' = 'div'> = Omit<JSX.IntrinsicElements[Tag], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'hidden' | 'style'> & {
+  // Written after the component's own declarations, so it wins. style?: string | undefined }
+
 [.] Plate
 interface Plate
   scale: number
@@ -388,11 +392,13 @@ interface Plate
   y: number
 
 [.] PopoverButtonProps
-type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'id' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+
+[.] PopoverLookButtonProps
+type PopoverLookButtonProps = PopoverButtonProps & Pick<Look, 'variant' | 'size' | 'label'>
 
 [.] PopoverPanelProps
-type PopoverPanelProps = Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'style'> & {
-  // Written after the component's own declarations, so it wins. style?: string | undefined }
+type PopoverPanelProps = PanelProps
 
 [.] PopoverPlacement
 type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
@@ -1203,7 +1209,7 @@ component default
 }
   placement?: PopoverPlacement | undefined
   trigger?: ((attributes: BellTriggerProps, unread: () => number) => Element) | undefined
-  triggerProps?: PopoverButtonProps | undefined
+  triggerProps?: PopoverLookButtonProps | undefined
   unread?: number | undefined
 
 [./bell.kay] default
@@ -1621,7 +1627,7 @@ component default
   open?: boolean | undefined
   option?: ((option: ComboboxOption<Value>) => Element) | undefined
   options: ComboboxOptions<Value>
-  panelProps?: Omit<HtmlAttributes<"ul">, "children" | "class" | "hidden" | "id" | "role"> | undefined
+  panelProps?: PanelProps<"ul"> | undefined
   parts?: undefined | {
   root?: string | undefined;
   icon?: readonly unknown[] | string | undefined | {
@@ -4376,7 +4382,7 @@ component default
     sizes?: string | undefined;
     size?: string | undefined;
   };
-}; plain?: boolean | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows: (RowsSource<Row> | undefined) & RowsSource<Row>; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; triggerProps?: PopoverButtonProps | undefined; virtual?: boolean | undefined }
+}; plain?: boolean | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows: (RowsSource<Row> | undefined) & RowsSource<Row>; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; triggerProps?: PopoverLookButtonProps | undefined; virtual?: boolean | undefined }
   | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   root?: string | undefined;
   filter?: string | undefined;
@@ -4501,7 +4507,7 @@ component default
     sizes?: string | undefined;
     size?: string | undefined;
   };
-}; plain?: boolean | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; triggerProps?: PopoverButtonProps | undefined; virtual?: boolean | undefined }
+}; plain?: boolean | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; triggerProps?: PopoverLookButtonProps | undefined; virtual?: boolean | undefined }
   | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   root?: string | undefined;
   filter?: string | undefined;
@@ -4626,7 +4632,7 @@ component default
     sizes?: string | undefined;
     size?: string | undefined;
   };
-}; plain?: boolean | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; triggerProps?: PopoverButtonProps | undefined; virtual?: boolean | undefined }
+}; plain?: boolean | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; triggerProps?: PopoverLookButtonProps | undefined; virtual?: boolean | undefined }
 
 [./tabs.kay] default
 component default
