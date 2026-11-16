@@ -101,7 +101,7 @@ Each lint has a level. `deny` is an error (the eight that ship a broken page, su
 | `missing-captcha` | warn | forms | A kayjs-auth call that asks a CAPTCHA by default (`password.register`, `password.requestReset`, `magicLink.request`, `password.signIn`) written with no `captcha` option, unless a module's `authCore` (`createAuth` before 1.91) sets `captcha: false`, which silences it project-wide, in the editor too |
 | `literal-tag` | deny | code | An HTML tag written in template text, shown as written |
 | `brace-in-attribute` | deny | code | A quoted attribute value holding `{name}`, which ships as written: write `title={name}` or a template literal |
-| `unknown-link-flag` | deny | code | A `data-` attribute one or two letters from a navigation flag of a link (`data-scroll`, `data-transition`, `data-prefetch`, `data-reload`), such as `data-prefech`, which would do nothing |
+| `unknown-link-flag` | deny | code | A `data-` attribute one letter from a navigation flag of a link (`data-scroll`, `data-transition`, `data-prefetch`, `data-reload`), such as `data-prefech`, which would do nothing |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |
 | `once-read-prop` | deny | code | A destructured prop read into a top-level `let`, a destructured `const`, one that awaits or a declaration nested in a block, that a function or the template reads later, in a browser script, so it keeps its first value |
 | `public-env-outside-src` | warn | code | An `s.Public` field in a `.ts` file outside `src`, which kay does not read, so an island types it as a string |

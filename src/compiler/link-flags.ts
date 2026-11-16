@@ -15,7 +15,7 @@ export const LINK_LINTS = {
   'unknown-link-flag': {
     level: 'deny',
     group: 'code',
-    summary: 'A `data-` attribute one or two letters from a navigation flag of a link (`data-scroll`, `data-transition`, `data-prefetch`, `data-reload`), such as `data-prefech` or `data-no-scroll`: no type knows a `data-` name, so a misspelt flag would do nothing and the link would swap as before. Found on any element and on a component call. The fix, which is not safe as the name may be another attribute, writes the flag meant.',
+    summary: 'A `data-` attribute one letter from a navigation flag of a link (`data-scroll`, `data-transition`, `data-prefetch`, `data-reload`), such as `data-prefech` or `data-no-scroll`: no type knows a `data-` name, so a misspelt flag would do nothing and the link would swap as before. Found on any element and on a component call. The fix, which is not safe as the name may be another attribute, writes the flag meant.',
     wrong: 'a(href="/tabs/a" data-scrol="keep") A',
     right: 'a(href="/tabs/a" data-scroll="keep") A',
   },
@@ -36,12 +36,22 @@ function nameOf(attribute: Attribute): Span | undefined {
   return attribute.kind === 'spread' || (attribute.kind === 'expression' && attribute.shorthand !== undefined) ? undefined : attribute.name
 }
 
-// The flag a `data-` name is a misspelling of: the distance of what follows `data-` stays under a third of its length, at most 3, so `data-read` and `data-presence` are an app's own.
+// The flag a `data-` name is a misspelling of: one letter off, two adjacent letters swapped, or a flag cut short. A name that goes on after a flag (`data-scrolled`, `data-reloading`, `data-scroll-x`) is an app's own, so is a name far from every flag.
 function nearest(name: string): string | undefined {
   const word = name.slice(5)
-  const allowed = Math.min(3, Math.floor(word.length / 3))
 
-  return NEARBY.find(flag => editDistance(word, flag.slice(5)) <= allowed)
+  return NEARBY.find((flag) => {
+    const meant = flag.slice(5)
+
+    return !word.startsWith(meant) && (editDistance(word, meant) <= 1 || swapped(word, meant))
+  })
+}
+
+// Two adjacent letters written in the other order, `realod` for `reload`.
+function swapped(a: string, b: string): boolean {
+  const at = [...a].findIndex((char, index) => char !== b[index])
+
+  return a.length === b.length && at >= 0 && a[at] === b[at + 1] && a[at + 1] === b[at] && a.slice(at + 2) === b.slice(at + 2)
 }
 
 // The navigation flags of links, on an element or on a component call that forwards them to its link: the names before 1.105 are `deprecated-link-flags` with a fix, and a `data-` name that is only a misspelling of one of the family is `unknown-link-flag`, as it would do nothing and no type knows a `data-` attribute.
@@ -69,7 +79,8 @@ export function linkFlags(file: KayFile): Diagnostic[] {
       if (meant === undefined)
         continue
 
-      const to = OLD[meant]?.name ?? meant
+      const renamed = OLD[meant]
+      const to = renamed === undefined ? meant : `${renamed.name}="${renamed.value}"`
 
       found.push({ ...at, code: 'unknown-link-flag', message: `\`${name}\` is no navigation flag of a link`, note: 'a link is followed with `data-scroll`, `data-transition`, `data-prefetch` and `data-reload`, and this name does nothing', help: `did you mean \`${to}\`?`, fixes: [{ title: `Write \`${to}\``, safe: false, edits: [{ ...at, text: to }] }], checkOnly: true })
     }
@@ -82,8 +93,8 @@ function oldFlag(source: string, attribute: Attribute, at: Span, name: string, o
   const base = { ...at, code: 'deprecated-link-flags', checkOnly: true, message: `\`${name}\` is \`${old.name}="${old.value}"\`, deprecated since 1.105`, help: `write \`${old.name}="${old.value}"\`, named as the option of \`navigate()\`` }
 
   if (attribute.kind === 'expression') {
-    // The keep flag's value is read as before, so the rename is safe; the other two were set by being present, which no value of the new name says.
-    return old.off === undefined ? base : { ...base, fixes: [{ title: `Write \`${old.name}\``, safe: true, edits: [{ ...at, text: old.name }] }] }
+    // The keep flag's value is read as before, but the new name types its words, so the rename is not safe; the other two were set by being present, which no value of the new name says.
+    return old.off === undefined ? base : { ...base, fixes: [{ title: `Write \`${old.name}\``, safe: false, edits: [{ ...at, text: old.name }] }] }
   }
 
   const written = old.off !== undefined && attribute.kind === 'static' && attribute.text === 'false' ? old.off : old.value

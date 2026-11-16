@@ -11,7 +11,7 @@ a.keep-link(href="/second" data-keep-scroll) Keep link
 div(data-keep-scroll data-no-transition)
   a.group-link(href="/second") Group link
 a.plain-link(href="/second") Plain link
-a.false-link(href="/second" data-scroll="top") False link
+a.false-link(href="/second" data-keep-scroll="false") False link
 a.true-link(href="/second" data-keep-scroll="true") True link
 a.empty-link(href="/second" data-scroll="") Empty link
 a.hash-link(href="/second#top" data-scroll="keep") Hash link

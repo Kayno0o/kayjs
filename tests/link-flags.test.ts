@@ -30,11 +30,11 @@ describe('deprecated-link-flags', () => {
     expect(result.fixed).toBe(`${head}a(href="/x" data-scroll="keep") go\na(href="/x" data-transition="false") go\na(href="/x" data-prefetch="false") go\na(href="/x" data-scroll="top") go\na(href="/x" data-scroll="keep") go\n`)
   })
 
-  it('renames a dynamic value, which the runtime reads as it read the old one, and leaves a negated flag with no fix', () => {
+  it('renames a dynamic value, which the runtime reads as it read the old one but a type may refuse, and leaves a negated flag with no fix', () => {
     const result = deprecated(`${ISLAND}a(href={to} data-keep-scroll={open() ? '' : undefined}) go\na(href={to} data-no-transition={open()}) go\n`)
 
     expect(result.at).toEqual(['data-keep-scroll', 'data-no-transition'])
-    expect(result.safe).toEqual([true, undefined])
+    expect(result.safe).toEqual([false, undefined])
     expect(result.fixed).toBe(`${ISLAND}a(href={to} data-scroll={open() ? '' : undefined}) go\na(href={to} data-no-transition={open()}) go\n`)
   })
 
@@ -57,18 +57,22 @@ describe('deprecated-link-flags', () => {
 
 describe('unknown-link-flag', () => {
   it.each([['server', SERVER], ['island', ISLAND]])('refuses a misspelt navigation flag in a %s template, naming the one meant', (_, head) => {
-    const result = unknown(`${head}a(href="/x" data-scrol="keep") go\na(href="/x" data-prefech="eager") go\na(href="/x" data-no-scroll) go\na(href="/x" data-transitions="false") go\na(href="/x" data-realod) go\n`)
+    const result = unknown(`${head}a(href="/x" data-scrol="keep") go\na(href="/x" data-prefech="eager") go\na(href="/x" data-no-transtion) go\na(href="/x" data-transtion="false") go\na(href="/x" data-relaod) go\n`)
 
-    expect(result.at).toEqual(['data-scrol', 'data-prefech', 'data-no-scroll', 'data-transitions', 'data-realod'])
+    expect(result.at).toEqual(['data-scrol', 'data-prefech', 'data-no-transtion', 'data-transtion', 'data-relaod'])
     expect(result.severity).toEqual(['error', 'error', 'error', 'error', 'error'])
-    expect(result.help.map(help => (/`(data-[a-z-]+)`/).exec(help ?? '')?.[1])).toEqual(['data-scroll', 'data-prefetch', 'data-scroll', 'data-transition', 'data-reload'])
+    expect(result.help.map(help => (/`(data-[^`]+)`/).exec(help ?? '')?.[1])).toEqual(['data-scroll', 'data-prefetch', 'data-transition="false"', 'data-transition', 'data-reload'])
   })
 
   it('finds a misspelt flag on a component call and with a dynamic value', () => {
-    expect(unknown(`${ISLAND}Button(href={to} data-keep-scrol)\na(href={to} data-prefetchh={open() ? 'eager' : undefined}) go\n`).at).toEqual(['data-keep-scrol', 'data-prefetchh'])
+    expect(unknown(`${ISLAND}Button(href={to} data-keep-scrol)\na(href={to} data-prefetc={open() ? 'eager' : undefined}) go\n`).at).toEqual(['data-keep-scrol', 'data-prefetc'])
   })
 
   it('takes the names of the family, the old ones included, and the data attributes of kay and of an app', () => {
     expect(unknown(`${SERVER}a(href="/x" data-scroll="keep" data-transition="false" data-reload data-prefetch="eager" data-keep-scroll data-no-transition data-no-prefetch data-part="a" data-field data-pending data-tooltip="x" data-hint="y" data-provider="p" data-testid="t" data-kay-retry) go\n`).at).toEqual([])
+  })
+
+  it('leaves a name that goes on after a flag, or a word near one, to the app', () => {
+    expect(unknown(`${SERVER}a(href="/x" data-scrolled data-scroll-x data-reloading data-prefetched data-translation data-transitions data-read data-presence data-keep-scroll-x) go\n`).at).toEqual([])
   })
 })

@@ -31,7 +31,7 @@ A rejected `await` block with no `catch` and no `try` around it used to remove i
 
 ### A link's flags are named as `navigate()`'s options
 
-`data-keep-scroll` is `data-scroll="keep"` (`data-keep-scroll="false"` is `data-scroll="top"`), `data-no-transition` is `data-transition="false"` and `data-no-prefetch` is `data-prefetch="false"`, typed on every element so a value outside their words is a `kay check` error. The old names work until 1.108 and `kay check --fix` writes the new ones (`deprecated-link-flags`, none for a dynamic `data-no-transition` or `data-no-prefetch`). A `data-` name one or two letters from a flag, as `data-prefech`, is the `unknown-link-flag` error.
+`data-keep-scroll` is `data-scroll="keep"` (`data-keep-scroll="false"` is `data-scroll="top"`), `data-no-transition` is `data-transition="false"` and `data-no-prefetch` is `data-prefetch="false"`, typed on every element, so a wrong value is a `kay check` error; a wrapper another library marks `data-scroll` now keeps its links' scroll. The old names work until 1.108 and `kay check --fix` writes the new ones (`deprecated-link-flags`). A `data-` name one letter from a flag, as `data-prefech`, is the `unknown-link-flag` error.
 
 ### Websocket frames are always JSON
 
