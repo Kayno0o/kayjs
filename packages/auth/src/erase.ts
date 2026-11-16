@@ -1,6 +1,7 @@
 import type { AuthFailed } from './failure'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
+import { KayError } from 'kay/library'
 import { notifications, personalData } from 'kay/server'
 import { linkedUser } from './core'
 import { reportFrom } from './events'
@@ -72,7 +73,7 @@ export async function eraseUser(core: Core, record: UserRecord): Promise<void> {
 
   // Kept as a `beforeDelete` that refuses keeps it: the caller leaves the account to be tried again.
   if (!erased.ok)
-    throw new Error(`beforeDelete refused to delete ${record.id}: ${erased.error.message}`)
+    throw new KayError('helper-failed', `beforeDelete refused to delete ${record.id}: ${erased.error.message}`)
 }
 
 // `eraseUser` for a user who goes, by their own hand or an admin's (`actor`): the invitations to their address go too, and the account-deleted notice is mailed. Refused with `refused` when `beforeDelete` says so, and with `last-owner` while they are the only owner of an organization with other members, unless `handOver` is set, as for an admin who cannot name an owner: the organization then passes to its longest-standing member. An organization they are alone in goes with them.
@@ -112,7 +113,7 @@ export async function eraseDue(core: Core, record: UserRecord): Promise<void> {
   }, stillDue)
 
   if (!erased.ok)
-    throw new Error(`the deletion of ${record.id} did not go through (${erased.error.code}): ${erased.error.message}`)
+    throw new KayError('helper-failed', `the deletion of ${record.id} did not go through (${erased.error.code}): ${erased.error.message}`)
 }
 
 // `afterDelete` runs once the user is gone, and what it records is forgotten after it. The audit log forgets the user before and after, and a failure of either fails the erase, so none of their data stays behind unreported; only the first leaves the account to delete again.

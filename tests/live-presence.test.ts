@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:test'
 import { chromium } from 'playwright-core'
+import { KayError } from '../src/runtime/kay-error'
 import { PROOF_LIFETIME_MS } from '../src/runtime/live-value'
 import { PRESENCE_LIVE_ID } from '../src/runtime/presence'
 import { presenceGrace, viewPresenceWith } from '../src/server/presence'
@@ -338,10 +339,10 @@ describe('presence on the server', () => {
     await leaves(rooms, ROOM, 0)
   })
 
-  it('throws a RangeError for a room and member over 256 characters, and a 500 page for the page that reads them', async () => {
+  it('throws an argument-invalid KayError for a room and member over 256 characters, and a 500 page for the page that reads them', async () => {
     const { presence } = await import('../src/runtime/presence')
 
-    expect(() => presence('r'.repeat(250), { name: 'Ann' })).toThrow(RangeError)
+    expect(() => presence('r'.repeat(250), { name: 'Ann' })).toThrow(KayError)
     expect(() => presence('r'.repeat(200), { name: 'Ann' })).not.toThrow()
     expect((await site.visit(`/long/${'r'.repeat(300)}`)).status).toBe(500)
     expect((await site.visit(`/long/${'r'.repeat(100)}`)).status).toBe(200)

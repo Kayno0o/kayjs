@@ -5,6 +5,7 @@ import { createSignal, getOwner, isSignal, liveOwner, renderEffect, runWithOwner
 export { actionStub, formAction, formChecked, formDescribed, formError, formHere, formInitial, formInitialChecked, formInvalid, formKey, formMarked, formProtection, formScope, formStart, formValue, isAction, issueScope, registerActions } from './action'
 export { fill } from './fills'
 export { registerImage } from './image'
+export { KayError } from './kay-error'
 export { registerPlaceholder } from './placeholder'
 export { uiRecipe } from './recipe'
 export { loadTemplateContext } from './template-context'

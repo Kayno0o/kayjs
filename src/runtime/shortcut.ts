@@ -1,3 +1,4 @@
+import { KayError } from './kay-error'
 import { lasting } from './lasting'
 import { effect, onCleanup, onMount } from './reactive'
 
@@ -53,7 +54,7 @@ function parse(spec: string, apple: boolean): Parsed {
   const parsed: Parsed = { key: ALIASES[named.toLowerCase()] ?? named.toLowerCase(), ctrl: false, meta: false, alt: false, shift: false, symbol: false }
 
   if (named === '')
-    throw new Error(`shortcut('${spec}') names no key`)
+    throw new KayError('argument-invalid', `shortcut('${spec}') names no key`)
 
   for (const modifier of raw.map(part => part.toLowerCase())) {
     if (modifier === 'mod')
@@ -61,7 +62,7 @@ function parse(spec: string, apple: boolean): Parsed {
     else if (modifier === 'ctrl' || modifier === 'meta' || modifier === 'alt' || modifier === 'shift')
       parsed[modifier] = true
     else
-      throw new Error(`shortcut('${spec}') has an unknown modifier '${modifier}': use mod, ctrl, meta, alt or shift`)
+      throw new KayError('argument-invalid', `shortcut('${spec}') has an unknown modifier '${modifier}': use mod, ctrl, meta, alt or shift`)
   }
 
   parsed.symbol = parsed.key.length === 1 && parsed.key !== ' ' && !ALPHANUMERIC.test(parsed.key)

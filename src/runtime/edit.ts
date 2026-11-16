@@ -2,6 +2,7 @@ import type { WriteResult } from './draft-issues'
 import type { EntryRef, Unclickable } from './fields'
 import { withBase, withoutBase } from './base'
 import { accepted, refusedIssues } from './draft-issues'
+import { KayError } from './kay-error'
 import { navigation } from './navigation'
 import { DRAFT_ROUTE, NAVIGATE_HEADER } from './swap'
 
@@ -83,10 +84,10 @@ export async function showDraft(entries: DraftEntry[]): Promise<WriteResult> {
     return refusedIssues((JSON.parse(text) as { issues: DraftIssue[] }).issues)
 
   if (!response.ok)
-    throw new Error(`kay: showDraft was answered ${response.status}: ${text}`)
+    throw new KayError('helper-failed', `kay: showDraft was answered ${response.status}: ${text}`)
 
   if (!navigation.hooks)
-    throw new Error('kay: showDraft needs the page swap, which `navigation: false` in kay.config.ts turns off')
+    throw new KayError('config-invalid', 'kay: showDraft needs the page swap, which `navigation: false` in kay.config.ts turns off')
 
   const { show } = await import('./page-swap')
 

@@ -1,4 +1,5 @@
 ---
+import { KayError } from 'kay/internal'
 import { effect, memo, onCleanup } from 'kay'
 import type { FormScope } from '../form'
 import FieldInput from '../editor/field-input.kay'
@@ -25,10 +26,10 @@ const field = memo(() => {
   const paired = pairedFields(fields).get(name)
 
   if (!found && paired)
-    throw new Error(`kayjs-cms: ${form.collection.name}'s ${JSON.stringify(name)} is the ${paired.role} of its image ${JSON.stringify(paired.image)}, which shows it: render ${JSON.stringify(paired.image)}`)
+    throw new KayError('argument-invalid', `kayjs-cms: ${form.collection.name}'s ${JSON.stringify(name)} is the ${paired.role} of its image ${JSON.stringify(paired.image)}, which shows it: render ${JSON.stringify(paired.image)}`)
 
   if (!found)
-    throw new Error(`kayjs-cms: ${form.collection.name} has no field ${JSON.stringify(name)} to render; its fields are ${fields.map(candidate => candidate.key).join(', ')}`)
+    throw new KayError('argument-invalid', `kayjs-cms: ${form.collection.name} has no field ${JSON.stringify(name)} to render; its fields are ${fields.map(candidate => candidate.key).join(', ')}`)
 
   return found
 })

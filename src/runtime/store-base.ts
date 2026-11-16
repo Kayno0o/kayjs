@@ -1,5 +1,6 @@
 import type { Duration } from './duration'
 import { durationMs } from './duration'
+import { KayError } from './kay-error'
 
 // What a store method answers when it may or may not wait: the value at once, or a promise of it, so a store over memory or a file answers at once and one over a database or Redis answers later. Callers `await` every call.
 export type MaybePromise<T> = T | Promise<T>
@@ -21,7 +22,7 @@ export function lengthMs(value: Duration | number, what = 'a store length'): num
   const ms = typeof value === 'number' ? value : durationMs(value)
 
   if (!Number.isFinite(ms))
-    throw new TypeError(`kay: ${what} is ${String(value)}; a store takes a duration such as '30s' or '250ms'`)
+    throw new KayError('argument-invalid', `kay: ${what} is ${String(value)}; a store takes a duration such as '30s' or '250ms'`)
 
   return ms
 }

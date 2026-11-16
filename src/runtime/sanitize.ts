@@ -1,4 +1,5 @@
 import type { SafeHtml } from './checks'
+import { KayError } from './kay-error'
 import { browserKeepsSameTab, browserOrigin, leavesSite, NEW_TAB_ATTRIBUTE } from './outside'
 import { isVouched, vouch } from './safe-html'
 import { configuredSite, keepsSameTab } from './site'
@@ -218,7 +219,7 @@ function allowed(options: SanitizeOptions | undefined): Allowed {
 
   for (const tag of options.tags ?? []) {
     if (UNSAFE_TAGS.has(tag.toLowerCase()))
-      throw new Error(`kay: sanitizeHtml never keeps <${tag}>, which runs code, loads another document or takes input`)
+      throw new KayError('argument-invalid', `kay: sanitizeHtml never keeps <${tag}>, which runs code, loads another document or takes input`)
 
     tags.add(tag.toLowerCase())
   }
@@ -226,11 +227,11 @@ function allowed(options: SanitizeOptions | undefined): Allowed {
   for (const [tag, names] of Object.entries(options.attributes ?? {})) {
     for (const name of names) {
       if (UNSAFE_ATTRIBUTE.test(name))
-        throw new Error(`kay: sanitizeHtml never keeps ${name}, which runs code or styles the page`)
+        throw new KayError('argument-invalid', `kay: sanitizeHtml never keeps ${name}, which runs code or styles the page`)
     }
 
     if (!tags.has(tag.toLowerCase()))
-      throw new Error(`kay: sanitizeHtml is given attributes of <${tag}>, a tag it does not keep: add it to \`tags\``)
+      throw new KayError('argument-invalid', `kay: sanitizeHtml is given attributes of <${tag}>, a tag it does not keep: add it to \`tags\``)
 
     attributes[tag.toLowerCase()] = [...attributes[tag.toLowerCase()] ?? [], ...names.map(name => name.toLowerCase())]
   }

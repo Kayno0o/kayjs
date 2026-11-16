@@ -1,4 +1,5 @@
 import type { s as server } from './schema'
+import { KayError } from './kay-error'
 
 const INERT = 'kay: a schema is inert in the browser: it validates on the server, so read its type with `Static<typeof SCHEMA>` and check values there'
 
@@ -9,7 +10,7 @@ const schema: object = /* @__PURE__ */ new Proxy({}, {
     if (typeof key === 'symbol' || key === 'then' || key === 'toJSON')
       return undefined
 
-    throw new Error(INERT)
+    throw new KayError('helper-failed', INERT)
   },
 })
 

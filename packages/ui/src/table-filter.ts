@@ -1,5 +1,6 @@
 import type { FilterField } from './table'
 import { queryParam, signal } from 'kay'
+import { KayError } from 'kay/internal'
 
 export interface FilterInput {
   // Read once, when the table is made.
@@ -17,7 +18,7 @@ export function tableFilter(input: FilterInput) {
 
   for (const field of extra) {
     if (taken.has(field.key))
-      throw new Error(`kayjs-ui: a Table field cannot be keyed ${field.key}, a name the table's sort, search or export address already writes in the query`)
+      throw new KayError('argument-invalid', `kayjs-ui: a Table field cannot be keyed ${field.key}, a name the table's sort, search or export address already writes in the query`)
   }
 
   const values = extra.map(field => queryParam(field.key, { default: '' }))

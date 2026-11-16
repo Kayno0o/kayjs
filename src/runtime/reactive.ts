@@ -2,6 +2,7 @@
 // Writes apply at once; effects that depend on what changed run batched in a microtask, or right away through `flush()`.
 
 import type { Setter, Signal } from './core'
+import { KayError } from './kay-error'
 import { sourceStart, warnOnce, warnUnowned } from './warn-once'
 
 type Equals<T> = false | ((previous: T, next: T) => boolean)
@@ -208,7 +209,7 @@ export function scope<T>(fn: () => T, detached = false): T {
 
 export function provideContext(key: symbol, value: unknown): void {
   if (!owner) {
-    throw new Error('kay: provide() runs in a component\'s script, as it renders')
+    throw new KayError('outside-request', 'kay: provide() runs in a component\'s script, as it renders')
   }
 
   (owner.context ??= new Map()).set(key, value)

@@ -1,4 +1,5 @@
 import type { Register } from './checks'
+import { KayError } from './kay-error'
 
 // The page patterns `kay check` registers, `/todos/:id`, an optional param as `:page?` and a catch-all as `*path`; any string where nothing is registered.
 export type RoutePattern = Register extends { patterns: infer Patterns extends string } ? Patterns : string
@@ -31,7 +32,7 @@ function segment(name: string, value: unknown): string {
   const text = typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value)) ? String(value) : ''
 
   if (text === '' || text === '.' || text === '..')
-    throw new TypeError(`route(): param "${name}" is ${typeof value === 'string' ? `"${text}"` : String(value)}`)
+    throw new KayError('argument-invalid', `route(): param "${name}" is ${typeof value === 'string' ? `"${text}"` : String(value)}`)
 
   return encoded(name, text)
 }
@@ -41,7 +42,7 @@ function encoded(name: string, text: string): string {
     return encodeURIComponent(text)
   }
   catch {
-    throw new TypeError(`route(): param "${name}" is not valid text`)
+    throw new KayError('argument-invalid', `route(): param "${name}" is not valid text`)
   }
 }
 

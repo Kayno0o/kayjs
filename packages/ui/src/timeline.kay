@@ -1,4 +1,5 @@
 --- <Key extends string | number>
+import { KayError } from 'kay/internal'
 import type { JSX, Snippet } from 'kay'
 import type { TimelineEntry } from './timeline'
 import { tabOf } from './outside'
@@ -44,7 +45,7 @@ const { items, entries: oldEntries, selected, onSelectedChange, label, emptyLabe
 const all = () => (items ?? oldEntries)!
 
 if ((rest as { onSelect?: unknown }).onSelect !== undefined)
-  throw new Error('kayjs-ui: a Timeline has no onSelect since 1.91; use onSelectedChange')
+  throw new KayError('argument-invalid', 'kayjs-ui: a Timeline has no onSelect since 1.91; use onSelectedChange')
 
 // The empty text is a div, not the list's own element, so it takes the attributes as a div does.
 const loose = rest as unknown as JSX.IntrinsicElements['div']

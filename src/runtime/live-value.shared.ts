@@ -4,6 +4,7 @@ import type { Duration } from './duration'
 import type { Setter } from './index'
 import type { ConnectionStatus, Source } from './live'
 import type { StoreBase } from './store-base'
+import { KayError } from './kay-error'
 
 // What both halves of `live()` read: its types, the route and script of the connection, and how a key reads.
 
@@ -134,7 +135,7 @@ export function writeArguments(args: unknown[], field: 'key' | 'user', what: str
   const [first, second] = args
 
   if (args.length < 2)
-    throw new TypeError(`kay: ${what} is one value for each ${field}: \`set(next, { ${field} })\``)
+    throw new KayError('argument-invalid', `kay: ${what} is one value for each ${field}: \`set(next, { ${field} })\``)
 
   if (typeof second === 'object' && second !== null && Object.keys(second).length === 1 && field in second)
     return [keyText((second as Record<string, string>)[field]!), first]

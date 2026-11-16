@@ -3,6 +3,7 @@ import type { Attachments } from './chat-attachments'
 import type { ConversationAnswer, ConversationSummary } from './conversation-title'
 import type { AiMessage, AiToolCall, ChatFailure, ChatMessage, ChatTurn, CodeBlock, Progress, Source } from './types'
 import { ActionError, ActionRedirectError, effect, onMount, signal, untrack } from 'kay'
+import { KayError } from 'kay/internal'
 import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
 import { sameSources, usableSources } from './chat-sources'
@@ -260,7 +261,7 @@ export function createChatSession(options: ChatSessionOptions) {
       }
 
       if (answer?.owned !== true || answer.op !== 'load')
-        throw new Error('the action answered no conversation; it returns the reply of ask() as it is')
+        throw new KayError('helper-failed', 'the action answered no conversation; it returns the reply of ask() as it is')
 
       owned.set(true)
       shown = answer.id

@@ -1,4 +1,5 @@
 import { NON_ROOT_TRAILING_SLASH, withoutBase } from './base'
+import { KayError } from './kay-error'
 import { lasting } from './lasting'
 import { hold, live, wanted } from './live-value'
 import { randomId } from './random-id'
@@ -36,7 +37,7 @@ function pagePath(): string {
   const path = typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? currentServerScope()?.path : withoutBase(location.pathname)
 
   if (path === undefined)
-    throw new TypeError('kay: presence() with no room is the page\'s own, which only a render or a browser knows; name a room, or call it in an island')
+    throw new KayError('outside-request', 'kay: presence() with no room is the page\'s own, which only a render or a browser knows; name a room, or call it in an island')
 
   return path.replace(NON_ROOT_TRAILING_SLASH, '')
 }
@@ -69,7 +70,7 @@ export function presence(first?: string | PresenceOptions<unknown>, second?: unk
   const key = JSON.stringify([room ?? pagePath(), member ?? null])
 
   if (key.length > MAX_PRESENCE_KEY)
-    throw new RangeError(`kay: presence(${key.slice(0, 40)}...): a room and its member are at most ${MAX_PRESENCE_KEY} characters as JSON`)
+    throw new KayError('argument-invalid', `kay: presence(${key.slice(0, 40)}...): a room and its member are at most ${MAX_PRESENCE_KEY} characters as JSON`)
 
   handle ??= (live as (initial: Handle, id: string, name: string) => Handle)((name: string) => readMembers?.(name) ?? [], PRESENCE_LIVE_ID, 'presence')
 

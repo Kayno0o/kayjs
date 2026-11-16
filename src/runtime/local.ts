@@ -4,6 +4,7 @@ import type { Local, LocalIssue, LocalOptions, LocalSyncStatus } from './local-t
 import { encodeCall } from './action'
 import { actionFailed, apiErrorOf, messageOf } from './api-error'
 import { withBase } from './base'
+import { KayError } from './kay-error'
 import { listenerSet } from './listener-set'
 import { MOST_FAULTS, MOST_WAIT_MS, RETRY_LATER } from './local-status'
 import { randomId } from './random-id'
@@ -462,28 +463,27 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
   private async write(op: 'put' | 'remove', row: Row): Promise<void> {
     if (op === 'remove' && this.options.remove === undefined)
-      throw new TypeError('kay: this local() collection declares no remove action')
+      throw new KayError('argument-invalid', 'kay: this local() collection declares no remove action')
 
     await this.ready
 
     if (this.state[0]() === 'unavailable')
-      throw new Error('kay: this browser keeps no IndexedDB, so a local() collection cannot be written')
+      throw new KayError('helper-failed', 'kay: this browser keeps no IndexedDB, so a local() collection cannot be written')
 
     const keyed = row[this.options.key]
 
     if (typeof keyed !== 'string' && typeof keyed !== 'number')
-      throw new TypeError(`kay: a local() row names itself by a string or a number in \`${this.options.key}\``)
+      throw new KayError('argument-invalid', `kay: a local() row names itself by a string or a number in \`${this.options.key}\``)
 
     const { headers, body } = encodeCall(row)
 
     if (typeof body !== 'string')
-      throw new TypeError('kay: a local() row cannot hold files')
+      throw new KayError('argument-invalid', 'kay: a local() row cannot hold files')
 
     const k = String(keyed)
     const action = op === 'put' ? this.options.put : this.options.remove!
     const sent: Record<string, string> = { ...headers, ...typeof location !== 'undefined' && { [PAGE_HEADER]: location.pathname + location.search } }
-    const db = await database()
-    const tx = db.transaction(['rows', 'outbox'], 'readwrite')
+    const tx = (await database()).transaction(['rows', 'outbox'], 'readwrite')
     const rows = tx.objectStore('rows')
     const before = await request(rows.get([this.c, k])) as RowRecord | undefined
 

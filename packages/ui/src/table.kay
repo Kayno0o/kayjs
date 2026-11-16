@@ -1,6 +1,7 @@
 --- <Row, Key extends RowKey<Row>>
 // What turns a use of the Table into an island, each prop with whether it is on when left out: a page or a server component drawing it with none of them on, and passing no function, gets plain markup and no script. Sorting is not one: a plain Table's sortable headers are links that put the sort in the URL (`sortParam`, `sort` by default) and the server sorts the rows.
 island({ plain: true, interactive: { filter: false, filterParam: false, fields: false, selectable: false, exportable: false, columnToggle: false, expandable: false, pageSize: false, rowHref: false, onRowClick: false, virtual: false, list: false } })
+import { KayError } from 'kay/internal'
 import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import type { RowsSource } from './source'
@@ -241,13 +242,13 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
 } & ({ rows: RowsSource<Row>, list?: undefined } | { rows?: undefined, list: InfiniteList<Row> })>()
 
 if ((rest as { onSelect?: unknown }).onSelect !== undefined)
-  throw new Error('kayjs-ui: a Table has no onSelect since 1.91; use onSelectedChange')
+  throw new KayError('argument-invalid', 'kayjs-ui: a Table has no onSelect since 1.91; use onSelectedChange')
 
 if (expandable && virtual)
-  throw new Error('kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
+  throw new KayError('argument-invalid', 'kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
 
 if (pageSize !== undefined && (virtual || list))
-  throw new Error('kayjs-ui: a Table with a pageSize cannot be virtual or take a list, which already hold their rows by the window or by the page')
+  throw new KayError('argument-invalid', 'kayjs-ui: a Table with a pageSize cannot be virtual or take a list, which already hold their rows by the window or by the page')
 
 const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: failure => onError?.(failure) })
 const rows = () => list ? (list.data ?? list.rows)() : source.rows()

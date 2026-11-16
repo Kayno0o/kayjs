@@ -1,4 +1,5 @@
 import { DevalueError, stringify } from 'devalue'
+import { KayError } from './kay-error'
 import { isVouched, vouch } from './safe-html'
 
 // Island props, action calls and the flash cookie go as devalue text: JSON that also carries Dates, Maps, Sets, bigints, URLs, RegExps, undefined and shared references.
@@ -209,5 +210,5 @@ export function isIndex(value: unknown, length: number): value is number {
 }
 
 export function malformed(index: unknown, type?: string): never {
-  throw new TypeError(`kay: the devalue text received is malformed at index ${String(index)}${type === undefined ? '' : `, a ${type} kay never sends`}`)
+  throw new KayError('helper-failed', `kay: the devalue text received is malformed at index ${String(index)}${type === undefined ? '' : `, a ${type} kay never sends`}`)
 }

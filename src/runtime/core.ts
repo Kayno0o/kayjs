@@ -12,6 +12,7 @@ import type { PlainValue, SignalOptions } from './reactive'
 import type { DenyOptions } from './refuse'
 import type { Schema, Static } from './schema'
 import { durationMs } from './duration'
+import { KayError } from './kay-error'
 import { lasting } from './lasting'
 import { createEffect, createSignal, getOwner, markSignal, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack, withSetter } from './reactive'
 import { tabVisible } from './visibility'
@@ -87,7 +88,7 @@ export function every(interval: Duration, run: () => unknown, options?: EveryOpt
 
   // A timer waits 2^31 - 1 ms at most and takes anything under a millisecond for one.
   if (!(ms >= 1 && ms <= MAX_TIMER))
-    throw new Error(`kay: every() takes a duration of 1 ms to 24 days such as '3s' or '250ms', not ${typeof interval === 'string' ? JSON.stringify(interval) : String(interval)}`)
+    throw new KayError('argument-invalid', `kay: every() takes a duration of 1 ms to 24 days such as '3s' or '250ms', not ${typeof interval === 'string' ? JSON.stringify(interval) : String(interval)}`)
 
   return lasting('every', run, () => createEffect(() => {
     if (options?.while && !options.while()) {

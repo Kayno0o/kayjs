@@ -1,6 +1,9 @@
 // What stops a compile, a build, a content load or a static export, named so that `kay explain <code>` can say where its fix is written.
 // Each code covers a group of messages with one cause; the registry is the one list a test holds the raise sites, `llms/errors.md` and the docs reference to.
 
+import type { KayErrorOptions } from '../runtime/kay-error'
+import { KayError, watchRaised } from '../runtime/kay-error'
+
 export const ERROR_GROUPS = {
   command: 'A command that could not run: a path that is missing, flags that do not go together.',
   compile: 'A `.kay` file that does not compile: found by `kay check`, `kay build` and `kay dev`.',
@@ -548,28 +551,15 @@ export function raisedMark(): number {
 // A message shorter than this says too little to tell which error a log is about.
 const MATCH_MIN = 16
 
-// An error kay raised itself, its code the one `kay explain` documents.
-// `kind` tells apart what one code covers (an `AiError`'s `auth` from its `schema`) and is the code when a code covers one cause, `status` is the HTTP status the error stands for, and `cause` is the error underneath.
-export interface KayErrorOptions extends ErrorOptions {
-  kind?: string | undefined
-  status?: number | undefined
-}
+export { KayError }
+export type { KayErrorOptions }
 
-export class KayError extends Error {
-  override name = 'KayError'
-  readonly kind: string
-  readonly status: number | undefined
+watchRaised((error) => {
+  raised.push({ error, order: ++raisedCount })
 
-  constructor(readonly code: ErrorName, message: string, { kind, status, ...options }: KayErrorOptions = {}) {
-    super(message, options)
-    this.kind = kind ?? code
-    this.status = status
-    raised.push({ error: this, order: ++raisedCount })
-
-    if (raised.length > RAISED_KEPT)
-      raised.shift()
-  }
-}
+  if (raised.length > RAISED_KEPT)
+    raised.shift()
+})
 
 // A failed `Bun.build`, keeping the code of the error a plugin threw in it.
 export function buildFailure(logs: readonly { message?: string }[], message: string, since: number): AggregateError {

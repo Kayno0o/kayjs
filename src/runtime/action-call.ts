@@ -363,7 +363,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
             clearTimeout(timer)
             timer = limit && setTimeout(() => {
               timedOut = true
-              limit.abort(new DOMException(`The server did not answer within ${String(timeoutOption)}`, 'TimeoutError'))
+              limit.abort(new DOMException(`The action call timeout of ${String(timeoutOption)} passed before the server answered`, 'TimeoutError'))
             }, timeout)
           }, left, caller, { key, options })
 

@@ -2,7 +2,7 @@
 import type { DataValue, JsonSchema, KayCommand, LocalizedEntry } from 'kay/library'
 import type { Unit } from './translation'
 import process from 'node:process'
-import { localizedEntry, missingTranslations, writeDraftEntry, writeDraftMessages } from 'kay/library'
+import { KayError, localizedEntry, missingTranslations, writeDraftEntry, writeDraftMessages } from 'kay/library'
 import { splitMarkdown } from './split'
 import { estimateTokens, pluralCategories, translateUnits } from './translation'
 
@@ -327,7 +327,7 @@ async function planEntry(root: string, config: Run['config'], collection: string
   const entry = await localizedEntry(root, config, collection, slug)
 
   if (entry.mark === undefined)
-    throw new Error(`holds JSON, which cannot be marked a draft: give ${collection} a boolean field and \`draft: 'field'\``)
+    throw new KayError('config-invalid', `holds JSON, which cannot be marked a draft: give ${collection} a boolean field and \`draft: 'field'\``)
 
   const paths: Path[] = []
 

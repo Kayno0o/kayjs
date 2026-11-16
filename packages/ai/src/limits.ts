@@ -6,7 +6,7 @@ import type { ModelsOptions } from './models'
 import type { AskHooks, Piece, Resilience, Usage } from './types'
 import process from 'node:process'
 import { logFrom } from 'kay'
-import { configError, currentRequest, durationSeconds, keyedDigest, knownAddress, limiter, limitRefused, userOf } from 'kay/library'
+import { configError, currentRequest, durationSeconds, KayError, keyedDigest, knownAddress, limiter, limitRefused, userOf } from 'kay/library'
 import { clientAddress, memoryRates, rateKey } from 'kay/server'
 import { AiError } from './errors'
 
@@ -254,7 +254,7 @@ function seconds(resetAt: number): number {
 
 function checked(window: { count: number, resetAt: number } | undefined): { count: number, resetAt: number } | undefined {
   if (window !== undefined && (!Number.isFinite(window.count) || !Number.isFinite(window.resetAt)))
-    throw new TypeError('the store answered something that is no window')
+    throw new KayError('helper-failed', 'the store answered something that is no window')
 
   return window
 }

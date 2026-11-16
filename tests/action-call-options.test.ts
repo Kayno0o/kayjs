@@ -294,7 +294,7 @@ describe('the timeout of a call', () => {
     const running = save({}, { timeout: '20ms', optimistic: () => setValue(2) })
 
     expect([value(), save.pending()]).toEqual([2, true])
-    await expect(running).rejects.toMatchObject({ name: 'TimeoutError', message: 'The server did not answer within 20ms' })
+    await expect(running).rejects.toMatchObject({ name: 'TimeoutError', message: 'The action call timeout of 20ms passed before the server answered' })
     expect([value(), save.pending()]).toEqual([1, false])
   })
 

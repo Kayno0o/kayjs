@@ -124,7 +124,7 @@ export async function exchange<T>(name: string, url: string, init: { headers: Re
       throw error
 
     if (late.signal.aborted)
-      throw new AiError('timeout', `${name} did not answer within ${timeout}`, { cause: error })
+      throw new AiError('timeout', `${name} did not answer within the call timeout of ${timeout}`, { cause: error })
 
     throw new AiError('network', `${name} could not be reached (${error instanceof Error ? error.message : String(error)})`, { cause: error })
   }
@@ -147,7 +147,7 @@ export async function* postEvents(name: string, url: string, headers: Record<str
     signal.throwIfAborted()
 
     if (connecting.signal.aborted)
-      throw new AiError('timeout', `${name} did not answer within ${connect} ms`, { cause: error })
+      throw new AiError('timeout', `${name} did not answer within the connect timeout of ${connect} ms`, { cause: error })
 
     throw new AiError('network', `${name} could not be reached (${error instanceof Error ? error.message : String(error)})`, { cause: error })
   }
@@ -236,7 +236,7 @@ async function* eventsOf(name: string, body: ReadableStream<Uint8Array>, idle: n
     signal.throwIfAborted()
 
     if (silent)
-      throw new AiError('timeout', `${name} sent nothing for ${idle} ms mid-reply`)
+      throw new AiError('timeout', `${name} sent nothing for the idle timeout of ${idle} ms mid-reply`)
 
     if (failure !== undefined) {
       throw new AiError('cut', `${name} dropped the connection mid-reply`, { cause: failure.error })

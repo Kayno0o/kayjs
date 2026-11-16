@@ -3,6 +3,7 @@ import type { DraftKeeper } from './draft-storage'
 import type { CmsDraftEntry, DraftResult, EntryRef, Issue } from './kay/contract'
 import type { FieldPath } from './markers'
 import { durationMs, signal } from 'kay'
+import { KayError } from 'kay/internal'
 import { BODY, entryKey } from './markers'
 import { differing, valueAt, withValueAt } from './paths'
 import { hashOf } from './room'
@@ -216,7 +217,7 @@ export function cmsDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     const entry = current().get(key)
 
     if (!entry)
-      throw new Error(`${key} was never opened`)
+      throw new KayError('helper-failed', `${key} was never opened`)
 
     const original = saved.get(key) as CmsDraftEntry
     const next = change(entry)

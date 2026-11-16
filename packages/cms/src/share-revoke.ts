@@ -4,6 +4,7 @@ import type { EntryRef } from './kay/contract'
 import { mkdir } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { repositoryRoot } from 'kay/content'
+import { KayError } from 'kay/library'
 import { fileVersion } from './files'
 import { rowOf } from './hidden'
 import { collectionLoader } from './kay/content'
@@ -75,7 +76,7 @@ export async function revokeShares(ref: EntryRef, author?: Identity | undefined)
   const store = storeOf(ref.collection)
 
   if (store?.save === undefined)
-    throw new Error(`${ref.collection} cannot keep a revocation: its loader gives no sibling`)
+    throw new KayError('config-invalid', `${ref.collection} cannot keep a revocation: its loader gives no sibling`)
 
   await store.save({ slug: placeOf(ref), data })
 }

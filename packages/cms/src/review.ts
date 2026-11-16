@@ -4,6 +4,7 @@ import type { CollectionInfo, EntryRef } from './kay/contract'
 import { mkdir, readdir } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { repositoryRoot } from 'kay/content'
+import { KayError } from 'kay/library'
 import { wording } from 'kay/words'
 import { fileVersion } from './files'
 import { rowOf } from './hidden'
@@ -319,7 +320,7 @@ export async function writeReview(ref: EntryRef, review: Review | undefined, { a
   const store = storeOf(ref.collection)
 
   if (store === undefined)
-    throw new Error(`${ref.collection} keeps no review: its loader gives no sibling`)
+    throw new KayError('config-invalid', `${ref.collection} keeps no review: its loader gives no sibling`)
 
   if (kept === undefined)
     await store.remove!({ slug: place })

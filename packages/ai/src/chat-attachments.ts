@@ -1,6 +1,7 @@
 import type { ByteSize } from 'kay/library'
 import { takeFiles } from '@kayjs/ui/lib/file-limits'
 import { byteCount, signal } from 'kay'
+import { KayError } from 'kay/internal'
 
 const DEFAULT_MAX_SIZE = 5 * 1024 * 1024
 
@@ -12,7 +13,7 @@ export function fileSizeLimit(size: ByteSize | undefined): number {
   const bytes = byteCount(size)
 
   if (bytes === undefined)
-    throw new Error(`kay: the maxSize of Chat is ${JSON.stringify(size)}; it takes a positive size, bytes or a string such as '2mb'`)
+    throw new KayError('config-invalid', `kay: the maxSize of Chat is ${JSON.stringify(size)}; it takes a positive size, bytes or a string such as '2mb'`)
 
   return bytes
 }

@@ -1,3 +1,5 @@
+import { KayError } from './kay-error'
+
 const CONTEXT = Symbol.for('kay.context')
 
 // What an extension's `context` module default-exports: how its request values are loaded, once per request.
@@ -42,12 +44,12 @@ export function setTemplateContext(read: () => Record<string, unknown> | undefin
 
 function valuesNow(key: string | symbol): Record<string, unknown> {
   if (current === undefined)
-    throw new Error(`kay: \`ctx\` is read on the server, so a component rendered in the browser, such as an island, cannot read ctx.${String(key)}; pass the value in as a prop`)
+    throw new KayError('outside-request', `kay: \`ctx\` is read on the server, so a component rendered in the browser, such as an island, cannot read ctx.${String(key)}; pass the value in as a prop`)
 
   const values = current()
 
   if (values === undefined)
-    throw new Error(`kay: ctx.${String(key)} is read in a render that loaded no request values, which only a page rendered per request does; a page reads \`ctx\` in its template or in a component it imports, never in a module; a component reached only through a script in node_modules is not found, so import it in the page`)
+    throw new KayError('outside-request', `kay: ctx.${String(key)} is read in a render that loaded no request values, which only a page rendered per request does; a page reads \`ctx\` in its template or in a component it imports, never in a module; a component reached only through a script in node_modules is not found, so import it in the page`)
 
   return values
 }

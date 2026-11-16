@@ -4,6 +4,7 @@ import { isAction } from './action-shared'
 import { claimedHost } from './claimed'
 import { escapeAttribute } from './escape'
 import { holdInvalid } from './invalid'
+import { KayError } from './kay-error'
 import { KEPT_END, KEPT_START } from './markers'
 import { untrack } from './reactive'
 import { FIXED_FIELDS } from './wire'
@@ -46,7 +47,7 @@ export function payloadQuery(fields: Record<string, unknown>): string {
         continue
 
       if (typeof item === 'object' && !(item instanceof Date))
-        throw new TypeError(`kay: ${name} in \`with()\` is neither text, a number, a boolean, a date nor a list of them`)
+        throw new KayError('argument-invalid', `kay: ${name} in \`with()\` is neither text, a number, a boolean, a date nor a list of them`)
 
       query.append(name, item instanceof Date ? item.toISOString() : String(item))
     }

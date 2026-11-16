@@ -4,6 +4,7 @@ import { t as schema } from 'elysia'
 import { FormatRegistry } from 'elysia/type-system'
 import { byteSize } from './byte-size'
 import { isEmail } from './email'
+import { KayError } from './kay-error'
 
 type Builder = typeof schema
 
@@ -41,7 +42,7 @@ function UnionKeys<const Keyed extends object>(record: Keyed, options?: Paramete
   const keys = Object.keys(record)
 
   if (keys.length === 0)
-    throw new Error('kay: s.UnionKeys() takes a record with at least one key')
+    throw new KayError('argument-invalid', 'kay: s.UnionKeys() takes a record with at least one key')
 
   return UnionEnum(keys as [keyof Keyed & string, ...(keyof Keyed & string)[]], options)
 }

@@ -1,5 +1,6 @@
 import type { CheckedHref } from './checks'
 import { withBase } from './base'
+import { KayError } from './kay-error'
 import { follow } from './navigate'
 import { leave, loadAgain, mayLeave, navigation, prefetched, swappable } from './navigation'
 import { LOAD_NAME } from './swap'
@@ -61,7 +62,7 @@ export async function navigateTo(to: string | { query: QueryChanges }, options: 
 
   // A `javascript:` URL, as one read from a query param could be, would run in the page; a `data:` one browsers refuse to load, and `vbscript:` is gone.
   if (url.protocol === 'javascript:')
-    throw new TypeError('kay: navigate() refuses javascript:')
+    throw new KayError('argument-invalid', 'kay: navigate() refuses javascript:')
 
   if (typeof to !== 'string') {
     mergeQuery(url.searchParams, to.query)

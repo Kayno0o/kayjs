@@ -1,3 +1,5 @@
+import { KayError } from './kay-error'
+
 export type LogLevel = 'info' | 'warn' | 'error'
 
 // Where the server sends kay's messages, in the format its `log` option sets; read off the global so every copy of kay in the process shares it.
@@ -19,7 +21,7 @@ export function kayLog(level: LogLevel, message: string, error?: unknown): void 
 // kept: request
 export function logFrom(from: string): Log {
   if (from === '')
-    throw new TypeError('kay: logFrom takes the name heading the library\'s messages, such as logFrom(\'kayjs-mail\')')
+    throw new KayError('argument-invalid', 'kay: logFrom takes the name heading the library\'s messages, such as logFrom(\'kayjs-mail\')')
 
   return {
     info: (message, error) => write('info', message, error, from),
