@@ -8,6 +8,7 @@ import Room from '../components/room.kay'
 ---
 h1 Failed await
 Room(label="Healthy")
+// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await answer
   p.pending Thinking
 then value

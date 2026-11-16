@@ -8,5 +8,6 @@ await comments then list
   p {String(list)}
 catch
   p.failed Comments are down
+// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await count then shown
   p.now {shown}

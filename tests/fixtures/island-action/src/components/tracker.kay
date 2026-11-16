@@ -3,6 +3,7 @@ import type { Action } from 'kay'
 import { signal } from 'kay'
 
 const { run } = props<{ run: Action<{ name: string }, string> }>()
+// kay-allow once-read-prop -- the first value is what the fixture shows
 const save = run.track()
 const shown = signal('')
 

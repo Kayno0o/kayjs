@@ -7,6 +7,7 @@ export const solve = action(t.Object({ name: t.String({ minLength: 3 }) }), () =
 const rows = Promise.resolve([1])
 ---
 p.shell Shell
+// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await rows then list
   form(action={solve})
     input(field="name")

@@ -24,10 +24,10 @@ const { calls, block, pending = false, labels, details, runningLabel, doneLabel,
   approvalLabel: string
 }>()
 
-const LABELS = { running: runningLabel, done: doneLabel, failed: failedLabel }
+const statusLabels = () => ({ running: runningLabel, done: doneLabel, failed: failedLabel })
 
 function status(call: AiToolCall) {
-  return call.approval === undefined ? LABELS[call.status] : approvalLabel
+  return call.approval === undefined ? statusLabels()[call.status] : approvalLabel
 }
 
 // The calls in one line, each tool once with its count: `Searched the docs x2, read_page`, ended by the status of what is not done.
@@ -47,10 +47,10 @@ function summary() {
   const held = calls.some(call => call.approval !== undefined)
 
   if (calls.some(call => call.status === 'running'))
-    return `${line} (${LABELS.running})`
+    return `${line} (${statusLabels().running})`
 
   if (failed)
-    return `${line} (${LABELS.failed})`
+    return `${line} (${statusLabels().failed})`
 
   return held ? `${line} (${approvalLabel})` : line
 }

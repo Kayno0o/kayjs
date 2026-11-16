@@ -3,6 +3,7 @@ island({ interactive: { open: false } })
 import { signal } from 'kay'
 
 const { open = false, data } = props<{ open?: boolean, data?: unknown }>()
+// kay-allow constant-signal -- the signal marks the component an island
 const shown = signal(open)
 ---
 section.shell(data-open={shown() ? '' : undefined} data-data={data === undefined ? undefined : 'given'})

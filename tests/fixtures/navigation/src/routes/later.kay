@@ -6,6 +6,7 @@ const answer = defer(Bun.sleep(100).then(() => 42))
 head
   title Later
 h1 Later
+// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await answer
   p.pending Thinking
 then value

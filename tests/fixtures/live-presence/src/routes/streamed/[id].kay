@@ -4,6 +4,7 @@ import Who from '../../components/who.kay'
 const { id } = ctx.params
 const later = Bun.sleep(20).then(() => id)
 ---
+// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await later
   p Waiting
 then room

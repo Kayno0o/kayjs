@@ -4,6 +4,7 @@ const slow = new Promise<number>(resolve => setTimeout(() => resolve(1), 30))
 import Inbox from '../components/inbox.kay'
 ---
 h1 Streamed
+// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await slow
   p Loading
 then _value

@@ -7,6 +7,7 @@ h2#first First
 p needle in the first
 div(style="height: 2500px")
 h2#second Second
+// kay-allow literal-tag -- the tag is the text under test
 p Before, then a needle and a NEEDLES word, <img src=x onerror="window.pwned = 1">.
 div(style="height: 2500px")
 h2#third Third

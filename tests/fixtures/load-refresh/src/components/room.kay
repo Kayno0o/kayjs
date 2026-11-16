@@ -1,6 +1,7 @@
 ---
 import { signal } from 'kay'
 
+// kay-allow constant-signal -- the signal marks the component an island
 const name = signal('Room')
 ---
 head

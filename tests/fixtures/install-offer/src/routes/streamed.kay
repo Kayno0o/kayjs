@@ -5,5 +5,6 @@ import Install from '../components/install.kay'
 const rows = defer(Promise.resolve([1]))
 ---
 p Shell
+// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await rows then list
   Install
