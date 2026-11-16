@@ -151,7 +151,7 @@ const SYNONYMS: Record<string, string> = {
 }
 
 // Change callbacks that only observe state the component owns, with no prop to hold it, or that hold it as a list (`expanded`) of the things they report one at a time.
-const OBSERVE_ONLY = new Set(['record.ts:onRecordingChange', 'table-expand.ts:onOpenChange', 'audio-player.kay:onChapterChange', 'date-input.kay:onMonthChange', 'date-range-input.kay:onMonthChange', 'hover-card.kay:onOpenChange', 'table.kay:onOpenChange', 'table.kay:onScrollChange', 'tree-view.kay:onOpenChange'])
+const OBSERVE_ONLY = new Set(['record.ts:onRecordingChange', 'table-expand.ts:onOpenChange', 'audio-player.kay:onChapterChange', 'date-input.kay:onMonthChange', 'date-range-input.kay:onMonthChange', 'hover-card.kay:onOpenChange', 'table.kay:onOpenChange', 'tooltip-host.kay:onOpenChange', 'table.kay:onScrollChange', 'tree-view.kay:onOpenChange'])
 // `on<Prop>Change` whose event names what it reports beside or in place of the prop's own name: a table holds `selected` as keys and reports `{ keys, rows }`, a chart holds `active` and reports its `index`.
 const ALIASED = new Set(['accordion.kay:onValueChange', 'tabs.kay:onValueChange', 'theme-toggle.kay:onValueChange', 'zoom-pane.kay:onPlateChange', 'timeline.kay:onSelectedChange', 'tree-view.kay:onSelectedChange', 'table.kay:onSelectedChange', 'table.kay:onHiddenColumnsChange', 'split-layout.kay:onDetailOpenChange', 'split-layout.kay:onSidebarOpenChange', 'markdown-editor.kay:onPreviewChange', 'audio-player.kay:onPositionChange', ...['bar-chart', 'line-chart', 'scatter-chart', 'sparkline', 'contribution-graph'].map(chart => `${chart}.kay:onActiveChange`)])
 
