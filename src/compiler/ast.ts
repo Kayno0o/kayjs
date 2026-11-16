@@ -624,9 +624,12 @@ export interface PartFacts {
   merges: boolean
 }
 
-// The name of every part of the component, which `partClass` tells the parts object of before 1.105 from an object of conditions in `class` by.
-export function componentPartNames(parts: PartFacts | undefined): string[] {
-  return [...new Set(['root', ...parts?.names.keys() ?? [], ...parts?.handed.keys() ?? []])]
+// The module level constant holding the names of the parts of a component, written once for every `partClass` call.
+export const PART_NAMES = 'KayPartNames'
+
+// The module level constant of a component with parts, the names of its parts in one string: `partClass` tells the parts object of before 1.105 from an object of conditions in `class` by them.
+export function partNamesConst(parts: PartFacts | undefined): string {
+  return parts?.merges === true ? `const ${PART_NAMES} = ${JSON.stringify([...new Set(['root', ...parts.names.keys(), ...parts.handed.keys()])].join(' '))}\n` : ''
 }
 
 const ANY_WHITESPACE = /\s+/g

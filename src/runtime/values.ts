@@ -236,14 +236,14 @@ function taggedParts(parts: Record<string, unknown>): Parts {
 }
 
 // Whether a `class` object is the parts of the form before 1.105, every key of it a part of the component, rather than an object of conditions taken by truthiness. Without the component's part names, the handed-on parts, which are tagged, are the only ones.
-function holdsParts(value: object, names: readonly string[] | undefined): boolean {
+function holdsParts(value: object, names: string | undefined): boolean {
   const keys = Object.keys(value)
 
-  return isParts(value) || (names !== undefined && keys.length > 0 && keys.every(key => names.includes(key)))
+  return isParts(value) || (names !== undefined && keys.length > 0 && keys.every(key => names.split(' ').includes(key)))
 }
 
 // What a component's `class` and `parts` props give a part, `class` winning: a `class` string, or array, is the root's, and an object holds one entry per part, its own object when that part is a component. The `class` object is the form before 1.105, still read and overridden by `parts`.
-export function partClass(props: unknown, part: string, names?: readonly string[]): unknown {
+export function partClass(props: unknown, part: string, names?: string): unknown {
   const { class: value, parts } = (props ?? {}) as { class?: unknown, parts?: unknown }
   const own = (from: unknown): unknown => {
     // A `class` that is no parts object, a string, an array or an object of conditions, is the root's, which the names of the component's parts tell apart.

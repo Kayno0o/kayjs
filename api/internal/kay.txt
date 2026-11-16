@@ -78,7 +78,7 @@ interface TemplateHelpers
   componentClass: <const List extends readonly unknown[]>(list: List) => ComponentClass<List>
   head: (tags: { tag: string; props: Record<string, unknown>; }[]) => void
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
-  partClass: (props: unknown, part: string, names?: readonly string[] | undefined) => unknown
+  partClass: (props: unknown, part: string, names?: string | undefined) => unknown
   partHanded: (part: string, list: readonly unknown[]) => unknown
   partsClass: (list: readonly unknown[]) => unknown
   staticFor: <T>(each: Iterable<T> | false | null | undefined, rendered: Element, fallback?: Element) => Element
@@ -340,7 +340,7 @@ function outside<T>(element: Element, href: T, ownRel?: boolean): T
 function part(render: () => unknown): Unit | null
 
 [./dom] partClass
-function partClass(props: unknown, part: string, names?: readonly string[] | undefined): unknown
+function partClass(props: unknown, part: string, names?: string | undefined): unknown
 
 [./dom] partHanded
 function partHanded(part: string, list: readonly unknown[]): unknown
@@ -582,7 +582,7 @@ function outsideLink(href: unknown, ownRel?: boolean): string
 function outsideLinks(markup: string): string
 
 [./html] partClass
-function partClass(props: unknown, part: string, names?: readonly string[] | undefined): unknown
+function partClass(props: unknown, part: string, names?: string | undefined): unknown
 
 [./html] partHanded
 function partHanded(part: string, list: readonly unknown[]): unknown

@@ -10,7 +10,7 @@ import type { Sites } from './rewrite-types'
 import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } from './script'
 import type { SlotTypes } from './slot-types'
 import { actionUrl } from '../runtime/action'
-import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
+import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, partNamesConst, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { addIslandShorthandTitle, addShorthandChecks, addShorthandGroup, hasShorthandTitle } from './head-shorthand'
 import { emitHeadTag, emitHeadText } from './head-tags'
@@ -537,21 +537,22 @@ class ModuleShell {
     const visible = rooted.filter(node => node.kind !== 'slot')
     const located = this.options.inspect === true ? sourceLocator(this.options.inspectSource?.text ?? src, this.options.moduleId, this.options.inspectSource?.real) : undefined
 
+    let after = ''
+
     if (mode === 'html') {
       new HtmlTemplate(b, src, this.facts, this.ownMarkup, { classMerge: this.options.classMerge, awaitAlert: awaitAlertTail(this.options.awaitAlert, 'html'), hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { groups: this.loadPlan.groups } }).value(visible)
-      b.add('\n}\n')
     }
     else if (mode === 'dom') {
       const dom = new DomTemplate(b, src, this.facts, this.ownMarkup, errors, located, this.options.classTable, awaitAlertTail(this.options.awaitAlert, 'dom'))
 
       dom.block(visible)
-      b.add('\n}\n')
-      b.add(dom.declarations(this.navigates()))
+      after = dom.declarations(this.navigates())
     }
     else {
       this.jsx.emitRoot(rooted)
-      b.add('\n}\n')
     }
+
+    b.add(`\n}\n${after}${partNamesConst(this.facts.parts)}`)
   }
 
   // Whether the script has `navigate` from `kay`, by import under any name or as a member of a namespace import.
