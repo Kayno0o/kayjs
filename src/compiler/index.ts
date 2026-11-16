@@ -24,6 +24,7 @@ import { cwd, scopeStorage } from './host'
 import { ignoredIslandExport, interactiveProps, islandMessages, malformedInteractive, withAlertKeys } from './island-arguments'
 import { describeCause } from './island-cause'
 import { markerMismatch } from './island-marker'
+import { linkFlags } from './link-flags'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseExpanded } from './markdown-block'
@@ -374,7 +375,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...spelledOutScriptFence(file), ...retiredAllowComments(source), ...deprecatedIslandForms(file, script), ...deprecatedIslandAttributes(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script, island !== undefined), ...malformedInteractive(script))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...spelledOutScriptFence(file), ...retiredAllowComments(source), ...deprecatedIslandForms(file, script), ...deprecatedIslandAttributes(file), ...linkFlags(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script, island !== undefined), ...malformedInteractive(script))
   }
 
   if (checked && pin !== undefined)

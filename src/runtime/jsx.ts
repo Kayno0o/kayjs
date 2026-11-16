@@ -152,6 +152,11 @@ interface CommonAttributes<Target> {
   'transition:leave-to'?: string | undefined
   // Sets one CSS property from a value, merged into `style` and left out while it is `null`, `undefined` or `false`: `style:color={color()}`, `style:--gap={gap()}`.
   [style: `style:${string}`]: string | number | false | null | undefined
+  // How the swap follows a link on the element or inside it, named as the options of `navigate()`: `data-scroll="keep"` leaves the window where it is (`"top"` scrolls to the top, as the nearest one decides), `data-transition="false"` swaps without a view transition, `data-prefetch` sets how eagerly the link's page is fetched, and `data-reload` loads the next page fully.
+  'data-scroll'?: Keyword<'keep' | 'top' | ''> | true
+  'data-transition'?: Keyword<'true' | 'false' | ''> | boolean
+  'data-prefetch'?: Keyword<'eager' | 'moderate' | 'conservative' | 'false'>
+  'data-reload'?: Keyword<''> | true
   [data: `data-${string}`]: AttributeValue
   [aria: `aria-${string}`]: AttributeValue
 }

@@ -91,6 +91,12 @@ describe('hints for the first template mistakes', () => {
     ])
   })
 
+  it('types the navigation flags of a link on any element and refuses a word outside their lists', async () => {
+    const found = await report('---\nconst kind = "keep" as const\nconst wide: string = "x"\n---\na(href="/" data-scroll="keep" data-transition="false" data-prefetch="eager" data-reload) go\nnav(data-scroll={kind} data-prefetch="false" data-transition)\n  a(href="/") go\na(href="/" data-scroll="kep") go\na(href="/" data-prefetch="now") go\na(href="/" data-transition="off") go\na(href="/" data-scroll={wide}) go\n')
+
+    expect(errors(found).map(error => error[0])).toEqual([8, 9, 10, 11])
+  })
+
   it('names the words of a list several tags share, which TypeScript names by its alias', async () => {
     const found = await report('---\n---\nimg(src="https://x.test/a.png" alt="" width="1" height="1" referrerpolicy="nope" crossorigin="nope")\nform(enctype="json")\nbutton(formmethod="put") go\n')
 

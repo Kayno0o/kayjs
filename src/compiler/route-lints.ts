@@ -1,4 +1,5 @@
 import type { Lint } from './lints'
+import { LINK_LINTS } from './link-flags'
 import { LOOP_LINTS } from './loop-lints'
 import { SERIAL_AWAITS_LINTS } from './serial-awaits'
 
@@ -6,6 +7,7 @@ import { SERIAL_AWAITS_LINTS } from './serial-awaits'
 export const ROUTE_LINTS = {
   ...SERIAL_AWAITS_LINTS,
   ...LOOP_LINTS,
+  ...LINK_LINTS,
   'text-size-colour': {
     level: 'warn',
     group: 'code',

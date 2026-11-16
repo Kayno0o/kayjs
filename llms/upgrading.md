@@ -29,6 +29,10 @@ A rejected `await` block with no `catch` and no `try` around it used to remove i
 
 `unkeyed-rows` reported a keyless `for` in islands only; it reports one in any component, a page or a layout excepted, as a component may render in the browser whichever page imports it. Name the rows with `key={row.slug}` or give them an `id`; `key={i}` (the fix `kay check` offers) matches them by position.
 
+### A link's flags are named as `navigate()`'s options
+
+`data-keep-scroll` is `data-scroll="keep"` (`data-keep-scroll="false"` is `data-scroll="top"`), `data-no-transition` is `data-transition="false"` and `data-no-prefetch` is `data-prefetch="false"`, typed on every element so a value outside their words is a `kay check` error. The old names work until 1.108 and `kay check --fix` writes the new ones (`deprecated-link-flags`, none for a dynamic `data-no-transition` or `data-no-prefetch`). A `data-` name one or two letters from a flag, as `data-prefech`, is the `unknown-link-flag` error.
+
 ### Websocket frames are always JSON
 
 On an `api()` module, `ws.send(value)` now sends `JSON.stringify(value)` for a string too, and a frame a client sends must be JSON text, so a binary frame from a client is refused too, and one that is not is answered `{ error: { key: 'kay.socket.notJson', fields } }`, and a message failing `body` `{ error: { key: 'kay.socket.invalid', fields } }` where it was dropped before. `deprecated-socket-frames` (`kay check --fix`) rewrites `ws.send(JSON.stringify(x))` to `ws.send(x)`, which sends what it did; a raw `WebSocket` client of your own parses each frame with `JSON.parse` and sends `JSON.stringify(message)`, and `socket()` does both. `rooms().publish` goes out as JSON the same way, a string included.

@@ -112,6 +112,14 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Chart from \'./chart.kay\'\nimport Card from \'./card.kay\'\n---\nChart(hydrate="client")\nCard(server="defer")',
     right: '---\nimport Chart from \'./chart.kay\'\nimport Card from \'./card.kay\'\n---\nChart(render="client")\nCard(server defer)',
   },
+  'deprecated-link-flags': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: '`data-keep-scroll`, `data-no-transition` and `data-no-prefetch`, named as the options of `navigate()` since 1.105: `data-scroll="keep"` (`"top"` for a plain scroll), `data-transition="false"` and `data-prefetch="false"`, typed on every element. The old names work until 1.108. Found on any element and on a component call that forwards them to its link. The fix writes the new attribute, a static `data-keep-scroll="false"` becoming `data-scroll="top"` and a dynamic `data-keep-scroll` being renamed with its value; a dynamic `data-no-transition` or `data-no-prefetch` is reported with no fix, as the old name was set by being present.',
+    wrong: 'nav(data-keep-scroll)\n  a(href="/tabs/a" data-no-prefetch) A',
+    right: 'nav(data-scroll="keep")\n  a(href="/tabs/a" data-prefetch="false") A',
+  },
   'deprecated-mail-form': {
     level: 'warn',
     group: 'deprecated',

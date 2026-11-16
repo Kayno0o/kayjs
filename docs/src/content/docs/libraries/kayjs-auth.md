@@ -680,7 +680,7 @@ authCore({
 ```
 
 ```kay
-a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
+a(href="/auth/discord?redirect=/account" data-prefetch="false") Sign in with Discord
 ```
 
 A sign-in stores none of the provider's tokens unless the app asks. Set `keepTokens: true` on the entry to keep them, encrypted, for `oauth.providerToken('discord')`. Unlinking a provider and deleting the account then revoke the token at the provider when it has a revocation endpoint (Discord, Google, GitLab, Apple, Twitch, X, and OpenID Connect providers that list one). GitHub and Microsoft have none, so the user ends the grant in their provider settings.

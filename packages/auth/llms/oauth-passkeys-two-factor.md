@@ -7,10 +7,10 @@
 Each entry of `oauth` names a provider app: `{ provider, clientId, clientSecret }`. Its routes are `/auth/<name>` and `/auth/<name>/callback`, and the callback URL to register at the provider is `site` + `/auth/<name>/callback`.
 
 ```kay
-a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
+a(href="/auth/discord?redirect=/account" data-prefetch="false") Sign in with Discord
 ```
 
-A link to an OAuth route changes the session on GET: give it `data-no-prefetch`, so a hover starts nothing.
+A link to an OAuth route changes the session on GET: give it `data-prefetch="false"`, so a hover starts nothing.
 
 ### Passkeys
 

@@ -14,7 +14,7 @@ form.same(action="/get-form" method="get")
 form.reload(action="/get-form" data-reload)
   input(name="q" value="reloaded" aria-label="Reload")
   button.reload-go Reload
-form.keep(action="/get-form" data-keep-scroll)
+form.keep(action="/get-form" data-scroll="keep")
   input(name="q" value="kept" aria-label="Keep")
   button.keep-go Keep
 form.away(action="https://example.com/search")

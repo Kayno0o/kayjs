@@ -339,7 +339,7 @@ a(href={withQuery({ page: 2 })}) Next
 
 In an island it follows the address, so the link changes with each `navigate.query()`, page swap and Back. It keeps the other params, and your `base`, `trailingSlash` and locale prefix are added the way they are to any link.
 
-`navigate('/todos', { scroll: 'keep' })` goes to the page without scrolling to the top, and `{ transition: false }` swaps it without a view transition. A link does the same with `data-keep-scroll` and `data-no-transition`, which an element around several links can carry. The nearest `data-keep-scroll` to the link decides, so `data-keep-scroll="false"` on one link inside a keeping element scrolls to the top.
+`navigate('/todos', { scroll: 'keep' })` goes to the page without scrolling to the top, and `{ transition: false }` swaps it without a view transition. A link does the same with `data-scroll="keep"` and `data-transition="false"`, which an element around several links can carry. The nearest `data-scroll` to the link decides, so `data-scroll="top"` on one link inside a keeping element scrolls to the top. A misspelt flag, such as `data-scrol`, is a `kay check` error.
 
 A page whose first part the server has not sent after 10 seconds (`client.pageTimeout` changes it), for a link or `navigate()`, is loaded by the browser instead, which shows its own progress or error. A view transition that has not finished after 3 seconds is skipped and the page is shown. A link you click during a transition skips it and is followed.
 
@@ -410,10 +410,10 @@ nav(data-prefetch="eager")
   a(href="/pricing") Pricing
 ```
 
-A link that changes something on GET, such as a logout, takes `data-no-prefetch`.
+A link that changes something on GET, such as a logout, takes `data-prefetch="false"`.
 
 ```kay
-a(href="/logout" data-no-prefetch) Sign out
+a(href="/logout" data-prefetch="false") Sign out
 ```
 
 ### Forms and a full load

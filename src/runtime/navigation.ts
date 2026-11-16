@@ -41,11 +41,11 @@ export interface Swap {
   intent: Intent
   // Takes the current history entry's place, as `navigate(href, { replace: true })` asks.
   replace?: boolean | undefined
-  // Where the window scrolls to instead of the intent's own, as `navigate(href, { scroll })` or a link in `data-keep-scroll` asks; a traversal keeps the position its entry saved.
+  // Where the window scrolls to instead of the intent's own, as `navigate(href, { scroll })` or a link in `data-scroll="keep"` asks; a traversal keeps the position its entry saved.
   scroll?: 'top' | 'keep' | undefined
-  // `false` swaps without a view transition, as `navigate(href, { transition: false })` or a link in `data-no-transition` asks.
+  // `false` swaps without a view transition, as `navigate(href, { transition: false })` or a link in `data-transition="false"` asks.
   transition?: boolean | undefined
-  // The link followed, whose `data-keep-scroll` and `data-no-transition` the lazy swap reads, so the eager click handler stays small.
+  // The link followed, whose `data-scroll` and `data-transition` the lazy swap reads, so the eager click handler stays small.
   link?: Element | undefined
   // The page loads a refresh names; only the elements reading them are swapped, the others are left as the page shows them. Without it, the whole page is.
   loads?: readonly string[] | undefined

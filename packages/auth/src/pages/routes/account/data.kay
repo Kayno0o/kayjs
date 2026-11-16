@@ -68,7 +68,7 @@ else
     .flex.flex-col.items-start.gap-3
       p {wording('auth.account.data.exportIntro', 'Everything we keep about your account, as a JSON file.')}
       if proved
-        Button(href={`${features.prefix}/export`} label={wording('auth.account.data.export', 'Download your data')} download data-no-prefetch)
+        Button(href={`${features.prefix}/export`} label={wording('auth.account.data.export', 'Download your data')} download data-prefetch="false")
       else if stale
         form.flex.flex-col.items-start.gap-3(action={signInAgain})
           p {wording('auth.proof.stale', 'For your safety, sign in again before doing this.')}

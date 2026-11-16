@@ -2258,7 +2258,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       expect(await go('a.keep-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
       expect(await go('a.group-link')).toEqual({ scroll: 'kept', transitions: 0, swapped: true })
 
-      // The nearest data-keep-scroll decides, "false" meaning a plain scroll to the top.
+      // The nearest data-scroll decides, "top" (or the old data-keep-scroll="false") meaning a plain scroll to the top.
       expect(await go('a.false-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
       expect(await go('a.nested-false-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
       expect(await go('a.false-group-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
@@ -2269,6 +2269,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       expect(await go('a.nested-keep-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
       expect(await go('a.false-group-keep-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
       expect(await go('a.hash-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
+
+      // `data-transition="false"` stops the transition, and the nearest `data-transition` decides.
+      expect(await go('a.new-off-link')).toEqual({ scroll: 'kept', transitions: 0, swapped: true })
+      expect(await go('a.new-on-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
 
       // Back to the page left restores where it was, whatever kept the scroll going there.
       await fresh.back()
@@ -2393,10 +2397,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
-  it('marks only the page tabs of a TabNav with data-keep-scroll, a #section link scrolling to its section', async () => {
+  it('marks only the page tabs of a TabNav with data-scroll, a #section link scrolling to its section', async () => {
     await page.goto(`${origin}/tabbed-hash`)
 
-    expect(await page.evaluate(() => [...document.querySelectorAll('.kui-tab-nav a')].map(link => link.hasAttribute('data-keep-scroll')))).toEqual([false, true])
+    expect(await page.evaluate(() => [...document.querySelectorAll('.kui-tab-nav a')].map(link => link.hasAttribute('data-scroll')))).toEqual([false, true])
   })
 
   it('keeps the scroll when a TabNav tab is followed, and restores it going back', async () => {

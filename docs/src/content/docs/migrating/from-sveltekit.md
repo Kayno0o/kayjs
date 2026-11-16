@@ -239,6 +239,6 @@ Kay's `tsconfig.json` turns on `noUncheckedIndexedAccess`, so `cells[index]` is 
 - **Adapters.** kay runs on Bun alone. `kay build --compile` makes one executable and `kay build --static` makes plain files, see [Deployment](/guides/deployment).
 - **Svelte components.** They do not run in `.kay`. Rewrite each as a `.kay` component.
 - **`use:` actions.** Use a `ref` or an `onMount` instead. Transitions are the `transition="fade"` attribute, played by CSS classes, see the [islands reference](/llms/islands).
-- **`data-sveltekit-preload-data`.** Links are prefetched by kay's `prefetch` setting, and `data-no-prefetch` opts one out.
+- **`data-sveltekit-preload-data`.** Links are prefetched by kay's `prefetch` setting, and `data-prefetch="false"` opts one out.
 
 Run `bun run check` as you go. It type-checks every `.kay` file and reports each link to a page that does not exist.

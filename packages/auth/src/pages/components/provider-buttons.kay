@@ -22,4 +22,4 @@ function carryRemember(event: Event) {
 // kay-allow unreachable-click
 .flex.flex-col.gap-2(onClick={carryRemember} onAuxClick={carryRemember})
   for provider of providers key={provider.name}
-    Button(href={provider.href} label={provider.label} data-provider={provider.name} data-no-prefetch)
+    Button(href={provider.href} label={provider.label} data-provider={provider.name} data-prefetch="false")

@@ -117,7 +117,7 @@ export async function cancelDeletionRoute({ auth, body, redirect, request }: Rou
   return redirect(afterwards(body, core), 303)
 }
 
-// A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
+// A GET, so a sign-in link works without JavaScript: give it `data-prefetch="false"` so a hover starts nothing.
 export async function startOAuthRoute({ auth, params: { provider = '' }, query, redirect, status }: RouteContext, core: Core, failurePage: string | undefined) {
   const started = !core.oauth.has(provider) ? undefined : await (await load.flow()).startOAuth(auth[STATE], provider, { redirect: text(query.redirect), remember: query.remember === undefined ? undefined : query.remember === '1' })
 

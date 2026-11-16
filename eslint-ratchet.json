@@ -190,7 +190,7 @@
     "max-lines": 631
   },
   "src/runtime/page-swap.ts": {
-    "complexity": 51
+    "complexity": 49
   },
   "src/runtime/swap-kept.ts": {
     "complexity": 46

@@ -282,7 +282,7 @@ export function closest(name: string, known: Iterable<string>): string | undefin
   return best
 }
 
-function editDistance(a: string, b: string): number {
+export function editDistance(a: string, b: string): number {
   let previous = Array.from({ length: b.length + 1 }, (_, index) => index)
 
   for (let i = 1; i <= a.length; i++) {
