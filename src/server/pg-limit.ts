@@ -1,5 +1,5 @@
 import { kayLog } from '../runtime/log'
-import { timeLimited, TimeoutError } from './pg-poll'
+import { PollTimeoutError, timeLimited } from './pg-poll'
 
 // How long a call of a store may take: inside the default shutdown timeout of 10 seconds, so a database that stopped answering fails a request, a worker's claim or a schedule's lock before it holds up a stop.
 export const STORE_TIMEOUT_MS = 8_000
@@ -16,7 +16,7 @@ export async function limited<Result>(what: string, work: () => Promise<Result>,
     return await timeLimited(work, ms, what)
   }
   catch (error) {
-    if (error instanceof TimeoutError)
+    if (error instanceof PollTimeoutError)
       kayLog('error', `${what} was given up on; the database stopped answering`, error)
 
     throw error

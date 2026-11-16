@@ -89,7 +89,7 @@ describe('beforeDelete', () => {
     const { ada, admin, store } = await registered({
       beforeDelete: ({ user }) => {
         if (user.email === 'ada@example.com')
-          refuse('Ada has open orders', { status: 409, errors: { orders: 'open' } })
+          refuse(409, { message: 'Ada has open orders', errors: { orders: 'open' } })
       },
     })
     const id = (await store.users.findByEmail('ada@example.com'))!.id

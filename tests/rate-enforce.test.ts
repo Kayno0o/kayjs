@@ -31,8 +31,8 @@ function guardContext(from: Request) {
       locale: 'en',
       cookies: {},
       locals: {},
-      deny: (status?: number, message?: string): never => {
-        Object.assign(denied, { status, message })
+      deny: (status?: number, options?: { message?: string }): never => {
+        Object.assign(denied, { status, message: options?.message })
 
         throw new Error('denied')
       },

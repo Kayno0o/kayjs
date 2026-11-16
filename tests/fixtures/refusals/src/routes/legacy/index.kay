@@ -1,0 +1,4 @@
+--- server
+ctx.deny(402, 'Pay first', { plan: 'pro' })
+---
+p Legacy

@@ -1,0 +1,4 @@
+--- server
+ctx.deny(403, { message: 'Upgrade', errors: { plan: 'pro' }, data: { plan: 'pro' } })
+---
+p Gate

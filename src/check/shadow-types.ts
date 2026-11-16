@@ -73,6 +73,7 @@ import { unreadOpenSettings } from './open-settings'
 import { pagesOptions } from './pages-options'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { rateEnforce } from './rate-enforce'
+import { refusalCalls } from './refusal-calls'
 import { removedUiTokens } from './removed-ui-tokens'
 import { routeShadow, routeShadowPath } from './route-shadow'
 import { schemaType } from './schema-type'
@@ -226,6 +227,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => ttlNames(root, options),
   async ({ root, options }) => storeMs(root, options),
   async ({ root, options }) => rateEnforce(root, options),
+  async ({ root, options }) => refusalCalls(root, options),
   async ({ root, options }) => authRateLimits(root, options),
   async ({ root, options }) => envFiles(root, options),
   async ({ root, options }) => contextImport(root, options),

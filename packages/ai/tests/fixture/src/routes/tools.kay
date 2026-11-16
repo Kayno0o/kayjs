@@ -11,7 +11,7 @@ export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLeng
   return { id: 1, title }
 })
 
-export const refuses = action(s.Object({}), (_input, ctx) => ctx.fail(409, { reason: 'full' }))
+export const refuses = action(s.Object({}), (_input, ctx) => ctx.deny(409, { data: { reason: 'full' } }))
 
 export const sendsAway = action(s.Object({}), (_input, ctx) => ctx.redirect('/'))
 

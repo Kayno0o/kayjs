@@ -230,7 +230,7 @@ function text(value: unknown, most: number, what: string): string | undefined {
   const trimmed = typeof value === 'string' ? value.replaceAll('\0', '').trim() : ''
 
   if (trimmed === '' || trimmed.length > most)
-    throw new RangeError(`kay: a push ${what} is 1 to ${most} characters; got ${typeof value === 'string' ? `${trimmed.length} characters` : typeof value}`)
+    throw new KayError('argument-invalid', `kay: a push ${what} is 1 to ${most} characters; got ${typeof value === 'string' ? `${trimmed.length} characters` : typeof value}`)
 
   return trimmed
 }
@@ -252,7 +252,7 @@ function payloadOf(message: PushMessage): Uint8Array<ArrayBuffer> {
   const title = text(message.title, MAX_TITLE, 'title')
 
   if (title === undefined)
-    throw new RangeError('kay: a push needs a title')
+    throw new KayError('argument-invalid', 'kay: a push needs a title')
 
   const body = text(message.body, MAX_BODY, 'body')
   const tag = text(message.tag, MAX_TAG, 'tag')
@@ -261,7 +261,7 @@ function payloadOf(message: PushMessage): Uint8Array<ArrayBuffer> {
   const bytes = new TextEncoder().encode(JSON.stringify({ title, ...body === undefined ? {} : { body }, ...url === undefined ? {} : { url }, ...tag === undefined ? {} : { tag }, ...icon === undefined ? {} : { icon } }))
 
   if (bytes.length > MAX_PAYLOAD_BYTES)
-    throw new RangeError(`kay: a push payload is at most ${MAX_PAYLOAD_BYTES} bytes; got ${bytes.length}`)
+    throw new KayError('argument-invalid', `kay: a push payload is at most ${MAX_PAYLOAD_BYTES} bytes; got ${bytes.length}`)
 
   return bytes
 }
@@ -353,15 +353,15 @@ export async function sendPush(user: string, message: PushMessage, options: Push
     throw new KayError('config-invalid', 'kay: sendPush needs push() in the config\'s extensions')
 
   if (typeof user !== 'string' || user === '' || user.length > 200)
-    throw new RangeError('kay: a push goes to a user id of 1 to 200 characters')
+    throw new KayError('argument-invalid', 'kay: a push goes to a user id of 1 to 200 characters')
 
   const { ttl = DEFAULT_TTL, urgency, topic } = options
 
   if (urgency !== undefined && !URGENCIES.has(urgency))
-    throw new RangeError(`kay: a push's urgency is very-low, low, normal or high; got ${JSON.stringify(urgency)}`)
+    throw new KayError('argument-invalid', `kay: a push's urgency is very-low, low, normal or high; got ${JSON.stringify(urgency)}`)
 
   if (topic !== undefined && !TOPIC.test(topic))
-    throw new RangeError('kay: a push topic is 1 to 32 characters of letters, digits, - and _')
+    throw new KayError('argument-invalid', 'kay: a push topic is 1 to 32 characters of letters, digits, - and _')
 
   const payload = payloadOf(message)
   const subscriptions = await pushStore().list(user)

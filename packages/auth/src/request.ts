@@ -310,7 +310,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
       if (signIn !== undefined && isNavigation(this.request))
         redirect(this.signInLink(signIn))
 
-      return deny(401, 'Sign in to continue')
+      return deny(401, { message: 'Sign in to continue' })
     }
 
     const user = publicUser(record) as BareUser<UserData>

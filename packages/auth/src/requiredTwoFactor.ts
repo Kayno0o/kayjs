@@ -55,7 +55,7 @@ export async function lacksTwoFactor(state: RequestState, user: BareUser, ask: T
 // What `ctx.redirect` and `ctx.deny` are in a guard, a page or an action.
 export interface Stoppers {
   redirect: (location: string) => never
-  deny: (status?: number, message?: string) => never
+  deny: (status?: number, options?: { message?: string | undefined }) => never
 }
 
 // A page opening goes to the security page to turn two-factor on, coming back after; anything else, and an app with no such page, gets the 403.
@@ -67,5 +67,5 @@ export function sendToEnrolment(core: Core, request: Request, { redirect, deny }
     redirect(withBack(core.securityPage, localPath(here.pathname + here.search, '/')))
   }
 
-  return deny(403, 'Two-factor authentication is required')
+  return deny(403, { message: 'Two-factor authentication is required' })
 }

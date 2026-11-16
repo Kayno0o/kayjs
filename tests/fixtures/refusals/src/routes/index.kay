@@ -1,0 +1,21 @@
+--- server
+import { action, refuse, s } from 'kay'
+
+// One action per way a handler ends with a refusal.
+export const refused = action(s.Object({ status: s.Integer() }), ({ status }, ctx) => ctx.deny(status, { message: 'Taken', errors: { name: 'Already taken' }, data: { row: 7 } }))
+
+export const dataOnly = action(s.Object({}), (input, ctx) => ctx.deny(409, { data: { row: 7 } }))
+
+export const text = action(s.Object({}), (input, ctx) => ctx.deny(502, { data: 'Not sent' }))
+
+export const bare = action(s.Object({}), (input, ctx) => ctx.deny(409))
+
+export const messageOnly = action(s.Object({}), (input, ctx) => ctx.deny(403, { message: 'Members only' }))
+
+export const thrown = action(s.Object({}), () => refuse(409, { message: 'Over', data: 'over' }))
+
+export const legacy = action(s.Object({}), (input, ctx) => ctx.deny(403, 'Members only'))
+
+export const old = action(s.Object({}), (input, ctx) => ctx.fail(409, { row: 7 }, { name: 'Already taken' }))
+---
+p Refusals

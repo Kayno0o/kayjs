@@ -230,7 +230,7 @@ markInvalid(input, 'length', input.value.length < 8)
 
 ## Failing on purpose
 
-A handler refuses a post with `ctx.fail(status, data)`. The page reads `data` with `add.failed()?.data`. Always `return` it: unlike `ctx.deny` and `ctx.notFound`, `ctx.fail` does not throw, so a call without `return` does nothing and the handler carries on. `kay check` reports it as `unreturned-fail`.
+A handler refuses a post with `ctx.deny(status, { message, errors, data })`, the call a guard, a page and an endpoint use too. The page reads `data` with `add.failed()?.data`. It throws, so write `return ctx.deny(...)` for TypeScript to type `data`. `ctx.fail(status, data, errors)` is the old spelling, kept until 1.108: it returns where `deny` throws, so `kay check` reports one that is not returned as `unreturned-fail`.
 
 ```kay
 --- server
@@ -240,7 +240,7 @@ import { schema } from '../schema'
 
 export const add = action(schema, async ({ title }, ctx) => {
   if (await exists(title))
-    return ctx.fail(409, { message: 'Already on the list' })
+    return ctx.deny(409, { data: { message: 'Already on the list' } })
 
   await addTodo(title)
 })
@@ -252,7 +252,7 @@ if add.failed()?.data then data
   p.error {data.message}
 ```
 
-To blame a field, give `ctx.fail` the messages as a third argument: `return ctx.fail(409, undefined, { email: 'Already taken' })`. The names are the schema's fields, and `''` is the form's own message. The field then shows it as if the schema had refused it: an `error email` line, `aria-invalid`, `add.error('email')` and the value the visitor typed, with or without JavaScript. A call throws an `ActionError` whose `errors` carry it.
+To blame a field, give `ctx.deny` the messages as `errors`: `return ctx.deny(409, { errors: { email: 'Already taken' } })`. The names are the schema's fields, and `''` is the form's own message. The field then shows it as if the schema had refused it: an `error email` line, `aria-invalid`, `add.error('email')` and the value the visitor typed, with or without JavaScript. A call throws an `ActionError` whose `errors` carry it.
 
 A handler that throws is logged, and the form shows `Something went wrong on our side; try again later`. The handler needs no `try`/`catch` of its own.
 
@@ -484,9 +484,9 @@ export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }),
 ---
 ```
 
-If the handler throws an error carrying `Symbol.for('kay.refused')` as `{ status, retryAfter?, message, errors?, data? }`, the action answers that status with a `Retry-After` header and the message, with `errors` beside the fields and `data` as `ctx.fail` gives them, in place of a 500. `refuse()` from `kay` throws one.
+If the handler throws an error carrying `Symbol.for('kay.refused')` as `{ status, retryAfter?, message, errors?, data? }`, the action answers that status with a `Retry-After` header and the message, with `errors` beside the fields and `data` as `ctx.deny` gives them, in place of a 500. `refuse()` from `kay` throws one.
 
-`refuse()` is the throwing twin of `return ctx.fail(status, data, errors)`, which answers the same. kayjs-ai refuses a visitor over its limit this way, and the action's `messages.rateLimit` can word it.
+`refuse(status, { message, errors, data })` throws what `ctx.deny` does in an action, so a function the handler calls can refuse too. kayjs-ai refuses a visitor over its limit this way, and the action's `messages.rateLimit` can word it.
 
 An island calling it gets a stream once the first value is there. `last()` reads the latest value, `status()` tells whether it is still open (`pending()` and `error()` read it too), and `close()` stops it.
 

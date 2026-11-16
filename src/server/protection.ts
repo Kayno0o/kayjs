@@ -20,7 +20,7 @@ import { optionMs } from './config-error'
 import { checkRequestIdHeader } from './config-limits'
 import { inMemory } from './memory-mark'
 import { STORE_TIMEOUT_MS } from './pg-limit'
-import { TimeoutError } from './pg-poll'
+import { PollTimeoutError } from './pg-poll'
 import { refused } from './rate-refusal'
 import { makeRoom } from './rate-windows'
 import { onReload } from './reload'
@@ -792,8 +792,8 @@ function recovered(name: string, store: RateStore): void {
 }
 
 function failed<Result>(name: string, store: RateStore, error: unknown, fallback: () => Result): Result {
-  // A Postgres rates store is under the same limit already, and gives up first with a TimeoutError.
-  if (error instanceof RatesTimeout || error instanceof TimeoutError) {
+  // A Postgres rates store is under the same limit already, and gives up first with a PollTimeoutError.
+  if (error instanceof RatesTimeout || error instanceof PollTimeoutError) {
     skipping = true
     skipped.set(store, Date.now() + SKIP_MS)
   }

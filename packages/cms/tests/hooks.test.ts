@@ -91,7 +91,7 @@ describe('beforeSave', () => {
   test('refuses with field errors, shown as a schema refusal and answered 422', async () => {
     configure({ beforeSave: ({ data }) => {
       if (data.summary === undefined)
-        refuse('A summary is needed', { errors: { summary: 'required' } })
+        refuse(422, { message: 'A summary is needed', errors: { summary: 'required' } })
     } })
 
     for (const name of ['posts', 'notes']) {
@@ -104,7 +104,7 @@ describe('beforeSave', () => {
 
   test('refuses a publish while a rule across the entry fails, and `false` is a 403', async () => {
     await saveEntry({ collection: 'notes', slug: 'one', data: { title: 'One', draft: true } }, { create: true })
-    configure({ beforeSave: ({ verb }) => verb === 'publish' ? refuse('Write a summary first', { errors: { summary: 'required' } }) : undefined })
+    configure({ beforeSave: ({ verb }) => verb === 'publish' ? refuse(422, { message: 'Write a summary first', errors: { summary: 'required' } }) : undefined })
     expect(await publishEntry({ collection: 'notes', slug: 'one' })).toMatchObject({ ok: false, error: { status: 422 } })
     expect((await entryOf({ collection: 'notes', slug: 'one' }))?.draft).toBe(true)
 
@@ -116,7 +116,7 @@ describe('beforeSave', () => {
     for (const name of ['posts', 'notes']) {
       configure({})
       await saveEntry({ collection: name, slug: 'one', data: { title: 'One' } }, { create: true })
-      configure({ beforeSave: ({ verb }) => verb === 'delete' || verb === 'rename' ? refuse('Locked', { status: 423 }) : undefined })
+      configure({ beforeSave: ({ verb }) => verb === 'delete' || verb === 'rename' ? refuse(423, { message: 'Locked' }) : undefined })
       expect(await deleteEntry({ collection: name, slug: 'one' })).toMatchObject({ ok: false, error: { status: 423, message: 'Locked' } })
       expect(await renameEntry({ collection: name, slug: 'one' }, 'two')).toMatchObject({ ok: false, error: { status: 423 } })
       expect(await entryOf({ collection: name, slug: 'one' })).toBeDefined()
@@ -257,7 +257,7 @@ describe('uploads', () => {
     configure({ beforeUpload: ({ name, type, size, bytes, collection }) => {
       scanned.push(`${collection} ${name} ${type} ${size} ${bytes.length}`)
 
-      return bytes.length === PNG.length ? refuse('Virus found', { status: 451 }) : undefined
+      return bytes.length === PNG.length ? refuse(451, { message: 'Virus found' }) : undefined
     } })
 
     const answer = await send('bad.png')

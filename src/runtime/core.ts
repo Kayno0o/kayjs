@@ -9,6 +9,7 @@ import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import type { Localized } from './localized'
 import type { PlainValue, SignalOptions } from './reactive'
+import type { DenyOptions } from './refuse'
 import type { Schema, Static } from './schema'
 import { durationMs } from './duration'
 import { lasting } from './lasting'
@@ -364,8 +365,15 @@ export interface RequestContext<Params extends Record<string, unknown> = Record<
   redirect: Redirect
   // Stops with a 404, rendering the nearest `_error.kay` for a page.
   notFound: () => never
-  // Ends with that status, 403 unless given, rendering the nearest `_<status>.kay` (`_401.kay`, `_403.kay`, `_429.kay`, `_503.kay`), else `_error.kay`, with `message` and `data` for a page: the page reads them as `ctx.error`.
-  deny: (status?: number, message?: string, data?: ErrorData) => never
+  // Ends with that status, 403 unless given, rendering the nearest `_<status>.kay` (`_401.kay`, `_403.kay`, `_429.kay`, `_503.kay`), else `_error.kay`, with `message` and `data` for a page: the page reads them as `ctx.error`. An action answers it as a failure, which `errors` puts on fields; a guard and an endpoint answer the status and message.
+  deny: Deny
+}
+
+// `ctx.deny(status, { message, errors, data })`, the one shape every refusal takes (`refuse()` throws the same).
+export interface Deny {
+  (status?: number, options?: DenyOptions<ErrorData>): never
+  /** @deprecated `deny(status, { message, data })`. Removed in 1.108; `deprecated-deny-call` rewrites it. */
+  (status: number, message: string, data?: ErrorData): never
 }
 
 // What `ctx.deny` hands the error page as `ctx.error.data`: the `errorData` an app sets in `Register`, `unknown` otherwise.
@@ -398,7 +406,7 @@ export interface PageError {
   status: number
   // The thrown error's message in development; production shows a generic one and logs the real error.
   message: string
-  // What `ctx.deny(status, message, data)` handed over, such as the plan a 403 asks for; its type is the app's `errorData` in `Register`, `unknown` unless it says.
+  // What `ctx.deny(status, { message, data })` handed over, such as the plan a 403 asks for; its type is the app's `errorData` in `Register`, `unknown` unless it says.
   data?: ErrorData | undefined
   // Development only.
   stack?: string | undefined

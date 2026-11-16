@@ -25,7 +25,13 @@ kay [./server] queue
 kay [./server] schedule
 kay [./server] workflow
 kay [./test] TestSite
+kay [.] ActionContext
+kay [.] CardPageContext
+kay [.] ErrorPageContext
+kay [.] PageContext
 kay [.] PersistedOptions
+kay [.] RequestContext
+kay [.] refuse
 mail [./subscribe-form.kay] default
 mail [.] ContactOptions
 mail [.] ListOptions

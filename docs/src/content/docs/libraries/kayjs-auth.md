@@ -290,7 +290,7 @@ export const signIn = action(s.Object({
   const result = await ctx.locals.auth.password.signIn(input)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error.code })
+    return ctx.deny(400, { data: { error: result.error.code } })
 
   return ctx.redirect(result.redirect)
 })
@@ -383,7 +383,7 @@ export const enable = action(s.Object({ code: s.String({ maxLength: 20 }) }), as
   const result = await ctx.locals.auth.twoFactor.enable(code)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error.code })
+    return ctx.deny(400, { data: { error: result.error.code } })
 
   return { recoveryCodes: result.recoveryCodes }
 })
@@ -497,7 +497,7 @@ export const register = action(s.Object({
   const result = await ctx.locals.auth.password.register(input, { captcha })
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error.code })
+    return ctx.deny(400, { data: { error: result.error.code } })
 
   return ctx.redirect('/')
 })
@@ -579,7 +579,7 @@ if (found.ok) {
 
 `beforeDelete({ user, context })` runs before any account is deleted, by the user, an admin or the prune, to remove the app's own records for them.
 
-It can keep the account: return `false`, or throw `refuse('Ada has open orders', { status: 409 })` from `kay`, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }`. Any other throw refuses with 500 and is reported with the source `auth.beforeDelete`. A guest or an unverified account the prune cannot delete stays and is tried again at the next run.
+It can keep the account: return `false`, or throw `refuse(409, { message: 'Ada has open orders' })` from `kay`, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }`. Any other throw refuses with 500 and is reported with the source `auth.beforeDelete`. A guest or an unverified account the prune cannot delete stays and is tried again at the next run.
 
 - `admin.impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `admin.stopImpersonating()` signs back in as themselves. Every write to the user's organizations is refused meanwhile with `impersonating`.
 - `admin.auditLog({ userId, before, limit })` reads everyone's audit log, or one user's.

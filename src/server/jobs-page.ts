@@ -17,7 +17,7 @@ export const JOBS_PATH = '/_kay/jobs'
 const HTML = 'text/html; charset=utf-8'
 const HEADERS = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow', 'referrer-policy': 'no-referrer' }
 
-const refuseUnguarded: Guard = ctx => ctx.deny(403, 'jobs has no guards: give `jobs` a `guards` such as `ctx => ctx.locals.auth.requireAdmin()`, or `guards: false` to open the page to everyone')
+const refuseUnguarded: Guard = ctx => ctx.deny(403, { message: 'jobs has no guards: give `jobs` a `guards` such as `ctx => ctx.locals.auth.requireAdmin()`, or `guards: false` to open the page to everyone' })
 
 export interface JobsPage {
   path: string

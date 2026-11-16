@@ -27,8 +27,8 @@ export function closeWith(pg: PgHandle, dispose: () => unknown): void {
 }
 
 // What a call given up on by `timeLimited` fails with.
-export class TimeoutError extends KayError {
-  override readonly name = 'TimeoutError'
+export class PollTimeoutError extends KayError {
+  override readonly name = 'PollTimeoutError'
   declare readonly code: 'poll-timeout'
 
   constructor(message: string, options?: KayErrorOptions) {
@@ -52,7 +52,7 @@ export async function timeLimited<Result>(work: () => Promise<Result>, ms: numbe
         for (const statement of run.statements)
           statement.cancel()
 
-        reject(new TimeoutError(`${what} took more than ${ms / 1000} seconds`))
+        reject(new PollTimeoutError(`${what} took more than ${ms / 1000} seconds`))
       }, ms)
       timer.unref()
     })])

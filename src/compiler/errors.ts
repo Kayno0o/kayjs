@@ -418,6 +418,11 @@ export const ERRORS = {
     summary: 'A violation of the site\'s content security policy as a browser reported it to kay\'s report route.',
     fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
+  'argument-invalid': {
+    group: 'runtime',
+    summary: 'An argument a helper of kay refuses, the caller\'s mistake rather than the app\'s setup: a push without a title, a room name or a payload over its limit, a `signed` value that is no string, a notification with no user.',
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
+  },
   'config-refused': {
     group: 'runtime',
     summary: 'A `kay.config.ts` that does not load, the process that found out having printed why.',

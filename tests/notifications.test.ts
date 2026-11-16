@@ -69,8 +69,8 @@ describe('the title of a notification', () => {
   })
 
   it('is 1 to 200 characters', async () => {
-    await expect(notify('ada', { title: '   ' })).rejects.toThrow(RangeError)
-    await expect(notify('ada', { title: 'a'.repeat(201) })).rejects.toThrow(RangeError)
+    await expect(notify('ada', { title: '   ' })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(notify('ada', { title: 'a'.repeat(201) })).rejects.toMatchObject({ code: 'argument-invalid' })
     expect((await notify('ada', { title: 'a'.repeat(200) })).title).toHaveLength(200)
   })
 
@@ -79,8 +79,8 @@ describe('the title of a notification', () => {
   })
 
   it('needs a user id', async () => {
-    await expect(notify('', { title: 'x' })).rejects.toThrow(RangeError)
-    await expect(notify('a'.repeat(201), { title: 'x' })).rejects.toThrow(RangeError)
+    await expect(notify('', { title: 'x' })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(notify('a'.repeat(201), { title: 'x' })).rejects.toMatchObject({ code: 'argument-invalid' })
   })
 })
 

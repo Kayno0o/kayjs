@@ -13,14 +13,14 @@ import PageSection from '@kayjs/ui/page-section.kay'
 export const prove = action(schemas.proof, async (input, ctx) => {
   const result = await ctx.locals.auth.reprove(proofOf(input))
 
-  return !result.ok ? ctx.fail(400, { error: result.error.code }) : undefined
+  return !result.ok ? ctx.deny(400, { data: { error: result.error.code } }) : undefined
 })
 
 export const remove = action(schemas.proof, async (input, ctx) => {
   const result = await ctx.locals.auth.account.delete(proofOf(input))
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error.code })
+    return ctx.deny(400, { data: { error: result.error.code } })
 
   const { pages, prefix } = ctx.locals.auth.features()
 

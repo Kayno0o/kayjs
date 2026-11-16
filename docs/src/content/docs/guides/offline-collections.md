@@ -43,7 +43,7 @@ If the server refuses a write, for example because the schema rejects it or a gu
 
 ## When two writes meet
 
-Say an action answers `ctx.fail(409, row)` with the row it holds when a write started from an older one. By default kay keeps the server's row and puts on it the fields your write changed. To decide yourself, give `conflict` a function. It gets the row you started from, your row and the server's row, and returns the row to keep.
+Say an action answers `ctx.deny(409, { data: row })` with the row it holds when a write started from an older one. By default kay keeps the server's row and puts on it the fields your write changed. To decide yourself, give `conflict` a function. It gets the row you started from, your row and the server's row, and returns the row to keep.
 
 ## Signing out
 

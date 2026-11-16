@@ -43,7 +43,7 @@ export default guard(async (ctx) => {
   const { guard: admits, pageLink } = settings()
 
   if (!admits)
-    return ctx.deny(403, 'kayjs-cms has no one let in: give cms() an access, a kayjs-auth role as cms({ access: \'editor\' }), or a password as cms({ access: { password } })')
+    return ctx.deny(403, { message: 'kayjs-cms has no one let in: give cms() an access, a kayjs-auth role as cms({ access: \'editor\' }), or a password as cms({ access: { password } })' })
 
   try {
     await admits(ctx)
@@ -57,7 +57,7 @@ export default guard(async (ctx) => {
   const below = ruled() ? belowPrefix(ctx) : undefined
 
   if (below === null)
-    return ctx.deny(403, wording('cms.guard.unplaced', 'The cms could not place this request among its routes'))
+    return ctx.deny(403, { message: wording('cms.guard.unplaced', 'The cms could not place this request among its routes') })
 
   // A role limited to some collections opens no other collection's screens, nor the site's.
   const named = below === undefined ? undefined : screenCollection(below)

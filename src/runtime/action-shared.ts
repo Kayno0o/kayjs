@@ -4,9 +4,11 @@ import type { ApiError } from './api-error'
 import type { ByteSize } from './byte-size'
 import type { CallResult, TrackHooks } from './call-result'
 import type { ErrorStatus, RouteParams } from './checks'
+import type { ErrorData } from './core'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
 import type { Connection, LoadStatus, Reader } from './live'
+import type { DenyOptions } from './refuse'
 import type { Schema, Static } from './schema'
 import type { MaybePromise, StoreBase } from './store-base'
 
@@ -229,12 +231,25 @@ export interface ProtectionMessages {
 
 // The context every request has, `params` those of the page the action was posted from, matched against the action's own route as its guards read them: scope what it touches by them, since the input is the visitor's to choose, and a layout's action gets those every page it wraps names.
 // Its `url` is that page's, as its guards read it, its `locale` that page's too, and `redirect` answers 303 unless given.
-export interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string, Guarded extends object = object> extends RequestContext<Params, Guarded> {
+export interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string, Guarded extends object = object> extends Omit<RequestContext<Params, Guarded>, 'deny'> {
   // Response status, for a fetch call or the redirect after a plain form post.
   status: (code: number) => void
-  // `return ctx.fail(409, { message: 'Taken' })`: a plain form post gets its page rendered again, which reads it through `action.failed()`; a call throws an `ActionError` carrying `data`. A string is also the form's message, under `errors['']`.
-  // `errors` puts a message on a field of the schema, or on the form under `''`: `return ctx.fail(409, undefined, { email: 'Already taken' })`, which `error email`, `aria-invalid`, `add.error('email')` and an `ActionError`'s `errors` follow as for a field the schema refused.
+  // `return ctx.deny(409, { message: 'Taken', data })` fails the post: a plain form post gets its page rendered again, which reads it through `action.failed()`; a call throws an `ActionError` carrying `data`. `message` is the form's own, under `errors['']`.
+  // `errors` puts a message on a field of the schema, or on the form under `''`: `return ctx.deny(409, { errors: { email: 'Already taken' } })`, which `error email`, `aria-invalid`, `add.error('email')` and an `ActionError`'s `errors` follow as for a field the schema refused.
+  // It throws, so a statement ends the handler too; `return` types what `data` is for `action.failed()`.
+  deny: ActionDeny<Field>
+  /** @deprecated `return ctx.deny(status, { data, errors })`. Removed in 1.108; `deprecated-ctx-fail` rewrites it. */
   fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data, errors?: FieldErrors<Field>) => Failure<Data>
+}
+
+// `ctx.deny` of an action: a refusal with `data` or `errors` is typed as a `Failure`, one with a message alone (or none) is `never`, so it narrows what follows as a guard's does.
+export interface ActionDeny<Field extends string = string> {
+  (status?: number, options?: { message?: string | undefined, errors?: undefined, data?: undefined }): never
+  <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, options: DenyOptions<Data, Field>): Failure<Data>
+  // What a helper taking the guard's `deny` sees: an action's context passes as one.
+  (status?: number, options?: DenyOptions<ErrorData>): never
+  /** @deprecated `deny(status, { message, data })`. Removed in 1.108; `deprecated-deny-call` rewrites it. */
+  (status: number, message: string, data?: unknown): never
 }
 
 // A message per field of the action's schema, and under `''` one for the whole form.

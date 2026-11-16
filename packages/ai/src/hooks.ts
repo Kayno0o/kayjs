@@ -100,7 +100,7 @@ export async function requested(hooks: readonly BeforeHook<RequestHookCall, Requ
     const answer = await hook({ ...current, context })
 
     if (answer === false)
-      refuse('The request was refused')
+      refuse(403, { message: 'The request was refused' })
 
     if (answer === undefined)
       continue

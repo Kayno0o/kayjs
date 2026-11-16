@@ -62,7 +62,7 @@ export const signIn = action(credentials, async (input, ctx) => {
   const user = await verify(input)
 
   if (!user)
-    return ctx.fail(401, { message: 'Wrong email or password' })
+    return ctx.deny(401, { data: { message: 'Wrong email or password' } })
 
   await ctx.locals.session.start({ userId: user.id })
   ctx.redirect('/')
@@ -105,7 +105,7 @@ export const signIn = action(credentials, async (input, ctx) => {
   const user = await verify(input)
 
   if (!user)
-    return ctx.fail(401, { message: 'Wrong email or password' })
+    return ctx.deny(401, { data: { message: 'Wrong email or password' } })
 
   await ctx.locals.session.start({ userId: user.id }, { maxAge: input.remember ? '90d' : 'browser' })
   ctx.redirect('/')
@@ -135,7 +135,7 @@ export default guard(({ locals, redirect, deny }) => {
     return redirect('/login')
 
   if (!locals.user.admin)
-    return deny(403, 'Admins only')
+    return deny(403, { message: 'Admins only' })
 })
 ```
 

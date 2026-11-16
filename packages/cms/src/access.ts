@@ -289,7 +289,7 @@ export async function may(ctx: GuardContext, doing: Doing, target?: Target): Pro
 }
 
 export function forbidden(ctx: GuardContext, doing: Doing | 'site', target?: Target): never {
-  return ctx.deny(403, refusal(doing, doing === 'edit' && target !== undefined && allows(known.get(ctx.request), 'read', target)))
+  return ctx.deny(403, { message: refusal(doing, doing === 'edit' && target !== undefined && allows(known.get(ctx.request), 'read', target)) })
 }
 
 // Where an anonymous visitor goes to sign in and return to `back`: the cms's own screen for a password guard, else kayjs-auth's sign-in page, else nowhere.

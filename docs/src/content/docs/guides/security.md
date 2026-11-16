@@ -304,7 +304,7 @@ import { verifyWork } from 'kay/server'
 const refusal = await verifyWork(input.proof, 'contact')
 
 if (refusal !== undefined)
-  deny(422, 'Please try again')
+  deny(422, { message: 'Please try again' })
 ```
 
 `verifyWork` answers `undefined` once for each solution. Otherwise it says `missing`, `expired` or `wrong`. A solution can pass only once, so replaying one fails.

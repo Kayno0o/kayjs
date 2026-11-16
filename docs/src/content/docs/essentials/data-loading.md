@@ -97,7 +97,7 @@ if (!ctx.locals.user)
 const post = await findPost(ctx.params.slug) ?? ctx.notFound()
 
 if (post.private && !ctx.locals.user.admin)
-  ctx.deny(403, 'Members only')
+  ctx.deny(403, { message: 'Members only' })
 ---
 h1 {post.title}
 ```

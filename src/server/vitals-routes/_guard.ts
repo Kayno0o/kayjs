@@ -6,7 +6,7 @@ export default function vitalsGuard(ctx: GuardContext): unknown {
   const { guard } = vitalsSettings()
 
   if (!guard)
-    return ctx.deny(403, 'vitals has no guard: give vitals() one, such as kayjs-auth\'s auth.guard()')
+    return ctx.deny(403, { message: 'vitals has no guard: give vitals() one, such as kayjs-auth\'s auth.guard()' })
 
   return guard(ctx)
 }

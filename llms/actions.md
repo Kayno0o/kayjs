@@ -36,7 +36,7 @@ export const rename = action(
   s.Object({ name: s.String({ minLength: 1, maxLength: 80, error: 'Write a name' }) }),
   async ({ name }, ctx) => {
     if (name === 'admin')
-      return ctx.fail(409, 'That name is taken')
+      return ctx.deny(409, { message: 'That name is taken' })
 
     return name
   },
@@ -139,7 +139,7 @@ const newTodo = s.Object({
 
 export const add = action(newTodo, async ({ title }, ctx) => {
   if ((await listTodos()).some(todo => todo.title === title))
-    return ctx.fail(409, { message: 'Already on the list' })
+    return ctx.deny(409, { message: 'Already on the list', data: { listed: true } })
 
   return (await addTodo(title)).id
 })
@@ -164,8 +164,8 @@ form(action={add})
 - `s.String({ format: 'email' })` accepts one plain address, the same check in the browser, on the server, in kayjs-auth and in kayjs-mail: letters and digits of any script, `+tag`, an internationalised domain; a local part up to 64 characters, labels up to 63, no quotes, comments, IP domain, name with angle brackets, list, line break or space around it, 254 characters at most, a host typed as is (no soft hyphen, zero-width space, fullwidth letter or ideographic full stop). Non-ASCII local parts and IDN domains pass for every app field; kayjs-auth alone also refuses a Latin, Cyrillic or Greek mix. `isEmail(value)` from `kay` is that check, `normalizeAddress(value)` from `kay/library` the form to store (trimmed, lower case, punycode domain).
 - A string field with no `maxLength` of its own is refused past 10,000 characters, with the error of a declared `maxLength`, and carries that bound to the form's `maxlength` and to the tool's schema; whatever builder wrote it, `t.Record` values, tuples and a string in an API route's `body` included. A field with an `enum`, a `const`, or a secret name such as `password` keeps none. Declare a tighter one for a name, an email or a title, which `kay check` warns of (`unbounded-string`), and a longer one for a field that takes more.
 - `s` from `kay` builds the schema. A schema shared by API modules, server fences and islands, and the types an island reads off it, are in [Schemas](schemas.md).
-- The handler's second argument is the request context every route shares (see routing, "The request context"), `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`, with `status(code)` and `fail(status, data)`, whose status is an error status, 400 to 599.
-- `ctx.redirect`, `ctx.notFound()` and `ctx.deny()` throw, as in a page, and a handler writes `return ctx.redirect(...)`, as a guard does; a call or a form post is answered with the redirect, a 404 or the denial as plain text, `redirect` with 303 unless given.
+- The handler's second argument is the request context every route shares (see routing, "The request context"), `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`, with `status(code)`.
+- `ctx.redirect`, `ctx.notFound()` and `ctx.deny()` throw, as in a page, and a handler writes `return ctx.redirect(...)`, as a guard does; a call or a form post is answered with the redirect or a 404 as plain text, `redirect` with 303 unless given. `ctx.deny(status, { message, errors, data })` fails the post as in the next lines when it holds `data` or `errors` (400 to 599); `deny(status, { message })` alone, and `deny(status, 'text')` until 1.108, stop with plain text.
 - Its `url` is the page's the post came from, as its guards read it, and its `locale` that page's, or the site's `lang` without `i18n`.
 - A location outside ASCII, such as `/blog/日本語`, goes out percent-encoded, from pages and guards too.
 - A location holding a control character, or a scheme other than `http:` and `https:`, such as `javascript:`, throws.
@@ -225,14 +225,14 @@ form(action={add})
 
 ### Refused posts
 
-- `ctx.fail` returns the failure where `ctx.deny`, `ctx.notFound` and `ctx.redirect` throw, so write `return ctx.fail(status, data, errors)` (the same answer as `refuse(message, { errors, data })`, which throws): a statement without `return` does nothing, which `kay check` reports as `unreturned-fail` and `--fix` repairs.
-- A post the schema refuses, or whose handler returns `ctx.fail(status, data)`, is answered with the page it came from, rendered with the failure's status, rather than with a redirect.
+- `ctx.deny(status, { message, errors, data })` is the one refusal of a guard, a page, an action and an endpoint, `refuse(status, { ... })` throws it from anywhere; `return` it so `failed()` types `data`. `ctx.fail` is its old spelling until 1.108 (`unreturned-fail`).
+- A post the schema refuses, or whose handler denies with `ctx.deny(status, { data })`, is answered with the page it came from, rendered with the failure's status, rather than with a redirect.
 - There `add.failed()` returns `{ status, message, values, errors, data }`, typed from the action, or `undefined`.
 - `values` is what the form posted (fields named like a password left out).
 - `errors` is a message per refused field, the schema's `error` option when set.
-- `data` is what `ctx.fail` received.
-- `return ctx.fail(409, undefined, { email: 'Already taken' })` puts a message on a field, typed from the schema's keys, with `''` for the form's own (a string `data` is that too), so `error email`, `aria-invalid`, `add.error('email')`, the value re-fill and an island's `ActionError.errors` (and a kayjs-ui `FormField` named `email`) follow it with and without JavaScript.
-- A string passed to `ctx.fail` is the form's message too, under `errors['']` where a rate limit's refusal sits: `return ctx.fail(502, 'Not sent; try again later')`, read by `add.error()`.
+- `data` is what `ctx.deny` received.
+- `return ctx.deny(409, { errors: { email: 'Already taken' } })` puts a message on a field, typed from the schema's keys, with `''` for the form's own, so `error email`, `aria-invalid`, `add.error('email')`, the value re-fill and an island's `ActionError.errors` (and a kayjs-ui `FormField` named `email`) follow it with and without JavaScript.
+- A rate limit's refusal sits under `errors['']`, read by `add.error()`, and a text `data` is that message: `return ctx.deny(502, { data: 'Not sent; try again later' })`.
 - The page renders as a visit of it would, through the app's plugins and the page's guards, and nothing the visitor typed is lost however long it is.
 - Reloading it posts again, as after any form a server answers in place.
 - The page is the one the post was sent from, as `ctx.params` reads it below, the home page when it names none or another site.

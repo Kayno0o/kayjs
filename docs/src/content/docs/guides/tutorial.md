@@ -129,7 +129,7 @@ export const add = action(s.Object({
   author: s.String({ minLength: 1, maxLength: 100, error: 'Write the author' }),
 }), async ({ title, author }, ctx) => {
   if ((await listBooks()).some(book => book.title === title))
-    return ctx.fail(409, { message: 'Already on the list' })
+    return ctx.deny(409, { data: { message: 'Already on the list' } })
 
   return (await addBook(title, author)).id
 })

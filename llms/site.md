@@ -320,7 +320,7 @@ export function checkComment({ name, text }: Comment): CommentErrors {
 }
 ```
 
-- The handler checks them, `src/routes/guestbook.kay`, and `ctx.fail(status, data, errors)` puts a message on each field it names, so `error name`, `aria-invalid` and `comment.error('name')` follow it as for a field the schema refused.
+- The handler checks them, `src/routes/guestbook.kay`, and `ctx.deny(status, { errors })` puts a message on each field it names, so `error name`, `aria-invalid` and `comment.error('name')` follow it as for a field the schema refused.
 - A string field with no `maxLength` is refused past 10,000 characters, and `kay check` asks a name, an email or a title for a tighter one (`unbounded-string`):
 
 ```kay
@@ -338,7 +338,7 @@ export const comment = action(newComment, (input, ctx) => {
   const errors = checkComment(input)
 
   if (Object.keys(errors).length > 0)
-    return ctx.fail(422, undefined, errors)
+    return ctx.deny(422, { errors })
 
   return { name: input.name.trim() }
 })
@@ -394,7 +394,7 @@ form(action={comment} novalidate onSubmit={submit})
 ```
 
 - Without JavaScript the same form posts as a plain one, and the island's first render reads the refused post's errors, or the success.
-- A call the server refuses throws `ActionError`, whose `data` is what `ctx.fail` received, typed once `comment.refused(error)` says the error is that call's.
+- A call the server refuses throws `ActionError`, whose `data` is what `ctx.deny` received, typed once `comment.refused(error)` says the error is that call's.
 - See [Actions](actions.md).
 
 ### Check, build, run

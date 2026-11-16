@@ -34,7 +34,7 @@ export function guardOf<Role extends string, Scope extends string>(core: Core, o
         // kay-allow external-redirect: `redirect` is the app's own sign-in page, the visited path rides in its query
         ctx.redirect(withBack(redirect, ctx.url.pathname + ctx.url.search))
 
-      ctx.deny(401, 'Sign in to continue')
+      ctx.deny(401, { message: 'Sign in to continue' })
     }
 
     // kay before 1.23 gives a guard no params, and `memberOf` then refuses rather than skip the check.

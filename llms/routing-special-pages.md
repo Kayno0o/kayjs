@@ -18,7 +18,7 @@ The rest of [Pages and routing](routing.md).
 ### Special pages
 
 - The nearest special page wins, wrapped by the layouts of its own directory.
-- `_error.kay` and the status pages read `ctx.error`: `status`, `message`, the `data` of the `ctx.deny` that ended the page (`ctx.deny(403, 'Upgrade', { plan: 'pro' })`, typed `unknown` unless the app sets `errorData` in `Register`: `declare module 'kay' { interface Register { errorData: { plan: string } } }`) and, in development only, `stack`.
+- `_error.kay` and the status pages read `ctx.error`: `status`, `message`, the `data` of the `ctx.deny` that ended the page (`ctx.deny(403, { message: 'Upgrade', data: { plan: 'pro' } })`, typed `unknown` unless the app sets `errorData` in `Register`: `declare module 'kay' { interface Register { errorData: { plan: string } } }`) and, in development only, `stack`.
 - Logged and displayed stacks point at `.kay` lines.
 - In production the message is generic and the real error goes to `console.error`.
 - Without an `_error.kay` the response is plain text, and development shows an error page with the stack instead, its frames opening in the editor under `kay dev`.

@@ -152,7 +152,7 @@ export default guard(async (ctx) => {
   }
 
   if (!admits)
-    return ctx.deny(403, refusal(editing, READ_METHODS.has(method)))
+    return ctx.deny(403, { message: refusal(editing, READ_METHODS.has(method)) })
 
   await admits(ctx)
   admitEditor(ctx)
@@ -166,7 +166,7 @@ export default guard(async (ctx) => {
 
     // A request the guard cannot place below the cms's mount would skip every role check, so it is refused.
     if (path === '')
-      return ctx.deny(403, wording('cms.guard.unplaced', 'The cms could not place this request among its routes'))
+      return ctx.deny(403, { message: wording('cms.guard.unplaced', 'The cms could not place this request among its routes') })
 
     await enforceRoles(ctx, path)
   }

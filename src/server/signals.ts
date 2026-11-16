@@ -1,9 +1,11 @@
 import type { RequestContext } from '../runtime'
 import type { ErrorData } from '../runtime/core'
+import type { DenyOptions } from '../runtime/refuse'
 import { KayError } from '../compiler/errors'
 import { leavesSite } from '../runtime/base'
 import { localizedLink } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
+import { RefusedError } from '../runtime/refuse'
 import { nodeHttp } from './builtins'
 
 // Thrown by `ctx.redirect()`, `ctx.notFound()` and `ctx.deny()` to end a guard, page or action early; the server turns them into responses.
@@ -64,7 +66,7 @@ export class NotFound {}
 export class Denied {
   readonly message: string
 
-  constructor(readonly status: number, message?: string, readonly data?: ErrorData) {
+  constructor(readonly status: number, message?: string, readonly data?: ErrorData, readonly errors?: Record<string, string>) {
     this.message = message ?? nodeHttp().STATUS_CODES[status] ?? 'Denied'
   }
 }
@@ -80,8 +82,26 @@ export function stoppers(request: Request): Pick<RequestContext, 'redirect' | 'n
     notFound: () => {
       throw new NotFound()
     },
-    deny: (code = 403, message, data) => {
-      throw new Denied(code, message, data)
+    deny: (code = 403, second?: string | DenyOptions<ErrorData>, data?: ErrorData) => {
+      throw typeof second === 'string' ? new Denied(code, second, data) : new Denied(code, second?.message, second?.data, second?.errors as Record<string, string> | undefined)
     },
   }
+}
+
+// `ctx.deny(status, { errors, data })` in an action fails the post as `ctx.fail` does, a form re-rendered with the fields and `data`, a call throwing an `ActionError`. A refusal of a message alone, or of the old text form, stops as a guard's does, so a guard run with an action's context refuses the same way.
+export function actionStoppers(request: Request): Pick<RequestContext, 'redirect' | 'notFound' | 'deny'> {
+  const { deny: stop, ...rest } = stoppers(request)
+
+  const deny = (status = 403, second?: string | DenyOptions<ErrorData>, data?: ErrorData): never => {
+    if (typeof second === 'string' || status < 400 || status > 599)
+      return stop(status, second as string, data)
+
+    if (second === undefined || (second.data === undefined && Object.keys(second.errors ?? {}).length === 0))
+      return stop(status, second)
+
+    // A text `data` with no `message` is the form's message, as `ctx.fail` made it; one with only data or fields has no form message, as `ctx.fail` had none.
+    throw new RefusedError({ status, message: second.message ?? (typeof second.data === 'string' ? second.data : ''), errors: (second.errors ?? {}) as Record<string, string>, data: second.data })
+  }
+
+  return { ...rest, deny }
 }

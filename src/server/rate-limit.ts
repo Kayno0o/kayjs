@@ -63,7 +63,7 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
         return
 
       ctx.headers.set('retry-after', String(wait))
-      ctx.deny(429, typeof message === 'function' ? message(wait) : message ?? kayWord('kay.protection.rateLimit', { seconds: wait }))
+      ctx.deny(429, { message: typeof message === 'function' ? message(wait) : message ?? kayWord('kay.protection.rateLimit', { seconds: wait }) })
     },
   }
 

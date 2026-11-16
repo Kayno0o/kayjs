@@ -53,7 +53,7 @@ test('every link of the screens stays at the root, with no // address', async ()
 })
 
 test('the guard covers the screens and nothing else of the site', async () => {
-  const closed = await rootSite(({ deny }) => deny(403, 'Editors only'))
+  const closed = await rootSite(({ deny }) => deny(403, { message: 'Editors only' }))
 
   expect((await closed.fetch('/not-found')).status).toBe(403)
   expect((await closed.fetch('/about')).status).toBe(200)

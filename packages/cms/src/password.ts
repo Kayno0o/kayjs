@@ -316,7 +316,7 @@ export function passwordGuard(passwords: string | Record<string, string>, { maxA
     const role = await known.current(sessionCookieOf(ctx.cookies))
 
     if (role === undefined)
-      return ctx.deny(401, wording('cms.guard.signedOut', 'Sign in to continue'))
+      return ctx.deny(401, { message: wording('cms.guard.signedOut', 'Sign in to continue') })
 
     signedInBy.set(ctx.request, { name: role, roles: [role] })
   })

@@ -8,7 +8,7 @@ import { PrivateAddressError } from '../src/server/address'
 import { DatabaseOwnedError } from '../src/server/app-identity'
 import { StreamRefusedError } from '../src/server/event-stream'
 import { logMessage, tapLogs } from '../src/server/log'
-import { TimeoutError } from '../src/server/pg-poll'
+import { PollTimeoutError } from '../src/server/pg-poll'
 import { GiveUpError } from '../src/server/queue'
 import { RequestTimeoutError } from '../src/server/request-timeout'
 import { RedirectRefusedError } from '../src/server/runtime-redirects'
@@ -19,7 +19,7 @@ describe('the runtime error classes', () => {
     [PrivateAddressError, 'private-address'],
     [RedirectRefusedError, 'redirect-refused'],
     [GiveUpError, 'job-give-up'],
-    [TimeoutError, 'poll-timeout'],
+    [PollTimeoutError, 'poll-timeout'],
     [IslandPropsError, 'island-props-invalid'],
     [StreamRefusedError, 'stream-refused'],
     [DatabaseOwnedError, 'database-owned'],

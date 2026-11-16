@@ -709,7 +709,7 @@ cms({
   guard,
   beforeSave: ({ verb, data, author }) => {
     if (verb === 'publish' && !data.summary)
-      refuse('Write a summary before publishing', { errors: { summary: 'required' } })
+      refuse(422, { message: 'Write a summary before publishing', errors: { summary: 'required' } })
 
     return { data: { ...data, updatedBy: author?.name } }
   },
@@ -744,7 +744,7 @@ cms({
   guard,
   beforeUpload: async ({ bytes }) => {
     if (await infected(bytes))
-      refuse('The file was refused by the scanner', { status: 451 })
+      refuse(451, { message: 'The file was refused by the scanner' })
   },
   afterUpload: async ({ key, path }) => {
     await purgeCdn(path)

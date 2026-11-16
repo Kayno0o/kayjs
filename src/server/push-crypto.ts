@@ -1,3 +1,4 @@
+import { KayError } from '../compiler/errors'
 // Web Push on Web Crypto: the payload encryption of RFC 8291 (aes128gcm, RFC 8188) and the VAPID authorization of RFC 8292, with no dependency.
 
 const encoder = new TextEncoder()
@@ -105,13 +106,13 @@ export interface EncryptionInputs {
 // The body of a push for the subscription holding `keys`: the salt, record size and sender key header, then the one encrypted record.
 export async function encryptPayload(payload: Uint8Array<ArrayBuffer>, keys: PushKeys, inputs: EncryptionInputs = {}): Promise<Uint8Array<ArrayBuffer>> {
   if (payload.length > MAX_PAYLOAD_BYTES)
-    throw new RangeError(`kay: a push payload is at most ${MAX_PAYLOAD_BYTES} bytes; got ${payload.length}`)
+    throw new KayError('argument-invalid', `kay: a push payload is at most ${MAX_PAYLOAD_BYTES} bytes; got ${payload.length}`)
 
   const browserPublic = fromBase64Url(keys.p256dh)
   const authSecret = fromBase64Url(keys.auth)
 
   if (browserPublic.length !== 65 || browserPublic[0] !== 4 || authSecret.length !== 16)
-    throw new RangeError('kay: a push subscription needs a 65 byte p256dh key and a 16 byte auth secret')
+    throw new KayError('argument-invalid', 'kay: a push subscription needs a 65 byte p256dh key and a 16 byte auth secret')
 
   const ephemeral = inputs.ephemeral ?? await generateVapidKeys()
   const salt = inputs.salt ?? crypto.getRandomValues(new Uint8Array(16))

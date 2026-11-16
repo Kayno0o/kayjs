@@ -16,7 +16,7 @@ import { removeTodo, saveTodo } from '../data'
 export const save = action(s.Object({ id: s.String({ maxLength: 40 }), title: s.String({ minLength: 1, maxLength: 200 }), rev: s.Number() }), async (todo, ctx) => {
   const held = await saveTodo(todo)
 
-  return held.conflict ? ctx.fail(409, held.row) : held.row
+  return held.conflict ? ctx.deny(409, { data: held.row }) : held.row
 })
 export const remove = action(s.Object({ id: s.String({ maxLength: 40 }) }), async ({ id }) => removeTodo(id))
 ---
@@ -44,7 +44,7 @@ button(onClick={() => todos.put({ id: crypto.randomUUID(), title: 'New', rev: 0 
 
 ### Decide a conflict
 
-An action answers `ctx.fail(409, row)` with the row the server holds when a write started from an older one. The default keeps the server's row and puts the fields this write changed on it, then sends that; `conflict` replaces it, and returning `undefined` takes the server's row as it is:
+An action answers `ctx.deny(409, { data: row })` with the row the server holds when a write started from an older one. The default keeps the server's row and puts the fields this write changed on it, then sends that; `conflict` replaces it, and returning `undefined` takes the server's row as it is:
 
 ```kay
 ---

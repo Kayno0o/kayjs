@@ -62,7 +62,7 @@ h1 {post.title}
 | `url.searchParams` | `ctx.query`, typed by a `query` schema in `page` (see [Data loading](/essentials/data-loading)) |
 | `event.locals` | `ctx.locals` |
 | `error(404)` | `ctx.notFound()` |
-| `error(403, 'Members only')` | `ctx.deny(403, 'Members only')` |
+| `error(403, 'Members only')` | `ctx.deny(403, { message: 'Members only' })` |
 | `redirect(302, '/login')` | `ctx.redirect('/login')` |
 | `setHeaders` | `ctx.headers` |
 | A promise returned from `load`, streamed | A promise left unawaited, rendered in an `await` block |
@@ -107,7 +107,7 @@ form(action={add})
 | `export const actions = { add }` | `export const add = action(schema, handler)`, one export per action |
 | `<form method="POST" action="?/add">` | `form(action={add})` |
 | `use:enhance` | Nothing to add. With kay's script a form posts without a reload, and without it the form still posts |
-| `fail(400, { missing: true })` | The schema refuses the input, or the handler returns `ctx.fail(409, data)` |
+| `fail(400, { missing: true })` | The schema refuses the input, or the handler returns `ctx.deny(409, { data })` |
 | `form?.missing` | `add.error('title')`, `error title` in the template, or `add.failed()?.data` |
 | `form` after a success | `add.data()` |
 | `redirect(303, '/')` in an action | `return ctx.redirect('/')` |

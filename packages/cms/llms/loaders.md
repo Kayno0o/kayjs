@@ -52,7 +52,7 @@ SQLite stores the JSON as written; Postgres stores `jsonb`, which reorders an ob
 
 - nothing: the write goes on unchanged;
 - `{ data, body }`: written instead, `data` replacing the entry's whole data, so spread the one you were given: `({ data, author }) => ({ data: { ...data, updatedBy: author?.name } })`. Only the verbs that write data take it; a `delete` and a `rename` can only be refused;
-- `false`, or a thrown `refuse(message, { errors, status })` from `kay`, to refuse: `refuse('A summary is needed', { errors: { summary: 'required' } })`. The entry form shows it as it shows a schema refusal, the message on the entry and each `errors` key on its field, and the API answers `{ ok: false, error, issues }` with `error.status` 422 (403 for `false`, or the `status` given). Nothing is written.
+- `false`, or a thrown `refuse(status, { message, errors })` from `kay`, to refuse: `refuse(422, { message: 'A summary is needed', errors: { summary: 'required' } })`. The entry form shows it as it shows a schema refusal, the message on the entry and each `errors` key on its field, and the API answers `{ ok: false, error, issues }` with `error.status` 422 (403 for `false`, or the `status` given). Nothing is written.
 
 `data` is the entry about to be written and `previous` the entry as stored now (`{ data, body }`, none for a new one); for a `delete` `data` is the entry removed, and for a `rename` `slug` is the new slug, `from` the old one and `data` the entry before its references are pointed at the new slug. Any other throw refuses with 500 and `Internal server error`, after it is reported with source `cms.beforeSave`; a hook that does not finish in 10 s does the same. A change that is not `{ data: object, body: string }` is a 500 too.
 

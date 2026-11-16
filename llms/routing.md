@@ -65,7 +65,7 @@ import { localPath, s } from 'kay'
 export const page = { query: s.Object({ next: s.Optional(s.String()) }) }
 
 if (ctx.params.id === 'latest') ctx.redirect(localPath(ctx.query.next, '/todos/42'))
-if (ctx.params.id === 'secret') ctx.deny(403, 'Members only')
+if (ctx.params.id === 'secret') ctx.deny(403, { message: 'Members only' })
 
 const { id } = ctx.params
 ---
@@ -77,7 +77,7 @@ h1 Todo {id}
 `RequestContext` from `kay` is what a page, a layout, a guard (`GuardContext`), an endpoint (`EndpointContext`) and an action (`ActionContext`) all read, the same in each:
 
 - `request`, `url`, `locale`, `params`, `cookies`, `locals` and `headers`, read as in a page.
-- `redirect(location, status?)`, `notFound()` and `deny(status?, message?, data?)`, which throw, written `return redirect(...)` in a guard, an endpoint or an action handler so TypeScript narrows what follows, and as a statement in a page fence; `redirect` answers 302 to a read and 303 to a post unless given a status.
+- `redirect(location, status?)`, `notFound()` and `deny(status?, { message, errors, data }?)` (the one refusal of an action, a guard, a page and an endpoint), which throw, written `return redirect(...)` in a guard, an endpoint or an action handler so TypeScript narrows what follows, and as a statement in a page fence; `redirect` answers 302 to a read and 303 to a post unless given a status.
 - A page adds `query`, `status`, `failed` and `succeeded`, an action `status` and `fail`; an API route reads Elysia's own context, its guards this one.
 - `params` is the route's, matched as a guard reads them, an action's those of the page it was posted from, and `locale` is the site's `lang` without `i18n` in all of them.
 - `guard` holds what the `_guard.ts` files above the route returned, typed by `kay check`, and `once(key, load)` shares one load between the loads of a request ([Guards](guards.md)).
@@ -269,7 +269,7 @@ The fence's `ctx`:
 - `ctx.cookies`, a `Bun.CookieMap`: `ctx.cookies.get('theme')`; what `set` and `delete` change is sent back, redirects included; what `set` writes is `HttpOnly`, `SameSite=Lax`, `Secure` over https and the `base` as `Path` unless `security: { cookies: false }` ([cookie defaults](server.md#sessions))
 - `ctx.locals`, what the app's Elysia `derive`, `resolve` and `decorate` add, such as the signed-in user
 - `ctx.status(404)` and `ctx.headers` set the response. A page rendered per request behind any guard, or whose loads or render read the session, `ctx.cookies`, a cookie `persisted` signal or how a form post went, goes out as `Cache-Control: private, no-cache` with `Vary: cookie`, so a CDN never hands one visitor's page to another, redirects included, unless `ctx.headers` sets a `cache-control` of its own; what an `await` block reads once the page started streaming comes too late to count
-- `ctx.redirect('/login')`, `ctx.notFound()` and `ctx.deny(403, 'Members only')` stop rendering; `deny` renders `_<status>.kay` or `_error.kay` with that status and message, and `data` as `ctx.error.data`
+- `ctx.redirect('/login')`, `ctx.notFound()` and `ctx.deny(403, { message: 'Members only' })` stop rendering; `deny` renders `_<status>.kay` or `_error.kay` with that status and message, and `data` as `ctx.error.data`
 - They throw and return `never`: `return` it in a function, a guard, an endpoint or an action handler, which a call through a contextually typed `ctx` needs for TypeScript to narrow what follows, and write a plain statement at the top of a page or layout fence; `redirect` answers 302 to a read and 303 to a post unless given a status
 - `ctx.redirect` to a path of a page puts on what a link to it has, in a guard, a page, an action and an endpoint alike: `base`, the page's locale (`/deferred` on an English page is `/en/deferred`, one already under a prefix is not prefixed twice) and the `trailingSlash` spelling (`/deferred/` under `always`, `/deferred` under `never`, as written under `ignore`), so the answer is one response with no slash redirect after it; the query and the hash go along, and a path with an extension, an endpoint's, an API route's, a public file's, an extension's or kay's own, a `.`-segment path and a full URL stay as written. It goes to any full http(s) URL, but a path a browser reads as another host (`//other.example/`, `/\other.example`) is a server error. A `?next=` param goes through `localPath(value, fallback)` from `kay`, which gives `value` when it is a path of this site and `fallback` otherwise: `ctx.redirect(localPath(ctx.query.next, '/account'))`. The path comes back resolved; a backslash, a control character, a path that leaves the site once decoded at any depth (`/%2F/evil.example`, `/%252F/evil.example`) or a malformed escape gives `fallback`.
   - `https://evil.example`, `//evil.example`, `/\evil.example` and a value that is no string all fall back.

@@ -283,7 +283,7 @@ export default guard(({ request, url, deny }) => {
   const key = request.headers.get('authorization') === `Bearer ${process.env.AGENT_KEY}`
 
   if (key && url.pathname !== '/mcp' && !toolCall(request))
-    deny(403, 'This key opens tools only')
+    deny(403, { message: 'This key opens tools only' })
 })
 ```
 

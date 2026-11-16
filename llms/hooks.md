@@ -12,14 +12,14 @@ A `beforeX` hook returns one of:
 - an object of the fields it may change, laid over the input;
 - `false`: X is refused with the transition's default refusal.
 
-It may also throw `refuse(message?, { status, errors, data })` from `kay`: 403 by default, 422 when `errors` names fields. The refusal has one shape, `ErrorShape`: `{ status, message, errors, data }`. A thrown `refuse()` carries it under `Symbol.for('kay.refused')`, so an action answers it as it answers `ctx.fail` (`message` is the form-wide error, `errors` the field errors, `data` what the call reads), as does every place answering that symbol, and `decide()` returns it as `refused`. Anywhere else a thrown `refuse()` is an ordinary error, a 500. Any other throw in a `beforeX` hook refuses as a server error (500), after it is logged and passed to `onError`: it fails closed.
+It may also throw `refuse(status, { message, errors, data })` from `kay`, the shape of `ctx.deny`: 403 by default (`refuse(message, { status, errors, data })` still works until 1.108, with 422 when `errors` names fields). The refusal has one shape, `ErrorShape`: `{ status, message, errors, data }`. A thrown `refuse()` carries it under `Symbol.for('kay.refused')`, so an action answers it as it answers `ctx.deny` (`message` is the form-wide error, `errors` the field errors, `data` what the call reads), as does every place answering that symbol, and `decide()` returns it as `refused`. Anywhere else a thrown `refuse()` is an ordinary error, a 500. Any other throw in a `beforeX` hook refuses as a server error (500), after it is logged and passed to `onError`: it fails closed.
 
 ```ts
 import { action, refuse } from 'kay'
 
 export const publish = action(schema, ({ summary }) => {
   if (summary === '')
-    refuse('A summary is needed', { errors: { summary: 'required' } })
+    refuse(422, { message: 'A summary is needed', errors: { summary: 'required' } })
   // ...
 })
 ```
@@ -42,7 +42,7 @@ export function notes({ beforeSave, afterSave }: NotesOptions) {
     const answer = await decide('notes.beforeSave', [beforeSave], input)
 
     if ('refused' in answer)
-      refuse(answer.refused.message, answer.refused)
+      refuse(answer.refused.status, answer.refused)
 
     const saved = { ...input, ...answer.change }
 

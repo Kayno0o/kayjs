@@ -99,7 +99,7 @@ export function safeNotificationUrl(url: unknown): string | undefined {
 
 function checkedUser(user: unknown): string {
   if (typeof user !== 'string' || user === '' || user.length > MAX_USER || user.includes('\0'))
-    throw new RangeError(`kay: a notification's user is the user's id, 1 to ${MAX_USER} characters; got ${typeof user === 'string' ? `${user.length} characters` : typeof user}`)
+    throw new KayError('argument-invalid', `kay: a notification's user is the user's id, 1 to ${MAX_USER} characters; got ${typeof user === 'string' ? `${user.length} characters` : typeof user}`)
 
   return user
 }
@@ -283,7 +283,7 @@ export async function notify(user: string, { title, url, ttl, push }: NotifyOpti
   const text = typeof title === 'string' ? title.replaceAll('\0', '').trim() : ''
 
   if (text === '' || text.length > MAX_TITLE)
-    throw new RangeError(`kay: a notification's title is 1 to ${MAX_TITLE} characters; got ${typeof title === 'string' ? `${text.length} characters` : typeof title}`)
+    throw new KayError('argument-invalid', `kay: a notification's title is 1 to ${MAX_TITLE} characters; got ${typeof title === 'string' ? `${text.length} characters` : typeof title}`)
 
   const link = safeNotificationUrl(url)
 

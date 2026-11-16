@@ -50,7 +50,7 @@ h1 {post.title}
 | `Route::get('/api/...')` returning JSON | An [API route](/guides/api-routes) in `src/api/` |
 | `redirect('/login')` | `ctx.redirect('/login')` |
 | `abort(404)` | `ctx.notFound()` |
-| `abort(403)` | `ctx.deny(403, 'Members only')` |
+| `abort(403)` | `ctx.deny(403, { message: 'Members only' })` |
 | `request()->query('q')` | `ctx.query`, typed by a `query` schema in `page` |
 | `Route::redirect(...)` | `redirects` in `kay.config.ts` |
 

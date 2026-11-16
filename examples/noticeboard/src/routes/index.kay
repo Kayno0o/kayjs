@@ -13,7 +13,7 @@ export const post = action(s.Object({
   const user = await ctx.locals.auth.user()
 
   if (!user)
-    return ctx.fail(401, { error: 'Sign in to pin a notice' })
+    return ctx.deny(401, { data: { error: 'Sign in to pin a notice' } })
 
   const notice = await db.repo(Notice).write.insertOne({ author_id: user.id, title: title.trim(), body: body.trim() })
 

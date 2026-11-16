@@ -15,7 +15,7 @@ export default guard(({ locals, redirect, deny }) => {
     return redirect('/login')
 
   if (!locals.user.admin)
-    return deny(403, 'Admins only')
+    return deny(403, { message: 'Admins only' })
 })
 ```
 

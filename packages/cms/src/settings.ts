@@ -292,7 +292,7 @@ function memberGuard(access: MemberAccess): { guard: Guard, member: MemberAccess
   return {
     guard: async (ctx) => {
       if (await member(ctx) === undefined)
-        return ctx.deny(401, wording('cms.guard.signedOut', 'Sign in to continue'))
+        return ctx.deny(401, { message: wording('cms.guard.signedOut', 'Sign in to continue') })
     },
     member,
   }

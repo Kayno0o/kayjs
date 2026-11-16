@@ -29,6 +29,7 @@ import { mailApi } from '../src/check/mail-api'
 import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
 import { pagesOptions } from '../src/check/pages-options'
 import { rateEnforce } from '../src/check/rate-enforce'
+import { refusalCalls } from '../src/check/refusal-calls'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
 import { secretKeys } from '../src/check/secret-keys'
@@ -49,6 +50,9 @@ type Name = keyof typeof DEPRECATED_LINTS
 const SITE: Record<string, (root: string, options: CheckOptions) => Promise<CheckDiagnostic[]>> = {
   'deprecated-ai-language': aiLanguage,
   'deprecated-rate-enforce': rateEnforce,
+  'deprecated-deny-call': refusalCalls,
+  'deprecated-ctx-fail': refusalCalls,
+  'deprecated-refuse-call': refusalCalls,
   'deprecated-auth-rate-limits': authRateLimits,
   'deprecated-job-handler': jobHandlers,
   'deprecated-schedule-call': scheduleCalls,

@@ -115,7 +115,7 @@ const MAX_ROOM_NAME = 256
 // The room name itself, refused when it is longer than `MAX_ROOM_NAME` characters: a name any visitor can make up costs every store a row, a watch and a poll.
 function named(room: string): string {
   if (room.length > MAX_ROOM_NAME)
-    throw new RangeError(`kay: a room name has at most ${MAX_ROOM_NAME} characters, and this one has ${room.length}`)
+    throw new KayError('argument-invalid', `kay: a room name has at most ${MAX_ROOM_NAME} characters, and this one has ${room.length}`)
 
   return room
 }
@@ -196,7 +196,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
   }
 
   if ((options.state !== undefined || options.snapshot !== undefined) && (store.state === undefined || store.update === undefined))
-    throw new Error('kay: rooms({ state }) needs a store that keeps a room\'s state, and this one has no `state` and `update`')
+    throw new KayError('config-invalid', 'kay: rooms({ state }) needs a store that keeps a room\'s state, and this one has no `state` and `update`')
 
   // Through JSON as a stored state is, so a state has one shape before and after an update.
   const initial = (): State => {
@@ -358,7 +358,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
         const next = JSON.stringify(change(kept === undefined ? initial() : JSON.parse(kept) as State))
 
         if (next === undefined)
-          throw new TypeError('kay: a room\'s state must be JSON, and `update` returned a value with none')
+          throw new KayError('argument-invalid', 'kay: a room\'s state must be JSON, and `update` returned a value with none')
 
         return next
       })

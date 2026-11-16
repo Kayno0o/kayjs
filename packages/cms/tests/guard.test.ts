@@ -33,8 +33,8 @@ function context(method: string, path: string, edit: boolean | string): GuardCon
   return {
     request: new Request(url, { method, headers: edit === false ? {} : { 'x-edit': edit === true ? 'posts/hello' : edit } }),
     url,
-    deny: (_code?: number, message?: string) => {
-      throw new Refused(message)
+    deny: (_code?: number, options?: { message?: string }) => {
+      throw new Refused(options?.message)
     },
   } as unknown as GuardContext
 }
@@ -92,7 +92,7 @@ describe('the API guard', () => {
 
   test('reads no entry the pages shown in edit mode did not read, with a guard or without one', async () => {
     for (const guarded of [false, true]) {
-      configure(guarded ? { guard: ({ deny }) => deny(403, 'Editors only') } : {})
+      configure(guarded ? { guard: ({ deny }) => deny(403, { message: 'Editors only' }) } : {})
 
       expect(await admitted(context('GET', '/entries/orders/42', 'posts/hello'))).toBe(false)
       expect(await admitted(context('GET', '/entries/posts/other', 'posts/hello'))).toBe(false)
@@ -125,7 +125,7 @@ describe('the API guard', () => {
   })
 
   test('with one, lets edit mode read and leave, and only whom it admits write', async () => {
-    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, 'Editors only') })
+    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, { message: 'Editors only' }) })
 
     expect(await admitted(context('GET', '/entries/posts/hello', true))).toBe(true)
     expect(await admitted(context('POST', '/preview/exit', true))).toBe(true)
@@ -141,7 +141,7 @@ describe('the API guard', () => {
   })
 
   test('marks an edit link\'s holder, whom the guard turns away, apart from a signed-in editor, so a review log is kept from them', async () => {
-    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, 'Editors only') })
+    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, { message: 'Editors only' }) })
 
     const holder = context('GET', '/entries/posts/hello', true)
     const editor = context('GET', '/entries/posts/hello', false)
@@ -230,7 +230,7 @@ describe('a guard loaded lazily', () => {
     configure({ guard: { load: async () => {
       loads++
 
-      return ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, 'Editors only')
+      return ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, { message: 'Editors only' })
     } } })
     expect(loads).toBe(0)
     expect(settings().guard).toBeTypeOf('function')
@@ -267,13 +267,13 @@ describe('the screens\' guard', () => {
   const screen = (path: string, headers: Record<string, string> = {}): GuardContext => {
     const url = new URL(`http://site.test${path}`)
 
-    return { request: new Request(url, { headers }), url, cookies: new Bun.CookieMap(), deny: (_code?: number, message?: string) => {
-      throw new Refused(message)
+    return { request: new Request(url, { headers }), url, cookies: new Bun.CookieMap(), deny: (_code?: number, options?: { message?: string }) => {
+      throw new Refused(options?.message)
     } } as unknown as GuardContext
   }
 
   test('marks the editor it lets in with the hint the pages look for, and no other', async () => {
-    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, 'Editors only') })
+    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, { message: 'Editors only' }) })
 
     const refused = screen('/admin')
     const admitted = screen('/admin', { 'x-editor': '1' })
@@ -328,7 +328,7 @@ describe('the screens\' guard', () => {
   })
 
   test('lets in whom the app\'s guard admits', async () => {
-    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, 'Editors only') })
+    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, { message: 'Editors only' }) })
 
     await expect(screenGuard(screen('/admin/not-found'))).rejects.toThrow('Editors only')
     await expect(Promise.resolve(screenGuard(screen('/admin/not-found', { 'x-editor': '1' })))).resolves.toBeUndefined()

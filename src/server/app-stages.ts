@@ -638,7 +638,7 @@ function imageGuard(images: NonNullable<KayConfig['assets']>['images']): Guard |
   if (given === false)
     return undefined
 
-  return given === undefined ? ctx => ctx.deny(403, 'images.resolve has no guards: give `images` a `guards`, or `guards: false` to resize them for everyone') : joinGuards(given)
+  return given === undefined ? ctx => ctx.deny(403, { message: 'images.resolve has no guards: give `images` a `guards`, or `guards: false` to resize them for everyone' }) : joinGuards(given)
 }
 
 async function imageRouteOf({ project: { root }, options, env, setup: { source, client, imageCache }, security }: Boot, actions: ActionOptions): Promise<ImageRouteOptions> {

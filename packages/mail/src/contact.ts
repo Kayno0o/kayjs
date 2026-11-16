@@ -110,7 +110,7 @@ export function contactForm<const Extra extends Record<string, Schema>, const Ho
     const { email } = input
 
     if ((message.match(LINK)?.length ?? 0) > maxLinks)
-      return ctx.fail(422, wording('mail.contact.tooManyLinks', 'No more than {max} links per message.', { max: maxLinks }))
+      return ctx.deny(422, { data: wording('mail.contact.tooManyLinks', 'No more than {max} links per message.', { max: maxLinks }) })
 
     const given: MailField[] = [{ label: labelOf('name', labels), value: name }, { label: labelOf('email', labels), value: email, href: `mailto:${email}` }]
 
@@ -145,12 +145,12 @@ export function contactForm<const Extra extends Record<string, Schema>, const Ho
       if (error instanceof MailNotConfiguredError) {
         log.error(error.message, error)
 
-        return ctx.fail(503, reach === undefined ? wording('mail.contact.notConfigured', 'The form cannot send messages yet.') : wording('mail.contact.notConfiguredReach', 'The form cannot send messages yet: write to {reach}.', words))
+        return ctx.deny(503, { data: reach === undefined ? wording('mail.contact.notConfigured', 'The form cannot send messages yet.') : wording('mail.contact.notConfiguredReach', 'The form cannot send messages yet: write to {reach}.', words) })
       }
 
       log.error('the contact mail could not be queued', error)
 
-      return ctx.fail(502, reach === undefined ? wording('mail.contact.sendFailed', 'Your message could not be sent. Please try again later.') : wording('mail.contact.sendFailedReach', 'Your message could not be sent. Please try again later, or write to {reach}.', words))
+      return ctx.deny(502, { data: reach === undefined ? wording('mail.contact.sendFailed', 'Your message could not be sent. Please try again later.') : wording('mail.contact.sendFailedReach', 'Your message could not be sent. Please try again later, or write to {reach}.', words) })
     }
 
     await dispatch('mail.contact.afterSend', [options.afterSend ?? options.onSend], { input, id })

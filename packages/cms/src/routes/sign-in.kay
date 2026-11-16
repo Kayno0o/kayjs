@@ -20,14 +20,14 @@ export const signIn = action(s.Object({
   const { passwords } = await probe(ctx)
 
   if (passwords && await passwords.lockedOut())
-    return ctx.fail(429, { message: wording('cms.signIn.locked', 'Too many wrong passwords just now. Try again in a few minutes.') })
+    return ctx.deny(429, { data: { message: wording('cms.signIn.locked', 'Too many wrong passwords just now. Try again in a few minutes.') } })
 
   const role = passwords?.match(password)
 
   if (!passwords || role === undefined) {
     await passwords?.failed()
 
-    return ctx.fail(401, { message: wording('cms.signIn.wrong', 'That is not the right password.') })
+    return ctx.deny(401, { data: { message: wording('cms.signIn.wrong', 'That is not the right password.') } })
   }
 
   const secure = overHttps(ctx.request)

@@ -135,7 +135,7 @@ test('the editor\'s sign-in link leads to the sign-in screen and back to the pag
 })
 
 test('a site without a password guard and without kayjs-auth sends the sign-in screen back to the guard\'s refusal', async () => {
-  const plain = await siteWith(({ deny }) => deny(401, 'Sign in'))
+  const plain = await siteWith(({ deny }) => deny(401, { message: 'Sign in' }))
   const response = await plain.fetch('/admin/sign-in')
 
   expect(response.status).toBe(302)

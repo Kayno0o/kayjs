@@ -312,7 +312,7 @@ describe('a guard the app wraps', () => {
       await pg(ctx)
     } })
     await visit('/admin/collections')
-    configure({ guard: ({ deny }) => deny(401, 'Sign in') })
+    configure({ guard: ({ deny }) => deny(401, { message: 'Sign in' }) })
 
     expect(activePasswords()).toBeUndefined()
     expect(await visit('/admin/collections', { auth: { bareUser: async () => null, signInUrl: (back?: string) => `/login?redirect=${encodeURIComponent(back ?? '/')}` } })).toBe('/login?redirect=%2Fadmin%2Fcollections')
@@ -340,7 +340,7 @@ describe('a guard the app wraps', () => {
     const other = passwordGuard('other-pw')
     const auth = { bareUser: async () => null, signInUrl: (back?: string) => `/login?redirect=${encodeURIComponent(back ?? '/')}` }
 
-    configure({ guard: ({ deny }) => deny(401, 'Sign in') })
+    configure({ guard: ({ deny }) => deny(401, { message: 'Sign in' }) })
     await statusOf(context(), other)
 
     expect(activePasswords()).toBeUndefined()
@@ -350,7 +350,7 @@ describe('a guard the app wraps', () => {
   test('a wrapped kayjs-auth guard sends to the auth sign-in page', async () => {
     const { configure } = await import('../src/settings')
     const auth = { bareUser: async () => null, signInUrl: (back?: string) => `/login?redirect=${encodeURIComponent(back ?? '/')}` }
-    const inner = ({ deny }: GuardContext): never => deny(401, 'Sign in')
+    const inner = ({ deny }: GuardContext): never => deny(401, { message: 'Sign in' })
 
     configure({ guard: async (ctx: GuardContext) => {
       await inner(ctx)

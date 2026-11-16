@@ -71,7 +71,7 @@ export async function loadGuards(route: Route, required: GuardRequirement = fals
 }
 
 // What a site requiring guards answers on a route of its own that no guard covers and that did not set `guards: false`.
-export const unguarded: Guard = ({ deny }) => deny(403, 'No guard covers this route')
+export const unguarded: Guard = ({ deny }) => deny(403, { message: 'No guard covers this route' })
 
 export function requiredGuards(guards: LoadedGuard[], route: { file: string, open?: true | undefined }, special: SpecialPages, required: GuardRequirement | undefined): LoadedGuard[] {
   return (required === true || required === 'routes') && guards.length === 0 && route.open !== true ? [{ file: route.file, special, check: unguarded }] : guards

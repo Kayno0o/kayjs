@@ -45,7 +45,7 @@ beforeEach(async () => {
   setContentPlace(dir, dir)
   registerEditSite({ urls: async () => undefined, locales: ['en'], defaultLocale: 'en' })
   restore = registerCollections([['posts', collection(join(dir, 'posts'), { schema, draft: 'draft' })]])
-  configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, 'Editors only') })
+  configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, { message: 'Editors only' }) })
   expect(await saveEntry({ collection: 'posts', slug: 'first', data: { title: 'One', draft: true } }, { create: true })).toMatchObject({ saved: true })
   expect(await submitEntry({ collection: 'posts', slug: 'first' }, { name: 'Wanda', id: 'writer-1', reviewers: [] })).toMatchObject({ saved: true })
 })

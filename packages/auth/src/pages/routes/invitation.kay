@@ -16,12 +16,12 @@ export const accept = action(schemas.id, async ({ id }, ctx) => {
   const auth = ctx.locals.auth
 
   if (!auth.features().organizations)
-    return ctx.fail(404, { error: 'not-found' })
+    return ctx.deny(404, { data: { error: 'not-found' } })
 
   const result = await auth.organizations.acceptInvitation(id)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error.code })
+    return ctx.deny(400, { data: { error: result.error.code } })
 
   const { organization } = result.membership
 
@@ -32,11 +32,11 @@ export const reject = action(schemas.id, async ({ id }, ctx) => {
   const auth = ctx.locals.auth
 
   if (!auth.features().organizations)
-    return ctx.fail(404, { error: 'not-found' })
+    return ctx.deny(404, { data: { error: 'not-found' } })
 
   const result = await auth.organizations.rejectInvitation(id)
 
-  return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error.code })
+  return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.deny(400, { data: { error: result.error.code } })
 })
 
 // Signs the wrong account out and comes back to this link to sign in with the right one.
@@ -44,7 +44,7 @@ export const switchAccount = action(schemas.id, async ({ id }, ctx) => {
   const auth = ctx.locals.auth
 
   if (!auth.features().organizations)
-    return ctx.fail(404, { error: 'not-found' })
+    return ctx.deny(404, { data: { error: 'not-found' } })
 
   const { signInPage, pages, prefix } = auth.features()
   const signIn = localize(signInPage)

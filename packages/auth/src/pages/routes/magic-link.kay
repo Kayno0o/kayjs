@@ -16,7 +16,7 @@ export const spend = action(schemas.token, async ({ token }, ctx) => {
   const result = await ctx.locals.auth.magicLink.signIn(token)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error.code === 'invalid' ? 'link' : result.error.code })
+    return ctx.deny(400, { data: { error: result.error.code === 'invalid' ? 'link' : result.error.code } })
 
   return ctx.redirect(localize(result.redirect))
 })

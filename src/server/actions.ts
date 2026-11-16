@@ -58,7 +58,7 @@ import { overHttps, requestUrl } from './request-url'
 import { guardUrl } from './routes'
 import { readPersonally } from './scope'
 import { carryContext } from './security'
-import { Denied, NotFound, Redirect, stoppers } from './signals'
+import { actionStoppers, Denied, NotFound, Redirect, stoppers } from './signals'
 import { toolSettings } from './tool-settings'
 import { answered, replyTrace, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
@@ -605,7 +605,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     status: (code) => {
       status = code
     },
-    ...stoppers(request),
+    ...actionStoppers(request),
     fail: <Data>(code: number, data?: Data, errors?: FieldErrors) => failure(code, data as Data, errors),
   }
 
@@ -681,7 +681,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
       if (refused.retryAfter !== undefined)
         headers.set('retry-after', String(refused.retryAfter))
 
-      return failed(request, headers, jar.cookies, { action: action.url, status: refused.status, values: submittedValues(context.body), errors: { '': refusalMessage(action, refused), ...refused.errors }, data: refused.data }, context.server, back)
+      return failed(request, headers, jar.cookies, { action: action.url, status: refused.status, values: submittedValues(context.body), errors: { ...refusalMessage(action, refused) !== '' && { '': refusalMessage(action, refused) }, ...refused.errors }, data: refused.data }, context.server, back)
     }
 
     // A mistake, or a service the handler relies on gone down: logged as any server error, and told the visitor beside the form they keep, as a refusal is.

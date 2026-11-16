@@ -14,7 +14,7 @@ export const signIn = action(s.Object({ identifier: s.String({ maxLength: 254 })
   const result = await ctx.locals.auth.password.signIn(input, { redirect: ctx.url.searchParams.get('redirect') ?? '/' })
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error.code })
+    return ctx.deny(400, { data: { error: result.error.code } })
 
   return ctx.redirect(result.redirect)
 })
@@ -53,7 +53,7 @@ export const spend = action(s.Object({ token: s.String() }), async ({ token }, c
   const result = await ctx.locals.auth.magicLink.signIn(token)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error.code })
+    return ctx.deny(400, { data: { error: result.error.code } })
 
   return ctx.redirect(result.redirect)
 })

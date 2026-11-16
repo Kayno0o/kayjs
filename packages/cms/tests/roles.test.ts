@@ -346,24 +346,24 @@ describe('the screens for a site on kayjs-auth', () => {
   }
 
   test('sends an anonymous visitor the app\'s guard turned away with a 401 to its sign-in page, back to this exact page', async () => {
-    configure({ guard: ({ deny }) => deny(401, 'Sign in') })
+    configure({ guard: ({ deny }) => deny(401, { message: 'Sign in' }) })
 
     expect(await visit('/admin/collections/posts?q=a&sort=title')).toBe('/login?redirect=%2Fadmin%2Fcollections%2Fposts%3Fq%3Da%26sort%3Dtitle')
   })
 
   test('leaves a post, a 403 and an app with no sign-in page as the guard answered', async () => {
-    configure({ guard: ({ deny }) => deny(401, 'Sign in') })
+    configure({ guard: ({ deny }) => deny(401, { message: 'Sign in' }) })
     expect(await visit('/admin', 'POST')).toBe(401)
     expect(await visit('/admin', 'GET', () => {
       throw new Error('no sign-in page')
     })).toBe(401)
 
-    configure({ guard: ({ deny }) => deny(403, 'No') })
+    configure({ guard: ({ deny }) => deny(403, { message: 'No' }) })
     expect(await visit('/admin')).toBe(403)
   })
 
   test('a path that would leave the site leads home, not away', async () => {
-    configure({ guard: ({ deny }) => deny(401, 'Sign in') })
+    configure({ guard: ({ deny }) => deny(401, { message: 'Sign in' }) })
 
     expect(await visit('//evil.example/x', 'GET', back => `/login?redirect=${encodeURIComponent(back ?? '/')}`)).toBe('/login?redirect=%2F')
   })

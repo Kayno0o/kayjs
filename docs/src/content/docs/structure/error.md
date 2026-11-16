@@ -5,7 +5,7 @@ description: The page shown when a load or a render throws.
 path: src/routes/_error.kay
 ---
 
-`_error.kay` renders with status 500 when a load or a render throws in its folder and below, and for a 404 with no [`_404.kay`](/structure/not-found). `ctx.deny(403, 'Members only')` renders it too, with that status and message, unless a [status page](#a-page-for-one-status) of that status exists. It reads `ctx.error`.
+`_error.kay` renders with status 500 when a load or a render throws in its folder and below, and for a 404 with no [`_404.kay`](/structure/not-found). `ctx.deny(403, { message: 'Members only' })` renders it too, with that status and message, unless a [status page](#a-page-for-one-status) of that status exists. It reads `ctx.error`.
 
 ```kay
 --- server
@@ -29,7 +29,7 @@ kay waits 10 seconds at most for `onError` after a job or an `onStop` hook, so a
 
 ```kay
 --- server
-// _403.kay, rendered by ctx.deny(403, 'Members only', { plan: 'pro' })
+// _403.kay, rendered by ctx.deny(403, { message: 'Members only', data: { plan: 'pro' } })
 const plan = (ctx.error.data as { plan: string } | undefined)?.plan
 ---
 h1 Upgrade to {plan}

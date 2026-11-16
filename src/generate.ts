@@ -121,7 +121,7 @@ function apiFiles(segments: readonly string[], tests: boolean, auth: boolean): R
 // The test visits a page below the folder, found by `generate`: the stub lets it through, and the assertion is the one to change with the rule.
 function guardFiles(segments: readonly string[], page: string | undefined, tests: boolean, auth: boolean): Record<string, string> {
   const files: Record<string, string> = {
-    [`src/routes/${segments.map(segment => `${segment}/`).join('')}_guard.ts`]: 'import { guard } from \'kay\'\n\n// Runs before every page and action in this folder and below: redirect or deny here, such as `return deny(403, "Admins only")`.\nexport default guard(() => undefined)\n',
+    [`src/routes/${segments.map(segment => `${segment}/`).join('')}_guard.ts`]: 'import { guard } from \'kay\'\n\n// Runs before every page and action in this folder and below: redirect or deny here, such as `return deny(403, { message: "Admins only" })`.\nexport default guard(() => undefined)\n',
   }
 
   if (tests && page !== undefined) {

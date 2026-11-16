@@ -207,7 +207,7 @@ export const ban = action(s.Object({ id: s.String() }), async ({ id }, ctx) => {
   const user = await ctx.locals.auth.requireUser()
 
   if (!auth.isGranted('admin', user))
-    return ctx.fail(403, { error: 'Admins only' })
+    return ctx.deny(403, { data: { error: 'Admins only' } })
 
   await db.repo(Notice).write.deleteMany({ author_id: id })
 })

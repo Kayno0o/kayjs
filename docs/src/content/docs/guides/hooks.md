@@ -46,12 +46,12 @@ import { action, refuse } from 'kay'
 
 export const publish = action(schema, ({ summary }) => {
   if (summary === '')
-    refuse('A summary is needed', { errors: { summary: 'required' } })
+    refuse(422, { message: 'A summary is needed', errors: { summary: 'required' } })
   // ...
 })
 ```
 
-The status is 403 unless you pass `errors`, which makes it 422, or a `status`. The visitor gets it as they get `ctx.fail`: the message at the top of the form, the errors beside their fields, and `data` for your code.
+The status is the first argument, `refuse(409, { message, errors, data })`, and 403 when left out. The visitor gets it as they get `ctx.deny` in an action: the message at the top of the form, the errors beside their fields, and `data` for your code.
 
 A thrown `refuse()` is answered this way in actions, in the `beforeX` hooks of libraries that use `decide()`, and wherever else kay answers `Symbol.for('kay.refused')`, as kayjs-ai does for its limits. Thrown anywhere else, it is an ordinary error and answers 500.
 

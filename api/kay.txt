@@ -24,10 +24,10 @@ interface Action<Input = never, Output = unknown, Honeypot extends string = neve
   with: (fields: Partial<Input>) => Action<Input, Output, Honeypot>
 
 [.] ActionContext
-interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string, Guarded extends object = object> extends RequestContext<Params, Guarded>
+interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string, Guarded extends object = object> extends Omit<RequestContext<Params, Guarded>, 'deny'>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
-  deny: (status?: number | undefined, message?: string | undefined, data?: unknown) => never
-  fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data | undefined, errors?: Partial<Record<"" | Field, string>> | undefined) => Failure<Data>
+  deny: ActionDeny<Field>
+  /** @deprecated `return ctx.deny(status, { data, errors })`. Removed in 1.108; `deprecated-ctx-fail` rewrites it. */ fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data | undefined, errors?: Partial<Record<"" | Field, string>> | undefined) => Failure<Data>
   guard: Guarded
   headers: Headers
   locale: string
@@ -236,7 +236,7 @@ type CallResult<Data, Failed> = | { ok: true, data: Data, error?: undefined } | 
 interface CardPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
   card: { title: string; image?: string | undefined; name?: string | undefined; }
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
-  deny: (status?: number | undefined, message?: string | undefined, data?: unknown) => never
+  deny: Deny
   guard: object
   headers: Headers
   locale: string
@@ -311,6 +311,15 @@ type Deferred<T> = Promise<T>
 [.] defineUi
 function defineUi(config: Readonly<Record<string, UiEntry>>): Readonly<Record<string, UiEntry>>
 
+[.] Deny
+interface Deny
+
+[.] DenyOptions
+interface DenyOptions<Data = unknown, Field extends string = string>
+  data?: Data | undefined
+  errors?: Partial<Record<"" | Field, string>> | undefined
+  message?: string | undefined
+
 [.] describeField
 function describeField(ids: string, options?: DescribeOptions): void
 
@@ -376,7 +385,7 @@ type ErrorData = Register extends { errorData: infer Data } ? Data : unknown
 [.] ErrorPageContext
 interface ErrorPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
-  deny: (status?: number | undefined, message?: string | undefined, data?: unknown) => never
+  deny: Deny
   error: PageError
   guard: object
   headers: Headers
@@ -826,7 +835,7 @@ type PageCache = Duration | 'private' | false | { browser?: Duration, shared?: D
 [.] PageContext
 interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>, Guarded extends object = object> extends RequestContext<Params, Guarded>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
-  deny: (status?: number | undefined, message?: string | undefined, data?: unknown) => never
+  deny: Deny
   guard: Guarded
   headers: Headers
   locale: string
@@ -1140,7 +1149,9 @@ interface Refreshable
   refresh: () => unknown
 
 [.] refuse
-function refuse(message?: string, { status, errors, data }?: RefuseOptions): never
+/** @deprecated `refuse(status, { message, errors, data })`. Removed in 1.108; `deprecated-refuse-call` rewrites it. */
+function refuse(status?: number | undefined, options?: DenyOptions<unknown, string> | undefined): never
+function refuse(message?: string | undefined, options?: RefuseOptions | undefined): never
 
 [.] RefuseOptions
 interface RefuseOptions
@@ -1154,7 +1165,7 @@ interface Register
 [.] RequestContext
 interface RequestContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
-  deny: (status?: number | undefined, message?: string | undefined, data?: unknown) => never
+  deny: Deny
   guard: Guarded
   headers: Headers
   locale: string

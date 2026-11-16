@@ -398,12 +398,12 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
         const handler = async (input: { email: string, wording?: string | undefined }, ctx: ActionContext): Promise<Failure<string> | undefined> => {
           if (!host.configured())
-            return ctx.fail(503, wording('mail.list.notConfigured', 'The form cannot subscribe anyone yet.'))
+            return ctx.deny(503, { data: wording('mail.list.notConfigured', 'The form cannot subscribe anyone yet.') })
 
           const email = normalizeAddress(input.email)
 
           if (email === undefined)
-            return ctx.fail(422, emailError())
+            return ctx.deny(422, { data: emailError() })
 
           // Past three asks an hour for one address, nothing is mailed and the answer stays the same, so the form cannot be used to fill someone's inbox and tells nothing of the address.
           if (await addressLimit.hit(keyedDigest('mail-list', `${name}\n${email}`)) !== undefined)
@@ -434,7 +434,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
           catch (error) {
             log.error('the confirmation mail of a list could not be rendered', error)
 
-            return ctx.fail(502, wording('mail.list.sendFailed', 'Your subscription could not be started. Please try again later.'))
+            return ctx.deny(502, { data: wording('mail.list.sendFailed', 'Your subscription could not be started. Please try again later.') })
           }
 
           // Off the response path, so the answer takes the same time for a new address as for a known one.

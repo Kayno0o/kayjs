@@ -198,7 +198,7 @@ export const signIn = action(credentials, async (input, ctx) => {
   const user = await verify(input)
 
   if (!user)
-    return ctx.fail(401, { message: 'Wrong email or password' })
+    return ctx.deny(401, { data: { message: 'Wrong email or password' } })
 
   await ctx.locals.session.start({ userId: user.id })
   ctx.redirect('/')
@@ -223,7 +223,7 @@ export default guard(({ locals, redirect, deny }) => {
     return redirect('/login')
 
   if (!locals.user.admin)
-    deny(403, 'Admins only')
+    deny(403, { message: 'Admins only' })
 })
 ```
 

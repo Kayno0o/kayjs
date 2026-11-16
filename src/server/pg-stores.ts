@@ -13,7 +13,7 @@ import { lengthMs } from '../runtime/store-base'
 import { maintenance } from './maintenance'
 import { rowsOf } from './pg-jobs'
 import { limited, limitedStore, MAINTENANCE_TIMEOUT_MS } from './pg-limit'
-import { closeWith, TimeoutError } from './pg-poll'
+import { closeWith, PollTimeoutError } from './pg-poll'
 import { NOW, query } from './pg-sql'
 import { compileMatch, matchesSession } from './session'
 import { sha256 } from './sha256'
@@ -43,7 +43,7 @@ export function pgSessions(pg: PgHandle): DeletableSessionStore {
       await limited('sweeping the sessions', sweep, MAINTENANCE_TIMEOUT_MS)
     }
     catch (error) {
-      if (!(error instanceof TimeoutError))
+      if (!(error instanceof PollTimeoutError))
         kayLog('error', 'dropping the expired sessions failed; trying again in an hour', error)
     }
   }
@@ -253,7 +253,7 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
       await limited('sweeping the notifications', async () => counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [Date.now()]), MAINTENANCE_TIMEOUT_MS)
     }
     catch (error) {
-      if (!(error instanceof TimeoutError))
+      if (!(error instanceof PollTimeoutError))
         kayLog('error', 'dropping the expired notifications failed; trying again in an hour', error)
     }
   }

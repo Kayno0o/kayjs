@@ -5,13 +5,13 @@ import { messages } from '../messages'
 import { refusals } from '../testing'
 
 // A reply action that can also refuse, which Chat's `action` must accept.
-export const guarded = action(messages, ({ messages }, ctx) => messages.at(-1)?.content === 'refuse' ? ctx.fail(403, 'Not today') : ask(messages))
+export const guarded = action(messages, ({ messages }, ctx) => messages.at(-1)?.content === 'refuse' ? ctx.deny(403, { message: 'Not today' }) : ask(messages))
 
 // Answers the statuses the test queued, whatever the schema thinks of the history.
 export const refusing = action(messages, ({ messages }, ctx) => {
   const status = refusals.shift()
 
-  return status === undefined ? ask(messages) : ctx.fail(status, status === 422 ? 'That message is refused' : undefined)
+  return status === undefined ? ask(messages) : ctx.deny(status, { data: status === 422 ? 'That message is refused' : undefined })
 })
 
 // An `ask` taking 60 characters of messages, which a Chat given no `maxChars` must learn from the 413.

@@ -1,4 +1,5 @@
 import type { Duration } from '../runtime/duration'
+import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { signedText, signText, useScriptSecret } from './stamp'
 
@@ -22,7 +23,7 @@ function signedValue(use: string, value: string, until: string): string {
 
 function checked(use: unknown, value: unknown): void {
   if (typeof use !== 'string' || typeof value !== 'string')
-    throw new TypeError('kay: signed takes a string `use` and a string `value`')
+    throw new KayError('argument-invalid', 'kay: signed takes a string `use` and a string `value`')
 }
 
 // Under a year, so the expiry stays a plain integer.
@@ -38,7 +39,7 @@ export const signed = {
     const seconds = durationSeconds(options.ttl ?? options.maxAge ?? DEFAULT_TTL, 'signed.sign()\'s ttl')
 
     if (seconds > MAX_SECONDS)
-      throw new RangeError('kay: signed.sign()\'s ttl is at most 1 year (\'52w\')')
+      throw new KayError('argument-invalid', 'kay: signed.sign()\'s ttl is at most 1 year (\'52w\')')
 
     useScriptSecret()
 

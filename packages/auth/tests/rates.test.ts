@@ -2,7 +2,7 @@ import type { AuthStore } from '../src/store'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { memoryRates } from 'kay/server'
 import { setupStore } from '../../../src/server/app-store'
-import { TimeoutError } from '../../../src/server/pg-poll'
+import { PollTimeoutError } from '../../../src/server/pg-poll'
 import { DEFAULT_LIMITS, memoryAuth } from '../src'
 import { log } from '../src/log'
 import { memoryAuthRates } from '../src/rates'
@@ -132,7 +132,7 @@ describe('a rates store that fails', () => {
     const slow = async () => {
       calls++
 
-      throw new TimeoutError('too slow')
+      throw new PollTimeoutError('too slow')
     }
 
     try {

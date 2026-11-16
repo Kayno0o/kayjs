@@ -113,9 +113,9 @@ describe('the encryption of a push (RFC 8291)', () => {
   it('refuses a payload past one record and keys of the wrong size', async () => {
     const browser = await generateVapidKeys()
 
-    await expect(encryptPayload(new Uint8Array(4000), { p256dh: browser.publicKey, auth: toBase64Url(new Uint8Array(16)) })).rejects.toThrow(RangeError)
-    await expect(encryptPayload(new Uint8Array(4), { p256dh: 'AAAA', auth: toBase64Url(new Uint8Array(16)) })).rejects.toThrow(RangeError)
-    await expect(encryptPayload(new Uint8Array(4), { p256dh: browser.publicKey, auth: 'AAAA' })).rejects.toThrow(RangeError)
+    await expect(encryptPayload(new Uint8Array(4000), { p256dh: browser.publicKey, auth: toBase64Url(new Uint8Array(16)) })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(encryptPayload(new Uint8Array(4), { p256dh: 'AAAA', auth: toBase64Url(new Uint8Array(16)) })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(encryptPayload(new Uint8Array(4), { p256dh: browser.publicKey, auth: 'AAAA' })).rejects.toMatchObject({ code: 'argument-invalid' })
   })
 })
 
@@ -245,13 +245,13 @@ describe('sendPush', () => {
   })
 
   it('refuses a title, body, tag, topic or urgency out of bounds, and drops a hostile link', async () => {
-    await expect(sendPush('ada', { title: '' })).rejects.toThrow(RangeError)
-    await expect(sendPush('ada', { title: 'a'.repeat(201) })).rejects.toThrow(RangeError)
-    await expect(sendPush('ada', { title: 'x', body: 'a'.repeat(501) })).rejects.toThrow(RangeError)
-    await expect(sendPush('ada', { title: 'x', tag: 'a'.repeat(65) })).rejects.toThrow(RangeError)
-    await expect(sendPush('ada', { title: 'x' }, { topic: 'bad topic' })).rejects.toThrow(RangeError)
-    await expect(sendPush('ada', { title: 'x' }, { urgency: 'now' as 'high' })).rejects.toThrow(RangeError)
-    await expect(sendPush('', { title: 'x' })).rejects.toThrow(RangeError)
+    await expect(sendPush('ada', { title: '' })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(sendPush('ada', { title: 'a'.repeat(201) })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(sendPush('ada', { title: 'x', body: 'a'.repeat(501) })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(sendPush('ada', { title: 'x', tag: 'a'.repeat(65) })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(sendPush('ada', { title: 'x' }, { topic: 'bad topic' })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(sendPush('ada', { title: 'x' }, { urgency: 'now' as 'high' })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(sendPush('', { title: 'x' })).rejects.toMatchObject({ code: 'argument-invalid' })
 
     const phone = await device('phone')
 

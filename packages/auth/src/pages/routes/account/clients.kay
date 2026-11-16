@@ -9,7 +9,7 @@ import EmptyState from '@kayjs/ui/empty-state.kay'
 import PageSection from '@kayjs/ui/page-section.kay'
 
 export const revoke = action(schemas.oauthClient, async ({ id }, ctx) => {
-  return (await ctx.locals.auth.oauthServer.revokeGrant(id)).ok ? 'revoked' : ctx.fail(404, { error: 'not-found' })
+  return (await ctx.locals.auth.oauthServer.revokeGrant(id)).ok ? 'revoked' : ctx.deny(404, { data: { error: 'not-found' } })
 })
 
 const clients = await ctx.locals.auth.oauthServer.clients()
