@@ -11,10 +11,15 @@ function refused(values: Record<string, string> | undefined, protection?: object
   const target = (() => undefined) as unknown as Record<PropertyKey, unknown>
 
   target[ACTION] = true
-  target.failed = () => values === undefined ? undefined : { values }
+  target.form = { failed: () => values === undefined ? undefined : { values }, error: () => undefined }
   target.protection = protection
 
   return target
+}
+
+// The `form` readers of a stub, to set its messages.
+function readers(target: Record<string, unknown>): Record<string, unknown> {
+  return target.form as Record<string, unknown>
 }
 
 function inside<T>(target: unknown, read: () => T): T {
@@ -172,7 +177,7 @@ describe('formErrors', () => {
   it('reads the messages of the action of the form being rendered, fixed when it was taken', () => {
     const target = refused(undefined) as unknown as Record<string, unknown>
 
-    target.error = (field: string) => field === 'title' ? 'Too short' : undefined
+    readers(target).error = (field: string) => field === 'title' ? 'Too short' : undefined
 
     const read = inside(target, () => formErrors())
 
@@ -185,8 +190,8 @@ describe('formErrors', () => {
     const outer = refused(undefined) as unknown as Record<string, unknown>
     const inner = refused(undefined) as unknown as Record<string, unknown>
 
-    outer.error = () => 'outer'
-    inner.error = () => 'inner'
+    readers(outer).error = () => 'outer'
+    readers(inner).error = () => 'inner'
     expect(inside(outer, () => inside(inner, () => formErrors()('x')))).toBe('inner')
     expect(inside(outer, () => inside('/plain', () => formErrors()('x')))).toBeUndefined()
   })
@@ -195,7 +200,7 @@ describe('formErrors', () => {
     const outer = refused(undefined) as unknown as Record<string, unknown>
     const read = (target: unknown, only: boolean) => formScope(outer, () => formScope(target, () => formErrors()('x'), only), false)
 
-    outer.error = () => 'outer'
+    readers(outer).error = () => 'outer'
 
     expect(read({ label: 'Undo' }, true)).toBe('outer')
     expect(read('/plain', true)).toBe('outer')
@@ -205,7 +210,7 @@ describe('formErrors', () => {
   it('pops the scope when the render throws', () => {
     const target = refused(undefined) as unknown as Record<string, unknown>
 
-    target.error = () => 'kept'
+    readers(target).error = () => 'kept'
 
     expect(() => formScope(target, () => {
       throw new Error('boom')
@@ -220,7 +225,7 @@ describe('formErrors', () => {
   it('answers nothing inside an island\'s own template, though a page form encloses it', () => {
     const target = refused(undefined) as unknown as Record<string, unknown>
 
-    target.error = () => 'page'
+    readers(target).error = () => 'page'
 
     expect(inside(target, () => issueScope(undefined, () => formErrors()('x')))).toBeUndefined()
     expect(inside(target, () => formErrors()('x'))).toBe('page')
