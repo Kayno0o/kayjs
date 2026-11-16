@@ -39,7 +39,7 @@ export function refuse(status?: number, options?: DenyOptions): never
 /** @deprecated `refuse(status, { message, errors, data })`. Removed in 1.108; `deprecated-refuse-call` rewrites it. */
 export function refuse(message?: string, options?: RefuseOptions): never
 export function refuse(first?: number | string, options: { message?: string | undefined, status?: number | undefined, errors?: Partial<Record<string, string>> | undefined, data?: unknown } = {}): never {
-  const named = typeof first !== 'number'
+  const named = typeof first === 'string'
   const { errors = {}, data } = options
   const code = (named ? options.status : first) ?? (Object.keys(errors).length > 0 ? 422 : 403)
   const message = (named ? first : options.message) ?? 'Refused'

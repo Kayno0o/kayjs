@@ -111,3 +111,11 @@ describe('ctx.deny in a page, a guard and an endpoint', () => {
     expect([teapot.status, await teapot.text()]).toEqual([418, 'Short and stout'])
   })
 })
+
+describe('the fixers and refuse', () => {
+  it('reads an undefined status as the status form', () => {
+    const status = undefined as number | undefined
+
+    expect(thrown(() => refuse(status, { message: 'Over', errors: { name: 'x' } }))).toMatchObject({ status: 422, message: 'Over' })
+  })
+})

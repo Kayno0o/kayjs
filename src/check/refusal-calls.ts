@@ -25,12 +25,11 @@ function objectOf(parts: Part[]): string {
 // The edit swapping the arguments from `first` on for the object, or none when a comment sits between them, which the swap would drop.
 function swapArguments(text: string, base: number, call: Call, first: number, parts: Part[]): Edit[] | null {
   const from = call.arguments[first]!
-  const to = call.arguments.at(-1)!
 
-  if (COMMENT.test(text.slice(from.start, to.end)))
+  if (COMMENT.test(text.slice(from.start, call.end)))
     return null
 
-  return [{ start: base + from.start, end: base + to.end, text: objectOf(parts) }]
+  return [{ start: base + from.start, end: base + call.end - 1, text: objectOf(parts) }]
 }
 
 // `ctx.deny(status, 'message', data)`, `ctx.deny(status, { message, data })` since 1.105: a refusal takes the one `{ message, errors, data }` everywhere, as `refuse(status, options)` does.
@@ -47,7 +46,8 @@ function denyCalls({ parsed, report }: Found): void {
       if (data !== undefined && !isUndefined(data))
         parts.push(['data', text.slice(data.start, data.end)])
 
-      report(base + node.start, base + node.end, '`deny(status, message, data)` is `deny(status, { message, data })` since 1.105', 'write the message and the data in one object', swapArguments(text, base, node, 1, parts))
+      // With `data`, an action fails the post as `ctx.fail` did instead of stopping with plain text, so that call is left to the app.
+      report(base + node.start, base + node.end, '`deny(status, message, data)` is `deny(status, { message, data })` since 1.105', 'write the message and the data in one object', data === undefined || isUndefined(data) ? swapArguments(text, base, node, 1, parts) : null)
     })
   }
 }
@@ -60,7 +60,7 @@ function isErrorStatus(node: Node | undefined): boolean {
   return node?.type === 'Literal' && typeof node.value === 'number' && node.value >= 400 && node.value <= 599
 }
 
-// `return ctx.fail(status, data, errors)`, `return ctx.deny(status, { data, errors })` since 1.105: an action refuses as a guard and a page do. A text is the message.
+// `return ctx.fail(status, data, errors)`, `return ctx.deny(status, { data, errors })` since 1.105: an action refuses as a guard and a page do. A text `data` is the form's message, and a call with neither data nor errors is left, as `deny(status)` stops with plain text.
 // Found on `ctx.fail` of a handler's `ctx`; the fix is made where the call is returned, as `deny` throws and `fail` did not.
 function failCalls({ parsed, report }: Found): void {
   for (const { ast, base, text } of parsed) {
@@ -72,7 +72,7 @@ function failCalls({ parsed, report }: Found): void {
       const parts: Part[] = []
 
       if (data !== undefined && !isUndefined(data))
-        parts.push([isText(data) ? 'message' : 'data', text.slice(data.start, data.end)])
+        parts.push(['data', text.slice(data.start, data.end)])
 
       if (errors !== undefined && !isUndefined(errors))
         parts.push(['errors', text.slice(errors.start, errors.end)])
@@ -85,7 +85,7 @@ function failCalls({ parsed, report }: Found): void {
       if (parts.length > 0)
         edits.push({ start: base + status!.end, end: base + node.end - 1, text: `, ${objectOf(parts)}` })
 
-      report(base + node.start, base + node.end, '`ctx.fail(status, data, errors)` is `ctx.deny(status, { data, errors })` since 1.105', 'write `ctx.deny` with the data and the errors in one object', returned && plain ? edits : null)
+      report(base + node.start, base + node.end, '`ctx.fail(status, data, errors)` is `ctx.deny(status, { data, errors })` since 1.105', 'write `ctx.deny` with the data and the errors in one object', returned && plain && parts.length > 0 ? edits : null)
     })
   }
 }

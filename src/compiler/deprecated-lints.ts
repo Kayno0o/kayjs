@@ -436,9 +436,9 @@ export const DEPRECATED_LINTS = {
     group: 'deprecated',
     since: '1.105',
     site: true,
-    summary: '`deny(status, \'message\', data)` of a guard, a page, an action and an endpoint, `deny(status, { message, errors, data })` since 1.105: a refusal takes one object in every place, as `refuse(status, { message, errors, data })` does, so `errors` puts a message on a field and the text is no longer an argument beside the data. An action answers `deny(status, { ... })` as it answers `ctx.fail`: the page again with the fields, or an `ActionError` for a call. The text form works until 1.108. Found on a call of `deny`, bare or read off a name, with a literal status from 400 to 599 and a text second argument, in the TypeScript files and `.kay` files of the project. The fix writes the object, unless a comment sits between the arguments.',
-    wrong: '// src/routes/_guard.ts\nimport { guard } from \'kay\'\n\nexport default guard(({ deny }) => {\n  deny(403, \'Members only\', { plan: \'pro\' })\n})',
-    right: '// src/routes/_guard.ts\nimport { guard } from \'kay\'\n\nexport default guard(({ deny }) => {\n  deny(403, { message: \'Members only\', data: { plan: \'pro\' } })\n})',
+    summary: '`deny(status, \'message\', data)` of a guard, a page, an action and an endpoint, `deny(status, { message, errors, data })` since 1.105: a refusal takes one object in every place, as `refuse(status, { message, errors, data })` does, so `errors` puts a message on a field and the text is no longer an argument beside the data. An action answers `deny(status, { data, errors })` as `ctx.fail`: the page again, or an `ActionError`. The text form works until 1.108. Found on a call of `deny`, bare or read off a name, with a literal status from 400 to 599 and a text second argument, in the TypeScript files and `.kay` files of the project. The fix writes the object, unless a comment sits between the arguments or a `data` is given, which an action answers as a failure, not plain text.',
+    wrong: '// src/routes/_guard.ts\nimport { guard } from \'kay\'\n\nexport default guard(({ deny }) => {\n  deny(403, \'Members only\')\n})',
+    right: '// src/routes/_guard.ts\nimport { guard } from \'kay\'\n\nexport default guard(({ deny }) => {\n  deny(403, { message: \'Members only\' })\n})',
   },
   'deprecated-ctx-fail': {
     level: 'warn',

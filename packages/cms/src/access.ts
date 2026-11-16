@@ -23,10 +23,16 @@ export interface Member {
 
 // A refusal a guard threw (`ctx.deny`, `ctx.redirect`) rather than a fault, found by its status as kay does not export the classes.
 export function refusalStatus(error: unknown): number | undefined {
-  if (typeof error !== 'object' || error === null || error instanceof Error)
+  if (typeof error !== 'object' || error === null)
     return undefined
 
-  const { status } = error as { status?: unknown }
+  // `refuse()` and an action's `ctx.deny(status, { data })` throw an Error carrying the refusal under this symbol.
+  const refused = (error as Record<symbol, { status?: unknown } | undefined>)[Symbol.for('kay.refused')]
+
+  if (error instanceof Error && refused === undefined)
+    return undefined
+
+  const { status } = refused ?? error
 
   return typeof status === 'number' ? status : undefined
 }

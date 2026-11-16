@@ -77,7 +77,7 @@ h1 Todo {id}
 `RequestContext` from `kay` is what a page, a layout, a guard (`GuardContext`), an endpoint (`EndpointContext`) and an action (`ActionContext`) all read, the same in each:
 
 - `request`, `url`, `locale`, `params`, `cookies`, `locals` and `headers`, read as in a page.
-- `redirect(location, status?)`, `notFound()` and `deny(status?, { message, errors, data }?)` (the one refusal of an action, a guard, a page and an endpoint), which throw, written `return redirect(...)` in a guard, an endpoint or an action handler so TypeScript narrows what follows, and as a statement in a page fence; `redirect` answers 302 to a read and 303 to a post unless given a status.
+- `redirect(location, status?)`, `notFound()` and `deny(status?, { message, errors, data }?)` (the one refusal of an action, a guard, a page and an endpoint; only an action reads `errors`), which throw, written `return redirect(...)` in a guard, an endpoint or an action handler so TypeScript narrows what follows, and as a statement in a page fence; `redirect` answers 302 to a read and 303 to a post unless given a status.
 - A page adds `query`, `status`, `failed` and `succeeded`, an action `status` and `fail`; an API route reads Elysia's own context, its guards this one.
 - `params` is the route's, matched as a guard reads them, an action's those of the page it was posted from, and `locale` is the site's `lang` without `i18n` in all of them.
 - `guard` holds what the `_guard.ts` files above the route returned, typed by `kay check`, and `once(key, load)` shares one load between the loads of a request ([Guards](guards.md)).

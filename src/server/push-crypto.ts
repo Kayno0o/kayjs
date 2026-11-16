@@ -1,5 +1,5 @@
-import { KayError } from '../compiler/errors'
 // Web Push on Web Crypto: the payload encryption of RFC 8291 (aes128gcm, RFC 8188) and the VAPID authorization of RFC 8292, with no dependency.
+import { KayError } from '../compiler/errors'
 
 const encoder = new TextEncoder()
 const RECORD_SIZE = 4096
