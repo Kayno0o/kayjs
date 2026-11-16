@@ -169,7 +169,7 @@ effect(() => {
 })
 ---
 div(part="root" ref={element => { root = element }})
-  SidePanel(id={panelId} open={open()} onOpenChange={changed} modal={false} keep title={label} closeLabel={closeLabel} launcher={openLabel} launcherLayer={40} launcherButton={{ openLabel: closeLabel, size: 'lg', variant: 'solid', tone: 'accent', tooltip: 'left' }} style={panelStyle()} data-large={large()} class={{ root: 'kai-launcher-panel', launcher: 'kai-launcher-button size-13 rounded-full border-0 bg-[var(--kai-chat-accent,var(--color-accent))] text-accent-foreground shadow-[0_0.25rem_1rem_rgb(0_0_0/25%)] hover:bg-accent-hover', body: 'kai-launcher-body flex flex-col px-4 pt-2 pb-3', head: 'px-4 py-2', title: 'text-[0.9375rem]' }})
+  SidePanel(id={panelId} open={open()} onOpenChange={changed} modal={false} keep title={label} closeLabel={closeLabel} launcher={openLabel} launcherLayer={40} launcherButton={{ openLabel: closeLabel, size: 'lg', variant: 'solid', tone: 'accent', tooltip: 'left' }} style={panelStyle()} data-large={large()} parts={{ root: 'kai-launcher-panel', launcher: 'kai-launcher-button size-13 rounded-full border-0 bg-[var(--kai-chat-accent,var(--color-accent))] text-accent-foreground shadow-[0_0.25rem_1rem_rgb(0_0_0/25%)] hover:bg-accent-hover', body: 'kai-launcher-body flex flex-col px-4 pt-2 pb-3', head: 'px-4 py-2', title: 'text-[0.9375rem]' }})
     @actions
       BareIconButton(part="new" label={newLabel} size="md" variant="ghost" tone="neutral" data-tooltip-placement="bottom span-left" onClick={startOver})
         | {newIcon}

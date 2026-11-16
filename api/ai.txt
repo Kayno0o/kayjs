@@ -914,6 +914,16 @@ component default
   doneLabel: string
   failedLabel: string
   labels: Record<string, string>
+  parts?: undefined | {
+  root?: string | undefined;
+  list?: string | undefined;
+  call?: string | undefined;
+  summary?: string | undefined;
+  name?: string | undefined;
+  status?: string | undefined;
+  title?: string | undefined;
+  code?: string | undefined;
+}
   pending?: boolean
   resultLabel: string
   runningLabel: string
@@ -958,6 +968,83 @@ component default
   onSuggestion?: ((event: { text: string; }) => unknown) | undefined
   onToolCall?: ((event: { call: AiToolCall; }) => unknown) | undefined
   open?: boolean | undefined
+  parts?: undefined | {
+  root?: string | undefined;
+  conversations?: string | undefined;
+  newConversation?: string | undefined;
+  conversationList?: string | undefined;
+  conversation?: string | undefined;
+  renameField?: string | undefined | {
+    root?: string | undefined;
+    field?: string | undefined;
+    icon?: string | undefined | {
+      root?: string | undefined;
+    };
+  };
+  deleteConfirm?: string | undefined;
+  confirm?: string | undefined;
+  cancel?: string | undefined;
+  conversationLink?: string | undefined;
+  rename?: string | undefined | {
+    root?: string | undefined;
+  };
+  delete?: string | undefined | {
+    root?: string | undefined;
+  };
+  empty?: string | undefined;
+  greeting?: string | undefined;
+  suggestions?: string | undefined;
+  suggestion?: string | undefined;
+  log?: string | undefined;
+  turn?: string | undefined;
+  editField?: string | undefined | {
+    root?: string | undefined;
+  };
+  files?: string | undefined;
+  file?: string | undefined;
+  actions?: string | undefined;
+  save?: string | undefined;
+  approval?: string | undefined;
+  approvalText?: string | undefined;
+  allow?: string | undefined;
+  deny?: string | undefined;
+  text?: string | undefined;
+  reasoning?: string | undefined;
+  reasoningText?: string | undefined;
+  note?: string | undefined;
+  edit?: string | undefined | {
+    root?: string | undefined;
+  };
+  regenerate?: string | undefined | {
+    root?: string | undefined;
+  };
+  thinking?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
+  disclosure?: string | undefined;
+  remove?: string | undefined | {
+    root?: string | undefined;
+  };
+  form?: string | undefined;
+  new?: string | undefined | {
+    root?: string | undefined;
+  };
+  attach?: string | undefined | {
+    root?: string | undefined;
+  };
+  field?: string | undefined | {
+    root?: string | undefined;
+  };
+  record?: string | undefined | {
+    root?: string | undefined;
+  };
+  recordSpinner?: string | undefined | {
+    root?: string | undefined;
+  };
+  send?: string | undefined | {
+    root?: string | undefined;
+  };
+}
   placeholder?: string | undefined
   regenerate?: boolean | undefined
   remember?: string | undefined
@@ -998,6 +1085,18 @@ component default
   newIcon: Element
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   open?: boolean | undefined
+  parts?: undefined | {
+  root?: string | undefined;
+  new?: string | undefined | {
+    root?: string | undefined;
+  };
+  expand?: string | undefined | {
+    root?: string | undefined;
+  };
+  close?: string | undefined | {
+    root?: string | undefined;
+  };
+}
 
 [./chat-sources.kay] default
 component default
@@ -1006,6 +1105,7 @@ component default
   here?: boolean | undefined
   label: string
   newTab?: "auto" | boolean | undefined
+  parts?: undefined | { root?: string | undefined; label?: string | undefined; list?: string | undefined; item?: string | undefined; link?: string | undefined; }
   sources: Source[]
 
 [./chat.kay] default
@@ -1123,6 +1223,83 @@ component default
   onStop?: (() => unknown) | undefined
   onSuggestion?: ((event: { text: string; }) => unknown) | undefined
   onToolCall?: ((event: { call: AiToolCall; }) => unknown) | undefined
+  parts?: undefined | {
+  root?: string | undefined;
+  conversations?: string | undefined;
+  newConversation?: string | undefined;
+  conversationList?: string | undefined;
+  conversation?: string | undefined;
+  renameField?: string | undefined | {
+    root?: string | undefined;
+    field?: string | undefined;
+    icon?: string | undefined | {
+      root?: string | undefined;
+    };
+  };
+  deleteConfirm?: string | undefined;
+  confirm?: string | undefined;
+  cancel?: string | undefined;
+  conversationLink?: string | undefined;
+  rename?: string | undefined | {
+    root?: string | undefined;
+  };
+  delete?: string | undefined | {
+    root?: string | undefined;
+  };
+  empty?: string | undefined;
+  greeting?: string | undefined;
+  suggestions?: string | undefined;
+  suggestion?: string | undefined;
+  log?: string | undefined;
+  turn?: string | undefined;
+  editField?: string | undefined | {
+    root?: string | undefined;
+  };
+  files?: string | undefined;
+  file?: string | undefined;
+  actions?: string | undefined;
+  save?: string | undefined;
+  approval?: string | undefined;
+  approvalText?: string | undefined;
+  allow?: string | undefined;
+  deny?: string | undefined;
+  text?: string | undefined;
+  reasoning?: string | undefined;
+  reasoningText?: string | undefined;
+  note?: string | undefined;
+  edit?: string | undefined | {
+    root?: string | undefined;
+  };
+  regenerate?: string | undefined | {
+    root?: string | undefined;
+  };
+  thinking?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
+  disclosure?: string | undefined;
+  remove?: string | undefined | {
+    root?: string | undefined;
+  };
+  form?: string | undefined;
+  new?: string | undefined | {
+    root?: string | undefined;
+  };
+  attach?: string | undefined | {
+    root?: string | undefined;
+  };
+  field?: string | undefined | {
+    root?: string | undefined;
+  };
+  record?: string | undefined | {
+    root?: string | undefined;
+  };
+  recordSpinner?: string | undefined | {
+    root?: string | undefined;
+  };
+  send?: string | undefined | {
+    root?: string | undefined;
+  };
+}
   placeholder?: string | undefined
   regenerate?: boolean | undefined
   remember?: string | undefined

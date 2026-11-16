@@ -2,7 +2,7 @@
 
 ## Common tasks
 
-A component with parts takes its `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its name, with its import path as the fallback ([Restyle a component from src/ui.ts](../../../llms/styles-and-assets.md#restyle-a-component-from-srcuits)):
+A component with parts takes a `class` string for the root and `parts` as an object of parts, `Card(parts={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its name, with its import path as the fallback ([Restyle a component from src/ui.ts](../../../llms/styles-and-assets.md#restyle-a-component-from-srcuits)):
 
 ```ts
 import { defineUi } from 'kay'
@@ -42,7 +42,7 @@ A variant or value the component lacks is added: `Button(tone="brand")` types an
 
 ### The contract every component keeps
 
-- Every element a component draws that an app could style carries `data-part`, the name its `class` object and `src/ui.ts` take; only hidden inputs, the `slot`, `option`, `datalist`, `script` and `<track>` tags, a FormField's own controls, a chart's visually hidden table, a date grid's `thead` and `tbody`, a Table's spacer and empty rows and a Toaster's message spans go without.
+- Every element a component draws that an app could style carries `data-part`, the name its `parts` object and `src/ui.ts` take; only hidden inputs, the `slot`, `option`, `datalist`, `script` and `<track>` tags, a FormField's own controls, a chart's visually hidden table, a date grid's `thead` and `tbody`, a Table's spacer and empty rows and a Toaster's message spans go without.
 - A state is the ARIA attribute where ARIA has one (`aria-expanded`, `aria-checked`, `aria-selected`, `aria-current`, `aria-pressed`, `aria-busy`, `aria-disabled` or `disabled`), else a named `data-*` attribute (`data-placement`, `data-dragging`, `data-direction`, `data-step`), and never a `data-state` that repeats an ARIA one. Style both from `src/ui.ts` with Tailwind's `aria-selected:` and `data-dragging:` variants.
 - `tests/contract-parts.test.ts` fails for a component with an unmarked element or a state outside this rule.
 - Every component spreads the props it does not name on one element, so `id`, `data-*` and `aria-*` arrive ([basics](basics.md)); `tests/contract-rest.test.ts` fails for one that does not.

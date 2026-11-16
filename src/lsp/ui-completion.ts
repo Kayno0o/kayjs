@@ -162,7 +162,7 @@ const KIND_CLASS = 7
 const KIND_ENUM_MEMBER = 20
 const KIND_VARIABLE = 6
 
-// What the cursor in a `class={{ }}` of `tag`, or in `src/ui.ts` when `tag` is none, may be completed with.
+// What the cursor in a `parts={{ }}` of `tag`, or in `src/ui.ts` when `tag` is none, may be completed with.
 export function uiItems(cursor: ObjectCursor, tag: string | undefined, data: UiData): CompletionItem[] {
   const item = (label: string, kind: number, detail: string): CompletionItem => ({ label, kind, detail })
 

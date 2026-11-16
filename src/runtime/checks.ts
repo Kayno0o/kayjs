@@ -363,7 +363,7 @@ type NonEmpty<Item> = Item extends string ? string extends Item ? never : '' ext
 
 // What a component call spreads for its `class`, merged from its shorthand, `class` and spreads: a `class` that is always a string when a non-empty literal takes part, else one that may be unset, as an optional property so `class?: string` takes it under `exactOptionalPropertyTypes` and a required `class: string` refuses it.
 // A parts object cannot be merged, so it is reported as the `class`.
-export type ComponentClass<List extends readonly unknown[]> = [PartsObject<List[number]>] extends [never] ? [{ [Index in keyof List]: NonEmpty<List[Index]> }[number]] extends [never] ? { class?: string } : { class: string } : { class: { kayError: 'A parts object cannot be merged with a shorthand or a spread: write the root\'s classes as root, class={{ root: "mt-4", head: "p-6" }}' } }
+export type ComponentClass<List extends readonly unknown[]> = [PartsObject<List[number]>] extends [never] ? [{ [Index in keyof List]: NonEmpty<List[Index]> }[number]] extends [never] ? { class?: string } : { class: string } : { class: { kayError: 'A parts object cannot be merged with a shorthand or a spread: give the parts as their own attribute, parts={{ root: "mt-4", head: "p-6" }}' } }
 
 // What the template's control flow and dynamic tags read as in the code the type checker reads: a `for` block is called on the spot with a row of its list, so TypeScript narrows it where the browser build hands accessors.
 export interface TemplateHelpers {

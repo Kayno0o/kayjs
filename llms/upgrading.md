@@ -45,6 +45,10 @@ A component no longer declares `children?: Snippet`, nor an optional block it re
 
 `data-keep-scroll` is `data-scroll="keep"` (`data-keep-scroll="false"` is `data-scroll="top"`), `data-no-transition` is `data-transition="false"` and `data-no-prefetch` is `data-prefetch="false"`, typed on every element, so a wrong value is a `kay check` error; a wrapper another library marks `data-scroll` now keeps its links' scroll. The old names work until 1.108 and `kay check --fix` writes the new ones (`deprecated-link-flags`). A `data-` name one letter from a flag, as `data-prefech`, is the `unknown-link-flag` error.
 
+### A component's parts are the `parts` attribute
+
+`Card(class={{ head: 'p-6' }})` is `Card(parts={{ head: 'p-6' }})`: `class` keeps strings, arrays and objects of conditions, and `parts` holds an entry per part, `root` included, so a shorthand or a spread can sit beside it (`Card.mt-4(parts={{ head: 'p-6' }})`). A component with parts takes both props, and `parts` leaves `...rest` as `class` does. The old form works until 1.108 and `kay check --fix` writes the new one (`deprecated-parts-class`).
+
 ### Websocket frames are always JSON
 
 On an `api()` module, `ws.send(value)` now sends `JSON.stringify(value)` for a string too, and a frame a client sends must be JSON text, so a binary frame from a client is refused too, and one that is not is answered `{ error: { key: 'kay.socket.notJson', fields } }`, and a message failing `body` `{ error: { key: 'kay.socket.invalid', fields } }` where it was dropped before. `deprecated-socket-frames` (`kay check --fix`) rewrites `ws.send(JSON.stringify(x))` to `ws.send(x)`, which sends what it did; a raw `WebSocket` client of your own parses each frame with `JSON.parse` and sends `JSON.stringify(message)`, and `socket()` does both. `rooms().publish` goes out as JSON the same way, a string included.

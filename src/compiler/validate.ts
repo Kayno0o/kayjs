@@ -34,7 +34,7 @@ const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const WHITESPACE = /\s+/
 
 // A `class` member of a props type, as the text of the type: one of its own members, not of a type nested in it.
-const CLASS_MEMBER = /^(?:class|'class'|"class")\??\s*:/
+const CLASS_MEMBER = /^(?:class|'class'|"class"|parts|'parts'|"parts")\??\s*:/
 const MEMBER_START = /[\s{;,]/
 const TYPE_OPENERS = '{[(<'
 const TYPE_CLOSERS = '}])>'
@@ -240,10 +240,10 @@ class Validator {
 
     if (parts) {
       const type = script.props?.type
-      const taken: Span | undefined = script.props?.bindings.find(binding => binding.key === 'class')?.local ?? (type && declaresClass(this.text(type)) ? type : undefined)
+      const taken: Span | undefined = script.props?.bindings.find(binding => binding.key === 'class' || binding.key === 'parts')?.local ?? (type && declaresClass(this.text(type)) ? type : undefined)
 
       if (taken)
-        this.error('part-invalid', taken, 'A component with parts takes `class` from its parts', { note: 'its `class` prop is a string for the root or an object with an entry per part, which a plain `class={className}` would render as the words of the part names', help: 'delete the `class` prop: the compiler types it and merges each entry onto its part' })
+        this.error('part-invalid', taken, 'A component with parts takes `class` from its parts', { note: 'its `class` prop is a string for the root and its `parts` prop an object with an entry per part, which a plain `class={className}` would render as the words of the part names', help: 'delete the prop: the compiler types it and merges each entry onto its part' })
 
       if (parts.root === 'none' && script.recipeRoot === true && script.recipeSpan)
         this.error('part-invalid', script.recipeSpan, 'The recipe styles the root, which the template has no part for', { note: 'the template has no single top element and none is marked `part="root"`, so the root classes would go nowhere', help: 'mark the element that is the root with `part="root"`' })

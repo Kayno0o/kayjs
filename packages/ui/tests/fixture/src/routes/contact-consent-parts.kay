@@ -8,4 +8,4 @@ export const contact = action(...contactForm({ enqueue: async () => undefined as
 import ContactForm from '@kayjs/ui/contact-form.kay'
 ---
 main
-  ContactForm(action={contact} class={{ issues: 'mine-issues', issue: 'mine-issue', consentBox: 'mine-box' }})
+  ContactForm(action={contact} parts={{ issues: 'mine-issues', issue: 'mine-issue', consentBox: 'mine-box' }})

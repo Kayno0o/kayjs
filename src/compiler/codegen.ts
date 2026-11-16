@@ -482,7 +482,7 @@ class ModuleShell {
     })
     const object = `{ ${entries.join('; ')} }`
 
-    const type = `{ class?: ${parts.root === 'none' ? `${object} | { kayError: 'A template with several top elements takes an object of its parts: mark one with part="root" to take a string' }` : `string | ${object}`} | undefined }`
+    const type = `{ class?: ${parts.root === 'none' ? `${object} | { kayError: 'A template with several top elements takes an object of its parts: mark one with part="root" to take a string' }` : `string | ${object}`} | undefined; parts?: ${object} | undefined }`
     const recipe = this.facts.recipe
 
     // The variants of the recipe, typed off it, so the component declares them once.
@@ -886,7 +886,7 @@ class ModuleShell {
 
     if (props.rest) {
       const owned = this.facts.parts?.merges === true
-      const keys = [...props.bindings.map(binding => JSON.stringify(binding.key)), ...owned ? ['"class"'] : [], ...owned && this.facts.recipe !== undefined ? [`...${this.facts.recipe}.variants`] : [], ...owned ? Object.keys(this.facts.ui?.variants ?? {}).map(name => JSON.stringify(name)) : []]
+      const keys = [...props.bindings.map(binding => JSON.stringify(binding.key)), ...owned ? ['"class"', '"parts"'] : [], ...owned && this.facts.recipe !== undefined ? [`...${this.facts.recipe}.variants`] : [], ...owned ? Object.keys(this.facts.ui?.variants ?? {}).map(name => JSON.stringify(name)) : []]
 
       b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${keys.join(', ')});\n`)
     }

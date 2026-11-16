@@ -35,7 +35,7 @@ With Tailwind, `Button(class="px-2")` over the `px-4` a component sets renders `
 
 ### Style a part of a component
 
-`part="head"` names an element, or a component call, inside a component, with no declaration in `props`. The compiler types the component's `class` from its parts: a string goes to the root, the single top element or the one marked `part="root"`, and an object holds an entry per part, merged onto the part after its own classes like any other class ([Override a class a component sets](#override-a-class-a-component-sets)):
+`part="head"` names an element, or a component call, inside a component, with no declaration in `props`. The compiler types the component's `class` and `parts` from its parts: a `class` string goes to the root, the single top element or the one marked `part="root"`, and `parts` is an object with an entry per part, `root` included, merged onto the part after its own classes like any other class ([Override a class a component sets](#override-a-class-a-component-sets)):
 
 ```kay
 ---
@@ -47,12 +47,12 @@ section.rounded.border
     slot
 ```
 
-`Card(title="Hi" class="mt-4")` styles the root, `Card(title="Hi" class={{ root: 'mt-4', head: 'p-6' }})` the root and the head.
+`Card(title="Hi" class="mt-4")` styles the root, `Card(title="Hi" parts={{ root: 'mt-4', head: 'p-6' }})` the root and the head, and both can be written at once.
 
 - A part renders `data-part="head"`, for selectors and `data-[part=head]:` utilities; one name may sit on several elements, every row of a `for`, and inside an `if` or a slot.
-- A part that is a component, `Button(part="action")`, hands its entry to that component's own `class`, a string or an object of its parts: `class={{ action: { icon: 'size-5' } }}`. `data-part` reaches its root through the spread there. Names after the first, `Busy(part="root spinner")`, hand the entries of those parts of this component on as well, under the same names, for a part that sits inside the called component. `kay check` reports a handed part the called component does not name, types its entry as the called component's part takes it, and a page or a layout, which has no class to hand from, refuses one.
-- A parts object cannot sit beside a shorthand or a spread on the call, `Card.mt-4(class={{ head: 'p-6' }})`, as it could be a `{ cls: condition }` one: `kay check` reports it, so write the root's classes as `root`. Any `{ name: string }` object there counts as a parts object, a condition value typed `string` included.
-- `kay check` reports a part named by an expression, an unknown part at a call, a string `class` for a template with several top elements and no `part="root"`, and a component with parts that also destructures `class`, as the compiler owns that prop. `...rest` leaves `class` out.
+- A part that is a component, `Button(part="action")`, hands its entry to that component's own `parts`, a string or an object of its parts: `parts={{ action: { icon: 'size-5' } }}`. `data-part` reaches its root through the spread there. Names after the first, `Busy(part="root spinner")`, hand the entries of those parts of this component on as well, under the same names, for a part that sits inside the called component. `kay check` reports a handed part the called component does not name, types its entry as the called component's part takes it, and a page or a layout, which has no class to hand from, refuses one.
+- `parts` sits beside a shorthand, a spread and a `class` on the call, `Card.mt-4(parts={{ head: 'p-6' }})`. The `class` object of before 1.105 works until 1.108; `deprecated-parts-class` writes `parts`.
+- `kay check` reports a part named by an expression, an unknown part at a call, a string `class` for a template with several top elements and no `part="root"`, and a component with parts that also destructures `class` or `parts`, as the compiler owns those props. `...rest` leaves them out.
 - A page or a layout has no `class` prop: its parts render `data-part` only.
 
 ### Give a component variants
@@ -81,7 +81,7 @@ section
 
 `Card(title="Hi" tone="danger" compact)` renders the danger classes on the root and the head, and the compact ones on the head and the body. A variant with only `true` and `false` values is a boolean prop.
 
-- Classes merge in the order the part's own classes, the recipe's base, its variants in the order they are declared, then the caller's `class`, so `Card(compact class={{ head: 'p-6' }})` gives `p-6` ([Override a class a component sets](#override-a-class-a-component-sets)).
+- Classes merge in the order the part's own classes, the recipe's base, its variants in the order they are declared, then the caller's `class`, so `Card(compact parts={{ head: 'p-6' }})` gives `p-6` ([Override a class a component sets](#override-a-class-a-component-sets)).
 - In an app with Tailwind, a recipe's utility classes are lifted at build: each string becomes one short class (`k1a2b3c4`) whose rule sits in the `utilities.recipe` cascade layer, so the HTML and the island JS carry the short name and no class table entry. The layer beats `components` (theme.css, skins) and loses to Tailwind's utilities, so an app `class` still wins; names with no utility (`kui-*`, `group`) stay as written. A variant's utility replaces the base's at every width (`md:px-4` in the base against `px-8` in a variant gives `px-8` at `md` too), and a `!` utility of the recipe beats an app's. A utility left unlifted (one quoted, holding `;`, or from an `as const` value) stays in `utilities` and beats the lifted variants. A lifted utility's `utilities` rule is cut unless a file, a word the build read or an `@source inline` names it too.
 - The recipe reaches the same parts `class` does: `part="head"` elements, the root, and a part that is a component, which takes its entry as a string. The variant props never reach `...rest`.
 - In an island, a variant changed at runtime swaps its classes. `kay check` reports a value no variant has at the call, `Card(tone="nope")`.
@@ -107,7 +107,7 @@ export default defineUi({
 })
 ```
 
-- Classes merge in the order the part's own, the component's recipe base, its variants, `src/ui.ts`'s parts and variants, then the caller's `class`, so `Card(class={{ head: 'p-8' }})` still wins.
+- Classes merge in the order the part's own, the component's recipe base, its variants, `src/ui.ts`'s parts and variants, then the caller's `class`, so `Card(parts={{ head: 'p-8' }})` still wins.
 - The file is read as it is written at build time and merged into the component's output: the per-page CSS cut sees the final classes, and the parts of an entry without variants are written into the component as static classes, so an island carries nothing for them. It holds string literals and object literals only; a variant reads the component's props and the defaults of its recipe.
 - A name matches the app's components under `src/` and kayjs-ui's. For one two components bear, or one from another package, key the specifier `src/ui.ts` would import it with: `'@kayjs/ui/card.kay'`, `'./components/card.kay'`. `kay check` reports a name no component bears, a name two bear (naming their specifiers) and two keys naming one component.
 - `defineUi` is typed from the components `kay check` writes to `.kay/types/kay-ui.d.ts`: each key completes, and a part, a variant or a value the component lacks fails `bun run check`.

@@ -81,7 +81,7 @@ test('thresholds colour the fill by the first step holding the value, in any ord
   expect(await fill(95, [{ upTo: 70, tone: 'success' }])).toEqual([null, true, false, false, false])
 })
 
-test('class={{ fill }} still replaces a threshold\'s colour', async () => {
+test('parts={{ fill }} still replaces a threshold\'s colour', async () => {
   const fill = (await mount('meter', { value: 40, thresholds: [{ upTo: 100, tone: 'success' }], class: { fill: 'bg-info' } })).querySelector('[data-part=fill]')!
 
   expect(fill.classList.contains('bg-info')).toBe(true)

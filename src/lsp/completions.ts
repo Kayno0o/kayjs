@@ -83,7 +83,7 @@ export async function templateCompletion(host: LspHost, { textDocument, position
   return items.length > 0 || context.wanted.kind === 'ui' ? { isIncomplete: false, items } : undefined
 }
 
-// The parts, variants and tokens src/ui.ts and a `class={{ }}` complete from, read from the component files and the theme.
+// The parts, variants and tokens src/ui.ts and a `parts={{ }}` complete from, read from the component files and the theme.
 export async function uiData(project: Project, document?: Document, tag?: string): Promise<UiData> {
   const tokens = themeTokens(project.root)
 

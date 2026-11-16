@@ -85,7 +85,7 @@ const fakeAction = new Proxy(Object.assign(async () => undefined, { url: '/_kay/
 const feed = infiniteList([{ id: 1 }], { limit: 1, key: row => row.id, load: async () => undefined })
 ---
 //- Renders components `src/ui.ts` restyles, for the library's restyle test.
-Card#card(title="Hi" class={{ body: 'p-9' }}) Body
+Card#card(title="Hi" parts={{ body: 'p-9' }}) Body
 Button#plain(label="Plain" tone="danger")
 Button#busy(label="Busy" variant="inline" icon="info" onClick={() => undefined})
 Button#link(label="Link" href="/" variant="inline")
@@ -143,7 +143,7 @@ CollapsibleSection#section-fold(title="More")
   p body
 Widget#widget(title="Orders" icon="info")
   p body
-Meter#meter(label="Disk" value={40} class={{ fill: 'bg-red-500' }})
+Meter#meter(label="Disk" value={40} parts={{ fill: 'bg-red-500' }})
 Popover#popover(open={false})
   @trigger(attributes)
     button({...attributes}) Open

@@ -63,6 +63,7 @@ function at(marked: string) {
 describe('class objects of a component call', () => {
   it('finds the parts of the component the object is on, in one line and across lines', () => {
     expect(at('Card(class={{ | }})')).toMatchObject({ kind: 'ui', tag: 'Card', cursor: { path: [], at: 'key' } })
+    expect(at('Card(parts={{ he| }})')).toMatchObject({ kind: 'ui', tag: 'Card', replaced: 'he' })
     expect(at('Card(class={{ he| }})')).toMatchObject({ kind: 'ui', replaced: 'he' })
     expect(at('Card(\n  title="a"\n  class={{\n    head: \'p-6\',\n    |\n  }}\n)')).toMatchObject({ kind: 'ui', tag: 'Card', cursor: { at: 'key' } })
     expect(at('li: Card(class={{ head: \'p-6 --kui-bo| }})')).toMatchObject({ kind: 'ui', cursor: { at: 'string', key: 'head' }, replaced: '--kui-bo' })

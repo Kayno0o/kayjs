@@ -8,7 +8,7 @@ Put `NavigationProgress` once in the layout, with no props: it follows `navigati
 
 ## Options
 
-`pending` replaces `navigation.pending()` for a bar that stands for some other wait. `tone` is `accent` (default), `neutral`, `success`, `warning`, `danger` or `info`. `onShow` and `onHide` hear the bar come and go. `class={{ root: 'h-1' }}` restyles the root, `fixed inset-x-0 top-0 h-0.5`, and `bar` the sliding bar.
+`pending` replaces `navigation.pending()` for a bar that stands for some other wait. `tone` is `accent` (default), `neutral`, `success`, `warning`, `danger` or `info`. `onShow` and `onHide` hear the bar come and go. `parts={{ root: 'h-1' }}` restyles the root, `fixed inset-x-0 top-0 h-0.5`, and `bar` the sliding bar.
 
 ## The followed link
 

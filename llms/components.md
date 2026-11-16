@@ -27,7 +27,7 @@ li(class={size})
 
 ### Let a caller style the parts of a component
 
-`part="head"` on an element, or a component call, lets the caller style it by name: `Card(class={{ root: 'mt-4', head: 'p-6' }})`, or a string for the root. The component declares nothing, see [Style a part of a component](styles-and-assets.md#style-a-part-of-a-component).
+`part="head"` on an element, or a component call, lets the caller style it by name: `Card(parts={{ root: 'mt-4', head: 'p-6' }})`, or a string for the root. The component declares nothing, see [Style a part of a component](styles-and-assets.md#style-a-part-of-a-component).
 
 ### Give a component variants
 

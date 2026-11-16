@@ -28,7 +28,7 @@ async function problems(page: string, route = 'src/routes/index.kay', config = t
   try {
     await Promise.all(Object.entries({ 'tsconfig.json': config, ...COMPONENTS, [route]: page }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
-    return (await check(root)).map(diagnostic => diagnostic.message.slice(0, diagnostic.message.includes('\n') ? diagnostic.message.indexOf('\n') : undefined)).filter(message => !message.includes('is declared but'))
+    return (await check(root)).map(diagnostic => diagnostic.message.slice(0, diagnostic.message.includes('\n') ? diagnostic.message.indexOf('\n') : undefined)).filter(message => !message.includes('is declared but') && !message.includes('since 1.105, `class` keeping'))
   }
   finally {
     await rm(root, { recursive: true, force: true })
@@ -42,7 +42,7 @@ async function positions(page: string, config = tsconfig): Promise<string[]> {
   try {
     await Promise.all(Object.entries({ 'tsconfig.json': config, ...COMPONENTS, 'src/routes/index.kay': page }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
-    return (await check(root)).filter(diagnostic => !diagnostic.message.includes('is declared but')).map(diagnostic => `${diagnostic.line}:${diagnostic.column}`)
+    return (await check(root)).filter(diagnostic => !diagnostic.message.includes('is declared but') && !diagnostic.message.includes('since 1.105, `class` keeping')).map(diagnostic => `${diagnostic.line}:${diagnostic.column}`)
   }
   finally {
     await rm(root, { recursive: true, force: true })
@@ -74,6 +74,13 @@ describe('kay check on a part handed to a called component', () => {
 describe('kay check on a component with parts', () => {
   it('passes a string for the root, an object of parts, and a nested object for a part that is a component', async () => {
     expect(await problems(`${IMPORTS}Card(class="mt-4") a\nCard(class={{ root: 'mt-4', head: 'p-6' }}) b\nPair(class={{ top: 'a', bottom: 'b' }})\nPanel(class={{ card: { head: 'p-2' }, root: 'x' }})\nPanel(class={{ card: 'mt-2' }})\n`)).toEqual([])
+  })
+
+  it('takes the parts as their own attribute, beside a shorthand, a spread and a class string, and reports an unknown or mistyped part', async () => {
+    expect(await problems(`${IMPORTS}Card.mt-4(parts={{ root: 'mt-4', head: 'p-6' }}) a\nCard({...rest} class="mt-2" parts={{ head: 'p-6' }}) b\nPair(parts={{ top: 'a', bottom: 'b' }})\nPanel(parts={{ card: { head: 'p-2' }, root: 'x' }})\nPanel(parts={{ card: 'mt-2' }})\n`)).toEqual([])
+    expect(await problems(`${IMPORTS}Card(parts={{ foot: 'p-6' }}) a\n`)).toEqual([expect.stringContaining('foot')])
+    expect(await problems(`${IMPORTS}Panel(parts={{ card: { foot: 'p-6' } }})\n`)).toEqual([expect.stringContaining('foot')])
+    expect(await problems(`${IMPORTS}Plain(parts={{ head: 'p-6' }})\n`)).not.toEqual([])
   })
 
   it('takes a part class that may be undefined under exactOptionalPropertyTypes', async () => {

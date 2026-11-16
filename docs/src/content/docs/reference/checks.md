@@ -212,6 +212,7 @@ Each lint has a level. `deny` is an error (the eight that ship a broken page, su
 | `deprecated-island-attributes` | warn | deprecated | `hydrate="client"` on a component call is `render="client"`, and `server="defer"` is `server defer`, since 1.105: `hydrate` is only when an island hydrates. The old forms work until 1.108. The fix rewrites the attribute. |
 | `deprecated-children-prop` | warn | deprecated | `children?: Snippet` in a component's props type beside a bare `slot`, since 1.105: a `slot` takes the children of a call with no declaration, typed from the template, and `children: Snippet` still requires them. The old declaration works until 1.108. Found in a props type written inline when the script reads no `children` prop. The fix removes the member. |
 | `deprecated-link-flags` | warn | deprecated | `data-keep-scroll`, `data-no-transition` and `data-no-prefetch`, since 1.105 `data-scroll="keep"`, `data-transition="false"` and `data-prefetch="false"`, named as the options of `navigate()`. The old names work until 1.108. The fix writes the new attribute. |
+| `deprecated-parts-class` | warn | deprecated | The parts of a component given as its `class`, `parts` since 1.105: `Card(class={{ head: 'p-6' }})` is `Card(parts={{ head: 'p-6' }})`. The old form works until 1.108. The fix writes `parts` for `class`. |
 
 ## Errors
 

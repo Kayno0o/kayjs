@@ -16,7 +16,7 @@ A function or a block with parameters makes the Meter an island on the page that
 
 ## Colors by threshold
 
-`thresholds={[{ upTo: 70, tone: 'success' }, { upTo: 90, tone: 'warning' }, { upTo: Infinity, tone: 'danger' }]}` colors the fill by the first step whose `upTo` is at least the value, in any order; a value past every step keeps the accent. The fill carries `data-tone` for your CSS. `class={{ fill: 'bg-warning' }}` styles the fill alone and replaces its color, for a rule of your own. The old `fillClass` prop still works and goes in 2.0.0.
+`thresholds={[{ upTo: 70, tone: 'success' }, { upTo: 90, tone: 'warning' }, { upTo: Infinity, tone: 'danger' }]}` colors the fill by the first step whose `upTo` is at least the value, in any order; a value past every step keeps the accent. The fill carries `data-tone` for your CSS. `parts={{ fill: 'bg-warning' }}` styles the fill alone and replaces its color, for a rule of your own. The old `fillClass` prop still works and goes in 2.0.0.
 
 <Demo name="meter/thresholds" />
 

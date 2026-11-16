@@ -211,7 +211,7 @@ Its header has a New conversation button, which clears the log and the kept hist
 
 <ReadMore href="/llms/kayjs-ai-chat-launcher">What the launcher takes of `Chat`, how its panel opens, closes and keeps the conversation, and its sizes.</ReadMore>
 
-Every element is a part that keeps its `kai-` class and takes utilities from `src/ui.ts` or a `class` object, `defineUi({ '@kayjs/ai/chat.kay': { parts: { send: 'size-12' } } })` or `Chat(class={{ log: 'max-h-96' }})`; a `class` string restyles the root.
+Every element is a part that keeps its `kai-` class and takes utilities from `src/ui.ts` or a `parts` object, `defineUi({ '@kayjs/ai/chat.kay': { parts: { send: 'size-12' } } })` or `Chat(parts={{ log: 'max-h-96' }})`; a `class` string restyles the root.
 
 - `chat.kay`: `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `note`, `status`, `disclosure`, `form`, `field`, `send` and `retry` (the Try again button, shown only after a failed reply).
 - `chat-calls.kay` (the tool calls): `root`, `summary`, `list`, `call`, `name`, `status`, `title` and `code`.

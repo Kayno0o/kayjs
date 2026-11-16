@@ -18,6 +18,7 @@ import { retiredAllowComments } from './deprecated-allow'
 import { deprecatedChildrenProp } from './deprecated-children'
 import { deprecatedIslandAttributes, deprecatedIslandForms, islandProblems } from './deprecated-island'
 import { deprecatedPageSettings } from './deprecated-page'
+import { deprecatedPartsClass } from './deprecated-parts'
 import { spelledOutScriptFence } from './deprecated-script-fence'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { openRedirects } from './fence-redirects'
@@ -376,7 +377,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...spelledOutScriptFence(file), ...retiredAllowComments(source), ...deprecatedIslandForms(file, script), ...deprecatedIslandAttributes(file), ...deprecatedChildrenProp(file, script), ...linkFlags(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script, island !== undefined), ...malformedInteractive(script))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...spelledOutScriptFence(file), ...retiredAllowComments(source), ...deprecatedIslandForms(file, script), ...deprecatedIslandAttributes(file), ...deprecatedChildrenProp(file, script), ...linkFlags(file), ...deprecatedPartsClass(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script, island !== undefined), ...malformedInteractive(script))
   }
 
   if (checked && pin !== undefined)

@@ -17,7 +17,7 @@ export type Wanted
     | { kind: 'value', tag: string, name: string }
     // A line start: block keywords and element names, or after `@` the blocks of the component the line is under.
     | { kind: 'line', slotOf?: string | undefined }
-    // The key or the string the cursor is in inside the `class={{ }}` object of a component call.
+    // The key or the string the cursor is in inside the `parts={{ }}` object of a component call.
     | { kind: 'ui', tag: string, cursor: ObjectCursor }
 
 export interface TemplateContext {
@@ -45,7 +45,7 @@ const QUOTED = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g
 // How many lines above the cursor an attribute list opened on may start.
 const MAX_ATTRIBUTE_LINES = 40
 const VALUE_BEFORE = /(?:^|[\s(,])([\w:-]+)=["']([^"'{}]*)$/
-const CLASS_OBJECT = /\bclass=\{\{/g
+const CLASS_OBJECT = /\b(?:class|parts)=\{\{/g
 const COMPONENT_LINE = /^\s*([A-Z][\w$]*)/
 
 // `templateStart` is where the template begins, past the fences: line starts and attributes mean something there only. Strings and comments are found anywhere.
@@ -140,7 +140,7 @@ function valueContext(source: string, lineStart: number, prefix: string, offset:
   return { wanted: { kind: 'value', tag, name }, replace: { start: offset - found[2]!.length, end: offset + after } }
 }
 
-// The `class={{ }}` object of a component call the cursor is in: its keys are the component's parts.
+// The `parts={{ }}` object of a component call the cursor is in: its keys are the component's parts.
 function classObject(source: string, offset: number, after: number): TemplateContext | undefined {
   let from = source.lastIndexOf('\n', offset - 1) + 1
 
@@ -316,7 +316,7 @@ export interface TemplateData {
   // The attribute and event names TypeScript gives a plain element, and the words it gives the attribute a `value` completion is in.
   intrinsic?: string[] | undefined
   values?: string[] | undefined
-  // The parts, variants and tokens of the components a `class={{ }}` or `src/ui.ts` is completed from.
+  // The parts, variants and tokens of the components a `parts={{ }}` or `src/ui.ts` is completed from.
   ui?: UiData | undefined
 }
 

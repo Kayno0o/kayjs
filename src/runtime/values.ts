@@ -231,16 +231,29 @@ function taggedParts(parts: Record<string, unknown>): Parts {
   return Object.defineProperty({ ...parts }, PARTS, { value: true })
 }
 
-// What a component's `class` prop gives a part: a string, or an array, is the root's, and an object holds one entry per part, its own object when that part is a component.
+// What a component's `class` and `parts` props give a part: a `class` string, or array, is the root's, and an object holds one entry per part, its own object when that part is a component. The `class` object is the form before 1.105, still read and overridden by `parts`.
 export function partClass(props: unknown, part: string): unknown {
-  const value = (props as { class?: unknown } | undefined)?.class
+  const { class: value, parts } = (props ?? {}) as { class?: unknown, parts?: unknown }
+  const own = (from: unknown): unknown => {
+    if (typeof from !== 'object' || from === null || Array.isArray(from))
+      return part === 'root' && from === value ? from : undefined
 
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    return part === 'root' ? value : undefined
+    const entry = Object.hasOwn(from, part) ? (from as Record<string, unknown>)[part] : undefined
 
-  const entry = Object.hasOwn(value, part) ? (value as Record<string, unknown>)[part] : undefined
+    return typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
+  }
+  const given = own(value)
+  const added = typeof parts === 'object' && parts !== null ? own(parts) : undefined
 
-  return typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
+  if (given === undefined || added === undefined)
+    return added ?? given
+
+  if (isParts(given) && isParts(added))
+    return mergeParts([given, added])
+
+  const joins = (entry: unknown) => typeof entry === 'string' || Array.isArray(entry)
+
+  return joins(given) && joins(added) ? [given, added] : added
 }
 
 // Whether a property and its value make one declaration: the value holds no comment start outside its strings, and what is left once its strings and parentheses are taken out holds no `;`, `{`, `}`, quote, parenthesis or backslash, which would add declarations or swallow the next.

@@ -33,6 +33,7 @@ const files: Record<string, string> = {
   '_layout.kay': 'main.p-2(part="page") page\n',
   'client.kay': '--- client\nlet count = 0\n---\nsection.card\n  header(part="head") {count}\n',
   'node_modules/uilib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n',
+  'calls-parts.kay': '---\nimport Card from \'./card.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Hands from \'./hands.kay\'\n---\nCard.mt-4(title="short" parts={{ head: \'p-6\' }}) a\nCard(title="root" class="mt-2" parts={{ root: \'mt-6\', body: \'p-8\' }}) b\nSpread(title="s" parts={{ root: \'p-9\' }} id="s")\nPanel(parts={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nHands(parts={{ root: \'p-6\', spinner: \'size-5\' }})\nHands(class={{ spinner: \'size-5\' }} parts={{ spinner: \'size-7\' }})\n',
   'calls.kay': '---\nimport Card from \'./card.kay\'\nimport Rows from \'./rows.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Rooted from \'./rooted.kay\'\nimport Wrapper from \'./wrapper.kay\'\nimport Hands from \'./hands.kay\'\nimport Library from \'uilib/card.kay\'\nconst built = [\'p-\', \'8\'].join(\'\')\n---\nCard(title="string" class="mt-4") a\nCard(title="parts" class={{ root: \'mt-6\', head: \'p-6\', body: built }}) b\nCard(title="plain")\nRows(rows={[\'x\', \'y\']} open class={{ item: \'p-8\', open: \'text-lg\' }})\nRows(rows={[]} open={false} class="gap-2")\nSpread(title="s" class={{ root: \'p-9\' }} id="s")\nPanel(class={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nPlain(class="given")\nRooted(class={{ top: \'t\', root: \'r\' }})\nWrapper(class="outer")\nHands(class={{ root: \'p-6\', spinner: \'size-5\' }})\nHands(class={{ root: { spinner: \'size-7\' }, spinner: \'size-5\' }})\nHands(class="p-8")\nLibrary(title="lib" class={{ head: \'p-6\' }})\n',
 }
 
@@ -101,6 +102,17 @@ describe('a component with parts, on the server', () => {
     expect(html).toContain('<button class="btn p-6" data-part="root"><span class="spin size-5" data-part="spinner">wait</span></button>')
     expect(html).toContain('<button class="btn" data-part="root"><span class="spin size-5 size-7" data-part="spinner">wait</span></button>')
     expect(html).toContain('<button class="btn p-8" data-part="root"><span class="spin" data-part="spinner">wait</span></button>')
+  })
+
+  it('takes the parts of a call from its own attribute, beside a shorthand and a class string, and still reads the object form of class', async () => {
+    const html = await render('calls-parts.kay')
+
+    expect(html).toContain('<section class="card p-4 mt-4"><header class="p-6" data-part="head">short</header>')
+    expect(html).toContain('<section class="card p-4 mt-2 mt-6"><header class="p-2" data-part="head">root</header><div class="p-8" data-part="body">b</div></section>')
+    expect(html).toContain('<article id="s" data-part="root" class="box p-9">s</article>')
+    expect(html).toContain('<section class="panel m-2"><section class="card p-4 m-1"><header class="p-9" data-part="head">t</header>')
+    expect(html).toContain('<button class="btn p-6" data-part="root"><span class="spin size-5" data-part="spinner">wait</span></button>')
+    expect(html).toContain('<button class="btn" data-part="root"><span class="spin size-5 size-7" data-part="spinner">wait</span></button>')
   })
 
   it('leaves a component without parts alone, class prop and all', async () => {
