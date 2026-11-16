@@ -39,7 +39,7 @@ main
   Table#table(columns={columns} rows={[{ id: 1, name: 'Io' }]} rowKey="id" selectable filter={['name']})
   div#narrow-table(style="width: 15rem")
     Table(columns={sortable} rows={[{ id: 1, name: 'Io' }]} rowKey="id" narrow="stack")
-  Toggle#toggle(label="Toggle")
+  Toggle(inputProps={{ id: "toggle" }} label="Toggle")
   ScatterChart#scatter(label="Games" points={[{ key: 1, label: 'Hades', x: 10, y: 90 }]})
   ImageCropper#cropper(src="/photo.png")
   Pagination#pager(page={2} pages={3} url="/borders")

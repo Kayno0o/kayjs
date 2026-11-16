@@ -6,6 +6,7 @@ import { addDays, addMonths, clampDate, dayName, firstDayOf, isDate, monthTitle,
 import { fieldRef } from './form-reset'
 import Icon from './icon.kay'
 import Popover from './popover.kay'
+import { controlProps } from './control-props'
 import TextInput from './text-input.kay'
 import { pageLocale, wording } from 'kay/words'
 
@@ -27,7 +28,7 @@ const look = recipe({
   },
 })
 
-const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), unavailableLabel = wording('ui.dateInput.unavailable', 'This date is not available'), disabledDay, day, open, onOpenChange, onMonthChange, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
+const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), unavailableLabel = wording('ui.dateInput.unavailable', 'This date is not available'), disabledDay, day, open, onOpenChange, onMonthChange, onInput, onChange, inputProps, ...restProps } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
   // The box's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -61,10 +62,13 @@ const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Cho
   onInput?: ((event: { value: string }) => unknown) | undefined
   // Called with the new date, or `''` once emptied, however it was set: typed, picked in the calendar or reset by a form.
   onChange?: ((event: { value: string }) => unknown) | undefined
+  // Attributes of the input itself, after the ones the component names; `id`, `data-*`, `title` and the other attributes it is given go on its root.
+  inputProps?: JSX.IntrinsicElements['input'] | undefined
 }>()
 
 // A box with no callback is plain: a refused post of its form, which the server renders it for, gives its date back in place of its own.
-const sent = onInput || onChange ? undefined : postedValue(rest.name, value)
+const { root: rootProps, field } = controlProps(restProps, inputProps)
+const sent = onInput || onChange ? undefined : postedValue(field.name, value)
 
 // The calendar is drawn once the island runs, so the server renders the plain date field alone and a form posts it without JavaScript.
 const ready = signal(false)
@@ -84,11 +88,11 @@ const first = () => firstDay ?? firstDayOf(pageLocale())
 const weeks = memo(() => monthWeeks(cursor(), first()))
 const names = memo(() => weekdays(pageLocale(), first()))
 
-const ref = fieldRef<HTMLInputElement>(element => box = element, rest.ref)
+const ref = fieldRef<HTMLInputElement>(element => box = element, field.ref)
 
 // A FormField wraps the control in its label, so the calendar button's name would join the input's: the input is named by the label's own text instead.
 effect(() => {
-  if (!ready() || rest['aria-label'] !== undefined || rest.label !== undefined || rest['aria-labelledby'] !== undefined)
+  if (!ready() || field['aria-label'] !== undefined || field.label !== undefined || field['aria-labelledby'] !== undefined)
     return
 
   const labelText = box?.closest('label')?.querySelector('.kui-label-text')
@@ -266,13 +270,13 @@ function focusLeft(event: FocusEvent) {
 const canStepBack = () => !isDate(min) || addMonths(cursor(), -1).slice(0, 7) >= min.slice(0, 7)
 const canStepOn = () => !isDate(max) || addMonths(cursor(), 1).slice(0, 7) <= max.slice(0, 7)
 ---
-div(ref={element => root = element})
-  TextInput({...rest} part="input" type="date" ref={ref} min={min} max={max} value={sent ?? value} onInput={live} onChange={heard})
+div({...rootProps} ref={element => root = element})
+  TextInput({...field} part="input" type="date" ref={ref} min={min} max={max} value={sent ?? value} onInput={live} onChange={heard})
   if ready()
     // The panel's click is cancelled so a FormField's label, which holds it in the DOM, does not move focus to the field and close the calendar.
     Popover(part="panel" open={opened()} label={openLabel} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft} onClick={event => event.preventDefault()})
       @trigger(attributes)
-        button({...attributes} part="trigger" type="button" aria-label={openLabel} disabled={rest.disabled || rest.readonly})
+        button({...attributes} part="trigger" type="button" aria-label={openLabel} disabled={Boolean(field.disabled || field.readonly)})
           Icon(icon="calendar")
       div(part="head")
         button(part="step" type="button" data-direction="previous" aria-label={previousLabel} disabled={!canStepBack()} onClick={() => go(addMonths(cursor(), -1))})

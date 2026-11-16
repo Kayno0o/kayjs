@@ -24,4 +24,4 @@ form#form
   IconPicker#icon(items={icons} name="icon" onChange={onIcon})
   TimeInput#time(name="time" onInput={({ value }) => onTimeInput(value)} onChange={() => undefined})
   TimeInput#required(name="required" value="10:00" required onInput={({ value }) => onRequiredInput(value)})
-  DateInput#date(name="date" onInput={({ value }) => onDateInput(value)})
+  DateInput(inputProps={{ id: "date" }} name="date" onInput={({ value }) => onDateInput(value)})

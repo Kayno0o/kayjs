@@ -34,7 +34,7 @@ button#open-switcher(onClick={() => switcher = true}) Open switcher
 button#anchor(onClick={event => anchor = event.currentTarget}) Anchor
 button#clear(onClick={() => anchor = null}) Clear
 MultiSelect(id="multi" label="Planets" options={planets} open={multi()} onOpenChange={({ open: shown }) => { calls.push(`multi ${shown}`); multi = shown }})
-DateInput(id="date" aria-label="Day" open={date()} onOpenChange={({ open: shown }) => { calls.push(`date ${shown}`); date = shown }})
+DateInput(inputProps={{ id: 'date' }} aria-label="Day" open={date()} onOpenChange={({ open: shown }) => { calls.push(`date ${shown}`); date = shown }})
 DateRangeInput(label="Stay" onOpenChange={({ open: shown, box }) => calls.push(`range ${box} ${shown}`)})
 DateRangeInput(label="Held" open={range()} onOpenChange={({ open: shown, box }) => { calls.push(`held ${box} ${shown}`); if (!shown) range = false }})
 Combobox(label="Planet" options={planets} open={combo()} onOpenChange={({ open: shown }) => { calls.push(`combo ${shown}`); combo = shown }})

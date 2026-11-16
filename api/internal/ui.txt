@@ -818,6 +818,9 @@ function monthStarts(days: readonly string[]): { column: number; label: string; 
 [./lib/contribution] steppedCell
 function steppedCell(key: string, index: number, count: number): number | undefined
 
+[./lib/control-props] controlProps
+function controlProps(props: object, inputProps?: object | undefined): { root: Record<string, unknown>; field: Record<string, unknown>; }
+
 [./lib/controlled-checkbox] controlledCheckbox
 function controlledCheckbox({
   control, checked, onChange, start, settled, appRef

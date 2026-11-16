@@ -6,6 +6,8 @@ const SRC = join(import.meta.dir, '../src')
 // The props a component does not name: a rest element of the destructured props, or the variable `without(props, ...)` is assigned to where the component reads them through one name.
 const REST_ELEMENT = /\.\.\.(\w+)\s*\}\s*=\s*props\b/
 const WITHOUT = /const\s+(\w+)\s*=\s*without\(/
+// A control splitting its props into the root's and the input's: the root's is what its template has to spread.
+const CONTROL = /const\s*\{\s*root(?::\s*(\w+))?,\s*field\s*\}\s*=\s*controlProps\(/
 
 // Components an app places on the page take `id`, `data-*` and `aria-*` through the props they do not name, spread on one element of their template.
 const components = readdirSync(SRC).filter(file => file.endsWith('.kay'))
@@ -14,7 +16,8 @@ describe('every component takes the attributes of its root element', () => {
   for (const file of components) {
     it(file, () => {
       const source = readFileSync(join(SRC, file), 'utf8')
-      const name = REST_ELEMENT.exec(source)?.[1] ?? WITHOUT.exec(source)?.[1]
+      const control = CONTROL.exec(source)
+      const name = control ? (control[1] ?? 'root') : REST_ELEMENT.exec(source)?.[1] ?? WITHOUT.exec(source)?.[1]
 
       expect(name, `${file} keeps no \`...rest\` of its props`).toBeDefined()
 

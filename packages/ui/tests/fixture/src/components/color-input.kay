@@ -9,10 +9,10 @@ const light = signal('#ff8800')
 ---
 form#form
   h2#tint-heading Tint heading
-  ColorInput#light(label="Light" name="light" value={light()} onInput={({ value }) => onInput?.(value)} onChange={({ value }) => onChange ? onChange(value) : light = value})
-  ColorInput#named(label="Accent" name="named" aria-label="Accent colour of the theme" value="#445566")
-  ColorInput#labelled(label="Tint" name="labelled" aria-labelledby="tint-heading" value="#778899")
-  ColorInput#locked(label="Locked" name="locked" value="#112233" disabled)
+  ColorInput(inputProps={{ id: "light" }} label="Light" name="light" value={light()} onInput={({ value }) => onInput?.(value)} onChange={({ value }) => onChange ? onChange(value) : light = value})
+  ColorInput(inputProps={{ id: "named" }} label="Accent" name="named" aria-label="Accent colour of the theme" value="#445566")
+  ColorInput(inputProps={{ id: "labelled" }} label="Tint" name="labelled" aria-labelledby="tint-heading" value="#778899")
+  ColorInput(inputProps={{ id: "locked" }} label="Locked" name="locked" value="#112233" disabled)
   button#set(type="button" onClick={() => light = '#00ff00'}) Set
   button#upper(type="button" onClick={() => light = '#ABCDEF'}) Upper
   button#invalid(type="button" onClick={() => light = 'red'}) Invalid

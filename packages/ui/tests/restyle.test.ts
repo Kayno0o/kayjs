@@ -305,7 +305,7 @@ describe('the buttons and fields whose recipe holds their look', () => {
   test('the consent box of a ContactForm is a Checkbox and its messages draw the FormField ones, from the same utilities', () => {
     const start = html.indexOf('data-part="consent"')
     const consent = html.slice(start, html.indexOf('data-part="issues"', start))
-    const classOf = (part: string) => consent.match(new RegExp(`class="([^"]*)" data-part="${part}"`))?.[1]
+    const classOf = (part: string) => consent.match(new RegExp(`class="([^"]*)" data-part="${part}"`))?.[1] ?? consent.match(new RegExp(`data-part="${part}"[^>]* class="([^"]*)"`))?.[1]
 
     expect(classOf('root')).toBe(CHECKBOX.root)
     expect(consent.match(/<input[^>]*class="([^"]*)"/)?.[1]).toStartWith(CHECKBOX.input)

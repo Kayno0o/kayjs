@@ -14,6 +14,6 @@ function hold() {
 }
 ---
 form
-  Slider#level(label="Level" min={0} max={100} step={10} value={50} onChange={hold})
+  Slider(inputProps={{ id: "level" }} label="Level" min={0} max={100} step={10} value={50} onChange={hold})
   button#next(type="button") Next
   button#release(type="button" onClick={() => release()}) Release

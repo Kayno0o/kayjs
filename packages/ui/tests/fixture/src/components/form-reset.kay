@@ -44,7 +44,7 @@ const choices = [{ value: 'x', label: 'X' }, { value: 'y', label: 'Y' }, { value
 form#form
   Checkbox(name="agree" label="Agree" checked={agree()} onChange={({ checked }) => agree = checked})
   Toggle(name="power" label="Power" checked={power()} onChange={({ checked }) => power = checked})
-  Checkbox#free(label="Free" onChange={({ checked }) => free = checked})
+  Checkbox(inputProps={{ id: "free" }} label="Free" onChange={({ checked }) => free = checked})
   ChipGroup(label="Decks" name="decks" options={options} value={decks()} onChange={({ value }) => decks = value})
   Segmented(label="Size" name="size" options={sizes} value={size()} onChange={({ value }) => size = value})
   Segmented(label="Sort" name="sort" options={sizes} value={sort()} onChange={({ value }) => sort = value})

@@ -8,6 +8,7 @@ import { afterPause, isRemote, searchOptions } from './options-source'
 import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
 import { defaultKept, fieldRef, onFormReset } from './form-reset'
 import { wording } from 'kay/words'
+import { controlProps } from './control-props'
 import { labelText } from './label-text'
 import Icon from './icon.kay'
 import type { IconProps } from 'kay/icons'
@@ -30,7 +31,7 @@ const look = recipe({
   },
 })
 
-const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, showLabel = false, name, minLength = 1, create = false, createLabel, loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), empty, failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
+const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, showLabel = false, name, minLength = 1, create = false, createLabel, loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), empty, failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, inputProps, ...restProps } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
   // The input's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -76,6 +77,8 @@ const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, 
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // Draws each row in place of its label and description: `@option(option)`. The row stays named by the option's `label`, and the input shows the label once it is picked.
   option?: Snippet<[option: ComboboxOption<Value>]> | undefined
+  // Attributes of the input itself, after the ones the component names; `id`, `data-*`, `title` and the other attributes it is given go on its root.
+  inputProps?: JSX.IntrinsicElements['input'] | undefined
 }>()
 
 const listId = id ?? uid()
@@ -127,7 +130,7 @@ effect(() => {
 
 // A FormField wraps the control in its label, so the status line and the rows would join the input's name: it is named by the label's own text instead, and so is the list.
 effect(() => {
-  if (!enhanced() || label !== undefined || rest['aria-labelledby'] !== undefined)
+  if (!enhanced() || label !== undefined || field['aria-labelledby'] !== undefined)
     return
 
   const labelText = input?.closest('label')?.querySelector('.kui-label-text')
@@ -363,22 +366,23 @@ onFormReset(() => input, () => {
   active = -1
 })
 
+const { root, field } = controlProps(restProps, inputProps)
 const ref = fieldRef<HTMLInputElement>((element) => {
   input = element
   keepInvalid(element, () => invalid)
-}, rest.ref)
+}, field.ref)
 // The heading's id while `showLabel` writes it, which then names the control in place of `aria-label`.
 const heading = showLabel && label ? uid() : undefined
 ---
 snippet box()
-  div(part="root")
+  div({...root} part="root")
     if icon
       Icon(icon={icon} part="icon")
     input(
       part="input"
       data-icon={icon ? '' : undefined}
-      {...rest}
-      data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']}
+      {...field}
+      data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? field['aria-invalid']}
       ref={ref}
       type="text"
       role="combobox"
@@ -388,7 +392,7 @@ snippet box()
       disabled={disabled}
       list={!remote && !enhanced() ? `${listId}-native` : undefined}
       aria-label={heading ? undefined : label}
-      aria-labelledby={heading ?? rest['aria-labelledby']}
+      aria-labelledby={heading ?? field['aria-labelledby']}
       aria-expanded={shown() ? 'true' : 'false'}
       aria-controls={listId}
       aria-autocomplete="list"

@@ -36,8 +36,8 @@ form#form
   ChipGroup#decks(label="Decks" name="decks" options={options} value={decks()} onChange={({ value }) => told('chips', decks.set)(value)})
   Toggle(name="published" label="Published" checked={published()} onChange={({ checked }) => told('toggle', published.set)(checked)})
   Segmented#sharing(label="Sharing" name="sharing" options={shares} value={sharing()} onChange={({ value }) => told('segmented', sharing.set)(value)})
-  Checkbox#all(label="Select all" indeterminate={mixed()} onChange={() => mixed = false})
+  Checkbox(inputProps={{ id: "all" }} label="Select all" indeterminate={mixed()} onChange={() => mixed = false})
   button#mix(type="button" onClick={() => mixed = true}) Mix
-  Checkbox#kept(label="Some" indeterminate)
+  Checkbox(inputProps={{ id: "kept" }} label="Some" indeterminate)
 Segmented#zoom(label="Zoom" name="zoom" options={ranges} value={zoom()} onChange={({ value }) => zoom = value})
 button#unzoom(type="button" onClick={() => zoom = null}) Unzoom

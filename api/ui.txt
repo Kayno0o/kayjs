@@ -1150,6 +1150,7 @@ component default
 }
   hint?: number | string | undefined
   indeterminate?: boolean | undefined
+  inputProps?: HtmlAttributes<"input"> | undefined
   invalid?: boolean | undefined
   issue?: string | undefined
   label?: string | undefined
@@ -1230,6 +1231,7 @@ component default
 [./color-input.kay] default
 component default
   class?: string | undefined | { root?: string | undefined; input?: string | undefined; label?: string | undefined; value?: string | undefined; }
+  inputProps?: HtmlAttributes<"input"> | undefined
   invalid?: boolean | undefined
   label: string
   onChange?: ((event: { value: string; }) => unknown) | undefined
@@ -1262,6 +1264,7 @@ component default
   failureLabel?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id?: string | undefined
+  inputProps?: HtmlAttributes<"input"> | undefined
   invalid?: boolean | undefined
   label?: string | undefined
   loadingLabel?: string | undefined
@@ -1482,6 +1485,7 @@ component default
   day?: ((iso: string, state: { selected: boolean; today: boolean; outside: boolean; disabled: boolean; }) => Element) | undefined
   disabledDay?: ((iso: string) => boolean) | undefined
   firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined
+  inputProps?: HtmlAttributes<"input"> | undefined
   invalid?: boolean | undefined
   label?: string | undefined
   max?: string | undefined
@@ -2913,6 +2917,7 @@ component default
 component default
   class?: string | undefined | { root?: string | undefined; label?: string | undefined; input?: string | undefined; value?: string | undefined; }
   formatValue?: ((value: number) => string) | undefined
+  inputProps?: HtmlAttributes<"input"> | undefined
   invalid?: boolean | undefined
   label: string
   max?: number | undefined
@@ -3450,6 +3455,7 @@ component default
   issue?: string | undefined;
 }
   hint?: number | string | undefined
+  inputProps?: HtmlAttributes<"input"> | undefined
   invalid?: boolean | undefined
   issue?: string | undefined
   label?: string | undefined

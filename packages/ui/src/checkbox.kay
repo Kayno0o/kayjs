@@ -4,6 +4,7 @@ import { effect, postedChecked, recipe, uid, untrack } from 'kay'
 import { controlledCheckbox } from './controlled-checkbox'
 import { CHECKBOX, FIELD_MESSAGE, fieldInvalid, keepInvalid } from './field-look'
 import { fieldIssueList, fieldNamed } from './forms'
+import { controlProps } from './control-props'
 import { without } from './props-without'
 
 const look = recipe({ parts: { root: CHECKBOX.root, input: CHECKBOX.input, label: CHECKBOX.label, hint: CHECKBOX.hint, field: 'inline-flex flex-col items-start gap-1', issues: FIELD_MESSAGE.issues, issue: FIELD_MESSAGE.issue } })
@@ -30,17 +31,27 @@ const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'c
   // A promise holds the box busy until it settles, and puts it back where it was when it rejects (logged) or resolves to false: a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   onChange?: ((event: { checked: boolean }) => unknown) | undefined
+  // Attributes of the input itself, after the ones the component names; `id`, `data-*`, `title` and the other attributes it is given go on its root.
+  inputProps?: JSX.IntrinsicElements['input'] | undefined
 }>()
 
 // Read through `given`, never destructured, so each prop stays live; `name` is read once, as the field a control posts as.
 const name = given.name
-const rest = without(given, 'checked', 'indeterminate', 'label', 'showLabel', 'hint', 'name', 'issue', 'invalid', 'onChange', 'class', ...look.variants)
+const { root, field } = controlProps(without(given, 'inputProps', 'checked', 'indeterminate', 'label', 'showLabel', 'hint', 'name', 'issue', 'invalid', 'onChange', 'class', ...look.variants), given.inputProps)
 const showLabel = given.showLabel ?? true
 
 let box: HTMLInputElement | undefined
 
-const sent = given.onChange ? undefined : postedChecked(name, rest.value as string | number | undefined, given.checked ?? false)
+const sent = given.onChange ? undefined : postedChecked(name, field.value as string | number | undefined, given.checked ?? false)
+// Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.error('terms')}` does.
+>>>>>>> 952f6a1 (feat(ui): a control keeps id and data-* on its root, the input takes inputProps)
+=======
+const sent = given.onChange ? undefined : postedChecked(name, field.value as string | number | undefined, given.checked ?? false)
 // Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.form.error('terms')}` does.
+=======
+const sent = given.onChange ? undefined : postedChecked(name, field.value as string | number | undefined, given.checked ?? false)
+// Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.error('terms')}` does.
+>>>>>>> 952f6a1 (feat(ui): a control keeps id and data-* on its root, the input takes inputProps)
 const shown = name !== undefined || 'issue' in given
 const checking = shown || 'invalid' in given
 // A FormField naming the same field shows its messages itself.
@@ -62,7 +73,7 @@ const { on, busy, ref, change } = controlledCheckbox({
   },
   // The click cleared it, whatever the parent still says.
   settled: input => input.indeterminate = given.indeterminate ?? false,
-  appRef: rest.ref,
+  appRef: field.ref,
 })
 
 // A property only, which no attribute sets.
@@ -73,8 +84,8 @@ effect(() => {
 ---
 // A native checkbox, so it submits inside a form and the keyboard and screen readers know it. A click while a change is under way ticks nothing.
 snippet control()
-  label(part="root")
-    input({...rest} aria-label={rest['aria-label'] || (showLabel ? undefined : given.label)} name={name} part="input" ref={ref} type="checkbox" checked={on()} aria-invalid={fieldInvalid(marked) ?? rest['aria-invalid']} aria-describedby={[rest['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
+  label({...root} part="root")
+    input({...field} aria-label={field['aria-label'] || (showLabel ? undefined : given.label)} name={name} part="input" ref={ref} type="checkbox" checked={on()} aria-invalid={fieldInvalid(marked) ?? field['aria-invalid']} aria-describedby={[field['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
     if given.label && showLabel
       span(part="label") {given.label}
     if given.hint !== undefined
