@@ -1,4 +1,4 @@
-import { AWAIT_FAILED } from './await-failed'
+import { AWAIT_FAILED, AWAIT_FAILED_KEY } from './await-failed'
 import { blockIn, islandOf, Region, release, swap } from './dom'
 import { getOwner, onCleanup, renderEffect, reportError, runWithOwner, unrecorded, untrack } from './reactive'
 import { isSnapshots, readSnapshots } from './snapshots'
@@ -11,11 +11,12 @@ const FRAME_MS = 16
 
 // What a block with no `catch` and no `try` around it shows once its value rejects, as the server writes it.
 function failure(): HTMLElement {
-  const alert = document.createElement('p')
+  const alert = document.createElement('span')
 
+  alert.className = 'kay-await-failed'
   alert.setAttribute('role', 'alert')
   alert.setAttribute('data-kay-await-failed', '')
-  alert.textContent = wording('kay.await.failed', AWAIT_FAILED)
+  alert.textContent = wording(AWAIT_FAILED_KEY, AWAIT_FAILED)
 
   return alert
 }

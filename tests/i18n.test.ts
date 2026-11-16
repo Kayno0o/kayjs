@@ -195,6 +195,9 @@ describe('locale prefixes', () => {
     expect((await get('/en')).html).toContain('<p class="called">Read &lt;b>our story, &lt;img src=x onerror=1>, or THE DOCS OF &lt;IMG SRC=X ONERROR=1>.</p>')
     expect(islandMessages('T(key="intro" name={name})\nT(name={name} key=\'rich.other\')\np {t(\'nav.home\')}')).toBe(', ["intro","rich.other","nav.home"]')
     expect(islandMessages('const text = T(\'intro\', { name })\nconst more = T( "rich.other")')).toBe(', ["intro","rich.other"]')
+    // An island with an await block ships the key of its alert, so the browser words it as the server does.
+    expect(islandMessages('p {t(\'nav.home\')}\nawait rows then list\n  p {list.length}')).toBe(', ["nav.home","kay.await.failed"]')
+    expect(islandMessages('p {t(\'nav.home\')}\n')).toBe(', ["nav.home"]')
   })
 
   it('write dir="rtl" on a page in a locale written right to left, and nothing on one written left to right', async () => {

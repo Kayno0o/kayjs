@@ -17,6 +17,7 @@ import { isPageFile, pageDirs } from '../build/page-dirs'
 import { mentionsServerOnly } from '../build/server-only'
 import { importedSignals } from '../build/signals'
 import { browserRole, onceReadChecks } from '../compiler'
+import { RETIRED_LINTS } from '../compiler/deprecated-allow'
 import { moduleChecks, turnsCaptchaOff } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
@@ -294,6 +295,9 @@ function lintConfigProblems(root: string, lints: LintLevels = {}): CheckDiagnost
 
   return levelEntries(lints).flatMap(([name, level]) => {
     const at = { file, ...locate(['lints', name]) }
+
+    if (RETIRED_LINTS.has(name))
+      return []
 
     if (!isLint(name) && !isLintGroup(name))
       return [{ ...at, message: `\`lints\` names \`${name}\`, which is no lint or group`, help: '`kay explain` lists them' }]

@@ -211,15 +211,11 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           if (!block.failed)
             report(rejectedAt(block, error))
 
-          if (!failed) {
-            // What came before the failure stays; with nothing shown yet, the pending block goes.
-            if (!shown)
-              write(block.id, EMPTY, false)
-
+          // What came before the failure stays.
+          if (!failed && shown)
             return
-          }
 
-          const rendered = renderOrReport(() => failed(error), report, render, block.id)
+          const rendered = renderOrReport(() => (failed ?? block.alert)(error), report, render, block.id)
 
           write(block.id, rendered, false)
           await Promise.all(rendered.deferred.map(send))
@@ -263,7 +259,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
   })
 }
 
-// The `then` block once the value resolves, or with an iterable's last part, or the `catch` block once it rejects; without one, the error is reported and the enclosing `try`'s `catch` renders, or the pending block just goes away.
+// The `then` block once the value resolves, or with an iterable's last part, or the `catch` block once it rejects; without one, the error is reported and the enclosing `try`'s `catch` renders, or the alert.
 // A block that throws while rendering is a bug in the page, not the value failing, so it is reported rather than shown as `catch`.
 export async function settle(block: PendingBlock, cancelled: () => boolean, report: (error: unknown) => void, render: (view: () => unknown, salt?: string) => Rendered = renderBlock): Promise<Rendered> {
   let value: { value: unknown } | undefined
@@ -275,9 +271,9 @@ export async function settle(block: PendingBlock, cancelled: () => boolean, repo
     if (!block.failed)
       report(rejectedAt(block, error))
 
-    const failed = block.failed ?? block.fallback
+    const failed = block.failed ?? block.fallback ?? block.alert
 
-    return failed ? renderOrReport(() => failed(error), report, render, block.id) : EMPTY
+    return renderOrReport(() => failed(error), report, render, block.id)
   }
 
   if (cancelled() || value === undefined)

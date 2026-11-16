@@ -2095,9 +2095,61 @@ describe('an await block with no catch, in an island', () => {
       await settle()
       expect(root.querySelector('p.text')).toBeNull()
       expect(root.querySelector('p.failed')!.textContent).toBe('Late')
-      // Without a try, nothing replaces the block, and the error is reported.
+      // Without a try, an alert replaces the block, and the error is reported.
       expect(root.querySelector('p.bare')).toBeNull()
+      const alert = root.querySelector('span.kay-await-failed')!
+
+      expect(alert.getAttribute('role')).toBe('alert')
+      expect(alert.hasAttribute('data-kay-await-failed')).toBe(true)
+      expect(alert.textContent).toBe('This could not be loaded; try again later')
       expect(errors.mock.calls.map(call => (call[0] as Error).message).sort()).toEqual(['Inner', 'Late', 'Late'])
+    }
+    finally {
+      errors.mockRestore()
+      await dispose()
+    }
+  })
+})
+
+describe('the alert of an await block with no catch, in an island', () => {
+  const mountWords = site({
+    'main.kay': '---\n---\nawait Promise.reject(new Error(\'Down\')) then value\n  p {value}\n',
+  })
+  const mountChild = site({
+    'child.kay': '---\n---\nawait Promise.reject(new Error(\'Child\')) then value\n  p {value}\n',
+    'main.kay': '---\nimport Child from \'./child.kay\'\n---\ntry\n  Child\ncatch\n  p.caught Caught\n',
+  })
+
+  it('is worded by the catalog the page ships under kay.await.failed', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+    const payload = document.createElement('script')
+
+    payload.type = 'application/json'
+    payload.setAttribute('data-kay-i18n', '')
+    payload.textContent = JSON.stringify({ locale: 'fr', messages: { 'kay.await.failed': 'Chargement impossible, réessayez plus tard' } })
+    document.head.append(payload)
+
+    const { root, dispose } = await mountWords()
+
+    try {
+      await settle()
+      expect(root.querySelector('span.kay-await-failed')!.textContent).toBe('Chargement impossible, réessayez plus tard')
+    }
+    finally {
+      payload.remove()
+      errors.mockRestore()
+      await dispose()
+    }
+  })
+
+  it('replaces an await in a component, not the catch of a try around the component, as the try reads its own template', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+    const { root, dispose } = await mountChild()
+
+    try {
+      await settle()
+      expect(root.querySelector('p.caught')).toBeNull()
+      expect(root.querySelector('span.kay-await-failed')!.getAttribute('role')).toBe('alert')
     }
     finally {
       errors.mockRestore()

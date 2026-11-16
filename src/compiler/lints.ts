@@ -1,5 +1,6 @@
 import type { AllowRules } from './allow-comments'
 import type { Diagnostic, ElementNode, ForNode, KayFile, TextChunk } from './ast'
+import type { RetiredLint } from './deprecated-allow'
 import type { Scope } from './template-scopes'
 import { accessibilityLints, MARKUP_LINTS } from './a11y'
 import { allowComments, honoured, refusedComments } from './allow-comments'
@@ -693,7 +694,7 @@ export type LintName = keyof typeof LINTS
 
 // `satisfied` is set by kay from the extensions' `satisfies`, never written in `kay.config.ts`: the lints an extension answers for a place it fills in by itself.
 // `comments` is no lint's level: it sets what a `// kay-allow` comment must hold to count.
-export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>> & { satisfied?: LintName[] | undefined, comments?: AllowRules | undefined }
+export type LintLevels = Partial<Record<LintName | LintGroup | RetiredLint, LintLevel>> & { satisfied?: LintName[] | undefined, comments?: AllowRules | undefined }
 
 export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
 
@@ -782,16 +783,7 @@ export function applyLints(diagnostics: Diagnostic[], source: string, levels: Li
 }
 
 function unknownLints(source: string): Diagnostic[] {
-  const unknown: Diagnostic[] = []
-
-  for (const comment of allowComments(source)) {
-    for (const { name, start } of comment.names) {
-      if (!isLint(name) && !RETIRED_LINTS.has(name))
-        unknown.push({ start, end: start + name.length, code: 'unknown-lint', message: `Unknown lint \`${name}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })
-    }
-  }
-
-  return unknown
+  return allowComments(source).flatMap(comment => comment.names.filter(({ name }) => !isLint(name) && !RETIRED_LINTS.has(name)).map(({ name, start }): Diagnostic => ({ start, end: start + name.length, code: 'unknown-lint', message: `Unknown lint \`${name}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })))
 }
 
 // The template's own lints: what it can say from the markup alone.

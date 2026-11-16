@@ -13,7 +13,7 @@ let cases = 0
 const reported: unknown[] = []
 let app: Awaited<ReturnType<typeof pages>>
 
-const ALERT = '<p role="alert" data-kay-await-failed>This could not be loaded; try again later</p>'
+const ALERT = '<span class="kay-await-failed" role="alert" data-kay-await-failed>This could not be loaded; try again later</span>'
 const FENCE = '--- server\nconst { value } = props<{ value: Promise<string> }>()\n---\n'
 
 async function load<P extends object = object>(source: string): Promise<(props: P) => JSX.Element> {
@@ -169,14 +169,14 @@ describe('compiling an await block with no catch', () => {
 })
 
 describe('renderToString with an await block with no catch', () => {
-  it('renders the catch block of the try around it, and an alert with none', async () => {
+  it('renders the catch block of the try around it, and fails with none', async () => {
     const guarded = await load<{ value: Promise<string> }>(`${FENCE}try\n  await value then text\n    p {text}\ncatch\n  p Unavailable`)
     const silent = await load<{ value: Promise<string> }>(`${FENCE}try\n  await value then text\n    p {text}\np after`)
     const bare = await load<{ value: Promise<string> }>(`${FENCE}await value then text\n  p {text}`)
 
     expect(await renderToString(guarded, { value: Promise.reject(new Error('down')) })).toBe('<p>Unavailable</p>')
     expect(await renderToString(silent, { value: Promise.reject(new Error('down')) })).toBe('<p>after</p>')
-    expect(await renderToString(bare, { value: Promise.reject(new Error('down')) })).toBe(ALERT)
+    await expect(renderToString(bare, { value: Promise.reject(new Error('down')) })).rejects.toThrow('down')
   })
 
   it('renders the catch block of the try around an await nested in a then block', async () => {

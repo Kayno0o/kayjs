@@ -150,6 +150,8 @@ catch
 
 Without `catch`, a rejection renders the `catch` of the nearest `try` around the block, and with no `try` shows a short alert in its place; the error is reported at its `await` line either way.
 
+The alert is `<span class="kay-await-failed" role="alert" data-kay-await-failed>`, which you style by its class or attribute. Word it under the `kay.await.failed` message; an island that has an `await` carries the message too. `renderToString` has no page to show it on, so it fails instead.
+
 On a prerendered page the block resolves at build. The page is written with the settled content, a visitor never sees `Loading comments`, and a slow value makes the build wait. `kay build` warns of such a block with its page and line, and names a page that waited a second or more. To show the pending content, put the block in a client island or a deferred server island (`server="defer"`), or render the page per request with `prerender: false`.
 
 Islands inside a streamed block hydrate when it lands. A form inside one is checked and sent by kay as one in the page is, with the page's locale words and its proof-of-work challenge.

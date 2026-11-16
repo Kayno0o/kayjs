@@ -43,31 +43,31 @@ import { configGroups } from './config-groups'
 import { configSwitches } from './config-switches'
 import { contextImport } from './context-import'
 import { ownFile } from './diagnose'
-
 import { endpointExports } from './endpoint-exports'
+
 import { envFiles } from './env-files'
-
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
+
 import { formatDurationNumbers } from './format-duration'
-
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
-import { guardOptions } from './guard-options'
 
+import { guardOptions } from './guard-options'
 import { unguardedRoutes, unguardedTools } from './guards'
+
 import { hookContext } from './hook-context'
 import { hookNames } from './hook-names'
 import { i18nKeys } from './i18n-keys'
 import { imagesKeys } from './images-keys'
-
 import { islandOnlyComponents } from './island-only'
-import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 
+import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 import { largePublicImages } from './large-images'
 
 import { liveApi } from './live-api'
-import { mailApi } from './mail-api'
 
+import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
+
 import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
 import { unreadOpenSettings } from './open-settings'
 import { pagesOptions } from './pages-options'
@@ -75,6 +75,7 @@ import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { rateEnforce } from './rate-enforce'
 import { refusalCalls } from './refusal-calls'
 import { removedUiTokens } from './removed-ui-tokens'
+import { retiredLintLevels } from './retired-lints'
 import { routeShadow, routeShadowPath } from './route-shadow'
 import { schemaType } from './schema-type'
 import { secretKeys } from './secret-keys'
@@ -218,6 +219,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => configSwitches(root, options),
   async ({ root, options }) => imagesKeys(root, options),
   async ({ root, options }) => clientKeys(root, options),
+  async ({ root, options }) => retiredLintLevels(root, options),
   async ({ root, options }) => configGroups(root, options),
   async ({ root, options }) => i18nKeys(root, options),
   async ({ root, options }) => secretKeys(root, options),

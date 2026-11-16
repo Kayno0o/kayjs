@@ -13,7 +13,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### An `await` with no `catch` shows an alert
 
-A rejected `await` block with no `catch` and no `try` around it used to remove its pending block and show nothing; it renders `<p role="alert" data-kay-await-failed>` now (the `kay.await.failed` message), so the `uncaught-await` lint is gone. `deprecated-uncaught-await` (`kay check --fix`) removes a `// kay-allow uncaught-await` comment. `AwaitProps` of `kay` no longer has `fallback`, the compiler's own channel for a `try`'s `catch`.
+A rejected `await` block with no `catch` and no `try` around it used to remove its pending block and show nothing; it renders `<span class="kay-await-failed" role="alert" data-kay-await-failed>` now (the `kay.await.failed` message), so the `uncaught-await` lint is gone. `deprecated-uncaught-await` (`kay check --fix`) removes a `// kay-allow uncaught-await` comment, and a `lints: { 'uncaught-await': ... }` entry of kay.config.ts. `AwaitProps` of `kay` no longer has `fallback`, the compiler's own channel for a `try`'s `catch`.
 
 ### A `for` over rows with no `id` needs a `key` in every component
 

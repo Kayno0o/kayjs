@@ -2712,6 +2712,24 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports the retired `uncaught-await` entry of `lints` as deprecated, not unknown or a type error, and its fix removes the line', async () => {
+    const config = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lints: {\n    \'uncaught-await\': \'allow\',\n    \'missing-alt\': \'allow\',\n  },\n})\n'
+    const root = await scratchProject({ 'kay.config.ts': config, 'src/routes/index.kay': 'p home\n' })
+
+    try {
+      const found = (await check(root, { lints: { 'uncaught-await': 'allow', 'missing-alt': 'allow' } })).filter(d => d.file === join(root, 'kay.config.ts'))
+
+      expect(found.map(d => [d.code, d.line])).toEqual([['deprecated-uncaught-await', 5]])
+      expect(found[0]!.fixes?.[0]?.safe).toBe(true)
+
+      await applySafeFixes(root, found)
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(config.replace('    \'uncaught-await\': \'allow\',\n', ''))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a lint or a level `lints` names that kay does not have once, in kay\'s words rather than also as a type error', async () => {
     const root = await scratchProject({ 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lints: { \'no-such-lint\': \'deny\', \'missing-alt\': \'denyy\' } })\n' })
 
@@ -4359,6 +4377,28 @@ describe.concurrent('kay check, unused code', () => {
       const found = (await check(root)).filter(d => d.code === 'unkeyed-rows')
 
       expect(found.map(d => [basename(d.file), d.line]).toSorted()).toEqual([['inner.kay', 4], ['shared.kay', 4], ['types.kay', 10], ['types.kay', 18]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('exempts pages, layouts and server components from unkeyed rows, and judges a generic only by its constraint', async () => {
+    const fence = (head: string, type: string) => `${head}\nconst { rows } = props<{ rows: ${type}[] }>()\n---\nfor row of rows\n  p {row.text}\n`
+    const root = await scratchProject({
+      'src/routes/index.kay': '--- server\nimport Use from \'../components/use.kay\'\n\nconst rows = [{ text: \'a\' }]\n---\nUse\nfor row of rows\n  p {row.text}\n',
+      'src/routes/_layout.kay': '---\nconst rows = [{ text: \'a\' }]\n---\nfor row of rows\n  p {row.text}\nslot\n',
+      'src/components/free.kay': fence('--- <Row extends { text: string }>', 'Row').replace('extends { text: string }', '').replace('{row.text}', '{String(row)}'),
+      'src/components/by-id.kay': fence('--- <Row extends { id: number, text: string }>', 'Row'),
+      'src/components/narrow.kay': fence('--- <Row extends { text: string }>', 'Row'),
+      'src/components/plain.kay': fence('---', '{ text: string }'),
+      'src/components/use.kay': '---\nimport Free from \'./free.kay\'\nimport ById from \'./by-id.kay\'\nimport Narrow from \'./narrow.kay\'\nimport Plain from \'./plain.kay\'\nimport { signal } from \'kay\'\n\nconst rows = signal([{ id: 1, text: \'a\' }])\n---\nFree(rows={rows()})\nById(rows={rows()})\nNarrow(rows={rows()})\nPlain(rows={rows()})\nbutton(onClick={() => rows = []}) Clear\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code === 'unkeyed-rows')
+
+      expect(found.map(d => [basename(d.file), d.line]).toSorted()).toEqual([['narrow.kay', 4], ['plain.kay', 4]])
     }
     finally {
       await rm(root, { recursive: true, force: true })

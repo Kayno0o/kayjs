@@ -1,10 +1,10 @@
-import type { AwaitProps } from './checks'
+import type { AwaitChannel } from './await-failed'
 import type { JSX } from './jsx'
 import { fragment, markers } from './dom'
 import { awaited } from './dom-await'
 
 // Compiled islands bind `await` blocks themselves; this is the component form, for code that builds one by hand.
-export function Await<T>(props: AwaitProps<T> & { fallback?: ((error: unknown) => JSX.Element) | undefined }): JSX.Element {
+export function Await<T>(props: AwaitChannel<T>): JSX.Element {
   return fragment((parent) => {
     const [start, end] = markers(parent)
 

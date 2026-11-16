@@ -2,8 +2,9 @@ import type { Diagnostic } from './ast'
 import { allowComments } from './allow-comments'
 import { positionAt } from './mapping'
 
-// Lints that no longer exist, whose `// kay-allow` comment is reported by its deprecation instead of as an unknown lint.
-export const RETIRED_LINTS: ReadonlySet<string> = new Set(['uncaught-await'])
+// Lints that no longer exist, whose `// kay-allow` comment and `lints` entry are reported by their deprecation instead of as an unknown lint. They go with `deprecated-uncaught-await`, in 1.108.
+export type RetiredLint = 'uncaught-await'
+export const RETIRED_LINTS: ReadonlySet<string> = new Set<RetiredLint>(['uncaught-await'])
 
 // A `// kay-allow uncaught-await` comment: an `await` with no `catch` renders the nearest `try`'s `catch`, or an alert, since 1.105, so there is nothing left to allow.
 export function retiredAllowComments(source: string): Diagnostic[] {

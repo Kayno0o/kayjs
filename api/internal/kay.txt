@@ -141,7 +141,7 @@ function arrive(search: string, from: number): Promise<void>
 function arrives(search: string): boolean
 
 [./await] Await
-function Await<T>(props: AwaitProps<T> & { fallback?: ((error: unknown) => unknown) | undefined; }): Element
+function Await<T>(props: AwaitChannel<T>): Element
 
 [./await] collectDeferred
 function collectDeferred<T>(render: () => T, within?: string | undefined): { result: T; deferred: PendingBlock[]; }
@@ -151,6 +151,7 @@ const earlyRejections: Pick<EarlyRejections, "graceMs">
 
 [./await] PendingBlock
 interface PendingBlock
+  alert: () => unknown
   failed?: ((error: unknown) => unknown) | undefined
   fallback?: ((error: unknown) => unknown) | undefined
   id: string

@@ -27,6 +27,7 @@ import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { reactiveValue } from './script'
 import { kayCtxImport } from './script-shared'
 import { shadowedBinds } from './template-reads'
+import { rowsJudged, typeParameterNames } from './type-parameters'
 import { headTagProblem, sharedImports } from './validate'
 
 const HORIZONTAL_SPACE = /^[ \t]*/
@@ -123,7 +124,6 @@ const QUERY: PageSettingName = 'query'
 // The server exports that are no actions: the page's settings, and each under its own name as they were exported before.
 const NOT_ACTIONS = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
-const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
 
 // What a pass builds: JSX, which the analysis pass reads, the same JSX with `kay check`'s assertions, or the code that runs, markup strings on the server or the browser's DOM.
 type OutputMode = 'jsx' | 'check' | 'html' | 'dom'
@@ -259,7 +259,7 @@ class ModuleShell {
       check: this.mode === 'check',
       staticLoops: this.staticLoops,
       sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
-      generic: this.genericComponent,
+      judgesRows: rowsJudged(this.file.typeParameters && this.text(this.file.typeParameters)),
       plain: this.plainNames(),
       ownMarkup: this.ownMarkup,
     }, this.sites)
@@ -1082,34 +1082,6 @@ type Helper = TemplateHelper | 'omit'
 
 // The members of `TemplateHelpers` in src/runtime/checks.ts.
 type DeclaredHelper = Helper | 'staticFor' | 'Dynamic' | 'head' | 'Try' | 'Await' | 'awaited'
-
-// `T extends Record<string, U>, const U = number` names `T` and `U`: the first identifier of each parameter, split at the commas outside any brackets.
-function typeParameterNames(parameters: string): string[] {
-  const names: string[] = []
-  let depth = 0
-  let start = 0
-
-  for (let index = 0; index <= parameters.length; index++) {
-    const char = parameters[index]
-
-    if (char === '<' || char === '(' || char === '[' || char === '{')
-      depth++
-    else if ((char === '>' && parameters[index - 1] !== '=') || char === ')' || char === ']' || char === '}')
-      depth--
-
-    if (index < parameters.length && (char !== ',' || depth > 0))
-      continue
-
-    const name = TYPE_PARAMETER_NAME.exec(parameters.slice(start, index))?.[1]
-
-    if (name !== undefined)
-      names.push(name)
-
-    start = index + 1
-  }
-
-  return names
-}
 
 // The server values the template's `await` blocks render by name, which `load` defers.
 function deferredData(facts: TemplateFacts, server: ServerAnalysis | undefined): Set<string> {

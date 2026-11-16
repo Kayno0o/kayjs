@@ -27,7 +27,8 @@ export interface JsxOptions {
   staticLoops: boolean
   // The props passed an island reach the browser as they are written, so `kay check` asserts they can.
   sendsIslandProps: boolean
-  generic: boolean
+  // Whether a keyless loop's rows are judged: not those of a generic component whose type parameters the check reads as keyed.
+  judgesRows: boolean
   // Names the script declares as plain data written out, which an island prop check takes as serializable whatever type the declaration gives them.
   plain: ReadonlySet<string>
   // Whether a name at an offset is bound to a project file imported as text, which `innerHTML` takes as it takes markup written out.
@@ -456,8 +457,8 @@ export class JsxTemplate {
     const positional = rowKeying(node, this.src).kind === 'positional'
 
     b.wrap(node, () => {
-      // A loop of a non-generic component that runs again in the browser with no key matches its rows by `id` or the item itself, which `KayKeyed` has the type check report for rows with no `id`; one that only ever runs on the server has no rows to match.
-      b.add(`{(() => { const kayEach = ${node.key || staticLoop || this.options.generic ? 'KayList' : 'KayKeyed'}(`)
+      // A loop with no key that runs again in the browser matches its rows by `id` or the item itself, which `KayKeyed` has the type check report for rows with no `id`. Pages and layouts only ever run on the server, so they have no rows to match, and a generic component with an unconstrained type parameter cannot be judged (`rowsJudged`); a static component only pages import is reported all the same, as the compiler cannot tell it never reaches the browser.
+      b.add(`{(() => { const kayEach = ${node.key || staticLoop || !this.options.judgesRows ? 'KayList' : 'KayKeyed'}(`)
 
       b.addSource(node.each)
       b.add('); return ')

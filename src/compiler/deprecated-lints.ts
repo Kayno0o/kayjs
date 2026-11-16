@@ -41,7 +41,7 @@ export const DEPRECATED_LINTS = {
     level: 'warn',
     group: 'deprecated',
     since: '1.105',
-    summary: 'A `// kay-allow uncaught-await` comment, since 1.105: the `uncaught-await` lint is gone, as an `await` with no `catch` renders the `catch` of the `try` around it, else an alert (`data-kay-await-failed`, worded by the `kay.await.failed` message) in its place, the rejection reported either way. The fix removes the comment, or the name from a list of lints.',
+    summary: 'A `// kay-allow uncaught-await` comment or a `lints: { \'uncaught-await\': ... }` entry of kay.config.ts, since 1.105: the `uncaught-await` lint is gone, as an `await` with no `catch` renders the `catch` of the `try` around it, else an alert (`data-kay-await-failed`, worded by the `kay.await.failed` message) in its place, the rejection reported either way. The fix removes the comment, or the name from a list of lints, or the config entry.',
     wrong: '// kay-allow uncaught-await\nawait comments then list\n  p {list.length} comments',
     right: 'await comments then list\n  p {list.length} comments',
   },

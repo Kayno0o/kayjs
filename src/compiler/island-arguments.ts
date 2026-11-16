@@ -1,11 +1,17 @@
 import type { Diagnostic, Span } from './ast'
 import type { ScriptAnalysis } from './script'
+import { AWAIT_FAILED_KEY } from '../runtime/await-failed'
 import { BUTTON_FORM_KEY } from '../runtime/button-form'
 
 const MESSAGE_KEY = /(?:\b(?:t|T|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
 
+const AWAIT_LINE = /^[ \t]*await\b/m
+
+// What the source words by key, and the alert an `await` of it may show, which the browser words as the server does.
 function messageKeys(source: string): string[] {
-  return [...new Set(Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!))]
+  const keys = Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!)
+
+  return [...new Set(AWAIT_LINE.test(source) ? [...keys, AWAIT_FAILED_KEY] : keys)]
 }
 
 // The `island` the `--- module` fence exports: `const` for `export const island = { hydrate, persist }`, the one form the compiler reads, `listed` for any other, `export { island }` included.

@@ -1031,7 +1031,7 @@ describe('await blocks', () => {
     const later = Promise.withResolvers<string>()
     const slow = later.promise
     const interval = spyOn(globalThis, 'setInterval')
-    const stream = streamDocument('<html><body>', [{ id: 'k1', value: slow, ready: (value: string) => value }], { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: '' }, false, () => undefined)
+    const stream = streamDocument('<html><body>', [{ id: 'k1', value: slow, ready: (value: string) => value, alert: () => '' }], { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: '' }, false, () => undefined)
     const chunks: string[] = []
     const tick = interval.mock.calls.find(([, ms]) => ms === KEEP_ALIVE_MS)![0] as () => void
 

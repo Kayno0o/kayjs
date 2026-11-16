@@ -14,7 +14,8 @@ export const LOOP_LINTS = {
 
 // What the type check's error on rows with no `id`, which carries the marker the `KayKeyed` type puts in it, stands for.
 export function unkeyedRows(message: string): TypeLint | undefined {
-  if (!message.includes('kayLint: "unkeyed-rows"'))
+  // A row type that is a type parameter reads as a mismatch with `UnkeyedRows<T>` shown as written or expanded, which holds no marker.
+  if (!message.includes('kayLint: "unkeyed-rows"') && !message.includes('UnkeyedRows<') && !message.includes('"id" extends keyof'))
     return undefined
 
   return {

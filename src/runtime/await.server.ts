@@ -1,8 +1,8 @@
-import type { AwaitProps } from './checks'
+import type { AwaitChannel } from './await-failed'
 import type { AwaitNote } from './html'
 import type { JSX } from './jsx'
 import type { Html } from './rendered'
-import { AWAIT_FAILED } from './await-failed'
+import { AWAIT_FAILED, AWAIT_FAILED_KEY } from './await-failed'
 import { escape } from './escape'
 import { awaitNotes, child } from './html'
 import { insideIsland } from './island.server'
@@ -18,14 +18,16 @@ export interface PendingBlock {
   ready: (value: never) => unknown
   failed?: ((error: unknown) => unknown) | undefined
   // The `catch` of the `try` around the block, rendered, and the error reported, when the block has no `catch` of its own.
-  fallback?: ((error: unknown) => unknown) | undefined
+  fallback?: AwaitChannel<never>['fallback']
+  // What a page shows when the block has neither; a mail fails instead, as it would go out with the content missing.
+  alert: () => unknown
   // Where the block was rendered, for the error of a block with no `catch` to name its line.
   site?: Error | undefined
 }
 
 // What a block with no `catch` and no `try` around it shows once its value rejects: a plain alert in the page's locale.
 function awaitFailed(): Html {
-  return html(`<p role="alert" data-kay-await-failed>${escape(wording('kay.await.failed', AWAIT_FAILED))}</p>`)
+  return html(`<span class="kay-await-failed" role="alert" data-kay-await-failed>${escape(wording(AWAIT_FAILED_KEY, AWAIT_FAILED))}</span>`)
 }
 
 // The errors already given a block's place, so a promise shared by several blocks or renders keeps one.
@@ -168,7 +170,7 @@ function noteAwait(notes: AwaitNote[], value: Promise<unknown> | undefined, pend
 
 // On a page, a pending value renders its `pending` block between markers that the streamed result replaces; a settled one renders right away.
 // Typed as the browser build is, which `kay check` reads templates against.
-export function Await<T>(props: AwaitProps<T> & { fallback?: ((error: unknown) => unknown) | undefined }): JSX.Element {
+export function Await<T>(props: AwaitChannel<T>): JSX.Element {
   const value = props.value
   const parts = isSnapshots(value)
 
@@ -194,10 +196,9 @@ export function Await<T>(props: AwaitProps<T> & { fallback?: ((error: unknown) =
   const parent = getOwner()
   const failed = props.failed
 
-  // With no `catch` of its own, the enclosing `try`'s, else the alert every block has.
-  const fallback = props.fallback ?? awaitFailed
+  const fallback = props.fallback
 
-  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => following(notes, () => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => following(notes, () => failed(error)))), fallback: error => runWithOwner(parent, () => following(notes, () => fallback(error))), site: failed ? undefined : new Error('await') })
+  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => following(notes, () => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => following(notes, () => failed(error)))), fallback: fallback && (error => runWithOwner(parent, () => following(notes, () => fallback(error)))), alert: awaitFailed, site: failed ? undefined : new Error('await') })
   // The streamed block replaces this one whole, so an `await` inside it renders its own pending block and streams nothing.
   deferred = undefined
 

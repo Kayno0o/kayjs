@@ -529,12 +529,12 @@ describe('renderToString', () => {
     expect(await renderToString(view, { name: 'Ada', rows: Promise.resolve(['one', 'two']) })).toBe('<p>Hello Ada</p><ul><li>one</li><li>two</li></ul>')
   })
 
-  it('renders the catch block of a value that rejects, and an alert when there is none', async () => {
+  it('renders the catch block of a value that rejects, and fails when there is none', async () => {
     const caught = await load<{ value: Promise<string> }>('---\nimport { defer } from \'kay\'\n\nconst { value } = props<{ value: Promise<string> }>()\nconst shown = defer(value)\n---\nawait shown then text\n  p {text}\ncatch\n  p Unavailable')
     const uncaught = await load<{ value: Promise<string> }>('---\nimport { defer } from \'kay\'\n\nconst { value } = props<{ value: Promise<string> }>()\nconst shown = defer(value)\n---\nawait shown then text\n  p {text}')
 
     expect(await renderToString(caught, { value: Promise.reject(new Error('down')) })).toBe('<p>Unavailable</p>')
-    expect(await renderToString(uncaught, { value: Promise.reject(new Error('down')) })).toBe('<p role="alert" data-kay-await-failed>This could not be loaded; try again later</p>')
+    await expect(renderToString(uncaught, { value: Promise.reject(new Error('down')) })).rejects.toThrow('down')
   })
 
   it('renders several blocks in place, and one nested in a then block once its own value settles', async () => {

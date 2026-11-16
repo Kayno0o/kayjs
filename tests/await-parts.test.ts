@@ -46,7 +46,7 @@ async function streamed(blocks: PendingBlock[], cancelAfter?: (chunk: string) =>
 }
 
 function block(value: PendingBlock['value'], options: { failed?: boolean } = {}): PendingBlock {
-  return { id: 'b', value, ready: (part: string) => html(`<p>${part}</p>`), failed: options.failed === true ? error => html(`<p class="failed">${(error as Error).message}</p>`) : undefined }
+  return { id: 'b', value, ready: (part: string) => html(`<p>${part}</p>`), failed: options.failed === true ? error => html(`<p class="failed">${(error as Error).message}</p>`) : undefined, alert: () => html('<p class="alert">Alert</p>') }
 }
 
 async function* parts(values: string[], gapMs: number, fail?: Error): AsyncGenerator<string> {
@@ -145,11 +145,11 @@ describe('an await block given an async iterable', () => {
     expect(reported).toEqual([])
   })
 
-  it('without a catch block, reports the failure, removing the pending block or leaving the parts sent so far', async () => {
+  it('without a catch block or a try, reports the failure, showing the alert in place of the pending block or leaving the parts sent so far', async () => {
     const before = await streamed([block(parts([], 0, new Error('Down')))])
     const after = await streamed([block(parts(['a'], 0, new Error('Cut')))])
 
-    expect(templatesOf(before.page, 'b')).toEqual([''])
+    expect(templatesOf(before.page, 'b')).toEqual(['<p class="alert">Alert</p>'])
     expect(templatesOf(after.page, 'b')).toEqual(['<!--kay-await:b--><p>a</p><!--/kay-await:b-->'])
     expect([before.reported, after.reported].map(errors => (errors as Error[]).map(error => error.message))).toEqual([['Down'], ['Cut']])
   })
@@ -181,7 +181,7 @@ describe('an await block given an async iterable', () => {
 
     const broken: PendingBlock = { id: 'b', value: endless(), ready: () => {
       throw new Error('Bug')
-    }, failed: () => html('<p class="failed">Shown</p>') }
+    }, failed: () => html('<p class="failed">Shown</p>'), alert: () => html('') }
     const { page, reported } = await streamed([broken])
 
     expect(templatesOf(page, 'b')).toEqual([''])
