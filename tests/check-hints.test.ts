@@ -277,3 +277,12 @@ describe('blocks typed from the template', () => {
     expect(found.map(d => d.line)).toEqual([4])
   })
 })
+
+describe('blocks left to the props type', () => {
+  it('does not derive a block for a props interface that extends another, whose blocks it may inherit', async () => {
+    const list = '---\nimport type { Snippet } from "kay"\ninterface Base { item: Snippet<[string]> }\ninterface Props extends Base { rows: string[] }\nconst { rows } = props<Props>()\n---\nul\n  for row of rows\n    li\n      slot item(row)\n'
+    const found = await report('---\nimport List from "./list.kay"\n---\nList(rows={["a"]})\n  @item(row)\n    p {row.toUpperCase()}\n', { 'src/components/list.kay': list })
+
+    expect(found).toEqual([])
+  })
+})

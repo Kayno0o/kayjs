@@ -133,14 +133,14 @@ function propMembers(type: TSType | undefined, body: Statement[]): NodeOfType<'T
   const literal = declared?.type === 'TSTypeAliasDeclaration' ? declared.typeAnnotation : type
 
   if (declared?.type === 'TSInterfaceDeclaration')
-    return declared.body.body
+    return declared.extends.length > 0 ? undefined : declared.body.body
 
   return literal?.type === 'TSTypeLiteral' ? literal.members : undefined
 }
 
 // The names a props type declares, when it is written where the compiler reads it.
 function declaredKeys(type: TSType | undefined, body: Statement[]): string[] | undefined {
-  return propMembers(type, body)?.flatMap(member => member.type === 'TSPropertySignature' && !member.computed ? keyName(member.key) ?? [] : [])
+  return propMembers(type, body)?.flatMap(member => (member.type === 'TSPropertySignature' || member.type === 'TSMethodSignature') && !member.computed ? keyName(member.key) ?? [] : [])
 }
 
 // The `children?: Snippet` member of a props type written inline, with the members around it, which a fix removing it needs.

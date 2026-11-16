@@ -569,7 +569,7 @@ class ModuleShell {
     return this.writesBlocks() ? this.file.template.filter((node): node is SlotNode => node.kind === 'slot') : []
   }
 
-  // The named slots a layout declares with `slot name`, in the order they are written; a slot called with arguments is a component's block prop, which a page cannot fill.
+  // What the template's slots add to the props type, and the imports it reads.
   private slotTypes(): SlotTypes {
     return this.slots ??= slotTypes(this.file, { component: this.options.component === true, layout: this.options.layoutFile === true, server: this.server !== undefined }, this.script.props, this.facts.snippet)
   }

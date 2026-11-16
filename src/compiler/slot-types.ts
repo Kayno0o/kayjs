@@ -19,8 +19,6 @@ function slotBlocks(file: KayFile): Map<string, boolean> {
 }
 
 export interface SlotTypes {
-  // What the props gain from the template's slots, as members of an object type: `children` for `slot`, a block for each `slot name`.
-  members: string[]
   // The members as an intersection to add to the props type, none when there are none.
   type: string
   // The names of the slots a layout declares, which a page fills.
@@ -34,7 +32,7 @@ export function slotTypes(file: KayFile, kind: { component: boolean, layout: boo
   const facts = templateFacts(file)
   const derivable = kind.component && !kind.server && (!props || props.keys !== undefined)
   const declared = new Set(props?.keys)
-  const blocks = derivable ? [...slotBlocks(file)].filter(([name]) => !declared.has(name)) : []
+  const blocks = derivable ? [...slotBlocks(file)].filter(([name]) => name !== 'children' && !declared.has(name)) : []
   const outlets = kind.layout ? slotNames(file.template, file.source) : []
   const members = [
     ...facts.childrenSlot ? ['children?: KayJSX.Element'] : [],
@@ -44,5 +42,5 @@ export function slotTypes(file: KayFile, kind: { component: boolean, layout: boo
   const jsx = facts.childrenSlot || snippet || members.length > 0 ? 'import type { JSX as KayJSX } from \'kay\'\n' : ''
   const calls = blocks.some(([, called]) => called) ? 'import type { SlotCall as KaySlotCall } from \'kay\'\n' : ''
 
-  return { members, type: members.length > 0 ? ` & { ${members.join('; ')} }` : '', outlets, imports: jsx + calls }
+  return { type: members.length > 0 ? ` & { ${members.join('; ')} }` : '', outlets, imports: jsx + calls }
 }
