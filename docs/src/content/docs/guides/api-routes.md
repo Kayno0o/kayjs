@@ -228,7 +228,7 @@ h1 Notes
 
 Here `addNote` is the tool `add_note`, and its description is the text you gave. `tool: true` uses the export name alone, and `tool: { name, description }` sets both.
 
-`tool: { readOnly: true }` tells the agent's client the action only reads, so it can run it without asking, and `/mcp` lists it with `readOnlyHint: true`.
+`tool: { readOnly: true }` tells the agent's client the action only reads, so it can run it without asking, and `/_kay/mcp` lists it with `readOnlyHint: true`.
 
 An agent reads an action's answer as JSON, and as `structuredContent` too when it is an object, so a client reading either one finds it. That is a lot of keys and quotes for an agent's context. `tool: { text }` words the answer instead, from what the action returned:
 
@@ -247,7 +247,7 @@ h1 Notes
 
 The agent gets that text alone, with no JSON and no `structuredContent`, while the page and any other caller still get the notes. An error thrown by `text` is the agent's refusal. A route's `detail.tool` takes `text` the same way, from its parsed JSON answer.
 
-To tell a client what a tool answers before it calls, give the action an `output` object schema (`s.Object` or `s.Record`; the types refuse a union, an array or a primitive): `tool: { output: s.Object({ id: s.Integer(), title: s.String() }) }`. `/mcp` lists it as the tool's `outputSchema`, and `kay check` refuses one the handler's return value does not fit. The schema describes the JSON the agent receives, so a `Date` is a string, a bigint a string, a `Map` an object and a `Set` an array.
+To tell a client what a tool answers before it calls, give the action an `output` object schema (`s.Object` or `s.Record`; the types refuse a union, an array or a primitive): `tool: { output: s.Object({ id: s.Integer(), title: s.String() }) }`. `/_kay/mcp` lists it as the tool's `outputSchema`, and `kay check` refuses one the handler's return value does not fit. The schema describes the JSON the agent receives, so a `Date` is a string, a bigint a string, a `Map` an object and a `Set` an array.
 
 An action that declares no `output` is listed with the schema of what its handler returns, read from its TypeScript return type when you run `kay build` (and in the background under `kay dev`), so there is nothing to declare.
 
@@ -282,12 +282,12 @@ import { toolCall } from 'kay/server'
 export default guard(({ request, url, deny }) => {
   const key = request.headers.get('authorization') === `Bearer ${process.env.AGENT_KEY}`
 
-  if (key && url.pathname !== '/mcp' && !toolCall(request))
+  if (key && url.pathname !== '/_kay/mcp' && !toolCall(request))
     deny(403, { message: 'This key opens tools only' })
 })
 ```
 
-`toolCall(request)` gives `{ tool, client }` for a call that `/mcp` passed on, and nothing for any other request. A client cannot fake it, so the key still opens nothing else. The check lets `/mcp` through, as the list of tools is guarded as a request to it. In an Elysia hook registered before `pages()`, read `toolCall(request)` the same way inside `.onRequest(({ request }) => ...)`.
+`toolCall(request)` gives `{ tool, client }` for a call that `/_kay/mcp` passed on, and nothing for any other request. A client cannot fake it, so the key still opens nothing else. The check lets `/_kay/mcp` through, as the list of tools is guarded as a request to it. In an Elysia hook registered before `pages()`, read `toolCall(request)` the same way inside `.onRequest(({ request }) => ...)`.
 
 ### Signing in
 

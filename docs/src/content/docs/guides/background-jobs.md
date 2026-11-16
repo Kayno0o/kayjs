@@ -105,7 +105,7 @@ Under `kay dev`, the dev tool's Jobs tab lists every queue's jobs and retries or
 
 A workflow run shows as its state, running, sleeping until a time, waiting for an event or failed, with its last steps, and buttons to send the event it waits for, with its data typed as JSON, or cancel it.
 
-In production, `jobs: { guards }` in `kay.config.ts` serves that list at `/_kay/jobs`, behind the guard you give it: `jobs: { guards: ctx => ctx.locals.auth.requireAdmin() }` with kayjs-auth, or any guard. Without one the page answers 403, `guards: false` opens it, and `jobs: { guards, path }` moves the page.
+In production, `jobs: { guards }` in `kay.config.ts` serves that list at `/_kay/jobs`, behind the guard you give it: `jobs: { guards: ctx => ctx.locals.auth.requireAdmin() }` with kayjs-auth, or any guard. Without one the page answers 403, `guards: false` opens it, and `endpoints: { jobs: '/admin/jobs' }` moves the page.
 
 Some failures are nobody's fault: a full disk, a service asking you to slow down. To try again later without spending an attempt, throw `retryLater` with how long to wait.
 

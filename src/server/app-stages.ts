@@ -196,6 +196,7 @@ export function bootOf(input: BootInput) {
   const metricsConfig = env.serving ? metricsOf(options.ops?.metrics) : undefined
   const metrics: Claim | undefined = metricsConfig && { path: options.endpoints?.metrics ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
   // Where the metrics were served before 1.105, answered as well until 1.108 by an app that did not move them, unless an app file serves something there.
+  const formerMcp: Claim | undefined = input.mcpAt !== undefined && options.endpoints?.mcp === undefined ? { path: FORMER_MCP_PATH, owner: '`mcp`', kind: 'kay', method: 'ALL' } : undefined
   const formerMetrics: Claim | undefined = metrics && options.endpoints?.metrics === undefined ? { path: FORMER_METRICS_PATH, owner: 'the metrics route', kind: 'kay' } : undefined
   // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
   const health: Claim | undefined = options.ops?.health === false ? undefined : { path: options.endpoints?.health ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
@@ -218,7 +219,7 @@ export function bootOf(input: BootInput) {
     metrics,
     formerMetrics,
     // Where the MCP endpoint was served before 1.105, redirected to its path now until 1.108 by an app that did not move it, unless an app file serves something there.
-    formerMcp: input.mcpAt !== undefined && options.endpoints?.mcp === undefined ? { path: FORMER_MCP_PATH, owner: '`mcp`', kind: 'kay', method: 'ALL' } as Claim : undefined,
+    formerMcp,
     health,
     registered,
     // Maps a browser's stack back to the source, for the error reports and the dev tool.
@@ -358,11 +359,11 @@ export function compressAnswers({ app, env, options, setup: { client }, compress
 }
 
 // kay's own messages go out whether requests are logged or not; one line per request when they are.
-export function logAnswers({ app, options, log, health }: Boot): void {
+export function logAnswers({ app, options, log, health, mcpAt }: Boot): void {
   useLogger(log.writer)
 
   if (log.requests)
-    logRequests(app, log.writer, health?.path, kayApiPrefixes(options.extensions))
+    logRequests(app, log.writer, health?.path, [...kayApiPrefixes(options.extensions), ...mcpAt === undefined ? [] : [mcpAt]])
 }
 
 // The app's rewrite, with the API paths a library moved; returns the mounts it reads, which the API modules fill once they are served.

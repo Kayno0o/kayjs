@@ -365,6 +365,33 @@ describe('the metrics path', () => {
     expect(await status(`${url}/_kay/metrics`)).toBe(404)
   })
 
+  it('lets a collector past the proxy key on both paths, and on neither once the app moved it', async () => {
+    const both = await listening({ metrics: true, proxy: { key: { header: 'x-upstream-key' } } }, { KAY_PROXY_KEY: KEY })
+    const moved = await listening({ metrics: true, endpoints: { metrics: '/stats' }, proxy: { key: { header: 'x-upstream-key' } } }, { KAY_PROXY_KEY: KEY })
+
+    expect(await status(`${both}/_kay/metrics`)).toBe(200)
+    expect(await status(`${both}/metrics`)).toBe(200)
+    expect(await status(`${both}/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect(await status(`${moved}/stats`)).toBe(200)
+    expect(await status(`${moved}/metrics`)).toBe(403)
+  })
+
+  it('answers the token on the former path too', async () => {
+    const url = await listening({ metrics: true }, { KAY_METRICS_TOKEN: TOKEN })
+
+    expect(await status(`${url}/metrics`)).toBe(403)
+    expect(await status(`${url}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+  })
+
+  it('keeps a page at /metrics, which the alias does not take, and the proxy key still guards it', async () => {
+    const url = await listening({ metrics: true, root: 'tests/fixtures/metrics-clash', proxy: { key: { header: 'x-upstream-key' } } }, { KAY_PROXY_KEY: KEY })
+
+    expect(await status(`${url}/metrics`)).toBe(403)
+    expect(await status(`${url}/metrics`, { 'x-upstream-key': KEY })).toBe(200)
+    expect(await (await fetch(`${url}/metrics`, { headers: { 'x-upstream-key': KEY } })).text()).toContain('A page where')
+    expect(await status(`${url}/_kay/metrics`)).toBe(200)
+  })
+
   it('still reads the path of the old key', async () => {
     const url = await listening({ metrics: { path: '/old-stats' } })
 

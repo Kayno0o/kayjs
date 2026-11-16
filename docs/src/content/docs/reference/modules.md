@@ -74,7 +74,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `s` | The schema builder `kay` exports, for a server module that imports nothing else from `kay` |
 | `rateLimit`, `memoryRates`, `sqliteRates`, `clientAddress`, `rateKey` | Rate limiting, and the key a limit counts an address under |
 | `crossSiteRefused`, `crossSiteResponse` | Whether a browser's cross-site POST or websocket upgrade should be refused, for code that kay's actions and API do not reach, and the 403 to answer it with. See [Security](/guides/security#a-post-from-another-site) |
-| `toolCall` | Whether a request is a tool call that `/mcp` passed on, and which. See [API routes](/guides/api-routes#telling-a-tool-call-apart) |
+| `toolCall` | Whether a request is a tool call that `/_kay/mcp` passed on, and which. See [API routes](/guides/api-routes#telling-a-tool-call-apart) |
 | `workChallenge`, `verifyWork` | Proof of work in a form field your own code checks |
 | `requestId` | The id of a request, on its log lines and its `X-Request-Id` header |
 | `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |

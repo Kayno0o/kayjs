@@ -28,7 +28,7 @@ describe('discovery', () => {
   const site = served({ mcp: true })
 
   test('the 401 of the MCP endpoint points at the resource metadata, which names the app\'s own authorization server', async () => {
-    const refused = await site().fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) })
+    const refused = await site().fetch('/_kay/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) })
 
     expect(refused.status).toBe(401)
     expect(refused.headers.get('www-authenticate')).toBe('Bearer resource_metadata="http://localhost/.well-known/oauth-protected-resource"')
@@ -37,8 +37,8 @@ describe('discovery', () => {
 
     expect(resource.status).toBe(200)
     expect(resource.headers.get('access-control-allow-origin')).toBe('*')
-    expect(await json(resource)).toEqual({ resource: 'http://localhost/mcp', authorization_servers: ['http://localhost'], bearer_methods_supported: ['header'], resource_name: 'API', scopes_supported: ['notes:read', 'files.read'] })
-    expect(await json(await site().fetch('/.well-known/oauth-protected-resource/mcp'))).toMatchObject({ resource: 'http://localhost/mcp' })
+    expect(await json(resource)).toEqual({ resource: 'http://localhost/_kay/mcp', authorization_servers: ['http://localhost'], bearer_methods_supported: ['header'], resource_name: 'API', scopes_supported: ['notes:read', 'files.read'] })
+    expect(await json(await site().fetch('/.well-known/oauth-protected-resource/_kay/mcp'))).toMatchObject({ resource: 'http://localhost/_kay/mcp' })
   })
 
   test('the authorization server metadata is served at both well-known locations, with PKCE S256 only and client ID metadata documents', async () => {
@@ -87,14 +87,14 @@ describe('discovery under a base', () => {
   const site = served({ mcp: true, base: '/shop', trailingSlash: 'always' })
 
   test('a site under a base and with trailing slashes puts the base in every URL, and a client finds the metadata by path appending under the issuer', async () => {
-    const refused = await site().fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) })
+    const refused = await site().fetch('/_kay/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) })
     const pointer = (/resource_metadata="([^"]+)"/).exec(refused.headers.get('www-authenticate')!)![1]!
 
     expect(pointer).toBe('http://localhost/shop/.well-known/oauth-protected-resource')
 
     const resource = await json(await site().fetch(new URL(pointer).pathname.replace('/shop', '')))
 
-    expect(resource).toMatchObject({ resource: 'http://localhost/shop/mcp', authorization_servers: ['http://localhost/shop'] })
+    expect(resource).toMatchObject({ resource: 'http://localhost/shop/_kay/mcp', authorization_servers: ['http://localhost/shop'] })
 
     const issuer = (resource.authorization_servers as string[])[0]!
     const metadata = await json(await site().fetch(new URL(`${issuer}/.well-known/openid-configuration`).pathname.replace('/shop', '')))
@@ -177,7 +177,7 @@ describe('signing in', () => {
     expect((await site().visit('/auth/account/clients')).html).not.toContain('Claude Code')
     expect((await site().visit(authorize)).html).toContain('Claude Code')
 
-    const several = await site().visit(`${authorize}&resource=http%3A%2F%2Flocalhost%2Fmcp&resource=http%3A%2F%2Flocalhost%2Fother`)
+    const several = await site().visit(`${authorize}&resource=http%3A%2F%2Flocalhost%2F_kay%2Fmcp&resource=http%3A%2F%2Flocalhost%2Fother`)
 
     expect(new URL(several.headers.get('location')!).searchParams.get('error')).toBe('invalid_target')
   })
@@ -186,7 +186,7 @@ describe('signing in', () => {
 describe('signing in under a base', () => {
   const site = served({ mcp: true, base: '/shop', trailingSlash: 'always' })
 
-  test('the full flow works with the base and trailing slashes, the issuer carrying the base, and the token works on /mcp', async () => {
+  test('the full flow works with the base and trailing slashes, the issuer carrying the base, and the token works on /_kay/mcp', async () => {
     const { exchanged } = await signIn(site(), 'http://localhost/shop', 'shop-user@example.com', { base: '/shop', slash: '/' })
 
     expect(exchanged).toMatchObject({ token_type: 'Bearer', scope: 'notes:read' })

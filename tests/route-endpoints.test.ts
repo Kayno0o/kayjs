@@ -56,6 +56,12 @@ describe('the MCP path', () => {
     expect(old.headers.get('location')).toBe('/_kay/mcp?x=1')
   })
 
+  it('keeps the base in the redirect', async () => {
+    const site = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, base: '/shop' })
+
+    expect((await site.fetch('/mcp', { method: 'POST', body: '{}' })).headers.get('location')).toBe('/shop/_kay/mcp')
+  })
+
   it('moves to endpoints.mcp, leaving /mcp unserved', async () => {
     const site = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, endpoints: { mcp: '/tools' } })
 

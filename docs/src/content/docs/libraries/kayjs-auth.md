@@ -776,9 +776,9 @@ For Traefik, use `forwardAuth` with the address `http://auth:3000/auth/forward?r
 
 ## Letting an AI agent sign in
 
-An agent such as Claude Code or MCP Inspector can sign in to your app through [`/mcp`](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) with no code on your side. With `auth()` and a store that keeps OAuth data (`memoryAuth` and `pgAuth` do), your app is its own OAuth authorization server.
+An agent such as Claude Code or MCP Inspector can sign in to your app through [`/_kay/mcp`](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) with no code on your side. With `auth()` and a store that keeps OAuth data (`memoryAuth` and `pgAuth` do), your app is its own OAuth authorization server.
 
-The agent is pointed at `/mcp`, gets a 401, and reads where to sign in. It sends the user to a consent page of your app, which names the agent and lists what it asks for. An agent that registered itself chooses its own name, so the page says nothing checked it (`auth.consent.unverified`); one named by a metadata document shows the host the document lives at. Once the user allows it, the agent gets a token.
+The agent is pointed at `/_kay/mcp`, gets a 401, and reads where to sign in. It sends the user to a consent page of your app, which names the agent and lists what it asks for. An agent that registered itself chooses its own name, so the page says nothing checked it (`auth.consent.unverified`); one named by a metadata document shows the host the document lives at. Once the user allows it, the agent gets a token.
 
 That token is one of kayjs-auth's bearer tokens. So `user()`, `via()`, `requireUser({ scope })` and your gates see the user and the scopes as they do for any token.
 
@@ -796,9 +796,9 @@ A whole sign-in ends 90 days after it began. One refresh token used twice ends i
 
 An agent that names a `resource` when it asks to sign in gets tokens bound to it. At the token endpoint, and when it refreshes, it may name that resource again or leave it out, and any other answers `invalid_target`. Naming more than one `resource` is `invalid_target` at both ends.
 
-A bound token works only on requests to that resource or under its path: a token asked for `/mcp` gets a 401 on `/api`. A token that asked for no resource works on every route within its scopes.
+A bound token works only on requests to that resource or under its path: a token asked for `/_kay/mcp` gets a 401 on `/api`. A token that asked for no resource works on every route within its scopes.
 
-The calls kay's `/mcp` makes to your tools count as made to `/mcp`. `userFromToken(token, url)` for a websocket takes the address of the handshake, and refuses a bound token without it.
+The calls kay's `/_kay/mcp` makes to your tools count as made to `/_kay/mcp`. `userFromToken(token, url)` for a websocket takes the address of the handshake, and refuses a bound token without it.
 
 An agent can end its own sign-in at `/auth/oauth/revoke` (RFC 7009), sending `token` and `client_id`; the metadata lists it as `revocation_endpoint`.
 
@@ -818,7 +818,7 @@ authCore({
 
 The agents can only ask for the scopes you declare. An agent that asks for none is given no scope, so its token reaches only routes marked `scope: false`. Name the scopes such an agent gets with `oauthServer: { defaultScopes: ['notes:read'] }`.
 
-In production, set `site` in `kay.config.ts` or in `authCore`: the OAuth server names itself from it. Without one its documents and endpoints answer an error, and `/mcp` points at no authorization server, as a Host header could name it otherwise. Registrations are limited per address; `rateLimit: { oauth: { registerAll } }` adds a ceiling on all addresses together.
+In production, set `site` in `kay.config.ts` or in `authCore`: the OAuth server names itself from it. Without one its documents and endpoints answer an error, and `/_kay/mcp` points at no authorization server, as a Host header could name it otherwise. Registrations are limited per address; `rateLimit: { oauth: { registerAll } }` adds a ceiling on all addresses together.
 
 The new tables are created by `db.sync()` if you use Postgres or SQLite.
 

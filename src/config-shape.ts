@@ -136,7 +136,7 @@ export const REMOVED_KEYS: Record<string, string> = {
   publicDir: 'dirs.public',
   maxSize: 'limits.body',
   maxSizeByPath: 'limits.byPath',
-  apiPath: 'serve.apiPrefix',
+  apiPath: 'endpoints.api',
   compress: 'serve.compress',
   compressionDictionary: 'serve.compressionDictionary',
   shutdownTimeout: 'serve.shutdownTimeout',
