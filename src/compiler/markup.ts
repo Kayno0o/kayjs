@@ -7,7 +7,7 @@ import type { BindingPlan, ElementShape } from './plan'
 import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
-import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE, formFieldOf, handedParts, modifiersOf, PART_NAMES, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
+import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
 import { addBoundWrites, calledByBinds, changeOf } from './bound-props'
 import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
@@ -15,6 +15,7 @@ import { IMAGE_OPTIONS, imageDefaults as imageDefaultsOf, imageOptions, NO_PLACE
 import { contentOf } from './items'
 import { controlId, fieldAttribute, inheritedAttributes, inheritedField } from './markup-fields'
 import { PROPS } from './names'
+import { oldPartsEntry } from './old-parts'
 import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, shapeOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
 import { bindEvent } from './validate'
 
@@ -330,20 +331,17 @@ export abstract class TemplateWriter {
         plan.attributes[written] = merged
     }
 
-    for (const [attributeName, text] of this.imageDefaults(element))
+    for (const [attributeName, text] of imageDefaultsOf(element, name => this.named(element, name)))
       plan.attributes.push({ kind: 'text', name: attributeName, text, bare: false, source: undefined })
 
     return plan
   }
 
   // An image loads lazily and decodes off the main thread unless the template says otherwise: a hero above the fold sets `loading="eager"` or `fetchpriority="high"`.
-  protected imageDefaults(element: ElementNode): [string, string][] {
-    return imageDefaultsOf(element, name => this.named(element, name))
-  }
 
   // The image defaults as a props object leading an element's sources, so a spread carrying its own wins.
   protected leadingImageDefaults(element: ElementNode): void {
-    const defaults = this.imageDefaults(element)
+    const defaults = imageDefaultsOf(element, name => this.named(element, name))
 
     if (defaults.length > 0)
       this.b.add(`{ ${defaults.map(([name, value]) => `${JSON.stringify(name)}: ${JSON.stringify(value)}`).join(', ')} }, `)
@@ -516,6 +514,10 @@ export abstract class TemplateWriter {
         continue
       }
 
+      // The `class` of before 1.105 is the component's `parts`.
+      if (oldPartsEntry(element, this.src, attribute, b, entry))
+        continue
+
       const name = this.source(attribute.name)
 
       if (element.name === 'img' && (name === NO_PLACEHOLDER || IMAGE_OPTIONS.has(name))) {
@@ -576,7 +578,7 @@ export abstract class TemplateWriter {
       items.push(() => b.add('(').addSource(expression).add(')'))
 
     for (const part of classes.parts ?? [])
-      items.push(...this.recipeItem(part), () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)}, ${PART_NAMES})`))
+      items.push(...this.recipeItem(part), () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`))
 
     b.add('[')
 
@@ -728,13 +730,13 @@ export abstract class TemplateWriter {
             b.add(', ')
           }
 
-          b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)}, ${PART_NAMES})])`)
+          b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})])`)
         },
       })
     }
 
     for (const part of parts)
-      items.push(...this.recipeItem(part).map(emit => ({ emit })), { emit: () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)}, ${PART_NAMES})`) })
+      items.push(...this.recipeItem(part).map(emit => ({ emit })), { emit: () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`) })
 
     const written = this.classTable === undefined
       ? items
@@ -813,7 +815,7 @@ export abstract class TemplateWriter {
   }
 
   protected classAttribute(element: ElementNode): NamedAttribute | undefined {
-    return element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'class')
+    return classMergeOf(element, this.src).attribute
   }
 
   protected shorthand(element: ElementNode): string {

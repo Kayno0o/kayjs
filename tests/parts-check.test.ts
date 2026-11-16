@@ -20,7 +20,7 @@ const COMPONENTS = {
   'src/hands.kay': '---\nimport Busy from \'./busy.kay\'\n---\nBusy(part="root spinner")\n',
   'src/panel.kay': '---\nimport Card from \'./card.kay\'\n---\nsection.panel\n  Card(part="card") body\n',
 }
-const IMPORTS = '---\nimport Card from \'../card.kay\'\nimport Pair from \'../pair.kay\'\nimport Panel from \'../panel.kay\'\nimport Plain from \'../plain.kay\'\nconst rest = { id: \'x\' }\n---\n'
+const IMPORTS = '---\nimport Card from \'../card.kay\'\nimport Pair from \'../pair.kay\'\nimport Panel from \'../panel.kay\'\nimport Plain from \'../plain.kay\'\nconst rest = { id: \'x\' }\nconst mine = { head: \'p-6\' }\n---\n'
 
 async function problems(page: string, route = 'src/routes/index.kay', config = tsconfig): Promise<string[]> {
   const root = await scratchDir('parts-check-')
@@ -101,9 +101,10 @@ describe('kay check on a component with parts', () => {
     expect(await problems(`${IMPORTS}Pair(class="mt-4")\n`)).toEqual([expect.stringContaining('several top elements')])
   })
 
-  it('reports a parts object beside a shorthand or a spread, which could be a condition object, and lets a condition object through', async () => {
-    expect(await problems(`${IMPORTS}Card.mt-4(class={{ head: 'p-6' }}) a\n`)).toEqual([expect.stringContaining('cannot be merged')])
-    expect(await problems(`${IMPORTS}Card({...rest} class={{ head: 'p-6' }}) a\n`)).toEqual([expect.stringContaining('cannot be merged')])
+  it('takes a literal parts object as the parts beside a shorthand or a spread, reports one held in a variable, and lets a condition object through', async () => {
+    expect(await problems(`${IMPORTS}Card.mt-4(class={{ head: 'p-6' }}) a\n`)).toEqual([])
+    expect(await problems(`${IMPORTS}Card({...rest} class={{ head: 'p-6' }}) a\n`)).toEqual([])
+    expect(await problems(`${IMPORTS}Card.mt-4(class={mine}) a\n`)).toEqual([expect.stringContaining('cannot be merged')])
     expect(await problems(`${IMPORTS}Plain.mt-4(class={{ on: true }})\nPlain({...rest} class={{ on: true }})\n`)).toEqual([])
   })
 
@@ -145,8 +146,8 @@ describe('kay check on a component with parts', () => {
   })
 
   it('reports a class error on the class attribute', async () => {
-    const parts = 'Card.mt-4(class={{ head: \'p-6\' }}) a'
-    const spread = 'Card.mt-4({...rest} class={{ head: \'p-6\' }}) a'
+    const parts = 'Card.mt-4(class={mine}) a'
+    const spread = 'Card.mt-4({...rest} class={mine}) a'
 
     expect(await positions(`${IMPORTS}${parts}\n`)).toEqual([at(parts, 'class')])
     expect(await positions(`${IMPORTS}${spread}\n`)).toEqual([at(spread, 'class')])

@@ -172,7 +172,7 @@ describe('a component with a recipe, as an island', () => {
   }
 
   it('renders what the server renders for the same props', async () => {
-    const props = { title: 'hi', tone: 'danger', compact: true, class: { head: 'p-6' } }
+    const props = { title: 'hi', tone: 'danger', compact: true, parts: { head: 'p-6' } }
     const server = await import(join(scratch, 'card.kay')) as { default: (props: object) => unknown }
     const holder = document.createElement('div')
 

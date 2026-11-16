@@ -1,7 +1,8 @@
-import type { ElementNode, NamedAttribute } from './ast'
+import type { Attribute, ElementNode, NamedAttribute } from './ast'
 import type { CodeBuilder } from './mapping'
 import type { ClassMerge } from './plan'
 import { helperName } from './markup'
+import { oldPartsClass } from './old-parts'
 import { shorthandClass } from './plan'
 
 // What wraps a merged class list: an array on an element, the class of `componentClass` on a component, or its spread when the merge can be empty.
@@ -81,4 +82,17 @@ export function addMergedClass(b: CodeBuilder, element: ElementNode, { attribute
   }
 
   b.add(close)
+}
+
+// The `class` of a component call that is its `parts` before 1.105, written as the `parts` prop, left out when a `parts` is written beside it, which the type check reads alone. Whether the attribute is that `class`.
+export function addOldParts(b: CodeBuilder, element: ElementNode, src: string, attribute: Attribute): boolean {
+  const old = oldPartsClass(element, src)
+
+  if (attribute !== old || old === undefined)
+    return false
+
+  if (!element.attributes.some(one => one.kind !== 'spread' && src.slice(one.name.start, one.name.end) === 'parts'))
+    b.add(' ').wrap(old.name, () => b.add('parts')).add('={').addSource(old.expression).add('}')
+
+  return true
 }

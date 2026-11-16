@@ -10,7 +10,7 @@ import type { Sites } from './rewrite-types'
 import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } from './script'
 import type { SlotTypes } from './slot-types'
 import { actionUrl } from '../runtime/action'
-import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, partNamesConst, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
+import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { addIslandShorthandTitle, addShorthandChecks, addShorthandGroup, hasShorthandTitle } from './head-shorthand'
 import { emitHeadTag, emitHeadText } from './head-tags'
@@ -552,7 +552,7 @@ class ModuleShell {
       this.jsx.emitRoot(rooted)
     }
 
-    b.add(`\n}\n${after}${partNamesConst(this.facts.parts)}`)
+    b.add(`\n}\n${after}`)
   }
 
   // Whether the script has `navigate` from `kay`, by import under any name or as a member of a namespace import.

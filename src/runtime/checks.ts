@@ -377,7 +377,7 @@ export interface TemplateHelpers {
   staticFor: <T>(each: Iterable<T> | null | undefined | false, rendered: JSX.Element, fallback?: JSX.Element) => JSX.Element
   Dynamic: <Tag>(props: { component: Tag } & PropsOf<Tag>) => JSX.Element
   componentClass: <const List extends readonly unknown[]>(list: List) => ComponentClass<List>
-  partClass: (props: unknown, part: string, names?: string) => unknown
+  partClass: (props: unknown, part: string) => unknown
   partHanded: (part: string, list: readonly unknown[]) => unknown
   partsClass: (list: readonly unknown[]) => unknown
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>

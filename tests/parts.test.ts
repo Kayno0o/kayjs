@@ -34,9 +34,10 @@ const files: Record<string, string> = {
   '_layout.kay': 'main.p-2(part="page") page\n',
   'client.kay': '--- client\nlet count = 0\n---\nsection.card\n  header(part="head") {count}\n',
   'node_modules/uilib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n',
+  'calls-rule.kay': '---\nimport Card from \'./card.kay\'\nconst user = { name: \'Ada\' } as { name: string } | undefined\nconst own = \'p-3\'\n---\nCard(title="a" class={{ active: user && user.name }})\nCard(title="b" class={{ active: true, head: \'p-4\' }})\nCard(title="c" class={{ head: \'p-6\' }})\nCard(title="d" class={{ root: \'mt-4\', body: \'p-8\' }})\nCard(title="e" parts={{ head: own }} class={{ head: \'p-6\' }})\n',
   'calls-conditions.kay': '---\nimport Card from \'./card.kay\'\nconst on = true\n---\nCard(title="array" class={[\'mt-2\', on && \'mt-3\']} parts={{ root: \'mt-6\', head: \'p-6\' }}) a\nCard(title="conditions" class={{ \'mt-2\': on, hidden: !on }} parts={{ root: \'mt-6\', head: \'p-6\' }}) b\n',
   'calls-parts.kay': '---\nimport Card from \'./card.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Hands from \'./hands.kay\'\nimport PanelOwn from \'./panel-own.kay\'\n---\nPanelOwn(parts={{ card: { head: \'p-9\' } }})\nCard.mt-4(title="short" parts={{ head: \'p-6\' }}) a\nCard(title="root" class="mt-2" parts={{ root: \'mt-6\', body: \'p-8\' }}) b\nSpread(title="s" parts={{ root: \'p-9\' }} id="s")\nPanel(parts={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nHands(parts={{ root: \'p-6\', spinner: \'size-5\' }})\nHands(class={{ spinner: \'size-5\' }} parts={{ spinner: \'size-7\' }})\n',
-  'calls.kay': '---\nimport Card from \'./card.kay\'\nimport Rows from \'./rows.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Rooted from \'./rooted.kay\'\nimport Wrapper from \'./wrapper.kay\'\nimport Hands from \'./hands.kay\'\nimport Library from \'uilib/card.kay\'\nconst built = [\'p-\', \'8\'].join(\'\')\n---\nCard(title="string" class="mt-4") a\nCard(title="parts" class={{ root: \'mt-6\', head: \'p-6\', body: built }}) b\nCard(title="plain")\nRows(rows={[\'x\', \'y\']} open class={{ item: \'p-8\', open: \'text-lg\' }})\nRows(rows={[]} open={false} class="gap-2")\nSpread(title="s" class={{ root: \'p-9\' }} id="s")\nPanel(class={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nPlain(class="given")\nRooted(class={{ top: \'t\', root: \'r\' }})\nWrapper(class="outer")\nHands(class={{ root: \'p-6\', spinner: \'size-5\' }})\nHands(class={{ root: { spinner: \'size-7\' }, spinner: \'size-5\' }})\nHands(class="p-8")\nLibrary(title="lib" class={{ head: \'p-6\' }})\n',
+  'calls.kay': '---\nimport Card from \'./card.kay\'\nimport Rows from \'./rows.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Rooted from \'./rooted.kay\'\nimport Wrapper from \'./wrapper.kay\'\nimport Hands from \'./hands.kay\'\nimport Library from \'uilib/card.kay\'\nconst built = [\'p-\', \'8\'].join(\'\')\n---\nCard(title="string" class="mt-4") a\nCard(title="parts" class={{ root: \'mt-6\', head: \'p-6\' }} parts={{ body: built }}) b\nCard(title="plain")\nRows(rows={[\'x\', \'y\']} open class={{ item: \'p-8\', open: \'text-lg\' }})\nRows(rows={[]} open={false} class="gap-2")\nSpread(title="s" class={{ root: \'p-9\' }} id="s")\nPanel(class={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nPlain(class="given")\nRooted(class={{ top: \'t\', root: \'r\' }})\nWrapper(class="outer")\nHands(class={{ root: \'p-6\', spinner: \'size-5\' }})\nHands(class={{ root: { spinner: \'size-7\' }, spinner: \'size-5\' }})\nHands(class="p-8")\nLibrary(title="lib" class={{ head: \'p-6\' }})\n',
 }
 
 beforeAll(async () => {
@@ -115,7 +116,7 @@ describe('a component with parts, on the server', () => {
     expect(html).toContain('<article id="s" data-part="root" class="box p-9">s</article>')
     expect(html).toContain('<section class="panel m-2"><section class="card p-4 m-1"><header class="p-9" data-part="head">t</header>')
     expect(html).toContain('<button class="btn p-6" data-part="root"><span class="spin size-5" data-part="spinner">wait</span></button>')
-    expect(html).toContain('<button class="btn" data-part="root"><span class="spin size-7 size-5" data-part="spinner">wait</span></button>')
+    expect(html).toContain('<button class="btn" data-part="root"><span class="spin size-5" data-part="spinner">wait</span></button>')
   })
 
   it('takes an array and an object of conditions as the class of a call, beside its parts', async () => {
@@ -125,14 +126,14 @@ describe('a component with parts, on the server', () => {
     expect(html).toContain('<section class="card p-4 mt-6 mt-2"><header class="p-6" data-part="head">conditions</header>')
   })
 
-  it('tells the parts object of before 1.105 from an object of conditions by its keys, not by what its values evaluate to', async () => {
-    const user = { name: 'Ada' } as { name: string } | undefined
-    const card = async (given: object) => render('card.kay', { title: 't', class: given })
+  it('hands a literal parts object in class to the component as its parts, and takes any other object as conditions', async () => {
+    const html = await render('calls-rule.kay')
 
-    expect(await card({ active: user?.name })).toContain('<section class="card p-4 active"><header class="p-2" data-part="head">')
-    expect(await card({ active: true, head: 'p-4' })).toContain('<section class="card p-4 active head"><header class="p-2" data-part="head">')
-    expect(await card({ head: 'p-6' })).toContain('<section class="card p-4"><header class="p-6" data-part="head">')
-    expect(await card({ root: 'mt-4', body: 'p-8' })).toContain('<section class="card p-4 mt-4"><header class="p-2" data-part="head">t</header><div class="p-8" data-part="body">')
+    expect(html).toContain('<section class="card p-4 active"><header class="p-2" data-part="head">a</header>')
+    expect(html).toContain('<section class="card p-4 active head"><header class="p-2" data-part="head">b</header>')
+    expect(html).toContain('<section class="card p-4"><header class="p-6" data-part="head">c</header>')
+    expect(html).toContain('<section class="card p-4 mt-4"><header class="p-2" data-part="head">d</header><div class="p-8" data-part="body"></div></section>')
+    expect(html).toContain('<header class="p-6" data-part="head">e</header>')
   })
 
   it('leaves a component without parts alone, class prop and all', async () => {
@@ -151,11 +152,11 @@ describe('a component with parts, on the server', () => {
     const attrs = { target: '_blank' }
 
     expect(await render('link.kay', { attrs })).toBe('<a data-part="link" href="/x" target="_blank">go</a>')
-    expect(await render('link.kay', { attrs, class: { link: 'mt-4' } })).toBe('<a data-part="link" href="/x" target="_blank" class="mt-4">go</a>')
+    expect(await render('link.kay', { attrs, parts: { link: 'mt-4' } })).toBe('<a data-part="link" href="/x" target="_blank" class="mt-4">go</a>')
     expect(await render('link.kay', { attrs: { class: 'brought' } })).toBe('<a data-part="link" href="/x" class="brought">go</a>')
     expect(await render('link.kay', { attrs: { class: '', style: '' } })).toBe('<a data-part="link" href="/x">go</a>')
     expect(await render('link-class.kay', { attrs })).toBe('<a data-part="link" href="/x" target="_blank" class="p-2">go</a>')
-    expect(await render('link-class.kay', { attrs: { class: 'brought' }, class: { link: 'mt-4' } })).toBe('<a data-part="link" href="/x" class="p-2 brought mt-4">go</a>')
+    expect(await render('link-class.kay', { attrs: { class: 'brought' }, parts: { link: 'mt-4' } })).toBe('<a data-part="link" href="/x" class="p-2 brought mt-4">go</a>')
   })
 
   it('renders the classes of a library component compiled from node_modules', async () => {
@@ -214,7 +215,7 @@ describe('a component with parts, as an island', () => {
   }
 
   it('renders the classes and data-part the server renders, in an if, a for and a component call', async () => {
-    const props = { title: 'hi', items: ['a', 'b'], class: { root: 'mt-6', head: 'p-6', item: 'p-8', action: 'p-9' } }
+    const props = { title: 'hi', items: ['a', 'b'], parts: { root: 'mt-6', head: 'p-6', item: 'p-8', action: 'p-9' } }
     const server = await import(join(scratch, 'island.kay')) as { default: (props: object) => unknown }
     const holder = document.createElement('div')
 
@@ -246,7 +247,7 @@ describe('a component with parts, as an island', () => {
   })
 
   it('hands the called component the parts a call names beside its own, as the server does', async () => {
-    const props = { class: { root: { spinner: 'size-7' }, spinner: 'size-5' } }
+    const props = { parts: { root: { spinner: 'size-7' }, spinner: 'size-5' } }
     const server = await import(join(scratch, 'hands.kay')) as { default: (props: object) => unknown }
     const holder = document.createElement('div')
 
@@ -260,7 +261,7 @@ describe('a component with parts, as an island', () => {
   })
 
   it('hands a part beside a shorthand on the call, the shorthand joining the root', async () => {
-    const { root, stop } = mount(handsShort, { class: { spinner: 'size-5' } })
+    const { root, stop } = mount(handsShort, { parts: { spinner: 'size-5' } })
 
     expect(summary(root, 'button, span')).toEqual([['button', 'btn mt-4', 'root'], ['span', 'spin size-5', 'spinner']])
     stop()
@@ -278,14 +279,14 @@ describe('a component with parts, as an island', () => {
     }
 
     expect(classOf(link, { attrs })).toBeNull()
-    expect(classOf(link, { attrs, class: { link: 'mt-4' } })).toBe('mt-4')
+    expect(classOf(link, { attrs, parts: { link: 'mt-4' } })).toBe('mt-4')
     expect(classOf(link, { attrs: { class: 'brought' } })).toBe('brought')
     expect(classOf(linkClass, { attrs })).toBe('p-2')
-    expect(classOf(linkClass, { attrs: { class: 'brought' }, class: { link: 'mt-4' } })).toBe('p-2 brought mt-4')
+    expect(classOf(linkClass, { attrs: { class: 'brought' }, parts: { link: 'mt-4' } })).toBe('p-2 brought mt-4')
   })
 
   it('follows a class the page builds from a signal', async () => {
-    const props = { title: 'hi', items: [], class: { shown: 'text-lg' } }
+    const props = { title: 'hi', items: [], parts: { shown: 'text-lg' } }
     const { root, stop } = mount(island, props)
 
     expect(root.querySelector('p')).toBeNull()
@@ -305,7 +306,7 @@ describe('a component with parts, as an island', () => {
   })
 
   it('renders a client-only component\'s parts', () => {
-    const { root, stop } = mount(client, { class: { root: 'mt-2', head: 'p-3' } })
+    const { root, stop } = mount(client, { parts: { root: 'mt-2', head: 'p-3' } })
 
     expect(summary(root)).toEqual([['section', 'card mt-2', null], ['header', 'p-3', 'head']])
     stop()
@@ -373,7 +374,7 @@ describe('kay check on parts', () => {
   })
 
   it('reads a part\'s own entry only', () => {
-    expect(partClass({ class: { head: 'p-6' } }, 'constructor')).toBeUndefined()
+    expect(partClass({ parts: { head: 'p-6' } }, 'constructor')).toBeUndefined()
     expect(partClass({ class: 'mt-4' }, 'head')).toBeUndefined()
     expect(partClass({ class: 'mt-4' }, 'root')).toBe('mt-4')
     expect(partClass(undefined, 'root')).toBeUndefined()
