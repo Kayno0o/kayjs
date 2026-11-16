@@ -624,6 +624,11 @@ export interface PartFacts {
   merges: boolean
 }
 
+// The name of every part of the component, which `partClass` tells the parts object of before 1.105 from an object of conditions in `class` by.
+export function componentPartNames(parts: PartFacts | undefined): string[] {
+  return [...new Set(['root', ...parts?.names.keys() ?? [], ...parts?.handed.keys() ?? []])]
+}
+
 const ANY_WHITESPACE = /\s+/g
 
 // The key of the prop of this component, typed `Bindable<T>`, the expression of a `bind:` names, which it passes on as it reads and writes it rather than a signal.

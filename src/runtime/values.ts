@@ -214,6 +214,7 @@ function mergeParts(found: readonly Parts[]): Parts {
   for (const parts of found) {
     for (const [name, entry] of Object.entries(parts)) {
       const earlier = Object.hasOwn(merged, name) ? merged[name] : undefined
+
       merged[name] = joinable(earlier) && joinable(entry) ? [earlier, entry] : entry ?? earlier
     }
   }
