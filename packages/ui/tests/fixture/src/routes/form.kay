@@ -4,7 +4,7 @@ import { action } from 'kay'
 
 export const rename = action(t.Object({ name: t.String({ minLength: 2, maxLength: 200, error: 'Two letters at least' }) }), async ({ name }) => name)
 
-const failure = rename.failed()
+const failure = rename.form.failed()
 ---
 ---
 import FormField from '@kayjs/ui/form-field.kay'

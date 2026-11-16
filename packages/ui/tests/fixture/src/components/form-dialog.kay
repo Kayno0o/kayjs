@@ -42,7 +42,7 @@ const rename = Object.assign(async (form: FormData) => {
   finally {
     pending = false
   }
-}, { [Symbol.for('kay.action')]: true, pending, url: '/_kay/action/form/rename', failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined, error: (field = '') => last()?.errors[field] }) as unknown as Action<{ name: string }, string | Failure<Refusal>>
+}, { [Symbol.for('kay.action')]: true, pending, url: '/_kay/action/form/rename', form: { failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined, error: (field = '') => last()?.errors[field] } }) as unknown as Action<{ name: string }, string | Failure<Refusal>>
 
 function said(refusal: Refusal) {
   return refusal.field ? { [refusal.field]: refusal.error } : refusal.error

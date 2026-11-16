@@ -1384,7 +1384,7 @@ describe('optimistic changes', () => {
       await expect(moving).rejects.toThrow('the user left')
       expect(at()).toBe(0)
       expect(move.pending()).toBe(false)
-      expect(move.failed()).toBeUndefined()
+      expect(move.form.failed()).toBeUndefined()
     }
     finally {
       fetched.mockRestore()

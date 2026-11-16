@@ -160,17 +160,17 @@ describe('the messages a refused form is described by', () => {
   input(name="title" aria-describedby="help")
   input(name="tag")
   input(name="slug" aria-describedby={hint})
-  p {add.error('tag')}
-  if add.error('title') then message
+  p {add.form.error('tag')}
+  if add.form.error('title') then message
     p {message}
-  if add.error('slug') then message
+  if add.form.error('slug') then message
     p {message}
   for row of rows
-    if add.error('tag') then message
+    if add.form.error('tag') then message
       p.row {message}
-  if add.error() then message
+  if add.form.error() then message
     p(id="own-form") {message}
-  if other.error('x') then message
+  if other.form.error('x') then message
     p.other {message}
 `
 
@@ -199,7 +199,7 @@ describe('the messages a refused form is described by', () => {
   })
 
   it('names an element inline in text holding the error', () => {
-    const { tsx } = compileKay('form(action={add})\n  input(name="tag")\n  p Problem: #[span {add.error(\'tag\')}]\n', 'page.kay', { output: 'html' })
+    const { tsx } = compileKay('form(action={add})\n  input(name="tag")\n  p Problem: #[span {add.form.error(\'tag\')}]\n', 'page.kay', { output: 'html' })
 
     expect(tsx).toContain('KayFieldDescribed(KayFormInvalid((add), "tag") ? "add-tag-error" : undefined, undefined, undefined, undefined, KayFormInvalid((add), "tag") || undefined)')
     expect(tsx).toContain('<span id=\\"add-tag-error\\">')
@@ -227,7 +227,7 @@ describe('the messages a refused form is described by', () => {
   })
 
   it('leaves a description of the field\'s own already naming the message as written, on the server and in an island', () => {
-    const source = 'form(action={add})\n  input(name="title" aria-describedby="note title-problem")\n  if add.error(\'title\')\n    p#title-problem {add.error(\'title\')}\n'
+    const source = 'form(action={add})\n  input(name="title" aria-describedby="note title-problem")\n  if add.form.error(\'title\')\n    p#title-problem {add.form.error(\'title\')}\n'
     const html = compileKay(source, 'page.kay', { output: 'html' }).tsx
     const dom = compileKay(source, 'page.kay', { output: 'dom' }).tsx
 
@@ -239,7 +239,7 @@ describe('the messages a refused form is described by', () => {
 
   it('imports the island\'s description helper only for a form whose messages describe its fields', () => {
     expect(compileKay('form(action={add})\n  input(name="title")\n', 'page.kay', { output: 'dom' }).tsx).not.toContain('formDescribed')
-    expect(compileKay('form(action={add})\n  input(name="title")\n  p {add.error(\'title\')}\n', 'page.kay', { output: 'dom' }).tsx).toContain('formDescribed as KayFormDescribed')
+    expect(compileKay('form(action={add})\n  input(name="title")\n  p {add.form.error(\'title\')}\n', 'page.kay', { output: 'dom' }).tsx).toContain('formDescribed as KayFormDescribed')
   })
 
   it('adds and removes the message\'s id alone, keeping the other ids in their order', () => {
@@ -250,7 +250,7 @@ describe('the messages a refused form is described by', () => {
       removeAttribute: (name: string) => void attributes.delete(name),
     } as unknown as Element
     let errors: Record<string, string> = {}
-    const target = Object.assign(() => undefined, { [Symbol.for('kay.action')]: true, error: (field: string) => errors[field] })
+    const target = Object.assign(() => undefined, { [Symbol.for('kay.action')]: true, form: { error: (field: string) => errors[field] } })
 
     formDescribed(element, target, 'title', 'title-error')
     expect(attributes.has('aria-describedby')).toBe(false)
@@ -290,7 +290,7 @@ describe('the messages a refused form is described by', () => {
   it('keeps a field invalid while any source marks it, takes the mark off once none does, and leaves one the page wrote', () => {
     const element = fakeElement()
     let errors: Record<string, string> = { title: 'Too short' }
-    const target = Object.assign(() => undefined, { [Symbol.for('kay.action')]: true, error: (field: string) => errors[field] })
+    const target = Object.assign(() => undefined, { [Symbol.for('kay.action')]: true, form: { error: (field: string) => errors[field] } })
     const field = {}
     const invalid = () => element.getAttribute('aria-invalid')
 
@@ -358,7 +358,7 @@ describe('a form naming its fields with field and showing their messages with er
   textarea(field="body")
   for row of rows
     error title
-  if add.error('title') then message
+  if add.form.error('title') then message
     p.old {message}
 `
 

@@ -40,7 +40,7 @@ const auth = ctx.locals.auth
 const features = auth.features()
 const pending = await auth.twoFactor.pending()
 const redirect = localPath(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
-const error = verify.failed()?.data?.error
+const error = verify.form.failed()?.data?.error
 const landmark = ctx.locals.auth.features().pages?.main !== false
 ---
 head

@@ -108,8 +108,8 @@ const enclosing: unknown[] = []
 const keys: (string | undefined)[] = []
 
 // The refusal of the action `target` as the form being rendered shows it: undefined without one, and when the post came from another form sharing the action, which a form with a key tells from the key the refusal brought back.
-function refusalOf(target: unknown): ReturnType<FormTarget['failed']> {
-  const failed = isAction(target) ? untrack((target as FormTarget).failed) : undefined
+function refusalOf(target: unknown): ReturnType<FormTarget['form']['failed']> {
+  const failed = isAction(target) ? untrack(() => (target as FormTarget).form.failed()) : undefined
   const key = keys.at(-1)
   const sent = failed?.values[FORM_FIELD]
 
@@ -275,7 +275,7 @@ export function issueScope<Result>(target: unknown, render: () => Result, only =
 export function formErrors(): (field: string) => string | undefined {
   const target = reading.at(-1)
 
-  return isAction(target) ? field => (target as FormTarget).error(field) : () => undefined
+  return isAction(target) ? field => (target as FormTarget).form.error(field) : () => undefined
 }
 
 // The action of the form being rendered, none outside one: what an `error` or `pending` line outside every `form(action)` of its file, in a snippet or a component, follows, taken as it renders and read later.
@@ -413,7 +413,7 @@ function protectionMarkup(target: unknown, reuse = true): string {
     return honeypot
 
   // A refused post keeps the time its form rendered at, so the visitor is not sent back to zero.
-  const sent = reuse ? untrack((target as FormTarget).failed)?.values[STAMP_FIELD] : undefined
+  const sent = reuse ? untrack(() => (target as FormTarget).form.failed())?.values[STAMP_FIELD] : undefined
 
   return `${honeypot}<input type="hidden" name="${STAMP_FIELD}" value="${escapeAttribute(stamper(target.url, sent, minTimeOf(target.protection)!.maxAge))}">`
 }
@@ -440,7 +440,7 @@ export function formChecked(target: unknown, name: string, value: unknown): bool
 
 // `aria-invalid` for a field a refused post or call got an error for.
 export function formInvalid(target: unknown, name: string): 'true' | undefined {
-  return isAction(target) && (target as FormTarget).error(name) !== undefined ? 'true' : undefined
+  return isAction(target) && (target as FormTarget).form.error(name) !== undefined ? 'true' : undefined
 }
 
 // What holds the mark of a refused field in an island, beside a component marking the same control.
@@ -470,5 +470,5 @@ export function formDescribed(element: Element, target: unknown, field: string, 
 
 // The message a refused post or call gave `field` of a form posting to `target`, or under '' the form's own: what an `error` line shows.
 export function formError(target: unknown, field: string): string | undefined {
-  return isAction(target) ? (target as FormTarget).error(field) : undefined
+  return isAction(target) ? (target as FormTarget).form.error(field) : undefined
 }

@@ -35,7 +35,7 @@ const user = await auth.requireUser()
 const features = auth.features()
 const tokens = await auth.tokens.list()
 const created = create.data()
-const refused = create.failed()?.data?.error
+const refused = create.form.failed()?.data?.error
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
 ---
 PageSection(title={wording('auth.account.tokens.title', 'Access tokens')})

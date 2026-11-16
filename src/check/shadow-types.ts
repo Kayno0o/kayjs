@@ -33,6 +33,7 @@ import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
+import { actionReaders } from './action-readers'
 import { actionType } from './action-type'
 import { aiLanguage } from './ai-language'
 import { appHooks } from './app-hooks'
@@ -43,31 +44,31 @@ import { configGroups } from './config-groups'
 import { configSwitches } from './config-switches'
 import { contextImport } from './context-import'
 import { ownFile } from './diagnose'
+
 import { endpointExports } from './endpoint-exports'
-
 import { envFiles } from './env-files'
+
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-
 import { formatDurationNumbers } from './format-duration'
+
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
-
 import { guardOptions } from './guard-options'
-import { unguardedRoutes, unguardedTools } from './guards'
 
+import { unguardedRoutes, unguardedTools } from './guards'
 import { hookContext } from './hook-context'
 import { hookNames } from './hook-names'
 import { i18nKeys } from './i18n-keys'
 import { imagesKeys } from './images-keys'
-import { islandOnlyComponents } from './island-only'
 
+import { islandOnlyComponents } from './island-only'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
+
 import { largePublicImages } from './large-images'
 
 import { liveApi } from './live-api'
-
 import { mailApi } from './mail-api'
-import { mcpRoutes } from './mcp-routes'
 
+import { mcpRoutes } from './mcp-routes'
 import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
 import { unreadOpenSettings } from './open-settings'
 import { pagesOptions } from './pages-options'
@@ -191,6 +192,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
   async ({ root, options }) => sourceReaders(root, options),
+  async ({ root, options }) => actionReaders(root, options),
   async ({ root, options }) => liveApi(root, options),
   async ({ root, options }) => actionType(root, options),
   async ({ root, options }) => socketFrames(root, options),

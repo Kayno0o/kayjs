@@ -18,7 +18,7 @@ import ContactForm from '@kayjs/ui/contact-form.kay'
 ContactForm(action={contact})
 ```
 
-- Fields beyond the name, email and message go in as the children, between the email and the message, each in a [FormField](/ui/form-field) with `issue={contact.error('topic')}`. They are named with `name`, as `field` is only valid in the form itself.
+- Fields beyond the name, email and message go in as the children, between the email and the message, each in a [FormField](/ui/form-field) with `issue={contact.form.error('topic')}`. They are named with `name`, as `field` is only valid in the form itself.
 - `nameLabel`, `emailLabel`, `messageLabel`, `submitLabel` and `sentLabel` replace the texts, which read the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones in the page's language (English and French), and are English without them, and `rows` sets the message box's height.
 - `onSend` is called once the message went out, with what the action returned, to count a conversion or close a dialog around the form. `onError` is called when the post is refused or fails, with the failure: its `status`, its `errors` by field and the `data` the handler passed to `ctx.fail`. The notice and the field messages show as before, and a form given neither stays static. The callbacks are functions, so they go to a form inside an island.
 - `@sent` replaces the notice that says the message went out: `ContactForm(action={contact})` then `@sent` and its markup.

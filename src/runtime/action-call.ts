@@ -247,6 +247,23 @@ function withFixed(input: unknown, fixed: Record<string, unknown> | undefined): 
   return copy
 }
 
+// Checks a form against the action's schema in the browser, as the server would, and hands `show` the messages to read as a refusal's, undefined for none; one field checked replaces that field's message and leaves the others.
+function validator(url: () => string, failed: () => { errors: Record<string, string> } | undefined, show: (errors: Record<string, string> | undefined) => unknown): (form: HTMLFormElement, field?: string) => Promise<boolean> {
+  return async (form, field) => {
+    const { fieldMessages } = await import('./validate')
+    const found = fieldMessages(form, withoutBase(url()), field)
+
+    if (found === undefined)
+      return true
+
+    const errors = field === undefined ? found : { ...Object.fromEntries(Object.entries(untrack(failed)?.errors ?? {}).filter(([name]) => name !== field)), ...found }
+
+    show(Object.keys(errors).length === 0 ? undefined : errors)
+
+    return field === undefined ? Object.keys(found).length === 0 : found[field] === undefined
+  }
+}
+
 // Posts a call, counting the ones in flight; a call that redirects rejects with `ActionRedirectError` once the browser is on its way, so the action stops being pending.
 // How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
 export function callable(url: () => string): { call: (input: never, options?: CallOptions) => CallPromise<CallResult<unknown, unknown>>, reads: PropertyDescriptorMap, bound: Bound } {
@@ -275,6 +292,8 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
 
     return found && !found.succeeded ? { status: found.status, message: messageOf({ status: found.status, errors: found.errors, data: found.data }, actionFailed(found.status)), values: found.values, errors: found.errors, data: found.data } : undefined
   }
+  const error = (field = '') => failed()?.errors[field]
+  const validate = validator(url, failed, errors => called(navigation.page, errors === undefined ? null : { action: url(), status: 422, values: {}, errors, data: undefined }))
 
   const run = async (lane: Lane, input: unknown, options?: CallOptions) => {
     // The page the call was made on, whose outcome it is even once the visitor went elsewhere.
@@ -469,25 +488,13 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       settled: read(async () => idle.wait(flying())),
       ...formHooks(url),
       progress: read(progress),
+      form: read({ failed, error, validate }),
       failed: read(failed),
       succeeded: read(() => succeededOf(outcome())),
       data: read(() => outcome()?.succeeded ? outcome()?.data : undefined),
       status: read(() => statusOf(inFlight(), outcome(), failed())),
-      error: read((field = '') => failed()?.errors[field]),
-      validate: read(async (form: HTMLFormElement, field?: string) => {
-        const { fieldMessages } = await import('./validate')
-        const found = fieldMessages(form, withoutBase(url()), field)
-
-        if (found === undefined)
-          return true
-
-        // One field checked replaces that field's message and leaves the others.
-        const errors = field === undefined ? found : { ...Object.fromEntries(Object.entries(untrack(failed)?.errors ?? {}).filter(([name]) => name !== field)), ...found }
-
-        called(navigation.page, Object.keys(errors).length === 0 ? null : { action: url(), status: 422, values: {}, errors, data: undefined })
-
-        return field === undefined ? Object.keys(found).length === 0 : found[field] === undefined
-      }),
+      error: read(error),
+      validate: read(validate),
       refused: read((error: unknown) => error instanceof ActionError && refusedAt.get(error) === url()),
       track: read(track),
       with: read((fields: Record<string, unknown>) => withFields(call, fields)),

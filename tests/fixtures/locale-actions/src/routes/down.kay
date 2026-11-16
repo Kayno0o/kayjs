@@ -22,9 +22,9 @@ form(action={mute})
   button Mute
 form(action={blank})
   button Blank
-if loud.error()
-  p.error {loud.error()}
-if mute.error()
-  p.error {mute.error()}
-if blank.error()
-  p.error {blank.error()}
+if loud.form.error()
+  p.error {loud.form.error()}
+if mute.form.error()
+  p.error {mute.form.error()}
+if blank.form.error()
+  p.error {blank.form.error()}

@@ -143,18 +143,18 @@ h2 Add one
 form(action={add})
   label Title
     input(name="title")
-  if add.error('title') then message
+  if add.form.error('title') then message
     p.error {message}
   label Author
     input(name="author")
-  if add.error('author') then message
+  if add.form.error('author') then message
     p.error {message}
-  if add.failed()?.data then data
+  if add.form.failed()?.data then data
     p.error {data.message}
   button Add
 ```
 
-A post the schema refuses comes back to the page with the fields as they were typed. `add.error('title')` holds the schema's `error` message. `ctx.fail` sends its data back the same way, and you read it with `add.failed()`.
+A post the schema refuses comes back to the page with the fields as they were typed. `add.form.error('title')` holds the schema's `error` message. `ctx.fail` sends its data back the same way, and you read it with `add.form.failed()`.
 
 Every string field needs a `maxLength`, so what a visitor posts is bounded. `kay check` reports one without it.
 

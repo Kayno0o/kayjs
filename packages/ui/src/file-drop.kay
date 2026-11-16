@@ -44,7 +44,7 @@ const { accept, multiple = false, paste = false, disabled = false, invalid, labe
   label?: string | undefined
   // The field the files post as: the zone keeps what is picked, dropped or pasted on its input, so a form posts them as a plain file field would, to an `s.File()` or `s.Files()` of an action. Inside a FormDialog, the message its call was refused with for that field shows under the zone, as a FormField shows it.
   name?: string | undefined
-  // A message of the page's own, such as `add.error('photo')` after a plain form post, shown under the zone.
+  // A message of the page's own, such as `add.form.error('photo')` after a plain form post, shown under the zone.
   issue?: string | undefined
   // `sm` is a slim row, its content from the left, to sit inline beside other fields rather than as a large target of its own.
   size?: Exclude<FieldSize, 'lg'> | undefined

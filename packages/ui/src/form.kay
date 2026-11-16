@@ -32,7 +32,7 @@ const checking = signal(false)
 let form: HTMLFormElement | undefined
 
 // The messages of the last refusal, the ones a post the page was rendered for came back with included, which the call's own then replace.
-formIssues.provide(() => ({ ...action.failed()?.errors as Record<string, string> | undefined, ...issues() }))
+formIssues.provide(() => ({ ...action.form.failed()?.errors as Record<string, string> | undefined, ...issues() }))
 
 async function submit(event: SubmitEvent) {
   event.preventDefault()

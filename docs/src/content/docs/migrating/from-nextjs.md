@@ -175,9 +175,9 @@ A server action is an `async` function marked `'use server'`. A kay action is ex
 | --- | --- |
 | `'use server'` function in a form | `export const add = action(schema, handler)` and `form(action={add})` |
 | `formData.get('title')` and manual checks | The schema, with `field="title"` checked against it by `kay check` |
-| `useActionState` | `add.error('title')`, `add.failed()`, `add.data()` |
+| `useActionState` | `add.form.error('title')`, `add.form.failed()`, `add.data()` |
 | `useFormStatus` | `add.pending()` |
-| A returned error object | `return ctx.deny(409, { data: { message } })`, read as `add.failed()?.data` |
+| A returned error object | `return ctx.deny(409, { data: { message } })`, read as `add.form.failed()?.data` |
 | Calling the action from a client component | Import it from the page and call it, `await add({ title })` |
 
 A form posts without JavaScript, and an action refuses a post from another site. See [Forms and actions](/essentials/forms-and-actions).

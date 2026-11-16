@@ -108,7 +108,7 @@ form(action={add})
 | `<form method="POST" action="?/add">` | `form(action={add})` |
 | `use:enhance` | Nothing to add. With kay's script a form posts without a reload, and without it the form still posts |
 | `fail(400, { missing: true })` | The schema refuses the input, or the handler returns `ctx.deny(409, { data })` |
-| `form?.missing` | `add.error('title')`, `error title` in the template, or `add.failed()?.data` |
+| `form?.missing` | `add.form.error('title')`, `error title` in the template, or `add.form.failed()?.data` |
 | `form` after a success | `add.data()` |
 | `redirect(303, '/')` in an action | `return ctx.redirect('/')` |
 | `invalidateAll()` after a post | Automatic. The page's loads run again after an action |

@@ -17,8 +17,7 @@ const action = Object.assign(async () => undefined, {
   succeeded: () => done(),
   status: () => done() === undefined ? 'idle' : 'ready',
   data: () => done()?.data,
-  failed: () => failed(),
-  error: (field = '') => (failed()?.errors as Record<string, string> | undefined)?.[field],
+  form: { failed: () => failed(), error: (field = '') => (failed()?.errors as Record<string, string> | undefined)?.[field] },
 }) as unknown as Action
 ---
 button#sent(onClick={() => { failed = undefined; done = { data: 'ok' } }}) Sent

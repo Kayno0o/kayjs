@@ -5,8 +5,9 @@ function action<Spec extends Schema, Output, const Honeypot extends string = nev
 [.] Action
 interface Action<Input = never, Output = unknown, Honeypot extends string = never>
   data: () => Final<Exclude<Output, Failure<unknown>>> | undefined
-  error: (field?: "" | Extract<keyof Input, string> | Honeypot | undefined) => string | undefined
-  failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
+  /** @deprecated Write `form.error(field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ error: (field?: "" | Extract<keyof Input, string> | Honeypot | undefined) => string | undefined
+  /** @deprecated Write `form.failed()`, the readers a form shows are grouped under `form`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
+  form: ActionForm<Input, Output, Honeypot>
   onData: (listener: (event: { input: FormData; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; input: FormData; }) => void) => () => void
   onStart: (listener: (event: { input: FormData; }) => void) => () => void
@@ -20,7 +21,7 @@ interface Action<Input = never, Output = unknown, Honeypot extends string = neve
   queue?: CallQueue | undefined;
 } & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Input, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
-  validate: (form: HTMLFormElement, field?: Extract<keyof Input, string> | undefined) => Promise<boolean>
+  /** @deprecated Write `form.validate(form, field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ validate: (form: HTMLFormElement, field?: Extract<keyof Input, string> | undefined) => Promise<boolean>
   with: (fields: Partial<Input>) => Action<Input, Output, Honeypot>
 
 [.] ActionContext
@@ -79,6 +80,12 @@ interface ActionFailed extends ActionRun
 
 [.] ActionFor
 interface ActionFor<Params extends Readonly<Record<string, unknown>>, Guarded extends object = object>
+
+[.] ActionForm
+interface ActionForm<Input = never, Output = unknown, Honeypot extends string = never>
+  error: (field?: "" | Extract<keyof Input, string> | Honeypot | undefined) => string | undefined
+  failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
+  validate: (form: HTMLFormElement, field?: Extract<keyof Input, string> | undefined) => Promise<boolean>
 
 [.] ActionHooks
 interface ActionHooks
@@ -1376,8 +1383,9 @@ interface Selection<Key>
 [.] ServerAction
 interface ServerAction<Spec extends Schema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Spec>>, Output, Honeypot>
   data: () => Final<Exclude<Output, Failure<unknown>>> | undefined
-  error: (field?: "" | Extract<keyof Sendable<Static<Spec>>, string> | Honeypot | undefined) => string | undefined
-  failed: () => FormFailure<Sendable<Static<Spec>>, FailureData<Output>, Honeypot> | undefined
+  /** @deprecated Write `form.error(field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ error: (field?: "" | Extract<keyof Sendable<Static<Spec>>, string> | Honeypot | undefined) => string | undefined
+  /** @deprecated Write `form.failed()`, the readers a form shows are grouped under `form`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ failed: () => FormFailure<Sendable<Static<Spec>>, FailureData<Output>, Honeypot> | undefined
+  form: ActionForm<Sendable<Static<Spec>>, Output, Honeypot>
   handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>
   onData: (listener: (event: { input: FormData; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; input: FormData; }) => void) => () => void
@@ -1394,7 +1402,7 @@ interface ServerAction<Spec extends Schema, Output, Honeypot extends string = ne
   queue?: CallQueue | undefined;
 } & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Sendable<Static<Spec>>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
-  validate: (form: HTMLFormElement, field?: Extract<keyof Sendable<Static<Spec>>, string> | undefined) => Promise<boolean>
+  /** @deprecated Write `form.validate(form, field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ validate: (form: HTMLFormElement, field?: Extract<keyof Sendable<Static<Spec>>, string> | undefined) => Promise<boolean>
   with: (fields: Partial<Sendable<Static<Spec>>>) => Action<Sendable<Static<Spec>>, Output, Honeypot>
 
 [.] ServerOfModule

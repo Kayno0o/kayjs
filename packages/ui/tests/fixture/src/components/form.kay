@@ -35,8 +35,7 @@ const add = Object.assign(async (form: FormData) => {
   [Symbol.for('kay.action')]: true,
   pending,
   url: '/_kay/action/form/add',
-  failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined,
-  error: (field = '') => last()?.errors[field],
+  form: { failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined, error: (field = '') => last()?.errors[field] },
 }) as unknown as Action<{ title: string }, string | Failure<never>>
 ---
 Form(action={add} failureLabel="Could not add" saved="Added." onSave={({ data }) => onSave(data)} onError={onError} refused={refused})

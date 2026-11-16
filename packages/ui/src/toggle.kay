@@ -31,7 +31,7 @@ const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'role' | 'chec
   hint?: string | number | undefined
   // The field the switch posts as: inside a FormDialog, the message its call was refused with for that field shows under the switch, as a FormField shows it.
   name?: string | undefined
-  // A message of the page's own, such as `add.error('terms')` after a plain form post, shown under the switch.
+  // A message of the page's own, such as `add.form.error('terms')` after a plain form post, shown under the switch.
   issue?: string | undefined
   // Marks the switch as refused, in the danger colour with `aria-invalid`. A message shown for the switch marks it on its own.
   invalid?: boolean | undefined
@@ -48,7 +48,7 @@ const rest = without(given, 'checked', 'label', 'showLabel', 'hint', 'name', 'is
 const showLabel = given.showLabel ?? true
 
 const sent = given.onChange ? undefined : postedChecked(name, rest.value as string | number | undefined, given.checked ?? false)
-// Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.error('terms')}` does.
+// Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.form.error('terms')}` does.
 const shown = name !== undefined || 'issue' in given
 const checking = shown || 'invalid' in given
 // A FormField naming the same field shows its messages itself.

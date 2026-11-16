@@ -49,8 +49,8 @@ export const signInAgain = action(async (ctx) => {
 const auth = ctx.locals.auth
 const user = await auth.requireUser()
 const features = auth.features()
-const refused = remove.failed()?.data?.error
-const notProved = prove.failed()?.data?.error
+const refused = remove.form.failed()?.data?.error
+const notProved = prove.form.failed()?.data?.error
 const proved = await auth.provedLately()
 // Neither proof form can pass: an admin acting as the user proves nothing, and an account with nothing to prove it by has only its sign-in, now old.
 const impersonated = await auth.impersonator() !== null

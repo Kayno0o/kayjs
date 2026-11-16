@@ -18,7 +18,7 @@ export const ACTION = Symbol.for('kay.action')
 
 // Type only: what the handler returns on success, so a prop typed with it takes a handler that can also `ctx.fail`.
 declare const RESULT: unique symbol
-// Type only: what the handler passes to `ctx.fail`, so a page can type `action.failed()`.
+// Type only: what the handler passes to `ctx.fail`, so a page can type `action.form.failed()`.
 declare const FAILED: unique symbol
 // Type only: the honeypot field an action's forms render, which `kay check` then takes as one of their fields.
 declare const HONEYPOT: unique symbol
@@ -234,9 +234,9 @@ export interface ProtectionMessages {
 export interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string, Guarded extends object = object> extends Omit<RequestContext<Params, Guarded>, 'deny'> {
   // Response status, for a fetch call or the redirect after a plain form post.
   status: (code: number) => void
-  // `return ctx.deny(409, { message: 'Taken', data })` fails the post: a plain form post gets its page rendered again, which reads it through `action.failed()`; a call throws an `ActionError` carrying `data`. `message` is the form's own, under `errors['']`.
-  // `errors` puts a message on a field of the schema, or on the form under `''`: `return ctx.deny(409, { errors: { email: 'Already taken' } })`, which `error email`, `aria-invalid`, `add.error('email')` and an `ActionError`'s `errors` follow as for a field the schema refused.
-  // It throws, so a statement ends the handler too; `return` types what `data` is for `action.failed()`.
+  // `return ctx.deny(409, { message: 'Taken', data })` fails the post: a plain form post gets its page rendered again, which reads it through `action.form.failed()`; a call throws an `ActionError` carrying `data`. `message` is the form's own, under `errors['']`.
+  // `errors` puts a message on a field of the schema, or on the form under `''`: `return ctx.deny(409, { errors: { email: 'Already taken' } })`, which `error email`, `aria-invalid`, `add.form.error('email')` and an `ActionError`'s `errors` follow as for a field the schema refused.
+  // It throws, so a statement ends the handler too; `return` types what `data` is for `action.form.failed()`.
   deny: ActionDeny<Field>
   /** @deprecated `return ctx.deny(status, { data, errors })`. Removed in 1.108; `deprecated-ctx-fail` rewrites it. */
   fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data, errors?: FieldErrors<Field>) => Failure<Data>
@@ -280,7 +280,7 @@ export type Final<Output> = Output extends AsyncIterable<infer Value> ? Value | 
 // Unknown for an action of any output, so any action passes where `Action` is expected, and for one whose output names no `Failure`, so a handler that can `ctx.fail` passes where only its success output is typed.
 export type FailureData<Output> = unknown extends Output ? unknown : [Extract<Output, Failure<unknown>>] extends [never] ? unknown : Output extends Failure<infer Data> ? Data : never
 
-// What a page reads back through `action.failed()` after a plain form post failed.
+// What a page reads back through `action.form.failed()` after a plain form post failed.
 export interface FormFailure<Input, Data, Honeypot extends string = never> {
   status: number
   // The text to show for the whole failure: the form's message, else the field messages joined, else the handler's data message.
@@ -418,6 +418,19 @@ export interface TrackedCall<Input, Result> extends Reader<Result extends { ok: 
 // What a call answers: `{ ok: true, data }` or the refusal, a failure with no answer (status 0) included, `.orThrow()` for the data or the failure thrown. An abort and a redirect reject.
 export type Called<Output> = CallPromise<CallResult<Answer<Success<Output>>, FailureData<Output>>>
 
+// What a form posting to an action shows, read apart from the action's call state: `add.form.failed()`, `add.form.error('title')`, `await add.form.validate(form)`. Methods, so any action still passes where `Action` is expected.
+export interface ActionForm<Input = never, Output = unknown, Honeypot extends string = never> {
+  // How the form post the page renders for went, refused; in an island, how its last call went, read reactively.
+  // eslint-disable-next-line ts/method-signature-style
+  failed(): FormFailure<Input, FailureData<Output>, Honeypot> | undefined
+  // The message a refused post or call got for one field, or for the whole form under ''.
+  // eslint-disable-next-line ts/method-signature-style
+  error(field?: Extract<keyof Input, string> | Honeypot | ''): string | undefined
+  // Checks a form in the browser against the action's schema, as the server would, writing what it refuses into `error(field)` (and `failed()`) in place of the last outcome: every field, or `field` alone, the other fields' messages kept. Resolves whether the checked fields are accepted. Nothing is posted and no bubble shows; a page whose forms hold no schema for the action accepts all.
+  // eslint-disable-next-line ts/method-signature-style
+  validate(form: HTMLFormElement, field?: Extract<keyof Input, string>): Promise<boolean>
+}
+
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input = never, Output = unknown, Honeypot extends string = never> {
   // A form's fields, read as a plain form post reads them: `add(new FormData(form))`. First, so a call matching neither is reported against the typed input below, naming its wrong field, and `Parameters<typeof add>` reads that one.
@@ -436,7 +449,9 @@ export interface Action<Input = never, Output = unknown, Honeypot extends string
   readonly track: (options?: { queue?: CallQueue | undefined } & TrackHooks<Answer<Success<Output>>>) => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
   // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
   readonly progress: () => number | undefined
-  // How the form post the page renders for went, refused, as `failed()` reads it; in an island, how its last call went, read reactively.
+  // What a form posting to this action shows: how the post the page renders for went, refused, and the message of each field. Apart from the call state above, which is the island's own calls.
+  readonly form: ActionForm<Input, Output, Honeypot>
+  /** @deprecated Write `form.failed()`, the readers a form shows are grouped under `form`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */
   readonly failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
   /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   readonly succeeded: () => FormSuccess<Final<Success<Output>>> | undefined
@@ -447,10 +462,10 @@ export interface Action<Input = never, Output = unknown, Honeypot extends string
   // This action for a form to post with fixed fields, as hidden inputs would carry them: `form(action={move.with({ id, to: 2 })})`. They travel in the form's action URL, so the form needs no inputs for them and posts them with or without JavaScript.
   // eslint-disable-next-line ts/method-signature-style
   with(fields: Partial<Input>): Action<Input, Output, Honeypot>
-  // The message a refused post got for one field, or for the whole form under ''; a method, so any action still passes where `Action` is expected.
+  /** @deprecated Write `form.error(field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */
   // eslint-disable-next-line ts/method-signature-style
   error(field?: Extract<keyof Input, string> | Honeypot | ''): string | undefined
-  // Checks a form in the browser against this action's schema, as the server would, writing what it refuses into `error(field)` (and `failed()`) in place of the last outcome: every field, or `field` alone, the other fields' messages kept. Resolves whether the checked fields are accepted. Nothing is posted and no bubble shows; a page whose forms hold no schema for the action accepts all.
+  /** @deprecated Write `form.validate(form, field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */
   // eslint-disable-next-line ts/method-signature-style
   validate(form: HTMLFormElement, field?: Extract<keyof Input, string>): Promise<boolean>
   // Whether `error` is a call to this action the server refused, its `data` typed as the handler passes it to `ctx.fail`.

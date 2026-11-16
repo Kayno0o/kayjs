@@ -41,4 +41,4 @@ A call that goes through toasts `saved` when given and calls `onSave` with what 
 
 ## A form of your own
 
-A `form(action={add})` written in a template needs none of this to show messages. A FormField, Checkbox or Toggle inside it with a `name` shows `add.error('name')`, with and without JavaScript. Use Form when you want the call, the toast and the focus. An empty message is dropped. An island's own template does not know a `form(action)` of the page around it, so inside an island use Form or the `issue` prop.
+A `form(action={add})` written in a template needs none of this to show messages. A FormField, Checkbox or Toggle inside it with a `name` shows `add.form.error('name')`, with and without JavaScript. Use Form when you want the call, the toast and the focus. An empty message is dropped. An island's own template does not know a `form(action)` of the page around it, so inside an island use Form or the `issue` prop.

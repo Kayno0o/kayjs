@@ -23,8 +23,7 @@ const add = Object.assign(async (form: FormData) => {
   [Symbol.for('kay.action')]: true,
   pending: () => false,
   url: '/_kay/action/form/add',
-  failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined,
-  error: (field = '') => last()?.errors[field],
+  form: { failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined, error: (field = '') => last()?.errors[field] },
 }) as unknown as Action<{ title: string }, string | Failure<never>>
 
 async function submit(event: SubmitEvent) {
@@ -34,7 +33,7 @@ async function submit(event: SubmitEvent) {
     await add(new FormData(event.currentTarget as HTMLFormElement))
   }
   catch {
-    // The refusal shows through add.error.
+    // The refusal shows through add.form.error.
   }
 }
 ---

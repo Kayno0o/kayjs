@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 
+import { actionReaders } from '../src/check/action-readers'
 import { actionType } from '../src/check/action-type'
 import { aiLanguage } from '../src/check/ai-language'
 import { appHooks } from '../src/check/app-hooks'
@@ -14,13 +15,13 @@ import { configSwitches } from '../src/check/config-switches'
 import { contextImport } from '../src/check/context-import'
 import { envFiles } from '../src/check/env-files'
 import { applySafeFixes } from '../src/check/fixes'
+
 import { formatDurationNumbers } from '../src/check/format-duration'
 
 import { guardOptions } from '../src/check/guard-options'
-
 import { hookContext } from '../src/check/hook-context'
-import { hookNames } from '../src/check/hook-names'
 
+import { hookNames } from '../src/check/hook-names'
 import { i18nKeys } from '../src/check/i18n-keys'
 import { imagesKeys } from '../src/check/images-keys'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
@@ -62,6 +63,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-source-readers': sourceReaders,
   'deprecated-live-api': liveApi,
   'deprecated-action-type': actionType,
+  'deprecated-action-readers': actionReaders,
   'deprecated-socket-frames': socketFrames,
 
   'deprecated-persisted-call': persistedCall,

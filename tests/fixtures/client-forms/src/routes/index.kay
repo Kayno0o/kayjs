@@ -19,7 +19,7 @@ import Opener from '../components/opener.kay'
 h1 Client forms
 if guarded.succeeded() then done
   p.sent Sent {done.data}
-if guarded.error() then message
+if guarded.form.error() then message
   p.error {message}
 form.server(action={guarded})
   input(name="note")

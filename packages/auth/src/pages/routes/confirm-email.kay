@@ -21,8 +21,8 @@ export const confirm = action(schemas.token, async ({ token }, ctx) => {
   return ctx.redirect(localize(result.redirect))
 })
 
-const token = ctx.url.searchParams.get('token') ?? confirm.failed()?.values.token
-const error = confirm.failed()?.data?.error
+const token = ctx.url.searchParams.get('token') ?? confirm.form.failed()?.values.token
+const error = confirm.form.failed()?.data?.error
 const landmark = ctx.locals.auth.features().pages?.main !== false
 ---
 head

@@ -55,7 +55,7 @@ form(part="root" {...rest} action={action} novalidate)
   if asksConsent()
     div(part="consent")
       // The Checkbox renders as an island of its own, which does not know this form, so its message is handed over.
-      Checkbox(part="consentBox issues issue" name="consent" label={consentLabel} issue={action.error('consent')})
+      Checkbox(part="consentBox issues issue" name="consent" label={consentLabel} issue={action.form.error('consent')})
       if privacy
         a(part="link" href={privacy} {...OUTSIDE}) {privacyLabel}
   else if privacy
@@ -70,5 +70,5 @@ form(part="root" {...rest} action={action} novalidate)
       | {sent}
     else
       Notice(tone="success" size="sm") {sentLabel}
-  else if action.error() then message
+  else if action.form.error() then message
     Notice(tone="danger" size="sm") {message}

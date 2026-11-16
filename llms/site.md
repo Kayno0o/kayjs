@@ -280,7 +280,7 @@ ul
 ### Forms
 
 - A page's server fence exports an action, a schema and a handler; `form(action={comment})` posts to it without JavaScript.
-- A refused post renders the page again, the fields holding what was sent and `comment.failed()` telling why.
+- A refused post renders the page again, the fields holding what was sent and `comment.form.failed()` telling why.
 - Each field names itself with `field`, which writes its `name` and the constraints the schema gives it, so the browser checks them without JavaScript.
 - An `error` line shows the message a refused post gave that field, the field described by it for screen readers.
 - A bare `error` shows the form's own:
@@ -320,7 +320,7 @@ export function checkComment({ name, text }: Comment): CommentErrors {
 }
 ```
 
-- The handler checks them, `src/routes/guestbook.kay`, and `ctx.deny(status, { errors })` puts a message on each field it names, so `error name`, `aria-invalid` and `comment.error('name')` follow it as for a field the schema refused.
+- The handler checks them, `src/routes/guestbook.kay`, and `ctx.deny(status, { errors })` puts a message on each field it names, so `error name`, `aria-invalid` and `comment.form.error('name')` follow it as for a field the schema refused.
 - A string field with no `maxLength` is refused past 10,000 characters, and `kay check` asks a name, an email or a title for a tighter one (`unbounded-string`):
 
 ```kay
@@ -359,7 +359,7 @@ import { comment } from '../routes/guestbook.kay'
 import { checkComment } from '../comment'
 import type { CommentErrors } from '../comment'
 
-const errors = signal<CommentErrors>(comment.failed()?.errors ?? {})
+const errors = signal<CommentErrors>(comment.form.failed()?.errors ?? {})
 const thanked = signal(comment.data()?.name ?? '')
 
 async function submit(event: SubmitEvent) {

@@ -61,7 +61,7 @@ if (!features.organizations)
   ctx.notFound()
 
 const prefix = features.pages?.prefix ?? features.prefix
-const requested = ctx.url.searchParams.get('invitation') ?? accept.failed()?.values.id ?? reject.failed()?.values.id ?? ''
+const requested = ctx.url.searchParams.get('invitation') ?? accept.form.failed()?.values.id ?? reject.form.failed()?.values.id ?? ''
 const id = requested.length <= ID_MAX ? requested : ''
 const invitation = id !== '' ? await auth.organizations.invitation(id) : null
 const user = invitation && await auth.via() === 'session' ? await auth.user() : null
@@ -69,7 +69,7 @@ const signedIn = user !== null && !user.guest
 const mine = signedIn && user.email === invitation?.email
 const unverified = mine && !user.emailVerified
 const back = encodeURIComponent(`${prefix}/invitation?invitation=${encodeURIComponent(id)}`)
-const refused = [accept, reject].map(form => form.failed()?.data?.error).find(error => error !== undefined)
+const refused = [accept, reject].map(action => action.form.failed()?.data?.error).find(error => error !== undefined)
 const landmark = ctx.locals.auth.features().pages?.main !== false
 ---
 head

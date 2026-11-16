@@ -6,7 +6,7 @@ import { action } from 'kay'
 export const ask = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { protect: { minTime: '3s' } })
 export const quick = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { protect: { minTime: { after: '3s', ttl: '1h', pretend: true } } })
 
-const failure = ask.failed()
+const failure = ask.form.failed()
 const asked = ask.status() === 'ready'
 const sent = quick.status() === 'ready'
 ---

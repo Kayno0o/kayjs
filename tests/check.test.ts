@@ -2316,9 +2316,9 @@ describe.concurrent('kay check, edge cases', () => {
       '    return 1',
       '})',
       '',
-      'const failure = signIn.failed()',
+      'const failure = signIn.form.failed()',
       'const saved: 1 | undefined = save.data()',
-      'const wrong: number | undefined = save.failed()?.data',
+      'const wrong: number | undefined = save.form.failed()?.data',
       'const formWide: string | undefined = failure?.errors[\'\']',
       'const caught: string | undefined = failure?.errors.website',
       '---',
@@ -2349,9 +2349,9 @@ describe.concurrent('kay check, edge cases', () => {
       '  return 1',
       '}, { protect: { honeypot: \'website\' } })',
       '---',
-      'p {save.error(\'code\')} {save.error(\'website\')} {save.error()} {save.failed()?.data?.error} {save.data()}',
-      'p {save.error(\'cod\')}',
-      'p {save.failed()?.data?.message}',
+      'p {save.form.error(\'code\')} {save.form.error(\'website\')} {save.form.error()} {save.form.failed()?.data?.error} {save.data()}',
+      'p {save.form.error(\'cod\')}',
+      'p {save.form.failed()?.data?.message}',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/routes/index.kay': page })
@@ -2407,7 +2407,7 @@ describe.concurrent('kay check, edge cases', () => {
       'form(action={save})',
       '  button Save',
       '  pending',
-      '    p {save.error(\'cod\')}',
+      '    p {save.form.error(\'cod\')}',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/other.kay': 'p\n  pending\n    p Saving\n' })

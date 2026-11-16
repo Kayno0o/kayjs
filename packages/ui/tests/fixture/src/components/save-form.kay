@@ -34,7 +34,7 @@ const rename = Object.assign(async (form: FormData) => {
   finally {
     pending = false
   }
-}, { [Symbol.for('kay.action')]: true, pending, url: '/_kay/action/form/rename', failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined, error: (field = '') => last()?.errors[field] }) as unknown as Action<{ name: string }, string | Failure<never>>
+}, { [Symbol.for('kay.action')]: true, pending, url: '/_kay/action/form/rename', form: { failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined, error: (field = '') => last()?.errors[field] } }) as unknown as Action<{ name: string }, string | Failure<never>>
 ---
 button#more(onClick={() => extra = true}) More
 SaveForm(action={rename} failureLabel="Could not save" saved="Saved." onSave={({ data }) => onSave(data)} onError={onError} onDiscard={onDiscard} shortcut={shortcut} confirm={confirm})

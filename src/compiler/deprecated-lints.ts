@@ -29,6 +29,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action<never, unknown> }>()\n---\nform(action={run})\n  button Go',
     right: '---\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action }>()\n---\nform(action={run})\n  button Go',
   },
+  'deprecated-action-readers': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'An action\'s `failed()`, `error(field)` and `validate(form, field)` before 1.105, which a form shows and now reads from `form`: `form.failed()`, `form.error(field)` and `form.validate(form, field)`, the call state (`pending()`, `status()`, `data()`) staying on the action. The old names work until 1.108. Found in the TypeScript files and `.kay` files of the project, templates included, on a name bound once to a call of `action` from `kay`, to the `.with()` of one, or imported in lowercase from a `.kay` file, as `kay check` reads no types: an action reached through a property or a prop is not found. The fix writes `form.` before the name.',
+    wrong: '---\nimport { add } from \'./notes.kay\'\n---\nform(action={add})\n  input(name="title" aria-invalid={add.error(\'title\') ? \'true\' : undefined})\n  if add.failed()\n    p Not saved',
+    right: '---\nimport { add } from \'./notes.kay\'\n---\nform(action={add})\n  input(name="title" aria-invalid={add.form.error(\'title\') ? \'true\' : undefined})\n  if add.form.failed()\n    p Not saved',
+  },
   'deprecated-ui-props': {
     level: 'warn',
     group: 'deprecated',

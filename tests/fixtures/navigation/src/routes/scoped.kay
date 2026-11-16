@@ -13,7 +13,7 @@ export const contact = action(t.Object({ message: t.String({ maxLength: 200 }), 
   return message.length
 })
 
-const failure = contact.failed()?.data
+const failure = contact.form.failed()?.data
 const sent = contact.succeeded()
 ---
 head

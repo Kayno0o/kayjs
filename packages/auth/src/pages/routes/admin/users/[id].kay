@@ -103,7 +103,7 @@ const declared = auth.admin.roles()
 const grantable = declared.filter(role => !user.roles.includes(role))
 const log = await auth.admin.auditLog({ userId: user.id, limit: 20 })
 const entries = log.ok ? log.entries : []
-const refused = [grant, revoke, ban, unban, remove, impersonate].map(form => form.failed()?.data?.error).find(error => error !== undefined)
+const refused = [grant, revoke, ban, unban, remove, impersonate].map(action => action.form.failed()?.data?.error).find(error => error !== undefined)
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
 const dateTime = (value: Date) => formatDate(value, { dateStyle: 'medium', timeStyle: 'short' })
 const locale = ctx.locale

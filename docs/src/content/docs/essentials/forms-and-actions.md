@@ -175,7 +175,7 @@ form(action={add})
 
 While the post is refused, `error title` renders `p.error` with the message. The field is marked `aria-invalid` and described by it.
 
-Written in a snippet or a component inside the form, `error title` shows the message of the form it renders in, so a field row can hold its own. Anywhere else, `add.error('title')` reads the message.
+Written in a snippet or a component inside the form, `error title` shows the message of the form it renders in, so a field row can hold its own. Anywhere else, `add.form.error('title')` reads the message.
 
 ### Showing that a form is posting
 
@@ -230,7 +230,7 @@ markInvalid(input, 'length', input.value.length < 8)
 
 ## Failing on purpose
 
-A handler refuses a post with `ctx.deny(status, { message, errors, data })`, the call a guard, a page and an endpoint use too. The page reads `data` with `add.failed()?.data`. It throws, so write `return ctx.deny(...)` for TypeScript to type `data`. `ctx.fail(status, data, errors)` is the old spelling, kept until 1.108: it returns where `deny` throws, so `kay check` reports one that is not returned as `unreturned-fail`.
+A handler refuses a post with `ctx.deny(status, { message, errors, data })`, the call a guard, a page and an endpoint use too. The page reads `data` with `add.form.failed()?.data`. It throws, so write `return ctx.deny(...)` for TypeScript to type `data`. `ctx.fail(status, data, errors)` is the old spelling, kept until 1.108: it returns where `deny` throws, so `kay check` reports one that is not returned as `unreturned-fail`.
 
 ```kay
 --- server
@@ -248,11 +248,11 @@ export const add = action(schema, async ({ title }, ctx) => {
 ```
 
 ```kay
-if add.failed()?.data then data
+if add.form.failed()?.data then data
   p.error {data.message}
 ```
 
-To blame a field, give `ctx.deny` the messages as `errors`: `return ctx.deny(409, { errors: { email: 'Already taken' } })`. The names are the schema's fields, and `''` is the form's own message. The field then shows it as if the schema had refused it: an `error email` line, `aria-invalid`, `add.error('email')` and the value the visitor typed, with or without JavaScript. A call throws an `ActionError` whose `errors` carry it.
+To blame a field, give `ctx.deny` the messages as `errors`: `return ctx.deny(409, { errors: { email: 'Already taken' } })`. The names are the schema's fields, and `''` is the form's own message. The field then shows it as if the schema had refused it: an `error email` line, `aria-invalid`, `add.form.error('email')` and the value the visitor typed, with or without JavaScript. A call throws an `ActionError` whose `errors` carry it.
 
 A handler that throws is logged, and the form shows `Something went wrong on our side; try again later`. The handler needs no `try`/`catch` of its own.
 
@@ -324,7 +324,7 @@ async function submit(event: SubmitEvent) {
 ---
 form(action={add} onSubmit={submit})
   input(name="title" bind:value={title})
-  if add.error('title') then message
+  if add.form.error('title') then message
     p.error {message}
   button(disabled={add.pending()}) Add
 ```
@@ -578,7 +578,7 @@ Any answer other than success gives `{ ok: false, status, message, errors, data,
 
 A success gives `{ ok: true, data }`. A failure with no answer from the server, such as a lost connection, is `{ ok: false, status: 0 }`.
 
-`add.failed()` and `add.data()` read the outcome in a server fence, a template, a component and an island alike. Each gives `undefined` when there is none.
+`add.form.failed()` and `add.data()` read the outcome in a server fence, a template, a component and an island alike. Each gives `undefined` when there is none. What a form shows (`failed()`, `error(field)` and `validate(form, field)`) sits under `add.form`, apart from the call state `add` keeps (`pending()`, `status()`, `data()`); before 1.105 they were on `add`, which works until 1.108.
 
 ## File uploads
 
@@ -647,6 +647,6 @@ Without one, a production server refuses to start, as it would sign with a key o
 
 ## Components that show a refused post
 
-A component inside a form reads the form's messages with `formErrors()` from `kay`: call it in the component's script, then `errors('title')` gives what the action refused `title` with (`add.error('title')`), or nothing outside a form. It is how a kayjs-ui FormField shows its message from its `name` alone. A component given an `action`, such as kayjs-ui's `Form`, is that form for its content.
+A component inside a form reads the form's messages with `formErrors()` from `kay`: call it in the component's script, then `errors('title')` gives what the action refused `title` with (`add.form.error('title')`), or nothing outside a form. It is how a kayjs-ui FormField shows its message from its `name` alone. A component given an `action`, such as kayjs-ui's `Form`, is that form for its content.
 
 A component inside a form reads the refused post with `postedValue(name)`, `postedChecked(name, value)` and `postedValues(name)` from `kay`, so a control of your own can show it again as the kayjs-ui ones do. They answer `undefined` outside a refused post and for a field named like a secret. In the browser they read what the server rendered. A list field is posted back as `name[]`. Forms posting to the same action share one refused post.

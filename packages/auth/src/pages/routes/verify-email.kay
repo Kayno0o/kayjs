@@ -38,11 +38,11 @@ export const resend = action(async (ctx) => {
 })
 
 const auth = ctx.locals.auth
-const token = ctx.url.searchParams.get('token') ?? verify.failed()?.values.token
+const token = ctx.url.searchParams.get('token') ?? verify.form.failed()?.values.token
 const [user, pending] = await Promise.all([auth.user(), auth.email.pendingCode()])
-const refused = verify.failed()?.data?.error
-const codeError = code.failed()?.data?.error
-const resendError = resend.failed()?.data?.error
+const refused = verify.form.failed()?.data?.error
+const codeError = code.form.failed()?.data?.error
+const resendError = resend.form.failed()?.data?.error
 const resent = resend.status() === 'ready'
 const landmark = ctx.locals.auth.features().pages?.main !== false
 ---

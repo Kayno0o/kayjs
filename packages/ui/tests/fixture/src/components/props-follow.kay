@@ -26,8 +26,7 @@ const action = Object.assign(async () => undefined, {
   succeeded: () => undefined,
   status: () => 'idle',
   data: () => undefined,
-  failed: () => undefined,
-  error: () => undefined,
+  form: { failed: () => undefined, error: () => undefined },
 }) as unknown as Action
 const trail = (count: number) => Array.from({ length: count }, (_, index) => ({ label: `Page ${index}`, href: `/p${index}` }))
 ---

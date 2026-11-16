@@ -16,7 +16,7 @@ effect(() => {
 })
 
 effect(() => {
-  const failure = action.failed()
+  const failure = action.form.failed()
 
   if (failure)
     untrack(() => whenRefused?.(failure))

@@ -28,13 +28,13 @@ export const forget = action(async () => 'Forgotten')
 form(action={send})
   textarea(name="message" aria-label="Message")
   button Send
-if send.error()
-  p.error {send.error()}
+if send.form.error()
+  p.error {send.form.error()}
 form(action={forget})
   button Forget
 form(action={explode})
   button Explode
-if explode.error()
-  p.error {explode.error()}
+if explode.form.error()
+  p.error {explode.form.error()}
 await later then value
   p {value}

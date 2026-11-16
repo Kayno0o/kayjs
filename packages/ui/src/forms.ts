@@ -265,8 +265,10 @@ async function refuse(form: HTMLFormElement, byField: Record<string, string>, is
 
 // What `checkSchema` asks of an action: `validate` and the errors of `failed()`.
 interface Validating {
-  validate: (form: HTMLFormElement, field?: string) => Promise<boolean>
-  failed: () => { errors: object } | undefined
+  form: {
+    validate: (form: HTMLFormElement, field?: string) => Promise<boolean>
+    failed: () => { errors: object } | undefined
+  }
 }
 
 // What a form's `validate` is: `'submit'` checks the fields against the action's schema when the form is sent, `'blur'` also each field as it loses focus, `false` leaves it to the server.
@@ -294,8 +296,8 @@ export async function checkSent(form: HTMLFormElement, action: Validating, issue
 // Checks the form against the action's schema in the browser, as the server would, and puts the messages where a refusal's go. Sent, a refusal shows as a call's does and nothing is called; with a `field`, the one that lost focus, only its message changes and the focus stays. True when what was checked is accepted.
 export async function checkSchema(form: HTMLFormElement, action: Validating, issues: Signal<Record<string, string>>, failure: string, field?: string): Promise<boolean> {
   try {
-    const accepted = await action.validate(form, field)
-    const errors = { ...untrack(action.failed)?.errors } as Record<string, string>
+    const accepted = await action.form.validate(form, field)
+    const errors = { ...untrack(action.form.failed)?.errors } as Record<string, string>
 
     if (field === undefined && !accepted) {
       await refuse(form, errors, issues, failure)

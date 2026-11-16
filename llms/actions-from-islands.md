@@ -8,7 +8,7 @@
 
 ### Call an action from an island
 
-An island imports the action from the page and calls it. The call answers `{ ok: true, data }` or `{ ok: false, error }` and never throws for a refusal, so the schema's messages show through `add.error()` with no `try`; `.orThrow()` is the throwing style:
+An island imports the action from the page and calls it. The call answers `{ ok: true, data }` or `{ ok: false, error }` and never throws for a refusal, so the schema's messages show through `add.form.error()` with no `try`; `.orThrow()` is the throwing style:
 
 ```kay
 ---
@@ -24,8 +24,8 @@ async function save() {
     title = ''
 }
 ---
-input(bind:value={title} aria-invalid={add.error('title') ? 'true' : undefined})
-if add.error('title') then message
+input(bind:value={title} aria-invalid={add.form.error('title') ? 'true' : undefined})
+if add.form.error('title') then message
   p.error {message}
 button(onClick={save} disabled={add.pending()}) Add
 ```

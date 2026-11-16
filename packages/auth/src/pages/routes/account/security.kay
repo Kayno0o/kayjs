@@ -76,10 +76,10 @@ const auth = ctx.locals.auth
 const user = await auth.requireUser()
 const features = auth.features()
 const passwordSaved = changePassword.status() === 'ready'
-const passwordRefused = changePassword.failed()?.data
-const setupUri = setUp.data() ?? enable.failed()?.values.uri
+const passwordRefused = changePassword.form.failed()?.data
+const setupUri = setUp.data() ?? enable.form.failed()?.values.uri
 const setupKey = setupUri && new URL(setupUri).searchParams.get('secret')
-const twoFactorError = setUp.failed()?.data?.error ?? enable.failed()?.data?.error ?? regenerate.failed()?.data?.error ?? disable.failed()?.data?.error
+const twoFactorError = setUp.form.failed()?.data?.error ?? enable.form.failed()?.data?.error ?? regenerate.form.failed()?.data?.error ?? disable.form.failed()?.data?.error
 const recoveryCodes = enable.data() ?? regenerate.data()
 // Where a guard sent the user from to turn two-factor on: back there once it is on and its recovery codes were seen.
 const back = localPath(ctx.url.searchParams.get('redirect'), '')
@@ -89,7 +89,7 @@ if (back !== '' && user.twoFactor && !recoveryCodes)
 
 const codesLeft = user.twoFactor ? await auth.twoFactor.recoveryCodesLeft() : 0
 const passkeys = features.passkeys ? await auth.passkeys.list() : []
-const removeRefused = removePasskey.failed()?.data
+const removeRefused = removePasskey.form.failed()?.data
 const passkeyErrors = Object.fromEntries((['proof', 'stale', 'limited', 'impersonating', 'expired', 'invalid', 'signed-out'] as const).map(code => [code, failure(code)]))
 ---
 if features.password

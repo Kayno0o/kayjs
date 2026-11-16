@@ -98,7 +98,7 @@ import Widget from '@kayjs/ui/widget.kay'
 import ZoomPane from '@kayjs/ui/zoom-pane.kay'
 
 const noop = () => undefined
-const action = Object.assign(async () => undefined, { pending: () => false, url: '/_kay/action/contract', error: () => undefined, succeeded: () => false, status: () => 'idle', data: () => undefined })
+const action = Object.assign(async () => undefined, { pending: () => false, url: '/_kay/action/contract', form: { failed: () => undefined, error: () => undefined }, succeeded: () => false, status: () => 'idle', data: () => undefined })
 const icon = 'plus'
 const rows = [{ key: 'a', label: 'Mars', value: 2, display: 'two' }, { key: 'b', label: 'Venus', value: 1 }]
 const tree = [{ key: 'mars', label: 'Mars', children: [{ key: 'phobos', label: 'Phobos' }] }, { key: 'venus', label: 'Venus' }]

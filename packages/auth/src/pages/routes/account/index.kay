@@ -46,14 +46,14 @@ const auth = ctx.locals.auth
 const user = await auth.requireUser()
 const features = auth.features()
 const resent = resend.status() === 'ready'
-const resendError = resend.failed()?.data?.error
+const resendError = resend.form.failed()?.data?.error
 const emailSent = changeEmail.data()
-const emailRefused = changeEmail.failed()?.data
+const emailRefused = changeEmail.form.failed()?.data
 const usernameSaved = changeUsername.status() === 'ready'
-const usernameRefused = changeUsername.failed()?.data
+const usernameRefused = changeUsername.form.failed()?.data
 const profile = await auth.account.profile(ctx.locale)
 const profileSaved = saveProfile.status() === 'ready'
-const profileRefused = saveProfile.failed()?.data
+const profileRefused = saveProfile.form.failed()?.data
 const profileProblems = profileRefused && 'errors' in profileRefused ? profileRefused.errors : {}
 const problemOf = (name: string) => Object.hasOwn(profileProblems, name) ? profileProblems[name] : undefined
 ---

@@ -5,7 +5,7 @@ import { action } from 'kay'
 export const note = action(t.Object({ text: t.String({ maxLength: 4 * 1024 * 1024 }) }), ({ text }) => text.length)
 export const attach = action(t.Object({ text: t.String({ maxLength: 4 * 1024 * 1024 }) }), ({ text }) => text.length, { maxSize: 4 * 1024 * 1024 })
 
-const failure = note.failed()
+const failure = note.form.failed()
 const sent = note.status() === 'ready'
 ---
 form(action={note})

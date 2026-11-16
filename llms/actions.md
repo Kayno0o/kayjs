@@ -63,7 +63,7 @@ form(action={subscribe})
     p Subscribing...
 ```
 
-In a snippet or a child component, `error` and `pending` follow the form that renders it (the form around a snippet's declaration when there is one), so a field row holds its own. The values behind them, `add.error('title')` and, in an island, `add.pending()`, read from any expression.
+In a snippet or a child component, `error` and `pending` follow the form that renders it (the form around a snippet's declaration when there is one), so a field row holds its own. The values behind them, `add.form.error('title')` and, in an island, `add.pending()`, read from any expression.
 
 ### Show what a post returned
 
@@ -152,7 +152,7 @@ ul
 form(action={add})
   input(field="title" placeholder="New todo")
   error title
-  if add.failed()?.data then data
+  if add.form.failed()?.data then data
     p.error {data.message}
   button Add
 ```
@@ -225,21 +225,21 @@ form(action={add})
 
 ### Refused posts
 
-- `ctx.deny(status, { message, errors, data })` is the one refusal of a guard, a page, an action and an endpoint, `refuse(status, { ... })` throws it from anywhere; `return` it so `failed()` types `data`. `ctx.fail` is its old spelling until 1.108 (`unreturned-fail`).
+- `ctx.deny(status, { message, errors, data })` is the one refusal of a guard, a page, an action and an endpoint, `refuse(status, { ... })` throws it from anywhere; `return` it so `form.failed()` types `data`. `ctx.fail` is its old spelling until 1.108 (`unreturned-fail`).
 - A post the schema refuses, or whose handler denies with `ctx.deny(status, { data })`, is answered with the page it came from, rendered with the failure's status, rather than with a redirect.
-- There `add.failed()` returns `{ status, message, values, errors, data }`, typed from the action, or `undefined`.
+- There `add.form.failed()` returns `{ status, message, values, errors, data }`, typed from the action, or `undefined`.
 - `values` is what the form posted (fields named like a password left out).
 - `errors` is a message per refused field, the schema's `error` option when set.
 - `data` is what `ctx.deny` received.
-- `return ctx.deny(409, { errors: { email: 'Already taken' } })` puts a message on a field, typed from the schema's keys, with `''` for the form's own, so `error email`, `aria-invalid`, `add.error('email')`, the value re-fill and an island's `ActionError.errors` (and a kayjs-ui `FormField` named `email`) follow it with and without JavaScript.
-- A rate limit's refusal sits under `errors['']`, read by `add.error()`, and a text `data` is that message: `return ctx.deny(502, { data: 'Not sent; try again later' })`.
+- `return ctx.deny(409, { errors: { email: 'Already taken' } })` puts a message on a field, typed from the schema's keys, with `''` for the form's own, so `error email`, `aria-invalid`, `add.form.error('email')`, the value re-fill and an island's `ActionError.errors` (and a kayjs-ui `FormField` named `email`) follow it with and without JavaScript.
+- A rate limit's refusal sits under `errors['']`, read by `add.form.error()`, and a text `data` is that message: `return ctx.deny(502, { data: 'Not sent; try again later' })`.
 - The page renders as a visit of it would, through the app's plugins and the page's guards, and nothing the visitor typed is lost however long it is.
 - Reloading it posts again, as after any form a server answers in place.
 - The page is the one the post was sent from, as `ctx.params` reads it below, the home page when it names none or another site.
 - Without the page swap the browser shows the action's URL, so the page carries a `base` naming its own URL, and its relative links lead where they did.
 - Each form on it posting to an action names that page in a `kay_back` query parameter, so a post refused again renders the same page, however many times in a row, and one that goes through goes back to it.
 - A handler that throws, a mail server down say, is logged as any server error, `onError` included, and answered as a refusal with status 500.
-- A plain form post then renders its page with the message under the form and what was typed kept, read by `add.error()`, and a call answers `{ ok: false }` with it in `errors['']`.
+- A plain form post then renders its page with the message under the form and what was typed kept, read by `add.form.error()`, and a call answers `{ ok: false }` with it in `errors['']`.
 - The message is `Something went wrong on our side; try again later` unless the site words it as `kay.action.serverError` ([Locales](locales-texts.md)) or the action words its own, `action(schema, handler, { messages: { serverError: 'Not sent; write to hello@example.com instead' } })`, so a handler needs no `try`/`catch` of its own to tell the visitor.
 - `serverError` may be a function given the error and `ctx`, sync or async, to word it from what is loaded per request or the page's `ctx.locale`: `serverError: async () => 'Write to ' + (await settings.one()).email`. Its text is answered with the same status 500; one that throws, or answers a blank text, leaves kay's message (a throw logged beside the handler's error), and a redirect or denial thrown from it is no answer either.
 - An action past its `timeout` (`serve.timeout` or the action's own) answers 504 the same way, worded `kay.action.timeout` (`This took too long; try again later`) and reported as a server error.
@@ -256,17 +256,7 @@ form(action={add})
 
 ### Reading the outcome
 
-- `add.failed()`, `add.data()`, `add.status()` and `add.error('title')` read the outcome from any template, layout, component or island, and from the server fence.
-- `error()` without a field is the form-wide message, `errors['']`.
-- The field name is typed from the schema.
-- An island reads them in the browser too, as its server render did, but for `values`, which stay on the server, so no field the server cannot tell is a secret reaches the page's source: the fields hold what was sent.
-- Once the page shown called the action, they read how its last call went instead, reactively, a call clearing them as it starts: an island calling `add({ title })` gets `{ ok: false }` and `add.error('title')` shows the message, the field marked invalid.
-- `await add.validate(form, field?)` checks a form against the action's schema, writing what it refuses into `add.error(field)` and `add.failed()` in place of the last outcome (`data()` too), for every field or `field` alone; it resolves whether it is accepted, posts nothing, and accepts a form with no schema on the page (a client-only island's). kayjs-ui's `Form`, `SaveForm` and `FormDialog` take `validate="submit" | "blur"`.
-- A post that succeeds goes back to the page with what the handler returned: `add.data()` returns it, typed from the action, or `undefined`, on that one render only; `add.status()` is `ready` then. `succeeded()`, which wrapped it in `{ data }`, works until 1.108 and `kay check` rewrites it.
-- `data` travels in a cookie, sealed (AES-GCM under a key derived from [the app secret](environment.md#the-app-secret), else a key of the process, which a restart changes), so a secret shown once, such as a new API token, can be neither read nor altered in it.
-- Data too big for it, over about 3.5 KB sealed, is left out with a warning, and `data()` returns `undefined`, as it does for a cookie that does not open, forged or sealed before a restart.
-- A prerendered page reads both too: the request carrying that cookie renders it afresh, see [Prerendering](prerendering.md#prerendering).
-- The cookie carrying `succeeded()` back is `HttpOnly`, `SameSite=Lax`, and `Secure` when the request came over https, `X-Forwarded-Proto` included, as is every request in production when `site` is https.
+- `add.form.failed()`, `add.data()`, `add.status()` and `add.form.error('title')` read how a post or the last call went from any template, component, island or server fence: [Refused fields](actions-refused-fields.md#reading-the-outcome).
 
 ### Files
 
