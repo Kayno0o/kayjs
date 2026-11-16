@@ -40,7 +40,6 @@ const { open, trigger, title, label, heading, level, placement, size, bare, keep
   open?: boolean | undefined
   // Renders what opens the dialog when `open` is left to the component: `@trigger(attributes)`, then `button({...attributes})`.
   trigger?: Snippet<[attributes: { 'onClick': () => void, 'aria-haspopup': 'dialog' }]> | undefined
-
   // The heading, and the dialog's name for screen readers. A `@title` block draws markup in its place, such as an icon, a status badge or an emphasised name: the dialog is then named by that heading's text, or by `label`.
   title: string | Snippet
   // The dialog's name for screen readers when it differs from the visible title, such as a short name beside a `@title` full of markup.
@@ -53,7 +52,7 @@ const { open, trigger, title, label, heading, level, placement, size, bare, keep
   keep?: boolean | undefined
   // Drawn inside the dialog before its head while it is open, on the edge of a panel: a resize grip, say.
   handle?: Snippet
-  // With `modal={false}`, a dialog docked beside the page as a tool: only its close control closes it, Escape does not, and it does not take the focus. Its geometry and `data-dock` are the caller's, `SidePanel` draws them.
+  // With `modal={false}`, a dialog docked beside the page as a tool: only its close control closes it, Escape included, and it takes no focus when it opens. Its geometry and `data-dock` are the caller's, `SidePanel` draws them.
   docked?: boolean | undefined
 
   // No inset or scroll on the body, for content that runs to the dialog's edge; the title and footer keep theirs.
@@ -122,7 +121,6 @@ effect(() => {
   if (dialog)
     syncOpen(dialog, shown, modally(), !beside())
 })
-
 
 // Typed text a modal dialog would lose is asked about first.
 const guarded = () => edited() && modally() && !autosave && !dirty && discard !== false

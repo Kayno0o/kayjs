@@ -4,7 +4,7 @@ description: A panel along the edge of the screen, with a head, a body and an op
 
 <Demo name="side-panel/basic" />
 
-SidePanel is a [Dialog](/ui/dialog#placement) with `placement="right"`, so it takes the props the Dialog does: `dirty`, `discard`, `autosave`, `keep`, `closeHref`, `header`, `close` and the rest. To style the head, title, body or footer of one panel, pass them under `root`: `class={{ root: { head: 'px-6' } }}`.
+SidePanel is a [Dialog](/ui/dialog#placement) with `placement="right"`, so it takes the props the Dialog does: `dirty`, `discard`, `autosave`, `keep`, `closeHref`, `header`, `close` and the rest. Its `class` styles the head, title, body and footer as before, `class={{ head: 'px-6' }}`, handed to the Dialog's parts.
 
 ## Controlled
 

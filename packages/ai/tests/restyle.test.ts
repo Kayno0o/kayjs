@@ -102,6 +102,11 @@ describe('restyling the chat from src/ui.ts', () => {
     expect(html).toMatch(/class="[^"]* size-16[^"]*"/)
   })
 
+  test('the launcher panel keeps the classes of its body, head and title, which the Dialog draws', () => {
+    expect(html).toMatch(/<div class="[^"]*kai-launcher-body[^"]*" data-part="body"/)
+    expect(html).toMatch(/<header class="[^"]*px-4 py-2[^"]*" data-part="head"/)
+  })
+
   test('a part nothing restyles keeps its kai class alone', () => {
     expect(html).toContain('class="kai-chat-disclosure"')
     expect(html).toContain('class="kai-chat-form"')

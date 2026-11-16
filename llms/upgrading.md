@@ -76,7 +76,7 @@ The prop holding the list a component draws is `items` on every one: `tabs` on T
 
 ### SidePanel is a Dialog with a side `placement`
 
-`SidePanel` draws a `Dialog` with `placement="right"`, so the head, title, body and footer are the Dialog's. Nothing changes in its props. A `src/ui.ts` entry for `'@kayjs/ui/side-panel.kay'` with `head`, `title`, `body` or `footer` moves to `'@kayjs/ui/dialog.kay'` (which then restyles centred dialogs too: a part restyled for one placement only is `class` on the call), and `SidePanel(class={{ head: 'px-6' }})` is `SidePanel(class={{ root: { head: 'px-6' } }})`. `kay check` already reports a part a component no longer has, listing the ones it has, which is why there is no lint for them.
+`SidePanel` draws a `Dialog` with `placement="right"`, so the head, title, body and footer are the Dialog's. Nothing changes in its props, and its `class` still takes `head`, `title`, `body` and `footer`, handed to the Dialog. A `src/ui.ts` entry for `'@kayjs/ui/side-panel.kay'` with `head`, `title`, `body` or `footer` moves to `'@kayjs/ui/dialog.kay'` (which then restyles centred dialogs too: a part restyled for one placement only is `class` on the call); `kay check` reports the entry left behind, as a part the component no longer has.
 
 ### A page is never an island
 

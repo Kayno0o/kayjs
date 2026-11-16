@@ -19,10 +19,7 @@ const look = recipe({
     root: '',
     grip: 'group/grip absolute z-[2] touch-none focus-visible:outline-2 focus-visible:outline-accent data-[dock=right]:inset-y-0 data-[dock=right]:-left-3 data-[dock=right]:w-6 data-[dock=right]:cursor-ew-resize data-[dock=bottom]:inset-x-0 data-[dock=bottom]:-top-3 data-[dock=bottom]:h-6 data-[dock=bottom]:cursor-ns-resize',
     line: 'pointer-events-none absolute bg-accent opacity-0 shadow-[0_0_0_1px_var(--color-popover)] group-[&:hover]/grip:opacity-100 group-focus-visible/grip:opacity-100 data-[dock=right]:inset-y-0 data-[dock=right]:left-[calc(50%-1px)] data-[dock=right]:w-0.5 data-[dock=bottom]:inset-x-0 data-[dock=bottom]:top-[calc(50%-1px)] data-[dock=bottom]:h-0.5',
-    head: '',
-    title: '',
-    body: '',
-    footer: '',
+
     // The button a closed docked panel leaves in the corner, off the dev tool's docked drawer.
     launcher: 'fixed z-30 right-[calc(1rem+var(--kay-dev-inset-right,0px))] bottom-[calc(1rem+var(--kay-dev-inset-bottom,0px)+env(safe-area-inset-bottom,0px))] rounded-xl border border-solid border-border bg-popover text-foreground shadow-[0_0.5rem_2rem_rgb(0_0_0/0.25)]',
   },
@@ -350,7 +347,7 @@ listen(() => document, 'keydown', event => {
 if trigger && !ownState()
   | {trigger(opener)}
 // Every way of closing it ends in the Dialog's `onOpenChange`, the close button included, so `changed` is the one place the parent learns of it.
-Dialog({...rest} part="root" placement="right" open={ownState() ? undefined : isOpen()} trigger={ownState() ? trigger : undefined} title={title} label={label} heading={heading} level={level} actions={actions} header={header} close={close} footer={footer} closeLabel={closeLabel} closeHref={closeHref} dirty={dirty} autosave={autosave} discard={discard} modal={modal} keep={keep} docked={docked()} data-dock={docked() ? dock : undefined} ref={element => { panel = element; rest.ref?.(element) }} size={typeof size === 'string' && !docked() ? size : undefined} style={panelStyle()} onOpenChange={followsHref(closeHref, onOpenChange) ? undefined : changed})
+Dialog({...rest} part="root head title body footer" placement="right" open={ownState() ? undefined : isOpen()} trigger={ownState() ? trigger : undefined} title={title} label={label} heading={heading} level={level} actions={actions} header={header} close={close} footer={footer} closeLabel={closeLabel} closeHref={closeHref} dirty={dirty} autosave={autosave} discard={discard} modal={modal} keep={keep} docked={docked()} data-dock={docked() ? dock : undefined} ref={element => { panel = element; rest.ref?.(element) }} size={typeof size === 'string' && !docked() ? size : undefined} style={panelStyle()} onOpenChange={followsHref(closeHref, onOpenChange) ? undefined : changed})
   @handle
     if isOpen() && docked() && dock then edge
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
