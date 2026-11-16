@@ -387,6 +387,13 @@ interface Plate
   x: number
   y: number
 
+[.] PopoverButtonProps
+type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+
+[.] PopoverPanelProps
+type PopoverPanelProps = Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'style'> & {
+  // Written after the component's own declarations, so it wins. style?: string | undefined }
+
 [.] PopoverPlacement
 type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 
@@ -790,6 +797,7 @@ component default
   newTab?: NewTab | undefined
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   open?: boolean | undefined
+  panelProps?: PopoverPanelProps | undefined
   placement?: PopoverPlacement | undefined
   style?: string | undefined
   tile?: ((app: SwitcherApp) => Element) | undefined
@@ -870,7 +878,7 @@ component default
   item?: string | undefined;
   row?: string | undefined;
   name?: string | undefined;
-}; failureLabel?: string | undefined; items: OptionsSource<GroupedAvatar>; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; placement?: PopoverPlacement | undefined; rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined; retryLabel?: string | undefined; size?: "xl" | Size | undefined }
+}; failureLabel?: string | undefined; items: OptionsSource<GroupedAvatar>; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; panelProps?: PopoverPanelProps | undefined; placement?: PopoverPlacement | undefined; rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined; retryLabel?: string | undefined; size?: "xl" | Size | undefined; triggerProps?: PopoverButtonProps | undefined }
   | { avatar?: ((person: GroupedAvatar) => Element) | undefined; avatars: OptionsSource<GroupedAvatar>; class?: string | undefined | {
   root?: string | undefined;
   count?: string | undefined;
@@ -885,7 +893,7 @@ component default
   item?: string | undefined;
   row?: string | undefined;
   name?: string | undefined;
-}; failureLabel?: string | undefined; items?: undefined; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; placement?: PopoverPlacement | undefined; rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined; retryLabel?: string | undefined; size?: "xl" | Size | undefined }
+}; failureLabel?: string | undefined; items?: undefined; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; panelProps?: PopoverPanelProps | undefined; placement?: PopoverPlacement | undefined; rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined; retryLabel?: string | undefined; size?: "xl" | Size | undefined; triggerProps?: PopoverButtonProps | undefined }
 
 [./avatar.kay] default
 component default
@@ -1004,8 +1012,10 @@ component default
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   onRead?: ((event: { id: string | undefined; }) => unknown) | undefined
   open?: boolean | undefined
+  panelProps?: PopoverPanelProps | undefined
   placement?: PopoverPlacement | undefined
   trigger?: ((attributes: BellTriggerProps, unread: () => number) => Element) | undefined
+  triggerProps?: PopoverButtonProps | undefined
   unread?: number | undefined
 
 [./bell.kay] default
@@ -1279,6 +1289,7 @@ component default
   open?: boolean | undefined
   option?: ((option: ComboboxOption<Value>) => Element) | undefined
   options: ComboboxOptions<Value>
+  panelProps?: Omit<HtmlAttributes<"ul">, "children" | "class" | "hidden" | "id" | "role"> | undefined
   showLabel?: boolean | undefined
   size?: FieldSize | undefined
   value?: "" | Value | undefined
@@ -1497,9 +1508,11 @@ component default
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   open?: boolean | undefined
   openLabel?: string | undefined
+  panelProps?: PopoverPanelProps | undefined
   previousLabel?: string | undefined
   size?: FieldSize | undefined
   todayLabel?: string | undefined
+  triggerProps?: PopoverButtonProps | undefined
   unavailableLabel?: string | undefined
   value?: string | undefined
 
@@ -2123,6 +2136,7 @@ component default
   loadingLabel?: string | undefined
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   open?: boolean | undefined
+  panelProps?: PopoverPanelProps | undefined
   placement?: PopoverPlacement | undefined
   retryLabel?: string | undefined
   size?: Size | undefined
@@ -2196,12 +2210,14 @@ component default
   open?: boolean | undefined
   option?: ((option: MultiSelectOption<Value>) => Element) | undefined
   options: OptionsSource<MultiSelectOption<Value>>
+  panelProps?: PopoverPanelProps | undefined
   placeholder?: string | undefined
   placement?: PopoverPlacement | undefined
   search?: boolean | undefined
   searchLabel?: string | undefined
   selectedLabel?: ((count: number) => string) | string | undefined
   size?: FieldSize | undefined
+  triggerProps?: PopoverButtonProps | undefined
   value?: readonly Value[] | undefined
   valueLabels?: Readonly<Record<string, string>> | undefined
 

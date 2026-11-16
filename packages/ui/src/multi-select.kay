@@ -4,7 +4,7 @@ import { fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import type { OptionsSource } from './options-source'
 import type { MultiSelectOption } from './multi-select'
-import type { PopoverPlacement } from './popover'
+import type { PopoverButtonProps, PopoverPanelProps, PopoverPlacement } from './popover'
 import { effect, postedValues, recipe, signal } from 'kay'
 import { stepIndex } from './cycle'
 import { afterPause, isRemote, searchOptions } from './options-source'
@@ -46,7 +46,7 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
   End: (_, count) => count - 1,
 }
 
-const { size = 'md', invalid, id, options, value = [], label, placeholder = wording('ui.multiSelect.placeholder', 'Any'), searchLabel = wording('ui.multiSelect.search', 'Search'), allLabel = wording('ui.multiSelect.all', 'All'), noneLabel = wording('ui.multiSelect.none', 'None'), emptyLabel = wording('ui.multiSelect.empty', 'No match'), empty, loadingLabel = wording('ui.multiSelect.loading', 'Loading…'), failureLabel = wording('ui.multiSelect.failure', 'Could not load the options'), minLength = 0, valueLabels, onLoad, onError, option: drawRow, selectedLabel, name, search, disabled = false, placement = 'bottom-start', open, onOpenChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
+const { size = 'md', invalid, id, options, value = [], label, placeholder = wording('ui.multiSelect.placeholder', 'Any'), searchLabel = wording('ui.multiSelect.search', 'Search'), allLabel = wording('ui.multiSelect.all', 'All'), noneLabel = wording('ui.multiSelect.none', 'None'), emptyLabel = wording('ui.multiSelect.empty', 'No match'), empty, loadingLabel = wording('ui.multiSelect.loading', 'Loading…'), failureLabel = wording('ui.multiSelect.failure', 'Could not load the options'), minLength = 0, valueLabels, onLoad, onError, option: drawRow, selectedLabel, name, search, disabled = false, placement = 'bottom-start', open, onOpenChange, onChange, panelProps = {}, triggerProps = {}, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
   // The trigger's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid` on its trigger. A FormField marks it on its own while it shows a message.
@@ -94,6 +94,10 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // Gets the picked options as a second argument, a value never loaded and without a `valueLabels` entry gets `{ value, label: String(value) }`, so `options` always lines up with the values.
   onChange?: ((event: { value: Value[], options: MultiSelectOption<Value>[] }) => unknown) | undefined
+  // Attributes of the floating panel, which `...rest` does not reach; the panel's id, role and popover state stay the component's.
+  panelProps?: PopoverPanelProps | undefined
+  // Attributes of the button that opens the panel, written before the ones that open it; `...rest` stays on the root.
+  triggerProps?: PopoverButtonProps | undefined
 }>()
 
 // A control with no callback is plain: a refused post of its form, which the server renders it for, gives its choices back in place of its own; a function of options leaves them as the text they were posted as.
@@ -243,10 +247,10 @@ function focusLeft(event: FocusEvent) {
 }
 ---
 div(part="root" {...rest} ref={ref} data-posted={sent === undefined ? undefined : name})
-  Popover(id={id} placement={placement} open={open} part="panel" label={label} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
+  Popover({...panelProps} id={id} placement={placement} open={open} part="panel" label={label} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
     @trigger(attributes)
       // A combobox opening a dialog, the role that takes `aria-invalid`, `aria-required` and `aria-describedby`, as a FormField sets them. Named by its label and what is picked, which a name of the label alone would hide; a count is described by the labels it stands for.
-      button.kui-field-input({...attributes} data-size={fieldSize(size)} ref={element => keepInvalid(element, () => invalid)} aria-invalid={fieldInvalid(() => invalid)} role="combobox" aria-haspopup="dialog" part="trigger" type="button" aria-label={`${label}: ${summary()}`} aria-description={picked().length > 1 ? pickedLabels(pool(), picked()).join(', ') : undefined} disabled={disabled} data-empty={picked().length === 0 || undefined})
+      button.kui-field-input({...triggerProps} {...attributes} data-size={fieldSize(size)} ref={element => keepInvalid(element, () => invalid)} aria-invalid={fieldInvalid(() => invalid)} role="combobox" aria-haspopup="dialog" part="trigger" type="button" aria-label={`${label}: ${summary()}`} aria-description={picked().length > 1 ? pickedLabels(pool(), picked()).join(', ') : undefined} disabled={disabled} data-empty={picked().length === 0 || undefined})
         span(part="summary") {summary()}
         Icon(icon="chevron" part="chevron")
     if searchable()

@@ -1690,6 +1690,13 @@ interface Plate
   x: number
   y: number
 
+[./lib/index] PopoverButtonProps
+type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+
+[./lib/index] PopoverPanelProps
+type PopoverPanelProps = Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'style'> & {
+  // Written after the component's own declarations, so it wins. style?: string | undefined }
+
 [./lib/index] PopoverPlacement
 type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 
@@ -2672,6 +2679,13 @@ function trackPointer(): void
 
 [./lib/pointer-held] whenReleased
 function whenReleased(show: () => void): void
+
+[./lib/popover] PopoverButtonProps
+type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
+
+[./lib/popover] PopoverPanelProps
+type PopoverPanelProps = Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'style'> & {
+  // Written after the component's own declarations, so it wins. style?: string | undefined }
 
 [./lib/popover] PopoverPlacement
 type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'

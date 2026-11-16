@@ -1,0 +1,17 @@
+---
+import AppSwitcher from '@kayjs/ui/app-switcher.kay'
+import AvatarGroup from '@kayjs/ui/avatar-group.kay'
+import Combobox from '@kayjs/ui/combobox.kay'
+import DateInput from '@kayjs/ui/date-input.kay'
+import Menu from '@kayjs/ui/menu.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
+
+// Each component with a floating panel, given the attributes of its panel and of the button that opens it.
+const people = [{ name: 'Ada' }, { name: 'Bo' }, { name: 'Cy' }]
+---
+Menu(label="Menu" icon="menu" items={[{ label: 'One', href: '/one' }]} panelProps={{ 'data-panel': 'menu' }})
+AppSwitcher(apps={[{ key: 'a', label: 'A', href: '/a' }]} panelProps={{ 'data-panel': 'switcher' }})
+AvatarGroup(items={people} max={1} panelProps={{ 'data-panel': 'avatars' }} triggerProps={{ 'data-trigger': 'avatars' }})
+DateInput(aria-label="Date" panelProps={{ 'data-panel': 'date' }} triggerProps={{ 'data-trigger': 'date' }})
+MultiSelect(label="Multi" options={[{ value: 'a', label: 'A' }]} panelProps={{ 'data-panel': 'multi' }} triggerProps={{ 'data-trigger': 'multi' }})
+Combobox(label="Combobox" options={[{ value: 'a', label: 'A' }]} panelProps={{ 'data-panel': 'combobox' }})

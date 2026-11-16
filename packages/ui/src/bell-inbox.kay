@@ -3,7 +3,7 @@ import type { JSX, Snippet } from 'kay'
 import type { BellItem, BellItems, BellTriggerProps, InboxItem } from './bell'
 import { bellItem } from './bell'
 
-import type { PopoverPlacement, PopoverTriggerProps } from './popover'
+import type { PopoverButtonProps, PopoverPanelProps, PopoverPlacement, PopoverTriggerProps } from './popover'
 import { call, effect, memo, recipe, resource, signal } from 'kay'
 import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
@@ -30,7 +30,7 @@ const look = recipe({
   },
 })
 
-const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, onRead, open, onOpenChange, item: drawRow, trigger, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
+const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, onRead, open, onOpenChange, item: drawRow, trigger, panelProps = {}, triggerProps = {}, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   // Names the button and the list it opens; the `ui.bell.label` message by default.
   label?: string | undefined
   placement?: PopoverPlacement | undefined
@@ -47,6 +47,10 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
   item?: Snippet<[note: Item & ReturnType<typeof bellItem>]> | undefined
   // Replaces the icon button that opens the list: `@trigger(attributes, unread)`, then `button({...attributes})`. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup`, the anchor style and an `aria-label` made of `label` and the unread count; `unread` is a function returning the count (a function, so the app's element is updated in place and keeps focus), to draw a badge of your own (the one over the default button is not drawn).
   trigger?: Snippet<[attributes: BellTriggerProps, unread: () => number]> | undefined
+  // Attributes of the floating panel, which `...rest` does not reach; the panel's id, role and popover state stay the component's.
+  panelProps?: PopoverPanelProps | undefined
+  // Attributes of the button that opens the panel, written before the ones that open it; `...rest` stays on the root.
+  triggerProps?: PopoverButtonProps | undefined
 }>()
 
 // The routes answer a path of the site or an http(s) URL only; checked again here, as the link is drawn.
@@ -117,12 +121,12 @@ async function send(id?: string) {
 }
 ---
 span(part="root" {...rest})
-  Popover(placement={placement} role="none" part="menu" open={open} onOpenChange={onOpenChange})
+  Popover({...panelProps} placement={placement} role="none" part="menu" open={open} onOpenChange={onOpenChange})
     @trigger(attributes)
       if trigger
         | {trigger(named(attributes), unread)}
       else
-        IconButton({...attributes} icon="bell" label={name()} variant="ghost" aria-haspopup="true")
+        IconButton({...triggerProps} {...attributes} icon="bell" label={name()} variant="ghost" aria-haspopup="true")
     div(part="list" aria-label={label})
       if items().length === 0 && !waiting()
         p(part="empty") {wording('ui.bell.empty', 'No notifications')}
