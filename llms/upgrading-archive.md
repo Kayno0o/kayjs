@@ -58,6 +58,34 @@ An app with no `store` now keeps sessions, jobs and every library in one SQLite 
 
 `seo` also takes `title`, `description`, `image` and `canonical`, and `head(title=... description=...)` takes them as attributes, so a page whose head has no tag of its own to write needs no `head` block.
 
+### Server hooks that observe are `after<Verb>`
+
+`deprecated-hook-names` finds the old names in the options of the call, in each collection of `cms({ collections })` and in the `hooks` of kayjs-auth's `src/auth.ts`: run `kay upgrade`. The old names work until 1.108, and the new one wins when both are written. `before<Verb>` (may refuse or change) and `onError`, `onEvent` and a queue's `onStart`, `onSuccess`, `onRetry` keep their names. Every hook already took one object with `context`.
+
+- kayjs-auth: `onSignUp` is `afterSignUp`; its error source is `auth.afterSignUp`.
+- kayjs-mail: `onSend` and `onSuppress` of `mailer()`, `onSend` of `contactForm()` are `afterSend` and `afterSuppress`; a list's `onSubscribe`, `onConfirm`, `onUnsubscribe` and `onBroadcast` are `afterSubscribe`, `afterConfirm`, `afterUnsubscribe` and `afterBroadcast`. Sources follow (`mail.afterSend`, `mail.list.afterSubscribe`).
+- kayjs-cms: `onSave` and `onUpload` of `cms()` and of a collection are `afterSave` and `afterUpload` (sources `cms.afterSave`, `cms.afterUpload`).
+- kayjs-ai: `onStep` and `onToolCall` are `afterStep` and `afterToolCall`, and `onSuccess` is `afterRequest`, beside `beforeRequest`, in `ai()` and in the options of `ask`, `speak`, `embed`, `transcribe` and `describeImage` (sources `ai.afterStep`, `ai.afterToolCall`, `ai.afterRequest`).
+- A test or a log reading a hook's `source` from `observe.onError` reads the new name.
+
+### Every guard option is `guards`, and a feature with none is closed
+
+`deprecated-guard-option` (`kay check --fix`) renames `guard` to `guards` in `vitals()` and in the `jobs` and `images` of kay.config.ts, and writes `requireGuards` as `guards: { default }`; the old forms work until 1.108.
+
+- `vitals({ guard })`, `jobs: { guard }` and `images: { guard }` are `guards`, taking a guard, a list, `{ load }` or `false`, as a page's and an API module's `guards` do. `cms()` keeps `access`, which also takes a role.
+- `jobs` with no `guards` mounts the page and answers 403 instead of stopping the boot, and `jobs: { guards: false }` opens it.
+- `images.resolve` with no `images.guards` answers 403 for every image it resolves, where it was open: write `guards: false` to resize them for everyone.
+- `requireGuards: true` is `guards: { default: 'closed' }` and `requireGuards: false` is `guards: { default: 'open' }`; left out, a site that guards some route of its own still closes the rest.
+
+### Every job takes `(input, ctx)`, and `src/jobs` mounts them
+
+`deprecated-job-handler`, `deprecated-schedule-call`, `deprecated-job-options` and `deprecated-disk-files` find the old forms: run `kay upgrade` on 1.105 and it rewrites each one written inline.
+
+- A handler is `(input, ctx)` with `ctx.signal`, `ctx.job` (`{ id, attempts, progress }`), `ctx.log` and `ctx.locale`. A queue's `(payload, signal, job)` still runs until 1.108, `ctx` being its signal too; a workflow's `({ id, input, step })` is `(input, { step, job: { id } })`, `job.id` the run's id, and a schedule's or `background` job's `(signal)` is `(_, { signal })`, a schedule's first argument being `{ schedule, boot }`. A handler passed by name is not rewritten and no lint finds it: TypeScript does. The `WorkflowRun` type is `WorkflowContext`, and `JobContext` is the `ctx` of every job.
+- `schedule('@hourly', job, options)` is `schedule({ cron: '@hourly', ...options }, job)`, `schedule('30s', job)` is `schedule({ every: '30s' }, job)`; the table form is unchanged. Both work until 1.108.
+- `lostAfter` on `queue()` and `workflow()` is `timeout`, as a schedule's; `lostAfter` works until 1.108. `diskFiles('dir', hooks)` is `diskFiles({ dir, ...hooks })`.
+- Queues, workflows and schedules move to `src/jobs/*.ts` when an app wants no `export default` and no `.use`; `src/plugins/jobs.ts` keeps working.
+
 ## 1.104.0
 
 ### Rate limits are one type and one check
@@ -149,29 +177,4 @@ An `s.Date()` field written `2024-02-30`, `2024-2-30`, `2024/02/30` or `2024-03-
 
 In `ctx.query` and `queryParam`, a blank param (`?q=`) of an optional field with a default reads that default, and a blank list param (`?tags=`) reads `[]`, where it read `[""]`, or answered 400 for a list of numbers. `persisted.query` writes `?q=` or `?tags=` when the user clears a field whose default is not empty, so a reload keeps it. A required field keeps its blank, and an action's body reads as before. A page that took a blank list as one empty item, or relied on a blank number list answering 400, reads the new value.
 
-## 1.101.0
-
-### The `hotkey` of Toaster and CommandPalette 1.97 deprecated is gone
-
-`deprecated-ui-hotkey` goes with it: run `kay upgrade` on 1.100 first. `hotkey` is ignored now, so a Toaster or CommandPalette that still has one loses its key: `hotkey="j"` is `shortcut="alt+j"` on a Toaster and `shortcut="mod+j"` on a CommandPalette, and `hotkey={null}` is `shortcut={null}`.
-
-### The `template-invalid` error code is split by problem
-
-`kay check --format json`, `kay build --format json` and the `code` of a thrown compile error no longer say `template-invalid`: each problem has its own code, `head-invalid`, `slot-invalid`, `duplicate-attribute`, `attribute-invalid`, `attribute-ineffective`, `element-invalid`, `part-invalid`, `form-misuse`, `server-island-invalid`, `fallback-invalid`, `bind-misuse` or `event-name`. A template `const` or snippet named like a name already declared is `name-clash` (it was `signal-misuse`). Messages that the old code covered and a fence rule fits better moved to `fence-invalid` (a name imported twice in the two fences, type parameters, a recipe or props on a page, `ctx` read in an island), `part-invalid` (the `class` prop or recipe of a component with parts) and `page-settings-invalid` (a `query` outside a page or a layout). Match on the new codes, or on the `compile` group; `kay explain <code>` says what each covers, and no `// kay-allow` comment reaches any of them, as before.
-### `apiUrl(module, path)` checks the path against the module
-
-The path must be one of the module's routes and its params are required, so `kay check` reports a path typed as `string`, a mistyped or removed route and a missing param. Write the path as a literal, or cast a dynamic one (`path as '/:id'`) or the module (`module as unknown`); fix a mistyped path. `apiUrl(request, path)` and a module typed `unknown` take any path. No deprecation lint: the type error is the report, and the runtime is unchanged.
-
-### `persisted()` takes no `storage`: each storage has its own entry
-
-`persisted(name, value, { storage: 'local' })` is `persisted.local(name, value)`, `{ storage: 'query' }` is `persisted.query(name, value)` (with `values` and `history` as options), and `{ storage: 'cookie' }` or none is `persisted(name, value)` or `persisted.cookie(name, value)`; `persisted.session()` is new. Each entry takes only the options its storage can use. The old form works until 1.104, and `kay upgrade` rewrites it (`deprecated-persisted-storage`); a call whose `storage` is not a literal, or that is read through another name than the `persisted` import, is changed by hand.
-
-### A `for` with no key matches rows by `id` or the object, never by position
-
-Rows of objects with no `id` used to be paired with the row left in their place when an edit, a removal or an insertion replaced them with copies, and a list of fresh objects reused the rows by position. Now a `for` with no `key` matches a row by `item.id` when it has one and by the item itself otherwise, so a copy of an object with no `id` is a new row: it redraws its markup and loses its fields and focus, as the row of a new object always did. `unkeyed-rows` reports such a `for` in an island, where the rows are matched again (`kay check`, a warning), and offers `key={i}`, which matches by position as a list of copies was matched before, without applying it; an `id` on the rows, or a `key` naming them such as `key={row.slug}`, keeps their nodes across copies and across a removal. No lint can tell a list of copies from a list of the same objects, so `kay upgrade` leaves it.
-
-### kayjs-auth on Postgres gains a `delete_at` column
-
-`kay_users` has a nullable `delete_at` column and its index, written on every new user whether `account.deleteAfter` is set or not. `db.sync()` adds them; an app that ships migrations generates one before deploying (`bunx pg-orm generate`, then `bunx pg-orm apply`), or sign-up fails with `column "delete_at" of relation "kay_users" does not exist`.
-
-Releases before 1.101 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.102 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
