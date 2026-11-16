@@ -19,7 +19,7 @@ const add = Object.assign(async (form: FormData) => {
     throw new ActionError(422, '', { title: 'Two letters at least' })
 
   return title
-}, { pending, url: '', failed: () => undefined }) as unknown as Action<{ title: string }, string | Failure<never>>
+}, { pending, url: '', form: { failed: () => undefined, error: () => undefined } }) as unknown as Action<{ title: string }, string | Failure<never>>
 ---
 .max-w-md
   Form(action={add} failureLabel="Could not add" saved="Added.")

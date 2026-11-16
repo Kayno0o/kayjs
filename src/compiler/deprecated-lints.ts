@@ -193,7 +193,7 @@ export const DEPRECATED_LINTS = {
     since: '1.105',
     summary: 'The `id`, `title` and `data-*` attributes of a kayjs-ui Toggle, Checkbox, Slider, ColorInput, Combobox (its `id` names the list and stays) or DateInput, which reached the input before 1.105 and are on the root element now, as on every component; the input takes `inputProps`. The old form works on the root until 1.108, so a stylesheet or a script that found the input by its `id` is what changes. Found on a component bound to the library\'s file in a template. The fix writes them all into one `inputProps={{ ... }}`; it offers none beside an `inputProps` already written.',
     wrong: '---\nimport Toggle from \'@kayjs/ui/toggle.kay\'\n---\nToggle(label="Alerts" id="alerts" data-track="alerts")',
-    right: '---\nimport Toggle from \'@kayjs/ui/toggle.kay\'\n---\nToggle(label="Alerts" inputProps={{ id: "alerts", "data-track": "alerts" }})',
+    right: '---\nimport Toggle from \'@kayjs/ui/toggle.kay\'\n---\nToggle(label="Alerts" inputProps={{ id: \'alerts\', \'data-track\': \'alerts\' }})',
   },
   'deprecated-ai-language': {
     level: 'warn',

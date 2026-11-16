@@ -243,7 +243,7 @@ A variant or value the component lacks is added: `Button(tone="brand")` types an
 
 Every element of a component that an app could style carries `data-part` (hidden inputs, a chart's hidden data table and a few layout rows aside), so no class has to be known to restyle it.
 
-The attributes a component is given, `id`, `data-*` and `title` among them, land on its root element. A control that draws its input inside a wrapper (Toggle, Checkbox, Slider, ColorInput, Combobox, DateInput) keeps `name`, `disabled`, `required`, `value`, `aria-*`, `ref` and the event handlers on the input, and takes the input's other attributes as `inputProps`: `Toggle(label="Alerts" inputProps={{ id: "alerts", autocomplete: "off" }})`.
+The attributes a component is given, `id`, `data-*` and `title` among them, land on its root element. A control that draws its input inside a wrapper (Toggle, Checkbox, Slider, ColorInput, Combobox, DateInput) keeps `name`, `disabled`, `required`, `value`, `aria-*`, `ref` and the event handlers on the input, and takes the input's other attributes as `inputProps`: `Toggle(label="Alerts" inputProps={{ id: 'alerts', autocomplete: 'off' }})`.
 
 A state is the ARIA attribute where ARIA has one (`aria-expanded`, `aria-checked`, `aria-selected`, `aria-current`, `aria-pressed`, `aria-busy`, `aria-disabled` or `disabled`), and a named `data-*` attribute where it has none (`data-placement`, `data-dragging`, `data-direction`, a Steps item's `data-step`). There is no `data-state` repeating an ARIA state. Tailwind's `aria-selected:` and `data-dragging:` variants style both from `src/ui.ts`.
 
