@@ -35,13 +35,13 @@ function shown(value: unknown): string {
   }
 }
 
-// Runs a reader that also runs in the browser, so throws a plain error, and raises what it throws as a `config-invalid` KayError.
+// Runs a reader that also runs in the browser, so throws a plain error or a light KayError such as `argument-invalid`, and raises what it throws as a `config-invalid` KayError.
 export function asConfigError<T>(read: () => T): T {
   try {
     return read()
   }
   catch (error) {
-    throw error instanceof Error && !(error instanceof KayError) ? new KayError('config-invalid', error.message, { cause: error }) : error
+    throw error instanceof Error && !(error instanceof KayError && error.code === 'config-invalid') ? new KayError('config-invalid', error.message, { cause: error }) : error
   }
 }
 
