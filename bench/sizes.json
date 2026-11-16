@@ -1,6 +1,6 @@
 {
   "static": {
-    "gzip": 9565,
+    "gzip": 9560,
     "files": 3,
     "packages": {
       "app": 493,
@@ -8,7 +8,7 @@
     }
   },
   "i18n-links": {
-    "gzip": 17330,
+    "gzip": 17324,
     "files": 2,
     "packages": {
       "app": 1020,
@@ -16,7 +16,7 @@
     }
   },
   "live-values": {
-    "gzip": 15245,
+    "gzip": 15252,
     "files": 4,
     "packages": {
       "app": 854,
@@ -24,7 +24,7 @@
     }
   },
   "bench-products": {
-    "gzip": 11080,
+    "gzip": 11081,
     "files": 2,
     "packages": {
       "app": 433,
@@ -48,13 +48,13 @@
     }
   },
   "ui-list": {
-    "gzip": 52131,
+    "gzip": 52229,
     "files": 9,
     "packages": {
       "app": 3223,
       "icons": 9375,
       "kay": 49654,
-      "kayjs-ui": 89926
+      "kayjs-ui": 90093
     }
   }
 }
