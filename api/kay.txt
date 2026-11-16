@@ -922,7 +922,7 @@ interface PageSettings
 function pageVisible(fallback?: boolean): () => boolean
 
 [.] PartClass
-type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
+type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Exclude<Props['class' & keyof Props], Record<string, boolean | null | undefined>> : never : never
 
 [.] persisted
 function persisted<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: PersistedCookieOptions<T> & { values: readonly T[]; }): Signal<T>

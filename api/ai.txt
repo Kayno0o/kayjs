@@ -900,7 +900,7 @@ component default
   argumentsLabel: string
   block?: ((call: AiToolCall) => Element) | undefined
   calls: AiToolCall[]
-  class?: string | undefined | {
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   root?: string | undefined;
   list?: string | undefined;
   call?: string | undefined;
@@ -974,10 +974,10 @@ component default
   newConversation?: string | undefined;
   conversationList?: string | undefined;
   conversation?: string | undefined;
-  renameField?: string | undefined | {
+  renameField?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
     field?: string | undefined;
-    icon?: string | undefined | {
+    icon?: readonly unknown[] | string | undefined | {
       root?: string | undefined;
     };
   };
@@ -985,10 +985,10 @@ component default
   confirm?: string | undefined;
   cancel?: string | undefined;
   conversationLink?: string | undefined;
-  rename?: string | undefined | {
+  rename?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  delete?: string | undefined | {
+  delete?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   empty?: string | undefined;
@@ -997,7 +997,7 @@ component default
   suggestion?: string | undefined;
   log?: string | undefined;
   turn?: string | undefined;
-  editField?: string | undefined | {
+  editField?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   files?: string | undefined;
@@ -1012,36 +1012,36 @@ component default
   reasoning?: string | undefined;
   reasoningText?: string | undefined;
   note?: string | undefined;
-  edit?: string | undefined | {
+  edit?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  regenerate?: string | undefined | {
+  regenerate?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   thinking?: string | undefined;
   status?: string | undefined;
   retry?: string | undefined;
   disclosure?: string | undefined;
-  remove?: string | undefined | {
+  remove?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   form?: string | undefined;
-  new?: string | undefined | {
+  new?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  attach?: string | undefined | {
+  attach?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  field?: string | undefined | {
+  field?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  record?: string | undefined | {
+  record?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  recordSpinner?: string | undefined | {
+  recordSpinner?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  send?: string | undefined | {
+  send?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
 }
@@ -1063,15 +1063,15 @@ component default
 [./chat-panel.kay] default
 component default
   children?: Element
-  class?: string | undefined | {
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   root?: string | undefined;
-  new?: string | undefined | {
+  new?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  expand?: string | undefined | {
+  expand?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  close?: string | undefined | {
+  close?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
 }
@@ -1087,13 +1087,13 @@ component default
   open?: boolean | undefined
   parts?: undefined | {
   root?: string | undefined;
-  new?: string | undefined | {
+  new?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  expand?: string | undefined | {
+  expand?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  close?: string | undefined | {
+  close?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
 }
@@ -1101,7 +1101,13 @@ component default
 [./chat-sources.kay] default
 component default
   block?: ((source: Source, n: number) => Element) | undefined
-  class?: string | undefined | { root?: string | undefined; label?: string | undefined; list?: string | undefined; item?: string | undefined; link?: string | undefined; }
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
+  root?: string | undefined;
+  label?: string | undefined;
+  list?: string | undefined;
+  item?: string | undefined;
+  link?: string | undefined;
+}
   here?: boolean | undefined
   label: string
   newTab?: "auto" | boolean | undefined
@@ -1115,16 +1121,16 @@ component default
   actions?: ((turn: ChatTurnView) => Element) | undefined
   attach?: boolean | undefined
   call?: ((call: AiToolCall) => Element) | undefined
-  class?: string | undefined | {
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   root?: string | undefined;
   conversations?: string | undefined;
   newConversation?: string | undefined;
   conversationList?: string | undefined;
   conversation?: string | undefined;
-  renameField?: string | undefined | {
+  renameField?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
     field?: string | undefined;
-    icon?: string | undefined | {
+    icon?: readonly unknown[] | string | undefined | {
       root?: string | undefined;
     };
   };
@@ -1132,10 +1138,10 @@ component default
   confirm?: string | undefined;
   cancel?: string | undefined;
   conversationLink?: string | undefined;
-  rename?: string | undefined | {
+  rename?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  delete?: string | undefined | {
+  delete?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   empty?: string | undefined;
@@ -1144,7 +1150,7 @@ component default
   suggestion?: string | undefined;
   log?: string | undefined;
   turn?: string | undefined;
-  editField?: string | undefined | {
+  editField?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   files?: string | undefined;
@@ -1159,36 +1165,36 @@ component default
   reasoning?: string | undefined;
   reasoningText?: string | undefined;
   note?: string | undefined;
-  edit?: string | undefined | {
+  edit?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  regenerate?: string | undefined | {
+  regenerate?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   thinking?: string | undefined;
   status?: string | undefined;
   retry?: string | undefined;
   disclosure?: string | undefined;
-  remove?: string | undefined | {
+  remove?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   form?: string | undefined;
-  new?: string | undefined | {
+  new?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  attach?: string | undefined | {
+  attach?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  field?: string | undefined | {
+  field?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  record?: string | undefined | {
+  record?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  recordSpinner?: string | undefined | {
+  recordSpinner?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  send?: string | undefined | {
+  send?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
 }
@@ -1229,10 +1235,10 @@ component default
   newConversation?: string | undefined;
   conversationList?: string | undefined;
   conversation?: string | undefined;
-  renameField?: string | undefined | {
+  renameField?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
     field?: string | undefined;
-    icon?: string | undefined | {
+    icon?: readonly unknown[] | string | undefined | {
       root?: string | undefined;
     };
   };
@@ -1240,10 +1246,10 @@ component default
   confirm?: string | undefined;
   cancel?: string | undefined;
   conversationLink?: string | undefined;
-  rename?: string | undefined | {
+  rename?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  delete?: string | undefined | {
+  delete?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   empty?: string | undefined;
@@ -1252,7 +1258,7 @@ component default
   suggestion?: string | undefined;
   log?: string | undefined;
   turn?: string | undefined;
-  editField?: string | undefined | {
+  editField?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   files?: string | undefined;
@@ -1267,36 +1273,36 @@ component default
   reasoning?: string | undefined;
   reasoningText?: string | undefined;
   note?: string | undefined;
-  edit?: string | undefined | {
+  edit?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  regenerate?: string | undefined | {
+  regenerate?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   thinking?: string | undefined;
   status?: string | undefined;
   retry?: string | undefined;
   disclosure?: string | undefined;
-  remove?: string | undefined | {
+  remove?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   form?: string | undefined;
-  new?: string | undefined | {
+  new?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  attach?: string | undefined | {
+  attach?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  field?: string | undefined | {
+  field?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  record?: string | undefined | {
+  record?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  recordSpinner?: string | undefined | {
+  recordSpinner?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  send?: string | undefined | {
+  send?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
 }

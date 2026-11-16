@@ -231,11 +231,17 @@ function taggedParts(parts: Record<string, unknown>): Parts {
   return Object.defineProperty({ ...parts }, PARTS, { value: true })
 }
 
+// Whether a `class` object is the parts of the form before 1.105, with a string or an object among its values, rather than an object of conditions, whose values are booleans.
+function holdsParts(value: object): boolean {
+  return isParts(value) || Object.values(value).some(entry => typeof entry === 'string' || (typeof entry === 'object' && entry !== null))
+}
+
 // What a component's `class` and `parts` props give a part, `class` winning: a `class` string, or array, is the root's, and an object holds one entry per part, its own object when that part is a component. The `class` object is the form before 1.105, still read and overridden by `parts`.
 export function partClass(props: unknown, part: string): unknown {
   const { class: value, parts } = (props ?? {}) as { class?: unknown, parts?: unknown }
   const own = (from: unknown): unknown => {
-    if (typeof from !== 'object' || from === null || Array.isArray(from))
+    // A `class` that is no parts object, a string, an array or an object of conditions, is the root's.
+    if (typeof from !== 'object' || from === null || Array.isArray(from) || (from === value && !holdsParts(from)))
       return part === 'root' && from === value ? from : undefined
 
     const entry = Object.hasOwn(from, part) ? (from as Record<string, unknown>)[part] : undefined
@@ -252,7 +258,7 @@ export function partClass(props: unknown, part: string): unknown {
   if (isParts(given) && isParts(added))
     return mergeParts([added, given])
 
-  const joins = (entry: unknown) => typeof entry === 'string' || Array.isArray(entry)
+  const joins = (entry: unknown) => typeof entry === 'string' || Array.isArray(entry) || (typeof entry === 'object' && entry !== null && !isParts(entry))
 
   return joins(given) && joins(added) ? [added, given] : given
 }

@@ -346,8 +346,8 @@ export interface AwaitProps<T> {
 
 type PropsOf<Tag> = Tag extends keyof JSX.IntrinsicElements ? JSX.IntrinsicElements[Tag] : Tag extends Component<infer Props> ? Props : Record<string, unknown>
 
-// The `class` a part that is a call of this component takes, as the component types it: a string for its root, or an object of its own parts.
-export type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
+// The `class` a part that is a call of this component takes, as the component types it: a string for its root, or an object of its own parts, an object of conditions left out.
+export type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Exclude<Props['class' & keyof Props], Record<string, boolean | null | undefined>> : never : never
 
 // The type of the part `Name` of a component, which a call of it receives from the part of the same name this component hands on: its own parts object entry for it.
 export type HandedPart<Component, Name extends string> = PartClass<Component> extends infer Class ? Class extends object ? Name extends keyof Class ? Class[Name] : never : never : never

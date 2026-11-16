@@ -83,6 +83,10 @@ describe('kay check on a component with parts', () => {
     expect(await problems(`${IMPORTS}Plain(parts={{ head: 'p-6' }})\n`)).not.toEqual([])
   })
 
+  it('takes an array and an object of conditions as class, beside parts', async () => {
+    expect(await problems(`${IMPORTS}Card(class={['a', rest.id === 'x' && 'b']} parts={{ head: 'p-6' }}) a\nCard(class={{ active: rest.id === 'x' }} parts={{ head: 'p-6' }}) b\nCard(class={['a']}) c\n`)).toEqual([])
+  })
+
   it('takes a part class that may be undefined under exactOptionalPropertyTypes', async () => {
     expect(await problems(`${IMPORTS}Card(class={{ head: rest.id === 'x' ? 'p-6' : undefined }}) a\n`, undefined, exact)).toEqual([])
   })
