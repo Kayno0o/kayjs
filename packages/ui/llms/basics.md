@@ -38,6 +38,7 @@ Dialog(open={editing()} title="Rename" onOpenChange={() => editing = false})
 ```
 
 - `size` is the width: `sm`, `md` (the default) or `lg`, and `full` fills the viewport less its margin in both directions. `bare` drops the body's inset and scroll, for content that runs to the edge, such as a pan and zoom canvas, which then fills the body (`.h-full`); the title and footer keep theirs.
+
 - Dialog, SidePanel, FormDialog and CommandPalette are one overlay family: `size` takes the same names, and Dialog and SidePanel share a head line with a close button (`closeLabel`, `Close`), `@actions` before it, `@header` for the whole line and `@close` for the button, `closeHref` (the close button is a link, `onOpenChange` optional, so a server page shows it) and `modal={false}` (beside the page, open on the server), `dirty` (also locks the close button), FormDialog passing them on.
 - `bind:` takes a value with its `on<Value>Change`: `Dialog(bind:open={editing})` is `open={editing()}` and `onOpenChange={({ open: v }) => editing = v}`.
 - Dialog is a modal `dialog`. It closes when its parent sets `open` to false, on Escape, or on a click outside. `onOpenChange({ open: false })` runs on any close. Closed by Escape or a click outside, its content is still there to read; closed by the parent, it is already gone. Its title names it for screen readers, an `h2` unless `level` says otherwise.

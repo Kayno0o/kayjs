@@ -8,3 +8,4 @@ Dialog#plain(open title="Plain" onOpenChange={close}) Body
 Dialog#full(open title="Full" size="full" bare onOpenChange={close})
   canvas#canvas
 Dialog#small(open title="Small" size="sm" onOpenChange={close}) Body
+Dialog#aside(open title="Aside" placement="right" size="lg" onOpenChange={close}) Body

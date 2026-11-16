@@ -43,7 +43,11 @@ The head line holds the title, the `@actions` block and a close button, named `C
 
 `closeHref` makes the close button a link, so a dialog open on the server closes with no JavaScript. With it `onOpenChange` is optional: leave it out and Escape follows the link too. `modal={false}` shows the dialog over the page without blocking it, open on the server, as SidePanel does.
 
-SidePanel, FormDialog and CommandPalette take the same `size` names (a palette's `md` is the narrower 36rem), and FormDialog passes `size`, `level`, `actions`, `header`, `close`, `closeHref`, `modal` and `closeLabel` to its Dialog.
+SidePanel, FormDialog and CommandPalette take the same `size` names (a palette's `md` is the narrower 36rem), and FormDialog passes `size`, `level`, `actions`, `header`, `close`, `closeHref`, `modal`, `closeLabel`, `placement` and `discard` to its Dialog.
+
+## Placement
+
+`placement` is where the dialog sits: `center` (the default) over the page, or `right` as a panel along the right edge, which slides in over the full height with `size` as its width. The parts, the close guards (`dirty`, `discard`, `autosave`, Escape, a click outside) and `onOpenChange` are the same in every placement. [SidePanel](/ui/side-panel) is a Dialog with `placement="right"` plus a launcher and a dock, and `FormDialog(placement="right")` opens a form in a panel.
 
 ## Heading level
 

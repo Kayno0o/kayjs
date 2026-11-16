@@ -565,9 +565,9 @@ describe('the overlays whose recipe holds their look', () => {
     ['menu', 'item', 'cursor-pointer', 'py-3'],
     ['popover', undefined, 'bg-popover', 'shadow-xl'],
     ['side', undefined, 'h-dvh', undefined],
-    ['side', 'head', 'border-b', 'px-6'],
-    ['side', 'title', 'truncate', 'text-lg'],
-    ['side', 'body', 'overflow-y-auto', 'px-6'],
+    ['side', 'head', 'border-b', undefined],
+    ['side', 'title', 'truncate', 'text-xl'],
+    ['side', 'body', 'overflow-y-auto', undefined],
     ['kui-command-palette', undefined, 'max-h-[min(70dvh,40rem)]', 'rounded-2xl'],
     ['kui-toaster', undefined, 'fixed', 'z-50'],
     ['kui-tooltip', undefined, 'bg-surface-strong', 'text-xs'],
@@ -592,10 +592,11 @@ describe('the overlays whose recipe holds their look', () => {
   test('a Dialog size is a variant of its root that replaces the width, and a bare body writes data-bare', () => {
     expect(html.match(/<dialog[^>]*id="dialog"[^>]*>/)![0]).not.toContain('data-size')
     // The merge that drops the base width needs the class table of a built app; here the variant comes after the base, which is what it reads.
-    expect(classesOfPart('dialog').filter(name => name.startsWith('max-w-'))).toEqual(['max-w-[min(42rem,calc(100vw-2rem))]'])
-    expect(classesOfPart('small').filter(name => name.startsWith('max-w-')).at(-1)).toBe('max-w-[min(28rem,calc(100vw-2rem))]')
-    expect(classesOfPart('full').filter(name => name.startsWith('max-w-')).at(-1)).toBe('max-w-[calc(100vw-2rem)]')
-    expect(classesOfPart('full')).toContain('h-[calc(100dvh-2rem)]')
+    expect(classesOfPart('dialog').filter(name => name.startsWith('max-w-'))).toEqual(['max-w-[min(var(--dialog-w,42rem),calc(100vw-2rem))]'])
+    expect(classesOfPart('dialog').filter(name => name.startsWith('[--dialog-w'))).toEqual([])
+    expect(classesOfPart('small')).toContain('[--dialog-w:28rem]')
+    expect(classesOfPart('full')).toContain('[--dialog-w:100vw]')
+    expect(classesOfPart('full')).toContain('[--dialog-h:calc(100dvh-2rem)]')
     expect(html.match(/<div[^>]*data-part="body"[^>]*>/g)!.filter(tag => (/ data-bare[ =>]/).test(tag))).toHaveLength(1)
     expect(html.match(/<dialog[^>]*id="full"[\s\S]*?<div[^>]*data-part="body"[^>]*>/)![0]).toMatch(/ data-bare[ =>]/)
   })

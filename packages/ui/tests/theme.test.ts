@@ -957,7 +957,7 @@ describe('theme.css', () => {
     for (const selector of ['.kui-table-wrap', '.kui-collapsible-section', '.kui-save-bar', ':where(.kui-site-nav > [data-part=\'list\']:popover-open)'])
       expect(blockOf(theme, selector), selector).toMatch(KEYLINE)
 
-    for (const name of ['card', 'card-row', 'widget', 'segmented', 'file-drop', 'toaster', 'dialog', 'command-palette', 'popover', 'side-panel', 'tooltip-host', 'pagination', 'line-chart'])
+    for (const name of ['card', 'card-row', 'widget', 'segmented', 'file-drop', 'toaster', 'dialog', 'command-palette', 'popover', 'tooltip-host', 'pagination', 'line-chart'])
       expect(sourceOf(name), name).toMatch(KEYLINE)
 
     expect(theme).toContain('--border-width: 1px;')

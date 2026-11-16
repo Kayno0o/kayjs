@@ -6,10 +6,12 @@ import IconButton from './icon-button.kay'
 import type { Discard } from './confirm'
 import { closeWatcher, discardAndClose, followsHref, leave, renderedOpen, syncOpen } from './overlay'
 
-// 'kui-dialog' stays as the component's name for an app's CSS and the always-hidden guard.
+// 'kui-dialog' stays as the component's name for an app's CSS and the always-hidden guard; a side placement is 'kui-side-panel' instead, which theme.css keeps the docked panel's shadow for.
+// A dialog shown with show(), beside the page, is positioned absolute and sits in the page, so it is fixed to the edge and above the page.
+// The width comes from `--dialog-w`, which `size` sets, so one size is one width in every placement, less the margin only a centred dialog keeps.
 const look = recipe({
   parts: {
-    root: 'kui-dialog m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border-solid border-[length:var(--border-width)] border-border-strong bg-surface p-0 [&[open]:not(:modal)]:fixed [&[open]:not(:modal)]:inset-0 [&[open]:not(:modal)]:z-30 [&[open]:not(:modal)]:h-fit [&[open]:not(:modal):not([data-modal=false])]:shadow-[0_0_0_100vmax_rgb(0_0_0/0.5)]',
+    root: 'flex w-full flex-col overflow-hidden border-solid border-border-strong bg-surface p-0 [&[open]:not(:modal)]:fixed [&[open]:not(:modal)]:z-30 [&[open]:not(:modal):not([data-modal=false])]:shadow-[0_0_0_100vmax_rgb(0_0_0/0.5)]',
     head: 'flex shrink-0 items-center gap-2 border-b border-border px-5 py-3',
     title: 'min-w-0 flex-1 text-lg [font-weight:var(--font-weight-semibold)] tracking-label text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     // The body of a `bare` dialog writes data-bare too, as a child cannot read the attribute of its parent in a utility.
@@ -17,22 +19,28 @@ const look = recipe({
     footer: 'flex shrink-0 flex-wrap justify-end gap-2 border-t border-border px-5 py-4',
   },
   variants: {
+    // Where the dialog sits: `center` (the default) over the page, or `right` as a panel along that edge, which slides in.
+    placement: {
+      center: { root: 'kui-dialog m-auto h-[var(--dialog-h,auto)] max-h-[calc(100dvh-2rem)] max-w-[min(var(--dialog-w,42rem),calc(100vw-2rem))] rounded-lg border-[length:var(--border-width)] [&[open]:not(:modal)]:inset-0 [&[open]:not(:modal)]:h-fit' },
+      right: { root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh max-w-[min(var(--dialog-w,42rem),100vw)] border-0 border-l-[length:var(--border-width)] text-foreground [transition:translate_calc(0.2s*var(--motion-scale))_ease-out,overlay_calc(0.2s*var(--motion-scale))_allow-discrete,display_calc(0.2s*var(--motion-scale))_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] backdrop:bg-black/50 data-dock:overflow-visible data-dock:[transition:none] data-dock:open:starting:[translate:none] data-dock:[&:not([open])]:[translate:none]', title: 'truncate' },
+    },
     // The width, the one vocabulary of every overlay: `sm`, `md` (the default), `lg`, or `full`, which takes the whole viewport width and height less the margin, for content such as a canvas that fills the dialog.
     size: {
-      sm: { root: 'max-w-[min(28rem,calc(100vw-2rem))]' },
+      sm: { root: '[--dialog-w:28rem]' },
       md: '',
-      lg: { root: 'max-w-[min(72rem,calc(100vw-2rem))]' },
-      full: { root: 'h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)]' },
+      lg: { root: '[--dialog-w:72rem]' },
+      full: { root: '[--dialog-w:100vw] [--dialog-h:calc(100dvh-2rem)]' },
     },
   },
-  defaults: { size: 'md' },
+  defaults: { placement: 'center', size: 'md' },
 })
 
-const { open, trigger, title, label, heading, level = 2, size = 'md', bare = false, dirty = false, autosave = false, discard, modal = true, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+const { open, trigger, title, label, heading, level, placement, size, bare, keep, handle, docked, dirty, autosave, discard, modal, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
   // Shows the dialog, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`. Left out, the dialog keeps its own state, opened by `trigger`.
   open?: boolean | undefined
   // Renders what opens the dialog when `open` is left to the component: `@trigger(attributes)`, then `button({...attributes})`.
   trigger?: Snippet<[attributes: { 'onClick': () => void, 'aria-haspopup': 'dialog' }]> | undefined
+
   // The heading, and the dialog's name for screen readers. A `@title` block draws markup in its place, such as an icon, a status badge or an emphasised name: the dialog is then named by that heading's text, or by `label`.
   title: string | Snippet
   // The dialog's name for screen readers when it differs from the visible title, such as a short name beside a `@title` full of markup.
@@ -41,6 +49,13 @@ const { open, trigger, title, label, heading, level = 2, size = 'md', bare = fal
   heading?: Snippet
   // The title's heading level: a modal opens over the page's own `h1`.
   level?: 2 | 3 | 4 | 5 | 6 | undefined
+  // Keeps the head and the body rendered while the dialog is closed, hidden with it, so what lives in them (a chat, a form half filled, a player) is not torn down and built again on each opening.
+  keep?: boolean | undefined
+  // Drawn inside the dialog before its head while it is open, on the edge of a panel: a resize grip, say.
+  handle?: Snippet
+  // With `modal={false}`, a dialog docked beside the page as a tool: only its close control closes it, Escape does not, and it does not take the focus. Its geometry and `data-dock` are the caller's, `SidePanel` draws them.
+  docked?: boolean | undefined
+
   // No inset or scroll on the body, for content that runs to the dialog's edge; the title and footer keep theirs.
   bare?: boolean | undefined
   // Work the dialog must not drop, such as a request in flight: a click outside, Escape and the close button leave it open. Typing is not that: it asks first, see `discard`.
@@ -86,23 +101,35 @@ const opener = { 'onClick': () => change(true), 'aria-haspopup': 'dialog' } as c
 // The name a screen reader announces: `label`, else a string title; a markup title names the dialog through its heading, which a `header` block replaces: that one needs a `label`.
 const name = () => label ?? (typeof title === 'string' ? title : undefined)
 const titleId = uid()
+const headingId = () => name() === undefined ? titleId : undefined
 
 // Set by any typing inside, and cleared however the dialog closes, since every way ends in its `close` event.
 const edited = signal(false)
 let dialog: HTMLDialogElement | undefined
 
+// Left out, `modal` is true.
+const modally = () => modal !== false
+const beside = () => !modally() && docked
+const rank = () => level ?? 2
+const headline = () => heading ?? title
+
 // Read once: the open attribute is what the server renders, and the client opens and closes the dialog by its methods.
-const serverOpen = renderedOpen(isOpen(), modal, closeHref)
+const serverOpen = renderedOpen(isOpen(), modally(), closeHref)
 
 effect(() => {
   const shown = isOpen()
 
   if (dialog)
-    syncOpen(dialog, shown, modal)
+    syncOpen(dialog, shown, modally(), !beside())
 })
 
+
 // Typed text a modal dialog would lose is asked about first.
-const guarded = () => edited() && modal && !autosave && !dirty && discard !== false
+const guarded = () => edited() && modally() && !autosave && !dirty && discard !== false
+
+function ask() {
+  void discardAndClose(dialog, discard || undefined)
+}
 
 function closed() {
   edited = false
@@ -124,7 +151,7 @@ function cancelled(event: Event) {
     return
 
   event.preventDefault()
-  void discardAndClose(dialog, discard || undefined)
+  ask()
 }
 
 // A click on the backdrop, which the browser leaves alone while the close is guarded.
@@ -137,7 +164,7 @@ function pressed(event: KeyboardEvent) {
 
 function clicked(event: MouseEvent) {
   if (event.target === dialog && guarded())
-    void discardAndClose(dialog, discard || undefined)
+    ask()
 }
 
 function leaving() {
@@ -145,7 +172,7 @@ function leaving() {
     return
 
   if (guarded())
-    void discardAndClose(dialog, discard || undefined)
+    ask()
   else
     dialog?.close()
 }
@@ -153,22 +180,24 @@ function leaving() {
 if trigger
   | {trigger(opener)}
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, autosave, edited: edited(), footer: footer !== undefined, guarded: guarded() })} onInput={() => edited = true} onCancel={event => { rest.onCancel?.(event); cancelled(event) }} onClick={event => { rest.onClick?.(event); clicked(event) }} onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onClose={closed})
-  if isOpen()
+dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modally() ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => { dialog = element; rest.ref?.(element) }} closedby={closeWatcher({ modal: modally(), docked: beside(), dirty: Boolean(dirty), autosave, edited: edited(), footer: footer !== undefined, guarded: guarded() })} onInput={() => edited = true} onCancel={event => { rest.onCancel?.(event); cancelled(event) }} onClick={event => { rest.onClick?.(event); clicked(event) }} onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onClose={closed})
+  if isOpen() || keep
+    if isOpen() && handle
+      | {handle}
     header(part="head")
       if header
         | {header}
       else
-        if level === 2
-          h2(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
-        else if level === 3
-          h3(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
-        else if level === 4
-          h4(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
-        else if level === 5
-          h5(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
+        if rank() === 2
+          h2(part="title" id={headingId()}) {headline()}
+        else if rank() === 3
+          h3(part="title" id={headingId()}) {headline()}
+        else if rank() === 4
+          h4(part="title" id={headingId()}) {headline()}
+        else if rank() === 5
+          h5(part="title" id={headingId()}) {headline()}
         else
-          h6(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
+          h6(part="title" id={headingId()}) {headline()}
         | {actions}
         if close
           | {close}

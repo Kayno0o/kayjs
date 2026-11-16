@@ -30,3 +30,13 @@ test('a bare Dialog keeps its title and holds its content in a body the styleshe
   expect(dialog('full').querySelector('h2[data-part=title]')?.textContent).toBe('Full')
   expect(dialog('full').querySelector('.kui-dialog [data-part=body] #canvas')).not.toBeNull()
 })
+
+test('a Dialog placed on a side is the side panel: named for it, slid in from that edge, with the same parts, and wide by its size', async () => {
+  const dialog = await open()
+  const aside = dialog('aside')
+
+  expect(aside.getAttribute('data-size')).toBe('lg')
+  expect([aside.classList.contains('kui-side-panel'), aside.classList.contains('kui-dialog'), dialog('plain').classList.contains('kui-dialog')]).toEqual([true, false, true])
+  expect(aside.querySelector('h2[data-part=title]')?.textContent).toBe('Aside')
+  expect(aside.querySelector('[data-part=body]')?.textContent).toBe('Body')
+})

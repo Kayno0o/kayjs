@@ -1,30 +1,28 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, listen, onCleanup, persisted, recipe, signal, uid, untrack } from 'kay'
+import { effect, listen, onCleanup, persisted, recipe, signal, untrack } from 'kay'
 import BareIconButton from './bare-icon-button.kay'
 import Icon from './icon.kay'
-import IconButton from './icon-button.kay'
+import Dialog from './dialog.kay'
 import type { IconProps } from 'kay/icons'
 import type { Discard } from './confirm'
 import type { IconSlot } from './defaults'
 import type { OverlaySize } from './overlay'
 import type { Size } from './size'
 import type { Tone } from './tone'
-import { closeWatcher, discardAndClose, followsHref, leave, renderedOpen, syncOpen } from './overlay'
+import { followsHref } from './overlay'
 import { wording } from 'kay/words'
 
-// 'kui-side-panel' stays as the component's name for an app's CSS and the always-hidden guard; theme.css keeps the docked panel's shadow.
-// A dialog shown with show(), beside the page, is positioned absolute and sits in the page, so it is fixed to the edge and above the page.
+// The panel is a Dialog with a side placement, which draws its root, head, title, body and footer; 'kui-side-panel' stays as the root's name for an app's CSS, and theme.css keeps the docked panel's shadow.
 const look = recipe({
   parts: {
-    // The width of a panel not docked comes by name, the one vocabulary of every overlay: `md` is the default 42rem.
-    root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--border-width)] border-border-strong bg-surface p-0 text-foreground [transition:translate_calc(0.2s*var(--motion-scale))_ease-out,overlay_calc(0.2s*var(--motion-scale))_allow-discrete,display_calc(0.2s*var(--motion-scale))_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] data-[size=sm]:max-w-[min(28rem,100vw)] data-[size=lg]:max-w-[min(72rem,100vw)] data-[size=full]:max-w-full backdrop:bg-black/50 [&[open]:not(:modal)]:fixed [&[open]:not(:modal)]:z-30 [&[open]:not(:modal):not([data-modal=false])]:shadow-[0_0_0_100vmax_rgb(0_0_0/0.5)] data-dock:overflow-visible data-dock:[transition:none] data-dock:open:starting:[translate:none] data-dock:[&:not([open])]:[translate:none]',
+    root: '',
     grip: 'group/grip absolute z-[2] touch-none focus-visible:outline-2 focus-visible:outline-accent data-[dock=right]:inset-y-0 data-[dock=right]:-left-3 data-[dock=right]:w-6 data-[dock=right]:cursor-ew-resize data-[dock=bottom]:inset-x-0 data-[dock=bottom]:-top-3 data-[dock=bottom]:h-6 data-[dock=bottom]:cursor-ns-resize',
     line: 'pointer-events-none absolute bg-accent opacity-0 shadow-[0_0_0_1px_var(--color-popover)] group-[&:hover]/grip:opacity-100 group-focus-visible/grip:opacity-100 data-[dock=right]:inset-y-0 data-[dock=right]:left-[calc(50%-1px)] data-[dock=right]:w-0.5 data-[dock=bottom]:inset-x-0 data-[dock=bottom]:top-[calc(50%-1px)] data-[dock=bottom]:h-0.5',
-    head: 'flex shrink-0 items-center gap-2 border-b border-border px-5 py-3',
-    title: 'min-w-0 flex-1 truncate text-lg [font-weight:var(--font-weight-semibold)] tracking-label text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
-    body: 'min-h-0 flex-1 overflow-y-auto px-5 py-4',
-    footer: 'flex shrink-0 flex-wrap justify-end gap-2 border-t border-border px-5 py-4',
+    head: '',
+    title: '',
+    body: '',
+    footer: '',
     // The button a closed docked panel leaves in the corner, off the dev tool's docked drawer.
     launcher: 'fixed z-30 right-[calc(1rem+var(--kay-dev-inset-right,0px))] bottom-[calc(1rem+var(--kay-dev-inset-bottom,0px)+env(safe-area-inset-bottom,0px))] rounded-xl border border-solid border-border bg-popover text-foreground shadow-[0_0.5rem_2rem_rgb(0_0_0/0.25)]',
   },
@@ -97,9 +95,12 @@ const DOCKS = { right: { min: 280, page: 352, step: 24, fallback: 384 }, bottom:
 // The launcher's distance from the window's right edge, which what keeps off it counts too.
 const LAUNCHER_GAP = 16
 
-// The state of a panel the app leaves to the component: `open` wins when given. Every close, the guarded ones too, ends in `closed()`, which comes here.
+// The state of a panel the app leaves to the component: `open` wins when given. Every close, the guarded ones too, ends in the Dialog's `onOpenChange`, which comes here.
 const inner = signal(false)
 const isOpen = () => open ?? inner()
+
+// A panel the app does not drive, whose close is a link: its Dialog keeps the state, so a navigation that keeps this instance resets it.
+const ownState = () => open === undefined && followsHref(closeHref, onOpenChange)
 
 function change(next: boolean) {
   if (open === undefined) {
@@ -117,65 +118,11 @@ const staying = () => launcherOpenIcon !== undefined || launcherButton?.openIcon
 
 const opener = { 'onClick': () => change(true), 'aria-haspopup': 'dialog' } as const
 
-// Read once: the open attribute is what the server renders, and the client opens and closes the panel by its methods.
-const serverOpen = renderedOpen(isOpen(), modal, closeHref)
-// The name a screen reader announces: `label`, else a string title; a markup title names the panel through its heading, which a `header` block replaces: that one needs a `label`.
-const name = () => label ?? (typeof title === 'string' ? title : undefined)
-const titleId = uid()
+function changed({ open: shown }: { open: boolean }) {
+  change(shown)
 
-// Set by any typing inside, and cleared however the panel closes or opens.
-const edited = signal(false)
-
-// Typed text a modal panel would lose is asked about first.
-const guarded = () => edited() && modal && !autosave && !dirty && discard !== false
-
-function closed() {
-  edited = false
-  if (followsHref(closeHref, onOpenChange)) {
-    // A client-side navigation may keep this instance, so an own state is reset too.
-    if (open === undefined)
-      inner = false
-
-    leave(closeHref, onOpenChange)
-  }
-  else {
-    change(false)
-
-    if (staying())
-      queueMicrotask(() => launching()?.focus())
-  }
-}
-
-// Escape, which the panel hears itself while typed text is at stake.
-function cancelled(event: Event) {
-  if (!guarded())
-    return
-
-  event.preventDefault()
-  void discardAndClose(panel, discard || undefined)
-}
-
-// A click on the backdrop, which the browser leaves alone while the close is guarded.
-// The keydown comes first and stops the browser's own close, which a second Escape with no click or key between would otherwise take for an uncancellable request.
-function pressed(event: KeyboardEvent) {
-  // An Escape an inner control used, such as to close its own list, is not a request to close this.
-  if (event.key === 'Escape' && !event.defaultPrevented && !event.isComposing)
-    cancelled(event)
-}
-
-function clicked(event: MouseEvent) {
-  if (event.target === panel && guarded())
-    void discardAndClose(panel, discard || undefined)
-}
-
-function leaving() {
-  if (followsHref(closeHref, onOpenChange))
-    return
-
-  if (guarded())
-    void discardAndClose(panel, discard || undefined)
-  else
-    panel?.close()
+  if (!shown && staying())
+    queueMicrotask(() => launching()?.focus())
 }
 
 const docked = () => !modal && dock !== undefined
@@ -184,7 +131,6 @@ const reached = signal<number>()
 const launching = signal<HTMLElement>()
 // 0 stands for no size kept yet.
 const kept = sizeKey === undefined ? undefined : persisted.cookie<number>(sizeKey, 0)
-let body: HTMLElement | undefined
 const dragging = signal(false)
 let panel: HTMLDialogElement | undefined
 let frame = 0
@@ -386,22 +332,10 @@ effect(() => {
     return
 
   seenKey = next
-  body?.scrollTo(0, 0)
+  panel?.querySelector('[data-part=body]')?.scrollTo(0, 0)
 })
 
 listen(() => window, 'resize', measureSoon)
-
-effect(() => {
-  const shown = isOpen()
-
-  if (!panel)
-    return
-
-  if (shown)
-    edited = false
-
-  syncOpen(panel, shown, modal, !docked())
-})
 
 // A browser with `closedby` closes a non-modal panel on Escape, stacked with the layers above it. Without it the panel listens itself, and leaves an Escape that belongs to a modal dialog or an open popover.
 listen(() => document, 'keydown', event => {
@@ -411,39 +345,17 @@ listen(() => document, 'keydown', event => {
   if (!document.querySelector(':modal, :popover-open'))
     panel?.close()
 })
+
 ---
-if trigger
+if trigger && !ownState()
   | {trigger(opener)}
-// Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' && !docked() ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, autosave, edited: edited(), footer: footer !== undefined, guarded: guarded() })} onInput={() => edited = true} onCancel={event => { rest.onCancel?.(event); cancelled(event) }} onClick={event => { rest.onClick?.(event); clicked(event) }} onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onClose={closed})
-  if isOpen() || keep
+// Every way of closing it ends in the Dialog's `onOpenChange`, the close button included, so `changed` is the one place the parent learns of it.
+Dialog({...rest} part="root" placement="right" open={ownState() ? undefined : isOpen()} trigger={ownState() ? trigger : undefined} title={title} label={label} heading={heading} level={level} actions={actions} header={header} close={close} footer={footer} closeLabel={closeLabel} closeHref={closeHref} dirty={dirty} autosave={autosave} discard={discard} modal={modal} keep={keep} docked={docked()} data-dock={docked() ? dock : undefined} ref={element => { panel = element; rest.ref?.(element) }} size={typeof size === 'string' && !docked() ? size : undefined} style={panelStyle()} onOpenChange={followsHref(closeHref, onOpenChange) ? undefined : changed})
+  @handle
     if isOpen() && docked() && dock then edge
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
         span(part="line" data-dock={edge})
-    header(part="head")
-      if header
-        | {header}
-      else
-        if level === 2
-          h2(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
-        else if level === 3
-          h3(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
-        else if level === 4
-          h4(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
-        else if level === 5
-          h5(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
-        else
-          h6(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
-        | {actions}
-        if close
-          | {close}
-        else
-          IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} disabled={dirty} onClick={leaving})
-    div(part="body" ref={element => body = element})
-      slot
-    if footer
-      div(part="footer")
-        | {footer}
+  slot
 if !modal && launcher && (!isOpen() || staying())
   BareIconButton(part="launcher" label={isOpen() ? launcherButton?.openLabel ?? launcher : launcher} size={launcherButton?.size} variant={launcherButton?.variant ?? 'ghost'} tone={launcherButton?.tone} data-tooltip-placement={launcherButton?.tooltip} aria-controls={rest.id} aria-expanded={staying() ? isOpen() : undefined} style={launcherLayer === undefined ? undefined : `z-index: ${launcherLayer}`} ref={element => launching = element} href={launcherHref} onClick={() => change(!isOpen())})
     if isOpen() && launcherOpenIcon

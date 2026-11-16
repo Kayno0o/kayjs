@@ -39,7 +39,6 @@ export default defineUi({
   '@kayjs/ui/widget.kay': { parts: { head: 'pb-2', title: 'text-sm' } },
   '@kayjs/ui/meter.kay': { parts: { fill: 'rounded-full' } },
   '@kayjs/ui/popover.kay': { parts: 'shadow-xl' },
-  '@kayjs/ui/side-panel.kay': { parts: { head: 'px-6', title: 'text-lg', body: 'px-6' } },
   '@kayjs/ui/confirm-delete.kay': { parts: { armed: 'gap-2', message: 'text-sm' } },
   '@kayjs/ui/save-form.kay': { parts: { bar: 'sticky', status: 'italic', actions: 'gap-4' } },
   '@kayjs/ui/command-palette.kay': { parts: 'rounded-2xl' },

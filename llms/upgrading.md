@@ -74,6 +74,10 @@ Four callbacks are renamed to say what they report, and the old names keep worki
 
 The prop holding the list a component draws is `items` on every one: `tabs` on Tabs, `avatars` on AvatarGroup, `entries` on CommandPalette and Timeline, `links` on SideNav, SiteNav and AppHeader, `steps` on Steps and `icons` on IconPicker. `rows` of a Table and `options` of the choice controls keep their names, as do TabNav (its `tabs` and `links` are two shapes picked by `param`), the `links` of a SideNav group and the infinite `list` of Table, Carousel, Masonry, MediaGallery, VirtualList and LoadMore. The old names work until 1.108, and `deprecated-ui-items` (`kay check --fix`) writes `items`; a template written under both reads `items`. Nothing else breaks: `label` on TextInput, Textarea, Select, DateInput, DateTimeInput, TimeInput, MarkdownEditor and FileDrop names the control (an `aria-label`, which still wins), Tabs takes `disabled` and TooltipHost `onOpenChange`.
 
+### SidePanel is a Dialog with a side `placement`
+
+`SidePanel` draws a `Dialog` with `placement="right"`, so the head, title, body and footer are the Dialog's. Nothing changes in its props. A `src/ui.ts` entry for `'@kayjs/ui/side-panel.kay'` with `head`, `title`, `body` or `footer` moves to `'@kayjs/ui/dialog.kay'` (which then restyles centred dialogs too: a part restyled for one placement only is `class` on the call), and `SidePanel(class={{ head: 'px-6' }})` is `SidePanel(class={{ root: { head: 'px-6' } }})`. `kay check` already reports a part a component no longer has, listing the ones it has, which is why there is no lint for them.
+
 ### A page is never an island
 
 A page without a `--- server` fence that has an `on*`, `bind:` or `ref`, a browser value of `kay` such as `signal`, or a live or persisted import used to become an island. It still does through 1.107, and `kay check` warns with `deprecated-page-island` at that line; 1.108 refuses it. Move what needs the browser into a component of its own and render it from the page: the component is the island. No `kay upgrade` fix exists, as the fix moves code into a new file.
