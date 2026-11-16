@@ -231,7 +231,7 @@
     "complexity": 110
   },
   "src/server/protection.ts": {
-    "max-lines": 730,
+    "max-lines": 729,
     "complexity": 54
   },
   "src/server/queue.ts": {
