@@ -2,7 +2,7 @@ import type { SQL } from 'bun'
 import type { PgSource } from 'kay/library'
 import type { ConversationKey, ConversationStore, StoredConversation } from './conversation-store'
 import type { ConversationRow } from './conversation-title'
-import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
+import { connectionOf, KayError, privilegeRefused, relationsMissing } from 'kay/library'
 import { MOST_CONVERSATIONS, MOST_TURNS, turnsOf, withinResultCap } from './conversation-store'
 
 // The tables the Postgres store keeps its data in, for a pg-orm `ignoreTables` of an app that creates them with `createAiTables`.
@@ -50,7 +50,7 @@ export function pgAi(source: PgSource): ConversationStore & { close: () => Promi
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error('kayjs-ai: pgAi needs its kay_ai_conversations table with its user_id column and indexes, and its role may not create or alter it: run `await createAiTables(db)` from kayjs-ai/pg as the database\'s owner, and list `aiTables` in pg-orm\'s `ignoreTables`', { cause: error })
+        throw new KayError('config-invalid', 'kayjs-ai: pgAi needs its kay_ai_conversations table with its user_id column and indexes, and its role may not create or alter it: run `await createAiTables(db)` from kayjs-ai/pg as the database\'s owner, and list `aiTables` in pg-orm\'s `ignoreTables`', { cause: error })
 
       throw error
     }

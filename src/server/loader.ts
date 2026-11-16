@@ -5,6 +5,7 @@ import process from 'node:process'
 import { plugin } from 'bun'
 import { inspecting } from '../build/assets'
 import { SCRIPT_FILE, scriptLoader } from '../build/files'
+import { KayError } from '../compiler/errors'
 import { loadConfig } from '../config-loader'
 import { switchOf } from '../config-switch'
 import { projectPaths } from '../project'
@@ -134,7 +135,7 @@ export async function registerLoader(root: string, settings?: Record<string, str
   }
 
   if (known !== undefined && known.settings !== key) {
-    throw new Error(`kay: the .kay loader is registered for ${at} with other library settings than ${JSON.stringify(chosen)}; one project renders libraries with one set`)
+    throw new KayError('config-invalid', `kay: the .kay loader is registered for ${at} with other library settings than ${JSON.stringify(chosen)}; one project renders libraries with one set`)
   }
 
   // A guess at the working directory gives way once the app names another project: no module of its own was waiting on it.

@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import type { Address, Delivery, Mail, MailAttachment, Transport } from './types'
 import { createHash, createHmac } from 'node:crypto'
-import { configError, durationSeconds } from 'kay/library'
+import { configError, durationSeconds, KayError } from 'kay/library'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { nodemailerMessage } from './smtp'
 
@@ -135,13 +135,13 @@ async function call(provider: HttpProvider, url: string, init: RequestInit, wait
     if (signal?.aborted === true)
       throw signal.reason
 
-    throw new Error(`kayjs-mail: ${NAMES[provider]} did not answer${timeout.aborted ? ` within ${wait / 1000} seconds` : ''}, so nothing was sent`, { cause: error })
+    throw new KayError('helper-failed', `kayjs-mail: ${NAMES[provider]} did not answer${timeout.aborted ? ` within ${wait / 1000} seconds` : ''}, so nothing was sent`, { kind: timeout.aborted ? 'mail-provider-timeout' : 'mail-provider-unreachable', cause: error })
   }
 
   if (!response.ok) {
     const said = await reason(response)
 
-    throw new Error(`kayjs-mail: ${NAMES[provider]} refused the mail with ${response.status}${said === '' ? '' : `: ${said}`}`, { cause: response.status })
+    throw new KayError('helper-failed', `kayjs-mail: ${NAMES[provider]} refused the mail with ${response.status}${said === '' ? '' : `: ${said}`}`, { kind: 'mail-provider-refused', cause: response.status })
   }
 
   return response
@@ -219,7 +219,7 @@ export function postmark(settings: PostmarkSettings): Transport {
 
       // A 200 can still carry a refusal in its ErrorCode.
       if (typeof answer.ErrorCode === 'number' && answer.ErrorCode !== 0)
-        throw new Error(`kayjs-mail: Postmark refused the mail with ${answer.ErrorCode}: ${String(answer.Message ?? '').slice(0, EXCERPT)}`)
+        throw new KayError('helper-failed', `kayjs-mail: Postmark refused the mail with ${answer.ErrorCode}: ${String(answer.Message ?? '').slice(0, EXCERPT)}`)
 
       return delivered(mail, 'postmark', textOf(answer.MessageID))
     },

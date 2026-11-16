@@ -226,12 +226,12 @@ onLiveRead((key, tags) => {
     return
 
   if (key.length > MAX_KEY_LENGTH || reads.at.size >= MAX_CACHE_KEYS)
-    throw new RangeError(`kay: cached('${key.slice(0, 40)}...') with live: true: a key is at most ${MAX_KEY_LENGTH} characters and a page follows at most ${MAX_CACHE_KEYS} keys`)
+    throw new KayError('argument-invalid', `kay: cached('${key.slice(0, 40)}...') with live: true: a key is at most ${MAX_KEY_LENGTH} characters and a page follows at most ${MAX_CACHE_KEYS} keys`)
 
   const size = reads.route ? encodeURIComponent(key).length + ROUTE_KEY_OVERHEAD : 0
 
   if (reads.route && reads.bytes + size > MAX_ROUTE_KEY_BYTES)
-    throw new RangeError(`kay: cached('${key.slice(0, 40)}...') with live: true: a route follows keys up to about ${MAX_ROUTE_KEY_BYTES} bytes together, as its proof travels in a header`)
+    throw new KayError('argument-invalid', `kay: cached('${key.slice(0, 40)}...') with live: true: a route follows keys up to about ${MAX_ROUTE_KEY_BYTES} bytes together, as its proof travels in a header`)
 
   reads.bytes += size
   reads.at.set(key, stampNow())

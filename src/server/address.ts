@@ -154,7 +154,7 @@ export function pinnedLookup(resolve: Resolver, allowPrivate: boolean) {
         const answers = await resolve(host)
 
         if (answers.length === 0)
-          throw new Error(`${host} resolves to no address`)
+          throw new KayError('helper-failed', `${host} resolves to no address`)
 
         if (!allowPrivate && !answers.every(({ address }) => isPublicAddress(address)))
           throw new PrivateAddressError(`${host} resolves to an address that is not public`)

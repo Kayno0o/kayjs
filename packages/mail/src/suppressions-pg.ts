@@ -2,7 +2,7 @@ import type { SQL } from 'bun'
 import type { PgSource } from 'kay/library'
 import type { StoredSuppression, SuppressionReason } from './events'
 import type { SuppressionStore } from './suppressions'
-import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
+import { connectionOf, KayError, privilegeRefused, relationsMissing } from 'kay/library'
 
 export const SUPPRESSIONS_TABLE = 'CREATE TABLE IF NOT EXISTS kay_mail_suppressions (email text PRIMARY KEY, reason text NOT NULL, source text NOT NULL, at bigint NOT NULL)'
 
@@ -34,7 +34,7 @@ export function pgSuppressions(source: PgSource): SuppressionStore & { close: ()
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error('kayjs-mail: the kay_mail_suppressions table is missing, and the role may not create it: run `await createMailSuppressionTables(db)` from kayjs-mail as the database\'s owner (`createMailTables(db)` beside lists), and list the table in pg-orm\'s `ignoreTables`', { cause: error })
+        throw new KayError('config-invalid', 'kayjs-mail: the kay_mail_suppressions table is missing, and the role may not create it: run `await createMailSuppressionTables(db)` from kayjs-mail as the database\'s owner (`createMailTables(db)` beside lists), and list the table in pg-orm\'s `ignoreTables`', { cause: error })
 
       throw error
     }

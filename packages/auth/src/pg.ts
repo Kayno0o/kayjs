@@ -1,7 +1,7 @@
 import type { Database, InferEntity } from '@kaynooo/pg-orm'
 import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OAuthClientRecord, OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
 import { defineTable } from '@kaynooo/pg-orm'
-import { durationSeconds, lengthMs } from 'kay/library'
+import { durationSeconds, KayError, lengthMs } from 'kay/library'
 import { log } from './log'
 
 // Each table keeps the `renamedFrom` of its pre-1.71 `auth_*` name for good, unlike a deprecated form: an app jumping several minors at once still gets its users renamed rather than empty tables beside them, and a rename finding no old table does nothing.
@@ -203,7 +203,7 @@ const UNUSED_CLIENT_MS = 24 * 60 * 60 * 1000
 // kayjs-auth's data in the app's Postgres or SQLite database, through pg-orm: list `authTables` in the database's tables.
 export function pgAuth(db: Database): AuthStore {
   if (typeof (db as Partial<Database> | null)?.repo !== 'function')
-    throw new TypeError('kayjs-auth: pgAuth takes a pg-orm `Database` listing `authTables`, not a connection URL or a Bun `SQL`: give `auth({ store: { url } })` for a URL')
+    throw new KayError('config-invalid', 'kayjs-auth: pgAuth takes a pg-orm `Database` listing `authTables`, not a connection URL or a Bun `SQL`: give `auth({ store: { url } })` for a URL')
 
   const users = db.repo(AuthUsers)
   const identities = db.repo(AuthIdentities)

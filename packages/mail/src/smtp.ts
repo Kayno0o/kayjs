@@ -1,7 +1,7 @@
 import type { Duration, RateLimit } from 'kay'
 import type { Delivery, Mail, Transport } from './types'
 import { createPrivateKey } from 'node:crypto'
-import { configError, durationSeconds } from 'kay/library'
+import { configError, durationSeconds, KayError } from 'kay/library'
 
 // Signs each mail for a relay that does not, its public key published in DNS at `<selector>._domainkey.<domain>`.
 export interface DkimSettings {
@@ -103,7 +103,7 @@ export function rateFromText(text: string | undefined): { max: number, window: D
   const [max, window = '1s'] = text.split('/')
 
   if (!WHOLE_NUMBER.test(max!) || Number(max) < 1)
-    throw new Error(`kayjs-mail: MAIL_RATE_LIMIT is ${JSON.stringify(text)}; it takes a count of at least 1 and a window, such as 5/1s`)
+    throw new KayError('config-invalid', `kayjs-mail: MAIL_RATE_LIMIT is ${JSON.stringify(text)}; it takes a count of at least 1 and a window, such as 5/1s`)
 
   durationSeconds(window, 'MAIL_RATE_LIMIT\'s window')
 

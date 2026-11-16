@@ -7,7 +7,7 @@ import type { OwnOptions, OwnPlugin } from '../own'
 import type { CreateUserInput, CreateUserResult } from '../password'
 import type { LinkType } from '../store'
 import { resolve } from 'node:path'
-import { appModules, checkOptionKeys, configError } from 'kay/library'
+import { appModules, checkOptionKeys, configError, KayError } from 'kay/library'
 import { pickLocale } from '../locale'
 import { buildOwn, MAIL_EXTENSION, ownEnv } from '../own'
 
@@ -254,7 +254,7 @@ export interface AuthExtensionOptions extends AuthPagesOptions {
 // The `auth` an app's module exports, for `prepare` to hand it the prefix and home `auth()` was given.
 function authOfExport(exported: unknown, module: string): { [PAGES_OF]?: PagesHandle | undefined } {
   if (typeof exported !== 'object' || exported === null || !('plugin' in exported))
-    throw new Error(`kayjs-auth: ${module} exports no \`auth\`: export the \`authCore\` result as \`export const auth = authCore(...)\``)
+    throw new KayError('config-invalid', `kayjs-auth: ${module} exports no \`auth\`: export the \`authCore\` result as \`export const auth = authCore(...)\``)
 
   return exported as { [PAGES_OF]?: PagesHandle | undefined }
 }
@@ -309,7 +309,7 @@ function moduleAuth(options: AuthExtensionOptions): AuthPages {
   const server = options.server === false ? undefined : options.server
 
   if (module !== undefined && options.server !== undefined)
-    throw new Error('kayjs-auth: auth() takes `module` or `server`, not both')
+    throw new KayError('config-invalid', 'kayjs-auth: auth() takes `module` or `server`, not both')
 
   const given = { prefix: options.prefix, home }
   const extension: AuthPages = {
@@ -355,7 +355,7 @@ export function profileValue(name: string, held: unknown): string {
     return ''
 
   if (typeof held !== 'string')
-    throw new TypeError(`kayjs-auth: pages.profile.load answered a ${typeof held} for the field "${name}", which takes a string, null or undefined`)
+    throw new KayError('argument-invalid', `kayjs-auth: pages.profile.load answered a ${typeof held} for the field "${name}", which takes a string, null or undefined`)
 
   return held
 }

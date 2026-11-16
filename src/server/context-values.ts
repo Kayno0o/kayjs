@@ -1,4 +1,5 @@
 import type { RequestRecord } from './request-record'
+import { KayError } from '../compiler/errors'
 import { isContextDefinition, setContextLoader, setTemplateContext } from '../runtime/template-context'
 import { importModule } from './bundle'
 import { RequestReadError } from './request-read'
@@ -48,7 +49,7 @@ async function definitionOf(file: string) {
   const { default: definition } = await importModule<{ default?: unknown }>(file)
 
   if (!isContextDefinition(definition))
-    throw new TypeError(`kay: ${file} is an extension's \`context\`, so it default-exports \`defineContext(load)\` from \`kay/server\``)
+    throw new KayError('config-invalid', `kay: ${file} is an extension's \`context\`, so it default-exports \`defineContext(load)\` from \`kay/server\``)
 
   return definition
 }
@@ -123,7 +124,7 @@ async function loadMissing(request: Request, record: RequestRecord, provider: Co
   const owners = new Map<string, string>()
   const give = (key: string, value: unknown, module: string) => {
     if (key in state.values || owners.has(key))
-      throw new Error(`kay: two extensions give ctx.${key}: ${owners.get(key) ?? state.owners.get(key)} and ${module}`)
+      throw new KayError('config-invalid', `kay: two extensions give ctx.${key}: ${owners.get(key) ?? state.owners.get(key)} and ${module}`)
 
     owners.set(key, module)
     Object.defineProperty(fresh, key, { value, enumerable: true, configurable: true, writable: true })
@@ -147,7 +148,7 @@ async function loadMissing(request: Request, record: RequestRecord, provider: Co
     }
 
     if (typeof result !== 'object' || result === null)
-      throw new TypeError(`kay: the context ${job.module} answered ${typeof result}, an object of the request values is what \`defineContext\` loads`)
+      throw new KayError('argument-invalid', `kay: the context ${job.module} answered ${typeof result}, an object of the request values is what \`defineContext\` loads`)
 
     for (const key of Object.keys(result))
       give(key, (result as Record<string, unknown>)[key], job.module)

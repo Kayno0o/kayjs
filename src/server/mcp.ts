@@ -671,7 +671,7 @@ function libraryTool(action: ServerAction<TSchema, unknown, string>): LibraryToo
 
   // Given at load to an action a page module exports, and empty for one it does not, or read while its module still runs.
   if (url === '')
-    throw new Error('kay: actionTool() takes an action a page module exports, which the server gives its URL as it loads; call it once the module has loaded')
+    throw new KayError('config-invalid', 'kay: actionTool() takes an action a page module exports, which the server gives its URL as it loads; call it once the module has loaded')
 
   const bound = boundToPage(action)
   const tool = action.protection?.tool === false || bound === true ? undefined : toolFor(action, url)

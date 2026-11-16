@@ -3,7 +3,7 @@ import type { PgSource } from 'kay/library'
 import type { Broadcast, BroadcastProgress, DeliveryState, ListStore, Proof, Subscriber } from './list-store'
 import type { MailStore } from './mail-store'
 import type { SuppressionStore } from './suppressions'
-import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
+import { connectionOf, KayError, privilegeRefused, relationsMissing } from 'kay/library'
 import { DELIVERY_TRIES } from './list-store'
 import { pgSuppressions, SUPPRESSIONS_TABLE } from './suppressions-pg'
 
@@ -75,7 +75,7 @@ export function pgLists(source: PgSource): ListStore & { close: () => Promise<vo
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error('kayjs-mail: pgLists needs its kay_mail_* tables, and its role may not create them: run `await createMailTables(db)` from kayjs-mail as the database\'s owner, and list `mailTables` in pg-orm\'s `ignoreTables`', { cause: error })
+        throw new KayError('config-invalid', 'kayjs-mail: pgLists needs its kay_mail_* tables, and its role may not create them: run `await createMailTables(db)` from kayjs-mail as the database\'s owner, and list `mailTables` in pg-orm\'s `ignoreTables`', { cause: error })
 
       throw error
     }
@@ -149,7 +149,7 @@ export function pgLists(source: PgSource): ListStore & { close: () => Promise<vo
       const [row] = await query<SubscriberRow>('SELECT * FROM kay_mail_subscribers WHERE list = $1 AND email = $2', [list, email])
 
       if (row === undefined)
-        throw new Error('kayjs-mail: the subscriber row was removed while it was being added')
+        throw new KayError('helper-failed', 'kayjs-mail: the subscriber row was removed while it was being added')
 
       return subscriberOf(row)
     },

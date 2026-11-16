@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
+import { KayError } from '../compiler/errors'
 import { readRedirects } from './redirects'
 
 const CONFIG_OBJECT = /(?:defineConfig\(|export default )\{/
@@ -12,13 +13,13 @@ const WHITESPACE = /\s/
 // Throws, saying why, when a path and a target are no redirect to add to a config whose redirects are `existing`.
 export function checkRedirect(redirect: string, target: string, existing: ReadonlySet<string>): void {
   if (existing.has(redirect))
-    throw new Error(`${redirect} is a redirect already`)
+    throw new KayError('redirect-refused', `${redirect} is a redirect already`)
 
   if (CONTROL.test(redirect) || CONTROL.test(target))
-    throw new Error('a path and a target hold no control character')
+    throw new KayError('redirect-refused', 'a path and a target hold no control character')
 
   if (!TARGET.test(target))
-    throw new Error(`${target} is no target: it starts with / or is another site's URL`)
+    throw new KayError('redirect-refused', `${target} is no target: it starts with / or is another site's URL`)
 
   readRedirects({ [redirect]: target })
 }

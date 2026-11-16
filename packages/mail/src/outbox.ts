@@ -2,7 +2,7 @@ import type { Duration } from 'kay'
 import type { Address, Delivery, Mail, MailAttachment, Transport } from './types'
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { durationSeconds, normalizeAddress } from 'kay/library'
+import { durationSeconds, KayError, normalizeAddress } from 'kay/library'
 import { devFile, devServer } from './delivery'
 import { log } from './log'
 import { linksOf } from './text'
@@ -195,7 +195,7 @@ export function createOutbox(file?: string): Outbox {
       const found = match === undefined ? links[0] : links.find(href => typeof match === 'string' ? href.includes(match) : match.test(href))
 
       if (found === undefined)
-        throw new Error(`kayjs-mail: mail "${mail.subject}" has no link${match === undefined ? '' : ` matching ${String(match)}`}, its links are ${links.length === 0 ? 'none' : links.join(', ')}`)
+        throw new KayError('argument-invalid', `kayjs-mail: mail "${mail.subject}" has no link${match === undefined ? '' : ` matching ${String(match)}`}, its links are ${links.length === 0 ? 'none' : links.join(', ')}`)
 
       return found
     },
@@ -204,7 +204,7 @@ export function createOutbox(file?: string): Outbox {
       const token = new URL(href, 'http://localhost').searchParams.get('token')
 
       if (token === null)
-        throw new Error(`kayjs-mail: the link ${href} of mail "${mail.subject}" has no token`)
+        throw new KayError('argument-invalid', `kayjs-mail: the link ${href} of mail "${mail.subject}" has no token`)
 
       return token
     },

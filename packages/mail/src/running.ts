@@ -1,4 +1,5 @@
 import type { Mailer } from './mailer'
+import { KayError } from 'kay/library'
 
 // The mailers of the sites running in this process, the latest started last. A site that is closed without stopping (kaynooo/kayjs#3053) leaves its entry until the next start.
 const running: Mailer[] = []
@@ -32,7 +33,7 @@ export function runningOrThrow(): Mailer {
   const found = runningMailer()
 
   if (found === undefined)
-    throw new Error('kayjs-mail: no mailer is running; add mail() to the extensions of kay.config.ts and start the server, or call send on the result of mailer()')
+    throw new KayError('mail-not-configured', 'kayjs-mail: no mailer is running; add mail() to the extensions of kay.config.ts and start the server, or call send on the result of mailer()')
 
   return found
 }

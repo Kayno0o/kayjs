@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite'
 import type { MaybePromise } from 'kay/library'
 import type { SuppressionStore } from './suppressions'
-import { openSqlite } from 'kay/library'
+import { KayError, openSqlite } from 'kay/library'
 import { suppressionsIn } from './suppressions'
 
 // Where the mailing lists were kept before every default shared `data/app.sqlite`: an app that has the file keeps reading it.
@@ -193,7 +193,7 @@ export function sqliteLists(path: string) {
       const row = byEmail.get(list, email)
 
       if (row == null)
-        throw new Error('kayjs-mail: the subscriber row was removed while it was being added')
+        throw new KayError('helper-failed', 'kayjs-mail: the subscriber row was removed while it was being added')
 
       return subscriberOf(row)
     },

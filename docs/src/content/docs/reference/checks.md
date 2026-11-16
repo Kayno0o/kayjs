@@ -300,6 +300,7 @@ A message opens with `kay: ` when it names a setting, with `kayjs-<library>: ` w
 | `job-give-up` | runtime | A workflow run whose steps changed under it, which gives up at once instead of retrying. | [Errors](/reference/checks) |
 | `poll-timeout` | runtime | A database call a store gave up on after its time limit. | [Errors](/reference/checks) |
 | `request-timeout` | runtime | A request that ran past its `timeout`: a page answers 504 through the nearest `_error.kay`. | [Errors](/reference/checks) |
+| `helper-failed` | runtime | A helper of kay or a library that could not do what it was asked because of a state it found, not an argument or a setting: a key that kept changing hands, a row removed under it, a mail provider that refused or did not answer (`kind` names which), a host that resolves to nothing. | [Errors](/reference/checks) |
 | `island-props-invalid` | runtime | An island given a prop that cannot reach the browser: a function, rendered markup or a value the wire format refuses. | [Errors](/reference/checks) |
 | `stream-refused` | runtime | A stream source that cannot serve after all, which closes the stream so the browser opens it again after its backoff. | [Errors](/reference/checks) |
 | `csp-violation` | runtime | A violation of the site's content security policy as a browser reported it to kay's report route. | [Errors](/reference/checks) |

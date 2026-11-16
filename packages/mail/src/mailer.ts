@@ -326,10 +326,10 @@ function unsubscribeHeaders(unsubscribe: NonNullable<MailMessage['unsubscribe']>
   const parsed = URL.parse(url)
 
   if (parsed?.protocol !== 'https:')
-    throw new Error(`kayjs-mail: "${subject}" unsubscribes at ${url}, which one-click unsubscribe refuses: it takes an https URL`)
+    throw new KayError('argument-invalid', `kayjs-mail: "${subject}" unsubscribes at ${url}, which one-click unsubscribe refuses: it takes an https URL`)
 
   if (address !== undefined && LINE_BREAK.test(address))
-    throw new Error(`kayjs-mail: "${subject}" has an address holding a line break`)
+    throw new KayError('argument-invalid', `kayjs-mail: "${subject}" has an address holding a line break`)
 
   const targets = [`<${parsed.href}>`, ...address === undefined ? [] : [`<mailto:${encodeURI(addressOf(address))}>`]]
 
@@ -482,15 +482,15 @@ export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
   const { module, server, ...mailerOptions } = options
 
   if (module !== undefined && server !== undefined)
-    throw new Error('kayjs-mail: mail() takes the path of the module or a `server`, not both')
+    throw new KayError('config-invalid', 'kayjs-mail: mail() takes the path of the module or a `server`, not both')
 
   if (module !== undefined && server === false)
-    throw new Error('kayjs-mail: mail() takes the path of the module or `server: false`, not both')
+    throw new KayError('config-invalid', 'kayjs-mail: mail() takes the path of the module or `server: false`, not both')
 
   const given = Object.values(mailerOptions).some(value => value !== undefined)
 
   if ((module !== undefined || server !== undefined) && given)
-    throw new Error('kayjs-mail: mail() takes the options of mailer() or a `module` or `server` building the mailer, not both: put them in the mailer the module exports')
+    throw new KayError('config-invalid', 'kayjs-mail: mail() takes the options of mailer() or a `module` or `server` building the mailer, not both: put them in the mailer the module exports')
 
   const devTool = { module: `${import.meta.dir}/devTool.ts` }
 
@@ -596,17 +596,17 @@ export function mailer(options: MailerOptions = {}): Mailer {
       throw new MailNotConfiguredError(['MAIL_TO'])
 
     if (to.length === 0)
-      throw new Error(`kayjs-mail: "${message.subject}" has no recipient`)
+      throw new KayError('argument-invalid', `kayjs-mail: "${message.subject}" has no recipient`)
 
     const [cc, bcc, [replyTo], [from]] = [given(message.cc), given(message.bcc), given(message.replyTo), given(message.from)]
 
     // nodemailer neutralises a line break in a name, a subject or a header, but one in an address, or a second address in it, still adds a recipient to the envelope.
     for (const address of [...to, ...cc, ...bcc, ...replyTo === undefined ? [] : [replyTo], ...from === undefined ? [] : [from]]) {
       if (LINE_BREAK.test(addressOf(address)))
-        throw new Error(`kayjs-mail: "${message.subject}" has an address holding a line break`)
+        throw new KayError('argument-invalid', `kayjs-mail: "${message.subject}" has an address holding a line break`)
 
       if (!oneAddress(address))
-        throw new Error(`kayjs-mail: "${message.subject}" has an address holding no address or several: each takes one, and several recipients go as an array`)
+        throw new KayError('argument-invalid', `kayjs-mail: "${message.subject}" has an address holding no address or several: each takes one, and several recipients go as an array`)
     }
 
     const unsubscribe = message.unsubscribe === undefined ? {} : unsubscribeHeaders(message.unsubscribe, message.subject)
@@ -800,7 +800,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   if (delivering() === 'smtp' && options.optional !== true) {
     plugin.onStart(() => {
       if (noSender())
-        throw new Error('kayjs-mail: mails need a sender in production: set MAIL_FROM, or the site (SITE_URL or `site` in kay.config.ts) for noreply@ its host, or `from` in mailer()')
+        throw new KayError('config-invalid', 'kayjs-mail: mails need a sender in production: set MAIL_FROM, or the site (SITE_URL or `site` in kay.config.ts) for noreply@ its host, or `from` in mailer()')
     })
   }
 

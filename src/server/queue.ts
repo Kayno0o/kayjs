@@ -287,7 +287,7 @@ export function sqliteJobs(path: string): JobStore {
           return held.id
       }
 
-      throw new Error(`kay: the key '${job.key}' of queue('${job.queue}') kept changing hands while a job was added`)
+      throw new KayError('helper-failed', `kay: the key '${job.key}' of queue('${job.queue}') kept changing hands while a job was added`)
     },
     claim(queue, now, until) {
       const row = open(false)?.claim.get(until, queue, now, now)
@@ -898,7 +898,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
       const listed = store().jobs?.(name)
 
       if (typeof match !== 'string' && !listed)
-        throw new Error(`kay: queue('${name}')'s store lists no jobs, so remove() takes a job's id rather than a function`)
+        throw new KayError('config-invalid', `kay: queue('${name}')'s store lists no jobs, so remove() takes a job's id rather than a function`)
 
       // A store listing its jobs tells an id of this queue from one it never held; one that does not counts the id as removed.
       const ids = listed ? (await listed).filter(job => typeof match === 'string' ? job.id === match : match(parse(job.payload) as Payload)).map(job => job.id) : [match as string]

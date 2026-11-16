@@ -1,3 +1,4 @@
+import { KayError } from '../compiler/errors'
 import { routerKey } from './routes'
 
 const GET_METHODS = new Set(['GET', 'ALL'])
@@ -68,7 +69,7 @@ export class ServedPaths {
     const taken = holders.find(holder => !this.#offers.has(holder))
 
     if (taken)
-      throw new Error(clash?.(taken) ?? `kay: ${taken.owner} and ${claim.owner} both serve ${claim.path}`)
+      throw new KayError('config-invalid', clash?.(taken) ?? `kay: ${taken.owner} and ${claim.owner} both serve ${claim.path}`)
 
     if (holders.length > 0)
       this.#claims.set(routerKey(claim.path), this.#claims.get(routerKey(claim.path))!.filter(held => !holders.includes(held)))

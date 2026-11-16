@@ -3,6 +3,7 @@ import type { TestSite } from 'kay/test'
 import type { Core } from './core'
 import type { OAuthTokens, OAuthUser } from './oauth/types'
 import { Elysia as ElysiaApp } from 'elysia'
+import { KayError } from 'kay/library'
 import { OAuthExchangeError } from './oauth/client'
 
 // What a stubbed provider answers: the account a sign-in comes back with, or why it fails. `access_denied` is a refused consent, `invalid_grant` a code the provider rejects and `server_error` a provider that is down.
@@ -62,10 +63,10 @@ export function oauthTest(core: Core, plugin: Elysia, site: OAuthSite): OAuthTes
     const entry = core.oauth.get(provider)
 
     if (!entry)
-      throw new Error(`kayjs-auth: oauth.stub found no provider ${provider} configured, its names are ${[...core.oauth.keys()].join(', ') || 'none'}`)
+      throw new KayError('argument-invalid', `kayjs-auth: oauth.stub found no provider ${provider} configured, its names are ${[...core.oauth.keys()].join(', ') || 'none'}`)
 
     if ('id' in outcome && outcome.id === '')
-      throw new Error('kayjs-auth: oauth.stub needs the account\'s id')
+      throw new KayError('argument-invalid', 'kayjs-auth: oauth.stub needs the account\'s id')
 
     const real = originals.get(entry) ?? entry.client
     const failure = 'error' in outcome ? new OAuthExchangeError(FAILURE_STATUS[outcome.error], `OAuth token request failed (${provider}): ${outcome.error}`) : undefined
@@ -98,13 +99,13 @@ export function oauthTest(core: Core, plugin: Elysia, site: OAuthSite): OAuthTes
       const outcome = entry && stubs.get(entry)
 
       if (!outcome)
-        throw new Error(`kayjs-auth: oauth.signIn found no stub for ${provider}: call oauth.stub first`)
+        throw new KayError('argument-invalid', `kayjs-auth: oauth.signIn found no stub for ${provider}: call oauth.stub first`)
 
       const start = await visit(`${core.prefix}/${provider}${options.redirect === undefined ? '' : `?redirect=${encodeURIComponent(options.redirect)}`}`)
       const location = start.headers.get('location')
 
       if (location === null)
-        throw new Error(`kayjs-auth: oauth.signIn found no redirect to ${provider}, the sign-in route answered ${start.status}`)
+        throw new KayError('argument-invalid', `kayjs-auth: oauth.signIn found no redirect to ${provider}, the sign-in route answered ${start.status}`)
 
       const state = encodeURIComponent(new URL(location, 'http://localhost').searchParams.get('state') ?? '')
       const answer = 'error' in outcome && outcome.error === 'access_denied' ? 'error=access_denied' : 'code=stub-code'

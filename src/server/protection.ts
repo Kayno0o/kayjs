@@ -20,7 +20,7 @@ import { optionMs } from './config-error'
 import { checkRequestIdHeader } from './config-limits'
 import { inMemory } from './memory-mark'
 import { STORE_TIMEOUT_MS } from './pg-limit'
-import { PollTimeoutError } from './pg-poll'
+import { StoreTimeoutError } from './pg-poll'
 import { refused } from './rate-refusal'
 import { makeRoom } from './rate-windows'
 import { onReload } from './reload'
@@ -689,8 +689,6 @@ const SKIP_MS = 10_000
 const skipped = new WeakMap<RateStore, number>()
 let skipping = false
 
-class RatesTimeout extends Error {}
-
 // The stores standing in for each store a limit counts in, per name, so each name falls back to its own memory.
 const standIns = new WeakMap<RateStore, Map<string, RateStore>>()
 
@@ -792,8 +790,8 @@ function recovered(name: string, store: RateStore): void {
 }
 
 function failed<Result>(name: string, store: RateStore, error: unknown, fallback: () => Result): Result {
-  // A Postgres rates store is under the same limit already, and gives up first with a PollTimeoutError.
-  if (error instanceof RatesTimeout || error instanceof PollTimeoutError) {
+  // A Postgres rates store is under the same limit already, and gives up first with a StoreTimeoutError.
+  if (error instanceof StoreTimeoutError) {
     skipping = true
     skipped.set(store, Date.now() + SKIP_MS)
   }
@@ -818,7 +816,7 @@ async function withinLimit<Result>(work: Promise<Result>): Promise<Result> {
 
   try {
     return await Promise.race([work, new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new RatesTimeout(`the rates store took more than ${STORE_TIMEOUT_MS / 1000} seconds`)), STORE_TIMEOUT_MS)
+      timer = setTimeout(() => reject(new StoreTimeoutError(`the rates store took more than ${STORE_TIMEOUT_MS / 1000} seconds`)), STORE_TIMEOUT_MS)
       timer.unref()
     })])
   }

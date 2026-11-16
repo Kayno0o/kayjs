@@ -3,6 +3,7 @@ import type { RemoteLimits } from './config-limits'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { JSON_FILE, writeAtomically } from '../build/files'
+import { KayError } from '../compiler/errors'
 import { ipVersion, PrivateAddressError, resolveHost } from './address'
 import { FETCH_TIMEOUT_MS, MAX_REMOTE_BYTES } from './config-limits'
 import { pinnedGet } from './fetch-public'
@@ -68,20 +69,20 @@ export async function remotePatterns(entries: readonly string[] = []): Promise<R
     const match = PATTERN.exec(entry)
 
     if (!match)
-      throw new Error(`images.remote holds ${entry}: an entry is an http or https origin, its host maybe starting with *. for any subdomain, and maybe a path: https://cms.example.com/uploads/`)
+      throw new KayError('config-invalid', `images.remote holds ${entry}: an entry is an http or https origin, its host maybe starting with *. for any subdomain, and maybe a path: https://cms.example.com/uploads/`)
 
     // Read as a URL is, so a default port, a letter case or a host outside ASCII compares as the URLs asked for do.
     const wildcard = match[2] !== undefined
     const url = URL.parse(`${match[1]}//${wildcard ? 'x.' : ''}${match[3]}${match[4] ?? '/'}`)
 
     if (!url)
-      throw new Error(`images.remote holds ${entry}, which is no URL`)
+      throw new KayError('config-invalid', `images.remote holds ${entry}, which is no URL`)
 
     // `*.com` would let any site of a whole top-level domain have the server download from it, and so would `*.co.uk` or `*.vercel.app`, whose subdomains belong to anyone.
     const base = url.hostname.slice(2).replace(TRAILING_DOT, '')
 
     if (wildcard && (!base.includes('.') || isPublicSuffix(base)))
-      throw new Error(`images.remote holds ${entry}: a *. wildcard covers the subdomains of one domain, never a whole public suffix such as *.com, *.co.uk or *.vercel.app`)
+      throw new KayError('config-invalid', `images.remote holds ${entry}: a *. wildcard covers the subdomains of one domain, never a whole public suffix such as *.com, *.co.uk or *.vercel.app`)
 
     return { protocol: url.protocol, host: wildcard ? url.host.slice(2) : url.host, wildcard, path: url.pathname, private: !wildcard && (ipVersion(url.hostname.replace(BRACKETS, '')) !== 0 || url.hostname === 'localhost') }
   })

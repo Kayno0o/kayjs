@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises'
 import { availableParallelism, constants } from 'node:os'
 import { basename, join } from 'node:path'
 import process from 'node:process'
+import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { databaseOf } from './app-database'
 import { noteLocalFile } from './local-files'
@@ -47,7 +48,7 @@ export function requestedWorkers(argv: string[], env: Record<string, string | un
   const count = parseWorkers(value)
 
   if (count === undefined)
-    throw new Error(`--workers takes a number from 1 to ${MAX_WORKERS}, or auto, not ${value}`)
+    throw new KayError('config-invalid', `--workers takes a number from 1 to ${MAX_WORKERS}, or auto, not ${value}`)
 
   return count
 }

@@ -3,7 +3,7 @@ import type { TestSite, Visit } from 'kay/test'
 import type { EntryRef, StoredEntry } from './kay/contract'
 import type { SaveOutcome } from './store'
 import { apiUrl } from 'kay'
-import { configError } from 'kay/library'
+import { configError, KayError } from 'kay/library'
 import entriesApi from './api/entries'
 import filesApi from './api/files'
 import { HINT_COOKIE } from './page-link'
@@ -125,10 +125,10 @@ export interface CmsTest {
 
 async function answered(response: Response, what: string, missing = false): Promise<unknown> {
   if (response.status === 401 || response.status === 403)
-    throw new Error(`kayjs-cms: ${what} was refused with ${response.status}: sign the site in first with \`cms.signInAs()\`, as a role the guard admits`)
+    throw new KayError('helper-failed', `kayjs-cms: ${what} was refused with ${response.status}: sign the site in first with \`cms.signInAs()\`, as a role the guard admits`)
 
   if (!response.ok && !(missing && response.status === 404))
-    throw new Error(`kayjs-cms: ${what} answered ${response.status}: ${await response.text()}`)
+    throw new KayError('helper-failed', `kayjs-cms: ${what} answered ${response.status}: ${await response.text()}`)
 
   return response.status === 404 ? undefined : response.json()
 }

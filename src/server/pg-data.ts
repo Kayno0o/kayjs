@@ -4,6 +4,7 @@ import type { AppStore } from './app-store'
 import type { PgIndex, PgSource } from './pg-jobs'
 import type { DeletableSessionStore } from './session'
 import { within } from '@kaynooo/utils/promise'
+import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { appName, claimDatabase } from './app-identity'
 import { pgCache } from './pg-cache'
@@ -137,7 +138,7 @@ export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
       }
       catch (error) {
         if (privilegeRefused(error))
-          throw new Error('kay: pgData needs the expires_at column of kay_live, and its role may not alter tables: run `await createDataTables(db)` from kay/server as the database\'s owner', { cause: error })
+          throw new KayError('config-invalid', 'kay: pgData needs the expires_at column of kay_live, and its role may not alter tables: run `await createDataTables(db)` from kay/server as the database\'s owner', { cause: error })
 
         throw error
       }
@@ -150,7 +151,7 @@ export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error(`kay: pgData needs ${await missingTables(db)}, and its role may not create them: run \`await createDataTables(db)\` from kay/server as the database's owner, and list \`dataTableNames\` from kay/server in pg-orm's \`ignoreTables\``, { cause: error })
+        throw new KayError('config-invalid', `kay: pgData needs ${await missingTables(db)}, and its role may not create them: run \`await createDataTables(db)\` from kay/server as the database's owner, and list \`dataTableNames\` from kay/server in pg-orm's \`ignoreTables\``, { cause: error })
 
       throw error
     }

@@ -322,7 +322,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
       signal.throwIfAborted()
 
       if (busy)
-        throw new Error(`kay: workflow('${name}') ran two steps at once: await each step before starting the next`)
+        throw new KayError('helper-failed', `kay: workflow('${name}') ran two steps at once: await each step before starting the next`)
 
       const slot = at++
       const seen = memo[slot]
@@ -351,7 +351,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
             stringify(value)
           }
           catch (error) {
-            throw new Error(`kay: step '${label}' of workflow('${name}') returned a value devalue cannot keep: ${error instanceof Error ? error.message : String(error)}`)
+            throw new KayError('helper-failed', `kay: step '${label}' of workflow('${name}') returned a value devalue cannot keep: ${error instanceof Error ? error.message : String(error)}`)
           }
 
           return await keep() ? value : await halt()

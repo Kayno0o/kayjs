@@ -1,4 +1,5 @@
 import type { Seed } from '../runtime/live-resource.server'
+import { KayError } from '../compiler/errors'
 import { readAnswer, RESOURCES_SCRIPT } from '../runtime/live'
 import { collectResources } from '../runtime/live-resource.server'
 import { knownAddress, requestServer } from './protection'
@@ -97,7 +98,7 @@ async function asked(request: Request, url: string, late: AbortSignal): Promise<
       const app = recordOf(request)?.app?.deref()
 
       if (app === undefined)
-        throw new Error('kay: no app to ask the route')
+        throw new KayError('helper-failed', 'kay: no app to ask the route')
 
       return app.handle(next)
     })

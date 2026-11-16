@@ -192,7 +192,7 @@ function idLine<T>(id: ((value: T) => string | number) | undefined, value: T): s
   const text = String(id(value))
 
   if (!SENDABLE_ID.test(text))
-    throw new TypeError('kay: an event stream id must be printable ASCII of at most 1 KB with no space at either end')
+    throw new KayError('argument-invalid', 'kay: an event stream id must be printable ASCII of at most 1 KB with no space at either end')
 
   return `id: ${text}\n`
 }
@@ -211,6 +211,6 @@ function encodeEvent(value: unknown): string {
   catch (error) {
     const reason = unsendable(error)
 
-    throw reason === undefined ? error : new TypeError(`kay: a value the event stream sent cannot reach the browser: ${reason}`)
+    throw reason === undefined ? error : new KayError('live-value-invalid', `kay: a value the event stream sent cannot reach the browser: ${reason}`)
   }
 }

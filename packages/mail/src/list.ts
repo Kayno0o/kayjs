@@ -8,7 +8,7 @@ import type { SuppressionStore } from './suppressions'
 import type { Address, Mail, MailMessage } from './types'
 import process from 'node:process'
 import { s } from 'kay'
-import { configError, defaultSqliteFile, dispatch, durationSeconds, escapeHtml, keyedDigest, normalizeAddress, trackDetached } from 'kay/library'
+import { configError, defaultSqliteFile, dispatch, durationSeconds, escapeHtml, KayError, keyedDigest, normalizeAddress, trackDetached } from 'kay/library'
 import { siteOrigin } from 'kay/seo'
 import { rateLimit, renderLocale, renderToString, retryLater } from 'kay/server'
 import { wording } from 'kay/words'
@@ -365,7 +365,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
     const message = async <P extends object>(given: ListMessage<P>, to: Address): Promise<StoredMessage & { mail: Mail }> => {
       if ((given as { attachments?: unknown }).attachments !== undefined)
-        throw new Error('kayjs-mail: a list mail takes no attachments')
+        throw new KayError('argument-invalid', 'kayjs-mail: a list mail takes no attachments')
 
       const mail = await host.render({ ...given, to } as unknown as MailMessage<P>)
 
@@ -464,7 +464,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       },
       async send(given) {
         if (!host.configured())
-          throw new Error('kayjs-mail: the mailer cannot send yet, so a list mail cannot go out')
+          throw new KayError('helper-failed', 'kayjs-mail: the mailer cannot send yet, so a list mail cannot go out')
 
         const stored = await message(given, LIST_RECIPIENT)
 

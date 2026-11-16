@@ -1,5 +1,6 @@
 import type { Auth } from './auth'
 import type { BareUser } from './core'
+import { KayError } from 'kay/library'
 import { log } from './log'
 
 export interface Viewer {
@@ -69,7 +70,7 @@ export function currentViewer(): Viewer & { request: Request } {
   const viewer = request && viewers.get(request)
 
   if (!viewer)
-    throw new Error('kayjs-auth: SignedIn, SignedOut and UserMenu read the signed-in user of the request being answered, so they cannot render in a prerendered page or outside a request; render the page per request (`prerender: false`)')
+    throw new KayError('outside-request', 'kayjs-auth: SignedIn, SignedOut and UserMenu read the signed-in user of the request being answered, so they cannot render in a prerendered page or outside a request; render the page per request (`prerender: false`)')
 
   return { ...viewer, request }
 }

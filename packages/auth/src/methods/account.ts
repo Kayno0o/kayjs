@@ -6,6 +6,7 @@ import type { ProfileFieldView } from '../pages'
 import type { SaveProfileResult } from '../profile'
 import type { Proof } from '../proof'
 import type { RequestState } from '../state'
+import { KayError } from 'kay/library'
 import { publicUser } from '../core'
 import { failed } from '../failure'
 import { load } from '../load'
@@ -62,7 +63,7 @@ export class AccountMethods {
     const profile = this.state.core.pages?.profile
 
     if (!profile)
-      throw new Error('kayjs-auth: account.saveProfile needs `pages.profile` in authCore')
+      throw new KayError('config-invalid', 'kayjs-auth: account.saveProfile needs `pages.profile` in authCore')
 
     const record = await this.state.current()
 

@@ -1,5 +1,6 @@
 import type { SQL } from 'bun'
 import type { RedirectSet, RedirectSnapshot, RuntimeRedirect, RuntimeRules, RuntimeStatus } from './runtime-redirects'
+import { KayError } from '../compiler/errors'
 import { privilegeRefused } from './pg-jobs'
 import { escaped, query, unescaped } from './pg-sql'
 import { check, encoded, entry, isPattern, MAX_RUNTIME_REDIRECTS, plainPath, RedirectRefusedError, snapshotOf } from './runtime-redirects'
@@ -83,7 +84,7 @@ export function pgRedirectSet(connect: () => Promise<SQL | undefined>, failed: (
     const db = await connect()
 
     if (!db)
-      throw new Error('kay: the redirects added while the site runs need the tables of the app\'s database, which kay creates on a write.')
+      throw new KayError('config-invalid', 'kay: the redirects added while the site runs need the tables of the app\'s database, which kay creates on a write.')
 
     changed()
 

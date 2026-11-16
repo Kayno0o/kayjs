@@ -1,5 +1,5 @@
 import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OAuthClientRecord, OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, UserRecord } from './store'
-import { durationSeconds } from 'kay/library'
+import { durationSeconds, KayError } from 'kay/library'
 import { memoryAuthRates } from './rates'
 
 // A client that registered itself and was never approved by anyone is dropped after this long.
@@ -37,7 +37,7 @@ export function memoryAuth(): AuthStore {
   const claimSlug = (organization: OrganizationRecord) => {
     for (const other of organizations.values()) {
       if (organization.slug !== null && other.slug === organization.slug && other.id !== organization.id)
-        throw new Error(`kayjs-auth: the slug ${organization.slug} is taken`)
+        throw new KayError('helper-failed', `kayjs-auth: the slug ${organization.slug} is taken`)
     }
   }
 
@@ -60,7 +60,7 @@ export function memoryAuth(): AuthStore {
       const other = holder(field, user[field])
 
       if (other && other.id !== user.id)
-        throw new Error(`kayjs-auth: the ${field} ${user[field]} is taken`)
+        throw new KayError('helper-failed', `kayjs-auth: the ${field} ${user[field]} is taken`)
     }
   }
 
@@ -176,7 +176,7 @@ export function memoryAuth(): AuthStore {
         const key = identityKey(identity.provider, identity.providerId)
 
         if (identities.has(key))
-          throw new Error(`kayjs-auth: that ${identity.provider} account is linked already`)
+          throw new KayError('helper-failed', `kayjs-auth: that ${identity.provider} account is linked already`)
 
         identities.set(key, { ...identity })
       },
@@ -246,7 +246,7 @@ export function memoryAuth(): AuthStore {
     passkeys: {
       create(passkey) {
         if (passkeys.has(passkey.id))
-          throw new Error(`kayjs-auth: the passkey ${passkey.id} is taken`)
+          throw new KayError('helper-failed', `kayjs-auth: the passkey ${passkey.id} is taken`)
 
         passkeys.set(passkey.id, copyPasskey(passkey)!)
       },
@@ -484,7 +484,7 @@ export function memoryAuth(): AuthStore {
         const key = memberKey(member.organizationId, member.userId)
 
         if (members.has(key))
-          throw new Error(`kayjs-auth: user ${member.userId} is a member already`)
+          throw new KayError('helper-failed', `kayjs-auth: user ${member.userId} is a member already`)
 
         members.set(key, copyMember(member)!)
       },

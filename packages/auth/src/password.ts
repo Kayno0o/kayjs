@@ -6,6 +6,7 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { hashPassword, passwordNeedsRehash } from '@kaynooo/utils'
 import { localPath } from 'kay'
+import { KayError } from 'kay/library'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { backOf, homeOf, newUserRecord, publicUser, unlinked } from './core'
@@ -165,12 +166,12 @@ export async function userProblems(core: Core, input: CreateUserInput): Promise<
   const username = input.username === undefined ? null : normalizeUsername(input.username)
 
   if (email === null && username === null)
-    throw new Error('kayjs-auth: createUser needs an email or a username to sign in with')
+    throw new KayError('argument-invalid', 'kayjs-auth: createUser needs an email or a username to sign in with')
 
   const undeclared = core.roles && input.roles?.find(role => !core.roles!.has(role))
 
   if (undeclared !== undefined)
-    throw new Error(`kayjs-auth: createUser was given the role '${undeclared}', which the \`roles\` option does not declare`)
+    throw new KayError('argument-invalid', `kayjs-auth: createUser was given the role '${undeclared}', which the \`roles\` option does not declare`)
 
   const errors: RegisterErrors = {
     email: email === null ? undefined : emailProblem(email),

@@ -10,7 +10,7 @@ import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
 import type { Requirement } from './types'
 import { localPath } from 'kay'
-import { durationSeconds, nameUser, overHttps, READ_METHODS, stoppers } from 'kay/library'
+import { durationSeconds, KayError, nameUser, overHttps, READ_METHODS, stoppers } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, forgetLocalMirrors, forgetPushDevice, rateKey, toolCall } from 'kay/server'
 import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
 import { bearerRequest, bearerToken } from './bearerHeader'
@@ -366,10 +366,10 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const record = await this.core.store.users.get(user.id)
 
     if (!record)
-      throw new Error(`kayjs-auth: no user ${user.id} to sign in`)
+      throw new KayError('helper-failed', `kayjs-auth: no user ${user.id} to sign in`)
 
     if (banned(record))
-      throw new Error(`kayjs-auth: user ${user.id} is banned`)
+      throw new KayError('helper-failed', `kayjs-auth: user ${user.id} is banned`)
 
     await chooseRemember(this[STATE], options.remember)
     await this.establish(record, 'app')
@@ -655,7 +655,7 @@ export function authOf(ctx: object): Auth {
   const auth = (ctx as { auth?: unknown }).auth
 
   if (!(auth instanceof Auth))
-    throw new Error('kayjs-auth: no `auth` in this context; `.use(auth.plugin)` before the routes and pages that read it')
+    throw new KayError('config-invalid', 'kayjs-auth: no `auth` in this context; `.use(auth.plugin)` before the routes and pages that read it')
 
   return auth as Auth
 }
@@ -666,7 +666,7 @@ export function requestAuth<Scope extends string, Role extends string, OrgRole e
 
   // Elysia uses a plugin once per app, so a plugin of the app's own that used the session plugin first keeps it to itself, out of the routes auth reaches.
   if (!session)
-    throw new Error('kayjs-auth: no session reaches this route. Use the session plugin on the app itself, or leave it to auth.plugin, rather than in a plugin of the app\'s own before auth.plugin')
+    throw new KayError('outside-request', 'kayjs-auth: no session reaches this route. Use the session plugin on the app itself, or leave it to auth.plugin, rather than in a plugin of the app\'s own before auth.plugin')
 
   core.settle()
 

@@ -5,6 +5,7 @@ import type { StoreBase } from '../runtime/store-base'
 import type { PluginInput } from './plugin'
 import process from 'node:process'
 import { within } from '@kaynooo/utils/promise'
+import { KayError } from '../compiler/errors'
 import { bagOf } from '../config-switch'
 import { kayLog } from '../runtime/log'
 import { appStore, storesOf } from './app-store'
@@ -218,7 +219,7 @@ async function withTimeout(check: unknown, ms: number, what: string): Promise<un
   const answer = await within(Promise.resolve(check), ms, LATE)
 
   if (answer === LATE)
-    throw new Error(`kay: ${what} took longer than ${ms / 1000} s`)
+    throw new KayError('hook-timeout', `kay: ${what} took longer than ${ms / 1000} s`)
 
   return answer
 }

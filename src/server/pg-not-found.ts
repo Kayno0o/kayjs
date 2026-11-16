@@ -2,6 +2,7 @@ import type { SQL } from 'bun'
 import type { Pending } from './missing-hits'
 import type { MissingPath, MissingStore, Reason } from './not-found'
 import type { PgSource } from './pg-jobs'
+import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { FLUSH_MS, holdHit, HOUR_MS, MAX_AGE_MS, MAX_PATHS, MAX_PENDING, MAX_REFERRERS } from './missing-hits'
 import { connectionOf, privilegeRefused, relationsMissing } from './pg-jobs'
@@ -48,7 +49,7 @@ async function ensureTables(db: SQL): Promise<void> {
   }
   catch (error) {
     if (privilegeRefused(error))
-      throw new Error('kay: the 404 log needs the tables kay_missing, kay_missing_referrers and kay_redirects, and the role may not create them: run `await createDataTables(db)` from kay/server as the database\'s owner, and list `dataTableNames` from kay/server in pg-orm\'s `ignoreTables`', { cause: error })
+      throw new KayError('config-invalid', 'kay: the 404 log needs the tables kay_missing, kay_missing_referrers and kay_redirects, and the role may not create them: run `await createDataTables(db)` from kay/server as the database\'s owner, and list `dataTableNames` from kay/server in pg-orm\'s `ignoreTables`', { cause: error })
 
     throw error
   }

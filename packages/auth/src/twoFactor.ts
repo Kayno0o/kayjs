@@ -4,6 +4,7 @@ import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { nanoid } from '@kaynooo/utils'
+import { KayError } from 'kay/library'
 import { report } from './events'
 import { failed } from './failure'
 import { secondFactorLimited } from './guesses'
@@ -124,10 +125,10 @@ export async function enrollTotp(core: Core, userId: string): Promise<TotpEnrolm
   const record = await core.store.users.get(userId)
 
   if (!record)
-    throw new Error(`kayjs-auth: enrollTotp found no member with id ${userId}`)
+    throw new KayError('argument-invalid', `kayjs-auth: enrollTotp found no member with id ${userId}`)
 
   if (record.totpEnabledAt !== null)
-    throw new Error('kayjs-auth: enrollTotp found a member who already has two-factor')
+    throw new KayError('argument-invalid', 'kayjs-auth: enrollTotp found a member who already has two-factor')
 
   const secret = generateTotpSecret()
 

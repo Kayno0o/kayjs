@@ -2,7 +2,7 @@ import type { Duration } from 'kay'
 import type { AuthLinkKind, AuthMailData, AuthMailKind, AuthMailWording, AuthNoticeKind } from 'kay/library/auth-mails'
 import type { EmailCore, EmailOptions } from './email'
 import { within } from '@kaynooo/utils/promise'
-import { configError, durationWords, escapeHtml as escape, siteLocales, trackDetached } from 'kay/library'
+import { configError, durationWords, escapeHtml as escape, KayError, siteLocales, trackDetached } from 'kay/library'
 import { AUTH_LINK_KINDS, AUTH_MAIL_WORDING, AUTH_NOTICE_KINDS } from 'kay/library/auth-mails'
 import { language, pickLocale } from './locale'
 import { log } from './log'
@@ -183,7 +183,7 @@ export function sendAside(email: EmailCore, build: () => AuthMailMessage, what: 
   trackDetached((async () => {
     try {
       if (await within(Promise.resolve(email.mailer.send(build())), ASIDE_TIMEOUT_MS, LATE) === LATE)
-        throw new Error(`no answer from the mailer in ${ASIDE_TIMEOUT_MS / 1000} s`)
+        throw new KayError('helper-failed', `no answer from the mailer in ${ASIDE_TIMEOUT_MS / 1000} s`, { kind: 'mailer-aside-timeout' })
     }
     catch (error) {
       log.error(`mailing ${what} failed`, error)

@@ -1,6 +1,7 @@
 import type { SQL } from 'bun'
 import type { JobStore, StoredJob, StoredJobState } from './queue'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { KayError } from '../compiler/errors'
 import { stepsQueue } from './job-steps'
 import { limitedStore } from './pg-limit'
 import { CHANNEL, hear } from './pg-notify'
@@ -349,7 +350,7 @@ export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): Jo
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error('kay: pgJobs needs the tables kay_jobs and kay_locks, and its role may not create them: list `jobTables` from kay/pg-orm in the Database\'s tables so a migration creates them, or run `await createJobTables(db)` from kay/server as the database\'s owner', { cause: error })
+        throw new KayError('config-invalid', 'kay: pgJobs needs the tables kay_jobs and kay_locks, and its role may not create them: list `jobTables` from kay/pg-orm in the Database\'s tables so a migration creates them, or run `await createJobTables(db)` from kay/server as the database\'s owner', { cause: error })
 
       throw error
     }
@@ -388,7 +389,7 @@ export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): Jo
           return held.id
       }
 
-      throw new Error(`kay: the key '${job.key}' of queue('${job.queue}') kept changing hands while a job was added`)
+      throw new KayError('helper-failed', `kay: the key '${job.key}' of queue('${job.queue}') kept changing hands while a job was added`)
     },
     async claim(queue, now, until) {
       const db = await open()

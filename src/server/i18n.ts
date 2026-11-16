@@ -354,7 +354,7 @@ export async function renderState(locale: string | undefined): Promise<LocaleSta
   const translations = i18n.translations.get(chosen)
 
   if (!translations)
-    throw new Error(`kay: renderToString renders in ${chosen}, which is none of the site's locales: ${i18n.settings.locales.join(', ')}`)
+    throw new KayError('argument-invalid', `kay: renderToString renders in ${chosen}, which is none of the site's locales: ${i18n.settings.locales.join(', ')}`)
 
   return { ...translations, settings: i18n.settings, path: '/', ...i18n.implicit && { implicit: true } }
 }

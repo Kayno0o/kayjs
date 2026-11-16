@@ -2,6 +2,7 @@ import type { BareUser } from './core'
 import type { OAuthSite, OAuthTest } from './oauthTest'
 import type { CreateUserInput } from './password'
 import type { TotpEnrolment } from './twoFactor'
+import { KayError } from 'kay/library'
 import { builtOwn } from './own'
 import { signInHook } from './testHook'
 
@@ -31,7 +32,7 @@ export function test(site: OAuthSite): AuthTest {
     const own = builtOwn(site)
 
     if (!own)
-      throw new Error('kayjs-auth: test(site) found no `auth()` built for this test site: await `testSite()` first, and give `test` the site it returned, of a project whose kay.config.ts registers `auth()` with no `module`')
+      throw new KayError('config-invalid', 'kayjs-auth: test(site) found no `auth()` built for this test site: await `testSite()` first, and give `test` the site it returned, of a project whose kay.config.ts registers `auth()` with no `module`')
 
     return own.test(site)
   }

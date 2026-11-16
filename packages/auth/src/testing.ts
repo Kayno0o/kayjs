@@ -2,6 +2,7 @@ import type { Elysia } from 'elysia'
 import type { BareUser, Core } from './core'
 import type { CreateUserInput } from './password'
 import { Elysia as ElysiaApp } from 'elysia'
+import { KayError } from 'kay/library'
 import { publicUser } from './core'
 import { normalizeEmail, normalizeUsername } from './rules'
 import { dropSession, signedInCookies } from './testCookies'
@@ -10,12 +11,12 @@ import { mergedData } from './userData'
 // `held` with `data` laid over it as the `user` schema accepts it; throws for data it refuses, or when the app declared no schema.
 function signInAsData(core: Core, held: Record<string, unknown> | undefined, data: object): Record<string, unknown> {
   if (!core.userData)
-    throw new Error('kayjs-auth: signInAs was given `data`, and authCore has no `user` schema')
+    throw new KayError('argument-invalid', 'kayjs-auth: signInAs was given `data`, and authCore has no `user` schema')
 
   const merged = mergedData(core.userData, held, data)
 
   if (merged === undefined)
-    throw new Error('kayjs-auth: signInAs was given `data` that does not fit the `user` schema')
+    throw new KayError('argument-invalid', 'kayjs-auth: signInAs was given `data` that does not fit the `user` schema')
 
   return merged
 }
@@ -37,7 +38,7 @@ function signInAsMismatch(core: Core, user: BareUser, given: { email: string | u
     differs.push('data')
 
   if (differs.length > 0)
-    throw new Error(`kayjs-auth: signInAs found a member whose ${differs.join(', ')} differ from the fields given`)
+    throw new KayError('argument-invalid', `kayjs-auth: signInAs found a member whose ${differs.join(', ')} differ from the fields given`)
 }
 
 // The Set-Cookie lines of a new session signed in as `userId`, minted by the plugin signing them in over a request of its own.
@@ -87,7 +88,7 @@ export async function signInAs(core: Core, plugin: Elysia, site: { cookies: Bun.
     const created = await (await import('./password')).createUser(core, fields)
 
     if (!created.ok)
-      throw new Error(`kayjs-auth: signInAs could not make the member: ${JSON.stringify(created.errors)}`)
+      throw new KayError('argument-invalid', `kayjs-auth: signInAs could not make the member: ${JSON.stringify(created.errors)}`)
 
     user = created.user
 

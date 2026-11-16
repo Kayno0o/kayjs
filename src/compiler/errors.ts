@@ -403,6 +403,11 @@ export const ERRORS = {
     summary: 'A request that ran past its `timeout`: a page answers 504 through the nearest `_error.kay`.',
     fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
+  'helper-failed': {
+    group: 'runtime',
+    summary: 'A helper of kay or a library that could not do what it was asked because of a state it found, not an argument or a setting: a key that kept changing hands, a row removed under it, a mail provider that refused or did not answer (`kind` names which), a host that resolves to nothing.',
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
+  },
   'island-props-invalid': {
     group: 'runtime',
     summary: 'An island given a prop that cannot reach the browser: a function, rendered markup or a value the wire format refuses.',

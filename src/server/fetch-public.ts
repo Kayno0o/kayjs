@@ -1,4 +1,5 @@
 import type { Resolver } from './address'
+import { KayError } from '../compiler/errors'
 import { ipVersion, isPublicAddress, pinnedLookup, PrivateAddressError, resolveHost } from './address'
 import { FETCH_TIMEOUT_MS } from './config-limits'
 
@@ -73,7 +74,7 @@ async function readCapped(response: Response, maxBytes: number): Promise<Uint8Ar
     size += chunk.byteLength
 
     if (size > maxBytes)
-      throw new Error(`the body is over ${maxBytes} bytes`)
+      throw new KayError('argument-invalid', `the body is over ${maxBytes} bytes`)
 
     chunks.push(chunk)
   }
@@ -90,7 +91,7 @@ export async function fetchPublic(url: string | URL, options: FetchPublicOptions
 
   for (let hops = 0; ; hops++) {
     if (target.protocol !== 'http:' && target.protocol !== 'https:')
-      throw new Error(`${target.href} is not an http or https URL`)
+      throw new KayError('argument-invalid', `${target.href} is not an http or https URL`)
 
     const response = await pinnedGet(target, headers, signal, resolve, allowPrivate?.(target.hostname.replace(BRACKETS, '')) ?? false)
     const location = response.headers.get('location')
@@ -99,7 +100,7 @@ export async function fetchPublic(url: string | URL, options: FetchPublicOptions
       await response.body?.cancel()
 
       if (redirect === 'error' || hops >= redirect)
-        throw new Error(`${target.href} redirects, which is not followed`)
+        throw new KayError('argument-invalid', `${target.href} redirects, which is not followed`)
 
       const next = new URL(location, target)
 

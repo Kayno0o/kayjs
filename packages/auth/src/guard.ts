@@ -1,5 +1,6 @@
 import type { Auth, AuthRequirement } from './auth'
 import { guard as kayGuard } from 'kay'
+import { KayError } from 'kay/library'
 
 /** What `authGuard()` takes, as `auth.guard()` does: where an anonymous visitor goes, the requirement a user meets and the scope a token holds, and whether two-factor is asked of the user (see `twoFactor.require`). */
 export interface GuardOptions {
@@ -15,7 +16,7 @@ export function authGuard(options: GuardOptions = {}) {
     const { auth } = ctx.locals
 
     if (typeof auth?.guarded !== 'function')
-      throw new Error('kayjs-auth: no `auth` in this context; add auth() to kay.config.ts, or `.use(auth.plugin)` before the routes')
+      throw new KayError('config-invalid', 'kayjs-auth: no `auth` in this context; add auth() to kay.config.ts, or `.use(auth.plugin)` before the routes')
 
     await auth.guarded(ctx, options)
   })

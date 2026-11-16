@@ -1,5 +1,6 @@
 import type { Entries, Handle, LiveKey, LiveStore } from './live-value.shared'
 import type { ServerScope } from './reactive'
+import { KayError } from '../compiler/errors'
 import { initialOf, keyText, writeArguments } from './live-value.shared'
 import { kayLog } from './log'
 import { currentServerScope } from './reactive'
@@ -563,7 +564,7 @@ const NO_CONNECTION = { status: () => 'idle', pending: () => false, error: () =>
 
 export function serverLive(id: string, initial: unknown, name: string | undefined, ttl: number | undefined, own: boolean): Handle {
   if (own && typeof initial === 'function')
-    throw new TypeError(`kay: live(${id}) with \`user: true\` is one value for each user, so its starting value is not a function of a key`)
+    throw new KayError('argument-invalid', `kay: live(${id}) with \`user: true\` is one value for each user, so its starting value is not a function of a key`)
 
   const keyed = typeof initial === 'function' && !own
   const known = slots().get(id)

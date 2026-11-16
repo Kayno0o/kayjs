@@ -9,7 +9,7 @@ import { solveWork } from '../src/runtime/work'
 import { setupStore } from '../src/server/app-store'
 import { countWrites } from '../src/server/kept-pages'
 import { overLimit } from '../src/server/over-limit'
-import { PollTimeoutError } from '../src/server/pg-poll'
+import { StoreTimeoutError } from '../src/server/pg-poll'
 import { apiLimitWait, countSucceeded, memoryRates, protectionRefusal, ratesFallingBack, ratesFor, refundRateLimit } from '../src/server/protection'
 import { rateLimit } from '../src/server/rate-limit'
 import { memoryRooms, sqliteRooms } from '../src/server/rooms'
@@ -94,7 +94,7 @@ describe('overLimit with a rates store that hangs', () => {
 })
 
 describe('overLimit after a store gave up by itself', () => {
-  it('leaves a store that threw a PollTimeoutError alone for a while', async () => {
+  it('leaves a store that threw a StoreTimeoutError alone for a while', async () => {
     const log = spyOn(console, 'warn').mockReturnValue()
     let calls = 0
 
@@ -102,7 +102,7 @@ describe('overLimit after a store gave up by itself', () => {
       setupStore({ rates: { hit: async () => {
         calls++
 
-        throw new PollTimeoutError('too slow')
+        throw new StoreTimeoutError('too slow')
       } } })
       await overLimit('gaps-gave-up', '10.0.0.7', 5, 60_000)
       await overLimit('gaps-gave-up', '10.0.0.7', 5, 60_000)
