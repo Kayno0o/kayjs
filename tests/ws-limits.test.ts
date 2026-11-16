@@ -11,12 +11,18 @@ const site = await testSite({ root, islands: false })
 // The server the site starts with its first socket, whose port a raw socket needs.
 const serve = Bun.serve
 let port = 0
+// A server that says no to the upgrade, as one does when it cannot take the socket.
+let refuseUpgrades = false
 let served: { websocket?: { maxPayloadLength?: number } } = {}
 
 Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
   const server = serve(options)
 
   port = server.port!
+
+  const upgrade = server.upgrade.bind(server)
+
+  server.upgrade = (...args: Parameters<typeof upgrade>) => !refuseUpgrades && upgrade(...args)
   served = options
 
   return server
@@ -175,6 +181,22 @@ describe('the open sockets of one client', () => {
     }
     finally {
       jest.useRealTimers()
+    }
+  })
+
+  it('frees the place of an api() route\'s refused upgrade at once, not after the hold', async () => {
+    refuseUpgrades = true
+
+    try {
+      const statuses: number[] = []
+
+      for (let attempt = 0; attempt < 4; attempt++)
+        statuses.push((await fetch(`http://localhost:${port}/api/chat/few`, { headers: { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13' } })).status)
+
+      expect(statuses).not.toContain(429)
+    }
+    finally {
+      refuseUpgrades = false
     }
   })
 

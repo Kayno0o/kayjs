@@ -2,6 +2,9 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { t } from 'elysia'
+import { s } from 'kay'
+import { api } from '../src/server'
 import { shutdown } from '../src/server/lifecycle'
 import { rooms } from '../src/server/rooms'
 import { scratchDir } from './scratch'
@@ -175,5 +178,28 @@ export default api().ws('/', {
     finally {
       await shutdown(app, true)
     }
+  })
+})
+
+describe('the reply of rooms', () => {
+  it('binds to a route whose response is a status map', () => {
+    const tally = rooms<{ n: number }>({ reply: t.Ref('mapped') as never })
+
+    api().model({ mapped: s.Object({ n: s.Number() }) }).ws('/', { response: { 200: tally.response } as never, message: () => undefined })
+    expect(() => tally.publish('only', { n: 1 })).not.toThrow()
+    expect(() => tally.publish('only', { n: 'x' } as never)).toThrow('reply')
+  })
+
+  it('resolves a shared schema against the models of each app', () => {
+    const reply = t.Ref('shared') as never
+    const first = rooms<{ n: number }>({ reply })
+    const second = rooms<{ n: number }>({ reply })
+
+    api().model({ shared: s.Object({ n: s.Number() }) }).ws('/', { response: first.response, message: () => undefined })
+    api().model({ shared: s.Object({ n: s.String() }) }).ws('/', { response: second.response, message: () => undefined })
+    expect(() => first.publish('only', { n: 1 })).not.toThrow()
+    expect(() => first.publish('only', { n: 'x' } as never)).toThrow('reply')
+    expect(() => second.publish('only', { n: 'x' } as never)).not.toThrow()
+    expect(() => second.publish('only', { n: 1 })).toThrow('reply')
   })
 })

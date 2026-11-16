@@ -132,7 +132,9 @@ const UNWATCHED_POLL_MS = optionMs('25ms', '')
 const IDLE_POLLS = 40
 const KEPT = 30_000
 
-const replyBinders = new WeakMap<object, (app: Elysia) => void>()
+// By the schema a room's `reply` and its `response` are, each a room with its own binder, so two rooms sharing one reply are bound by the app that uses each.
+const replyBinders = new WeakMap<object, Set<(app: Elysia) => void>>()
+const STATUS = /^\d{3}$/
 
 // The models and modules an app registered, which a schema naming one by reference needs to check a value.
 export function modelsOf(app: Elysia): { modules: never, models: never, normalize: boolean | undefined } {
@@ -141,10 +143,21 @@ export function modelsOf(app: Elysia): { modules: never, models: never, normaliz
   return { modules: definitions.typebox, models: definitions.type, normalize: app.config.normalize as boolean | undefined }
 }
 
-// Hands a route's `response` schema to the rooms it is the `reply` of, along with the app that sends it.
+// Hands a route's `response` schema, or each one of its status map (`{ 200: schema }`), to the rooms it is the `reply` of, along with the app that sends it.
 export function bindReply(schema: unknown, app: Elysia): void {
-  if (typeof schema === 'object' && schema !== null)
-    replyBinders.get(schema)?.(app)
+  if (typeof schema !== 'object' || schema === null)
+    return
+
+  for (const bind of replyBinders.get(schema) ?? [])
+    bind(app)
+
+  const keys = Object.keys(schema)
+
+  if (keys.length > 0 && keys.every(key => STATUS.test(key))) {
+    for (const value of Object.values(schema)) {
+      bindReply(value, app)
+    }
+  }
 }
 
 // Rooms of websocket connections, typed by what they send: join one in `open`, leave in `close`, and publish to it from anywhere.
@@ -154,9 +167,22 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
   const store: RoomStore = options.store ?? memoryRooms()
   let replyCheck: { Check: (value: unknown) => boolean } | undefined
 
+  // The `response` of a room with a `reply` is a copy of it, so a route that gives it binds this room alone, and a `reply` shared by rooms of several apps resolves in each one's models.
+  const response = options.reply === undefined ? t.Unsafe<Message>(t.Any()) : { ...options.reply }
+
   // Rebuilds the check with the models of the app whose route sends this `reply` as its `response`, so a `t.Ref` in it resolves.
-  if (options.reply !== undefined)
-    replyBinders.set(options.reply, (app) => { replyCheck = getSchemaValidator(options.reply as never, modelsOf(app)) })
+  if (options.reply !== undefined) {
+    const bind = (app: Elysia): void => {
+      replyCheck = getSchemaValidator(options.reply as never, modelsOf(app))
+    }
+
+    for (const key of [options.reply, response]) {
+      const binders = replyBinders.get(key) ?? new Set()
+
+      binders.add(bind)
+      replyBinders.set(key, binders)
+    }
+  }
 
   // The text a message goes out as, once the room's `reply` schema has taken it.
   const textOf = (message: unknown): string => {
@@ -252,7 +278,7 @@ export function rooms<Message, Member, State>(...[options = {}]: [options?: Room
   }
 
   return {
-    response: (options.reply ?? t.Unsafe<Message>(t.Any())),
+    response,
     memberOf(ws, room) {
       const written = local.get(room)?.get(idOf(ws.raw))?.member
 

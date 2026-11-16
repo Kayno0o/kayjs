@@ -47,7 +47,7 @@ import { mismatchOf } from './response-mismatch'
 import { apiRoutePath, withoutSlash } from './routes'
 import { markPrivate, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
-import { holdingUnlessAdopted, socketOptions } from './socket'
+import { holdToLimits, socketOptions } from './socket'
 import { answered, failed, replyTrace, SERVER_SPAN, startSpan, tracedUnder, tracing } from './trace'
 import { kayWord } from './words'
 import { socketLimits } from './ws-limits'
@@ -157,7 +157,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
       // Whichever way the module chains its `.ws()` (in a group, a guard or a used plugin), every websocket route is held to its limits.
       if (hooks && route.method === 'WS')
-        hooks.beforeHandle = [socketLimits(route.path, hooks.detail?.messages, app, (request, run) => inApiLocale(request, options, run)), ...holdingUnlessAdopted(hooks, app), ...[hooks.beforeHandle ?? []].flat()]
+        hooks.beforeHandle = [socketLimits(route.path, hooks.detail?.messages, app, (request, run) => inApiLocale(request, options, run)), holdToLimits(app), ...[hooks.beforeHandle ?? []].flat()]
 
       if (hooks?.error !== undefined)
         hooks.error = [hooks.error].flat().map(hook => localizedHook(hook, options))

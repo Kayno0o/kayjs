@@ -197,8 +197,8 @@ interface Handlers {
 // Servers whose `upgrade` already holds the routes no `api()` `.ws()` made, so it is wrapped once.
 const held = new WeakSet<object>()
 
-// Holds a route no `api()` `.ws()` made, one a module built with its own `new Elysia()`, to its frame size and its connection cap: the protocol is the api's own, the limits are every route's.
-// A route the api's `.ws()` made marks its context as adopted, and its socket is left as it is.
+// Holds a route to its frame size and its connection cap: the protocol is the api's own, the limits are every route's.
+// A route the api's `.ws()` made marks its context as adopted, and its socket is left as it is, but the upgrade of any route that is refused frees its place at once.
 export function holdToLimits(app: Elysia): (context: Holding) => void {
   return (context) => {
     const server = context.server ?? (app as { server?: Upgrading | null }).server
@@ -309,9 +309,7 @@ export function socketBody(app: Elysia, body: unknown, name: () => string): Body
   }
 }
 
-const ADOPTS = Symbol.for('kay.socketAdopts')
-
-// The `upgrade` option of a route made by the api's `.ws()`: it marks the context the route upgrades in, as its socket is adopted when it opens and is not held to the limits a second time, and marks itself, so the mount can tell the route from one made some other way.
+// The `upgrade` option of a route made by the api's `.ws()`: it marks the context the route upgrades in, as its socket is adopted when it opens and is not held to the limits a second time.
 function adopting(given: unknown): (context: Holding) => unknown {
   const upgrade = (context: Holding): unknown => {
     context[ADOPTED] = true
@@ -325,15 +323,7 @@ function adopting(given: unknown): (context: Holding) => unknown {
     return undefined
   }
 
-  Object.defineProperty(upgrade, ADOPTS, { value: true })
-
   return upgrade
-}
-
-// The hook holding a route to its limits, none for a route the api's `.ws()` made, which adopts its own sockets.
-// Known when the module mounts, as Elysia keeps the options it was given in the route's `websocket` hook: `holdToLimits` is added only to a route that is not.
-export function holdingUnlessAdopted(hooks: unknown, app: Elysia): ((context: Holding) => void)[] {
-  return (hooks as { websocket?: { upgrade?: { [ADOPTS]?: boolean } } } | undefined)?.websocket?.upgrade?.[ADOPTS] === true ? [] : [holdToLimits(app)]
 }
 
 // What a websocket route may be given beside the handlers: the options of Elysia's `.ws()`, which reach it as written.
