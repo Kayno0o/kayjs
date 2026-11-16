@@ -194,7 +194,7 @@ interface Handlers {
   [ADOPTED]?: boolean
 }
 
-// Servers whose `upgrade` already holds the routes no `api()` `.ws()` made, so it is wrapped once.
+// Servers whose `upgrade` is already wrapped to hold every route's limits and to free the place of a refused upgrade, so it is wrapped once.
 const held = new WeakSet<object>()
 
 // Holds a route to its frame size and its connection cap: the protocol is the api's own, the limits are every route's.
@@ -311,7 +311,7 @@ export function socketBody(app: Elysia, body: unknown, name: () => string): Body
 
 // The `upgrade` option of a route made by the api's `.ws()`: it marks the context the route upgrades in, as its socket is adopted when it opens and is not held to the limits a second time.
 function adopting(given: unknown): (context: Holding) => unknown {
-  const upgrade = (context: Holding): unknown => {
+  return (context) => {
     context[ADOPTED] = true
 
     if (typeof given === 'function')
@@ -322,8 +322,6 @@ function adopting(given: unknown): (context: Holding) => unknown {
 
     return undefined
   }
-
-  return upgrade
 }
 
 // What a websocket route may be given beside the handlers: the options of Elysia's `.ws()`, which reach it as written.
