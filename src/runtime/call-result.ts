@@ -5,12 +5,40 @@ import { listenerSet } from './listener-set'
 import { ownSignal, untrack } from './reactive'
 
 // How a tracked call went, for an action and for a route alike: what it answered, or the refusal. `message` is the text to show; `errors` holds a message per field, the form-wide one under ''; `data` is what the handler passed to `ctx.fail` for an action, the answer a route refused with for a route.
-// A refusal carries them twice, flat on the result and as its `error`, the one place every other result keeps its failure.
+// A refusal carries them twice, flat on the result and as its `error`, the one place every other result keeps its failure: the `ApiError` itself (an `ActionError` for an action), so `orThrow()` and a `throw result.error` throw what the call threw.
 export type CallResult<Data, Failed>
   = | { ok: true, data: Data, error?: undefined }
     | ({ ok: false, error: ErrorShape<Failed> } & ErrorShape<Failed>)
 
-type Refusal = { ok: false } & ErrorShape
+// What a call returns: the result, and `orThrow()` for the throwing style, which resolves with the data and rejects with the failure itself (an `ActionError`, an `ApiError`, the `TimeoutError` of a timeout).
+export type CallPromise<Result> = Promise<Result> & { orThrow: () => Promise<Result extends { ok: true, data: infer Data } ? Data : never> }
+
+// The mark a call's result carries (not enumerable), so a reader tells it from an answer shaped like one, such as an entry write's `{ ok: false, error, issues }`: `unwrapped` of kayjs-ui looks for it by name.
+const RESULT = Symbol.for('kay.call-result')
+
+const marked = <Result extends object>(result: Result): Result => Object.defineProperty(result, RESULT, { value: true })
+
+// Turns a call that throws into one that answers a result: `refused` gives the `ApiError` of what it threw, which is the result's `error`, or undefined for what is no failure of the call (an abort, a redirect) or of the visitor (a bug), which rejects as it threw.
+export function settling<Data>(throwing: Promise<Data>, refused: (error: unknown) => ApiError | undefined): CallPromise<CallResult<Data, unknown>> {
+  const result = (async (): Promise<CallResult<Data, unknown>> => {
+    try {
+      return marked({ ok: true, data: await throwing })
+    }
+    catch (failure) {
+      const error = refused(failure)
+
+      if (error === undefined)
+        throw failure
+
+      return marked({ ok: false, status: error.status, message: error.message, errors: error.errors, data: error.data, error })
+    }
+  })()
+
+  // A call awaited only through `orThrow()` leaves this one to reject on its own, which is no unhandled rejection.
+  void Promise.allSettled([result])
+
+  return Object.assign(result, { orThrow: async () => throwing })
+}
 
 // The callbacks a tracked call takes in its options, and as methods of the same names: `onX` after a transition, one object argument, `input` the first argument of the call. One that throws is logged and leaves the call alone.
 // `input` is `unknown`, so an action of any input still passes where another is expected, as `Action` stands for any.
@@ -47,12 +75,12 @@ export function whenIdle(): { wait: (count: number) => Promise<void>, check: (co
 // It resolves `{ ok: true, data }`, or what `refused` makes of an error the call threw, which rethrows when it returns undefined; an abort rethrows and is no failure. `holds` says a result is a stream, which counts as in flight until it ends, calling `release` then; `take` counts it in flight again, for a stream that is retried.
 export function trackCalls<Args extends unknown[]>(
   call: (...args: Args) => Promise<unknown>,
-  refused: (error: unknown) => Refusal | undefined,
+  refused: (error: unknown) => ApiError | undefined,
   holds?: (data: unknown, release: () => void, take: () => void) => boolean,
   // An error that is no failure of the call, such as a redirect, which `status()`, `error()` and `retry()` leave alone (a retry would post a login or a checkout again).
   aside?: (error: unknown) => boolean,
   hooks?: TrackHooks<never>,
-): ((...args: Args) => Promise<CallResult<unknown, unknown>>) & Reader<unknown, LoadStatus> & { settled: () => Promise<void> } & { onSuccess: (listener: (event: { data: unknown, input: unknown }) => void) => () => void } {
+): ((...args: Args) => CallPromise<CallResult<unknown, unknown>>) & Reader<unknown, LoadStatus> & { settled: () => Promise<void> } & { onSuccess: (listener: (event: { data: unknown, input: unknown }) => void) => () => void } {
   const successes = listenerSet<{ data: unknown, input: unknown }>()
   const answers = listenerSet<{ value: unknown, input: unknown }>()
   const failures = listenerSet<{ error: ApiError, input: unknown }>()
@@ -77,7 +105,7 @@ export function trackCalls<Args extends unknown[]>(
     idle.check(untrack(inFlight))
   }
 
-  const run = async (...args: Args): Promise<CallResult<unknown, unknown>> => {
+  const run = async (...args: Args): Promise<unknown> => {
     let streaming = false
     // The hook runs once the call is no longer in flight, so `pending()` is false in it and `retry()` works from it.
     let tell: (() => void) | undefined
@@ -96,7 +124,7 @@ export function trackCalls<Args extends unknown[]>(
         successes.emit({ data, input: args[0] })
       }
 
-      return { ok: true, data }
+      return data
     }
     catch (failure) {
       if (aside?.(failure) !== true && !args.some(arg => (arg as { signal?: AbortSignal } | undefined)?.signal?.aborted === true)) {
@@ -108,12 +136,7 @@ export function trackCalls<Args extends unknown[]>(
         tell = () => failures.emit({ error, input: args[0] })
       }
 
-      const result = refused(failure)
-
-      if (result === undefined)
-        throw failure
-
-      return { ...result, error: { status: result.status, message: result.message, errors: result.errors, data: result.data } }
+      throw failure
     }
     finally {
       if (!streaming)
@@ -123,7 +146,10 @@ export function trackCalls<Args extends unknown[]>(
     }
   }
 
-  return Object.assign(run, {
+  // eslint-disable-next-line ts/promise-function-async -- an async function would wrap the call's promise, which carries `orThrow()`
+  const answering = (...args: Args) => settling(run(...args), refused)
+
+  return Object.assign(answering, {
     status: () => inFlight() > 0 ? 'loading' as const : outcome(),
     pending: () => inFlight() > 0,
     error,

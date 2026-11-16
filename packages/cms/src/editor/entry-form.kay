@@ -243,7 +243,7 @@ async function remove(): Promise<void> {
 
   const url = source.data()?.entry.url
   // Known before the delete, so a screens' address that cannot be read stops it rather than leaving a page that no longer exists.
-  const screen = url !== undefined && isShown(url) ? collectionPath(can.data()?.prefix ?? (await call(editorApi, '/can')).prefix, entry.collection) : undefined
+  const screen = url !== undefined && isShown(url) ? collectionPath(can.data()?.prefix ?? (await call(editorApi, '/can').orThrow()).prefix, entry.collection) : undefined
 
   if (!await deleteSaved(entry, drafts.version(entry) ?? source.data()?.entry.version))
     return

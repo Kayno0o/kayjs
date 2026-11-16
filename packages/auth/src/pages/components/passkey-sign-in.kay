@@ -16,12 +16,12 @@ async function signIn() {
   error = ''
 
   try {
-    const options = await passkeyOptions({}, { refresh: false })
+    const options = await passkeyOptions({}, { refresh: false }).orThrow()
     const response = await askPasskey(options)
     const remember = rememberChoice()
 
     if (response)
-      await passkey({ response, redirect, ...(remember === undefined ? {} : { remember }) })
+      await passkey({ response, redirect, ...(remember === undefined ? {} : { remember }) }).orThrow()
   }
   catch (caught) {
     error = passkeyFailure(caught, {}, failed)

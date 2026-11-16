@@ -13,7 +13,7 @@ const notes = local({
   read: async signal => hang ? new Promise<never>((_, reject) => signal.addEventListener('abort', () => {
     document.body.dataset.aborted = 'yes'
     reject(signal.reason)
-  })) : fail && document.cookie.includes('readfail=1') ? Promise.reject(new Error('read broke')) : call(notesApi, '/', { signal }),
+  })) : fail && document.cookie.includes('readfail=1') ? Promise.reject(new Error('read broke')) : call(notesApi, '/', { signal }).orThrow(),
   put: save,
   remove: drop,
   version,

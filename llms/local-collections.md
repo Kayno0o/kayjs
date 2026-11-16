@@ -31,7 +31,7 @@ import { call, local } from 'kay'
 import { remove, save } from '../routes/todos.kay'
 import todosApi from '../api/todos'
 
-const todos = local({ key: 'id', read: async signal => call(todosApi, '/', { signal }), put: save, remove })
+const todos = local({ key: 'id', read: async signal => call(todosApi, '/', { signal }).orThrow(), put: save, remove })
 ---
 p {todos.sync.queued()} waiting for the server, {todos.sync.status()}
 ul

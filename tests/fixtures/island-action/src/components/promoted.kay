@@ -5,5 +5,5 @@ import Clicker from './clicker.kay'
 
 const { run } = props<{ run: Action<{ name: string }, string> }>()
 ---
-Clicker(choose={async () => { document.body.dataset.answer = await run({ name: 'Pat' }) }})
+Clicker(choose={async () => { document.body.dataset.answer = await run({ name: 'Pat' }).orThrow() }})
 p.url {run.url}

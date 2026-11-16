@@ -35,8 +35,9 @@ async function attempt<T>(run: () => Promise<T>, failure: string): Promise<Attem
 
   setSessionEnded(signedOut)
 
+  // `attempt` unwraps by the mark of a call's result, which `run` already unwrapped with `.orThrow()`, so its type reads an answer shaped like a result (an entry write's refusal) as one.
   if (!signedOut)
-    return result
+    return result as Attempted<T> | undefined
 
   toast.error(wording('cms.session.toast', 'Your session has ended. Sign in again to save.'))
 
@@ -129,7 +130,7 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
     method: 'post',
     params: { collection: ref.collection, slug },
     body: { data: entry.data, create, ...localeOf({ ...ref, locale }), ...(entry.body === undefined ? {} : { body: entry.body }), ...versionOf(drafts.version(ref)) },
-  }), wording('cms.save.failure', 'Could not save'))
+  }).orThrow(), wording('cms.save.failure', 'Could not save'))
 
   if (outcome && 'issues' in outcome) {
     // A new entry's issues name the slug it was saved under, not the one its draft is kept by.
@@ -190,7 +191,7 @@ export async function deleteSaved(ref: EntryRef, version?: string | undefined): 
     method: 'delete',
     params: { collection: ref.collection, slug: ref.slug },
     query: { ...localeOf(ref), ...versionOf(version) },
-  }), wording('cms.save.deleteFailure', 'Could not delete'))
+  }).orThrow(), wording('cms.save.deleteFailure', 'Could not delete'))
 
   return settled(outcome, wording('cms.save.deleted', 'Deleted'), wording('cms.save.notDeleted', 'Not deleted'))
 }
@@ -210,7 +211,7 @@ export async function deleteUnusedUploadsInChunks(keys: string[]): Promise<boole
 
 // Deletes unused uploads and their variants in one request, so the server reads the content once for all, and says how it went; true once the rows are stale, deleted or not.
 export async function deleteUnusedUploads(keys: string[]): Promise<boolean> {
-  const result = await attempt(async () => call(filesApi, '/unused/delete', { method: 'post', body: { keys } }), wording('cms.save.deleteFailure', 'Could not delete'))
+  const result = await attempt(async () => call(filesApi, '/unused/delete', { method: 'post', body: { keys } }).orThrow(), wording('cms.save.deleteFailure', 'Could not delete'))
 
   if (!result)
     return false
@@ -231,7 +232,7 @@ export async function deleteUnusedUploads(keys: string[]): Promise<boolean> {
 
 // Renames what the media library shows for an upload and says how it went; true once renamed.
 export async function renameMedia(key: string, name: string): Promise<boolean> {
-  const result = await attempt(async () => call(filesApi, '/media/rename', { method: 'post', body: { key, name } }), wording('cms.media.renameFailure', 'Could not rename'))
+  const result = await attempt(async () => call(filesApi, '/media/rename', { method: 'post', body: { key, name } }).orThrow(), wording('cms.media.renameFailure', 'Could not rename'))
 
   if (!result)
     return false
@@ -248,7 +249,7 @@ export async function renameSaved(ref: EntryRef, slug: string, version?: string 
     params: { collection: ref.collection, slug: ref.slug },
     query: { ...localeOf(ref), ...versionOf(version) },
     body: { slug },
-  }), wording('cms.save.renameFailure', 'Could not rename'))
+  }).orThrow(), wording('cms.save.renameFailure', 'Could not rename'))
 
   if (outcome && 'issues' in outcome)
     onRefused?.(outcome.issues.map(issue => issue.message).join('; '))
@@ -273,7 +274,7 @@ export async function publishSaved(ref: EntryRef): Promise<boolean> {
     method: 'post',
     params: { collection: ref.collection, slug: ref.slug },
     query: localeOf(ref),
-  }), wording('cms.save.publishFailure', 'Could not publish'))
+  }).orThrow(), wording('cms.save.publishFailure', 'Could not publish'))
 
   return settled(outcome, wording('cms.save.published', 'Published'), wording('cms.save.notPublished', 'Not published'))
 }
@@ -284,7 +285,7 @@ export async function unpublishSaved(ref: EntryRef): Promise<boolean> {
     method: 'post',
     params: { collection: ref.collection, slug: ref.slug },
     query: localeOf(ref),
-  }), wording('cms.entry.unpublishFailure', 'Could not unpublish'))
+  }).orThrow(), wording('cms.entry.unpublishFailure', 'Could not unpublish'))
 
   return settled(outcome, wording('cms.save.unpublished', 'Unpublished'), wording('cms.save.notUnpublished', 'Not unpublished'))
 }
@@ -305,7 +306,7 @@ export async function submitSaved(ref: EntryRef): Promise<ReviewReply | undefine
     method: 'post',
     params: { collection: ref.collection, slug: ref.slug },
     query: localeOf(ref),
-  }), wording('cms.review.submitFailure', 'Could not send for review'))
+  }).orThrow(), wording('cms.review.submitFailure', 'Could not send for review'))
 
   return replyOf(outcome, wording('cms.review.submittedToast', 'Sent for review'), wording('cms.review.notSubmitted', 'Not sent for review'))
 }
@@ -317,7 +318,7 @@ export async function approveSaved(ref: EntryRef, version: string | undefined): 
     params: { collection: ref.collection, slug: ref.slug },
     query: localeOf(ref),
     body: version === undefined ? {} : { version },
-  }), wording('cms.review.approveFailure', 'Could not approve'))
+  }).orThrow(), wording('cms.review.approveFailure', 'Could not approve'))
 
   return replyOf(outcome, wording('cms.review.approvedToast', 'Approved'), wording('cms.review.notApproved', 'Not approved'))
 }
@@ -329,7 +330,7 @@ export async function sendBackSaved(ref: EntryRef, note: string): Promise<Review
     params: { collection: ref.collection, slug: ref.slug },
     query: localeOf(ref),
     body: { note },
-  }), wording('cms.review.sendBackFailure', 'Could not send back'))
+  }).orThrow(), wording('cms.review.sendBackFailure', 'Could not send back'))
 
   return replyOf(outcome, wording('cms.review.sentBackToast', 'Sent back'), wording('cms.review.notSentBack', 'Not sent back'))
 }
@@ -358,14 +359,14 @@ export async function restoreVersion(ref: EntryRef, at: number, version?: string
     method: 'post',
     params: { collection: ref.collection, slug: ref.slug },
     body: { at, ...localeOf(ref), ...versionOf(version) },
-  }), wording('cms.history.restoreFailure', 'Could not restore'))
+  }).orThrow(), wording('cms.history.restoreFailure', 'Could not restore'))
 
   return settled(outcome, wording('cms.history.restored', 'Restored'), wording('cms.history.notRestored', 'Not restored'))
 }
 
 // Writes a deleted entry back and says how it went; true once restored.
 export async function restoreDeleted(collection: string, id: string): Promise<boolean> {
-  const outcome = await attempt(async () => call(trashApi, '/:collection/:id/restore', { method: 'post', params: { collection, id } }), wording('cms.history.restoreFailure', 'Could not restore'))
+  const outcome = await attempt(async () => call(trashApi, '/:collection/:id/restore', { method: 'post', params: { collection, id } }).orThrow(), wording('cms.history.restoreFailure', 'Could not restore'))
 
   return settled(outcome, wording('cms.history.restored', 'Restored'), wording('cms.history.notRestored', 'Not restored'))
 }
@@ -376,7 +377,7 @@ export async function eraseDeleted(ref: EntryRef): Promise<boolean> {
     method: 'post',
     params: { collection: ref.collection, slug: ref.slug },
     body: { ...localeOf(ref) },
-  }), wording('cms.trash.eraseFailure', 'Could not erase'))
+  }).orThrow(), wording('cms.trash.eraseFailure', 'Could not erase'))
 
   if (!outcome)
     return false
@@ -388,7 +389,7 @@ export async function eraseDeleted(ref: EntryRef): Promise<boolean> {
 
 // Asks for a link showing the entry's saved draft to whoever it is sent to and copies it, the link toasted when the browser refuses the clipboard; true once made.
 export async function shareDraft(ref: EntryRef): Promise<boolean> {
-  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/share', { method: 'post', params: { collection: ref.collection, slug: ref.slug }, query: localeOf(ref) }), wording('cms.share.failure', 'Could not make the link'))
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/share', { method: 'post', params: { collection: ref.collection, slug: ref.slug }, query: localeOf(ref) }).orThrow(), wording('cms.share.failure', 'Could not make the link'))
 
   if (!outcome)
     return false
@@ -414,7 +415,7 @@ export async function shareDraft(ref: EntryRef): Promise<boolean> {
 
 // Refuses every share link made for the entry so far and says so; true once revoked.
 export async function revokeSharedLinks(ref: EntryRef): Promise<boolean> {
-  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/revoke-shares', { method: 'post', params: { collection: ref.collection, slug: ref.slug }, query: localeOf(ref) }), wording('cms.share.revokeFailure', 'Could not revoke the links'))
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/revoke-shares', { method: 'post', params: { collection: ref.collection, slug: ref.slug }, query: localeOf(ref) }).orThrow(), wording('cms.share.revokeFailure', 'Could not revoke the links'))
 
   if (!outcome)
     return false
@@ -430,7 +431,7 @@ export async function moveSaved(ref: EntryRef, direction: 'up' | 'down'): Promis
     method: 'post',
     params: { collection: ref.collection, slug: ref.slug },
     query: { ...localeOf(ref), direction },
-  }), wording('cms.save.moveFailure', 'Could not move'))
+  }).orThrow(), wording('cms.save.moveFailure', 'Could not move'))
 
   return settled(outcome, wording('cms.save.moved', 'Moved'), wording('cms.save.notMoved', 'Not moved'))
 }
@@ -463,7 +464,7 @@ function settled(outcome: Outcome | undefined, done: string, refused: string): b
 // Adds the redirect from a missing path to its target and says how it went; true once added. The rows are stale either way, the caller refreshing them.
 // 308 is permanent and 410 says the path is gone, with no target. A path that has a redirect takes the new target and status, which is how one is edited.
 export async function addMissingRedirect(from: string, to: string, status: RedirectStatus): Promise<boolean> {
-  const done = await attempt(async () => call(redirectsApi, '/', { method: 'post', body: { from, to, status } }), wording('cms.redirects.addFailure', 'Could not add the redirect'))
+  const done = await attempt(async () => call(redirectsApi, '/', { method: 'post', body: { from, to, status } }).orThrow(), wording('cms.redirects.addFailure', 'Could not add the redirect'))
 
   if (done)
     toast.success(wording('cms.redirects.added', 'Redirect added'))
@@ -471,8 +472,8 @@ export async function addMissingRedirect(from: string, to: string, status: Redir
   return done !== undefined
 }
 
-const removeRedirectsCall = async (froms: string[]) => call(redirectsApi, '/remove', { method: 'post', body: { froms } })
-const dismissCall = async (paths?: string[]) => paths ? call(redirectsApi, '/dismiss', { method: 'post', body: { paths } }) : call(redirectsApi, '/clear', { method: 'post' })
+const removeRedirectsCall = async (froms: string[]) => call(redirectsApi, '/remove', { method: 'post', body: { froms } }).orThrow()
+const dismissCall = async (paths?: string[]) => paths ? call(redirectsApi, '/dismiss', { method: 'post', body: { paths } }).orThrow() : call(redirectsApi, '/clear', { method: 'post' }).orThrow()
 
 // Removes redirects added from the screen, so their paths answer 404 again; true once removed, a failure toasted.
 export async function removeAddedRedirects(froms: string[]): Promise<boolean> {
@@ -513,7 +514,7 @@ export async function dismissMissingPathsOrThrow(paths?: string[]): Promise<bool
 // The paths of the site holding the text typed, for a redirect's target box; none when they cannot be read, as the box takes any path typed.
 export async function fetchSitePaths(q: string): Promise<string[]> {
   try {
-    return await call(redirectsApi, '/paths', { query: { q } })
+    return await call(redirectsApi, '/paths', { query: { q } }).orThrow()
   }
   catch {
     return []

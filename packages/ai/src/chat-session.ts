@@ -178,7 +178,7 @@ export function createChatSession(options: ChatSessionOptions) {
       return undefined
 
     try {
-      const answer = await voice.transcribe({ audio }, { refresh: false })
+      const answer = await voice.transcribe({ audio }, { refresh: false }).orThrow()
 
       if (heardIn !== left)
         return undefined
@@ -215,7 +215,7 @@ export function createChatSession(options: ChatSessionOptions) {
 
   // A read or a change of the conversations, which the action answers through `ask` with no model asked: the message only carries a rename's title.
   async function consult(header: string, content = ''): Promise<ConversationAnswer | undefined> {
-    return answerIn(await options.action({ messages: [{ role: 'user', content }] }, { refresh: false, headers: { [CONVERSATION_HEADER]: header } }))
+    return answerIn(await options.action({ messages: [{ role: 'user', content }] }, { refresh: false, headers: { [CONVERSATION_HEADER]: header } }).orThrow())
   }
 
   // Shows the conversation `id`, or a new one; a visitor the server cannot keep one for gets the tab's history back, as without `keepOnServer`.
@@ -491,7 +491,7 @@ export function createChatSession(options: ChatSessionOptions) {
       const sent = posted(history(), headers[CONVERSATION_HEADER] === undefined ? options.keep : 1, Math.min(options.maxChars, learned))
 
       try {
-        return await options.action({ messages: sent }, { signal: abort, refresh: false, headers })
+        return await options.action({ messages: sent }, { signal: abort, refresh: false, headers }).orThrow()
       }
       catch (error) {
         if (!(error instanceof ActionError) || error.status !== 413 || sent.length < 2 || retries === MAX_RETRIES || abort.aborted)
@@ -611,7 +611,7 @@ export function createChatSession(options: ChatSessionOptions) {
   // Tells the server to end a reply that outlives its request, which closing the stream does not.
   async function endOnServer(id: string, messages: ChatMessage[]) {
     try {
-      const answer = await options.action({ messages }, { refresh: false, headers: { [REPLY_HEADER]: `stop:${id}` } })
+      const answer = await options.action({ messages }, { refresh: false, headers: { [REPLY_HEADER]: `stop:${id}` } }).orThrow()
 
       if (typeof answer === 'object' && answer !== null && 'close' in answer)
         (answer as ActionStream<unknown>).close()

@@ -10,7 +10,7 @@ const waiting = new Promise<never>(() => undefined)
 const ready = signal<Promise<unknown>>(Promise.resolve(1))
 
 async function open() {
-  answer = await quiet()
+  answer = await quiet().orThrow()
   ready = waiting
 }
 ---

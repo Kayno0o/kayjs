@@ -7,7 +7,7 @@ export async function readReferrers(collection: string, slugs: string[]): Promis
     return {}
 
   try {
-    return await call(referrersApi, '/:collection', { params: { collection }, query: { slugs: JSON.stringify(slugs) } })
+    return await call(referrersApi, '/:collection', { params: { collection }, query: { slugs: JSON.stringify(slugs) } }).orThrow()
   }
   catch {
     return {}

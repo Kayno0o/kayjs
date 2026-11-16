@@ -73,13 +73,22 @@ interface Posted {
 
 const SHOWN = 'conv-0001'
 
+// What an action's call returns: the promise, with `orThrow()` for the throwing style the session reads it by.
+function withOrThrow<Args extends unknown[], Answer>(run: (...args: Args) => Promise<Answer>) {
+  return async (...args: Args) => {
+    const answer = run(...args)
+
+    return Object.assign(answer, { orThrow: async () => answer })
+  }
+}
+
 // A session holding its conversation on the server: `reads` answers each load, list, rename and remove in turn, `replies` each send.
 function chat(reads: ConversationAnswer[], replies: (() => Promise<ActionStream<string | Progress>>)[], options: Partial<ChatSessionOptions> & { shown?: string | undefined } = {}) {
   const posts: Posted[] = []
   const consulted: Posted[] = []
   const conversation = signal<string | undefined>(options.shown)
 
-  const action = (async (input: { messages: ChatMessage[] }, call: CallOptions = {}) => {
+  const action = withOrThrow(async (input: { messages: ChatMessage[] }, call: CallOptions = {}) => {
     const headers = call.headers ?? {}
     const header = headers[CONVERSATION_HEADER]
 

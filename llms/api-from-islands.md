@@ -20,22 +20,21 @@ p {list.status()}
 
 ### Call a route from an event handler
 
-`call(module, path, options)` calls any route over HTTP, and a refusal throws `ApiError`:
+`call(module, path, options)` calls any route over HTTP and answers `{ ok: true, data }` or `{ ok: false, error }`, never throwing for a refusal; `.orThrow()` throws it as an `ApiError`:
 
 ```kay
 ---
-import { call, ApiError, signal } from 'kay'
+import { call, signal } from 'kay'
 import notes from '../api/notes'
 
 const title = signal('')
 ---
 input(bind:value={title} aria-label="Title")
 button(onClick={async () => {
-  try {
-    await call(notes, '/', { method: 'post', body: { title: title() } })
-  } catch (error) {
-    if (error instanceof ApiError) console.error(error.status, error.message)
-  }
+  const result = await call(notes, '/', { method: 'post', body: { title: title() } })
+
+  if (!result.ok)
+    console.error(result.status, result.message)
 }}) Add
 ```
 
@@ -137,16 +136,16 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - `list.mutate(value)` (or `mutate(current => next)`) sets the value for every resource sharing the key and asks the route again to settle it, dropping a request still in flight so an older answer never overwrites it; `mutate(value, { refresh: false })` keeps the value as set.
 - `resource(load)` reads anything else the same way, such as a WebSocket call or a `fetch` to another server: `load(signal)` returns a value or a promise, the signals it reads before its first await are tracked so it runs again when one changes, `signal` aborts when a newer run supersedes it or the component is gone, and a throw is `error()` with status 0 unless it is an `ApiError`.
 - `stream(source)` reads an async iterable, `source(signal)` returning it, with `last()`, `onData()`, `status()` and `close()`: `done` once it ends, `failed` when it throws, and it opens once the island is in the page, and `source` stops on its `signal`.
-- `call(module, path, options)` from `kay` calls any of its routes over HTTP from an event handler, or any code running in the browser, a module several islands share included: `await call(notes, '/', { method: 'post', body: { title } })`.
+- `call(module, path, options)` from `kay` calls any of its routes over HTTP from an event handler, or any code running in the browser, a module several islands share included: `const { ok, data } = await call(notes, '/', { method: 'post', body: { title } })`, or `await call(notes, '/', { method: 'post', body: { title } }).orThrow()` for the data, throwing the failure.
 - `method` is GET unless named, and named where the path answers no GET.
 - `params`, `query` and `body` are typed from the route, and the answer as `resource()` reads it, a number or a boolean arriving as the text Elysia sends, `null` as `null` and nothing (`undefined`, a 204) as `''`, so `run !== null` is a check the type allows.
 - A param is encoded as one path segment, each segment of a `*` too, and an empty param or a param or a `*` segment that is `.` or `..` is refused with a `KayError` (`argument-invalid`) (thrown by `call()`, by `stream()` and `socket()` at the call or at `start()`, and failing the request of `resource()`), as it would reach the collection or the parent route. A `*` may be empty. Pass a `*` value decoded.
 - A file or a `Blob` the route answers arrives as a `Blob`, or as text when its type is text, and a `Response` it builds is typed `unknown`, read as JSON, text or a `Blob` by its content type.
-- A refusal throws `ApiError` from `kay` with `status`, `message`, `errors` and `data`: `data` is the answer, its text when its JSON does not parse, and `message` reads, in this order, `errors['']`, the field messages joined, `data.message`, the text the route answered, its status text, `HTTP 503` when it says nothing. `errors` is the message per field a refused route answers in `{ errors, status }`, else the message under `''`. Status 0 (no answer came or it was cut off) has the message `The server could not be reached` and the browser's own error as `cause`, so `error.message` is always safe to show. `answer` is the old name of `data` (and, on an `ActionError`, of `body`). `ErrorShape<Data>` from `kay` is these four fields, `{ status, message, errors, data }`, as every failure reads them: the `ApiError` itself, a `track()` result that is not ok, a `FormFailure` and a `LocalIssue` all satisfy it.
-- `const save = call.track(notes, '/')` is a handle for one route, as an action's `track()` is for an action: `await save({ method: 'post', body })` resolves `{ ok: true, data }` or, for any refusal, `{ ok: false, status, message, errors, data, error }` (`error` repeats the four) with no `try`, and `save.pending()`, `save.status()` (`idle` before the first call), `save.error()`, `save.retry()` and `save.settled()` read only its own calls. `data` is the answer the route refused with and `errors` a message per field, read from the route's `{ errors }` answer (`errors.title`), else the refusal's message under `''`; a call with no answer (status 0) or aborted still throws. `call.track(notes, '/', { onData, onError })` and `save.onData(fn)` / `save.onError(fn)` take the callbacks of an action's `track()`, with `input` the options the call was given ([the action form](actions-from-islands.md)).
+- A refusal answers `{ ok: false, status, message, errors, data, error }`, `error` an `ApiError` from `kay` (what `.orThrow()` throws) with `status`, `message`, `errors` and `data`: `data` is the answer, its text when its JSON does not parse, and `message` reads, in this order, `errors['']`, the field messages joined, `data.message`, the text the route answered, its status text, `HTTP 503` when it says nothing. `errors` is the message per field a refused route answers in `{ errors, status }`, else the message under `''`. Status 0 (no answer came or it was cut off) has the message `The server could not be reached` and the browser's own error as `cause`, so `error.message` is always safe to show. `answer` is the old name of `data` (and, on an `ActionError`, of `body`). `ErrorShape<Data>` from `kay` is these four fields, `{ status, message, errors, data }`, as every failure reads them: the `ApiError` itself, a `track()` result that is not ok, a `FormFailure` and a `LocalIssue` all satisfy it.
+- `const save = call.track(notes, '/')` is a handle for one route, as an action's `track()` is for an action: `await save({ method: 'post', body })` answers what `call` does, and `save.pending()`, `save.status()` (`idle` before the first call), `save.error()`, `save.retry()` and `save.settled()` read only its own calls. `data` is the answer the route refused with and `errors` a message per field, read from the route's `{ errors }` answer (`errors.title`), else the refusal's message under `''`; a call with no answer answers status 0, and an abort rejects. `call.track(notes, '/', { onData, onError })` and `save.onData(fn)` / `save.onError(fn)` take the callbacks of an action's `track()`, with `input` the options the call was given ([the action form](actions-from-islands.md)).
 - An `ApiError`'s `message` is always the text to show, an `ActionError` included, so write `error = e instanceof ApiError ? e.message : 'Sync failed.'`.
 - A frequent write that should not refresh the page can be an action called with `{ refresh: false }` rather than a route, see [Calling from an island](actions-from-islands.md#calling-from-an-island).
-- `signal` aborts the call, which rejects with the signal's reason, while the answer is read too.
+- `signal` aborts the call, which rejects with the signal's reason (an abort is no failure of the call), while the answer is read too.
 - A body holding a `File` or a `Blob`, or a `FormData`, goes as a multipart form, its other fields as text, a Date as its ISO text, an object as JSON and null left out, as in a `query`.
 - `progress: sent => ...` gets how much of it went, from 0 to 1.
 - `keepalive: true` lets a call made from `pagehide` or `beforeunload` outlive the page, as on an action ([the limits](actions-from-islands.md)): `call(notes, '/', { method: 'post', body, keepalive: true })`. A JSON body over the browser's 64 KB cap (shared by the keepalive calls in flight), and a body with files, go as a plain call instead of failing.

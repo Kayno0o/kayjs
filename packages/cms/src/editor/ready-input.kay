@@ -54,13 +54,13 @@ const drawn = (icons: { name: string, icon: Omit<IconProps, 'innerHTML'> & { inn
 // The icon picked, drawn first when the first page leaves it out, so the editor sees what the field holds.
 async function findIcons(query: string, limit: number, offset: number): Promise<{ name: string, icon: IconProps }[]> {
   const set = field.kind === 'icon' ? field.set : ''
-  const page = drawn(await call(iconsApi, '/', { query: { set, query, limit, offset } }))
+  const page = drawn(await call(iconsApi, '/', { query: { set, query, limit, offset } }).orThrow())
   const held = text()
 
   if (query !== '' || offset > 0 || held === '' || page.some(choice => choice.name === held))
     return page
 
-  const exact = drawn(await call(iconsApi, '/', { query: { set, query: held.slice(held.indexOf(':') + 1), limit: 20, offset: 0 } })).find(choice => choice.name === held)
+  const exact = drawn(await call(iconsApi, '/', { query: { set, query: held.slice(held.indexOf(':') + 1), limit: 20, offset: 0 } }).orThrow()).find(choice => choice.name === held)
 
   return exact ? [exact, ...page] : page
 }

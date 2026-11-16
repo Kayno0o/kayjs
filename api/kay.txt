@@ -200,7 +200,10 @@ type Bindable<T> = (T & BindableMark) | Extract<T, null | undefined>
 function byteCount(value: unknown): number | undefined
 
 [.] call
-function call<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>>
+function call<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...args: Optional<ApiCallOptions<Module, Path, M>>): CallPromise<CallResult<Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>, unknown>>
+
+[.] Called
+type Called<Output> = CallPromise<CallResult<Answer<Success<Output>>, FailureData<Output>>>
 
 [.] CallMethod
 type CallMethod<Node> = Exclude<RouteKey<Node>, 'subscribe'>
@@ -224,6 +227,9 @@ interface CallOptions<Output = unknown>
 type CallPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends {
   path: infer Path, node: infer Node
 } ? [CallMethod<Node>] extends [never] ? never : Path : never : never
+
+[.] CallPromise
+type CallPromise<Result> = Promise<Result> & { orThrow: () => Promise<Result extends { ok: true, data: infer Data } ? Data : never> }
 
 [.] CallQueue
 type CallQueue = 'parallel' | 'serial' | 'latest'
@@ -803,7 +809,7 @@ const navigation: {
 type NavigationState = 'idle' | 'loading' | 'swapping'
 
 [.] NoInputAction
-type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions<Answer<Success<Output>>>) => Promise<Answer<Success<Output>>>)
+type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions<Answer<Success<Output>>>) => Called<Output>)
 
 [.] onBeforeNavigate
 /** @deprecated Call `navigation.onBeforeNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it. */

@@ -1,5 +1,5 @@
 import type { t } from 'elysia'
-import type { ActionContext, ActionProtection, Answer, CallOptions, OutputSchema, ServerAction, Settled, Success } from './action-shared'
+import type { ActionContext, ActionProtection, Answer, Called, CallOptions, OutputSchema, ServerAction, Settled, Success } from './action-shared'
 import type { RouteParams } from './checks'
 import type { Schema, Static } from './schema'
 import { callable } from './action-call'
@@ -20,8 +20,8 @@ export type { Caller, Settles } from './action-owner'
 export { readActionResponse } from './action-post'
 export { honeypotField, minTimeOf, resolveProtection, workOf } from './action-protection'
 export { isAction } from './action-shared'
-export type { Action, ActionContext, ActionDone, ActionErrorDetail, ActionFailed, ActionHookContext, ActionHooks, ActionProtect, ActionProtection, ActionRateLimit, ActionRun, ActionStartDetail, ActionStream, ActionSuccessDetail, ActionTool, Answer, CallOptions, CallQueue, CallResult, Failure, FailureData, FailureOf, FailuresOf, FieldErrors, Final, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, Outcome, OutputSchema, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateLimitRefusal, RateStore, RateWindow, Refreshable, ResolvedProtection, ResultOf, RetryOptions, Sendable, ServerAction, Settled, Success, SuccessOf, TrackedCall } from './action-shared'
-export type { TrackHooks } from './call-result'
+export type { Action, ActionContext, ActionDone, ActionErrorDetail, ActionFailed, ActionHookContext, ActionHooks, ActionProtect, ActionProtection, ActionRateLimit, ActionRun, ActionStartDetail, ActionStream, ActionSuccessDetail, ActionTool, Answer, Called, CallOptions, CallQueue, CallResult, Failure, FailureData, FailureOf, FailuresOf, FieldErrors, Final, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, Outcome, OutputSchema, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateLimitRefusal, RateStore, RateWindow, Refreshable, ResolvedProtection, ResultOf, RetryOptions, Sendable, ServerAction, Settled, Success, SuccessOf, TrackedCall } from './action-shared'
+export type { CallPromise, TrackHooks } from './call-result'
 
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 // A module outside the root, as a linked library is, has `..` segments in its path, which a URL would resolve away.
@@ -32,7 +32,7 @@ export function actionUrl(moduleId: string, name: string): string {
 }
 
 // What an action with no input takes: no fields, so `add()` calls it.
-export type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions<Answer<Success<Output>>>) => Promise<Answer<Success<Output>>>)
+export type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions<Answer<Success<Output>>>) => Called<Output>)
 
 // An empty object schema built by hand: `t.Object({})` would carry Elysia into the islands importing this module, and TypeBox reads a schema by this symbol.
 type EmptySchema = ReturnType<typeof t.Object<Record<never, never>>>

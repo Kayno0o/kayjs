@@ -449,7 +449,7 @@ describe('call.track', () => {
     }
   })
 
-  it('reads a refusal and a call that got no answer as an ApiError, kept until a success, the second still throwing', async () => {
+  it('reads a refusal and a call that got no answer as an ApiError, kept until a success, the second a status 0 result', async () => {
     const fetched = answering(refusal(409, 'Taken'), new TypeError('Failed to fetch'), new Response('"yes"', { headers: { 'content-type': 'application/json' } }))
 
     try {
@@ -460,7 +460,7 @@ describe('call.track', () => {
       expect(save.error()).toBeInstanceOf(ApiError)
       expect(save.error()).toMatchObject({ status: 409, message: 'Taken' })
 
-      await expect(save({ method: 'post' })).rejects.toMatchObject({ status: 0 })
+      expect(await save({ method: 'post' })).toMatchObject({ ok: false, status: 0 })
       expect(save.status()).toBe('failed')
       expect(save.error()).toMatchObject({ status: 0, message: 'The server could not be reached' })
 

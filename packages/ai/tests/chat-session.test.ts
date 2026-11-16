@@ -73,6 +73,15 @@ interface Posted {
   headers: Record<string, string>
 }
 
+// What an action's call returns: the promise, with `orThrow()` for the throwing style the session reads it by.
+function withOrThrow<Args extends unknown[], Answer>(run: (...args: Args) => Promise<Answer>) {
+  return async (...args: Args) => {
+    const answer = run(...args)
+
+    return Object.assign(answer, { orThrow: async () => answer })
+  }
+}
+
 // A session over an action answering each call in turn, a stop's call answered by nothing.
 function chat(answers: Answer[], options: Partial<ChatSessionOptions> & { initial?: ChatTurn[] } = {}) {
   const posts: Posted[] = []
@@ -80,7 +89,7 @@ function chat(answers: Answer[], options: Partial<ChatSessionOptions> & { initia
   let focused = 0
   let followed = 0
 
-  const action = (async (input: { messages: ChatMessage[] }, call: CallOptions = {}) => {
+  const action = withOrThrow(async (input: { messages: ChatMessage[] }, call: CallOptions = {}) => {
     const headers = call.headers ?? {}
     const post = { messages: input.messages, headers }
 
@@ -460,7 +469,7 @@ test('a reset stops the reply and clears the log, the field, the files and the s
 // A transcribe reading the recording's bytes as what was said, `refuse` refused as a provider's error would be, and one held until `release` lets it answer.
 function transcriber() {
   const { promise: held, resolve: release } = Promise.withResolvers<void>()
-  const transcribe = (async ({ audio }: { audio: File }) => {
+  const transcribe = withOrThrow(async ({ audio }: { audio: File }) => {
     const text = await audio.text()
 
     if (text === 'refuse')

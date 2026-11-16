@@ -121,7 +121,7 @@ describe('proof-of-work', () => {
   })
 
   it('solves the challenge a call is refused with, then sends it again', async () => {
-    const solve = actionStub(`${ROUTE}/solve`) as (input: { message: string }) => Promise<number>
+    const solve = actionStub(`${ROUTE}/solve`) as unknown as (input: { message: string }) => { orThrow: () => Promise<number> }
     const sent: (string | null)[] = []
     const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (url: string, init: RequestInit) => {
       const request = new Request(new URL(url, 'http://localhost'), { ...init, headers: { ...init.headers as Record<string, string>, origin: 'http://localhost' } })
@@ -132,7 +132,7 @@ describe('proof-of-work', () => {
     }) as unknown as typeof fetch)
 
     try {
-      expect(await solve({ message: 'hello' })).toBe(5)
+      expect(await solve({ message: 'hello' }).orThrow()).toBe(5)
       expect(sent[0]).toBeNull()
       expect(sent[1]).toMatch(/\.\d+$/)
 

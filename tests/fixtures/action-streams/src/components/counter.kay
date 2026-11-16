@@ -6,15 +6,15 @@ import { count, endless, quiet } from '../routes/index.kay'
 const answer = signal<ActionStream<number> | undefined>(undefined)
 
 async function start() {
-  answer = await count({ to: 3 })
+  answer = await count({ to: 3 }).orThrow()
 }
 
 async function forever() {
-  answer = await endless()
+  answer = await endless().orThrow()
 }
 
 async function hush() {
-  answer = await quiet()
+  answer = await quiet().orThrow()
 }
 ---
 button.start(type="button" onClick={start}) Start

@@ -8,24 +8,20 @@
 
 ### Call an action from an island
 
-An island imports the action from the page and calls it, catching `ActionError` to show the schema's messages:
+An island imports the action from the page and calls it. The call answers `{ ok: true, data }` or `{ ok: false, error }` and never throws for a refusal, so the schema's messages show through `add.error()` with no `try`; `.orThrow()` is the throwing style:
 
 ```kay
 ---
-import { ActionError, signal } from 'kay'
+import { signal } from 'kay'
 import { add } from '../routes/index.kay'
 
 const title = signal('')
 
 async function save() {
-  try {
-    await add({ title: title() })
+  const result = await add({ title: title() })
+
+  if (result.ok)
     title = ''
-  }
-  catch (error) {
-    if (!(error instanceof ActionError))
-      throw error
-  }
 }
 ---
 input(bind:value={title} aria-invalid={add.error('title') ? 'true' : undefined})
@@ -97,7 +93,7 @@ import { count } from '../routes/index.kay'
 
 const answer = signal<ActionStream<number> | undefined>(undefined)
 ---
-button(onClick={async () => answer = await count({ to: 10 })}) Count
+button(onClick={async () => answer = await count({ to: 10 }).orThrow()}) Count
 p {answer()?.data()}
 ```
 
@@ -121,16 +117,16 @@ p {column()}
 
 ### Calling from an island
 
-- An island imports the action from the page and calls it, as in [Call an action from an island](#call-an-action-from-an-island): `const id = await add({ title })`.
+- An island imports the action from the page and calls it, as in [Call an action from an island](#call-an-action-from-an-island): `const { ok, data, error } = await add({ title })`, or `const id = await add({ title }).orThrow()` to throw the failure.
 - An `s.Optional` field takes `undefined` as the field left out, `exactOptionalPropertyTypes` or not: `resize({ file, width: max ?? undefined })`. A wrong field is reported at that field, not against the `FormData` form of the call.
 - Once a call went through, the page shows what it changed, its loads run again as `refresh()` runs them, where the page swap runs: islands whose props did not change keep their state. A page with `liveRefresh: true` in its [settings](routing.md#page-settings) is left alone when every cached key the handler invalidated (`cached(..., { live: true })`) is one the page or a `resource()` follows: its live connection, once open, shows them a moment after the answer (`x-kay-invalidated` names the keys on the answer; a streaming action's end event names them, as it goes on invalidating until the stream ends). One key not followed, more than 20 keys or a connection that is down load the page as before, and `refresh: true` always does.
-- `add({ title }, { refresh: false })` leaves the page as it is, so a frequent write from an island (a vote, an undo) needs no API route to avoid the refresh; `const save = add.track()` then `await save(input, { refresh: false })` also answers a refusal as a result.
+- `add({ title }, { refresh: false })` leaves the page as it is, so a frequent write from an island (a vote, an undo) needs no API route to avoid the refresh; `add` answers a refusal as a result, as `await add(input, { refresh: false })` does.
 - `await add.settled()` resolves once no call to `add` is in flight, whichever way they went (a stream counts until it ends; it never rejects), so an island that fired writes without awaiting them waits for them there; `save.settled()` does the same for the calls made through a `track()` handle.
 - `add.pending()` reads, reactively, whether a call the page made is still in flight, and `add.progress()` how much of a call carrying files the browser sent, from 0 to 1: `button(disabled={add.pending()})`.
 - `await move({ id, to }, { optimistic: () => tiers = moved })` shows the change at once: if the call fails, or the function throws, each signal the function wrote goes back to what it held, those another optimistic call made inside it wrote included, a `selection` among them with its `is(key)` flags, unless something wrote it since, while that call's `pending()` follows its own request, and the call throws as any does.
 - Calls over one signal each put it back to what it held before them when they fail, whichever order they fail in: a failure found overwritten by a later call still in flight hands that call the earlier value, so it ends where it began if it fails too.
 - A call takes `queue: 'parallel' | 'serial' | 'latest'`: `serial` posts a call once the earlier ones of the action settled (a stream counts settled once it started), `latest` aborts the earlier calls still in flight, which reject with an `AbortError` and put their `optimistic` change back, with no `onError`. `add.track({ queue })` gives the handle's own calls that default, ordered apart from the action's, and an abort is no failure of the handle.
-- `timeout: '5s'` aborts a post unanswered that long (counted from the post, not from the wait in a queue): the call rejects with a `TimeoutError`, `pending()` clears, `track()` records it as a failure with status 0, and the page refreshes as after an abort once sent.
+- `timeout: '5s'` aborts a post unanswered that long (counted from the post, not from the wait in a queue): the call answers a failure with status 0, `pending()` clears, `track()` records it as a failure, `.orThrow()` rejects with a `TimeoutError`, and the page refreshes as after an abort once sent.
 - `keepalive: true` sends the post with `fetch`'s `keepalive`, so a call made from `pagehide` or `beforeunload` outlives the page: `save(state, { keepalive: true })`. A browser caps a keepalive body at 64 KB, so a JSON body over it is sent as a plain post instead of failing, as is a call carrying files or a form. The cap is shared by every keepalive request of the page in flight, so a call that would pass it with the ones kay sent is posted plain too; kay's own error reports count against it unseen, so a save can still be refused beside them; a page holding a proof-of-work challenge loads its solver first, which an unloading page may not finish.
 - `retry: 2` or `retry: { times, delay, when }` posts again after a 503 or a post that failed before it was sent (`delay` defaults to `'500ms'` and doubles; `when(error)` takes an `ApiError` and decides alone for the rest). A timeout, a 504 and a network failure after the send need a `when`, as the handler may have run; a redirect and an abort are never tried again, and a TypeError thrown before the post is no failure of it. Every try sends one `Idempotency-Key` header (32 hex characters, an own `headers` entry wins), read from `ctx.request`, so a handler tells a repeat from a new call.
 - `onStart({ input })`, `onSuccess({ data })`, `onError({ error })` (an `ApiError`) and `onSettled({ data, error })` observe a call; none runs `onError` for an abort or a redirect, `onSettled` runs for every ending (an abort's `error` is the abort), `onSuccess` of a stream runs as it starts, `latest` never aborts a stream already started, and a hook that throws or rejects is logged and never fails the call.
@@ -141,10 +137,11 @@ p {column()}
 - `{ signal }` aborts a call: it rejects with the signal's reason, what `optimistic` showed goes back, and the action records no outcome.
 - `{ headers }` sends extra request headers with the call, which the handler reads from `ctx.request`; the ones kay sets itself win.
 - A call aborted once sent may still have run, so the page refreshes as after one that went through, unless `refresh: false`.
-- The call is typed, `ctx.fail` results excluded, and throws `ActionError` from `kay` with `status`, `errors` and `data` when it fails, its `message` being the string given to `ctx.fail`, else the form-wide message, the schema's field messages joined, or `data.message`, so `error.message` is what to show; it extends `ApiError`, so one `instanceof ApiError` catches a refused action and a refused `call()`.
+- The call is typed, `ctx.deny` results excluded: it answers `{ ok: true, data }` for what the handler returned, else `{ ok: false, status, message, errors, data, error }`, `error` repeating the four as an `ActionError` from `kay`, its `message` being the one given to `ctx.deny`, else the form-wide message, the schema's field messages joined, or `data.message`, so `result.message` is what to show; `data` is typed as `add.refused` types it. It never throws for a visitor's mistake, a refusal (4xx), a handler that threw (5xx), a network failure or a timeout (status 0) alike, `pending()` clearing either way; an abort rejects with its reason and a redirect with an `ActionRedirectError`, as they are no failure of the call.
+- `await add(input).orThrow()` is the throwing style: it resolves with the data and throws the `ActionError` (an `ApiError`, so one `instanceof ApiError` catches a refused action and a refused `call()`), the `TypeError` of a network failure or the `TimeoutError` itself, as a call threw before 1.105.
 - `const save = add.track()` is a handle for one component, row or button: `save.pending()` reads, reactively, only the calls made through it, where `add.pending()` reads every call of the page; `save.status()` (`idle`, `loading`, `ready`, `failed`), `save.error()` (the last failure as an `ApiError`, a call that got no answer included, kept until a call succeeds) and `save.retry()` (repeats the call that failed, with the same arguments as they were, gives no result back, and ignores a redirect) read the same way ([Island sources](island-sources.md)). `add.track({ onData: ({ value, input }) => ..., onError: ({ error, input }) => ... })` takes callbacks for every call of the handle, and the handle has them as methods too (`save.onError(({ error }) => toast.error(error.message))`, returning what stops it): `onData` runs when a call succeeds, `value` what it answered (for a stream, once it is open; `onSuccess({ data })` works until 1.108), `onError` when it fails, a call that got no answer included, never for an abort or a redirect; `input` is what the call was given ([Island sources](island-sources.md#hooks)). `call.track(module, path, hooks)` takes the same two.
-- `await save(input, options)` takes what `add` does and resolves with `{ ok: true, data }` or, for any non-2xx answer of the server, `{ ok: false, status, message, errors, data, error }` (`error` repeats the four), `message` the text to show, `errors` per field and `data` typed as `add.refused` types it, so no `try` or `ActionError` check is needed; a failure with no answer, a network error, an abort or a redirect, still throws, `pending()` clearing either way; an action with no input is called `save()`.
-- The same `{ ok, status, message, errors, data }` (an `ErrorShape` when not ok) is what `call.track(module, path)` gives for an API route ([API from islands](api-from-islands.md)), so one result handler serves both.
+- `await save(input, options)` takes what `add` does and answers the same result, a handle's calls only counting in its own `pending()`; an action with no input is called `save()`.
+- The same `{ ok, status, message, errors, data }` (an `ErrorShape` when not ok) is what `call(module, path)` and `call.track(module, path)` give for an API route ([API from islands](api-from-islands.md)), so one result handler serves both.
 - `add.refused(error)` tells a refusal of a call to `add` from any other error, a redirect's included, and types its `data` as the handler passes it to `ctx.fail`, with no cast: `if (add.refused(error)) shown = error.data?.message`.
 - `data` is undefined for a call refused before the handler ran, by the schema or a limit.
 - Its input, its result and that `data` cross as island props do, Dates, Maps, Sets and bigints included; a result holding a function or a class instance answers 500, logging where it sits.
@@ -155,8 +152,8 @@ p {column()}
 
 ### Streaming actions
 
-- A handler returning an async iterable answers a call from an island with server-sent events: `await reply({ prompt })` resolves once the first value is there with an `ActionStream<T>` from `kay`, typed from what it yields, whose `last()`, `status()`, `onData()` and `close()` read as `stream()`'s do (it is the same `Connection` type); it never reconnects by itself, but `retry()` on one that failed calls the action again with the same input and reads the new answer into the same stream (`pending()` while it is sent, `onOpen({ reconnected: true })` once it opens, `last()` forgotten), and a refused retry fails it again. `await answer.ended()` reads it to its end with no polling: it resolves with the last value once the stream ran to its end (undefined for none), and rejects with an `ActionError` of status 500 when it failed, as a throw before the first value does, or an `AbortError` when it was closed first, which a stream closing with its block or with a visit to another path is, so code awaiting it there catches that. It is a method rather than the stream being awaitable, as `await reply()` would then wait for the end and hand back the value instead of the stream. `Answer<Output>` from `kay` is what a call resolves with for a given output, an `ActionStream` for an iterable, for a library typing a callback that receives it.
-- Guards, the schema, `rateLimit`, the cross-site check and the bot protections run before the handler, and what the iterable throws before its first value, a `ctx.redirect`, a `ctx.deny` or an error, answers as the handler's would, the call throwing `ActionError` or redirecting; the cookies it set by then go out with the stream.
+- A handler returning an async iterable answers a call from an island with server-sent events: `await reply({ prompt })` resolves `{ ok: true, data }` once the first value is there, `data` an `ActionStream<T>` from `kay`, typed from what it yields, whose `last()`, `status()`, `onData()` and `close()` read as `stream()`'s do (it is the same `Connection` type); it never reconnects by itself, but `retry()` on one that failed calls the action again with the same input and reads the new answer into the same stream (`pending()` while it is sent, `onOpen({ reconnected: true })` once it opens, `last()` forgotten), and a refused retry fails it again. `await answer.ended()` reads it to its end with no polling: it resolves with the last value once the stream ran to its end (undefined for none), and rejects with an `ActionError` of status 500 when it failed (a call that failed before the first value answered `{ ok: false }` instead), or an `AbortError` when it was closed first, which a stream closing with its block or with a visit to another path is, so code awaiting it there catches that. It is a method rather than the stream being awaitable, as `await reply()` would then wait for the end and hand back the value instead of the stream. `Answer<Output>` from `kay` is what a call resolves with for a given output, an `ActionStream` for an iterable, for a library typing a callback that receives it.
+- Guards, the schema, `rateLimit`, the cross-site check and the bot protections run before the handler, and what the iterable throws before its first value, a `ctx.redirect`, a `ctx.deny` or an error, answers as the handler's would, the call answering `{ ok: false }` or redirecting; the cookies it set by then go out with the stream.
 - A throw past the first value is logged, `onError` included, and ends the stream `failed`.
 - `pending()` stays true until the stream ends; once it ran to its end the page refreshes, unless `refresh: false`, and `data()` reads its last value.
 - `close()` stops the handler's iterable, its `finally` running, as does the visitor going away; a stream called from an island's setup, an element's event handler or a `listen` callback closes with the enclosing block or component (the nearest still alive for a row playing its leave phase, or for a block the call's own result removes, as `reply = await ask()` flipping the `if` its button sits in, as long as the block goes in the task the answer arrived in), so a `persist` island's stays open across pages, and an effect running again closes the one it called; a stream called under no owner (after an `await` in a handler, or from a timer, or from a handler of an element whose whole owner chain is already disposed) closes once the visitor goes to another path, not at once. An `effect()` or `onCleanup()` called in a `listen` callback attaches to the island's owner and builds up per event, as in an element's handler, so keep them out of it; the callback is called with no `this`, so a `function` callback reads the target as `event.currentTarget`.

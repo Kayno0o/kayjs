@@ -766,7 +766,7 @@ async function stopEditing(): Promise<void> {
   confirming = false
   leaving = true
 
-  if (!await attempt(() => call(previewApi, '/exit', { method: 'post' }), wording('cms.editor.leaveFailure', 'Could not leave edit mode'))) {
+  if (!await attempt(() => call(previewApi, '/exit', { method: 'post' }).orThrow(), wording('cms.editor.leaveFailure', 'Could not leave edit mode'))) {
     leaving = false
 
     return

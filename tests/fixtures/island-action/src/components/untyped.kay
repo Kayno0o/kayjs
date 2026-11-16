@@ -1,8 +1,13 @@
 ---
 import { signal } from 'kay'
 
-const { run } = props<{ run: (input: { name: string }) => Promise<string> }>()
+const { run } = props<{ run: (input: { name: string }) => Promise<{ ok: true, data: string } | { ok: false }> }>()
 const answer = signal('')
 ---
-button.show(type="button" onClick={async () => answer = await run({ name: 'Zoe' })}) Show
+button.show(type="button" onClick={async () => {
+  const result = await run({ name: 'Zoe' })
+
+  if (result.ok)
+    answer = result.data
+}}) Show
 p.untyped {answer()}

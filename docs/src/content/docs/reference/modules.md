@@ -37,7 +37,7 @@ A name is imported where it is used, in a `.kay` file and in a `.ts` file alike;
 | `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...); `Schema` is the type of what it builds, `Static<typeof schema>` the value's type, and `s.typebox` the TypeBox builder underneath, unstable |
 | `Static`, `InputOf` | Types: what a schema describes, and an action's input. See [Forms and actions](/essentials/forms-and-actions#one-schema-for-the-server-and-the-browser) |
 | `action` | A form post or island call checked by a schema. See [Forms and actions](/essentials/forms-and-actions) |
-| `ActionError`, `ActionRedirectError` | What an action called from an island throws: its schema's messages, or the redirect it answered |
+| `ActionError`, `ActionRedirectError` | What an action called from an island fails with, as the `error` of its result or what `.orThrow()` throws: its schema's messages, or the redirect it answered |
 | `focusInvalid`, `flush` | Focus the first invalid field once pending writes rendered; run pending effects now |
 | `guard` | A route guard. See [Sessions and guards](/guides/sessions-and-guards) |
 | `defer` | No longer needed, as an `await` block streams any promise; returns the promise as is |
@@ -46,7 +46,7 @@ A name is imported where it is used, in a `.kay` file and in a `.ts` file alike;
 | `shortcut` | Binds a keyboard shortcut such as `mod+s` for as long as the island lives, on the page or one element. See [Islands](/essentials/islands#keyboard-shortcuts) |
 | `guardLeave` | Warns before leaving a page with unsaved changes |
 | `navigation` | Where an in-place navigation stands (`status()`, `pending()`, `to()`, `error()`), and its hooks: `onBeforeNavigate`, which may cancel one, and `onNavigate`, after each shown page. See [Islands](/essentials/islands#page-navigation) |
-| `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`, which has the route's `status` (0 when no answer came), a `message` safe to show, `errors` per field and the route's `data`. See [API routes](/guides/api-routes) |
+| `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` answers `{ ok, data }` or `{ ok: false, error }`, the `ApiError` having the route's `status` (0 when no answer came), a `message` safe to show, `errors` per field and the route's `data`. See [API routes](/guides/api-routes) |
 | `apiUrl` | Where a route of an API module is served, under `base` and `endpoints.api`, for code that needs the URL rather than a call. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables marked `s.Public` in `defineEnv`, exposed to islands |
 | `route` | The path of a page from its pattern and params, typed from your pages and encoded. See [Routing](/essentials/routing#linking-to-a-page-with-params) |

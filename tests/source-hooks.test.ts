@@ -440,7 +440,7 @@ describe('track hooks', () => {
       save.onError(({ error, input: given }) => seen.push(['error', error.status, error.message, given]))
       await save(input)
       await save(input)
-      await expect(save(input)).rejects.toThrow()
+      expect(await save(input)).toMatchObject({ ok: false, status: 0 })
       expect(seen).toEqual([['success', 'saved', input], ['error', 409, 'Taken', input], ['error', 0, 'The server could not be reached', input]])
     }
     finally {

@@ -21,7 +21,7 @@ const label = (path: string | typeof BODY) => path === BODY ? wording('cms.entry
 // The entry as the other save left it, with the version a save would name.
 async function fetchTheirs(quiet = false): Promise<{ entry: CmsDraftEntry, version: string | undefined } | undefined> {
   const { collection, slug, locale } = form.entry
-  const read = async () => call(entriesApi, '/:collection/:slug', { params: { collection, slug }, query: locale === undefined ? {} : { locale } })
+  const read = async () => call(entriesApi, '/:collection/:slug', { params: { collection, slug }, query: locale === undefined ? {} : { locale } }).orThrow()
   let answer: Awaited<ReturnType<typeof read>> | undefined
 
   if (quiet) {

@@ -2,7 +2,7 @@ import type { BeforeHook, Hook, HookContext } from '../server/hooks'
 import type { ActionError, FAILURE } from './action-error'
 import type { ApiError } from './api-error'
 import type { ByteSize } from './byte-size'
-import type { CallResult, TrackHooks } from './call-result'
+import type { CallPromise, CallResult, TrackHooks } from './call-result'
 import type { ErrorStatus, RouteParams } from './checks'
 import type { ErrorData } from './core'
 import type { Duration } from './duration'
@@ -398,9 +398,9 @@ export interface CallOptions<Output = unknown> {
 
 // An action seen through the calls one island makes, so a row's button reads its own `pending()`.
 export interface TrackedCall<Input, Result> extends Reader<Result extends { ok: true, data: infer Data } ? Data : never, LoadStatus> {
-  (form: FormData, options?: CallOptions): Promise<Result>
+  (form: FormData, options?: CallOptions): CallPromise<Result>
   // Resolves with how the call went, any answer the server gave included; a failure that is no answer, such as a network error, an abort or a redirect, still throws. Last, as on `Action`, so a wrong field is named.
-  (...call: object extends Input ? [input?: Input, options?: CallOptions] : [input: Input, options?: CallOptions]): Promise<Result>
+  (...call: object extends Input ? [input?: Input, options?: CallOptions] : [input: Input, options?: CallOptions]): CallPromise<Result>
   // `idle` before the first call, `loading` while one is in flight, then `ready` or `failed` by the last to settle; `pending()` reads whether one is in flight, `error()` the last failure as an `ApiError`, kept until a call succeeds (a refusal and a call that got no answer alike), and `retry()` repeats the call that failed with its arguments.
   readonly pending: () => boolean
   // Resolves once no call made through this handle is in flight, whichever way they went; never rejects.
@@ -415,11 +415,14 @@ export interface TrackedCall<Input, Result> extends Reader<Result extends { ok: 
   onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }
 
+// What a call answers: `{ ok: true, data }` or the refusal, a failure with no answer (status 0) included, `.orThrow()` for the data or the failure thrown. An abort and a redirect reject.
+export type Called<Output> = CallPromise<CallResult<Answer<Success<Output>>, FailureData<Output>>>
+
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input = never, Output = unknown, Honeypot extends string = never> {
   // A form's fields, read as a plain form post reads them: `add(new FormData(form))`. First, so a call matching neither is reported against the typed input below, naming its wrong field, and `Parameters<typeof add>` reads that one.
-  (form: FormData, options?: CallOptions<Answer<Success<Output>>>): Promise<Answer<Success<Output>>>
-  (input: Input, options?: CallOptions<Answer<Success<Output>>>): Promise<Answer<Success<Output>>>
+  (form: FormData, options?: CallOptions<Answer<Success<Output>>>): Called<Output>
+  (input: Input, options?: CallOptions<Answer<Success<Output>>>): Called<Output>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
   // Resolves once no call of this action is in flight, whichever way they went, so an island that did not await its writes can wait for them: `await add.settled()`. A stream counts until it ends. Never rejects.

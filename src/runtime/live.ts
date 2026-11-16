@@ -1,5 +1,5 @@
 import type { UrlInput } from './api-url'
-import type { CallResult, TrackHooks } from './call-result'
+import type { CallPromise, CallResult, TrackHooks } from './call-result'
 import type { Duration } from './duration'
 import type { Seed } from './live-resource.server'
 import type { SocketRefusal } from './socket-message'
@@ -7,7 +7,7 @@ import { ApiError, apiErrorOf, failed, refused, textOf, unreachable } from './ap
 import { routeUrl } from './api-url'
 import { withBase } from './base'
 import { callBody } from './call-body'
-import { trackCalls } from './call-result'
+import { settling, trackCalls } from './call-result'
 import { connection, connectionHooks, ended } from './connection'
 import { KayError } from './kay-error'
 import { withKeepalive } from './keepalive'
@@ -1009,7 +1009,6 @@ export type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & {
 export type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends Response ? unknown : Value extends Blob ? Blob | string : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null ? null : Value extends undefined | void ? '' : Jsonified<Value>
 export type ApiAnswer<Module, Path, M> = Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>
 
-// Calls a route of a module under `src/api`, from an event handler or any code running in the browser, typed from the route: resolves with what it answered, and throws an `ApiError` when it refused.
 async function callApi<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<ApiAnswer<Module, Path, M>> {
   const { method = 'get', body, signal, progress, keepalive } = (options ?? {}) as { method?: string, body?: unknown, signal?: AbortSignal, progress?: (sent: number) => void, keepalive?: boolean }
   const url = withBase(routeUrl(module, path, options as UrlInput | undefined))
@@ -1039,7 +1038,7 @@ async function callApi<Module, const Path extends CallPath<Module>, const M exte
 
 // A route handle over `call` with a pending count of its own: `const save = call.track(api, '/notes', { onError: ({ error }) => toast.error(error.message) })`, then `await save({ method: 'post', body })` resolves `{ ok, data }` or the route's refusal as `{ ok: false, status, errors, data }`, as an action's `track()` does, and `save.pending()` reads only its own calls. A call that got no answer (status 0) or was aborted still throws.
 export interface TrackedApi<Module, Path> extends Reader<unknown, LoadStatus> {
-  <const M extends CallMethod<NodeAt<Module, Path>> = never>(...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<CallResult<ApiAnswer<Module, Path, M>, unknown>>
+  <const M extends CallMethod<NodeAt<Module, Path>> = never>(...[options]: Optional<ApiCallOptions<Module, Path, M>>): CallPromise<CallResult<ApiAnswer<Module, Path, M>, unknown>>
   readonly pending: () => boolean
   readonly settled: () => Promise<void>
   // What the last call that succeeded answered; undefined before the first.
@@ -1052,16 +1051,20 @@ export interface TrackedApi<Module, Path> extends Reader<unknown, LoadStatus> {
   readonly onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }
 
+// What a call that failed answers: the route's refusal or a failure with no answer (status 0). An abort rejects as it threw.
+const refusalOfApi = (error: unknown): ApiError | undefined => error instanceof ApiError ? error : undefined
+
+// Calls a route of a module under `src/api`, from an event handler or any code running in the browser, typed from the route: resolves `{ ok: true, data }` with what it answered, or `{ ok: false, status, message, errors, data }` when it refused or got no answer, and never throws for either; `.orThrow()` resolves with the data and throws an `ApiError` instead, and an abort rejects with the signal's reason.
+function called<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...args: Optional<ApiCallOptions<Module, Path, M>>): CallPromise<CallResult<ApiAnswer<Module, Path, M>, unknown>> {
+  return settling<ApiAnswer<Module, Path, M>>(callApi(module, path, ...args), refusalOfApi)
+}
+
 function track<Module, const Path extends CallPath<Module>>(module: Module, path: Path, hooks?: TrackHooks<unknown>): TrackedApi<Module, Path> {
-  return trackCalls(
-    async (options: unknown) => (callApi as unknown as (module: unknown, path: string, options: unknown) => Promise<unknown>)(module, path, options),
-    error => error instanceof ApiError && error.status >= 400 ? { ok: false, status: error.status, message: error.message, errors: error.errors, data: error.data } : undefined,
-    undefined,
-    undefined,
-    hooks as TrackHooks<never> | undefined,
-  ) as unknown as TrackedApi<Module, Path>
+  const run = async (options: unknown) => (callApi as unknown as (module: unknown, path: string, options: unknown) => Promise<unknown>)(module, path, options)
+
+  return trackCalls(run, refusalOfApi, undefined, undefined, hooks as TrackHooks<never> | undefined) as unknown as TrackedApi<Module, Path>
 }
 
 // `call` with `track` on it, built in its declaration and marked pure so a bundle dropping `call` drops `track` and the tracker too.
 // kept: request
-export const call = /* @__PURE__ */ Object.assign(callApi, { track })
+export const call = /* @__PURE__ */ Object.assign(called, { track })

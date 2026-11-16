@@ -101,7 +101,7 @@ describe('an action returning an async iterable', () => {
     const typed = action(t.Object({ to: t.Number() }), async function* ({ to }) {
       yield to
     })
-    const answer = async (): Promise<ActionStream<number>> => typed({ to: 1 })
+    const answer = async (): Promise<ActionStream<number>> => typed({ to: 1 }).orThrow()
     const last = (): number | undefined => typed.succeeded()?.data
     // @ts-expect-error each value is a number
     const wrong = async (): Promise<ActionStream<string>> => typed({ to: 1 })
@@ -114,7 +114,7 @@ describe('an action returning an async iterable', () => {
       yield 'part'
     } }
     const typed = action(() => reply)
-    const answer = async (): Promise<ActionStream<string>> => typed()
+    const answer = async (): Promise<ActionStream<string>> => typed().orThrow()
     // @ts-expect-error the call is a stream, not the text the thenable resolves to
     const wrong = async (): Promise<string> => typed()
 

@@ -8,6 +8,6 @@ import { summarize } from '../routes/verdicts.kay'
 
 const shown = signal<ActionStream<DeepPartial<Static<typeof verdict>>> | undefined>(undefined)
 ---
-button(onClick={async () => shown = await summarize({ prompt: 'Summarize' })}) Summarize
+button(onClick={async () => shown = await summarize({ prompt: 'Summarize' }).orThrow()}) Summarize
 p {shown()?.last()?.title}
 p {shown()?.last()?.author?.name}

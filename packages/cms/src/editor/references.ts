@@ -19,7 +19,7 @@ export async function referenceChoices(collection: string): Promise<Choice[]> {
     return known
 
   const read = (async () => {
-    const { choices, complete } = await call(entriesApi, '/:collection', { params: { collection } })
+    const { choices, complete } = await call(entriesApi, '/:collection', { params: { collection } }).orThrow()
 
     if (!complete)
       throw new KayError('helper-failed', 'too many entries to list')

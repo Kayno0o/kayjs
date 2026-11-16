@@ -52,7 +52,7 @@ export async function uploadDenied(collection: string): Promise<string | undefin
   if (denial === undefined) {
     denial = (async () => {
       try {
-        return (await call(editorApi, '/can', { query: { collection } })).denied.upload
+        return (await call(editorApi, '/can', { query: { collection } }).orThrow()).denied.upload
       }
       catch {
         return undefined
@@ -95,7 +95,7 @@ export async function uploadRules(collection: string): Promise<UploadRules | und
 
 async function load(collection: string): Promise<UploadRules | undefined> {
   try {
-    return await call(filesApi, '/rules', { query: { collection } })
+    return await call(filesApi, '/rules', { query: { collection } }).orThrow()
   }
   catch {
     rules.delete(collection)
@@ -174,7 +174,7 @@ export async function uploadFile(collection: string, file: File, { progress, sig
     form.append('file', file)
 
     try {
-      return await call(filesApi, '/:collection', { method: 'post', params: { collection }, body: form, ...progress && { progress }, ...signal && { signal } })
+      return await call(filesApi, '/:collection', { method: 'post', params: { collection }, body: form, ...progress && { progress }, ...signal && { signal } }).orThrow()
     }
     catch (error) {
       throw signal?.aborted === true ? error : uploadFailure(error, file, limits)
@@ -187,5 +187,5 @@ export async function uploadFile(collection: string, file: File, { progress, sig
 
 // The uploads stored for `collection`, to pick one again; `images` leaves out the other files.
 export async function listUploads(collection: string, images: boolean): Promise<{ path: string, name: string }[]> {
-  return call(filesApi, '/:collection', { params: { collection }, query: { images: String(images) } })
+  return call(filesApi, '/:collection', { params: { collection }, query: { images: String(images) } }).orThrow()
 }

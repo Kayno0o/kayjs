@@ -98,7 +98,7 @@ effect(() => {
 async function send(id?: string) {
   if (!custom) {
     try {
-      await call(inboxApi, '/read', { method: 'post', body: id === undefined ? {} : { id } })
+      await call(inboxApi, '/read', { method: 'post', body: id === undefined ? {} : { id } }).orThrow()
     }
     catch {
       // nothing to undo

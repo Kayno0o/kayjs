@@ -94,7 +94,13 @@ function gated(): { posts: () => number, answer: (post: number, response: Respon
 }
 
 const ok = (value: unknown) => new Response(stringify(value))
-const stub = () => actionStub('/_kay/action/test/options') as unknown as Stub
+
+// The calls throw, as `.orThrow()` makes them: what a call answers as a result is in call-result.test.ts.
+function stub() {
+  const raw = actionStub('/_kay/action/test/options') as unknown as Stub & { settled: () => Promise<void> }
+
+  return Object.assign(async (input: object, options?: CallOptions) => (raw as unknown as (input: object, options?: CallOptions) => { orThrow: () => Promise<unknown> })(input, options).orThrow(), { pending: raw.pending, track: raw.track, settled: raw.settled }) as unknown as Stub
+}
 
 describe('what a call does once it succeeded', () => {
   it('refreshes the resources it names in place of the page, and nothing for refresh: false', async () => {
@@ -330,9 +336,9 @@ describe('the timeout of a call', () => {
 
     const [value, setValue] = reactive.createSignal(1)
     const run = stub().track()
-    const [result] = await Promise.allSettled([run({}, { timeout: '20ms', optimistic: () => setValue(2) })])
+    const result = await run({}, { timeout: '20ms', optimistic: () => setValue(2) })
 
-    expect(result).toMatchObject({ status: 'rejected', reason: { name: 'TimeoutError' } })
+    expect(result).toMatchObject({ ok: false, status: 0 })
     expect(value()).toBe(1)
     expect([run.status(), (run.error() as { status: number }).status]).toEqual(['failed', 0])
   })

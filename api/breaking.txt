@@ -29,9 +29,11 @@ kay [.] ActionContext
 kay [.] AwaitProps
 kay [.] CardPageContext
 kay [.] ErrorPageContext
+kay [.] NoInputAction
 kay [.] PageContext
 kay [.] PersistedOptions
 kay [.] RequestContext
+kay [.] call
 kay [.] refuse
 mail [./subscribe-form.kay] default
 mail [.] ContactOptions
@@ -118,3 +120,5 @@ ui [.] Toast
 ui [.] ToastOptions
 ui [.] ToastPatch
 ui [.] ToastPromiseOptions
+ui [.] attempt
+ui [.] toast

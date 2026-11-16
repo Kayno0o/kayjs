@@ -8,7 +8,7 @@ export async function previewMarkdown(markdown: string, entry?: EntryRef): Promi
   const place = entry && entry.slug !== '' ? { collection: entry.collection, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale } } : {}
 
   try {
-    return (await call(markdownApi, '/', { method: 'post', body: { markdown, ...place } })).html
+    return (await call(markdownApi, '/', { method: 'post', body: { markdown, ...place } }).orThrow()).html
   }
   catch (error) {
     if (error instanceof ApiError && error.status === 422)

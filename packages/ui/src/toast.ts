@@ -219,6 +219,24 @@ function update(id: number, patch: ToastPatch): boolean {
 // What a settled `toast.promise` shows: the words, or the words with their own second line and button. The loading toast's `description` and `action` are not carried over.
 export type ToastOutcome = string | { message: string, description?: string | undefined, action?: ToastAction | undefined }
 
+// What a call's result is for a toast: the data of `{ ok: true, data }`, and the failure of `{ ok: false, error }` thrown, so a call of `call()` or an action reads as it did when it threw; anything else is its own value.
+export type Unwrapped<T> = T extends { ok: true, data: infer Data } ? Data : T extends { ok: false, error: { status: number } } ? never : T
+
+// The mark kay puts on the result of a call, which an answer shaped like one lacks.
+const CALL_RESULT = Symbol.for('kay.call-result')
+
+function unwrapped<T>(value: T): Unwrapped<T> {
+  const result = value as { ok?: unknown, data?: unknown, error?: ApiError | undefined } | null
+
+  if (typeof result !== 'object' || result === null || !(CALL_RESULT in result))
+    return value as Unwrapped<T>
+
+  if (result.ok === true)
+    return result.data as Unwrapped<T>
+
+  throw result.error
+}
+
 export interface ToastPromiseOptions<T> extends Omit<ToastOptions, 'tone'> {
   // Shown, with a spinner and no clock, until the call settles.
   loading: string
@@ -230,7 +248,7 @@ export interface ToastPromiseOptions<T> extends Omit<ToastOptions, 'tone'> {
 
 // Shows `loading` while `source` (a promise, or a function returning one) is pending, then settles the same toast into its success or its error. Resolves to what the call returned, or to undefined once it threw, as `attempt` does, so it needs no `catch`.
 // The outcome keeps the toast's `onDismiss`, which hears one dismissal for the whole flow, and drops its `description` and `action` unless the outcome gives its own. A reader who closed the loading toast meanwhile still gets the outcome, as a new toast without a second `onDismiss`, which already heard `user`. The outcome is announced politely, an error included.
-async function promise<T>(source: Promise<T> | (() => Promise<T>), { loading, success, error, ...options }: ToastPromiseOptions<T>): Promise<T | undefined> {
+async function promise<T>(source: Promise<T> | (() => Promise<T>), { loading, success, error, ...options }: ToastPromiseOptions<Unwrapped<T>>): Promise<Unwrapped<T> | undefined> {
   const id = push(loading, 'info', { ...options, duration: false, loading: true })
 
   const settle = (read: () => ToastOutcome | undefined, tone: Tone) => {
@@ -254,10 +272,10 @@ async function promise<T>(source: Promise<T> | (() => Promise<T>), { loading, su
       push(message, tone, { tone, duration: options.duration, description, action, outcome: true })
   }
 
-  let value: T
+  let value: Unwrapped<T>
 
   try {
-    value = await (typeof source === 'function' ? source() : source)
+    value = unwrapped(await (typeof source === 'function' ? source() : source))
   }
   catch (thrown) {
     settle(() => typeof error === 'function' ? error(thrown) : error, 'danger')
@@ -297,16 +315,16 @@ export type Attempted<T> = T extends void ? true : T
 // Runs a change the page waits on, resolving to what `run` returned, or to `undefined` once a refused call has toasted instead of throwing.
 // What is toasted: the message `refused` reads from the data the action's handler passed to `ctx.fail`, else a refusal of the whole call such as a limit, else `failure`.
 // A call made with `call()` throws `ApiError`, read the same way: `refused` gets the route's JSON answer, else the words of a 4xx that read as a message, else `failure`, which status 0 and a 5xx always get.
-export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: (data: Data) => string | undefined): Promise<Attempted<T> | undefined> {
+export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: (data: Data) => string | undefined): Promise<Attempted<Unwrapped<T>> | undefined> {
   const options = typeof failure === 'string' ? { failure, refused } : failure
 
   try {
-    const value = await run()
+    const value = unwrapped(await run())
 
     if (options.success !== undefined)
       toast.success(options.success)
 
-    return (value === undefined ? true : value) as Attempted<T>
+    return (value === undefined ? true : value) as Attempted<Unwrapped<T>>
   }
   catch (error) {
     // The browser is going to the page the action redirected to: nothing failed, nothing to toast.

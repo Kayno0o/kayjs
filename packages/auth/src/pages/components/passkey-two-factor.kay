@@ -16,11 +16,11 @@ async function verify() {
   error = ''
 
   try {
-    const options = await passkeyOptions({}, { refresh: false })
+    const options = await passkeyOptions({}, { refresh: false }).orThrow()
     const response = await askPasskey(options)
 
     if (response)
-      await passkey({ response })
+      await passkey({ response }).orThrow()
   }
   catch (caught) {
     error = passkeyFailure(caught, {}, failed)

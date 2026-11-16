@@ -305,7 +305,7 @@ An island imports the action from the page and calls it from a submit handler, w
 
 An optional field takes `undefined` as the field left out, so `resize({ width: max ?? undefined })` needs no spread. A field the schema does not take is reported at that field.
 
-A refused call throws an `ActionError`, and `add.error('title')` shows the message. Its `message` reads the text given to `ctx.fail`, else the schema's messages or the `message` of the data, so `error.message` can go in a notice.
+A call answers `{ ok: true, data }` when the handler returned, or `{ ok: false, status, message, errors, data, error }` when it was refused, failed or got no answer (status 0). It never throws for a visitor's mistake, and `result.message` can go in a notice. `await add(input).orThrow()` is the throwing style: it resolves with the data and throws the `ActionError`. An abort and a redirect still reject, as they are no failure of the call.
 
 ```kay
 ---
@@ -316,7 +316,10 @@ const title = signal('')
 
 async function submit(event: SubmitEvent) {
   event.preventDefault()
-  await add({ title: title() })
+  const result = await add({ title: title() })
+
+  if (result.ok)
+    title = ''
 }
 ---
 form(action={add} onSubmit={submit})
@@ -504,11 +507,11 @@ p {answer()?.data()}
 
 Yield the whole text so far, not just the new piece. Then `last()` is all the island needs.
 
-Code that needs the stream's end, not each value, awaits `answer.ended()`. It resolves with the last value once the stream ran to its end, or undefined when it sent none. It rejects with an `ActionError` of status 500 when the stream failed, and with an `AbortError` when it was closed first. A stream closes with its block and when the visitor goes to another page, so code awaiting its end there catches the `AbortError`.
+Code that needs the stream's end, not each value, awaits `answer.ended()`. It resolves with the last value once the stream ran to its end, or undefined when it sent none. It rejects with an `ActionError` of status 500 when the stream failed (a call that failed before the first value answered `{ ok: false }`), and with an `AbortError` when it was closed first. A stream closes with its block and when the visitor goes to another page, so code awaiting its end there catches the `AbortError`.
 
 A stream that failed can be tried again with `answer.retry()`. It calls the action again with the same input and reads the new answer into the same stream, so `pending()` is true while the call goes out and `last()` starts over.
 
-Guards, the schema and rate limits run before the first value, as for any call. A refusal throws an `ActionError`. `reply.pending()` stays true until the stream ends.
+Guards, the schema and rate limits run before the first value, as for any call. A refusal answers `{ ok: false }`. `reply.pending()` stays true until the stream ends.
 
 `close()` stops the handler's loop on the server. So does the visitor leaving. A stream started while the island sets up, from an event handler or from a `listen` callback closes with the enclosing block or component, so a `persist` island's stays open across pages. For a row playing its leave phase, that is the nearest one still alive.
 
@@ -546,7 +549,7 @@ The values travel in the form's action URL. A visitor can change them as they co
 
 `add.track()` gives a handle for one component. Its `pending()` reads only the calls made through it, `status()` is `idle` before the first call, `error()` is the last failure as an `ApiError`, and `retry()` sends the call that failed again with the same arguments, as they were.
 
-A retry gives no result back; read `status()`, or add `onData` and `onError` to the handle. Every source shares this shape: see [island sources](/llms/island-sources). A call resolves with how it went, instead of throwing when the server refuses it. [`call.track()`](/guides/api-routes) gives an API route's calls the same result.
+A retry gives no result back; read `status()`, or add `onData` and `onError` to the handle. Every source shares this shape: see [island sources](/llms/island-sources). Every call resolves with how it went, instead of throwing when the server refuses it, and so do [`call()` and `call.track()`](/guides/api-routes) for an API route.
 
 To wait for writes you did not await, `await add.settled()` resolves once no call to `add` is running, and `removing.settled()` once none made through the handle is. It resolves whichever way the calls went, and never throws. A call whose action redirects rejects with an `ActionRedirectError` carrying `location` once the browser has gone there (the swap has shown the page, or a full load has started), so it stops running, as it does when a leave guard keeps the visitor on the page.
 

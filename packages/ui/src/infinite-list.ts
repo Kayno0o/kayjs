@@ -1,6 +1,6 @@
 import type { Action, CallOptions, InputOf, LoadStatus, Source } from 'kay'
 import type { SortState } from './table'
-import type { AttemptOptions } from './toast'
+import type { AttemptOptions, Unwrapped } from './toast'
 import { ApiError, effect, signal, untrack } from 'kay'
 import { attempt } from './toast'
 
@@ -44,7 +44,7 @@ export interface LoadSource<Row> {
 }
 
 // What an action answers, once it went through.
-type Answered<Target extends Action> = Awaited<ReturnType<Target>>
+type Answered<Target extends Action> = Unwrapped<Awaited<ReturnType<Target>>>
 
 // The part of an action source that reads the rows out of its answer: left out when the answer is the rows.
 type RowsOf<Row, Target extends Action> = [Answered<Target>] extends [Row[]]

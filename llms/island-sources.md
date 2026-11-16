@@ -37,7 +37,7 @@ else
 
 ### One failure
 
-A failure is an `ApiError` from `kay` whatever raised it: `status`, `message`, `errors` (a message per field) and `data` (the server's answer, typed for an action by `add.refused`). `message` is always the text to show. A route's refusal keeps its status; a failure with no answer (a network error, a function that threw, a timeout) is status 0. An `ActionError` is an `ApiError`, and a `track()` result that is not `ok` carries the same four fields, with the error itself as `error`.
+A failure is an `ApiError` from `kay` whatever raised it (a call answers it as the `error` of `{ ok: false }` and never throws it, `.orThrow()` does): `status`, `message`, `errors` (a message per field) and `data` (the server's answer, typed for an action by `add.refused`). `message` is always the text to show. A route's refusal keeps its status; a failure with no answer (a network error, a function that threw, a timeout) is status 0. An `ActionError` is an `ApiError`, and a `track()` result that is not `ok` carries the same four fields, with the error itself as `error`.
 
 ### Which source has what
 

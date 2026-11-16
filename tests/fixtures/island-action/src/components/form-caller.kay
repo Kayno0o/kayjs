@@ -10,7 +10,7 @@ async function go() {
 
   form.append('name', 'Go')
   form.append('id', '99')
-  answer = await run(form)
+  answer = await run(form).orThrow()
 }
 ---
 button.form(type="button" onClick={go}) Form

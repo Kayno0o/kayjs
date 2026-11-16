@@ -58,7 +58,8 @@ export async function post<Output>(url: string, input: unknown, onProgress: (sen
       return await (files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : withKeepalive(call?.options?.keepalive === true, body, async extra => fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal }, ...extra })))
     }
     catch (error) {
-      if (typeof error === 'object' && error !== null)
+      // A failure after the caller's signal aborted is the abort's, not the network's.
+      if (typeof error === 'object' && error !== null && signal?.aborted !== true)
         networkFailures.add(error)
 
       throw error

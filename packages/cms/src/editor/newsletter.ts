@@ -17,12 +17,12 @@ export interface MailPreview {
 
 // The mail a send would make, rendered by the server, and how many subscribers would get it; undefined once a refusal has been toasted.
 export async function previewNewsletter(ref: EntryRef): Promise<MailPreview | undefined> {
-  return attempt(async () => call(newsletterApi, '/:collection/:slug/preview', { method: 'post', ...params(ref) }), wording('cms.newsletter.previewFailure', 'Could not render the mail'))
+  return attempt(async () => call(newsletterApi, '/:collection/:slug/preview', { method: 'post', ...params(ref) }).orThrow(), wording('cms.newsletter.previewFailure', 'Could not render the mail'))
 }
 
 // Mails the list mail to the editor alone; true once sent.
 export async function testNewsletter(ref: EntryRef): Promise<boolean> {
-  const outcome = await attempt(async () => call(newsletterApi, '/:collection/:slug/test', { method: 'post', ...params(ref) }), wording('cms.newsletter.testFailure', 'Could not send the test'))
+  const outcome = await attempt(async () => call(newsletterApi, '/:collection/:slug/test', { method: 'post', ...params(ref) }).orThrow(), wording('cms.newsletter.testFailure', 'Could not send the test'))
 
   if (outcome === undefined)
     return false
@@ -34,7 +34,7 @@ export async function testNewsletter(ref: EntryRef): Promise<boolean> {
 
 // Queues the mail for every subscriber; true once queued.
 export async function sendNewsletter(ref: EntryRef): Promise<boolean> {
-  const outcome = await attempt(async () => call(newsletterApi, '/:collection/:slug/send', { method: 'post', ...params(ref) }), wording('cms.newsletter.sendFailure', 'Could not send to the list'))
+  const outcome = await attempt(async () => call(newsletterApi, '/:collection/:slug/send', { method: 'post', ...params(ref) }).orThrow(), wording('cms.newsletter.sendFailure', 'Could not send to the list'))
 
   if (outcome === undefined)
     return false

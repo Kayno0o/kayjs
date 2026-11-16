@@ -74,16 +74,21 @@ import notes from '../api/notes'
 const title = signal('')
 ---
 input(bind:value={title})
-button(onClick={() => call(notes, '/', { method: 'post', body: { title: title() } })}) Add
+button(onClick={async () => {
+  const result = await call(notes, '/', { method: 'post', body: { title: title() } })
+
+  if (!result.ok)
+    console.error(result.message)
+}}) Add
 ```
 
 `method` is GET unless named. `params`, `query` and `body` are typed from the route, and so is the answer. A route answering `null` gives `null`, one answering nothing (`undefined`, a 204) gives `''`, and a file arrives as a `Blob`. A param is encoded as one path segment, and an empty param, or `.` or `..` as a param or as a segment of a `*`, is refused with a `KayError` (`argument-invalid`), as it would reach the collection or the parent route. A `*` may be empty. Pass a `*` value decoded.
 
-A refusal throws an `ApiError` with its `status` and `message`. Its status is 0 when no answer came.
+The call answers `{ ok: true, data }`, or `{ ok: false, status, message, errors, data, error }` for a refusal, a route that failed and a call that got no answer (status 0), and never throws for them. `await call(...).orThrow()` resolves with the data and throws the `ApiError` instead. An abort rejects with the signal's reason.
 
-`call.track(notes, '/')` gives a handle that answers a refusal as a result instead of throwing, as an action's `track()` does: `const result = await save({ method: 'post', body })` is `{ ok: true, data }` or `{ ok: false, status, message, errors, data, error }` (`error` repeats them), with `errors` a message per field a refused route names, else the refusal's message under `''`, and `save.pending()` reads only its own calls. A call that got no answer still throws.
+`call.track(notes, '/')` gives a handle that answers the same result and counts its own calls, as an action's `track()` does: `const result = await save({ method: 'post', body })`, with `errors` a message per field a refused route names, else the refusal's message under `''`, and `save.pending()` reads only its own calls.
 
-To show a refusal, read the `message` of the `ApiError` a call throws: it is the field messages or the `message` the route answered, else the status text, and `The server could not be reached` when no answer came. `errors` holds a message per field and `data` what the route answered.
+To show a refusal, read the `message` of the result, the one of the `ApiError` it holds as `error`: it is the field messages or the `message` the route answered, else the status text, and `The server could not be reached` when no answer came. `errors` holds a message per field and `data` what the route answered.
 
 For a write from an island that should not reload the page, an [action](/essentials/forms-and-actions#calling-an-action-from-an-island) called with `{ refresh: false }` does the same, and brings a schema and a rate limit of its own.
 

@@ -216,7 +216,10 @@ function messagesOf(said: Record<string, string> | string | undefined): Record<s
 // The schema refuses fields; the handler refuses with data of its own, which `refused` reads, a single message going under the empty name as the whole form's.
 export async function callAction<Output>(form: HTMLFormElement, action: Action<never, Output>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined, onError?: ((failure: { error: unknown }) => unknown) | undefined): Promise<{ result: Answer<Success<Output>> } | undefined> {
   try {
-    return { result: await action(new FormData(form)) }
+    const called = action(new FormData(form)) as Promise<Answer<Success<Output>>> & { orThrow?: () => Promise<Answer<Success<Output>>> }
+
+    // A function an app passes in place of an action answers its value, and throws.
+    return { result: await (called.orThrow?.() ?? called) }
   }
   catch (error) {
     // The browser is going to the page the action redirected to: nothing failed.

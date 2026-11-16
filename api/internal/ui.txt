@@ -1310,7 +1310,7 @@ type ActionSource<Row, Target extends Action> = {
 } & RowsOf<Row, Target>
 
 [./lib/index] attempt
-function attempt<T, Data = unknown>(run: () => Promise<T>, failure: AttemptOptions<Data> | string, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
+function attempt<T, Data = unknown>(run: () => Promise<T>, failure: AttemptOptions<Data> | string, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<Unwrapped<T>> | undefined>
 
 [./lib/index] Attempted
 type Attempted<T> = T extends void ? true : T
@@ -1862,7 +1862,7 @@ const toast: {
   update: (id: number, patch: ToastPatch) => boolean;
   promise: <T>(source: (() => Promise<T>) | Promise<T>, {
     loading, success, error, ...options
-  }: ToastPromiseOptions<T>) => Promise<T | undefined>;
+  }: ToastPromiseOptions<Unwrapped<T>>) => Promise<Unwrapped<T> | undefined>;
 }
 
 [./lib/index] Toast
@@ -1962,6 +1962,9 @@ const uiDefaults: UiSettings
 [./lib/index] UiSettings
 interface UiSettings
   icons: Record<"alert" | "back" | "chevron" | "close" | "delete" | "globe" | "info" | "menu" | "play" | "plus" | "search" | "spinner" | "star" | "success" | "zoomFit" | "zoomIn" | "zoomOut", IconProps> & Partial<Record<AddedSlot, IconProps>>
+
+[./lib/index] Unwrapped
+type Unwrapped<T> = T extends { ok: true, data: infer Data } ? Data : T extends { ok: false, error: { status: number } } ? never : T
 
 [./lib/infinite-list] ActionSource
 type ActionSource<Row, Target extends Action> = {
@@ -3095,7 +3098,7 @@ interface TimelineEntry<Key extends string | number = string>
   tone?: Tone | undefined
 
 [./lib/toast] attempt
-function attempt<T, Data = unknown>(run: () => Promise<T>, failure: AttemptOptions<Data> | string, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
+function attempt<T, Data = unknown>(run: () => Promise<T>, failure: AttemptOptions<Data> | string, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<Unwrapped<T>> | undefined>
 
 [./lib/toast] Attempted
 type Attempted<T> = T extends void ? true : T
@@ -3126,7 +3129,7 @@ const toast: {
   update: (id: number, patch: ToastPatch) => boolean;
   promise: <T>(source: (() => Promise<T>) | Promise<T>, {
     loading, success, error, ...options
-  }: ToastPromiseOptions<T>) => Promise<T | undefined>;
+  }: ToastPromiseOptions<Unwrapped<T>>) => Promise<Unwrapped<T> | undefined>;
 }
 
 [./lib/toast] Toast
@@ -3186,6 +3189,9 @@ function toasts(): Toast[]
 
 [./lib/toast] ToastTone
 type ToastTone = Tone
+
+[./lib/toast] Unwrapped
+type Unwrapped<T> = T extends { ok: true, data: infer Data } ? Data : T extends { ok: false, error: { status: number } } ? never : T
 
 [./lib/tone] Tone
 type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'

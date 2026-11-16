@@ -24,11 +24,11 @@ async function add(event: SubmitEvent) {
 
     proof.delete('name')
 
-    const options = await passkeyOptions(proof, { refresh: false })
+    const options = await passkeyOptions(proof, { refresh: false }).orThrow()
     const response = await makePasskey(options)
 
     if (response)
-      await addPasskey({ response, ...(name() ? { name: name() } : {}) })
+      await addPasskey({ response, ...(name() ? { name: name() } : {}) }).orThrow()
   }
   catch (caught) {
     error = passkeyFailure(caught, errors, failed)

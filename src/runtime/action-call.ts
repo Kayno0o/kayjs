@@ -1,6 +1,7 @@
 import type { Caller } from './action-owner'
 import type { Action, ActionErrorDetail, ActionStartDetail, ActionStream, ActionSuccessDetail, CallOptions, CallQueue, Outcome, TrackedCall } from './action-shared'
-import type { TrackHooks } from './call-result'
+import type { ApiError } from './api-error'
+import type { CallPromise, CallResult, TrackHooks } from './call-result'
 import type { Duration } from './duration'
 import type { ConnectionStatus, LoadStatus } from './live'
 import { ActionError, ActionRedirectError } from './action-error'
@@ -9,10 +10,10 @@ import { networkFailures, refusedAt, superseding } from './action-marks'
 import { refreshed, refreshedIn, refreshedUnlessFollowed } from './action-navigate'
 import { onStreamEnd, SETTLED } from './action-owner'
 import { ACTION } from './action-shared'
-import { actionFailed, apiErrorOf, messageOf } from './api-error'
+import { actionFailed, apiErrorOf, failed, messageOf, unreachable } from './api-error'
 import { withoutBase } from './base'
 import { skew } from './build'
-import { trackCalls, whenIdle } from './call-result'
+import { settling, trackCalls, whenIdle } from './call-result'
 import { durationSeconds, isZeroDuration } from './duration'
 import { navigation } from './navigation'
 import { released, undoable } from './optimistic'
@@ -162,7 +163,7 @@ export function actionStub(url: string, fixed?: Record<string, unknown>): Action
   return stubWith(url, reads, bound, fixed)
 }
 
-type Bound = (fields: Record<string, unknown> | undefined) => { call: (input: never, options?: CallOptions) => Promise<unknown>, track: (handle?: { queue?: CallQueue } & TrackHooks<never>) => TrackedCall<never, unknown> }
+type Bound = (fields: Record<string, unknown> | undefined) => { call: (input: never, options?: CallOptions) => CallPromise<CallResult<unknown, unknown>>, track: (handle?: { queue?: CallQueue } & TrackHooks<never>) => TrackedCall<never, unknown> }
 
 // `with` adds to the fields fixed, so a call, `track()` and a form all carry them, a form posting to the URL holding them as it does on the server; its pending state and outcome stay the action's own.
 function stubWith(url: string, reads: PropertyDescriptorMap, bound: Bound, fixed: Record<string, unknown> | undefined): Action<unknown, unknown> {
@@ -248,7 +249,7 @@ function withFixed(input: unknown, fixed: Record<string, unknown> | undefined): 
 
 // Posts a call, counting the ones in flight; a call that redirects rejects with `ActionRedirectError` once the browser is on its way, so the action stops being pending.
 // How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
-export function callable(url: () => string): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap, bound: Bound } {
+export function callable(url: () => string): { call: (input: never, options?: CallOptions) => CallPromise<CallResult<unknown, unknown>>, reads: PropertyDescriptorMap, bound: Bound } {
   const [inFlight, setInFlight, flying] = lazySignal(0)
   const [last, setLast] = lazySignal<{ page: number, outcome: Outcome | null } | undefined>(undefined)
   const [progress, setProgress] = lazySignal<number | undefined>(undefined)
@@ -538,7 +539,8 @@ function binder(run: (lane: Lane, input: unknown, options?: CallOptions) => Prom
   const actionLane: Lane = { tail: Promise.resolve() }
 
   return fields => ({
-    call: async (input: unknown, options?: CallOptions) => run(actionLane, withFixed(input, fields), options),
+    // eslint-disable-next-line ts/promise-function-async -- an async function would wrap the call's promise, which carries `orThrow()`
+    call: (input: unknown, options?: CallOptions) => settling(run(actionLane, withFixed(input, fields), options), refusalOf(url)),
     track: (handle) => {
       const lane: Lane = { tail: Promise.resolve(), queue: handle?.queue }
 
@@ -547,11 +549,29 @@ function binder(run: (lane: Lane, input: unknown, options?: CallOptions) => Prom
   })
 }
 
+// What a call that failed answers: the refusal of this action, or a failure with no answer (status 0, the network's or a timeout's). An abort, a redirect and what is thrown before the post is sent are no failure of the call, and reject as they are thrown.
+function refusalOf(url: () => string): (error: unknown) => ApiError | undefined {
+  return (error) => {
+    if (error instanceof ActionRedirectError || superseding.has(error as object))
+      return undefined
+
+    if (error instanceof ActionError)
+      return refusedAt.get(error) === url() ? error : undefined
+
+    const name = (error as { name?: unknown } | null)?.name
+
+    if (name === 'TimeoutError' || (name !== 'AbortError' && networkFailures.has(error as object)))
+      return name === 'TimeoutError' ? failed(0, (error as Error).message, error) : unreachable(error)
+
+    return undefined
+  }
+}
+
 // A handle over `call` whose refusals of this action it answers as results.
 function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>, url: () => string, hooks?: TrackHooks<never>): TrackedCall<never, unknown> {
   return trackCalls(
     call as (input: unknown, options?: CallOptions) => Promise<unknown>,
-    error => !(error instanceof ActionError) || error instanceof ActionRedirectError || refusedAt.get(error) !== url() ? undefined : { ok: false, status: error.status, message: error.message, errors: error.errors, data: error.data },
+    refusalOf(url),
     (data, release, take) => {
       const held = onStreamEnd(data, release)
 

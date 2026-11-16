@@ -10,7 +10,7 @@ export interface HeldSlug {
 // The slugs a collection holds, with their locale; undefined when they cannot be read, as they only flag a taken one and a folder typo and the server decides.
 export async function readHeldSlugs(collection: string): Promise<HeldSlug[] | undefined> {
   try {
-    const slugs = await call(slugsApi, '/:collection', { params: { collection } })
+    const slugs = await call(slugsApi, '/:collection', { params: { collection } }).orThrow()
 
     return Array.isArray(slugs) ? slugs : undefined
   }

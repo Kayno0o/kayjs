@@ -1,20 +1,14 @@
 ---
 import type { Action } from 'kay'
-import { ActionError, signal } from 'kay'
+import { signal } from 'kay'
 
 const { run, label = 'Go' } = props<{ run: Action<{ name: string }, string>, label?: string }>()
 const answer = signal('')
 
 async function go() {
-  try {
-    answer = await run({ name: label })
-  }
-  catch (error) {
-    if (!(error instanceof ActionError))
-      throw error
+  const result = await run({ name: label })
 
-    answer = `refused: ${error.errors.name}`
-  }
+  answer = result.ok ? result.data : `refused: ${result.errors.name}`
 }
 ---
 button.go(id={`go-${label}`} type="button" onClick={go} disabled={run.pending()}) {label}

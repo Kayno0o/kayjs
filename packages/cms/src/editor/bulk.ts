@@ -27,8 +27,8 @@ async function run(action: BulkAction, { ref, version }: BulkTarget): Promise<st
 
   try {
     const outcome = action === 'delete'
-      ? await call(entriesApi, '/:collection/:slug', { method: 'delete', params, query: { ...query, ...version === undefined ? {} : { version } } })
-      : await call(entriesApi, action === 'publish' ? '/:collection/:slug/publish' : '/:collection/:slug/unpublish', { method: 'post', params, query })
+      ? await call(entriesApi, '/:collection/:slug', { method: 'delete', params, query: { ...query, ...version === undefined ? {} : { version } } }).orThrow()
+      : await call(entriesApi, action === 'publish' ? '/:collection/:slug/publish' : '/:collection/:slug/unpublish', { method: 'post', params, query }).orThrow()
 
     return 'issues' in outcome ? outcome.issues.map(issue => issue.message).join('; ') : undefined
   }
@@ -64,7 +64,7 @@ export async function duplicateSaved(ref: EntryRef): Promise<string | undefined>
       method: 'post',
       params: { collection: ref.collection, slug: ref.slug },
       query: ref.locale === undefined ? {} : { locale: ref.locale },
-    })
+    }).orThrow()
 
     if ('issues' in outcome) {
       toast.error(wording('cms.save.notDuplicated', 'Not duplicated: {message}', { message: outcome.issues.map(issue => issue.message).join('; ') }))

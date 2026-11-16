@@ -1,4 +1,4 @@
-import type { Action, Failure, NoInputAction } from '../src/runtime'
+import type { Action, Answer, CallOptions, Failure, NoInputAction, Success } from '../src/runtime'
 import type { NavigationHooks } from '../src/runtime/navigation'
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
@@ -1124,6 +1124,13 @@ describe('linked', () => {
   })
 })
 
+// The calls throw, as `.orThrow()` makes them: what a call answers as a result is in call-result.test.ts.
+function throwing<Input, Output>(action: Action<Input, Output>) {
+  const raw = action as unknown as (input: Input, options?: CallOptions) => { orThrow: () => Promise<Answer<Success<Output>>> }
+
+  return Object.assign(async (input: Input, options?: CallOptions) => raw(input, options).orThrow(), action)
+}
+
 describe('optimistic changes', () => {
   it('leave kay\'s own signals as they are, undoing what the change writes after one', () => {
     const [own, setOwn] = ownSignal(0)
@@ -1241,8 +1248,8 @@ describe('optimistic changes', () => {
   })
 
   it('undo an optimistic call made inside another\'s optimistic function, both failing, the inner one first', async () => {
-    const outer = actionStub('/_kay/action/test/outer') as unknown as Action<object, null>
-    const inner = actionStub('/_kay/action/test/inner') as unknown as Action<object, null>
+    const outer = throwing<object, null>(actionStub('/_kay/action/test/outer') as never)
+    const inner = throwing<object, null>(actionStub('/_kay/action/test/inner') as never)
     const a = signal(0)
     // Each call's request fails when the test says, the inner one first.
     const failing = new Map<string, () => void>()
@@ -1274,8 +1281,8 @@ describe('optimistic changes', () => {
   })
 
   it('keeps an action called inside another\'s optimistic function pending until its own call settles, the outer one failing first', async () => {
-    const outer = actionStub('/_kay/action/test/outer') as unknown as Action<object, null>
-    const inner = actionStub('/_kay/action/test/inner') as unknown as Action<object, null>
+    const outer = throwing<object, null>(actionStub('/_kay/action/test/outer') as never)
+    const inner = throwing<object, null>(actionStub('/_kay/action/test/inner') as never)
     const a = signal(0)
     const failing = new Map<string, () => void>()
     const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL) => new Promise((_, reject) => {
@@ -1321,7 +1328,7 @@ describe('optimistic changes', () => {
   })
 
   it('undo what they wrote before throwing, the call never posting nor staying pending', async () => {
-    const move = actionStub('/_kay/action/test/throws') as unknown as Action<{ to: number }, number>
+    const move = throwing<{ to: number }, number>(actionStub('/_kay/action/test/throws') as never)
     const at = signal(0)
     const fetched = spyOn(globalThis, 'fetch')
 
@@ -1343,7 +1350,7 @@ describe('optimistic changes', () => {
   })
 
   it('name the page they are called from, which the action reads its params off', async () => {
-    const rename = actionStub('/_kay/action/test/rename') as unknown as Action<object, null>
+    const rename = throwing<object, null>(actionStub('/_kay/action/test/rename') as never)
     const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => new Response(null)) as unknown as typeof fetch)
     const had = Object.getOwnPropertyDescriptor(globalThis, 'location')
 
@@ -1363,7 +1370,7 @@ describe('optimistic changes', () => {
   })
 
   it('roll back when the call is aborted, which rejects with the signal\'s reason and records no outcome', async () => {
-    const move = actionStub('/_kay/action/test/aborted') as unknown as Action<{ to: number }, number>
+    const move = throwing<{ to: number }, number>(actionStub('/_kay/action/test/aborted') as never)
     const at = signal(0)
     const controller = new AbortController()
     const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (_: unknown, init?: RequestInit) => new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)))) as unknown as typeof fetch)
@@ -1385,7 +1392,7 @@ describe('optimistic changes', () => {
   })
 
   it('refresh the page when a call is aborted once sent, as the server may have run it, unless the call says refresh: false', async () => {
-    const move = actionStub('/_kay/action/test/sent') as unknown as Action<{ to: number }, number>
+    const move = throwing<{ to: number }, number>(actionStub('/_kay/action/test/sent') as never)
     const refreshed = jest.fn(async () => undefined)
     const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (_: unknown, init?: RequestInit) => {
       init?.signal?.throwIfAborted()
@@ -1422,7 +1429,7 @@ describe('optimistic changes', () => {
   })
 
   it('roll back when the action call fails, and stand once it went through', async () => {
-    const move = actionStub('/_kay/action/test/move') as unknown as Action<{ to: number }, number>
+    const move = throwing<{ to: number }, number>(actionStub('/_kay/action/test/move') as never)
     const at = signal(0)
     const answers = [new Response(stringify({ errors: { '': 'Locked' } }), { status: 409, headers: { 'x-kay-failure': '1' } }), new Response(stringify(2))]
     const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => answers.shift()!) as unknown as typeof fetch)
@@ -1505,7 +1512,7 @@ describe('a tracked action call', () => {
       // The handle holds only its own calls, the action every call of the page.
       await eventually(() => expect(settled).toEqual(['handle']))
       releases[1]!(fail(500, { errors: { '': 'Broke' } }))
-      await expect(second).rejects.toBeInstanceOf(ActionError)
+      expect(await second).toMatchObject({ ok: false, status: 500 })
       await saved.settled()
       expect(settled).toEqual(['handle', 'action'])
     }
@@ -1562,8 +1569,9 @@ describe('a tracked action call', () => {
 
       // The refusal's data is typed as the handler passes it to ctx.fail.
       expect(refused.ok ? undefined : refused.data?.reason).toBe('locked')
-      expect(refused).toEqual({ ok: false, status: 409, message: 'Taken', errors: { id: 'Taken' }, data: { reason: 'locked' }, error: { status: 409, message: 'Taken', errors: { id: 'Taken' }, data: { reason: 'locked' } } })
-      expect(await call({ id: 2 })).toEqual({ ok: false, status: 422, message: 'Bad id', errors: { id: 'Bad id' }, data: undefined, error: { status: 422, message: 'Bad id', errors: { id: 'Bad id' }, data: undefined } })
+      expect(refused).toMatchObject({ ok: false, status: 409, message: 'Taken', errors: { id: 'Taken' }, data: { reason: 'locked' } })
+      expect(!refused.ok && refused.error).toBeInstanceOf(ActionError)
+      expect(await call({ id: 2 })).toMatchObject({ ok: false, status: 422, message: 'Bad id', errors: { id: 'Bad id' }, data: undefined })
       expect(call.pending()).toBe(false)
       // The action's own reading of its last call stays as it was.
       expect(saved.error('id')).toBe('Bad id')
@@ -1592,7 +1600,7 @@ describe('a tracked action call', () => {
       const call = saved.track()
       const other = actionStub('/_kay/action/test/other') as unknown as Action<{ id: number }, string>
 
-      await expect(call({ id: 1 })).rejects.toThrow('offline')
+      expect(await call({ id: 1 })).toMatchObject({ ok: false, status: 0 })
       expect(call.pending()).toBe(false)
       // A 500 is a refusal the server answered, so it comes back as one.
       expect(await call({ id: 1 })).toMatchObject({ ok: false, status: 500 })

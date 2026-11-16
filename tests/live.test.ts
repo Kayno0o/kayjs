@@ -855,11 +855,11 @@ describe('call()', () => {
     const before = served.mock.calls.length
     const sentSince = () => keepalives().slice(before)
 
-    await call(notes, '/', { method: 'post', body: { title: 'kept' }, keepalive: true })
-    await call(notes, '/', { method: 'post', body: { title: 'plain' } })
+    await call(notes, '/', { method: 'post', body: { title: 'kept' }, keepalive: true }).orThrow()
+    await call(notes, '/', { method: 'post', body: { title: 'plain' } }).orThrow()
 
     try {
-      await call(notes, '/', { method: 'post', body: { title: 'x'.repeat(70 * 1024) }, keepalive: true })
+      await call(notes, '/', { method: 'post', body: { title: 'x'.repeat(70 * 1024) }, keepalive: true }).orThrow()
     }
     catch {
       // The route may refuse a title this long; what matters is how it was sent.
@@ -873,45 +873,45 @@ describe('call()', () => {
     const title = 'x'.repeat(40 * 1024)
 
     await Promise.allSettled([
-      call(notes, '/', { method: 'post', body: { title }, keepalive: true }),
-      call(notes, '/', { method: 'post', body: { title }, keepalive: true }),
+      call(notes, '/', { method: 'post', body: { title }, keepalive: true }).orThrow(),
+      call(notes, '/', { method: 'post', body: { title }, keepalive: true }).orThrow(),
     ])
 
     expect(served.mock.calls.slice(before).map(([, init]) => init?.keepalive)).toEqual([true, undefined])
   })
 
   it('calls any method of a route, sending its body as JSON and reading its answer typed', async () => {
-    const added = await call(notes, '/', { method: 'post', body: { title: 'Milk' } })
+    const added = await call(notes, '/', { method: 'post', body: { title: 'Milk' } }).orThrow()
 
     expect(added).toEqual({ id: added.id, title: 'Milk', at: '2026-01-01T00:00:00.000Z' })
     expect(served.mock.calls.at(-1)?.[1]).toMatchObject({ method: 'POST', headers: { 'accept': 'application/json', 'content-type': 'application/json' }, body: '{"title":"Milk"}' })
-    expect(await call(notes, '/:id', { method: 'patch', params: { id: added.id }, body: { title: 'Oat milk' } })).toMatchObject({ title: 'Oat milk' })
-    expect((await call(notes, '/')).map(note => note.title)).toContain('Oat milk')
-    expect(await call(notes, '/:id', { method: 'delete', params: { id: added.id } })).toBe('true')
+    expect(await call(notes, '/:id', { method: 'patch', params: { id: added.id }, body: { title: 'Oat milk' } }).orThrow()).toMatchObject({ title: 'Oat milk' })
+    expect((await call(notes, '/').orThrow()).map(note => note.title)).toContain('Oat milk')
+    expect(await call(notes, '/:id', { method: 'delete', params: { id: added.id } }).orThrow()).toBe('true')
   })
 
   it('hands an island the null a route answered, typed as null, and an empty answer as \'\'', async () => {
-    const active = await call(notes, '/active')
-    const later = await call(notes, '/active-later')
+    const active = await call(notes, '/active').orThrow()
+    const later = await call(notes, '/active-later').orThrow()
     const typed: { run: string } | null = active
     const typedLater: { run: string } | null = later
-    const empty: '' = await call(notes, '/touch', { method: 'post' })
+    const empty: '' = await call(notes, '/touch', { method: 'post' }).orThrow()
 
     expect(typed).toBeNull()
     expect(typedLater).toBeNull()
     expect(empty).toBe('')
-    expect(await call(notes, '/gone')).toBe('')
+    expect(await call(notes, '/gone').orThrow()).toBe('')
   })
 
   it('throws an ApiError with the status and message of a refusal, and status 0 when no answer came', async () => {
-    const missing = call(notes, '/:id', { method: 'patch', params: { id: 404 }, body: { title: 'x' } })
+    const missing = call(notes, '/:id', { method: 'patch', params: { id: 404 }, body: { title: 'x' } }).orThrow()
 
     await expect(missing).rejects.toBeInstanceOf(ApiError)
     await expect(missing).rejects.toMatchObject({ status: 404, message: 'No such note', data: 'No such note', errors: { '': 'No such note' } })
-    await expect(call(notes, '/', { method: 'post', body: { title: '' } })).rejects.toMatchObject({ status: 422 })
+    await expect(call(notes, '/', { method: 'post', body: { title: '' } }).orThrow()).rejects.toMatchObject({ status: 422 })
 
     served.mockImplementationOnce((async () => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch)
-    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'The server could not be reached', cause: expect.objectContaining({ message: 'Failed to fetch' }) })
+    await expect(call(notes, '/').orThrow()).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'The server could not be reached', cause: expect.objectContaining({ message: 'Failed to fetch' }) })
   })
 
   it('track() resolves a route\'s answer or refusal as the result an action\'s track() gives', async () => {
@@ -923,7 +923,7 @@ describe('call()', () => {
 
     const missing = await edit({ method: 'patch', params: { id: 404 }, body: { title: 'x' } })
 
-    expect(missing).toEqual({ ok: false, status: 404, message: 'No such note', errors: { '': 'No such note' }, data: 'No such note', error: { status: 404, message: 'No such note', errors: { '': 'No such note' }, data: 'No such note' } })
+    expect(missing).toMatchObject({ ok: false, status: 404, message: 'No such note', errors: { '': 'No such note' }, data: 'No such note' })
 
     const invalid = await save({ method: 'post', body: { title: '' } })
 
@@ -932,7 +932,7 @@ describe('call()', () => {
     expect(edit.pending()).toBe(false)
   })
 
-  it('track() keeps a pending count per handle and throws what is no answer', async () => {
+  it('track() keeps a pending count per handle and answers no answer as status 0', async () => {
     const slow = call.track(notes, '/slow')
     const other = call.track(notes, '/')
     const running = slow()
@@ -944,11 +944,11 @@ describe('call()', () => {
     expect(slow.pending()).toBe(false)
 
     served.mockImplementationOnce((async () => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch)
-    await expect(other()).rejects.toMatchObject({ name: 'ApiError', status: 0 })
+    expect(await other()).toMatchObject({ ok: false, status: 0 })
     expect(other.pending()).toBe(false)
   })
 
-  it('track() maps a validation failure to its fields and any other refusal under the form-wide key, and throws on a broken success', async () => {
+  it('track() maps a validation failure to its fields and any other refusal under the form-wide key, and answers a broken success as status 0', async () => {
     const answering = (status: number, body: unknown, type = 'application/json') => served.mockImplementationOnce((async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers: { 'content-type': type } })) as unknown as typeof fetch)
     const save = call.track(notes, '/')
 
@@ -962,7 +962,7 @@ describe('call()', () => {
     expect(await save({ method: 'post', body: { title: 'x' } })).toMatchObject({ ok: false, status: 409, data: { reason: 'taken' } })
 
     answering(200, '{broken', 'application/json')
-    await expect(save()).rejects.toBeInstanceOf(ApiError)
+    expect(await save()).toMatchObject({ ok: false })
     expect(save.pending()).toBe(false)
 
     const controller = new AbortController()
@@ -984,10 +984,10 @@ describe('call()', () => {
       return undefined
     }
 
-    expect(await shown(call(notes, '/:id', { method: 'patch', params: { id: 404 }, body: { title: 'x' } }))).toBe('No such note')
+    expect(await shown(call(notes, '/:id', { method: 'patch', params: { id: 404 }, body: { title: 'x' } }).orThrow())).toBe('No such note')
 
     served.mockImplementationOnce((async () => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch)
-    expect(await shown(call(notes, '/'))).toBe('The server could not be reached')
+    expect(await shown(call(notes, '/').orThrow())).toBe('The server could not be reached')
   })
 
   it('words an ActionError with what a visitor can read, not the serialized body', () => {
@@ -1015,17 +1015,17 @@ describe('call()', () => {
 
   it('aborts a call with its signal, which rejects with the signal\'s reason', async () => {
     const controller = new AbortController()
-    const slow = call(notes, '/slow', { signal: controller.signal })
+    const slow = call(notes, '/slow', { signal: controller.signal }).orThrow()
 
     controller.abort()
     await expect(slow).rejects.toMatchObject({ name: 'AbortError' })
-    await expect(call(notes, '/slow', { signal: AbortSignal.abort(new Error('gone')) })).rejects.toThrow('gone')
+    await expect(call(notes, '/slow', { signal: AbortSignal.abort(new Error('gone')) }).orThrow()).rejects.toThrow('gone')
   })
 
   it('sends a body carrying a file as a form, and reports its upload where the browser can', async () => {
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' })
 
-    expect(await call(notes, '/attachments', { method: 'post', body: { file, caption: 'Hi' } })).toEqual({ name: 'hello.txt', size: 5, caption: 'Hi' })
+    expect(await call(notes, '/attachments', { method: 'post', body: { file, caption: 'Hi' } }).orThrow()).toEqual({ name: 'hello.txt', size: 5, caption: 'Hi' })
     expect(served.mock.calls.at(-1)?.[1]?.body).toBeInstanceOf(FormData)
 
     const form = new FormData()
@@ -1036,11 +1036,11 @@ describe('call()', () => {
     globalThis.XMLHttpRequest = UploadRequest as unknown as typeof XMLHttpRequest
 
     try {
-      expect(await call(notes, '/attachments', { method: 'post', body: form, progress: fraction => void sent.push(fraction) })).toEqual({ name: 'hello.txt', size: 5, caption: 'Form' })
+      expect(await call(notes, '/attachments', { method: 'post', body: form, progress: fraction => void sent.push(fraction) }).orThrow()).toEqual({ name: 'hello.txt', size: 5, caption: 'Form' })
       expect(sent).toEqual([0.5, 1])
 
       const controller = new AbortController()
-      const aborted = call(notes, '/attachments', { method: 'post', body: form, progress: () => undefined, signal: controller.signal })
+      const aborted = call(notes, '/attachments', { method: 'post', body: form, progress: () => undefined, signal: controller.signal }).orThrow()
 
       controller.abort(new Error('cancelled'))
       await expect(aborted).rejects.toThrow('cancelled')
@@ -1060,15 +1060,15 @@ describe('call()', () => {
     })
 
     answer(cut, { headers: { 'content-type': 'application/json' } })
-    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'The server could not be reached', cause: expect.objectContaining({ message: 'ECONNRESET' }) })
+    await expect(call(notes, '/').orThrow()).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'The server could not be reached', cause: expect.objectContaining({ message: 'ECONNRESET' }) })
     answer('{oops', { status: 500, headers: { 'content-type': 'application/json' } })
-    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 500, message: '{oops', data: '{oops' })
+    await expect(call(notes, '/').orThrow()).rejects.toMatchObject({ name: 'ApiError', status: 500, message: '{oops', data: '{oops' })
     answer('<p>Down</p>', { status: 502, headers: { 'content-type': 'text/html' } })
-    await expect(call(notes, '/')).rejects.toMatchObject({ status: 502, message: '<p>Down</p>' })
+    await expect(call(notes, '/').orThrow()).rejects.toMatchObject({ status: 502, message: '<p>Down</p>' })
     answer(null, { status: 503 })
-    await expect(call(notes, '/')).rejects.toMatchObject({ status: 503, message: 'HTTP 503' })
+    await expect(call(notes, '/').orThrow()).rejects.toMatchObject({ status: 503, message: 'HTTP 503' })
     answer('', { headers: { 'content-type': 'application/json' } })
-    expect(await call(notes, '/') as unknown).toBe('')
+    expect(await call(notes, '/').orThrow() as unknown).toBe('')
   })
 
   it('rejects with the signal\'s reason when aborted while the answer is read', async () => {
@@ -1085,7 +1085,7 @@ describe('call()', () => {
       pull: () => taken.resolve(),
     }), { headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch)
 
-    const reading = call(notes, '/', { signal: controller.signal })
+    const reading = call(notes, '/', { signal: controller.signal }).orThrow()
 
     await taken.promise
     controller.abort(new Error('left'))
@@ -1094,22 +1094,22 @@ describe('call()', () => {
   })
 
   it('reads a file as a Blob, nothing as \'\', and reaches a path named like a method', async () => {
-    const bytes: Blob | string = await call(notes, '/bytes')
-    const touched: '' = await call(notes, '/touch', { method: 'post' })
+    const bytes: Blob | string = await call(notes, '/bytes').orThrow()
+    const touched: '' = await call(notes, '/touch', { method: 'post' }).orThrow()
 
     expect(bytes).toBeInstanceOf(Blob)
     expect([...await (bytes as Blob).bytes()]).toEqual([0, 255])
     expect(touched).toBe('')
-    expect(await call(notes, '/post/:id', { params: { id: '7' } })).toBe('post 7')
+    expect(await call(notes, '/post/:id', { params: { id: '7' } }).orThrow()).toBe('post 7')
   })
 
   it('sends a Date as its ISO text and an object as JSON, in a query or a form, leaving null out', async () => {
     const at = new Date(Date.UTC(2026, 0, 2))
 
-    await call(notes, '/', { query: { since: at, filter: { done: false }, none: null } })
+    await call(notes, '/', { query: { since: at, filter: { done: false }, none: null } }).orThrow()
     expect(String(served.mock.calls.at(-1)?.[0])).toBe(`/api/notes?since=${encodeURIComponent(at.toISOString())}&filter=${encodeURIComponent('{"done":false}')}`)
 
-    await Promise.allSettled([call(notes, '/attachments', { method: 'post', body: { file: new File(['a'], 'a.txt'), caption: 'Hi', at, none: null } as never })])
+    await Promise.allSettled([call(notes, '/attachments', { method: 'post', body: { file: new File(['a'], 'a.txt'), caption: 'Hi', at, none: null } as never }).orThrow()])
     const form = served.mock.calls.at(-1)?.[1]?.body as FormData
 
     expect(form.get('at')).toBe(at.toISOString())
@@ -1123,15 +1123,15 @@ describe('call()', () => {
   it('takes the methods, params and body each route declares', () => {
     const typed = async () => {
       // @ts-expect-error: a websocket route is opened with socket()
-      void call(chat, '/:room', { params: { room: 'a' } })
+      void call(chat, '/:room', { params: { room: 'a' } }).orThrow()
       // @ts-expect-error: the note's id is a param the path names
-      void call(notes, '/:id', { method: 'delete' })
+      void call(notes, '/:id', { method: 'delete' }).orThrow()
       // @ts-expect-error: the route takes a title
-      void call(notes, '/', { method: 'post', body: {} })
+      void call(notes, '/', { method: 'post', body: {} }).orThrow()
       // @ts-expect-error: the path answers no GET, so the method is named
-      void call(notes, '/attachments', { body: { file: new File([], 'a'), caption: '' } })
+      void call(notes, '/attachments', { body: { file: new File([], 'a'), caption: '' } }).orThrow()
       // @ts-expect-error: a value from JSON has no Date
-      void (await call(notes, '/'))[0]?.at.getTime() // eslint-disable-line ts/no-unsafe-call -- the line is a type test: it must fail to type, which leaves the call unresolved
+      void (await call(notes, '/').orThrow())[0]?.at.getTime() // eslint-disable-line ts/no-unsafe-call -- the line is a type test: it must fail to type, which leaves the call unresolved
     }
 
     expect(typed).toBeFunction()
@@ -1141,17 +1141,17 @@ describe('call()', () => {
     const extensionNotes = (_app: ExtensionApp) => notes
     const extensionChat = async (_app: ExtensionApp) => Promise.resolve(chat)
     const typed = async () => {
-      const titles: string[] = (await call(extensionNotes, '/')).map(note => note.title)
+      const titles: string[] = (await call(extensionNotes, '/').orThrow()).map(note => note.title)
       const room = socket(extensionChat, '/:room', { params: { room: 'a' } })
       const ticks = stream(extensionChat, '/ticks', { query: { count: 1 } })
       const rooms = resource(extensionChat, '/rooms')
 
       // @ts-expect-error: the route takes a title
-      void call(extensionNotes, '/', { method: 'post', body: {} })
+      void call(extensionNotes, '/', { method: 'post', body: {} }).orThrow()
       // @ts-expect-error: no such path
-      void call(extensionNotes, '/nowhere')
+      void call(extensionNotes, '/nowhere').orThrow()
       // @ts-expect-error: a websocket route is opened with socket()
-      void call(extensionChat, '/:room', { params: { room: 'a' } })
+      void call(extensionChat, '/:room', { params: { room: 'a' } }).orThrow()
 
       return [titles, room, ticks, rooms]
     }
