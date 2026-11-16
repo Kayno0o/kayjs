@@ -286,3 +286,21 @@ test('a second TooltipHost renders nothing while the first is mounted, and takes
 
   expect(tooltips().map(item => [item.textContent, item.matches(':popover-open')])).toEqual([['Copy', true]])
 })
+
+test('onOpenChange hears the close of a tooltip showing when its host unmounts', async () => {
+  const heard: string[] = []
+
+  mounted = await mountComponent(Hosts, { onTooltip: ({ open, element }: { open: boolean, element: HTMLElement }) => heard.push(`${open ? 'open' : 'close'} ${element.id}`) })
+  clock.start()
+
+  const { root } = mounted
+
+  root.querySelector('#tip')!.dispatchEvent(new Event('pointerover', { bubbles: true }))
+  await clock.elapse(100)
+  await clock.settle()
+  expect(heard).toEqual(['open tip'])
+
+  click(root.querySelector('#unmount'))
+  await clock.settle()
+  expect(heard).toEqual(['open tip', 'close tip'])
+})

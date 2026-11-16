@@ -169,24 +169,15 @@ effect(() => {
   })
 })
 
-// The element whose tooltip is showing, kept to name it when the tooltip hides.
-let shownFor: HTMLElement | undefined
-
+// The cleanup reports the close, whether the tooltip moved on, hid, or the host unmounted or gave way to another while it showed.
 effect(() => {
   const target = aimed()
-  const was = shownFor
 
-  shownFor = target?.element
+  if (!target || !owns())
+    return
 
-  if (onOpenChange && owns() && target?.element !== was) {
-    untrack(() => {
-      if (was)
-        onOpenChange?.({ open: false, element: was })
-
-      if (target)
-        onOpenChange?.({ open: true, element: target.element })
-    })
-  }
+  untrack(() => onOpenChange?.({ open: true, element: target.element }))
+  onCleanup(() => untrack(() => onOpenChange?.({ open: false, element: target.element })))
 })
 
 effect(() => {
