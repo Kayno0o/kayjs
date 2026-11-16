@@ -213,7 +213,7 @@ export function createOutbox(file?: string): Outbox {
       const { find = () => true, site } = options
       const lookup = () => mails.findLast(mail => sentTo(mail, wanted) && find(mail))
       const wait = options.timeout === undefined ? DEFAULT_WAIT_MS : durationSeconds(options.timeout, 'outbox.waitFor()\'s timeout') * 1000
-      const fail = () => new Error(`kayjs-mail: no mail to ${address}${options.find ? ' matching `find`' : ''} reached the outbox within ${wait} ms, ${withinOutbox(mails)}`)
+      const fail = () => new KayError('helper-failed', `kayjs-mail: no mail to ${address}${options.find ? ' matching `find`' : ''} reached the outbox within ${wait} ms, ${withinOutbox(mails)}`)
 
       if (site) {
         const deadline = Date.now() + wait

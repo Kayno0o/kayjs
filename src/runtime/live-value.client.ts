@@ -409,7 +409,7 @@ export function browserLive(id: string, initial: unknown): Handle {
   }
 
   const refuse = (): never => {
-    throw new KayError('helper-failed', `kay: the live value ${id} is changed on the server, not in a browser`)
+    throw new KayError('argument-invalid', `kay: the live value ${id} is changed on the server, not in a browser`)
   }
 
   return Object.assign(keyed ? (key: LiveKey) => read(keyText(key)) : () => read(''), { set: refuse, ...keyed && { delete: refuse } }, connectionOf, { onData: slot.data.on, onError: (listener: (event: { error: ApiError }) => void) => failures().on(listener) }) as unknown as Handle

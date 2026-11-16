@@ -124,7 +124,7 @@ export async function exchange<T>(name: string, url: string, init: { headers: Re
       throw error
 
     if (late.signal.aborted)
-      throw new AiError('timeout', `${name} did not answer within the call timeout of ${timeout}`, { cause: error })
+      throw new AiError('timeout', `${name} did not answer within the call timeout of ${optionMs(timeout, 'the call timeout')} ms`, { cause: error })
 
     throw new AiError('network', `${name} could not be reached (${error instanceof Error ? error.message : String(error)})`, { cause: error })
   }

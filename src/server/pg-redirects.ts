@@ -167,7 +167,7 @@ export function pgRedirectSet(connect: () => Promise<SQL | undefined>, failed: (
       if (fresh === undefined && !degraded) {
         degraded = true
         retryAt = Date.now() + RETRY_MS
-        failed(new Error(`the redirects were not read within ${BOUND_MS} ms`))
+        failed(new KayError('helper-failed', `kay: the redirects were not read within the ${BOUND_MS} ms read bound`))
       }
 
       return fresh ?? stale

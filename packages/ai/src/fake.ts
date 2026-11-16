@@ -1,5 +1,6 @@
 import type { AudioFormat, Finish, Piece, Provider, ProviderMessage, ProviderRequest, Reasoning, ToolSpec } from './types'
 import process from 'node:process'
+import { KayError } from 'kay/library'
 import { mediaChars } from './attachments'
 
 // What a fake reply was asked: the request a provider would have been sent.
@@ -308,7 +309,7 @@ function createFake(): Fake {
         const vectors = answerOf(embeddings, given, () => input.map(text => vectorOf(text, dimensions ?? DIMENSIONS)))
 
         if (vectors.length !== input.length)
-          throw new Error(`fakeAi.embedding() answered ${vectors.length} vectors for ${input.length} texts`)
+          throw new KayError('helper-failed', `fakeAi.embedding() answered ${vectors.length} vectors for ${input.length} texts`)
 
         return vectors
       }),

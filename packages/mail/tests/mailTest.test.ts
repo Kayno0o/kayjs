@@ -53,6 +53,6 @@ describe('mail test(site)', () => {
   })
 
   it('names the mails the outbox holds when none came', async () => {
-    await expect(mail.waitFor('nobody@fixture.test', { timeout: '50ms' })).rejects.toThrow('no mail to nobody@fixture.test')
+    await expect(mail.waitFor('nobody@fixture.test', { timeout: '50ms' })).rejects.toMatchObject({ code: 'helper-failed', message: expect.stringContaining('no mail to nobody@fixture.test') })
   })
 })
