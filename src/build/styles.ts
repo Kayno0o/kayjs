@@ -4,11 +4,13 @@ import { readFileSync, statSync } from 'node:fs'
 import { realpath, rename } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
 import { islandId, withoutTwin } from '../compiler'
+import { AWAIT_LINE } from '../compiler/island-arguments'
 import { parseKay } from '../compiler/parser'
 import { rebaseUrls, scopeAttribute, scopeCss, scopeHash } from '../compiler/scoped-style'
 import { tailwindEntry } from '../format/tailwind'
 import { cacheDir, projectPaths } from '../project'
 import { ASSET_FILE, clientDir, writeAsset } from './assets'
+import { awaitAlertOf } from './await-alert'
 import { pruneCache, touchCacheFile } from './cache'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { CSS_FILE, KAY_FILE, resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
@@ -274,7 +276,11 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
         // A component `src/ui.ts` restyles has the classes written there, which the page using it keeps the rules of.
         const restyled = uiEntryOf(root, path) === undefined ? '' : importing(note(path, [join(root, UI_FILE)]))
 
-        return { contents: classes + contents + moduleContents + scoped + styles + content + restyled, loader: 'js' }
+        // A component with an `await` may draw the app's `await-failed.kay`, which the compiler imports, so its styles go to the page too.
+        const alert = AWAIT_LINE.test(source) ? awaitAlertOf(root, path) : undefined
+        const alerting = alert === undefined ? '' : importing(note(path, [alert.file]))
+
+        return { contents: classes + contents + moduleContents + scoped + styles + content + restyled + alerting, loader: 'js' }
       })
       build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => {
         loaded?.add(path)

@@ -4,7 +4,7 @@ import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, SlotNode, Sp
 import type { IslandCause } from './island-cause'
 import type { LoadPlan } from './load-plan'
 import type { Rewrite } from './mapping'
-import type { WRITE_HELPERS } from './names'
+import type { AwaitAlert, WRITE_HELPERS } from './names'
 import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite-types'
 import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } from './script'
@@ -15,7 +15,7 @@ import { addIslandShorthandTitle, addShorthandChecks, addShorthandGroup, hasShor
 import { emitHeadTag, emitHeadText } from './head-tags'
 import { awaitAlertTail, htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
-import { asksOf, exportsIslandOptions, islandMessages } from './island-arguments'
+import { asksOf, exportsIslandOptions, islandMessages, withAlertKeys } from './island-arguments'
 import { ambientHelpers, constDeclaration } from './items'
 import { JsxTemplate } from './jsx'
 import { planLoads } from './load-plan'
@@ -38,7 +38,7 @@ export interface GenerateOptions {
   name: string
   classTable?: ClassTable | undefined
   classMerge?: boolean | undefined
-  awaitAlert?: string | undefined
+  awaitAlert?: AwaitAlert | undefined
   // The write helpers the rewrites call, imported from the runtime.
   writes?: ReadonlySet<keyof typeof WRITE_HELPERS> | undefined
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
@@ -623,7 +623,7 @@ class ModuleShell {
   private islandTail(src: string): string {
     const html = this.options.output === 'html'
 
-    return islandMessages(src, this.options.client, html ? this.options.lives : undefined, html ? this.options.cause : undefined, false, html && exportsIslandOptions(this.script) && asksOf(this.script), this.file.wrapsButtons === true)
+    return islandMessages(withAlertKeys(src, this.options.awaitAlert), this.options.client, html ? this.options.lives : undefined, html ? this.options.cause : undefined, false, html && exportsIslandOptions(this.script) && asksOf(this.script), this.file.wrapsButtons === true)
   }
 
   private get wrapped(): boolean {

@@ -27,6 +27,7 @@ import { fontFallbacks, withFontFallbacks } from '../server/fonts'
 import { routeMounts } from '../server/routes'
 import { declaresAction } from './action-calls'
 import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
+import { AWAIT_ALERT_FILE } from './await-alert'
 import { pruneNodes, pruneUtilityLayer } from './class-rules'
 import { buildClassTable, mergesAtRuntime } from './class-table'
 import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, liftSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
@@ -214,7 +215,7 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
 
     const classTableText = JSON.stringify([classTable, islandTable])
     // `src/ui.ts` is written into the components it restyles, none of which imports it, so no chunk lists it among its inputs.
-    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE)) || previous.classTable !== classTableText || (!options.hot && (previous.sources.actionForms !== sources.actionForms || previous.sources.actionProps !== sources.actionProps))
+    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE) || file === join(realRoot, AWAIT_ALERT_FILE)) || previous.classTable !== classTableText || (!options.hot && (previous.sources.actionForms !== sources.actionForms || previous.sources.actionProps !== sources.actionProps))
     const stylesAgain = !previous || await increments!.stylesChanged(previous, sources, texts)
 
     if (previous && islandsAgain)
@@ -486,7 +487,8 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
   // `src/ui.ts` is written into the components it restyles, none of which imports it.
   const reaching = await reachingAny(outside.map(file => realpathSync(file)), entries, edges)
   const reachingOutside = outside.filter(file => reaching.has(realpathSync(file)))
-  const written = [...bundled, ...existsSync(ui) ? [ui] : [], ...reachingOutside]
+  const alert = join(root, AWAIT_ALERT_FILE)
+  const written = [...bundled, ...existsSync(ui) ? [ui] : [], ...existsSync(alert) ? [alert] : [], ...reachingOutside]
 
   // The browser merges classes only where a component writes a class that is not a literal, a spread or a part; two literals side by side were resolved while compiling.
   if (!written.some(file => mergesAtRuntime(file)))

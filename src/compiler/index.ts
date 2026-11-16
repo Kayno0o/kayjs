@@ -6,6 +6,7 @@ import type { IslandCause } from './island-cause'
 import type { LintLevels } from './lints'
 import type { Expansion } from './markdown-block'
 import type { ImportedSignals, SignalKind } from './module-signals'
+import type { AwaitAlert } from './names'
 import type { NameFindings } from './rewrite-types'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
@@ -20,7 +21,7 @@ import { spelledOutScriptFence } from './deprecated-script-fence'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { openRedirects } from './fence-redirects'
 import { cwd, scopeStorage } from './host'
-import { ignoredIslandExport, interactiveProps, islandMessages, malformedInteractive } from './island-arguments'
+import { ignoredIslandExport, interactiveProps, islandMessages, malformedInteractive, withAlertKeys } from './island-arguments'
 import { describeCause } from './island-cause'
 import { markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
@@ -95,7 +96,7 @@ export interface CompileOptions {
   // The server's build of an app with Tailwind: a shorthand beside a static `class` merges while rendering.
   classMerge?: boolean | undefined
   // The app's `src/await-failed.kay`, which an `await` with no `catch` and no `try` around it renders in place of kay's alert, imported by this path; unset when the app has none.
-  awaitAlert?: string | undefined
+  awaitAlert?: AwaitAlert | undefined
   // Development: every element carries `data-kay-src`, its file and position, for `kay dev`'s inspector.
   inspect?: boolean | undefined
 }
@@ -403,7 +404,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}${fallback?.code ?? ''}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), undefined, fallback !== undefined, false, file.wrapsButtons === true)})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, cause, why: cause && describeCause(cause), classes, actionForm: facts.actionForm, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}${fallback?.code ?? ''}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(withAlertKeys(source, options.awaitAlert), true, lives.map(binding => binding.local), undefined, fallback !== undefined, false, file.wrapsButtons === true)})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, cause, why: cause && describeCause(cause), classes, actionForm: facts.actionForm, diagnostics: reported }
   }
 
   return {

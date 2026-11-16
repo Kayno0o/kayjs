@@ -123,7 +123,7 @@ export async function transformKayCached(original: string, filename: string, giv
   const signals = importedSignals(withoutTwin(filename), source)
   const hydratable = options.hydratable ?? false
   const root = options.root ?? process.cwd()
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}${options.variant === undefined ? '' : `-uses-${Bun.hash(options.variant).toString(36)}`}`, `${options.target}\0${hydratable}\0${options.pages?.join(',')}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${awaitAlertOf(root)}\0${JSON.stringify(signals)}\0${options.target === 'ssr' && namedRefresh(withoutTwin(filename), root)}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}${options.variant === undefined ? '' : `-uses-${Bun.hash(options.variant).toString(36)}`}`, `${options.target}\0${hydratable}\0${options.pages?.join(',')}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${JSON.stringify(awaitAlertOf(root))}\0${JSON.stringify(signals)}\0${options.target === 'ssr' && namedRefresh(withoutTwin(filename), root)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   countCache('components', cached !== undefined)

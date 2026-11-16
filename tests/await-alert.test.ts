@@ -3,8 +3,13 @@ import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
+import { styleImports } from '../src/build/styles'
 import { transformKayCached } from '../src/build/transform'
 import { compileKay } from '../src/compiler'
+import { projectPaths } from '../src/project'
+import { Await, collectDeferred } from '../src/runtime/await.server'
+import { html } from '../src/runtime/rendered'
+import { streamDocument } from '../src/server/stream'
 import { settle } from '../src/test'
 import { eventually } from './helpers/eventually'
 import { scratchDir } from './scratch'
@@ -105,8 +110,8 @@ describe('the compile of an await with no catch', () => {
 
   it('imports the app\'s file in the server and browser builds, for development and production alike', () => {
     for (const inspect of [false, true]) {
-      const server = compileKay(source, '/a/b.kay', { output: 'html', awaitAlert: '/a/src/await-failed.kay', inspect }).tsx
-      const browser = compileKay(source, '/a/b.kay', { output: 'dom', awaitAlert: '/a/src/await-failed.kay', inspect }).tsx
+      const server = compileKay(source, '/a/b.kay', { output: 'html', awaitAlert: { file: '/a/src/await-failed.kay', keys: [] }, inspect }).tsx
+      const browser = compileKay(source, '/a/b.kay', { output: 'dom', awaitAlert: { file: '/a/src/await-failed.kay', keys: [] }, inspect }).tsx
 
       expect(server).toContain('import KayAwaitFailed from "/a/src/await-failed.kay"')
       expect(server).toContain('alert: (error) => KayComponent(KayAwaitFailed, { error: error instanceof Error ? { name: error.name, message: error.message } : String(error) })')
@@ -118,7 +123,7 @@ describe('the compile of an await with no catch', () => {
     const caught = '---\nconst a = Promise.resolve(1)\n---\nawait a then x\n  p {x}\ncatch\n  p.no\n'
 
     for (const output of ['html', 'dom'] as const) {
-      expect(compileKay(caught, '/a/b.kay', { output, awaitAlert: '/a/src/await-failed.kay' }).tsx).not.toMatch(/KayComponent\(KayAwaitFailed|alert:/)
+      expect(compileKay(caught, '/a/b.kay', { output, awaitAlert: { file: '/a/src/await-failed.kay', keys: [] } }).tsx).not.toMatch(/KayComponent\(KayAwaitFailed|alert:/)
       expect(compileKay(source, '/a/b.kay', { output }).tsx).not.toContain('KayAwaitFailed')
     }
   })
@@ -141,6 +146,62 @@ describe('the compile of an await with no catch', () => {
 
     expect(before).not.toContain('KayAwaitFailed')
     expect(after).toContain('KayAwaitFailed')
+  })
+})
+
+describe('the app\'s await-failed.kay, for what it needs around it', () => {
+  it('has its message keys shipped with an island that has an await', () => {
+    const source = '---\nimport { signal } from \'kay\'\nconst n = signal(0)\n---\nawait Promise.reject(new Error(\'x\')) then v\n  p {v}\nbutton(onClick={() => n.set(1)}) {n()}\n'
+    const code = compileKay(source, '/a/b.kay', { output: 'html', hydratable: true, awaitAlert: { file: '/a/src/await-failed.kay', keys: ['errors.load'] } }).tsx
+
+    expect(code).toContain('"errors.load"')
+    expect(code).toContain('"kay.await.failed"')
+  })
+
+  it('reaches the page\'s styles through every component with an await', async () => {
+    const root = await scratchDir('await-alert-styles-')
+    const loaded = new Set<string>()
+
+    dirs.push(root)
+    await Promise.all([
+      Bun.write(projectPaths(root).classes, ''),
+      Bun.write(join(root, 'src/await-failed.kay'), '---\n---\np.app-alert Failed\nstyle\n  .app-alert { color: red }\n'),
+      Bun.write(join(root, 'src/main.kay'), '---\n---\nawait Promise.resolve(1) then v\n  p {v}\n'),
+    ])
+    await Bun.build({ entrypoints: [join(root, 'src/main.kay')], outdir: join(root, 'out'), target: 'browser', plugins: [styleImports(root, [], loaded)] })
+    expect([...loaded].some(file => file.endsWith('src/await-failed.kay'))).toBe(true)
+  })
+
+  it('stays apart from the catch channel, so a mail with no catch still fails', () => {
+    const { deferred } = collectDeferred(() => Await({ value: Promise.reject(new Error('x')), ready: () => html(''), alert: () => html('<p>app</p>') }))
+
+    void Promise.allSettled([deferred[0]!.value])
+    expect(deferred[0]!.fallback).toBeUndefined()
+    expect(deferred[0]!.failed).toBeUndefined()
+  })
+
+  it('shows the alert of an async iterable that fails before its first part', async () => {
+    async function* parts(): AsyncGenerator<string> {
+      await Bun.sleep(1)
+      yield* []
+
+      throw new Error('Cut')
+    }
+
+    const { deferred } = collectDeferred(() => Await({ value: parts(), ready: part => html(`<p>${String(part)}</p>`), alert: error => html(`<p class="app">${(error as Error).message}</p>`) }))
+    const reader = streamDocument('<html><body>', deferred, { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: '' }, false, () => undefined).getReader()
+    let page = ''
+
+    for (;;) {
+      const { done, value } = await reader.read()
+
+      if (done)
+        break
+
+      page += new TextDecoder().decode(value)
+    }
+
+    expect(page).toContain('<p class="app">Cut</p>')
   })
 })
 
@@ -204,6 +265,33 @@ describe('the app\'s await-failed.kay, in the browser', () => {
       root.querySelector<HTMLButtonElement>('button.retry')!.click()
       await eventually(() => expect(root.querySelector('p.text')?.textContent).toBe('loaded'))
       expect(root.querySelector('p.app-alert')).toBeNull()
+      expect(calls).toBe(2)
+    }
+    finally {
+      errors.mockRestore()
+      dispose()
+    }
+  })
+
+  it('shows the alert again when the retry fails too', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+    let calls = 0
+
+    Object.assign(globalThis, { again: async () => {
+      calls++
+
+      throw new Error(`Try ${calls}`)
+    } })
+
+    const { root, dispose } = await mount('---\nconst { error, retry } = props<{ error: unknown, retry?: () => void }>()\n---\np.app-alert {(error as Error).message}\nbutton.retry(onClick={retry}) Again\n', {
+      'main.kay': '---\ndeclare const again: () => Promise<string>\n---\nawait again() then text\n  p.text {text}\n',
+    })
+
+    try {
+      await settle()
+      expect(root.querySelector('p.app-alert')!.textContent).toBe('Try 1')
+      root.querySelector<HTMLButtonElement>('button.retry')!.click()
+      await eventually(() => expect(root.querySelector('p.app-alert')?.textContent).toBe('Try 2'))
       expect(calls).toBe(2)
     }
     finally {
