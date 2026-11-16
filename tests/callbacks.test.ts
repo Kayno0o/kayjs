@@ -243,6 +243,9 @@ describe('the docs write the signatures the code has', () => {
   const SERVER_HOOKS = new Set(['onError', 'onSend', 'onSave'])
   // Positional by design: the `ai({ ... })` hooks (`Hook<AiToolCall>`) and the cms `CustomFieldProps.onChange(next)` setter, not component events.
   const POSITIONAL = new Set(['packages/cms/llms/fields.md:onChange'])
+  // A websocket's `onRefused` hears kay's `SocketRefusal`, where kayjs-ui's toast of the same name hears `{ data }`.
+  const SOCKET_PAGES = new Set(['llms/api-routes.md', 'llms/api-from-islands.md', 'docs/src/content/docs/guides/live-and-realtime.md'])
+  const SOCKET_REFUSAL = new Set(['key', 'fields'])
   const SIGNATURE = /`(on[A-Z]\w*)\(([^`]*)\)`/g
   const DOCS = ['docs/src/content/ui/*.md', 'docs/src/content/docs/**/*.md', 'llms/*.md', 'packages/*/llms/*.md', 'packages/*/llms.txt', 'llms.txt']
 
@@ -257,7 +260,7 @@ describe('the docs write the signatures the code has', () => {
         const text = await Bun.file(join(ROOT, file)).text()
 
         for (const [, name, args] of text.matchAll(SIGNATURE)) {
-          const known = FIELDS.get(name!)
+          const known = name === 'onRefused' && SOCKET_PAGES.has(file) ? SOCKET_REFUSAL : FIELDS.get(name!)
 
           // Only the callbacks of components: a server hook of the same name (`onError`) is another rule's.
           if (known === undefined || args!.trim() === '' || args!.trim() === '...')
