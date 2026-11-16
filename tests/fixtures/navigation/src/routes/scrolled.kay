@@ -1,7 +1,7 @@
 ---
 import Keeper from '../components/keeper.kay'
 ---
-// kay-allow-file deprecated-link-flags -- keep-link, group-link and true-link use the names before 1.105, which still work
+// kay-allow-file deprecated-link-flags -- keep-link, group-link, false-link and true-link use the names before 1.105, which still work
 head
   title Scrolled
 h1 Scrolled

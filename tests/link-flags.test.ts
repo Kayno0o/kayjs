@@ -64,6 +64,13 @@ describe('unknown-link-flag', () => {
     expect(result.help.map(help => (/`(data-[^`]+)`/).exec(help ?? '')?.[1])).toEqual(['data-scroll', 'data-prefetch', 'data-transition="false"', 'data-transition', 'data-reload'])
   })
 
+  it('offers no fix for a misspelt old name written with a value, which would keep that value', () => {
+    const result = unknown(`${SERVER}a(href="/x" data-no-transtion="x") go\na(href="/x" data-no-transtion) go\n`)
+
+    expect(result.safe).toEqual([undefined, false])
+    expect(result.fixed).toBe(`${SERVER}a(href="/x" data-no-transtion="x") go\na(href="/x" data-transition="false") go\n`)
+  })
+
   it('finds a misspelt flag on a component call and with a dynamic value', () => {
     expect(unknown(`${ISLAND}Button(href={to} data-keep-scrol)\na(href={to} data-prefetc={open() ? 'eager' : undefined}) go\n`).at).toEqual(['data-keep-scrol', 'data-prefetc'])
   })

@@ -15,7 +15,7 @@ export const LINK_LINTS = {
   'unknown-link-flag': {
     level: 'deny',
     group: 'code',
-    summary: 'A `data-` attribute one letter from a navigation flag of a link (`data-scroll`, `data-transition`, `data-prefetch`, `data-reload`), such as `data-prefech` or `data-no-scroll`: no type knows a `data-` name, so a misspelt flag would do nothing and the link would swap as before. Found on any element and on a component call. The fix, which is not safe as the name may be another attribute, writes the flag meant.',
+    summary: 'A `data-` attribute one letter from a navigation flag of a link (`data-scroll`, `data-transition`, `data-prefetch`, `data-reload`), such as `data-prefech` or `data-scrol`: no type knows a `data-` name, so a misspelt flag would do nothing and the link would swap as before. Found on any element and on a component call. The fix, which is not safe as the name may be another attribute, writes the flag meant.',
     wrong: 'a(href="/tabs/a" data-scrol="keep") A',
     right: 'a(href="/tabs/a" data-scroll="keep") A',
   },
@@ -81,8 +81,10 @@ export function linkFlags(file: KayFile): Diagnostic[] {
 
       const renamed = OLD[meant]
       const to = renamed === undefined ? meant : `${renamed.name}="${renamed.value}"`
+      // An old name written with a value keeps that value after the name, so writing `name="value"` there would leave two: that case gets the help alone.
+      const fixes = renamed !== undefined && attribute.kind !== 'boolean' ? [] : [{ title: `Write \`${to}\``, safe: false, edits: [{ ...at, text: to }] }]
 
-      found.push({ ...at, code: 'unknown-link-flag', message: `\`${name}\` is no navigation flag of a link`, note: 'a link is followed with `data-scroll`, `data-transition`, `data-prefetch` and `data-reload`, and this name does nothing', help: `did you mean \`${to}\`?`, fixes: [{ title: `Write \`${to}\``, safe: false, edits: [{ ...at, text: to }] }], checkOnly: true })
+      found.push({ ...at, code: 'unknown-link-flag', message: `\`${name}\` is no navigation flag of a link`, note: 'a link is followed with `data-scroll`, `data-transition`, `data-prefetch` and `data-reload`, and this name does nothing', help: `did you mean \`${to}\`?`, fixes, checkOnly: true })
     }
   }
 
