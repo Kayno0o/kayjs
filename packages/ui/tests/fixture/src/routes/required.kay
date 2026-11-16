@@ -25,6 +25,6 @@ main
       Segmented#segmented(name="size" options={plans} label="Size" required)
       Rating#rating(name="stars" label="Stars" required)
       ChipGroup#chips(name="tags" options={plans} label="Tags" required)
-      Checkbox(inputProps={{ id: "box" }} name="terms" label="Terms" required)
-      Toggle(inputProps={{ id: "toggle" }} name="news" label="News" required)
+      Checkbox(inputProps={{ id: 'box' }} name="terms" label="Terms" required)
+      Toggle(inputProps={{ id: 'toggle' }} name="news" label="News" required)
       RadioGroup#optional(name="other" options={plans} label="Other")

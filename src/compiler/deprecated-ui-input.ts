@@ -18,16 +18,21 @@ function attributeEnd(attribute: Named): number {
   return attribute.kind === 'expression' ? attribute.shorthand?.end ?? attribute.expression.end + 1 : attribute.name.end
 }
 
+// A string literal in single quotes, as the code an app lints is written.
+function quoted(value: string): string {
+  return `'${JSON.stringify(value).slice(1, -1).replaceAll('\\"', '"').replaceAll('\'', '\\\'')}'`
+}
+
 // What an attribute holds, written as a property value of an object literal.
 function propertyValue(attribute: Named, text: (span: Span) => string): string {
   if (attribute.kind === 'static')
-    return JSON.stringify(attribute.text)
+    return quoted(attribute.text)
 
   return attribute.kind === 'expression' ? text(attribute.expression).trim() : '\'\''
 }
 
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
-const propertyKey = (name: string) => IDENTIFIER.test(name) ? name : JSON.stringify(name)
+const propertyKey = (name: string) => IDENTIFIER.test(name) ? name : quoted(name)
 
 // The edit writing `inputProps` into the brackets of an element with none to rewrite, which has none when it is written `Toggle#id` alone.
 function insertion(element: ElementNode, object: string, others: boolean): (Span & { text: string })[] {
@@ -65,7 +70,7 @@ export function deprecatedUiInput(element: ElementNode, file: string, text: (spa
 
   const written = attributes.some(one => text(one.name) === 'inputProps')
   const entries = [
-    ...shorthand && !moved.some(one => text(one.name) === 'id') ? [`id: ${JSON.stringify(text(shorthand))}`] : [],
+    ...shorthand && !moved.some(one => text(one.name) === 'id') ? [`id: ${quoted(text(shorthand))}`] : [],
     ...moved.map(one => `${propertyKey(text(one.name))}: ${propertyValue(one, text)}`),
   ]
   const object = `inputProps={{ ${entries.join(', ')} }}`

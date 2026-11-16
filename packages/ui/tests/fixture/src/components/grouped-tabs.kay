@@ -14,7 +14,7 @@ Tabs#tabs(items={tabs} value="profile" label="Settings")
   @panel(tab)
     if tab === 'access'
       FormField(label="Access" group issue={issue()})
-        Toggle(inputProps={{ id: "login" }} name="login" label="Login")
-        Toggle(inputProps={{ id: "admin" }} name="admin" label="Admin")
+        Toggle(inputProps={{ id: 'login' }} name="login" label="Login")
+        Toggle(inputProps={{ id: 'admin' }} name="admin" label="Admin")
     else
       input#nick(name="nick")

@@ -13,8 +13,8 @@ const kinds = [{ value: 'post', label: 'Post' }, { value: 'page', label: 'Page' 
 //- The space skin over the controls it redraws, for the browser test to read and axe to check.
 main.starfield.flex.flex-col.items-start.gap-4.p-8
   h1 Space skin
-  Checkbox(inputProps={{ id: "ticked" }} label="Ticked" checked)
-  Checkbox(inputProps={{ id: "plain" }} label="Plain")
+  Checkbox(inputProps={{ id: 'ticked' }} label="Ticked" checked)
+  Checkbox(inputProps={{ id: 'plain' }} label="Plain")
   Select#kind(value="post" options={kinds} aria-label="Kind")
   MultiSelect(label="Planets" options={kinds} value={['post']})
   Button#key(label="Key")
