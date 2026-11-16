@@ -12,7 +12,7 @@ hall.rows.push({ id: 2, name: 'Front', parent: hall, rows: [] })
 
 export const schedule = action(t.Object({ title: t.String({ maxLength: 10_000, minLength: 1 }), at: t.Date() }), ({ title, at }, ctx) => {
   if (at < EARLIEST)
-    return ctx.fail(422, { earliest: EARLIEST })
+    return ctx.deny(422, { data: { earliest: EARLIEST } })
 
   return { title, at, tags: new Set(['new']), seats: 10n }
 })

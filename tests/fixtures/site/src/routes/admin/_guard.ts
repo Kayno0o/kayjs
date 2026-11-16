@@ -9,5 +9,5 @@ export default guard(({ locals, cookies, headers, redirect, deny }) => {
     redirect('/about')
 
   if (locals.user !== 'ada')
-    deny(403, 'Admins only')
+    deny(403, { message: 'Admins only' })
 })

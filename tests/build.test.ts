@@ -2620,7 +2620,7 @@ describe('the build report', () => {
   it('weighs each route, times the stages, counts what the caches answered, and keeps the sizes of the last good build only', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n = n() + 1}) {n()}\n',
       'src/page.css': '.page-marker { color: red }\n',
       'src/routes/index.kay': '--- server\nimport \'../page.css\'\n\nexport const page = { prerender: true }\n---\n---\nimport Counter from \'../counter.kay\'\n---\nhead\n  title Home\n  meta(name="description" content="Home")\nCounter\n',
       'src/routes/live.kay': '--- server\nconst path = ctx.url.pathname\n---\n---\nimport Counter from \'../counter.kay\'\n---\nhead\n  title Live\n  meta(name="description" content="Live")\nCounter\np {path}\n',
