@@ -1,4 +1,4 @@
-import type { Duration, Snippet } from 'kay'
+import type { CallResult, Duration, Snippet } from 'kay'
 import type { Tone } from './tone'
 import { ActionError, ActionRedirectError, ApiError, durationMs, signal, untrack } from 'kay'
 import { answerMessage } from './internal/answer-message'
@@ -220,7 +220,9 @@ function update(id: number, patch: ToastPatch): boolean {
 export type ToastOutcome = string | { message: string, description?: string | undefined, action?: ToastAction | undefined }
 
 // What a call's result is for a toast: the data of `{ ok: true, data }`, and the failure of `{ ok: false, error }` thrown, so a call of `call()` or an action reads as it did when it threw; anything else is its own value.
-export type Unwrapped<T> = T extends { ok: true, data: infer Data } ? Data : T extends { ok: false, error: { status: number } } ? never : T
+type ResultMark = Extract<keyof CallResult<unknown, unknown>, symbol>
+
+export type Unwrapped<T> = T extends { ok: true, data: infer Data } ? (ResultMark extends keyof T ? Data : T) : T extends { ok: false } ? (ResultMark extends keyof T ? never : T) : T
 
 // The mark kay puts on the result of a call, which an answer shaped like one lacks.
 const CALL_RESULT = Symbol.for('kay.call-result')
@@ -275,7 +277,7 @@ async function promise<T>(source: Promise<T> | (() => Promise<T>), { loading, su
   let value: Unwrapped<T>
 
   try {
-    value = unwrapped(await (typeof source === 'function' ? source() : source))
+    value = unwrapped(await (typeof source === 'function' ? source() : source)) as Unwrapped<T>
   }
   catch (thrown) {
     settle(() => typeof error === 'function' ? error(thrown) : error, 'danger')

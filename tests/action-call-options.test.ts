@@ -293,7 +293,7 @@ describe('what a call does once it succeeded', () => {
 })
 
 describe('the timeout of a call', () => {
-  it('rejects a call the server leaves unanswered with a readable TimeoutError, putting the optimistic change back', async () => {
+  it('rejects a call the server leaves unanswered with a readable ApiError of status 0 caused by the TimeoutError, putting the optimistic change back', async () => {
     gated()
 
     const [value, setValue] = reactive.createSignal(1)
@@ -301,7 +301,7 @@ describe('the timeout of a call', () => {
     const running = save({}, { timeout: '20ms', optimistic: () => setValue(2) })
 
     expect([value(), save.pending()]).toEqual([2, true])
-    await expect(running).rejects.toMatchObject({ name: 'TimeoutError', message: 'The action call timeout of 20ms passed before the server answered' })
+    await expect(running).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'The action call timeout of 20ms passed before the server answered', cause: { name: 'TimeoutError' } })
     expect([value(), save.pending()]).toEqual([1, false])
   })
 
@@ -409,7 +409,7 @@ describe('the retries of a call', () => {
     expect(await stub()({}, { retry: { times: 1, delay: '1ms' } })).toBe('late')
     mocks.pop()!.mockRestore()
     failing()
-    await expect(stub()({}, { retry: { times: 1, delay: '1ms' } })).rejects.toBeInstanceOf(TypeError)
+    await expect(stub()({}, { retry: { times: 1, delay: '1ms' } })).rejects.toMatchObject({ status: 0, cause: expect.any(TypeError) })
     mocks.pop()!.mockRestore()
     failing()
     expect(await stub()({}, { retry: { times: 1, delay: '1ms', when: () => true } })).toBe('late')
@@ -417,7 +417,7 @@ describe('the retries of a call', () => {
 
     const hung = serve(async post => post < 2 ? new Promise<Response>(() => undefined) : ok('late'))
 
-    await expect(stub()({}, { timeout: '20ms', retry: { times: 1, delay: '1ms' } })).rejects.toMatchObject({ name: 'TimeoutError' })
+    await expect(stub()({}, { timeout: '20ms', retry: { times: 1, delay: '1ms' } })).rejects.toMatchObject({ status: 0, cause: { name: 'TimeoutError' } })
     expect(hung.posts()).toBe(1)
     mocks.pop()!.mockRestore()
 

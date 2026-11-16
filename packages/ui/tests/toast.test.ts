@@ -1,3 +1,4 @@
+import type { CallResult } from 'kay'
 import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test'
 import { ActionError, ActionRedirectError, ApiError, signal } from 'kay'
 import { callAction } from '../src/forms'
@@ -235,8 +236,8 @@ describe('attempt', () => {
     const mark = Symbol.for('kay.call-result')
     const marked = <T extends object>(value: T): T => Object.defineProperty(value, mark, { value: true })
 
-    expect(await attempt(async () => marked({ ok: true as const, data: 'saved', error: undefined }), 'Could not save')).toBe('saved')
-    expect(await attempt(async () => marked({ ok: false, error: new ApiError(500, 'Down') }), 'Could not save')).toBeUndefined()
+    expect(await attempt(async () => marked({ ok: true, data: 'saved' }) as CallResult<string, unknown>, 'Could not save')).toBe('saved')
+    expect(await attempt(async () => marked({ ok: false, error: new ApiError(500, 'Down') }) as unknown as CallResult<string, unknown>, 'Could not save')).toBeUndefined()
     expect(shown()).toEqual([{ message: 'Could not save', tone: 'danger' }])
 
     const answer = { ok: false, error: { status: 422 }, issues: [] }

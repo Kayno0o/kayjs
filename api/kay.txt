@@ -235,7 +235,11 @@ type CallPromise<Result> = Promise<Result> & { orThrow: () => Promise<Result ext
 type CallQueue = 'parallel' | 'serial' | 'latest'
 
 [.] CallResult
-type CallResult<Data, Failed> = | { ok: true, data: Data, error?: undefined } | ({ ok: false, error: ErrorShape<Failed> } & ErrorShape<Failed>)
+type CallResult<Data, Failed> = | {
+  ok: true, data: Data, error?: undefined, readonly [RESULT]?: true
+} | ({
+  ok: false, error: ErrorShape<Failed>, readonly [RESULT]?: true
+} & ErrorShape<Failed>)
 
 [.] CardPageContext
 interface CardPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>

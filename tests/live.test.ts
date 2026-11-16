@@ -948,7 +948,7 @@ describe('call()', () => {
     expect(other.pending()).toBe(false)
   })
 
-  it('track() maps a validation failure to its fields and any other refusal under the form-wide key, and answers a broken success as status 0', async () => {
+  it('track() maps a validation failure to its fields and any other refusal under the form-wide key, and rejects a success whose JSON does not parse, which is a bug of the route', async () => {
     const answering = (status: number, body: unknown, type = 'application/json') => served.mockImplementationOnce((async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers: { 'content-type': type } })) as unknown as typeof fetch)
     const save = call.track(notes, '/')
 
@@ -962,7 +962,7 @@ describe('call()', () => {
     expect(await save({ method: 'post', body: { title: 'x' } })).toMatchObject({ ok: false, status: 409, data: { reason: 'taken' } })
 
     answering(200, '{broken', 'application/json')
-    expect(await save()).toMatchObject({ ok: false })
+    await expect(save()).rejects.toMatchObject({ name: 'ApiError', status: 200 })
     expect(save.pending()).toBe(false)
 
     const controller = new AbortController()

@@ -7,6 +7,7 @@ let ActionError: typeof import('../src/runtime/action').ActionError
 let ActionRedirectError: typeof import('../src/runtime/action').ActionRedirectError
 let FAILURE_HEADER: string
 let call: typeof import('../src/runtime/live').call
+let signal: typeof import('../src/runtime/core').signal
 
 interface Result { ok: boolean, data?: unknown, status?: number, message?: string, errors?: Record<string, string>, error?: { status: number, message: string, errors: Record<string, string>, data: unknown } }
 type Call = ((input: object, options?: object) => Promise<Result> & { orThrow: () => Promise<unknown> }) & { track: () => (input: object) => Promise<Result> & { orThrow: () => Promise<unknown> }, pending: () => boolean }
@@ -16,6 +17,7 @@ beforeAll(async () => {
   ;({ actionStub, ActionError, ActionRedirectError } = await import('../src/runtime/action'))
   ;({ FAILURE_HEADER } = await import('../src/runtime/swap'))
   ;({ call } = await import('../src/runtime/live'))
+  ;({ signal } = await import('../src/runtime/core'))
 })
 
 afterAll(async () => {
@@ -24,10 +26,12 @@ afterAll(async () => {
 
 const mocks: { mockRestore: () => void }[] = []
 
-afterEach(() => {
+function restore(): void {
   for (const mock of mocks.splice(0))
     mock.mockRestore()
-})
+}
+
+afterEach(restore)
 
 function answer(reply: () => Response | Promise<Response>): void {
   mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async (_url: string, init?: RequestInit) => {
@@ -89,6 +93,55 @@ describe('what an island call of an action answers', () => {
     expect(result.message).toContain('timeout')
   })
 
+  it('answers a serial call that failed as a result, and rejects what a later latest call aborted', async () => {
+    answer(() => refusal(422, { name: 'Required' }, undefined))
+
+    const serial = stub()
+    const first = serial({}, { queue: 'serial' })
+    const second = serial({}, { queue: 'serial' })
+
+    expect([(await first).ok, (await second).ok]).toEqual([false, false])
+    restore()
+
+    // Answers after a moment, unless aborted by then.
+    mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async (_url: string, init?: RequestInit) => new Promise<Response>((resolve, reject) => {
+      if (init?.signal?.aborted === true) {
+        reject(init.signal.reason)
+
+        return
+      }
+
+      const timer = setTimeout(() => resolve(new Response(stringify('later'))), 30)
+
+      init?.signal?.addEventListener('abort', () => {
+        clearTimeout(timer)
+        reject(init.signal!.reason)
+      }, { once: true })
+    })) as unknown as typeof fetch))
+
+    const latest = stub()
+    const earlier = latest({}, { queue: 'latest' })
+    const later = latest({}, { queue: 'latest' })
+
+    await expect(earlier).rejects.toHaveProperty('name', 'AbortError')
+    expect(await later).toEqual({ ok: true, data: 'later' })
+  })
+
+  it('puts an optimistic change back when the call answers a failure, and keeps it for a success', async () => {
+    const at = signal(0)
+
+    answer(() => refusal(409, { name: 'Taken' }, undefined))
+
+    const failed = await stub()({}, { optimistic: () => at.set(1) })
+
+    expect(failed.ok).toBe(false)
+    expect(at()).toBe(0)
+    restore()
+    answer(() => new Response(stringify('fine')))
+    expect((await stub()({}, { optimistic: () => at.set(2) })).ok).toBe(true)
+    expect(at()).toBe(2)
+  })
+
   it('rejects for a signal of the caller that timed out, which is an abort and not the timeout option', async () => {
     mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async (_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true })
@@ -106,9 +159,7 @@ describe('what an island call of an action answers', () => {
 
     controller.abort()
     await expect(running).rejects.toHaveProperty('name', 'AbortError')
-    for (const mock of mocks.splice(0)) {
-      mock.mockRestore()
-    }
+    restore()
     answer(() => new Response(null, { status: 303, headers: { 'x-kay-redirect': '/away' } }))
 
     const navigate = await import('../src/runtime/navigate-api')
@@ -133,9 +184,7 @@ describe('what an island call of an action answers', () => {
 
     await expect(refused).rejects.toBeInstanceOf(ActionError)
     await expect(refused).rejects.toMatchObject({ status: 422, errors: { name: 'Required' } })
-    for (const mock of mocks.splice(0)) {
-      mock.mockRestore()
-    }
+    restore()
     answer(() => new Response(stringify('fine')))
     expect(await stub()({}).orThrow()).toBe('fine')
   })
@@ -160,7 +209,12 @@ describe('what an island call of an action answers', () => {
     const result = await save({})
 
     expect([result.ok, result.status]).toEqual([false, 0])
-    await expect(save({}).orThrow()).rejects.toBeInstanceOf(TypeError)
+    const running = save({})
+    const failed = await running
+
+    expect(failed.error).toMatchObject({ name: 'ApiError', status: 0 })
+    // The result and the throwing style hold the same failure, a network error read as status 0 by both.
+    await expect(running.orThrow()).rejects.toBe(failed.error)
   })
 })
 
@@ -172,24 +226,18 @@ describe('what an island call of an API route answers', () => {
   it('resolves { ok, data }, a refusal, a 5xx and a network failure as results, never throwing', async () => {
     mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json([1, 2])) as unknown as typeof fetch))
     expect(await route()).toEqual({ ok: true, data: [1, 2] })
-    for (const mock of mocks.splice(0)) {
-      mock.mockRestore()
-    }
+    restore()
 
     mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json({ errors: { title: 'Short' } }, { status: 422 })) as unknown as typeof fetch))
 
     const refused = await route()
 
     expect([refused.ok, refused.status, refused.errors, refused.message]).toEqual([false, 422, { title: 'Short' }, 'Short'])
-    for (const mock of mocks.splice(0)) {
-      mock.mockRestore()
-    }
+    restore()
 
     mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async () => new Response('boom', { status: 500 })) as unknown as typeof fetch))
     expect((await route()).status).toBe(500)
-    for (const mock of mocks.splice(0)) {
-      mock.mockRestore()
-    }
+    restore()
 
     mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async () => {
       throw new TypeError('Failed to fetch')

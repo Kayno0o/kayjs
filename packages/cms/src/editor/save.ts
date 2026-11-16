@@ -1,4 +1,4 @@
-import type { Attempted } from '@kayjs/ui'
+import type { Attempted, Unwrapped } from '@kayjs/ui'
 import type { Drafts } from '../drafts'
 import type { EntryRef, Issue } from '../kay/contract'
 import type { RedirectStatus } from '../missing'
@@ -16,7 +16,7 @@ import { isSignedOut, setSessionEnded } from './session'
 import { uploading } from './upload'
 
 // `attempt` that tells an ended sign-in apart from a failure: it toasts that the session ended and shows the way to sign in again, and leaves the edits where they are.
-async function attempt<T>(run: () => Promise<T>, failure: string): Promise<Attempted<T> | undefined> {
+async function attempt<T>(run: () => Promise<T>, failure: string): Promise<Attempted<Unwrapped<T>> | undefined> {
   let signedOut = false
 
   const result = await attemptCall(async () => {
@@ -35,9 +35,8 @@ async function attempt<T>(run: () => Promise<T>, failure: string): Promise<Attem
 
   setSessionEnded(signedOut)
 
-  // `attempt` unwraps by the mark of a call's result, which `run` already unwrapped with `.orThrow()`, so its type reads an answer shaped like a result (an entry write's refusal) as one.
   if (!signedOut)
-    return result as Attempted<T> | undefined
+    return result
 
   toast.error(wording('cms.session.toast', 'Your session has ended. Sign in again to save.'))
 

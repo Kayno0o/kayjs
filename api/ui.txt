@@ -661,7 +661,11 @@ interface UiSettings
   icons: Record<"alert" | "back" | "chevron" | "close" | "delete" | "globe" | "info" | "menu" | "play" | "plus" | "search" | "spinner" | "star" | "success" | "zoomFit" | "zoomIn" | "zoomOut", IconProps> & Partial<Record<AddedSlot, IconProps>>
 
 [.] Unwrapped
-type Unwrapped<T> = T extends { ok: true, data: infer Data } ? Data : T extends { ok: false, error: { status: number } } ? never : T
+type Unwrapped<T> = T extends {
+  ok: true, data: infer Data
+} ? (ResultMark extends keyof T ? Data : T) : T extends {
+  ok: false
+} ? (ResultMark extends keyof T ? never : T) : T
 
 [./accordion.kay] default
 component default

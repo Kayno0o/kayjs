@@ -75,7 +75,8 @@ interface Posted {
 
 // What an action's call returns: the promise, with `orThrow()` for the throwing style the session reads it by.
 function withOrThrow<Args extends unknown[], Answer>(run: (...args: Args) => Promise<Answer>) {
-  return async (...args: Args) => {
+  // eslint-disable-next-line ts/promise-function-async -- an async function would wrap the promise, which carries `orThrow()`
+  return (...args: Args) => {
     const answer = run(...args)
 
     return Object.assign(answer, { orThrow: async () => answer })

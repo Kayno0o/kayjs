@@ -4,17 +4,17 @@ import { apiErrorOf } from './api-error'
 import { listenerSet } from './listener-set'
 import { ownSignal, untrack } from './reactive'
 
+// The mark a call's result carries (not enumerable), so a reader tells it from an answer shaped like one, such as an entry write's `{ ok: false, error, issues }`: `unwrapped` of kayjs-ui looks for it by name, and `CallResult` names it as an optional key, which is how a type tells a result from such an answer.
+const RESULT: unique symbol = Symbol.for('kay.call-result')
+
 // How a tracked call went, for an action and for a route alike: what it answered, or the refusal. `message` is the text to show; `errors` holds a message per field, the form-wide one under ''; `data` is what the handler passed to `ctx.fail` for an action, the answer a route refused with for a route.
 // A refusal carries them twice, flat on the result and as its `error`, the one place every other result keeps its failure: the `ApiError` itself (an `ActionError` for an action), so `orThrow()` and a `throw result.error` throw what the call threw.
 export type CallResult<Data, Failed>
-  = | { ok: true, data: Data, error?: undefined }
-    | ({ ok: false, error: ErrorShape<Failed> } & ErrorShape<Failed>)
+  = | { ok: true, data: Data, error?: undefined, readonly [RESULT]?: true }
+    | ({ ok: false, error: ErrorShape<Failed>, readonly [RESULT]?: true } & ErrorShape<Failed>)
 
-// What a call returns: the result, and `orThrow()` for the throwing style, which resolves with the data and rejects with the failure itself (an `ActionError`, an `ApiError`, the `TimeoutError` of a timeout).
+// What a call returns: the result, and `orThrow()` for the throwing style, which resolves with the data and rejects with the failure itself (an `ActionError`, or an `ApiError`, which is a status 0 one with the browser's error or the `TimeoutError` as its `cause` when no answer came).
 export type CallPromise<Result> = Promise<Result> & { orThrow: () => Promise<Result extends { ok: true, data: infer Data } ? Data : never> }
-
-// The mark a call's result carries (not enumerable), so a reader tells it from an answer shaped like one, such as an entry write's `{ ok: false, error, issues }`: `unwrapped` of kayjs-ui looks for it by name.
-const RESULT = Symbol.for('kay.call-result')
 
 const marked = <Result extends object>(result: Result): Result => Object.defineProperty(result, RESULT, { value: true })
 
@@ -23,12 +23,26 @@ export const signalAborted = (options: unknown): boolean => (options as { signal
 
 // Turns a call that throws into one that answers a result: `refused` gives the `ApiError` of what it threw, which is the result's `error`, or undefined for what is no failure of the call (an abort, a redirect) or of the visitor (a bug), which rejects as it threw.
 export function settling<Data>(throwing: Promise<Data>, refused: (error: unknown) => ApiError | undefined): CallPromise<CallResult<Data, unknown>> {
+  // What a failure is read as is kept, so the result's `error` and what `orThrow()` rejects with are the same object.
+  let read: { failure: unknown, error: ApiError | undefined } | undefined
+
+  const refusal = (failure: unknown): ApiError | undefined => {
+    if (read !== undefined && read.failure === failure)
+      return read.error
+
+    const error = refused(failure)
+
+    read = { failure, error }
+
+    return error
+  }
+
   const result = (async (): Promise<CallResult<Data, unknown>> => {
     try {
       return marked({ ok: true, data: await throwing })
     }
     catch (failure) {
-      const error = refused(failure)
+      const error = refusal(failure)
 
       if (error === undefined)
         throw failure
@@ -37,10 +51,19 @@ export function settling<Data>(throwing: Promise<Data>, refused: (error: unknown
     }
   })()
 
+  const orThrow = async () => {
+    try {
+      return await throwing
+    }
+    catch (failure) {
+      throw refusal(failure) ?? failure
+    }
+  }
+
   // A call awaited only through `orThrow()` leaves this one to reject on its own, which is no unhandled rejection.
   void Promise.allSettled([result])
 
-  return Object.assign(result, { orThrow: async () => throwing })
+  return Object.assign(result, { orThrow })
 }
 
 // The callbacks a tracked call takes in its options, and as methods of the same names: `onX` after a transition, one object argument, `input` the first argument of the call. One that throws is logged and leaves the call alone.

@@ -1051,8 +1051,8 @@ export interface TrackedApi<Module, Path> extends Reader<unknown, LoadStatus> {
   readonly onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }
 
-// What a call that failed answers: the route's refusal or a failure with no answer (status 0). An abort rejects as it threw.
-const refusalOfApi = (error: unknown): ApiError | undefined => error instanceof ApiError ? error : undefined
+// What a call that failed answers: the route's refusal or a failure with no answer (status 0). An abort rejects as it threw, and so does an answer the route sent wrong (a 2xx whose JSON does not parse), which is no visitor's mistake.
+const refusalOfApi = (error: unknown): ApiError | undefined => error instanceof ApiError && (error.status === 0 || error.status >= 400) ? error : undefined
 
 // Calls a route of a module under `src/api`, from an event handler or any code running in the browser, typed from the route: resolves `{ ok: true, data }` with what it answered, or `{ ok: false, status, message, errors, data }` when it refused or got no answer, and never throws for either; `.orThrow()` resolves with the data and throws an `ApiError` instead, and an abort rejects with the signal's reason.
 function called<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...args: Optional<ApiCallOptions<Module, Path, M>>): CallPromise<CallResult<ApiAnswer<Module, Path, M>, unknown>> {
