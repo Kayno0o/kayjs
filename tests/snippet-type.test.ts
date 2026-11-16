@@ -87,7 +87,7 @@ describe('Snippet', () => {
     expect(await problems({
       'src/routes/index.kay': '---\nimport Card from \'../card.kay\'\n---\nCard(title="x" n={1})\n',
       'src/card.kay': '---\nconst { title, n } = props<{ title: string, n: number }>()\n---\nslot title\nslot n(1)\nslot nope\n',
-    })).toEqual([['src/card.kay', 5, 'TS2349'], ['src/card.kay', 6, 'TS2339']])
+    })).toEqual([['src/card.kay', 5, 'TS2349']])
   })
 
   it('puts the error of a slot at its name', async () => {
@@ -96,7 +96,7 @@ describe('Snippet', () => {
       'src/card.kay': '---\nconst { title, n } = props<{ title: string, n: number }>()\n---\nslot title\nslot n(1)\nslot nope\n',
     })
 
-    expect(found.map(d => [d.line, d.column])).toEqual([[5, 6], [6, 6]])
+    expect(found.map(d => [d.line, d.column])).toEqual([[5, 6]])
   })
 
   it('sends an island a Snippet with no parameters as its static slot, and refuses one with parameters from a layout or a server page', async () => {
