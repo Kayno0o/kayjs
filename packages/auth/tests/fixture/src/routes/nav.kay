@@ -6,15 +6,16 @@ import SignedIn from '@kayjs/auth/components/signed-in.kay'
 import SignedOut from '@kayjs/auth/components/signed-out.kay'
 import DeletionBanner from '@kayjs/auth/components/deletion-banner.kay'
 import ImpersonationBanner from '@kayjs/auth/components/impersonation-banner.kay'
+import SignInLink from '@kayjs/auth/components/sign-in-link.kay'
 import UserMenu from '@kayjs/auth/components/user-menu.kay'
 ---
 ImpersonationBanner
 DeletionBanner
 nav
   SignedOut
-    a#sign-in(href="/auth/sign-in") Sign in
+    SignInLink#sign-in
   SignedIn
     p#member Member
   SignedIn(role="admin")
     p#admin Admin
-  UserMenu
+  UserMenu(signIn={false})

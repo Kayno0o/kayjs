@@ -133,7 +133,7 @@ const user = await ctx.locals.auth.user()
 if user then signedIn
   p Signed in as {signedIn.email}
 else
-  a(href="/auth/sign-in") Sign in
+  a(href={ctx.locals.auth.signInUrl()}) Sign in
 ```
 
 A page or an action that needs a user asks for one with `requireUser()`. An anonymous visitor reading a page goes to the sign-in page and comes back. A post, an action's call included, is refused with a 401. No check is written by hand.
@@ -183,12 +183,15 @@ The prebuilt pages that open from a mailed link, to reset a password, verify an 
 
 For a link of your own, `signInUrl()` is the sign-in page leading back to the current page, and `signInUrl('/pricing')` to another path of the site. A path that is not of the site leads home.
 
-A sign-out button is a form posting to `/auth/sign-out`, with no action of yours. Its `redirect` field says where to go next, a path of the site, `/` by default. A link signs no one out, and a post from another site is refused.
+`SignOutButton` is the sign-out button, a form posting to `/auth/sign-out` with no action of yours. Its `redirect` says where to go next, a path of the site, `/` by default. A link signs no one out, and a post from another site is refused. `SignInLink` is the way back in.
 
 ```kay
-form(method="post" action="/auth/sign-out")
-  input(type="hidden" name="redirect" value="/")
-  button Sign out
+---
+import SignInLink from '@kayjs/auth/components/sign-in-link.kay'
+import SignOutButton from '@kayjs/auth/components/sign-out-button.kay'
+---
+SignOutButton(redirect="/")
+SignInLink
 ```
 
 ### On a plain Elysia app
@@ -206,20 +209,23 @@ Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: 
 ```kay
 ---
 import SignedIn from '@kayjs/auth/components/signed-in.kay'
-import SignedOut from '@kayjs/auth/components/signed-out.kay'
+import SignInLink from '@kayjs/auth/components/sign-in-link.kay'
+import SignOutButton from '@kayjs/auth/components/sign-out-button.kay'
 import UserMenu from '@kayjs/auth/components/user-menu.kay'
 ---
 nav
-  SignedOut
-    a(href="/auth/sign-in") Sign in
   SignedIn(role="admin")
     a(href="/admin") Admin
   UserMenu
+  SignInLink(button tone="accent" label="Join")
+  SignOutButton(redirect="/goodbye" variant="ghost")
 ```
 
 - `SignedIn` renders its children for a signed-in user, and with `role="admin"` for one holding that role, the app's `roles` hierarchy applied. `SignedOut` renders them for a visitor.
-- `UserMenu` shows the username or email, a link to the account when the prebuilt pages are on (`account={false}` leaves it out) and a sign-out button. The account pages' own header is one.
-- A guest is signed out for all three.
+- `UserMenu` shows the username or email, a link to the account when the prebuilt pages are on (`account={false}` leaves it out), its children and a sign-out button (`redirect` names where it goes). A visitor gets a link to the sign-in page instead, `signIn={false}` leaving it out. The account pages' own header is one.
+- `SignOutButton` takes `redirect` (the pages' `home` by default), `label` (children follow it), and a Button's `variant`, `tone`, `size` and `icon`; `class` styles the form and `class={{ button: '...' }}` the button.
+- `SignInLink` leads back to the page it is on (`redirect` names another path, `href` another page), takes `label` (children follow it), and draws as a Button with `button`.
+- A guest is signed out for all of them.
 - `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
 - They read the request being answered, so a page with `prerender: true` fails the build asking you to render it per request. They nest in one another and in the app's own `await` blocks.
 

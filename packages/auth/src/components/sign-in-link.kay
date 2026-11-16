@@ -1,0 +1,19 @@
+---
+import { localize } from 'kay/i18n'
+import { wording } from 'kay/words'
+import type { AsLink } from '@kayjs/ui/lib/button-props'
+import Button from '@kayjs/ui/button.kay'
+import { currentViewer } from '../viewer'
+
+// A link to the sign-in page, leading back to this page (`redirect` names another path of the site; `href` another page altogether, such as the app's own sign-in). `button` draws it as a Button, with its `variant`, `tone`, `size` and `icon`; children follow the label.
+const { redirect, href, button = false, label, variant, tone, size, icon, busy, spinner, ...rest } = props<Omit<AsLink, 'href'> & { href?: string | undefined, redirect?: string | undefined, button?: boolean | undefined }>()
+const target = href ?? localize(currentViewer().auth.signInUrl(redirect))
+const text = label ?? wording('auth.signIn.link', 'Sign in')
+---
+if button
+  Button(part="root" {...rest} href={target} label={text} variant={variant} tone={tone} size={size} icon={icon} busy={busy} spinner={spinner})
+    slot
+else
+  a(part="root" {...rest} href={target})
+    | {text}
+    slot

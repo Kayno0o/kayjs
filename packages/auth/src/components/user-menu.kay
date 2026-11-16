@@ -1,21 +1,24 @@
 ---
+import type { JSX } from 'kay'
 import { ctx } from 'kay'
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
-import Button from '@kayjs/ui/button.kay'
 import { currentViewer } from '../viewer'
+import SignInLink from './sign-in-link.kay'
+import SignOutButton from './sign-out-button.kay'
 
-// `account={false}` leaves out the link to the account page, as the account page itself does.
-const { account = true } = props<{ account?: boolean }>()
+// `account={false}` leaves out the link to the account page, as the account page itself does, and `signIn={false}` the sign-in link a visitor sees. `redirect` is where a sign-out goes; children follow the account link; attributes go on the wrapper.
+const { account = true, signIn = true, redirect, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class'> & { account?: boolean, signIn?: boolean, redirect?: string | undefined }>()
 const features = currentViewer().auth.features()
 const accountPage = features.pages ? localize(`${features.pages.prefix}/account`) : null
-const home = localize(features.pages?.home ?? '/')
 ---
 if ctx.user then found
-  .kayjs-auth.flex.flex-wrap.items-center.gap-3
+  .kayjs-auth.flex.flex-wrap.items-center.gap-3(part="root" {...rest})
     span.text-muted {found.username ?? found.email}
     if account && accountPage
       a(href={accountPage}) {wording('auth.account.title', 'Your account')}
-    form(method="post" action={`${features.prefix}/sign-out`})
-      input(type="hidden" name="redirect" value={home})
-      Button(type="submit" label={wording('auth.account.signOut', 'Sign out')})
+    slot
+    SignOutButton(redirect={redirect})
+else if signIn
+  .kayjs-auth.flex.flex-wrap.items-center.gap-3(part="root" {...rest})
+    SignInLink

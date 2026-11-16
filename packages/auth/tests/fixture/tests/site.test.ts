@@ -142,6 +142,21 @@ describe('the prebuilt pages', () => {
     expect(nested.find('.kayjs-auth form button').map(button => button.text)).toEqual(['Sign out'])
   })
 
+  test('SignOutButton and SignInLink are customised by props, and UserMenu links a visitor to sign in', async () => {
+    const anonymous = await (await browser()).visit('/menu')
+
+    expect(anonymous.find('#menu a').map(link => [link.text, link.attributes.href])).toEqual([['Sign in', '/auth/sign-in?redirect=%2Fmenu']])
+    expect(anonymous.find('#as-button').map(link => [link.text, link.attributes.href, link.attributes['data-variant']])).toEqual([['Join', '/auth/sign-in?redirect=%2Fpricing', 'solid']])
+    expect(anonymous.find('#custom').map(link => [link.text, link.attributes.href])).toEqual([['Log in', '/own-sign-in']])
+
+    const ada = await signedUp('menu@example.com')
+    const member = await ada.visit('/menu')
+
+    expect(member.find('#menu form').map(form => form.attributes.action)).toEqual(['/auth/sign-out'])
+    expect(member.find('input[name=redirect]').map(input => input.attributes.value)).toEqual(['/menu', '/nav'])
+    expect(member.find('button#out').map(button => [button.text, button.attributes['data-test']])).toEqual([['Leave', 'out']])
+  })
+
   test('a template reads ctx.user and ctx.can with no fence, in the first bytes, and a page reaching no template reads no session', async () => {
     const anonymous = await (await browser()).visit('/ctx')
 

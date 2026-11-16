@@ -9,20 +9,23 @@
 ```kay
 ---
 import SignedIn from '@kayjs/auth/components/signed-in.kay'
-import SignedOut from '@kayjs/auth/components/signed-out.kay'
+import SignInLink from '@kayjs/auth/components/sign-in-link.kay'
+import SignOutButton from '@kayjs/auth/components/sign-out-button.kay'
 import UserMenu from '@kayjs/auth/components/user-menu.kay'
 ---
 nav
-  SignedOut
-    a(href="/auth/sign-in") Sign in
   SignedIn(role="admin")
     a(href="/admin") Admin
   UserMenu
+  SignInLink(button tone="accent" label="Join")
+  SignOutButton(redirect="/goodbye" variant="ghost")
 ```
 
 - `SignedIn` renders its children for a signed-in user, and with `role="admin"` for one holding that role, the app's `roles` hierarchy applied. `SignedOut` renders them for a visitor.
-- `UserMenu` shows the user's username or email, a link to their account when the prebuilt pages are on (`account={false}` leaves it out) and a sign-out button back to the pages' home. The account pages' own header is one.
-- A guest is signed out for all three.
+- `UserMenu` shows the user's username or email, a link to their account when the prebuilt pages are on (`account={false}` leaves it out), its children, and a sign-out button back to the pages' home (`redirect` names another path). A visitor gets a link to the sign-in page instead, `signIn={false}` leaving it out. The account pages' own header is one.
+- `SignOutButton` is the form posting to the sign-out route, a Button inside it: `redirect` is the path to go to after (the pages' `home` by default), `label` words the button and children follow it, and `variant`, `tone`, `size`, `icon` and attributes are the Button's. `class` styles the form, `class={{ button: '...' }}` the button. It never reads the prefix: the app writes no `features().prefix`.
+- `SignInLink` is a link to the sign-in page leading back to the page it is on: `redirect` names another path of the site, `href` another page altogether (the app's own sign-in), `label` the wording, children following it. `button` draws it as a Button, taking `variant`, `tone`, `size` and `icon`.
+- A guest is signed out for all of them.
 - `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
 - They read the request being answered, so a page with `prerender: true` fails the build asking you to render it per request. They nest in one another and in the app's own `await` blocks.
 
@@ -56,4 +59,4 @@ A page reads the user before it renders when its imports reach `SignedIn`, `Sign
 ## Reference
 
 - `viewer` goes beside `module` and `pages` in `auth({ ... })`: left out, the pages reaching a template reading `ctx` read the user; `true` reads it on every page.
-- `SignedIn` takes `role`; `UserMenu` takes `account`; `SignedOut`, `ImpersonationBanner` and `DeletionBanner` take none. All import from `@kayjs/auth/components/<name>.kay`.
+- `SignedIn` takes `role`; `UserMenu` takes `account`, `signIn` and `redirect`; `SignOutButton` takes `redirect`, `label` and a Button's props; `SignInLink` takes `redirect`, `href`, `button`, `label` and a Button's props; `SignedOut`, `ImpersonationBanner` and `DeletionBanner` take none. All import from `@kayjs/auth/components/<name>.kay`.

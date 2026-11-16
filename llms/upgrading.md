@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.105.0
 
+### `UserMenu` links a visitor to sign in
+
+`UserMenu` now draws a sign-in link for a visitor, where it drew nothing: remove the `SignedOut` link you kept beside it, or pass `signIn={false}`. `SignOutButton` and `SignInLink` ([components](../packages/auth/llms/signed-in-components.md)) replace a hand-written sign-out form and sign-in link.
+
 ### An island's call answers a result
 
 `await add(input)` and `await call(api, '/path')` from an island resolved with the data and threw `ActionError` or `ApiError` for a refusal. They resolve `{ ok: true, data }` or `{ ok: false, status, message, errors, data, error }` now, and throw for no visitor's mistake: a refusal, a handler that threw, a network failure and a timeout (status 0) are results; an abort and a redirect still reject. `kay check` fails where the old result is used as the data. Write `const { ok, data } = await add(input)`, or append `.orThrow()` to keep the throwing style: `const id = await add(input).orThrow()` resolves the data and throws what the call threw (an `ActionError`, or an `ApiError` of status 0 for a call with no answer). A `try` around a call whose `catch` shows the refusal now never runs: read `result.error`, `result.message` or `add.form.error('field')`. A call awaited with its result left out (`await add(input)` in a `try` to know it failed) needs `.orThrow()` or a look at `result.ok`. `track()` handles answer the same, a call with no answer included. No lint rewrites it, as `await add(input)` reads the same in both styles and tells them apart by what is done with the answer, which `kay check` reads no types of. kayjs-ui's `attempt` and `toast.promise` take a call's result as they took what it threw, and `site.call` of a test site is unchanged.

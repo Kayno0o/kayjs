@@ -1,0 +1,12 @@
+--- server
+export const page = { guards: false }
+---
+---
+import SignInLink from '@kayjs/auth/components/sign-in-link.kay'
+import SignOutButton from '@kayjs/auth/components/sign-out-button.kay'
+import UserMenu from '@kayjs/auth/components/user-menu.kay'
+---
+UserMenu#menu(redirect="/menu")
+SignInLink#as-button(button tone="accent" redirect="/pricing" label="Join")
+SignInLink#custom(href="/own-sign-in" label="Log in")
+SignOutButton#out(redirect="/nav" label="Leave" tone="danger" data-test="out")

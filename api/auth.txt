@@ -1868,6 +1868,45 @@ component default
 [./components/impersonation-banner.kay] default
 component default
 
+[./components/sign-in-link.kay] default
+component default
+  button?: boolean | undefined
+  children?: Element
+  class?: string | undefined | {
+  root?: string | undefined | {
+    root?: string | undefined | {
+      root?: string | undefined;
+      spinner?: string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: string | undefined | {
+      root?: string | undefined;
+    };
+  };
+}
+  href?: string | undefined
+  redirect?: string | undefined
+
+[./components/sign-out-button.kay] default
+component default
+  children?: Element
+  class?: string | undefined | {
+  root?: string | undefined;
+  button?: string | undefined | {
+    root?: string | undefined | {
+      root?: string | undefined;
+      spinner?: string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: string | undefined | {
+      root?: string | undefined;
+    };
+  };
+}
+  redirect?: string | undefined
+
 [./components/signed-in.kay] default
 component default
   children?: Element
@@ -1880,6 +1919,10 @@ component default
 [./components/user-menu.kay] default
 component default
   account?: boolean
+  children?: Element
+  class?: string | undefined | { root?: string | undefined; }
+  redirect?: string | undefined
+  signIn?: boolean
 
 [./pg] AuthAttempts
 const AuthAttempts: TableDef<"kay_attempts", ExtractColumns<{

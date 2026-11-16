@@ -11,6 +11,7 @@ export default defineMessages({
     remember: 'Rester connecté',
     signIn: {
       title: 'Connexion',
+      link: 'Se connecter',
       identifier: 'Adresse e-mail ou nom d’utilisateur',
       submit: 'Se connecter',
       provider: 'Continuer avec {provider}',
