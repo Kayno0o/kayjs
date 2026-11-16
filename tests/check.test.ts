@@ -159,7 +159,6 @@ describe('kay check', () => {
     const brief = diagnostics.filter(d => d.code !== 'external-redirect').map(d => ({ file: d.file.slice(fixtures.length + 1), line: d.line, column: d.column, code: d.code, message: firstLine(d.message) }))
 
     expect(brief).toEqual([
-      ...[7, 9].map(line => ({ file: 'broken/src/routes/feed.kay', line, column: 1, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects' })),
       { file: 'broken/src/routes/[id].kay', line: 2, column: 30, code: 'TS2339', message: 'Property \'slug\' does not exist on type \'{ id: string; }\'.' },
       { file: 'broken/src/routes/[id].kay', line: 5, column: 9, code: 'TS2551', message: expect.stringContaining('Property \'nam\' does not exist') },
       { file: 'broken/src/routes/feed.kay', line: 10, column: 11, code: 'TS2551', message: expect.stringContaining('Property \'lengt\' does not exist on type \'string[]\'') },
@@ -455,7 +454,7 @@ describe.concurrent('kay check, edge cases', () => {
   })
 
   it('types a template const, reporting at its line a type error and a name nothing reads', async () => {
-    const root = await scratchProject({ 'src/list.kay': '---\nconst { products } = props<{ products: { name: string, cents: number }[] }>()\n---\nfor product of products\n  const price = product.cents.toUpperCase()\n  const { name, cents: _cents } = product\n  const unused = 1\n  li {price} {name}\n' })
+    const root = await scratchProject({ 'src/list.kay': '---\nconst { products } = props<{ products: { name: string, cents: number }[] }>()\n---\nfor product of products key={product.name}\n  const price = product.cents.toUpperCase()\n  const { name, cents: _cents } = product\n  const unused = 1\n  li {price} {name}\n' })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[5, 'TS2339'], [7, 'unread-name']])
@@ -1650,10 +1649,10 @@ describe.concurrent('kay check, edge cases', () => {
   })
 
   it('types an await block\'s then alias as each part of an async iterable, and as what a promise resolves to', async () => {
-    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nasync function* count() {\n  yield 1\n}\n\nconst parts = count()\nconst done = Promise.resolve(\'a\')\n---\n// kay-allow uncaught-await\nawait parts then n\n  p {n.toFixed(1)} {n.length}\n// kay-allow uncaught-await\nawait done then text\n  p {text.length} {text.toFixed(1)}\n' })
+    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nasync function* count() {\n  yield 1\n}\n\nconst parts = count()\nconst done = Promise.resolve(\'a\')\n---\nawait parts then n\n  p {n.toFixed(1)} {n.length}\nawait done then text\n  p {text.length} {text.toFixed(1)}\n' })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[11, 'TS2339'], [14, 'TS2551']])
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[10, 'TS2339'], [12, 'TS2551']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -2117,7 +2116,7 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       // Only the last block reads a path nothing narrows.
-      expect((await check(root, { lints: { 'uncaught-await': 'allow' } })).map(diagnostic => [basename(diagnostic.file), diagnostic.line, firstLine(diagnostic.message)])).toEqual([
+      expect((await check(root)).map(diagnostic => [basename(diagnostic.file), diagnostic.line, firstLine(diagnostic.message)])).toEqual([
         ['island.kay', 40, expect.stringContaining('dossier.latest\' is possibly \'null\'')],
         ['static.kay', 36, expect.stringContaining('dossier.latest\' is possibly \'null\'')],
       ])
@@ -3858,7 +3857,7 @@ describe.concurrent('kay check, markup', () => {
       'for waves of rows',
       '  div(innerHTML={waves})',
       'div(innerHTML={waves})',
-      'for row of objects',
+      'for row of objects key={row.waves}',
       '  const { waves: label } = row',
       '  div(innerHTML={waves})',
       '  div(innerHTML={label})',
@@ -4300,7 +4299,7 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('warns of an island\'s for over objects with no id and no key, and offers the key written as a position', async () => {
+  it('warns of a component\'s for over objects with no id and no key, and offers the key written as a position', async () => {
     const list = '---\nimport { signal } from \'kay\'\n\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts = []; todos = []; tags = [] }}) Clear\n'
     const root = await scratchProject({
       'src/components/list.kay': list,
@@ -4321,7 +4320,7 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('reports unkeyed rows only where islands match them, and judges the row type of nullable, union, any and optional-id lists', async () => {
+  it('reports unkeyed rows in every component, not a page, and judges the row type of nullable, union, any and optional-id lists', async () => {
     const types = [
       '---',
       'import { signal } from \'kay\'',
@@ -4351,7 +4350,7 @@ describe.concurrent('kay check, unused code', () => {
       // Imported by an island only: its loop matches rows in the browser.
       'src/components/inner.kay': rows,
       'src/components/outer.kay': '---\nimport { signal } from \'kay\'\nimport Inner from \'./inner.kay\'\n\nconst list = signal([{ text: \'a\' }])\n---\nInner(rows={list()})\nbutton(onClick={() => list = []}) Clear\n',
-      // Imported by a page too: it may only ever render on the server, so it stays silent.
+      // Imported by a page too: it may still render in the browser, so it is reported as well.
       'src/components/shared.kay': rows,
       'src/routes/index.kay': '---\nimport Outer from \'../components/outer.kay\'\nimport Shared from \'../components/shared.kay\'\nimport Types from \'../components/types.kay\'\n---\nOuter\nTypes\nShared(rows={[{ text: \'a\' }]})\n',
     })
@@ -4359,7 +4358,7 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const found = (await check(root)).filter(d => d.code === 'unkeyed-rows')
 
-      expect(found.map(d => [basename(d.file), d.line]).toSorted()).toEqual([['inner.kay', 4], ['types.kay', 10], ['types.kay', 18]])
+      expect(found.map(d => [basename(d.file), d.line]).toSorted()).toEqual([['inner.kay', 4], ['shared.kay', 4], ['types.kay', 10], ['types.kay', 18]])
     }
     finally {
       await rm(root, { recursive: true, force: true })

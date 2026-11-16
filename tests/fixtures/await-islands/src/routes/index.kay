@@ -11,7 +11,6 @@ const reply = parts()
 import Probe from '../components/probe.kay'
 ---
 h1 Parts
-// kay-allow uncaught-await
 await reply
   p.pending Waiting
   Probe(text="pending")

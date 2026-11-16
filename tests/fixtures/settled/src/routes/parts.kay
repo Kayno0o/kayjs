@@ -11,17 +11,14 @@ const broken = Promise.reject(new Error('no'))
 broken.catch(() => undefined)
 ---
 p.shell Shell
-// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await rows
   p.pending Waiting
 then text
   p.word {text}
-// kay-allow uncaught-await
 await nothing
   p.gone Gone
 then text
   | {text}
-// kay-allow uncaught-await
 await broken
   p.fail Failing
 then value

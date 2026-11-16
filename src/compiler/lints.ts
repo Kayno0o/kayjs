@@ -1,9 +1,10 @@
 import type { AllowRules } from './allow-comments'
-import type { Diagnostic, ElementNode, ForNode, KayFile, Node, TextChunk } from './ast'
+import type { Diagnostic, ElementNode, ForNode, KayFile, TextChunk } from './ast'
 import type { Scope } from './template-scopes'
 import { accessibilityLints, MARKUP_LINTS } from './a11y'
 import { allowComments, honoured, refusedComments } from './allow-comments'
-import { keyedByPosition, someNode, walkNodes } from './ast'
+import { keyedByPosition, walkNodes } from './ast'
+import { RETIRED_LINTS } from './deprecated-allow'
 import { DEPRECATED_LINTS } from './deprecated-lints'
 import { I18N_LINTS } from './i18n-lints'
 import { positionAt } from './mapping'
@@ -366,13 +367,6 @@ export const LINTS = {
     summary: 'A name only the server\'s `kay/cache` has, `invalidatePage` or `sqliteCache`, imported by what runs in the browser, an island\'s script or a browser-only component: the browser entry has `cached` and `invalidate` alone, so the build fails there.',
     wrong: '---\nimport { signal } from \'kay\'\nimport { sqliteCache } from \'kay/cache\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
     right: '---\nimport { signal } from \'kay\'\nimport { invalidate } from \'kay/cache\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
-  },
-  'uncaught-await': {
-    level: 'deny',
-    group: 'code',
-    summary: 'An `await` block with no `catch` and no `try` around it: once its value rejects, the pending block goes and nothing takes its place, so the visitor never learns it failed, and only the log does. A `try` around the block gives it that `try`\'s `catch`.',
-    wrong: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments',
-    right: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments\ncatch\n  p Comments are unavailable',
   },
   'once-read-prop': {
     level: 'deny',
@@ -792,7 +786,7 @@ function unknownLints(source: string): Diagnostic[] {
 
   for (const comment of allowComments(source)) {
     for (const { name, start } of comment.names) {
-      if (!isLint(name))
+      if (!isLint(name) && !RETIRED_LINTS.has(name))
         unknown.push({ start, end: start + name.length, code: 'unknown-lint', message: `Unknown lint \`${name}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })
     }
   }
@@ -803,22 +797,6 @@ function unknownLints(source: string): Diagnostic[] {
 // The template's own lints: what it can say from the markup alone.
 export function templateLints(file: KayFile): Diagnostic[] {
   const found: Diagnostic[] = []
-  // The `await` blocks inside a `try`, whose `catch` renders when one has none of its own.
-  const guarded = new Set<Node>()
-
-  walkNodes(file.template, false, (node) => {
-    if (node.kind === 'try') {
-      someNode(node.children, (inner) => {
-        if (inner.kind === 'await')
-          guarded.add(inner)
-
-        return false
-      })
-    }
-
-    return false
-  })
-
   const scopes = templateScopes(file)
 
   // `literal` inside an element whose text shows code, where a tag is meant as written.
@@ -836,9 +814,6 @@ export function templateLints(file: KayFile): Diagnostic[] {
     }
     else if (node.kind === 'for') {
       positionalKey(file.source, node, found)
-    }
-    else if (node.kind === 'await' && !node.rejected && !guarded.has(node)) {
-      found.push({ start: node.start, end: node.value.end, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects', note: 'the pending block goes, and the error only reaches the log', help: 'add a `catch` block after it, at the same indentation, saying what failed', checkOnly: true })
     }
 
     return literal

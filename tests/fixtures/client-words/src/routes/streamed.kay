@@ -9,7 +9,6 @@ export const check = action(t.Object({
 const rows = defer(Promise.resolve([1]))
 ---
 p.shell Shell
-// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await rows then list
   form(action={check})
     input(field="name")

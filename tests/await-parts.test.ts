@@ -284,15 +284,12 @@ const words = reply()
 const outer = nested()
 ---
 h1 Reply
-// kay-allow uncaught-await
 await words
   p.pending Thinking
 then text
   p.text {text}
-// kay-allow uncaught-await
 await outer then part
   p.outer {part}
-  // kay-allow uncaught-await
   await new Promise(resolve => setTimeout(resolve, 10, part.toUpperCase()))
     p.inner-pending Waiting
   then inner
@@ -306,10 +303,8 @@ async function* lines() {
 
 async function* none() {}
 ---
-// kay-allow uncaught-await
 await lines() then text
   p {text}
-// kay-allow uncaught-await
 await none() then text
   p.none {text}
 `),

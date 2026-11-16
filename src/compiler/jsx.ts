@@ -27,6 +27,7 @@ export interface JsxOptions {
   staticLoops: boolean
   // The props passed an island reach the browser as they are written, so `kay check` asserts they can.
   sendsIslandProps: boolean
+  generic: boolean
   // Names the script declares as plain data written out, which an island prop check takes as serializable whatever type the declaration gives them.
   plain: ReadonlySet<string>
   // Whether a name at an offset is bound to a project file imported as text, which `innerHTML` takes as it takes markup written out.
@@ -399,16 +400,13 @@ export class JsxTemplate {
 
       b.add('} keyed={')
 
-      if (keying.kind === 'positional') {
-        b.add('false')
-      }
-      else if (keying.kind === 'expression') {
+      if (keying.kind === 'expression') {
         addKeyParameters(b, node, this.src)
         b.add(' => (').addSource(keying.key).add(')')
       }
-      // Rows keyed by the item's `id` or the item itself, which any item has.
       else {
-        b.add('() => 0')
+        // Rows keyed by the item's `id` or the item itself, which any item has, or by position.
+        b.add(keying.kind === 'positional' ? 'false' : '() => 0')
       }
 
       b.add('}')
@@ -458,11 +456,10 @@ export class JsxTemplate {
     const positional = rowKeying(node, this.src).kind === 'positional'
 
     b.wrap(node, () => {
-      // A loop of an island, or of a component only islands import (what does not send island props), with no key matches its rows by `id` or the item itself, which `KayKeyed` has the type check report for rows with no `id`.
-      b.add(`{(() => { const kayEach = ${node.key || staticLoop || this.options.sendsIslandProps ? 'KayList' : 'KayKeyed'}(`)
+      // A loop of a non-generic component that runs again in the browser with no key matches its rows by `id` or the item itself, which `KayKeyed` has the type check report for rows with no `id`; one that only ever runs on the server has no rows to match.
+      b.add(`{(() => { const kayEach = ${node.key || staticLoop || this.options.generic ? 'KayList' : 'KayKeyed'}(`)
 
       b.addSource(node.each)
-
       b.add('); return ')
 
       if (staticLoop) {

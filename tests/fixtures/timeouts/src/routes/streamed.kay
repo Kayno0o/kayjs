@@ -2,6 +2,5 @@
 const later = Bun.sleep(600).then(() => 'late comments')
 ---
 p first
-// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await later then text
   p.comments {text}

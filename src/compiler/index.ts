@@ -13,6 +13,7 @@ import { actionOf, drawIcons, elementsIn, INTERACTIVE_ATTRIBUTE, SERVER_IN_ISLAN
 import { browserReads } from './browser'
 import { wrapActionButtons } from './button-forms'
 import { generate, isInteractive, islandCause, lineOf } from './codegen'
+import { retiredAllowComments } from './deprecated-allow'
 import { deprecatedIslandAttributes, deprecatedIslandForms, islandProblems } from './deprecated-island'
 import { deprecatedPageSettings } from './deprecated-page'
 import { spelledOutScriptFence } from './deprecated-script-fence'
@@ -370,7 +371,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...spelledOutScriptFence(file), ...deprecatedIslandForms(file, script), ...deprecatedIslandAttributes(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script, island !== undefined), ...malformedInteractive(script))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...spelledOutScriptFence(file), ...retiredAllowComments(source), ...deprecatedIslandForms(file, script), ...deprecatedIslandAttributes(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script, island !== undefined), ...malformedInteractive(script))
   }
 
   if (checked && pin !== undefined)

@@ -1,13 +1,26 @@
+import { AWAIT_FAILED } from './await-failed'
 import { blockIn, islandOf, Region, release, swap } from './dom'
 import { getOwner, onCleanup, renderEffect, reportError, runWithOwner, unrecorded, untrack } from './reactive'
 import { isSnapshots, readSnapshots } from './snapshots'
+import { wording } from './words.client'
 
 // The `await` block: its own module, as it weighs on a page whose islands await nothing.
 
 // An iterable's parts render at most this often in an island, about once a frame.
 const FRAME_MS = 16
 
-// An `await` block: the pending block while the value is a promise, then the `then` or `catch` block once it settles, or with no `catch` the enclosing `try`'s as `fallback`; a plain value renders `then` at once, and an async iterable renders `then` again with each part, at most once a frame.
+// What a block with no `catch` and no `try` around it shows once its value rejects, as the server writes it.
+function failure(): HTMLElement {
+  const alert = document.createElement('p')
+
+  alert.setAttribute('role', 'alert')
+  alert.setAttribute('data-kay-await-failed', '')
+  alert.textContent = wording('kay.await.failed', AWAIT_FAILED)
+
+  return alert
+}
+
+// An `await` block: the pending block while the value is a promise, then the `then` or `catch` block once it settles, or with no `catch` the enclosing `try`'s as `fallback`, or an alert; a plain value renders `then` at once, and an async iterable renders `then` again with each part, at most once a frame.
 export function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined): void {
   const region = new Region(element, start, end)
   const block = blockIn(region)
@@ -74,15 +87,12 @@ export function awaited(element: Node | null, start: Node | null, end: Node | nu
           if (failed) {
             land(() => failed(error))
           }
-          // The enclosing `try`'s `catch` takes the place of the block, the error reported as the `try` reports one.
-          else if (fallback) {
+          // The enclosing `try`'s `catch` takes the place of the block, else an alert, the error reported as the `try` reports one.
+          else {
             if (own === version)
               reportError(error, islandOf(region.parent))
 
-            land(() => fallback(error))
-          }
-          else if (own === version) {
-            reportError(error, islandOf(region.parent))
+            land(() => fallback ? fallback(error) : failure())
           }
 
           return

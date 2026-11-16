@@ -30,7 +30,6 @@ pre.block
   | a : b ?
 code.inline a : b
 Content
-// kay-allow uncaught-await
 await later
   p.pending En cours
 then value

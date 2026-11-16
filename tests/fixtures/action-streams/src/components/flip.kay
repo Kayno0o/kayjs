@@ -33,7 +33,6 @@ else if mode === 'match'
     else
       p.shown shown
 else
-  // kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
   await ready()
     p.waiting waiting
   then

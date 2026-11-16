@@ -11,7 +11,6 @@ h1 Streamed
 form(action={note})
   input(name="text" aria-label="Text")
   button Note
-// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await later
   p.pending Waiting
 then text

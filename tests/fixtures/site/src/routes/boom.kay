@@ -36,6 +36,5 @@ form(action={explode})
   button Explode
 if explode.error()
   p.error {explode.error()}
-// kay-allow uncaught-await
 await later then value
   p {value}

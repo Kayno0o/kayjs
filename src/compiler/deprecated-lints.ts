@@ -37,6 +37,14 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Stat from \'@kayjs/ui/stat.kay\'\n---\nStat(value={12} label="moons" variant="tile")',
     right: '---\nimport Stat from \'@kayjs/ui/stat.kay\'\n---\nStat(value={12} label="moons" layout="tile")',
   },
+  'deprecated-uncaught-await': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: 'A `// kay-allow uncaught-await` comment, since 1.105: the `uncaught-await` lint is gone, as an `await` with no `catch` renders the `catch` of the `try` around it, else an alert (`data-kay-await-failed`, worded by the `kay.await.failed` message) in its place, the rejection reported either way. The fix removes the comment, or the name from a list of lints.',
+    wrong: '// kay-allow uncaught-await\nawait comments then list\n  p {list.length} comments',
+    right: 'await comments then list\n  p {list.length} comments',
+  },
   'deprecated-script-fence': {
     level: 'warn',
     group: 'deprecated',

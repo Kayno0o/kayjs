@@ -26,6 +26,7 @@ kay [./server] schedule
 kay [./server] workflow
 kay [./test] TestSite
 kay [.] ActionContext
+kay [.] AwaitProps
 kay [.] CardPageContext
 kay [.] ErrorPageContext
 kay [.] PageContext

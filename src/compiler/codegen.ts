@@ -259,6 +259,7 @@ class ModuleShell {
       check: this.mode === 'check',
       staticLoops: this.staticLoops,
       sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
+      generic: this.genericComponent,
       plain: this.plainNames(),
       ownMarkup: this.ownMarkup,
     }, this.sites)
@@ -636,10 +637,7 @@ class ModuleShell {
 
   // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops hand each row its item rather than an accessor to it; the type check knows it of a route file, not of a component an island may render.
   private get staticLoops(): boolean {
-    if (this.kind === 'island')
-      return false
-
-    return this.options.output === 'html' || this.kind === 'twin' || this.fence !== undefined || this.options.route === true
+    return this.kind !== 'island' && (this.options.output === 'html' || this.kind === 'twin' || this.fence !== undefined || this.options.route === true)
   }
 
   // What `ctx` is typed as: the error page and the card page carry what they render.

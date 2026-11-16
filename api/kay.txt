@@ -181,7 +181,6 @@ function apiUrl<Module, const Path extends ApiPath<Module>>(module: Module, path
 [.] AwaitProps
 interface AwaitProps<T>
   failed?: ((error: unknown) => Element) | undefined
-  fallback?: ((error: unknown) => Element) | undefined
   pending?: (() => Element) | undefined
   ready: (value: Settled<T>) => Element
   value: T

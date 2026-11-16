@@ -1087,7 +1087,7 @@ describe('blocks', () => {
   const fresh = () => Object.assign(globalThis, { feeds: [], renders: 0 })
 
   const mount19b = site({
-    'main.kay': `---\nimport { signal } from 'kay'\n\n${FEED}\n${COUNTED}\nconst source = signal(feed())\n---\nbutton.next(onClick={() => source.set(feed())}) Next\nawait source()\n  p.wait Waiting\nthen text\n  p.text {shown(text)}\n  // kay-allow uncaught-await\n  await Promise.resolve(text.toUpperCase()) then upper\n    p.upper {upper}\ncatch error\n  p.failed {(error as Error).message}\n`,
+    'main.kay': `---\nimport { signal } from 'kay'\n\n${FEED}\n${COUNTED}\nconst source = signal(feed())\n---\nbutton.next(onClick={() => source.set(feed())}) Next\nawait source()\n  p.wait Waiting\nthen text\n  p.text {shown(text)}\n  await Promise.resolve(text.toUpperCase()) then upper\n    p.upper {upper}\ncatch error\n  p.failed {(error as Error).message}\n`,
   })
 
   it('render an await block given an async iterable again with each part, the latest of those coming within a frame, and not again once it ends on a part shown', async () => {
@@ -2075,7 +2075,6 @@ describe('an await block with no catch, in an island', () => {
       '      p.inner {inner}',
       'catch error',
       '  p.failed {(error as Error).message}',
-      '// kay-allow uncaught-await',
       'await source() then text',
       '  p.bare {text}',
       '',

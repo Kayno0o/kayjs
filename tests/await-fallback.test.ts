@@ -13,6 +13,7 @@ let cases = 0
 const reported: unknown[] = []
 let app: Awaited<ReturnType<typeof pages>>
 
+const ALERT = '<p role="alert" data-kay-await-failed>This could not be loaded; try again later</p>'
 const FENCE = '--- server\nconst { value } = props<{ value: Promise<string> }>()\n---\n'
 
 async function load<P extends object = object>(source: string): Promise<(props: P) => JSX.Element> {
@@ -30,11 +31,11 @@ beforeAll(async () => {
     Bun.write(join(dir, 'routes/silent.kay'), '--- server\nconst slow = (async () => {\n  await Bun.sleep(10)\n  throw new Error(\'Down\')\n})()\n---\ntry\n  await slow\n    p.pending Loading\n  then text\n    p.text {text}\np.after After\n'),
     Bun.write(join(dir, 'routes/nested.kay'), '--- server\nconst outer = Promise.resolve(\'ok\')\nconst inner = (async () => {\n  await Bun.sleep(10)\n  throw new Error(\'Inner\')\n})()\n---\ntry\n  await outer then first\n    p.first {first}\n    await inner then second\n      p.second {second}\ncatch\n  p.failed Outer\n'),
     Bun.write(join(dir, 'routes/own.kay'), '--- server\nconst slow = (async () => {\n  await Bun.sleep(10)\n  throw new Error(\'Own\')\n})()\n---\ntry\n  await slow then text\n    p.text {text}\n  catch\n    p.own Own\ncatch\n  p.failed Outer\n'),
-    Bun.write(join(dir, 'routes/outside.kay'), '--- server\nconst slow = (globalThis as { outside?: () => Promise<string> }).outside!()\n---\nh1 Page\n// kay-allow uncaught-await\nawait slow then text\n  p.text {text}\n'),
+    Bun.write(join(dir, 'routes/outside.kay'), '--- server\nconst slow = (globalThis as { outside?: () => Promise<string> }).outside!()\n---\nh1 Page\nawait slow then text\n  p.text {text}\n'),
     Bun.write(join(dir, 'routes/snippet.kay'), '--- server\nconst second = (async () => {\n  await Bun.sleep(10)\n  throw new Error(\'Second\')\n})()\nconst items = [1, 2]\n---\ntry\n  snippet row(n: number)\n    await second then text\n      p.row {n} {text}\n  for item of items key={item}\n    {row(item)}\ncatch\n  p.failed Failed\n'),
     Bun.write(join(dir, 'routes/in-catch.kay'), '--- server\nconst first = (async () => {\n  await Bun.sleep(10)\n  throw new Error(\'First\')\n})()\nfunction broken(): string {\n  throw new Error(\'Broken\')\n}\n---\ntry\n  try\n    p {broken()}\n  catch\n    await first then text\n      p.in-catch {text}\ncatch\n  p.outer Outer\n'),
-    Bun.write(join(dir, 'routes/in-bare-catch.kay'), '--- server\nconst first = (async () => {\n  await Bun.sleep(10)\n  throw new Error(\'First\')\n})()\nfunction broken(): string {\n  throw new Error(\'Broken\')\n}\n---\ntry\n  p {broken()}\ncatch\n  // kay-allow uncaught-await\n  await first then text\n    p.in-catch {text}\n'),
-    Bun.write(join(dir, 'routes/bare.kay'), '--- server\nconst slow = (async () => {\n  await Bun.sleep(10)\n  throw new Error(\'Bare\')\n})()\nconst plain = (async () => {\n  await Bun.sleep(10)\n  throw \'text only\'\n})()\n---\n// kay-allow uncaught-await\nawait slow\n  p.pending Loading\nthen text\n  p.text {text}\n// kay-allow uncaught-await\nawait plain then text\n  p.text {text}\n'),
+    Bun.write(join(dir, 'routes/in-bare-catch.kay'), '--- server\nconst first = (async () => {\n  await Bun.sleep(10)\n  throw new Error(\'First\')\n})()\nfunction broken(): string {\n  throw new Error(\'Broken\')\n}\n---\ntry\n  p {broken()}\ncatch\n  await first then text\n    p.in-catch {text}\n'),
+    Bun.write(join(dir, 'routes/bare.kay'), '--- server\nconst slow = (async () => {\n  await Bun.sleep(10)\n  throw new Error(\'Bare\')\n})()\nconst plain = (async () => {\n  await Bun.sleep(10)\n  throw \'text only\'\n})()\n---\nawait slow\n  p.pending Loading\nthen text\n  p.text {text}\nawait plain then text\n  p.text {text}\n'),
     Bun.write(join(dir, 'routes/shell.kay'), '--- server\nconst slow = Promise.reject(new Error(\'Early\'))\n---\ntry\n  p.sync Shell\n  await slow\n    p.pending Loading\n  then text\n    p.text {text}\ncatch\n  p.failed Failed\n'),
   ])
   app = await pages({ root: dir, dirs: { routes: 'routes' }, observe: { onError: ({ error }) => void reported.push(error) }, prebuilt: false, security: false })
@@ -106,7 +107,7 @@ describe('an await block with no catch and no try', () => {
     const lines = describeThrown(failure).match(/outside\.kay:\d+/g) ?? []
 
     expect(reported).toHaveLength(1)
-    expect(lines).toEqual(['outside.kay:6'])
+    expect(lines).toEqual(['outside.kay:5'])
   })
 
   it('reports a frozen error as it is', async () => {
@@ -117,10 +118,10 @@ describe('an await block with no catch and no try', () => {
     expect(reported).toEqual([failure])
   })
 
-  it('removes the pending block and reports the error with the line of its await block, a rejection that is no error wrapped', async () => {
+  it('shows an alert in place of the pending block and reports the error with the line of its await block, a rejection that is no error wrapped', async () => {
     const html = await page('/bare')
 
-    expect(swaps(html)).toEqual(['', ''])
+    expect(swaps(html)).toEqual([ALERT, ALERT])
 
     const stacks = reported.map(error => (error as Error).stack)
 
@@ -145,7 +146,7 @@ describe('an await block in a snippet and in a catch block', () => {
 
   it('takes the try around a try whose catch block holds it, and none when no try is left', async () => {
     expect(swaps(await page('/in-catch'))).toEqual(['<p class="outer">Outer</p>'])
-    expect(swaps(await page('/in-bare-catch'))).toEqual([''])
+    expect(swaps(await page('/in-bare-catch'))).toEqual([ALERT])
   })
 })
 
@@ -168,14 +169,14 @@ describe('compiling an await block with no catch', () => {
 })
 
 describe('renderToString with an await block with no catch', () => {
-  it('renders the catch block of the try around it, and still rejects with none', async () => {
+  it('renders the catch block of the try around it, and an alert with none', async () => {
     const guarded = await load<{ value: Promise<string> }>(`${FENCE}try\n  await value then text\n    p {text}\ncatch\n  p Unavailable`)
     const silent = await load<{ value: Promise<string> }>(`${FENCE}try\n  await value then text\n    p {text}\np after`)
-    const bare = await load<{ value: Promise<string> }>(`${FENCE}// kay-allow uncaught-await\nawait value then text\n  p {text}`)
+    const bare = await load<{ value: Promise<string> }>(`${FENCE}await value then text\n  p {text}`)
 
     expect(await renderToString(guarded, { value: Promise.reject(new Error('down')) })).toBe('<p>Unavailable</p>')
     expect(await renderToString(silent, { value: Promise.reject(new Error('down')) })).toBe('<p>after</p>')
-    await expect(renderToString(bare, { value: Promise.reject(new Error('down')) })).rejects.toThrow('down')
+    expect(await renderToString(bare, { value: Promise.reject(new Error('down')) })).toBe(ALERT)
   })
 
   it('renders the catch block of the try around an await nested in a then block', async () => {

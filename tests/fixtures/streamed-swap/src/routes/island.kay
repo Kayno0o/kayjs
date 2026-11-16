@@ -8,7 +8,6 @@ import Counter from '../components/counter.kay'
 head
   title Island
 h1 Island
-// kay-allow uncaught-await
 await i
   p.pending Loading I
 then value

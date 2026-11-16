@@ -826,24 +826,6 @@ describe('signal-set-call on a signal kay exports', () => {
   })
 })
 
-describe('uncaught-await', () => {
-  it('reports an await block with no catch block and no try around it, one-line or not', () => {
-    expect(lints('await comments\n  p Loading\nthen list\n  p {list.length}\n')).toEqual([{ code: 'uncaught-await', severity: 'error', at: 'await comments' }])
-    expect(lints('try\n  p Fine\ncatch\n  await comments then list\n    p {list.length}\n')).toEqual([{ code: 'uncaught-await', severity: 'error', at: 'await comments' }])
-  })
-
-  it('leaves an await block inside a try, whatever it is nested in, and the catch block of the try is no cover', () => {
-    expect(lints('try\n  await comments then list\n    p {list.length}\ncatch\n  p Failed\n')).toEqual([])
-    expect(lints('try\n  if ok\n    for item of items\n      await item then row\n        p {row}\ncatch\n  p Failed\n')).toEqual([])
-    expect(lints('try\n  await comments then list\n    await list then count\n      p {count}\n')).toEqual([])
-  })
-
-  it('leaves an await block with a catch block, and reports one nested in a then block on its own', () => {
-    expect(lints('await comments then list\n  p {list.length}\ncatch\n  p Failed\n')).toEqual([])
-    expect(lints('await comments then list\n  await list then count\n    p {count}\ncatch\n  p Failed\n')).toEqual([{ code: 'uncaught-await', severity: 'error', at: 'await list' }])
-  })
-})
-
 describe('brace-in-attribute', () => {
   const head = '---\nconst name = "a"\nconst user = { name: "a" }\n---\n'
 

@@ -1,4 +1,5 @@
 import type { MessageValue } from '../runtime/i18n'
+import { AWAIT_FAILED } from '../runtime/await-failed'
 import { NUMERIC_FORMATS } from '../runtime/form'
 import { wording } from '../runtime/words.server'
 
@@ -8,6 +9,7 @@ export const KAY_ENGLISH = {
   'kay.action.serverError': 'Something went wrong on our side; try again later',
   'kay.action.bodyLimit': 'Too large to send; {size} at most',
   'kay.action.timeout': 'This took too long; try again later',
+  'kay.await.failed': AWAIT_FAILED,
   'kay.link.newTab': '(opens in a new tab)',
   'kay.offline.title': 'Offline',
   'kay.offline.text': 'This page needs a connection, and none is open.',

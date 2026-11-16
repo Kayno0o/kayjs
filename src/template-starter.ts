@@ -31,7 +31,7 @@ function header({ has, tw }: Setup): string {
     `  nav${tw('.mx-auto.flex.max-w-5xl.items-center.justify-between.gap-4')}(aria-label="Main navigation")`,
     `    a${tw('.text-xl.font-bold.no-underline')}(href="/") __NAME__`,
     `    ul${tw('.flex.gap-4')}`,
-    '      for link of links',
+    '      for link of links key={link.href}',
     '        li',
     '          a(href={link.href}) {link.label}',
     has('accents') && '    AccentPicker',

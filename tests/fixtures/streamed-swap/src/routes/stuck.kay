@@ -7,7 +7,6 @@ head
   title Stuck
 h1 Stuck
 a.home(href="/") Home
-// kay-allow uncaught-await
 await s
   p.pending Loading S
 then value

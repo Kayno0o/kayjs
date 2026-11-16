@@ -5,7 +5,6 @@ import Inbox from '../components/inbox.kay'
 ---
 h1 Streamed head
 Inbox
-// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await slow
   p Loading
 then _value

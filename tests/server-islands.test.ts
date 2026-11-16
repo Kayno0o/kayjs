@@ -171,7 +171,7 @@ describe('server islands', () => {
     const copied = join(copy, 'src/routes')
     const build = await scratchBuild()
 
-    await Bun.write(join(copy, 'src/components/reply.kay'), '---\nasync function* reply() {\n  yield \'Hel\'\n  yield \'Hello\'\n}\n---\n// kay-allow uncaught-await\nawait reply()\n  p.pending Thinking\nthen text\n  p.reply {text}\n')
+    await Bun.write(join(copy, 'src/components/reply.kay'), '---\nasync function* reply() {\n  yield \'Hel\'\n  yield \'Hello\'\n}\n---\nawait reply()\n  p.pending Thinking\nthen text\n  p.reply {text}\n')
     await Bun.write(join(copied, 'reply.kay'), '---\nimport Reply from \'../components/reply.kay\'\n---\nh1 Reply\nReply(server)\n')
 
     try {
@@ -191,11 +191,11 @@ describe('server islands', () => {
   })
 
   // A prerendered page holds the checks of the forms it rendered, so the block settled per request brings its own: kaynooo/kayjs#963.
-  const PROPS = '---\nimport type { Action } from \'kay\'\n\nconst { to, show } = props<{ to: Action<{ name: string }, unknown>, show: boolean }>()\nconst rows = Promise.resolve([1])\nconst inner = Promise.resolve([2])\n---\n// kay-allow uncaught-await\nawait rows\n  p.pending Loading\nthen list\n'
+  const PROPS = '---\nimport type { Action } from \'kay\'\n\nconst { to, show } = props<{ to: Action<{ name: string }, unknown>, show: boolean }>()\nconst rows = Promise.resolve([1])\nconst inner = Promise.resolve([2])\n---\nawait rows\n  p.pending Loading\nthen list\n'
   const FORM = 'if show\n  form(action={to})\n    input(field="name")\n    button Send\n'
   const indented = (text: string, by: number) => text.split('\n').map(line => (line === '' ? line : ' '.repeat(by) + line)).join('\n')
   // `nested` puts the form in a block inside the block of the island.
-  const rowsKay = (nested: boolean) => PROPS + (nested ? `  // kay-allow uncaught-await\n  await inner\n    p.pending Inside\n  then deeper\n${indented(FORM, 4)}` : indented(FORM, 2))
+  const rowsKay = (nested: boolean) => PROPS + (nested ? `  await inner\n    p.pending Inside\n  then deeper\n${indented(FORM, 4)}` : indented(FORM, 2))
   const pageKay = (mark: string) => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\nexport const page = { prerender: true }\nexport const send = action(t.Object({ name: t.String({ minLength: 3 }) }), () => 'sent', { protect: { proofOfWork: 50 } })\n\nconst show = ctx.url.searchParams.has('show')\n--- script\nimport Rows from '../components/rows.kay'\n---\nh1 Rows\nRows(${mark}show={show} to={send})\n`
   const FRENCH = 'kay: { invalid: { required: \'Champ requis\', tooShort: \'Au moins {min} caractères\', tooLong: \'Au plus {max} caractères\', pattern: \'Mauvais format\', format: \'Pas au format {format}\', tooFewItems: \'Au moins {min} choix\', tooManyItems: \'Au plus {max} choix\', tooSmall: \'{min} ou plus\', tooBig: \'{max} ou moins\', type: \'Valeur invalide\' } }'
   const messages = (words: string) => `import { defineMessages } from 'kay/i18n'\n\nexport default defineMessages({ title: 'Rows'${words === '' ? '' : `, ${words}`} })\n`

@@ -2,11 +2,14 @@ import type { AwaitProps } from './checks'
 import type { AwaitNote } from './html'
 import type { JSX } from './jsx'
 import type { Html } from './rendered'
+import { AWAIT_FAILED } from './await-failed'
+import { escape } from './escape'
 import { awaitNotes, child } from './html'
 import { insideIsland } from './island.server'
 import { getOwner, runWithOwner } from './reactive'
 import { html } from './rendered'
 import { isSnapshots } from './snapshots'
+import { wording } from './words.server'
 
 // A block whose value was still pending when the page rendered, streamed in once it settles, or as each part of an async iterable comes.
 export interface PendingBlock {
@@ -18,6 +21,11 @@ export interface PendingBlock {
   fallback?: ((error: unknown) => unknown) | undefined
   // Where the block was rendered, for the error of a block with no `catch` to name its line.
   site?: Error | undefined
+}
+
+// What a block with no `catch` and no `try` around it shows once its value rejects: a plain alert in the page's locale.
+function awaitFailed(): Html {
+  return html(`<p role="alert" data-kay-await-failed>${escape(wording('kay.await.failed', AWAIT_FAILED))}</p>`)
 }
 
 // The errors already given a block's place, so a promise shared by several blocks or renders keeps one.
@@ -160,7 +168,7 @@ function noteAwait(notes: AwaitNote[], value: Promise<unknown> | undefined, pend
 
 // On a page, a pending value renders its `pending` block between markers that the streamed result replaces; a settled one renders right away.
 // Typed as the browser build is, which `kay check` reads templates against.
-export function Await<T>(props: AwaitProps<T>): JSX.Element {
+export function Await<T>(props: AwaitProps<T> & { fallback?: ((error: unknown) => unknown) | undefined }): JSX.Element {
   const value = props.value
   const parts = isSnapshots(value)
 
@@ -186,9 +194,10 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
   const parent = getOwner()
   const failed = props.failed
 
-  const fallback = props.fallback
+  // With no `catch` of its own, the enclosing `try`'s, else the alert every block has.
+  const fallback = props.fallback ?? awaitFailed
 
-  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => following(notes, () => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => following(notes, () => failed(error)))), fallback: fallback && (error => runWithOwner(parent, () => following(notes, () => fallback(error)))), site: failed ? undefined : new Error('await') })
+  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => following(notes, () => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => following(notes, () => failed(error)))), fallback: error => runWithOwner(parent, () => following(notes, () => fallback(error))), site: failed ? undefined : new Error('await') })
   // The streamed block replaces this one whole, so an `await` inside it renders its own pending block and streams nothing.
   deferred = undefined
 

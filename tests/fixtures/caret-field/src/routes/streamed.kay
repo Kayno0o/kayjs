@@ -14,6 +14,5 @@ head
 h1 Caret
 p.searched {q}
 NavButtons
-// kay-allow uncaught-await -- the fixture streams an await with no catch on purpose
 await later then shown
   BoundField(value={shown} hydrate="visible")

@@ -15,7 +15,7 @@ ZoomPane(
   class="h-64 w-full rounded-lg border border-muted bg-surface"
 )
   .relative.size-full
-    for pin of pins
+    for pin of pins key={pin.name}
       span.absolute.rounded-full.bg-border.px-2.py-0.5.text-xs(
         style={pinStyle(pin)}
       )

@@ -10,13 +10,11 @@ h1 Slow
 a.home(href="/") Home
 input.field
 div.spacer(style="height: 2000px")
-// kay-allow uncaught-await
 await a
   p.pending Loading A
 then value
   p.done-a {value}
   div.tail(style="height: 3000px")
-// kay-allow uncaught-await
 await b
   p.pending Loading B
 then value

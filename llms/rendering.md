@@ -229,7 +229,7 @@ catch
 - `await value then name` on one line has no pending block.
 - `catch error` binds the rejection.
 - Without `catch`, a rejection renders the `catch` block of the nearest `try` around the `await` in the same template, streamed or not, reported like the `try`'s own error; a `try` with no `catch` renders nothing there, and the rest of the page stays.
-- With no `try` either, a rejection removes the pending block and is reported at the `await` line in the dev overlay, `.kay/dev/errors.json` and `onError`, which `kay check` warns of (`uncaught-await`).
+- With no `try` either, a rejection replaces the pending block with `<p role="alert" data-kay-await-failed>`, worded by the `kay.await.failed` message (`This could not be loaded; try again later`), and is reported at the `await` line in the dev overlay, `.kay/dev/errors.json` and `onError`: a block always shows that it failed, and a `catch` says what failed.
 - A `then` block that throws while rendering is a bug, not a rejection: it removes the pending block and is logged too, never showing `catch`.
 - An `await` block takes any promise, whatever made it: a server fence variable, `await data.comments`, a prop or one a component makes; a value that is no promise renders at once.
 - A promise rejecting before its block renders crashes nothing: the server holds every unhandled rejection of its process until a block, or any code, takes it, logs one nothing took within 30 seconds, and a process ending with one held logs it and exits with code 1. `defer()` from `kay` is no longer needed and still works.

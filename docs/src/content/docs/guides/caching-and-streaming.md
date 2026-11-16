@@ -148,7 +148,7 @@ catch
   p Comments are unavailable
 ```
 
-Without `catch`, a rejection renders the `catch` of the nearest `try` around the block, and with no `try` removes the pending block and is reported at its `await` line.
+Without `catch`, a rejection renders the `catch` of the nearest `try` around the block, and with no `try` shows a short alert in its place; the error is reported at its `await` line either way.
 
 On a prerendered page the block resolves at build. The page is written with the settled content, a visitor never sees `Loading comments`, and a slow value makes the build wait. `kay build` warns of such a block with its page and line, and names a page that waited a second or more. To show the pending content, put the block in a client island or a deferred server island (`server="defer"`), or render the page per request with `prerender: false`.
 

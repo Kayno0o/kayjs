@@ -9,7 +9,6 @@ const now = 'right away'
 import Counter from '../components/counter.kay'
 ---
 h1 Feed
-// kay-allow uncaught-await
 await items
   p.pending Loading the feed
 then list
@@ -21,6 +20,5 @@ await broken then value
   p {value}
 catch error
   p.error {error instanceof Error ? error.message : 'Failed'}
-// kay-allow uncaught-await
 await now then value
   p.now {value}
