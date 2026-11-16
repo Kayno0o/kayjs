@@ -6,7 +6,7 @@ import { eachNode } from './each-node'
 import { isFunction } from './fence-nodes'
 import { lintLevels } from './lints'
 import { PROPS, SELF } from './names'
-import { sourceEnds } from './rewrite-reads'
+import { sourceEnds, valueReferences } from './rewrite-reads'
 
 // A prop named like an initial value is read once on purpose, and so is a callback (`onChange`), which a component reads to tell whether one was given.
 export const INITIAL_PROP = /^(?:(?:initial|default)(?![a-z])|on[A-Z])/
@@ -26,7 +26,6 @@ function isReference(node: NodeOfType<'Identifier'>, parent: Node | undefined): 
 
 // The reads of a value a top-level declaration derives from: the identifiers `isLive` accepts that its initializer reads as a value.
 // The test of a condition, the arguments of a call or `new`, a write target, a class and a function's body choose or build something once and are left out, as is `id ?? uid()`; so a declaration reading none of them is no derivation.
-// The reads of a value a top-level declaration derives from: the identifiers `isLive` accepts that its initializer reads as a value.
 export function derivedReads(init: Node, isLive: (name: string) => boolean): NodeOfType<'Identifier'>[] {
   const found: NodeOfType<'Identifier'>[] = []
   const seen = new Set<number>()
@@ -98,6 +97,33 @@ export function suspends(node: Node): boolean {
   return found
 }
 
+// A props object read by its name, `const all = props<T>()`.
+function isPropsObject(binding: Binding): boolean {
+  const node = binding.path.node
+
+  return node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init?.type === 'Identifier' && node.init.name === PROPS
+}
+
+// Whether the component's own run assigns the binding, or calls its `set`, past `from`: a handler or an effect writing it runs later.
+function writtenLater(binding: Binding, component: Node, from: number): boolean {
+  const inSetup = (path: Path): boolean => {
+    let up: Path | null = path
+
+    while (up && !up.isFunction())
+      up = up.parentPath
+
+    return up?.node === component
+  }
+
+  const sets = valueReferences(binding).filter((reference) => {
+    const member = reference.parentPath
+
+    return member?.is('MemberExpression') && member.node.object === reference.node && member.node.property.type === 'Identifier' && member.node.property.name === 'set'
+  })
+
+  return [...binding.constantViolations, ...sets].some(path => path.node.start > from && inSetup(path))
+}
+
 // Where the initializer of a top-level `const` of the component runs from and to in the source, when the browser computes it by a memo: it reads a prop, a signal or a derived `const` as a value, and no `kay-allow once-read-prop` comment says its first value is meant.
 export function derivedSpan(path: Path<NodeOfType<'VariableDeclarator'>>, live: ReadonlySet<Binding>, input: RewriteInput): (Span & { binding: Binding }) | undefined {
   const { id, init } = path.node
@@ -108,18 +134,20 @@ export function derivedSpan(path: Path<NodeOfType<'VariableDeclarator'>>, live: 
   if (!binding || id.type !== 'Identifier' || !init || path.scope.node.type !== 'FunctionDeclaration' || path.scope.node.id?.name !== SELF || statement?.parentPath?.node.type !== 'BlockStatement' || !statement.is('VariableDeclaration') || !derivable(statement.node, path.node))
     return undefined
 
+  const used = new Map<string, Binding | undefined>()
   const reads = derivedReads(init, (name) => {
-    const binding = path.scope.getBinding(name)
+    const found = path.scope.getBinding(name)
 
-    // The props object read by its name is live as the destructured props are.
-    const node = binding?.path.node
+    used.set(name, found)
 
-    return binding !== undefined && (live.has(binding) || (node?.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init?.type === 'Identifier' && node.init.name === PROPS))
+    return found !== undefined && (live.has(found) || isPropsObject(found))
   })
 
   const span = sourceEnds(map, init)
+  const read = new Set(reads.map(node => used.get(node.name)))
 
-  if (reads.length === 0 || !span)
+  // The server renders what a later write of the script left and a memo is computed on its first read, so a const read before such a write stays plain.
+  if (reads.length === 0 || !span || [...read].some(found => found && writtenLater(found, path.scope.node, init.end)))
     return undefined
 
   // The comment of the lint says the first value is meant, which it still is.

@@ -77,6 +77,32 @@ describe('a top-level const derived from a prop or a signal', () => {
     expect(result.diagnostics.map(d => d.code)).not.toContain('name-clash')
   })
 
+  it('leaves a const plain when the script writes a signal it reads later, and keeps it live when a handler writes', () => {
+    const plain = code('const d = count() * 2\ncount = 5\nconst e = count() + 1\ncount.set(7)', 'dom')
+
+    expect(plain).toContain('const d = count() * 2')
+    expect(plain).toContain('const e = count() + 1')
+    expect(code('const d = count() * 2\nconst go = () => count = 5', 'dom')).toContain('const d = KayMemo(() => (count() * 2))')
+    expect(code('const go = () => count = 5\nconst d = count() * 2', 'dom')).toContain('const d = KayMemo(')
+  })
+
+  it('reads a derived const used as a component tag through its call', () => {
+    const dom = compileKay('---\nimport Alpha from \'./alpha.kay\'\nimport Beta from \'./beta.kay\'\nconst { kind } = props<{ kind: string }>()\nconst Tag = kind === \'a\' ? Alpha : Beta\nconst Pick = ({ a: Alpha, b: Beta })[kind]\n---\nPick\n', 'test.kay', { output: 'dom' }).tsx
+
+    expect(dom).toContain('KayDynamic(Pick(), ')
+    expect(dom).toContain('const Pick = KayMemo(')
+  })
+
+  it('wraps an alias of a signal, and leaves a module fence and an export alone', () => {
+    expect(code('const alias = count\nconst show = () => alias()()', 'dom')).toContain('const alias = KayMemo(() => (count))')
+
+    const module = compileKay('--- module\nexport const base = 1\n---\n---\nconst { n } = props<{ n: number }>()\nconst twice = n * 2\n---\np {base} {twice}\n', 'test.kay', { output: 'dom' })
+
+    expect(module.tsx).toContain('const base = 1')
+    expect(module.tsx).not.toContain('const base = KayMemo')
+    expect(compileKay('---\nconst { n } = props<{ n: number }>()\nexport const twice = n * 2\n---\np {n}\n', 'test.kay', { output: 'dom' }).diagnostics.length).toBeGreaterThan(0)
+  })
+
   it('wraps an object and an array as the one value they are, read through the call', () => {
     const dom = code('const shape = { size, first: items[0] }\nconst copy = [...items]\nconst show = () => [shape.size, copy.length]', 'dom')
 
