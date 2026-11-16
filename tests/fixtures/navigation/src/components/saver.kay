@@ -5,7 +5,7 @@ import { noteDown } from '../routes/keepalive.kay'
 const big = signal('')
 
 async function saveBig() {
-  big = (await noteDown({ text: 'x'.repeat(70 * 1024) }, { keepalive: true })).length.toString()
+  big = (await noteDown({ text: 'x'.repeat(70 * 1024) }, { keepalive: true }).orThrow()).length.toString()
 }
 
 onMount(() => {

@@ -1606,7 +1606,7 @@ describe('failed actions', () => {
     globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => app.handle(new Request(new URL(String(input), 'http://localhost'), init))) as typeof fetch
 
     try {
-      await add({ title: 'Serve pages' })
+      await add({ title: 'Serve pages' }).orThrow()
     }
     catch (caught) {
       error = caught

@@ -100,9 +100,9 @@ describe('a page whose navigate-api chunk fails to load with the build unchanged
     answer(new Response(stringify('ok')))
     behave('navigate-api', 'fail')
 
-    const call = actionStub('/_kay/action/test/refresh') as unknown as (input: object) => Promise<unknown>
+    const call = actionStub('/_kay/action/test/refresh') as unknown as (input: object) => { orThrow: () => Promise<unknown> }
 
-    expect(await call({})).toBe('ok')
+    expect(await call({}).orThrow()).toBe('ok')
     await settle()
 
     expect(reloaded).toHaveBeenCalledTimes(1)

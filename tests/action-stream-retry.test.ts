@@ -7,7 +7,7 @@ import { eventually } from './helpers/eventually'
 
 interface Stream { error: () => unknown, pending: () => boolean, status: () => string, last: () => number | undefined, retry: () => void }
 type Tracked = ((input: object) => Promise<{ ok: true, data: Stream }>) & { pending: () => boolean }
-type Stub = ((input: object, options?: { timeout?: string }) => Promise<Stream>) & { track: () => Tracked }
+type Stub = ((input: object, options?: { timeout?: string }) => { orThrow: () => Promise<Stream> }) & { track: () => Tracked }
 
 let actionStub: typeof import('../src/runtime/action').actionStub
 const mocks: { mockRestore: () => void }[] = []
@@ -102,7 +102,7 @@ describe('a stream retried', () => {
     mocks.push(spyOn(console, 'error').mockImplementation(() => undefined))
 
     const server = serve([failing, () => done(9)], [0, 120])
-    const stream = await stub()({}, { timeout: '40ms' })
+    const stream = await stub()({}, { timeout: '40ms' }).orThrow()
 
     await eventually(() => expect(stream.status()).toBe('failed'))
     stream.retry()
