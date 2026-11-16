@@ -311,7 +311,7 @@ export const LINTS = {
     right: '--- server\nimport { ask } from \'@kayjs/ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), ({ messages }) => ask(messages))\n---\np x',
   },
   'unreturned-fail': {
-    level: 'warn',
+    level: 'deny',
     group: 'code',
     summary: 'A `ctx.fail(...)` statement in an action\'s handler (or `fail(...)` destructured from the context) that is not returned: `fail` returns the failure the action answers with, where `deny`, `notFound` and `redirect` throw, so the statement does nothing and the handler carries on. An arrow function with an expression body already returns, and a nested function is left alone. The fix prepends `return`. Found in `.kay` fences and `.ts` modules alike.',
     wrong: '--- server\nexport const rename = action(s.Object({ name: s.String() }), ({ name }, ctx) => {\n  if (name === \'admin\')\n    ctx.fail(409, \'That name is taken\')\n\n  return name\n})\n---\np x',
@@ -325,7 +325,7 @@ export const LINTS = {
     right: '--- server\nexport const reset = action(s.Object({ email: s.String(), captcha: s.String() }), ({ email, captcha }, ctx) => ctx.locals.auth.password.requestReset(email, { captcha }))\n---\np x',
   },
   'positional-key': {
-    level: 'warn',
+    level: 'deny',
     group: 'islands',
     summary: 'A `for` keyed by the row\'s index while its rows have an `id`: a row added or removed before others shifts every later one to another key, so their markup and state stay where the old rows were.',
     wrong: 'for todo, i of todos key={i}\n  TodoRow(id={todo.id} title={todo.title})',
@@ -347,14 +347,14 @@ export const LINTS = {
     right: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
   },
   'constant-signal': {
-    level: 'warn',
+    level: 'deny',
     group: 'islands',
     summary: 'A signal the component script declares and nothing writes: it never changes, so a plain value renders the same without the reactivity.',
     wrong: '---\nimport { signal } from \'kay\'\n\nconst title = signal(\'Todos\')\n---\nh1 {title()}',
     right: '---\nconst title = \'Todos\'\n---\nh1 {title}',
   },
   'signal-set-call': {
-    level: 'warn',
+    level: 'deny',
     group: 'islands',
     summary: 'A signal written by calling `.set(value)` where assigning it, `open = true`, compiles to the same call. An updater written inline, `count.set(c => c * 2)`, stays a call. `kay check --fix` assigns it.',
     wrong: '---\nimport { signal } from \'kay\'\n\nconst open = signal(false)\n---\nbutton(onClick={() => open.set(true)}) Open\nif open()\n  p Opened',
@@ -368,21 +368,21 @@ export const LINTS = {
     right: '---\nimport { signal } from \'kay\'\nimport { invalidate } from \'kay/cache\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
   },
   'uncaught-await': {
-    level: 'warn',
+    level: 'deny',
     group: 'code',
     summary: 'An `await` block with no `catch` and no `try` around it: once its value rejects, the pending block goes and nothing takes its place, so the visitor never learns it failed, and only the log does. A `try` around the block gives it that `try`\'s `catch`.',
     wrong: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments',
     right: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments\ncatch\n  p Comments are unavailable',
   },
   'once-read-prop': {
-    level: 'warn',
+    level: 'deny',
     group: 'code',
     summary: 'A destructured prop read into a top-level `const` or `let` that a function or the template reads later, in a component that runs in the browser: the declaration runs once, when the component is created, so the value keeps the prop\'s first value after the parent changes it. A prop read as the test of an `if` or a ternary, as an argument of a call or `new`, as a write target or in a class, one inside `signal(...)`, `persisted(...)` or `posted...(...)`, `id ?? uid()`, a callback prop (`onChange`) and a prop named `initial*` or `default*` are choices made once and left alone; for another, compute the value where it is used or in a `memo`, or allow it with `// kay-allow once-read-prop: why the first value is meant`.',
     wrong: '---\nimport { signal } from \'kay\'\n\nconst { items } = props<{ items: string[] }>()\nconst last = items.length - 1\nconst open = signal(false)\n---\nbutton(onClick={() => open(!open())}) {last}',
     right: '---\nimport { memo, signal } from \'kay\'\n\nconst { items } = props<{ items: string[] }>()\nconst last = memo(() => items.length - 1)\nconst open = signal(false)\n---\nbutton(onClick={() => open(!open())}) {last()}',
   },
   'literal-tag': {
-    level: 'warn',
+    level: 'deny',
     group: 'code',
     summary: 'Template text holding what reads as an HTML tag: kay escapes text, so readers see the tag as written rather than the element.',
     wrong: 'p Press <kbd>Ctrl</kbd> K to search',
@@ -403,7 +403,7 @@ export const LINTS = {
     right: '--- style\n:global(body) { margin: 0 }\n---\np hi',
   },
   'brace-in-attribute': {
-    level: 'warn',
+    level: 'deny',
     group: 'code',
     // eslint-disable-next-line no-template-curly-in-string
     summary: 'A quoted attribute value holding `{name}`: only text interpolates, so the braces ship as written. `{name}` or a template literal, `title={`Hello ${name}`}`, is the attribute that reads the value; `\\{` keeps a literal brace. `kay check --fix` writes it.',

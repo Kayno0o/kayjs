@@ -3,7 +3,7 @@ import type { Lint, TypeLint } from './lints'
 // The lints of a `for`'s rows, with the other lints in `LINTS`.
 export const LOOP_LINTS = {
   'unkeyed-rows': {
-    level: 'warn',
+    level: 'deny',
     group: 'islands',
     typed: true,
     summary: 'A `for` with no `key` in an island, or in a component only islands import, over rows of an object type with no `id` (a component shared with server-rendered pages is not reported): its rows are matched by the item itself, so an item rebuilt as a copy (`{ ...row, text }`, a list fetched again) is a new row, which redraws its markup and loses its fields and focus, where before 1.101 kay paired such copies with the rows left in their place. Give the rows an `id`, or write the `key` that names them (`key={row.slug}`); `key={i}` matches by position, as a list of copies was matched before. Rows kept as the same objects, or a list that never changes, need nothing, so `allow` it where that holds. The fix offered writes `key={i}`, adding the index to the `for`; `kay check --fix` leaves it, as position may not be what names a row.',

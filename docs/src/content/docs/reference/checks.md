@@ -37,7 +37,7 @@ The editor shows each problem of an open file with the same message, note and he
 
 ## Errors and warnings
 
-Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. Warnings fail the check only with `--deny-warnings`. The `check` script of a new project leaves it out, so a warning shows on the diff without failing CI. Add it to the script to fail on warnings too. `kay build` and `kay dev` never fail on one.
+Each lint has a level. `deny` is an error (the nine that ship a broken page, such as `brace-in-attribute` and `uncaught-await`, are, since 1.105), `warn` a warning, `allow` hides it. Warnings fail the check only with `--deny-warnings`. The `check` script of a new project leaves it out, so a warning shows on the diff without failing CI. Add it to the script to fail on warnings too. `kay build` and `kay dev` never fail on one.
 
 | Lint | Default | Group | Reports |
 | --- | --- | --- | --- |
@@ -58,8 +58,8 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `invalid-autocomplete` | deny | forms | An `autocomplete` value HTML does not define |
 | `unbounded-string` | warn | forms | A string field of an action named like a short value (`name`, `email`, `title`...) with no `maxLength` of its own, which takes the default bound of 10,000 characters, unless an `enum`, `const` or anchored bounded `pattern` bounds it |
 | `invalid-nesting` | warn | islands | Markup HTML forbids or the parser rewrites, so the server and an island may disagree: a block in a `p`, a `form` in a `form`, a `tr` straight in a `table`, a cell outside a row, a heading in a heading, an `option` outside a `select`, an `li` outside a list, a non-`li` straight in one |
-| `positional-key` | warn | islands | A `for` keyed by position whose rows read `item.id` |
-| `unkeyed-rows` | warn | islands | A `for` of an island with no `key` over rows of an object type with no `id` |
+| `positional-key` | deny | islands | A `for` keyed by position whose rows read `item.id` |
+| `unkeyed-rows` | deny | islands | A `for` of an island with no `key` over rows of an object type with no `id` |
 | `incomplete-match` | warn | code | A `match` with no `else` that leaves members of a union out |
 | `missing-label` | warn | a11y | A form field with no label |
 | `skipped-heading` | warn | a11y | An `h3` right after an `h1` |
@@ -89,19 +89,19 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unstructured-page` | warn | a11y | A prerendered page with no `main` or no `h1`, reported by `kay build` |
 | `redundant-alt` | warn | a11y | Alt text that says it is an image |
 | `uncalled-signal` | deny | islands | A signal read by name where its value goes, or handed to a parameter that takes anything, not called |
-| `constant-signal` | warn | islands | A signal that is only ever read |
-| `signal-set-call` | warn | islands | A signal written with `.set(value)` where assigning it does the same |
+| `constant-signal` | deny | islands | A signal that is only ever read |
+| `signal-set-call` | deny | islands | A signal written with `.set(value)` where assigning it does the same |
 | `server-only-import` | deny | islands | `invalidatePage` or `sqliteCache` imported from `kay/cache` by code that runs in the browser |
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
 | `external-redirect` | warn | security | A `redirect()` whose target is not written as a path of the site or wrapped in `localPath()`, and that the request can reach, which makes it an open redirect |
 | `async-reply` | warn | code | An `async` function returning kayjs-ai's `ask()`, which awaits the reply so nothing streams |
-| `unreturned-fail` | warn | code | A `ctx.fail(...)` in an action's handler that is not returned, so it does nothing |
+| `unreturned-fail` | deny | code | A `ctx.fail(...)` in an action's handler that is not returned, so it does nothing |
 | `missing-captcha` | warn | forms | A kayjs-auth call that asks a CAPTCHA by default (`password.register`, `password.requestReset`, `magicLink.request`, `password.signIn`) written with no `captcha` option, unless a module's `authCore` (`createAuth` before 1.91) sets `captcha: false`, which silences it project-wide, in the editor too |
-| `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
-| `brace-in-attribute` | warn | code | A quoted attribute value holding `{name}`, which ships as written: write `title={name}` or a template literal |
+| `literal-tag` | deny | code | An HTML tag written in template text, shown as written |
+| `brace-in-attribute` | deny | code | A quoted attribute value holding `{name}`, which ships as written: write `title={name}` or a template literal |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |
-| `uncaught-await` | warn | code | An `await` block with no `catch` and no `try` around it |
-| `once-read-prop` | warn | code | A destructured prop read into a top-level `const` or `let` that a function or the template reads later, in a browser script, so it keeps its first value |
+| `uncaught-await` | deny | code | An `await` block with no `catch` and no `try` around it |
+| `once-read-prop` | deny | code | A destructured prop read into a top-level `const` or `let` that a function or the template reads later, in a browser script, so it keeps its first value |
 | `public-env-outside-src` | warn | code | An `s.Public` field in a `.ts` file outside `src`, which kay does not read, so an island types it as a string |
 | `browser-global-at-load` | deny | code | A module a page imports reading `window`, `document` or another browser-only name as it loads, so the page throws on the server; read it in a function or after a `typeof window` check |
 | `unmounted-jobs` | warn | code | A `src/jobs.ts` that no plugin and no `src/server.ts` imports, so its queues run nowhere; jobs live in `src/jobs/*.ts` |

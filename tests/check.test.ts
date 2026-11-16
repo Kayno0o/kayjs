@@ -3983,6 +3983,7 @@ describe.concurrent('kay check, unused code', () => {
 
   it('prints warnings apart from errors, failing on them only with --deny-warnings', async () => {
     const root = await scratchProject({
+      'kay.config.ts': 'export default { lints: { \'positional-key\': \'warn\' } }\n',
       'src/list.kay': '---\nconst { todos } = props<{ todos: { id: number, title: string }[] }>()\n---\nfor todo, i of todos key={i}\n  a(href={`/todos/${todo.id}`}) {todo.title}\n',
     })
 
@@ -4697,6 +4698,7 @@ describe.concurrent('kay check, unused code', () => {
 
   it('prints the problems as workflow commands a CI annotates the diff with, or as one JSON document, failing alike', async () => {
     const root = await scratchProject({
+      'kay.config.ts': 'export default { lints: { \'positional-key\': \'warn\' } }\n',
       'src/list.kay': '---\nconst { todos } = props<{ todos: { id: number, title: string }[] }>()\n---\nfor todo, i of todos key={i}\n  a(href={`/todos/${todo.id}`}) {todo.title}\nimg(src="/a.png" width="1" height="1")\n',
     })
     const file = relative(process.cwd(), join(root, 'src/list.kay'))

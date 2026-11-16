@@ -24,7 +24,7 @@ describe('lint levels', () => {
   it('reports a lint at its default level: an error when it denies, a warning when it warns', () => {
     expect(lints(`${ROWS}img(src="/a.png" width="1" height="1")\nfor todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`)).toEqual([
       { code: 'missing-alt', severity: 'error', at: 'img' },
-      { code: 'positional-key', severity: 'warning', at: 'i' },
+      { code: 'positional-key', severity: 'error', at: 'i' },
     ])
   })
 
@@ -45,7 +45,7 @@ describe('lint levels', () => {
     const source = '---\nimport { signal } from \'kay\'\n\n// kay-allow constant-signal\nconst a = signal(1)\nconst b = signal(2) // kay-allow constant-signal, missing-alt\nconst c = signal(3)\n---\n// kay-allow missing-alt\nimg(src="/a.png" width="1" height="1")\nimg(src="/b.png" width="1" height="1")\np {a()} {b()} {c()}\n'
 
     expect(lints(source)).toEqual([
-      { code: 'constant-signal', severity: 'warning', at: 'c' },
+      { code: 'constant-signal', severity: 'error', at: 'c' },
       { code: 'missing-alt', severity: 'error', at: 'img' },
     ])
   })
@@ -59,8 +59,8 @@ describe('lint levels', () => {
       { code: 'missing-alt', severity: 'error', at: 'img' },
     ])
     expect(lints(source.replace('// kay-allow-file constant-signal, missing-alt', '// kay-allow-file'))).toEqual([
-      { code: 'constant-signal', severity: 'warning', at: 'a' },
-      { code: 'constant-signal', severity: 'warning', at: 'c' },
+      { code: 'constant-signal', severity: 'error', at: 'a' },
+      { code: 'constant-signal', severity: 'error', at: 'c' },
       { code: 'missing-alt', severity: 'error', at: 'img' },
       { code: 'missing-alt', severity: 'error', at: 'img' },
     ])
@@ -184,11 +184,11 @@ describe('kay explain', () => {
     }
 
     expect(explainLint('constant-signal')).toBe([
-      'constant-signal: warn by default, in islands',
+      'constant-signal: deny by default, in islands',
       LINTS['constant-signal'].summary,
       'Reported:\n\n    ---\n    import { signal } from \'kay\'\n\n    const title = signal(\'Todos\')\n    ---\n    h1 {title()}',
       'Written right:\n\n    ---\n    const title = \'Todos\'\n    ---\n    h1 {title}',
-      'Its level is set in kay.config.ts, as `lints: { \'constant-signal\': \'deny\' }`, to `allow`, `warn` or `deny`, or with its group\'s, `lints: { islands: \'deny\' }`; a `// kay-allow constant-signal` comment allows it on the line it ends, or alone on its line, on the line after it, and `// kay-allow-file constant-signal` in the whole file.',
+      'Its level is set in kay.config.ts, as `lints: { \'constant-signal\': \'warn\' }`, to `allow`, `warn` or `deny`, or with its group\'s, `lints: { islands: \'warn\' }`; a `// kay-allow constant-signal` comment allows it on the line it ends, or alone on its line, on the line after it, and `// kay-allow-file constant-signal` in the whole file.',
     ].join('\n\n'))
   })
 
@@ -591,7 +591,7 @@ describe('positional-key', () => {
   it('reports rows keyed by their index while each has an `id`, dropping the key, and the index once nothing else reads it', () => {
     const source = `${ROWS}for todo, i of todos key={i}\n  a(href={\`/todos/\${todo.id}\`}) {todo.title}\n`
 
-    expect(lints(source)).toEqual([{ code: 'positional-key', severity: 'warning', at: 'i' }])
+    expect(lints(source)).toEqual([{ code: 'positional-key', severity: 'error', at: 'i' }])
     expect(fixed(source)).toEqual([source.replace('for todo, i of todos key={i}', 'for todo of todos')])
   })
 
@@ -639,11 +639,11 @@ describe('constant-signal', () => {
   it('reports a signal every use of which reads it, naming the plain value it could be', () => {
     const diagnostics = compileKay(script('const title = signal(\'Todos\')', 'h1 {title()}'), 'list.kay', { check: true }).diagnostics
 
-    expect(diagnostics.map(d => [d.code, d.severity, d.help])).toEqual([['constant-signal', 'warning', 'make it a plain value, `const title = \'Todos\'`, read as `title`']])
+    expect(diagnostics.map(d => [d.code, d.severity, d.help])).toEqual([['constant-signal', 'error', 'make it a plain value, `const title = \'Todos\'`, read as `title`']])
   })
 
   it('reports a signal a prop takes the value of', () => {
-    expect(lints(script('const open = signal(false)', 'Child(open={open()})\np {open()}'))).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'open' }])
+    expect(lints(script('const open = signal(false)', 'Child(open={open()})\np {open()}'))).toEqual([{ code: 'constant-signal', severity: 'error', at: 'open' }])
   })
 
   it('leaves a signal something writes, binds or hands on, and a `signal` that is not kay\'s', () => {
@@ -828,8 +828,8 @@ describe('signal-set-call on a signal kay exports', () => {
 
 describe('uncaught-await', () => {
   it('reports an await block with no catch block and no try around it, one-line or not', () => {
-    expect(lints('await comments\n  p Loading\nthen list\n  p {list.length}\n')).toEqual([{ code: 'uncaught-await', severity: 'warning', at: 'await comments' }])
-    expect(lints('try\n  p Fine\ncatch\n  await comments then list\n    p {list.length}\n')).toEqual([{ code: 'uncaught-await', severity: 'warning', at: 'await comments' }])
+    expect(lints('await comments\n  p Loading\nthen list\n  p {list.length}\n')).toEqual([{ code: 'uncaught-await', severity: 'error', at: 'await comments' }])
+    expect(lints('try\n  p Fine\ncatch\n  await comments then list\n    p {list.length}\n')).toEqual([{ code: 'uncaught-await', severity: 'error', at: 'await comments' }])
   })
 
   it('leaves an await block inside a try, whatever it is nested in, and the catch block of the try is no cover', () => {
@@ -840,7 +840,7 @@ describe('uncaught-await', () => {
 
   it('leaves an await block with a catch block, and reports one nested in a then block on its own', () => {
     expect(lints('await comments then list\n  p {list.length}\ncatch\n  p Failed\n')).toEqual([])
-    expect(lints('await comments then list\n  await list then count\n    p {count}\ncatch\n  p Failed\n')).toEqual([{ code: 'uncaught-await', severity: 'warning', at: 'await list' }])
+    expect(lints('await comments then list\n  await list then count\n    p {count}\ncatch\n  p Failed\n')).toEqual([{ code: 'uncaught-await', severity: 'error', at: 'await list' }])
   })
 })
 
@@ -849,10 +849,10 @@ describe('brace-in-attribute', () => {
 
   it('reports a quoted attribute holding a braced name, a path or a call', () => {
     expect(lints(`${head}a(href="/x" title="Hello {name}" alt="{user.name}" data-x="{user.name.slice(1)}") go\na(href="{name}") go\n`)).toEqual([
-      { code: 'brace-in-attribute', severity: 'warning', at: '{name}' },
-      { code: 'brace-in-attribute', severity: 'warning', at: '{user.name}' },
-      { code: 'brace-in-attribute', severity: 'warning', at: '{user.name.slice(1)}' },
-      { code: 'brace-in-attribute', severity: 'warning', at: '{name}' },
+      { code: 'brace-in-attribute', severity: 'error', at: '{name}' },
+      { code: 'brace-in-attribute', severity: 'error', at: '{user.name}' },
+      { code: 'brace-in-attribute', severity: 'error', at: '{user.name.slice(1)}' },
+      { code: 'brace-in-attribute', severity: 'error', at: '{name}' },
     ])
   })
 
@@ -907,10 +907,10 @@ describe('brace-in-attribute', () => {
 describe('literal-tag', () => {
   it('reports an HTML tag written in template text, a pair once, a closing tag left alone too', () => {
     expect(lints('p Press <kbd>Ctrl</kbd> K\n| Line<br>next\np(title="a") <em>a <b>b</b></em> </p>\n')).toEqual([
-      { code: 'literal-tag', severity: 'warning', at: '<kbd>' },
-      { code: 'literal-tag', severity: 'warning', at: '<br>' },
-      { code: 'literal-tag', severity: 'warning', at: '<em>' },
-      { code: 'literal-tag', severity: 'warning', at: '</p>' },
+      { code: 'literal-tag', severity: 'error', at: '<kbd>' },
+      { code: 'literal-tag', severity: 'error', at: '<br>' },
+      { code: 'literal-tag', severity: 'error', at: '<em>' },
+      { code: 'literal-tag', severity: 'error', at: '</p>' },
     ])
   })
 
@@ -1286,7 +1286,7 @@ describe('unreturned-fail', () => {
   const handler = 'export const rename = action(s.Object({ name: s.String({ maxLength: 20 }) }), ({ name }, ctx) => {\n  if (name === \'admin\')\n    ctx.fail(409, \'taken\')\n\n  return name\n})'
 
   it('reports a ctx.fail statement in a handler, with a fix prepending return', () => {
-    expect(found(handler)).toEqual([{ code: 'unreturned-fail', severity: 'warning', at: 'ctx.fail(409, \'taken\')' }])
+    expect(found(handler)).toEqual([{ code: 'unreturned-fail', severity: 'error', at: 'ctx.fail(409, \'taken\')' }])
     expect(fixed(server(handler))).toEqual([server(handler.replace('    ctx.fail', '    return ctx.fail'))])
   })
 
@@ -1488,7 +1488,7 @@ describe('once-read-prop', () => {
   const used = '\nconst show = () => [last, other]'
 
   it('reports a prop read into a const that a function or the template reads later', () => {
-    expect(found(`const last = items.length - 1${used}`)).toEqual([{ code: 'once-read-prop', severity: 'warning', at: 'items' }])
+    expect(found(`const last = items.length - 1${used}`)).toEqual([{ code: 'once-read-prop', severity: 'error', at: 'items' }])
     expect(found('const last = items.length - 1', undefined, 'p {last}')).toHaveLength(1)
     expect(found('let last = items.length\nconst other = 1\nconst show = memo(() => last)')).toHaveLength(1)
     expect(found(`const last = items[0] + items[1]${used}`)).toHaveLength(2)
@@ -1538,7 +1538,7 @@ describe('once-read-prop', () => {
   })
 
   it('reports a renamed prop under its local name, keeps watching one with a default, and skips the default itself', () => {
-    expect(found(`const last = heading.length${used}`, 'items: heading')).toEqual([{ code: 'once-read-prop', severity: 'warning', at: 'heading' }])
+    expect(found(`const last = heading.length${used}`, 'items: heading')).toEqual([{ code: 'once-read-prop', severity: 'error', at: 'heading' }])
     expect(found(`const last = size.length${used}`)).toHaveLength(1)
     expect(found(`const last = 1${used}`, 'items, size = items[0]')).toEqual([])
   })
