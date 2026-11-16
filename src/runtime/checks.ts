@@ -182,8 +182,8 @@ type CheckedTarget<Location extends string> = string extends Location
 // `ctx.redirect`: a site path is checked like a link, so a redirect cannot point at a page that does not exist.
 export type Redirect = <const Location extends string>(location: Location & CheckedHref<Location> & CheckedTarget<Location>, status?: 301 | 302 | 303 | 307 | 308) => never
 
-// A literal status `ctx.fail` takes is an error one, from 400 to 599; a computed one is checked when the action runs.
-export type ErrorStatus<Status extends number> = number extends Status ? unknown : `${Status}` extends `${'4' | '5'}${Digit}${Digit}` ? unknown : { kayError: `ctx.fail takes an error status, from 400 to 599, not ${Status}` }
+// A literal status `ctx.deny` takes is an error one, from 400 to 599; a computed one is checked when it runs.
+export type ErrorStatus<Status extends number> = number extends Status ? unknown : `${Status}` extends `${'4' | '5'}${Digit}${Digit}` ? unknown : { kayError: `ctx.deny takes an error status, from 400 to 599, not ${Status}` }
 
 // A literal duration is positive; a computed one is checked when it is used.
 export type PositiveDuration<Length extends Duration> = string extends Length ? unknown : `${Length}` extends `-${string}` | '0' | `0${'ms' | 's' | 'm' | 'h' | 'd' | 'w'}` ? { kayError: `A duration is positive, such as '5m', not ${Length}` } : unknown

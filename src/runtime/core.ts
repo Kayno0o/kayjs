@@ -4,7 +4,7 @@ import type { CorsOptions } from '../server/cors'
 import type { GuardOption } from '../server/lazy-guard'
 import type { RateLimit } from './action-shared'
 import type { ByteSize } from './byte-size'
-import type { Deferred, Locals, Redirect, Register, RouteParams } from './checks'
+import type { Deferred, ErrorStatus, Locals, Redirect, Register, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import type { Localized } from './localized'
@@ -371,7 +371,7 @@ export interface RequestContext<Params extends Record<string, unknown> = Record<
 
 // `ctx.deny(status, { message, errors, data })`, the one shape every refusal takes (`refuse()` throws the same).
 export interface Deny {
-  (status?: number, options?: DenyOptions<ErrorData>): never
+  <const Status extends number = number>(status?: Status & ErrorStatus<Status>, options?: DenyOptions<ErrorData>): never
   /** @deprecated `deny(status, { message, data })`. Removed in 1.108; `deprecated-deny-call` rewrites it. */
   (status: number, message: string, data?: ErrorData): never
 }

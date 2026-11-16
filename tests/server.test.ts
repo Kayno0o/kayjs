@@ -2200,7 +2200,7 @@ describe('action input', () => {
     try {
       expect((await fail(418)).status).toBe(418)
       expect((await fail(200)).status).toBe(500)
-      expect(logged).toHaveBeenCalledWith(expect.stringContaining('ctx.fail takes an error status, from 400 to 599, not 200'))
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('ctx.deny takes an error status, from 400 to 599, not 200'))
     }
     finally {
       logged.mockRestore()

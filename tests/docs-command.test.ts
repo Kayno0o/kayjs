@@ -95,7 +95,7 @@ describe('a search', () => {
 
   it('finds a dotted name as one word, not by its parts', () => {
     expect(searchDocs(docFiles(root).filter(file => file.label.startsWith('kayjs-fake/')), 's.Object')[0]!.section.label).toBe('kayjs-fake/gadgets.md#validate-a-post')
-    expect(searchDocs(docFiles(checkout), 'ctx.fail')[0]!.section.file.label).toBe('kay/actions.md')
+    expect(searchDocs(docFiles(checkout), 'ctx.deny')[0]!.section.file.label).toBe('kay/actions.md')
   })
 
   it('searches a hyphenated word no section holds whole as its parts', () => {

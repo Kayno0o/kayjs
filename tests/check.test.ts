@@ -2307,12 +2307,12 @@ describe.concurrent('kay check, edge cases', () => {
       '',
       'export const signIn = action(t.Object({ code: t.String({ maxLength: 200 }) }), async ({ code }, ctx) => {',
       '  if (code === \'x\')',
-      '    return ctx.fail(400, { error: \'bad\' })',
+      '    return ctx.deny(400, { data: { error: \'bad\' } })',
       '  ctx.redirect(\'/\')',
       '}, { protect: { honeypot: \'website\' } })',
       'export const save = action(t.Object({ code: t.String({ maxLength: 200 }) }), async ({ code }, ctx) => {',
       '  if (code === \'x\')',
-      '    return ctx.fail(400, { error: \'bad\' })',
+      '    return ctx.deny(400, { data: { error: \'bad\' } })',
       '  if (code === \'y\')',
       '    return 1',
       '})',
@@ -2346,7 +2346,7 @@ describe.concurrent('kay check, edge cases', () => {
       '',
       'export const save = action(t.Object({ code: t.String({ maxLength: 200 }) }), async ({ code }, ctx) => {',
       '  if (code === \'x\')',
-      '    return ctx.fail(400, { error: \'bad\' })',
+      '    return ctx.deny(400, { data: { error: \'bad\' } })',
       '  return 1',
       '}, { protect: { honeypot: \'website\' } })',
       '---',
@@ -2424,7 +2424,7 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('refuses a literal ctx.fail status, redirect target or cached ttl the server would refuse when it runs', async () => {
+  it('refuses a literal ctx.deny status, redirect target or cached ttl the server would refuse when it runs', async () => {
     const page = [
       '--- server',
       'import { t } from \'elysia\'',
@@ -2433,11 +2433,11 @@ describe.concurrent('kay check, edge cases', () => {
       '',
       'export const save = action(t.Object({ code: t.String({ maxLength: 200 }), status: t.Number(), next: t.String({ maxLength: 200 }) }), async ({ code, status, next }, ctx) => {',
       '  if (code === \'a\')',
-      '    return ctx.fail(422, { error: \'bad\' })',
+      '    return ctx.deny(422, { data: { error: \'bad\' } })',
       '  if (code === \'b\')',
-      '    return ctx.fail(status)',
+      '    return ctx.deny(status, { data: 1 })',
       '  if (code === \'c\')',
-      '    return ctx.fail(200)',
+      '    return ctx.deny(200)',
       '  if (code === \'d\')',
       '    ctx.redirect(next)',
       '  if (code === \'e\')',
@@ -2460,7 +2460,7 @@ describe.concurrent('kay check, edge cases', () => {
     try {
       expect((await check(root)).filter(d => d.code !== 'external-redirect').map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1] ?? d.message])).toEqual([
         [22, '`kept`, `never`, `later`, `none` are awaited one after the other, though none reads another'],
-        [12, 'ctx.fail takes an error status, from 400 to 599, not 200'],
+        [12, 'ctx.deny takes an error status, from 400 to 599, not 200'],
         [18, 'A redirect target starting with // or a backslash is read by a browser as another site; use a full https:// URL'],
         [19, 'A redirect goes to a path or an http(s) URL, not to a javascript: URL'],
         [23, 'A duration is positive, such as \'5m\', not 0s'],
