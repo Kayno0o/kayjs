@@ -805,7 +805,7 @@ async function failed(request: Request, headers: Headers, cookies: CookieMap, fl
   return new Response(encodeOrExplain({ errors: flash.errors, data: flash.data }, `what ${flash.action} passed to ctx.fail`), { status: flash.status, headers })
 }
 
-// The page renders as for a visit, through the app, its guards and hooks included, and the failure reaches `failed()` in memory, so all the visitor typed comes back whatever its length.
+// The page renders as for a visit, through the app, its guards and hooks included, and the failure reaches `form.failed()` in memory, so all the visitor typed comes back whatever its length.
 // It answers the post itself, with the failure's status: a reload posts again, as after any form a server answers in place, and without the page swap a `base` keeps relative links pointing where they did on the page.
 async function renderBack(app: Elysia, base: string, request: Request, headers: Headers, flash: Flash, server: Server | null): Promise<Response> {
   const from = new URL(backTo(request, base), request.url)
@@ -816,7 +816,7 @@ async function renderBack(app: Elysia, base: string, request: Request, headers: 
   let page: Response
   let html: string | undefined
 
-  // Read through before the failure is forgotten: an `await` block streamed after the shell may read `failed()` too.
+  // Read through before the failure is forgotten: an `await` block streamed after the shell may read `form.failed()` too.
   try {
     page = await visitAs(request, new Request(new URL(`${path}${from.search}`, request.url), { headers: sent }), server, async visit => app.handle(visit))
 

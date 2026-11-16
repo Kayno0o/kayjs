@@ -1574,7 +1574,7 @@ describe('a tracked action call', () => {
       expect(await call({ id: 2 })).toMatchObject({ ok: false, status: 422, message: 'Bad id', errors: { id: 'Bad id' }, data: undefined })
       expect(call.pending()).toBe(false)
       // The action's own reading of its last call stays as it was.
-      expect(saved.error('id')).toBe('Bad id')
+      expect(saved.form.error('id')).toBe('Bad id')
     }
     finally {
       fetched.mockRestore()
