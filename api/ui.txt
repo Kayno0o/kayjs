@@ -2745,6 +2745,10 @@ component default
     body?: string | undefined;
     footer?: string | undefined;
   };
+  head?: string | undefined;
+  title?: string | undefined;
+  body?: string | undefined;
+  footer?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
   launcher?: string | undefined | {
@@ -2767,6 +2771,10 @@ component default
     body?: string | undefined;
     footer?: string | undefined;
   };
+  head?: string | undefined;
+  title?: string | undefined;
+  body?: string | undefined;
+  footer?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
   launcher?: string | undefined | {
@@ -2789,6 +2797,10 @@ component default
     body?: string | undefined;
     footer?: string | undefined;
   };
+  head?: string | undefined;
+  title?: string | undefined;
+  body?: string | undefined;
+  footer?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
   launcher?: string | undefined | {

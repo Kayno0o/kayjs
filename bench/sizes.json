@@ -16,11 +16,11 @@
     }
   },
   "live-values": {
-    "gzip": 15253,
+    "gzip": 15245,
     "files": 4,
     "packages": {
       "app": 854,
-      "kay": 34153
+      "kay": 34156
     }
   },
   "bench-products": {
@@ -48,13 +48,13 @@
     }
   },
   "ui-list": {
-    "gzip": 52056,
+    "gzip": 52131,
     "files": 9,
     "packages": {
-      "app": 3218,
+      "app": 3223,
       "icons": 9375,
       "kay": 49654,
-      "kayjs-ui": 90054
+      "kayjs-ui": 89926
     }
   }
 }

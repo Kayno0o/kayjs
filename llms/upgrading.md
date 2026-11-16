@@ -102,30 +102,6 @@ A page without a `--- server` fence that has an `on*`, `bind:` or `ref`, a brows
 - The launcher's panel and button are kayjs-ui's `SidePanel` now, so a restyle of `@kayjs/ai/chat-panel.kay` changes: its parts `panel`, `button` and `glyph` are `root` and `launcher` of `'@kayjs/ui/side-panel.kay'` (the glyph is the button's icon), `head` and `title` are the same parts of `'@kayjs/ui/side-panel.kay'`, `body` is its `body`, and `actions` and `action` are gone: the header's buttons are the `new`, `expand` and `close` parts of `chat-panel.kay`. `kay check` already reports a part a component no longer has, listing the ones it has, which is why there is no lint for them. The `.kai-launcher` wrapper is no longer a fixed container and `.kai-launcher-panel` is a `dialog` that is `display: none` unless `[open]` (no `[hidden]`): a rule of an app's own on `.kai-launcher-head`, `-title`, `-actions`, `-glyph` or `.kai-launcher-panel[hidden]` moves to those parts and to `[open]`.
 - `transcribe()` and `describeImage()` take `locale`, a BCP 47 tag, in place of `language`.
 - `ask`, `describeImage`, `transcribe`, `speak` and `embed` take one `CallOptions`, so `retry`, `fallback`, `timeout`, `signal` and the `ai()` hooks reach each of them. `timeout` also takes a single duration for the whole call.
-### Query params, persisted state, navigation and effects have one API each
-
-Every old form below works until 1.108, `kay check` reports it as a `deprecated-*` warning, and `kay upgrade` rewrites it. The rewrite reads script fences and TypeScript files: a call written in a template expression, such as an `onClick` handler, stays and works.
-
-- `persisted.query(name, value, options)` is `queryParam(name, { default: value, ...options })`, the one signal of a query param, which also takes `values` (`deprecated-persisted-query`).
-- `persisted(name, value)` is `persisted.cookie(name, value)`: a call names its storage (`deprecated-persisted-call`).
-- `navigate({ query: changes }, options)` is `navigate.query(changes, options)`: `navigate(href)` goes to a page, `navigate.query()` changes the query of this one (`deprecated-navigate-query`).
-- `onNavigate(fn)` and `onBeforeNavigate(fn)` are `navigation.onNavigate(fn)` and `navigation.onBeforeNavigate(fn)`, the hooks of the source (`deprecated-navigation-hooks`).
-- An island listening to `kay:navigate`, `kay:navigate-start`, `kay:navigate-error`, `kay:navigate-stall`, `kay:action-start`, `kay:action-success`, `kay:action-error`, `kay:consent` or `kay:install` with `listen` uses the function hook: `navigation.onNavigate`, `onStart`, `onError` and `onStall`, `add.onStart`, `onData` and `onError` of an action (`{ input }`, `{ error, input }`), the `consent` signal, `installPrompt.available()`. The events still fire for a plain script, and the old listener works until 1.108 (`deprecated-island-events`, which rewrites the swap's events when the handler takes no parameter; the others are reported with the hook to write).
-- `listen(window, ...)` is `listen(() => window, ...)`: the target is one form, a function (`deprecated-listen-target`).
-- `mount` and `Mounted` are imported from `kay`, not `kay/mount`; `s`, `RateLimit` and `RateLimitRefusal` from `kay`, not `kay/server`; `sqliteCache` from `kay/cache`, not `kay/server` (`deprecated-import-path`).
-
-### The `storage` option of `persisted()` is gone
-
-`persisted(name, value, { storage: 'local' })` is `persisted.local(name, value)`, `{ storage: 'query' }` is `queryParam(name, { default: value })` and `{ storage: 'cookie' }` is `persisted.cookie(name, value)`; `persisted.session()` keeps a value in sessionStorage. The option was deprecated in 1.101 and `deprecated-persisted-storage` goes with it: run `kay upgrade` on 1.104 first and it rewrites every one it can find. On 1.105 the types refuse the option (`PersistedOptions` is gone) and the runtime ignores it, and a call still passing it is reported by `deprecated-persisted-call` with no fix.
-### cms access is one option
-
-`cms({ access })` says who is let in: a kayjs-auth role or a list of them, `{ password }`, a function returning the person, or `false`; `guard`, `role` and `member` still work and are refused beside it. `deprecated-cms-options` (`kay check --fix`) rewrites `role` and `guard: passwordGuard(...)` and a list `uploads` to `uploads: { types }`; it works until 1.108.
-
-- `cms({ role: 'editor' })` is `cms({ access: 'editor' })`, and `guard: passwordGuard(pw, opts)` is `access: { password: pw, ...opts }`.
-- With `roles` listed and no `access`, `guard` or `role`, kayjs-auth admits their holders and refuses everyone else, edit links included, where the screens stayed closed before.
-- `cms({ roles })` no longer needs a guard, and `can` no longer needs `roles`; with kayjs-auth and no `access`, the holders of the roles listed are let in, where the screens stayed closed before.
-- A production server reads the forge from `CMS_URL` (`forgejo://TOKEN@git.example.com/owner/repo`, `github://TOKEN@owner/repo`, `gitlab://TOKEN@group/project`); `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN`, `CMS_BRANCH` and `CMS_HOST` still work without it, and `kay env` lists `CMS_URL`.
-- The no-guard error and warning name `cms({ access })`, as do the `cms.*` message defaults that named `role` or `guard`.
 
 The rest of this release is in [Upgrading, older releases](upgrading-archive.md).
 
