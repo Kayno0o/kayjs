@@ -8,6 +8,7 @@ type Schema = Record<string, unknown>
 // A stream, a handler's async iterable or the connection a call to a streaming action answers with, is no JSON answer.
 // A Date and a bigint are strings, a Map an object and a Set an array, as `json()` writes them, an object with `toJSON` is what that returns, a function is `undefined` (no property, `null` in an array), and `unknown` stays `unknown`.
 // A number that is NaN or Infinity is written as `null` and described as a number: the type cannot tell.
+// An action call resolves `{ ok: true, data } | { ok: false, ... }`, so `answer` reads the data of the first; a type with no such branch is read whole.
 export const WIRE_PRELUDE = `type Wire<T> = unknown extends T ? unknown
   : T extends AsyncIterable<unknown> | { ended: () => Promise<unknown>, onClose: (...args: never[]) => unknown } ? never
   : T extends ArrayBufferView | ArrayBuffer ? never
@@ -20,7 +21,8 @@ export const WIRE_PRELUDE = `type Wire<T> = unknown extends T ? unknown
   : T extends object ? { [K in keyof T as [T[K]] extends [(...args: never[]) => unknown] ? never : K]: Wire<T[K]> }
   : never
 declare function probe<T>(handler: (...args: never[]) => T): Wire<Awaited<T>>
-type Answered<A> = A extends (...args: never[]) => Promise<infer R> ? R : never
+type Succeeded<R> = [Extract<R, { ok: true, data: unknown }>] extends [never] ? R : Extract<R, { ok: true, data: unknown }>['data']
+type Answered<A> = A extends (...args: never[]) => PromiseLike<infer R> ? Succeeded<R> : never
 declare function answer<A>(action: A): Wire<Answered<A>>`
 
 // Raised for a type no schema describes, which the object around it turns into `{}` and the root into no schema.
