@@ -18,6 +18,9 @@ const RESULT = Symbol.for('kay.call-result')
 
 const marked = <Result extends object>(result: Result): Result => Object.defineProperty(result, RESULT, { value: true })
 
+// Whether a call's options carry a signal that was aborted: what fails then is the abort's, and rejects as it threw, a timeout signal's included.
+export const signalAborted = (options: unknown): boolean => (options as { signal?: AbortSignal } | undefined)?.signal?.aborted === true
+
 // Turns a call that throws into one that answers a result: `refused` gives the `ApiError` of what it threw, which is the result's `error`, or undefined for what is no failure of the call (an abort, a redirect) or of the visitor (a bug), which rejects as it threw.
 export function settling<Data>(throwing: Promise<Data>, refused: (error: unknown) => ApiError | undefined): CallPromise<CallResult<Data, unknown>> {
   const result = (async (): Promise<CallResult<Data, unknown>> => {
@@ -47,7 +50,7 @@ export interface TrackHooks<Data> {
   onData?: ((event: { value: Data, input: unknown }) => void) | undefined
   /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   onSuccess?: ((event: { data: Data, input: unknown }) => void) | undefined
-  // A call failed, for a refusal and for no answer alike (which still throws); not for an abort or a redirect.
+  // A call failed, for a refusal and for no answer alike; not for an abort or a redirect.
   onError?: ((event: { error: ApiError, input: unknown }) => void) | undefined
 }
 
@@ -127,7 +130,7 @@ export function trackCalls<Args extends unknown[]>(
       return data
     }
     catch (failure) {
-      if (aside?.(failure) !== true && !args.some(arg => (arg as { signal?: AbortSignal } | undefined)?.signal?.aborted === true)) {
+      if (aside?.(failure) !== true && !args.some(signalAborted)) {
         const error = apiErrorOf(failure)
 
         failedWith = args
@@ -147,7 +150,7 @@ export function trackCalls<Args extends unknown[]>(
   }
 
   // eslint-disable-next-line ts/promise-function-async -- an async function would wrap the call's promise, which carries `orThrow()`
-  const answering = (...args: Args) => settling(run(...args), refused)
+  const answering = (...args: Args) => settling(run(...args), error => args.some(signalAborted) ? undefined : refused(error))
 
   return Object.assign(answering, {
     status: () => inFlight() > 0 ? 'loading' as const : outcome(),

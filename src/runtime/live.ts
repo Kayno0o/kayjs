@@ -1036,7 +1036,7 @@ async function callApi<Module, const Path extends CallPath<Module>, const M exte
   return answer as ApiAnswer<Module, Path, M>
 }
 
-// A route handle over `call` with a pending count of its own: `const save = call.track(api, '/notes', { onError: ({ error }) => toast.error(error.message) })`, then `await save({ method: 'post', body })` resolves `{ ok, data }` or the route's refusal as `{ ok: false, status, errors, data }`, as an action's `track()` does, and `save.pending()` reads only its own calls. A call that got no answer (status 0) or was aborted still throws.
+// A route handle over `call` with a pending count of its own: `const save = call.track(api, '/notes', { onError: ({ error }) => toast.error(error.message) })`, then `await save({ method: 'post', body })` resolves `{ ok, data }` or the route's refusal as `{ ok: false, status, errors, data }`, as an action's `track()` does, and `save.pending()` reads only its own calls. A call that got no answer comes back as status 0, and an abort still throws.
 export interface TrackedApi<Module, Path> extends Reader<unknown, LoadStatus> {
   <const M extends CallMethod<NodeAt<Module, Path>> = never>(...[options]: Optional<ApiCallOptions<Module, Path, M>>): CallPromise<CallResult<ApiAnswer<Module, Path, M>, unknown>>
   readonly pending: () => boolean
@@ -1047,7 +1047,7 @@ export interface TrackedApi<Module, Path> extends Reader<unknown, LoadStatus> {
   readonly onData: (listener: (event: { value: unknown, input: unknown }) => void) => () => void
   /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   readonly onSuccess: (listener: (event: { data: unknown, input: unknown }) => void) => () => void
-  // Called with `{ error, input }` when a call fails, a refusal or no answer (which still throws), not for an abort; returns what stops it.
+  // Called with `{ error, input }` when a call fails, a refusal or no answer, not for an abort; returns what stops it.
   readonly onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }
 

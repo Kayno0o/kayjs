@@ -48,7 +48,7 @@ export interface LocalHooks<Row> {
 export interface LocalOptions<Row extends object, Key extends keyof Row & string> extends LocalHooks<Row> {
   // The field naming a row: a string or a number.
   key: Key
-  // The server's rows, read while online: after loading, after the queue was sent and on `sync()`. The signal aborts when the read takes over 30 seconds, so pass it to the call (`call(api, '/', { signal })`).
+  // The server's rows, read while online: after loading, after the queue was sent and on `sync()`. The signal aborts when the read takes over 30 seconds, so pass it to the call (`call(api, '/', { signal }).orThrow()`).
   read: (signal: AbortSignal) => Promise<readonly Row[]> | readonly Row[]
   // The action a write of a row replays through, so its guards, schema and limits apply as to any call.
   put: Action<Row, unknown>

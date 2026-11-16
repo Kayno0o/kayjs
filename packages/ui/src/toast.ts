@@ -314,7 +314,7 @@ export type Attempted<T> = T extends void ? true : T
 
 // Runs a change the page waits on, resolving to what `run` returned, or to `undefined` once a refused call has toasted instead of throwing.
 // What is toasted: the message `refused` reads from the data the action's handler passed to `ctx.fail`, else a refusal of the whole call such as a limit, else `failure`.
-// A call made with `call()` throws `ApiError`, read the same way: `refused` gets the route's JSON answer, else the words of a 4xx that read as a message, else `failure`, which status 0 and a 5xx always get.
+// A call made with `call()` and `.orThrow()` throws `ApiError`, read the same way: `refused` gets the route's JSON answer, else the words of a 4xx that read as a message, else `failure`, which status 0 and a 5xx always get.
 export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: (data: Data) => string | undefined): Promise<Attempted<Unwrapped<T>> | undefined> {
   const options = typeof failure === 'string' ? { failure, refused } : failure
 

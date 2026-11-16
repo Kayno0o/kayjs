@@ -13,7 +13,7 @@ import { ACTION } from './action-shared'
 import { actionFailed, apiErrorOf, failed, messageOf, unreachable } from './api-error'
 import { withoutBase } from './base'
 import { skew } from './build'
-import { settling, trackCalls, whenIdle } from './call-result'
+import { settling, signalAborted, trackCalls, whenIdle } from './call-result'
 import { durationSeconds, isZeroDuration } from './duration'
 import { navigation } from './navigation'
 import { released, undoable } from './optimistic'
@@ -540,7 +540,7 @@ function binder(run: (lane: Lane, input: unknown, options?: CallOptions) => Prom
 
   return fields => ({
     // eslint-disable-next-line ts/promise-function-async -- an async function would wrap the call's promise, which carries `orThrow()`
-    call: (input: unknown, options?: CallOptions) => settling(run(actionLane, withFixed(input, fields), options), refusalOf(url)),
+    call: (input: unknown, options?: CallOptions) => settling(run(actionLane, withFixed(input, fields), options), error => signalAborted(options) ? undefined : refusalOf(url)(error)),
     track: (handle) => {
       const lane: Lane = { tail: Promise.resolve(), queue: handle?.queue }
 

@@ -89,6 +89,14 @@ describe('what an island call of an action answers', () => {
     expect(result.message).toContain('timeout')
   })
 
+  it('rejects for a signal of the caller that timed out, which is an abort and not the timeout option', async () => {
+    mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async (_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true })
+    })) as unknown as typeof fetch))
+    await expect(stub()({}, { signal: AbortSignal.timeout(20) })).rejects.toHaveProperty('name', 'TimeoutError')
+    await expect((stub().track() as unknown as Call)({}, { signal: AbortSignal.timeout(20) })).rejects.toHaveProperty('name', 'TimeoutError')
+  })
+
   it('still rejects for an abort and a redirect, which are no failure of the call', async () => {
     const controller = new AbortController()
 

@@ -399,7 +399,7 @@ export interface CallOptions<Output = unknown> {
 // An action seen through the calls one island makes, so a row's button reads its own `pending()`.
 export interface TrackedCall<Input, Result> extends Reader<Result extends { ok: true, data: infer Data } ? Data : never, LoadStatus> {
   (form: FormData, options?: CallOptions): CallPromise<Result>
-  // Resolves with how the call went, any answer the server gave included; a failure that is no answer, such as a network error, an abort or a redirect, still throws. Last, as on `Action`, so a wrong field is named.
+  // Resolves with how the call went, any answer the server gave included; a network error is status 0, and an abort or a redirect still throws. Last, as on `Action`, so a wrong field is named.
   (...call: object extends Input ? [input?: Input, options?: CallOptions] : [input: Input, options?: CallOptions]): CallPromise<Result>
   // `idle` before the first call, `loading` while one is in flight, then `ready` or `failed` by the last to settle; `pending()` reads whether one is in flight, `error()` the last failure as an `ApiError`, kept until a call succeeds (a refusal and a call that got no answer alike), and `retry()` repeats the call that failed with its arguments.
   readonly pending: () => boolean
@@ -411,7 +411,7 @@ export interface TrackedCall<Input, Result> extends Reader<Result extends { ok: 
   onData: (listener: (event: { value: Result extends { ok: true, data: infer Data } ? Data : never, input: unknown }) => void) => () => void
   /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   onSuccess: (listener: (event: { data: Result extends { ok: true, data: infer Data } ? Data : never, input: unknown }) => void) => () => void
-  // Called with `{ error, input }` when a call fails, a refusal or no answer (which still throws), not for an abort or a redirect; returns what stops it.
+  // Called with `{ error, input }` when a call fails, a refusal or no answer, not for an abort or a redirect; returns what stops it.
   onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }
 

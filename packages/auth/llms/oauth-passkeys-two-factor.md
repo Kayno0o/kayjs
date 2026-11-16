@@ -29,11 +29,11 @@ export const addPasskey = action(s.Object({ response: passkeyAttestation, name: 
 import { makePasskey, passkeyFailure } from '@kayjs/auth/browser'
 
 try {
-  const { options } = await passkeyOptions({ password })
+  const { options } = await passkeyOptions({ password }).orThrow()
   const response = await makePasskey(options)
 
   if (response)
-    await addPasskey({ response, name })
+    await addPasskey({ response, name }).orThrow()
 }
 catch (caught) {
   error.set(passkeyFailure(caught, { proof: 'Wrong password' }, 'That did not work'))

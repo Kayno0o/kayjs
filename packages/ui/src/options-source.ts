@@ -6,7 +6,7 @@ export interface OptionsQuery {
   q: string
 }
 
-// The options of a choice control: a list, a promise of one, or a function answering one for a query, such as an action or a wrapped API call. A function and a promise are asked in the browser only.
+// The options of a choice control: a list, a promise of one, or a function answering one for a query, such as an action or a wrapped API call, each through `.orThrow()`. A function and a promise are asked in the browser only.
 export type OptionsSource<Option, Query extends OptionsQuery = OptionsQuery> = readonly Option[] | PromiseLike<readonly Option[]> | ((input: Query) => readonly Option[] | PromiseLike<readonly Option[]>)
 
 // Whether the source has to be asked, as a function or a promise has.

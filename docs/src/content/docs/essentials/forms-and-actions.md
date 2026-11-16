@@ -383,7 +383,7 @@ button(onClick={() => move({ id, to: 'done' }, { optimistic: () => column = 'don
 p {column()}
 ```
 
-The call still throws when it fails. While it runs, `pending()` follows its own request. Calls over one signal can overlap: each failure puts the signal back to what it held before that call, whichever order they fail in. To order the calls themselves, see [Queuing calls](#queuing-calls).
+The call answers a failure as a result, and `.orThrow()` throws it. While it runs, `pending()` follows its own request. Calls over one signal can overlap: each failure puts the signal back to what it held before that call, whichever order they fail in. To order the calls themselves, see [Queuing calls](#queuing-calls).
 
 A form posting in place, `form(action={add})`, tells an island how it went through three hooks of the action. `add.onStart` runs before the post, with the fields as `input`, `add.onData` when it went through, and `add.onError` when it did not, with an `error` holding the `status` (0 when there was no answer) and the `errors` per field, `''` being the whole form.
 
@@ -576,7 +576,7 @@ if problem() !== ''
 
 Any answer other than success gives `{ ok: false, status, message, errors, data, error }` (`error` repeats the four). `message` is the text to show, `errors` is per field, and `data` is typed as the handler passes it to `ctx.fail`. Here `data.message` is what the handler passed to `ctx.fail(409, { message })`.
 
-A success gives `{ ok: true, data }`. A failure with no answer from the server, such as a lost connection, still throws.
+A success gives `{ ok: true, data }`. A failure with no answer from the server, such as a lost connection, is `{ ok: false, status: 0 }`.
 
 `add.failed()` and `add.data()` read the outcome in a server fence, a template, a component and an island alike. Each gives `undefined` when there is none.
 

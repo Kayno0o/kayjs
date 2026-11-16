@@ -1,7 +1,7 @@
 import type { ErrorShape } from './api-error'
 
 // Apart from the helpers of `./api-error`, so a lazy chunk building one (a deferred server island's failure) pulls only the class into the shared chunk, not the action messages.
-// What `call()` throws when a route refused or no answer came, aborting aside, and what an action's call throws as an `ActionError`: one class to catch for both.
+// What `call(...).orThrow()` throws when a route refused or no answer came, aborting aside, and the `error` of such a result, as an action's is an `ActionError`: one class to catch for both.
 // kept: free
 export class ApiError<Data = unknown> extends Error implements ErrorShape<Data> {
   override name = 'ApiError'

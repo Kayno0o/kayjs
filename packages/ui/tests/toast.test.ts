@@ -231,6 +231,19 @@ describe('a toast\'s time', () => {
 })
 
 describe('attempt', () => {
+  test('throws the failure of a call result for the toast and unwraps its data, but takes an answer shaped like one as it is', async () => {
+    const mark = Symbol.for('kay.call-result')
+    const marked = <T extends object>(value: T): T => Object.defineProperty(value, mark, { value: true })
+
+    expect(await attempt(async () => marked({ ok: true as const, data: 'saved', error: undefined }), 'Could not save')).toBe('saved')
+    expect(await attempt(async () => marked({ ok: false, error: new ApiError(500, 'Down') }), 'Could not save')).toBeUndefined()
+    expect(shown()).toEqual([{ message: 'Could not save', tone: 'danger' }])
+
+    const answer = { ok: false, error: { status: 422 }, issues: [] }
+
+    expect(await attempt(async () => answer, 'Could not save')).toBe(answer)
+  })
+
   test('toasts the failure instead of throwing, and resolves to undefined', async () => {
     expect(await attempt(async () => Promise.reject(new Error('refused')), 'Could not save')).toBeUndefined()
     expect(shown()).toEqual([{ message: 'Could not save', tone: 'danger' }])

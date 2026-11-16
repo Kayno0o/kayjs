@@ -12,7 +12,7 @@ const bareOpen = signal(false)
 const busy = signal(false)
 const states = signal<string[]>([])
 
-// A delete made with `call()`, which throws ApiError for a refusal, built here so it is the class the library reads.
+// A delete made with `call().orThrow()`, which throws ApiError for a refusal, built here so it is the class the library reads.
 async function removeByApi() {
   if (apiRefusal)
     throw new ApiError(apiRefusal.status, apiRefusal.message, apiRefusal.answer)

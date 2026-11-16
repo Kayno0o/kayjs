@@ -44,7 +44,7 @@ import { api } from 'kay/server'
 export default api().post('/', async ({ body }) => (await renderMarkdown(body.markdown)).html, { body: s.Object({ markdown: s.String() }) })
 ```
 
-In the page, `preview={async markdown => call(preview, '/', { method: 'post', body: { markdown } })}`.
+In the page, `preview={async markdown => call(preview, '/', { method: 'post', body: { markdown } }).orThrow()}`.
 
 The editor puts the HTML through `sanitizeHtml` (images and tables kept), so a script or a `javascript:` link in the text never runs. Set `previewTrusted` to insert the HTML as it comes, for a renderer that has sanitized it already. The preview waits for a short pause in typing, and if the call throws, the pane says it could not be shown. kayjs-cms does all of this for you.
 
