@@ -6,7 +6,7 @@ const SEPARATOR = /[,;]/
 const AFTER_COMMA = /^\s*,\s*/
 const BEFORE_COMMA = /,\s*$/
 const SNIPPET_WORD = /\bSnippet\b/g
-const SNIPPET_ONLY = /^import\s+type\s*\{\s*Snippet\s*\}/
+const SNIPPET_ONLY = /^import\s+(?:type\s*)?\{\s*(?:type\s+)?Snippet\s*(?:,\s*)?\}/
 
 // What leaves the props type: the member and the separator after it, or the one before the last member, or the whole type when it is the only one.
 function removal(own: Span, previous: Span | undefined, next: Span | undefined, type: Span | undefined): { start: number, end: number, text: string } {

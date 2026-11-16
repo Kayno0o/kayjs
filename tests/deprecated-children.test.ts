@@ -39,3 +39,13 @@ describe('deprecated-children-prop', () => {
     expect(run('---\nimport type { Snippet } from \'kay\'\nconst all = props<{ title: string, children?: Snippet }>()\n---\nsection\n  h2 {all.title}\n  slot\n').at).toEqual([])
   })
 })
+
+describe('deprecated-children-prop imports', () => {
+  const body = '---\nIMPORTconst { title } = props<{ title: string, children?: Snippet }>()\n---\nsection\n  slot\n'
+  const result = (statement: string) => run(body.replace('IMPORT', statement)).fixed
+
+  it('drops an inline type import, a multi-line one and a line of its own', () => {
+    expect(result('import { type Snippet } from \'kay\'\n\n')).toBe('---\nconst { title } = props<{ title: string }>()\n---\nsection\n  slot\n')
+    expect(result('import type {\n  Snippet,\n} from \'kay\'\n\n')).toBe('---\nconst { title } = props<{ title: string }>()\n---\nsection\n  slot\n')
+  })
+})

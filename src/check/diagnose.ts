@@ -35,6 +35,7 @@ const BLOCK_NAME = /^[\w$-]+/
 const PARAMETER_NAME = /(?:^|, )(\.\.\.)?([\w$]+)\??:/g
 const UNREADABLE = /args_\d|[{[(<]/
 const UNNAMED = /args_\d+: /g
+const CALLED_BLOCK = /^Type 'Element' is not assignable to type 'SlotCall(?: \| undefined)?'/
 const BLOCK_TYPE = /^Type 'Element' is not assignable to type '\(?\((.*?)\) => Element\)?/
 const LEADING_NAME = /^[a-z_$][\w$]*/i
 const MEMBER_OF = /([a-z_$][\w$]*)\??\.$/i
@@ -113,6 +114,9 @@ function blockWithoutParameters(diagnostic: TsgoDiagnostic, source: string, span
 
   const name = source[span.start - 1] === '@' ? BLOCK_NAME.exec(source.slice(span.start))?.[0] : undefined
   const parameters = BLOCK_TYPE.exec(diagnostic.message)?.[1]
+
+  if (name !== undefined && CALLED_BLOCK.test(diagnostic.message))
+    return `the component calls \`@${name}\` with values: write the block with the parameters it is called with, as \`@${name}(...)\``
 
   if (name === undefined || parameters === undefined)
     return undefined

@@ -254,6 +254,7 @@ describe('blocks typed from the template', () => {
     const plain = await report('---\nimport List from "./list.kay"\n---\nList(rows={["a"]})\n  @item\n    p x\n', { 'src/components/list.kay': list })
 
     expect(plain.map(d => d.line)).toEqual([5])
+    expect(plain[0]!.help).toContain('write the block with the parameters it is called with, as `@item(...)`')
   })
 
   it('keeps the block a props type declares, with the arguments it gives', async () => {
@@ -284,5 +285,18 @@ describe('blocks left to the props type', () => {
     const found = await report('---\nimport List from "./list.kay"\n---\nList(rows={["a"]})\n  @item(row)\n    p {row.toUpperCase()}\n', { 'src/components/list.kay': list })
 
     expect(found).toEqual([])
+  })
+})
+
+describe('blocks derived only where the props type is read', () => {
+  const user = '---\nimport Card from "./card.kay"\n---\nCard(title="a")\n  @actions\n    p x\n'
+  const card = (head: string, type: string) => `---\n${head}const { title } = props<${type}>()\n---\nh2 {title}\nslot actions\n`
+
+  it('derives nothing for a type alias that is an intersection, or an imported type', async () => {
+    const intersection = await report(user, { 'src/components/card.kay': card('type A = { title: string }\ntype B = { open?: boolean }\ntype Props = A & B\n', 'Props') })
+    const imported = await report(user, { 'src/components/card.kay': card('import type { CardProps } from "./types"\n', 'CardProps'), 'src/components/types.ts': 'export interface CardProps { title: string }\n' })
+
+    expect(intersection.map(d => d.line)).toContain(5)
+    expect(imported.map(d => d.line)).toContain(5)
   })
 })
