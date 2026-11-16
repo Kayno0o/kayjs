@@ -900,7 +900,7 @@ pgDescribe('pgRooms', () => {
     const sql = await fresh()
     const [handle] = handles(1)
     const store = pgRooms(handle!, { poll: '20ms' })
-    const live = rooms<string, undefined, { count: number }>({ store, state: () => ({ count: 0 }), snapshot: state => state })
+    const live = rooms<{ count: number }, undefined, { count: number }>({ store, state: () => ({ count: 0 }), snapshot: state => state })
     const received: string[] = []
     const ada = { raw: { sendText: (text: string) => void received.push(text) } }
 
