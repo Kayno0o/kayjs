@@ -5,6 +5,7 @@ import type { JSX, Snippet } from 'kay'
 import type { DateRange } from './date'
 import { effect, postedValue, recipe, signal, uid, untrack } from 'kay'
 import DateInput from './date-input.kay'
+import type { PopoverButtonProps, PopoverPanelProps } from './popover'
 import { dateRangeFrom } from './date'
 import { defaultKept, onFormReset, startRef } from './form-reset'
 import { wording } from 'kay/words'
@@ -18,7 +19,7 @@ const look = recipe({
   },
 })
 
-const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, showLabel = false, fromLabel, toLabel, fromName, toName, disabled, disabledDay, day, open, onOpenChange, onMonthChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, showLabel = false, fromLabel, toLabel, fromName, toName, disabled, disabledDay, day, open, onOpenChange, onMonthChange, onChange, panelProps, triggerProps, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The size of both date boxes: `md` by default, `sm` and `lg` change their padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -52,6 +53,9 @@ const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, s
   onMonthChange?: ((event: { month: string, box: 'from' | 'to' }) => unknown) | undefined
   // Runs once a date is set, with the pair in order, and only when the range changed.
   onChange?: ((event: { value: DateRange }) => unknown) | undefined
+  // Attributes of each box's calendar panel and of the button opening it.
+  panelProps?: PopoverPanelProps | undefined
+  triggerProps?: PopoverButtonProps | undefined
 }>()
 
 // A range with no callback is plain: a refused post of its form, which the server renders it for, gives its two dates back in place of its own.
@@ -95,9 +99,9 @@ const heading = showLabel && label ? uid() : undefined
 ---
 snippet range()
   div(part="root" {...rest} ref={ref} role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']})
-    DateInput(size={size} invalid={invalid} name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={({ month }) => onMonthChange?.({ month, box: 'from' })} open={open === undefined ? undefined : open === 'from'} onOpenChange={({ open }) => onOpenChange?.({ open, box: 'from' })} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={({ value }) => commit(value, pair()[1] ?? '')})
+    DateInput(panelProps={panelProps} triggerProps={triggerProps} size={size} invalid={invalid} name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={({ month }) => onMonthChange?.({ month, box: 'from' })} open={open === undefined ? undefined : open === 'from'} onOpenChange={({ open }) => onOpenChange?.({ open, box: 'from' })} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={({ value }) => commit(value, pair()[1] ?? '')})
     span(part="separator" aria-hidden="true") -
-    DateInput(size={size} invalid={invalid} name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={({ month }) => onMonthChange?.({ month, box: 'to' })} open={open === undefined ? undefined : open === 'to'} onOpenChange={({ open }) => onOpenChange?.({ open, box: 'to' })} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={({ value }) => commit(pair()[0] ?? '', value)})
+    DateInput(panelProps={panelProps} triggerProps={triggerProps} size={size} invalid={invalid} name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={({ month }) => onMonthChange?.({ month, box: 'to' })} open={open === undefined ? undefined : open === 'to'} onOpenChange={({ open }) => onOpenChange?.({ open, box: 'to' })} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={({ value }) => commit(pair()[0] ?? '', value)})
 if heading
   div(part="field")
     span(part="heading" id={heading}) {label}

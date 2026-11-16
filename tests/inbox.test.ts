@@ -205,6 +205,13 @@ describe('the Bell with a source of its own', () => {
     expect(page.text).toContain('Deploy done')
   })
 
+  it('puts panelProps on the panel and triggerProps on the button opening it', async () => {
+    const text = (await get('/custom-island')).text
+
+    expect(text).toContain('data-panel="bell"')
+    expect(text).toContain('data-trigger="bell"')
+  })
+
   it('links a path of the site and draws a hostile url as a button', async () => {
     const text = (await get('/custom')).text
 

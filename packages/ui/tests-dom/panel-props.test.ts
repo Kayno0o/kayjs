@@ -12,7 +12,7 @@ afterEach(() => {
 test('a component with a floating panel puts panelProps on the panel', async () => {
   mounted = await mountComponent(PanelProps, {})
 
-  for (const kind of ['menu', 'switcher', 'avatars', 'date', 'multi', 'combobox']) {
+  for (const kind of ['menu', 'switcher', 'avatars', 'date', 'multi', 'range', 'table', 'combobox']) {
     const panel = mounted.root.querySelector<HTMLElement>(`[data-panel="${kind}"]`)
 
     expect(panel, kind).not.toBeNull()
@@ -23,7 +23,7 @@ test('a component with a floating panel puts panelProps on the panel', async () 
 test('a component drawing its own trigger puts triggerProps on that button', async () => {
   mounted = await mountComponent(PanelProps, {})
 
-  for (const kind of ['avatars', 'date', 'multi']) {
+  for (const kind of ['avatars', 'date', 'multi', 'range', 'table']) {
     const trigger = mounted.root.querySelector<HTMLElement>(`[data-trigger="${kind}"]`)
 
     expect(trigger, kind).not.toBeNull()

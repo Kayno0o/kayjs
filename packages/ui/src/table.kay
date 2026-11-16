@@ -21,6 +21,7 @@ import { expanding } from './table-expand'
 import { downloadCsv } from './table-export'
 import { uses } from './uses'
 import Popover from './popover.kay'
+import type { PopoverButtonProps, PopoverPanelProps } from './popover'
 import Select from './select.kay'
 import { cellText, columnStyle, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sortedRows } from './table'
 import { asyncRows } from './source'
@@ -118,7 +119,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, items: infinite, list: legacy, rowKey, sort, plain = false, sortable = true, serverSort = false, onSortChange, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
+const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, items: infinite, list: legacy, rowKey, sort, plain = false, sortable = true, serverSort = false, onSortChange, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, panelProps = {}, triggerProps = {}, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
   columns: Column<Row>[]
   // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `items` holds them: one of the two is required.
   rows?: RowsSource<Row> | undefined
@@ -149,6 +150,9 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   columnToggle?: boolean | undefined
   // Names the column toggle's button.
   columnsLabel?: string | undefined
+  // Attributes of the column list's floating panel and of the button opening it; `...rest` stays on the root.
+  panelProps?: PopoverPanelProps | undefined
+  triggerProps?: PopoverButtonProps | undefined
   // The keys of the columns hidden, replacing each column's `hidden`; a table whose parent passes another list follows it.
   hiddenColumns?: string[] | undefined
   // Called with the keys of the columns hidden each time the reader shows or hides one.
@@ -425,9 +429,9 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
   if (uses('selectable') && selectable) || (uses('exportable') && exportable) || (uses('columnToggle') && columnToggle)
     div(part="selection")
       if uses('columnToggle') && columnToggle
-        Popover(placement="bottom-start" part="columnsPanel" label={columnsLabel})
+        Popover({...panelProps} placement="bottom-start" part="columnsPanel" label={columnsLabel})
           @trigger(attributes)
-            Button({...attributes} label={columnsLabel} variant="ghost" size="sm")
+            Button({...triggerProps} {...attributes} label={columnsLabel} variant="ghost" size="sm")
           for column of columns() key={column.key}
             if column.header
               Checkbox(label={column.header} checked={!hiddenKeys().includes(column.key)} onChange={({ checked }) => showColumn!(column.key, checked)})

@@ -4,7 +4,9 @@ import AvatarGroup from '@kayjs/ui/avatar-group.kay'
 import Combobox from '@kayjs/ui/combobox.kay'
 import DateInput from '@kayjs/ui/date-input.kay'
 import Menu from '@kayjs/ui/menu.kay'
+import DateRangeInput from '@kayjs/ui/date-range-input.kay'
 import MultiSelect from '@kayjs/ui/multi-select.kay'
+import Table from '@kayjs/ui/table.kay'
 
 // Each component with a floating panel, given the attributes of its panel and of the button that opens it.
 const people = [{ name: 'Ada' }, { name: 'Bo' }, { name: 'Cy' }]
@@ -14,4 +16,6 @@ AppSwitcher(apps={[{ key: 'a', label: 'A', href: '/a' }]} panelProps={{ 'data-pa
 AvatarGroup(items={people} max={1} panelProps={{ 'data-panel': 'avatars' }} triggerProps={{ 'data-trigger': 'avatars' }})
 DateInput(aria-label="Date" panelProps={{ 'data-panel': 'date' }} triggerProps={{ 'data-trigger': 'date' }})
 MultiSelect(label="Multi" options={[{ value: 'a', label: 'A' }]} panelProps={{ 'data-panel': 'multi' }} triggerProps={{ 'data-trigger': 'multi' }})
+DateRangeInput(label="Range" panelProps={{ 'data-panel': 'range' }} triggerProps={{ 'data-trigger': 'range' }})
+Table(label="Rows" columns={[{ key: 'name', header: 'Name' }]} rows={[{ name: 'Ada' }]} rowKey="name" columnToggle panelProps={{ 'data-panel': 'table' }} triggerProps={{ 'data-trigger': 'table' }})
 Combobox(label="Combobox" options={[{ value: 'a', label: 'A' }]} panelProps={{ 'data-panel': 'combobox' }})

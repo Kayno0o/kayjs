@@ -245,7 +245,7 @@ Every element of a component that an app could style carries `data-part` (hidden
 
 The attributes a component is given, `id`, `data-*` and `title` among them, land on its root element. A control that draws its input inside a wrapper (Toggle, Checkbox, Slider, ColorInput, Combobox, DateInput) keeps `name`, `disabled`, `required`, `value`, `aria-*`, `ref` and the event handlers on the input, and takes the input's other attributes as `inputProps`: `Toggle(label="Alerts" inputProps={{ id: 'alerts', autocomplete: 'off' }})`.
 
-A component with a floating panel (Menu, AppSwitcher, BellInbox, AvatarGroup, DateInput, MultiSelect, and Combobox for its suggestion list) takes `panelProps` for the panel, and one that draws its own button to open it (BellInbox, AvatarGroup, DateInput, MultiSelect) takes `triggerProps`: `Menu(label="Actions" items={items} panelProps={{ 'data-panel': 'actions' }})`.
+A component with a floating panel (Menu, AppSwitcher, BellInbox, AvatarGroup, DateInput, DateRangeInput, MultiSelect, Table, and Combobox for its suggestion list) takes `panelProps` for the panel, and one that draws its own button to open it (BellInbox, AvatarGroup, DateInput, DateRangeInput, MultiSelect, Table) takes `triggerProps`: `Menu(label="Actions" items={items} panelProps={{ 'data-panel': 'actions' }})`.
 
 A state is the ARIA attribute where ARIA has one (`aria-expanded`, `aria-checked`, `aria-selected`, `aria-current`, `aria-pressed`, `aria-busy`, `aria-disabled` or `disabled`), and a named `data-*` attribute where it has none (`data-placement`, `data-dragging`, `data-direction`, a Steps item's `data-step`). There is no `data-state` repeating an ARIA state. Tailwind's `aria-selected:` and `data-dragging:` variants style both from `src/ui.ts`.
 

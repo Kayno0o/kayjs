@@ -22,7 +22,7 @@ function onRead({ id }: { id: string | undefined }) {
   read = id === undefined ? all.map(note => note.key) : [...read(), id]
 }
 ---
-BellInbox(items={load} onRead={onRead} onOpenChange={({ open }) => log = [...log(), open ? 'open' : 'close']})
+BellInbox(items={load} onRead={onRead} panelProps={{ 'data-panel': 'bell' }} triggerProps={{ 'data-trigger': 'bell' }} onOpenChange={({ open }) => log = [...log(), open ? 'open' : 'close']})
   @item(note)
     strong {note.who}
     em {note.label}
