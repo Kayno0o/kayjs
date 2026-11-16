@@ -20,12 +20,12 @@ export const readDocsPage = action(
     const found = await readPage(path)
 
     if (found === undefined)
-      return ctx.deny(404, { message: `There is no page at ${path.slice(0, 80)}; use a path from the list or from search_docs` })
+      return ctx.deny(404, { data: `There is no page at ${path.slice(0, 80)}; use a path from the list or from search_docs` })
 
     const { text, parts } = partOfPage(found.text, part)
 
     if (part !== undefined && part > parts)
-      return ctx.deny(404, { message: `${found.href} has ${parts === 1 ? 'only 1 part' : `only ${parts} parts`}, so there is no part ${part}; ${parts === 1 ? 'ask for part 1' : `ask for a part from 1 to ${parts}`}` })
+      return ctx.deny(404, { data: `${found.href} has ${parts === 1 ? 'only 1 part' : `only ${parts} parts`}, so there is no part ${part}; ${parts === 1 ? 'ask for part 1' : `ask for a part from 1 to ${parts}`}` })
 
     return { path: found.href, title: found.title, part: part ?? 1, parts, text }
   },
@@ -46,7 +46,7 @@ export const reply = action(
       log.error('the chat could not start an ask', error)
 
       // Below 500, as the chat shows the message of a refusal under that and a generic one past it.
-      return ctx.deny(400, { message: 'The chat is not available on this site right now. Search the docs with Ctrl K instead.' })
+      return ctx.deny(400, { data: 'The chat is not available on this site right now. Search the docs with Ctrl K instead.' })
     }
   },
   { protect: { rateLimit: { max: 8, window: '1m' } } },

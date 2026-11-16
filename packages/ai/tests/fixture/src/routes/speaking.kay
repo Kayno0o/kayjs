@@ -17,7 +17,7 @@ export const transcribe = action(s.Object({ audio: s.File() }), async ({ audio }
   if (text.startsWith('slow '))
     await Bun.sleep(1000)
 
-  return text === 'refuse' ? ctx.deny(422, { message: 'Too noisy to write down.' }) : { text }
+  return text === 'refuse' ? ctx.deny(422, { data: 'Too noisy to write down.' }) : { text }
 }, { maxSize: '1mb' })
 --- script
 import Chat from '@kayjs/ai/chat.kay'

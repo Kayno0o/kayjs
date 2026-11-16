@@ -5,7 +5,7 @@ import { messages } from '../messages'
 import { refusals } from '../testing'
 
 // A reply action that can also refuse, which Chat's `action` must accept.
-export const guarded = action(messages, ({ messages }, ctx) => messages.at(-1)?.content === 'refuse' ? ctx.deny(403, { message: 'Not today' }) : ask(messages))
+export const guarded = action(messages, ({ messages }, ctx) => messages.at(-1)?.content === 'refuse' ? ctx.deny(403, { data: 'Not today' }) : ask(messages))
 
 // Answers the statuses the test queued, whatever the schema thinks of the history.
 export const refusing = action(messages, ({ messages }, ctx) => {

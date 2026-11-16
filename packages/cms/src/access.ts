@@ -32,7 +32,7 @@ export function refusalStatus(error: unknown): number | undefined {
   if (error instanceof Error && refused === undefined)
     return undefined
 
-  const { status } = refused ?? error
+  const { status } = (refused ?? error) as { status?: unknown }
 
   return typeof status === 'number' ? status : undefined
 }
