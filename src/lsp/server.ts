@@ -297,7 +297,8 @@ export class KayLanguageServer implements LspHost {
     else if (previous.tsx !== document.tsx)
       this.server.notify('textDocument/didChange', { textDocument: { uri: document.shadowUri, version: document.version }, contentChanges: [{ text: document.tsx }] })
 
-    this.diagnostics.scheduleDiagnostics([uri])
+    if (!previous?.route || previous.tsx !== document.tsx)
+      this.diagnostics.scheduleDiagnostics([uri])
   }
 
   private close(uri: string) {

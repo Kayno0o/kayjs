@@ -21,7 +21,7 @@ export default api()
   )
 ```
 
-`api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed. Its handlers read `guard` and `once` as a page does, `guard` typed from the module's own `guards` and, in `kay check`, from the `_guard.ts` files above it; the editor's TypeScript server needs them named, `api<{ org: Org }>()`. A `derive` or `resolve` of the module's own runs before its guards, so `guard` is empty there.
+`api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed. Its handlers read `guard` and `once` as a page does, `guard` typed from the module's own `guards` and from the `_guard.ts` files above it, in `kay check` and in the editor. A `derive` or `resolve` of the module's own runs before its guards, so `guard` is empty there.
 
 A [`_guard.ts`](/structure/guard) in `src/api/` protects its routes as it protects pages. A route at the path of a page, a public file, an endpoint or a redirect stops the server at boot.
 
