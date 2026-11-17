@@ -197,7 +197,11 @@ describe('kay grammar', () => {
     expect(lines[12]?.[0]).toBe('when: keyword.control.conditional.kay')
   })
 
-  it('reads a destructured loop item, an object or an array pattern, with an index after it', () => {
+  it('reads as in a condition as TypeScript, not as an alias', () => {
+    expect(tokenize('if user as u\n  p')[0]).not.toContain('as: keyword.control.as.kay')
+  })
+
+  it('reads a destructured loop item,an object or an array pattern, with an index after it', () => {
     const [object, array] = tokenize(['for { id, name }, i of rows key={id}', 'for [k, [v]] of entries key={k}'].join('\n'))
 
     expect(object).toContain('i: variable.other.readwrite.kay')

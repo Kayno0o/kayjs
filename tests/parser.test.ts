@@ -483,6 +483,14 @@ describe('control flow', () => {
     ])
   })
 
+  it('takes any name after then, and refuses a reserved word, no name or two', () => {
+    expect(parse('if user then été\n  p').diagnostics).toEqual([])
+    expect(parse('if user then _u$\n  p').diagnostics).toEqual([])
+
+    for (const test of ['null', 'class', 'public', '', 'u v'])
+      expect(parse(`if user then ${test}\n  p`).diagnostics.map(d => d.message)).toEqual(['`then` takes one name after a condition'])
+  })
+
   it('reads for with index, key and an else fallback', () => {
     const file = parse('for todo, i of todos().filter(t => t.open) key={todo.id}\n  li {todo.title}\nelse\n  li.empty none')
     const node = file.template[0] as ForNode
