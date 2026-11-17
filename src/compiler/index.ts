@@ -3,6 +3,7 @@ import type { UiEntry } from '../runtime/ui'
 import type { Attribute, Diagnostic, KayFile, Node, Span } from './ast'
 import type { ErrorName } from './errors'
 import type { IslandCause } from './island-cause'
+import type { ImportedComponents } from './lazy-imports'
 import type { LintLevels } from './lints'
 import type { Expansion } from './markdown-block'
 import type { ImportedSignals, SignalKind } from './module-signals'
@@ -26,6 +27,7 @@ import { cwd, scopeStorage } from './host'
 import { ignoredIslandExport, interactiveProps, islandMessages, malformedInteractive, withAlertKeys } from './island-arguments'
 import { describeCause } from './island-cause'
 import { markerMismatch } from './island-marker'
+import { lazyImportsOf } from './lazy-imports'
 import { linkFlags } from './link-flags'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
@@ -96,6 +98,8 @@ export interface CompileOptions {
   insideIsland?: boolean | undefined
   // The signals and memos of the modules the component imports, which it writes by assigning and the check reports read uncalled: `importedSignals` from kay's build finds them.
   importedSignals?: ImportedSignals | undefined
+  // The `.kay` modules the component imports that a template draws only where a branch may not render, which then load on their own the first time they draw: found by kay's build, which names the chunk of each.
+  components?: ImportedComponents | undefined
   // The browser's build only: the classes a later Tailwind class overrides, with which literal classes written together resolve while compiling.
   classTable?: ClassTable | undefined
   // The server's build of an app with Tailwind: a shorthand beside a static `class` merges while rendering.
@@ -325,9 +329,11 @@ export function compileKay(original: string, filename: string, options: CompileO
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const pin = file.pin
+  const hydrated = hydratableServer && (island !== undefined || options.twinBuild === true)
+  const lazy = lazyImportsOf(file, script.imports, options, hydrated, routeFile, client)
   const rawCause = island === undefined ? undefined : islandCause(file, script) ?? browserCause(file, script, live)
   const cause = withInteractive(realCause(rawCause, expansion, original), script)
-  const generateOptions = { cause: options.inspect === true && cause !== undefined ? describeCause(cause) : undefined, classTable: options.classTable, classMerge: options.classMerge, awaitAlert: options.awaitAlert, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, writtenProps: options.writtenProps, output: options.output, failedCode, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && pageFile, pageFile, namedRefresh: options.namedRefresh, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: isErrorPage(basename(filename)), cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
+  const generateOptions = { cause: options.inspect === true && cause !== undefined ? describeCause(cause) : undefined, classTable: options.classTable, classMerge: options.classMerge, awaitAlert: options.awaitAlert, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, writtenProps: options.writtenProps, output: options.output, failedCode, hydratable: hydrated, moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && pageFile, pageFile, namedRefresh: options.namedRefresh, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, lazy, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: isErrorPage(basename(filename)), cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {

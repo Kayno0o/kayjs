@@ -43,8 +43,10 @@ const SAFE_HTML_MODULE = /(?:^|[/\\])safe-html(?:\.ts)?$/
 // One bundle per component and version of its file, for the test process, evaluated again on every mount.
 const bundles = new Map<string, Promise<string>>()
 
-// Lets queued effects and timers due now land, as after a click, before the DOM is read.
+// Lets queued effects and timers due now land, as after a click, before the DOM is read, and the components that load when they first draw arrive.
 export async function settle(): Promise<void> {
+  await sleep(0)
+  await (globalThis as { $kayLazyIdle?: () => Promise<void> }).$kayLazyIdle?.()
   await sleep(0)
 }
 
@@ -182,7 +184,7 @@ async function bundle(root: string, file: string): Promise<string> {
 
     const loaded = await loadConfig(root)
     const trees = apiTrees(root, loaded)
-    const config = { entrypoints: [join(work, 'entry.ts')], target: 'browser', metafile: true, define: { KAY_FRENCH: writesFrench(loaded) ? 'true' : 'undefined', KAY_I18N: loaded.i18n === undefined ? 'undefined' : 'true' }, plugins: [apiStubs(trees), kay({ root, settings: loaded.librarySettings, api: trees }), sharedMarks, sharedModules(trees.map(({ dir }) => dir))], throw: false } satisfies Bun.BuildConfig
+    const config = { entrypoints: [join(work, 'entry.ts')], target: 'browser', metafile: true, define: { KAY_FRENCH: writesFrench(loaded) ? 'true' : 'undefined', KAY_I18N: loaded.i18n === undefined ? 'undefined' : 'true' }, plugins: [apiStubs(trees), kay({ root, settings: loaded.librarySettings, api: trees, lazy: false }), sharedMarks, sharedModules(trees.map(({ dir }) => dir))], throw: false } satisfies Bun.BuildConfig
     const build = await Bun.build({ ...config, outdir: join(work, 'out') })
 
     if (!build.success) {

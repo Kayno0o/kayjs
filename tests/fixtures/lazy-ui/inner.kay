@@ -1,0 +1,8 @@
+---
+import Heavy from './heavy.kay'
+import Shell from './shell.kay'
+
+const { shown } = props<{ shown: boolean }>()
+---
+Shell(open={shown})
+  Heavy(label="Inner")

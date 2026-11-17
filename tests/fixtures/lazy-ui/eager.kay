@@ -1,0 +1,5 @@
+---
+import Heavy from './heavy.kay'
+---
+main
+  Heavy(label="Eager")

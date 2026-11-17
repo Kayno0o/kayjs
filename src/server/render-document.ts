@@ -255,11 +255,11 @@ function navigationScripts(client: ClientBuild): string {
 // A page without islands needs no hydration script, only the entry swapping pages.
 // `saving` is set where a page drops island-only preloads for a visitor saving data. The chunks of the islands hydrating at once, `immediate`, that page keeps: they are marked `data-load`, which the dropping no longer matches.
 // One also needed by an island that waits for that visitor, `waiting`, is marked `data-wait` too, where the code waiting for the viewport is preloaded for that visitor even though no link was dropped.
-function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean, saving?: { immediate: Set<string>, waiting: Set<string> }): string {
+function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean, drawn: Set<string>, saving?: { immediate: Set<string>, waiting: Set<string> }): string {
   const immediate = saving?.immediate
   const waiting = saving?.waiting
 
-  return islandScriptsOf(client, `${streamed}\n${hydration}\n${lazy}\n${[...islands].sort().join('\n')}\n\0${immediate === undefined ? '-' : [...immediate].sort().join('\n')}\n\0${waiting === undefined ? '-' : [...waiting].sort().join('\n')}`, () => {
+  return islandScriptsOf(client, `${streamed}\n${hydration}\n${lazy}\n${[...islands].sort().join('\n')}\n\0${[...drawn].sort().join('\n')}\n\0${immediate === undefined ? '-' : [...immediate].sort().join('\n')}\n\0${waiting === undefined ? '-' : [...waiting].sort().join('\n')}`, () => {
     const chunks = new Set(client.entryImports)
 
     // Waiting for an island to be visible or idle, or a deferred server island to near the viewport, needs its own chunk, which the entry would ask for only once it ran.
@@ -280,6 +280,16 @@ function islandScripts(client: ClientBuild, islands: Set<string>, streamed: bool
 
         if (waiting?.has(id) === true)
           waits.add(chunk)
+      }
+    }
+
+    // The components an island draws at first paint that its own chunk loads lazily: loaded before it hydrates, as the island's own code is.
+    for (const key of drawn) {
+      for (const chunk of client.lazies?.[key] ?? []) {
+        chunks.add(chunk)
+
+        if (immediate !== undefined)
+          now.add(chunk)
       }
     }
 
@@ -495,7 +505,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   // A production page only posting forms loads navigation alone; a streamed one, or a prerendered one holding a server island, may still render islands or forms per request, which the islands' entry runs.
   const navigates = posts && !hasIslands && !follows && !defers && !streamed && (scan?.modes.length ?? 0) === 0 && client.navEntry !== undefined
   const checked = posts ? formsScript(forms, options.dev) : ''
-  const scripts = shipsEntry ? (navigates ? navigationScripts(client) : islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0 || defers, options.islandPreloads === undefined ? undefined : islands)) + checked + workScript(forms, options.prerendering === true) : ''
+  const scripts = shipsEntry ? (navigates ? navigationScripts(client) : islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0 || defers, islands.lazies, options.islandPreloads === undefined ? undefined : islands)) + checked + workScript(forms, options.prerendering === true) : ''
   const state = localeState()
   // Without `i18n` the page may say its own language; with it, the locale decides.
   const lang = (state === undefined || state.implicit ? head.lang : undefined) ?? state?.locale ?? options.lang ?? DEFAULT_LANG

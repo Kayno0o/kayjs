@@ -1,6 +1,7 @@
 import type { Diagnostic, SourceMap } from '../compiler'
 import type { ErrorName } from '../compiler/errors'
 import type { IslandCause } from '../compiler/island-cause'
+import type { ImportedComponents } from '../compiler/lazy-imports'
 import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { ClassTable } from '../runtime/class-table'
@@ -17,6 +18,7 @@ import { projectPaths } from '../project'
 import { awaitAlertOf } from './await-alert'
 import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache'
 import { compilerFingerprint } from './fingerprint'
+import { importedComponents } from './lazy-components'
 import { throughLinks } from './links'
 import { namedRefresh } from './named-refresh'
 import { isPageFile, realpathOrSelf } from './page-dirs'
@@ -65,6 +67,8 @@ export interface TransformOptions {
   writtenProps?: ReadonlySet<string> | undefined
   // The server's build of an app with Tailwind, which merges a shorthand beside a static `class` while rendering; set by `transformKayCached` from the app's stylesheets.
   classMerge?: boolean | undefined
+  // False keeps every component's import eager.
+  lazy?: boolean | undefined
 }
 
 interface Compiled {
@@ -102,8 +106,8 @@ export class KayCompileError extends Error {
 }
 
 // .kay source to TypeScript building HTML strings on the server and DOM nodes in the browser; Bun strips the types when it loads the result.
-export function transformKay(source: string, filename: string, options: TransformOptions, signals?: ImportedSignals): string {
-  const { code, map } = compile(source, filename, options, signals)
+export function transformKay(source: string, filename: string, options: TransformOptions, signals?: ImportedSignals, components?: ImportedComponents): string {
+  const { code, map } = compile(source, filename, options, signals, components)
 
   registerSourceMap(filename, { source, tsx: code, map }, options.target === 'dom')
 
@@ -123,9 +127,10 @@ export async function transformKayCached(original: string, filename: string, giv
 
   // Read once: it is part of the cache key and, on a miss, what the compile reads too.
   const signals = importedSignals(withoutTwin(filename), source)
+  const components = componentsOf(source, filename, options)
   const hydratable = options.hydratable ?? false
   const root = options.root ?? process.cwd()
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}${options.variant === undefined ? '' : `-uses-${Bun.hash(options.variant).toString(36)}`}`, `${options.target}\0${hydratable}\0${options.pages?.join(',')}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${JSON.stringify(awaitAlertOf(root))}\0${JSON.stringify(signals)}\0${options.target === 'ssr' && namedRefresh(withoutTwin(filename), root)}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}${options.variant === undefined ? '' : `-uses-${Bun.hash(options.variant).toString(36)}`}`, `${options.target}\0${hydratable}\0${options.pages?.join(',')}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${JSON.stringify(awaitAlertOf(root))}\0${JSON.stringify(signals)}\0${JSON.stringify(components)}\0${options.target === 'ssr' && namedRefresh(withoutTwin(filename), root)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   countCache('components', cached !== undefined)
@@ -134,7 +139,7 @@ export async function transformKayCached(original: string, filename: string, giv
   if (cached !== undefined) {
     if (!hasSourceMapOf(filename, source, cached, options.target === 'dom')) {
       registerSourceMap(filename, () => {
-        const { code, map } = compile(source, filename, options, signals)
+        const { code, map } = compile(source, filename, options, signals, components)
 
         return { source, tsx: code, map }
       }, options.target === 'dom')
@@ -143,7 +148,7 @@ export async function transformKayCached(original: string, filename: string, giv
     return cached
   }
 
-  const code = transformKay(source, filename, options, signals)
+  const code = transformKay(source, filename, options, signals, components)
 
   await writeCacheEntry(entry, code)
 
@@ -247,8 +252,13 @@ export function cacheEntry(cacheDir: string, filename: string, kind: string, inp
   }
 }
 
+// The imported components a file may draw lazily: for the browser's build and the server's hydratable one, the only two that split them.
+function componentsOf(source: string, filename: string, options: TransformOptions) {
+  return options.lazy !== false && (options.target === 'dom' || options.hydratable === true) ? importedComponents(withoutTwin(filename), source, options.root ?? process.cwd()) : undefined
+}
+
 // `filename` may name a static component's `?island` twin, the build of it that renders inside islands.
-function compile(source: string, filename: string, options: TransformOptions, signals = importedSignals(withoutTwin(filename), source)): Compiled {
+function compile(source: string, filename: string, options: TransformOptions, signals = importedSignals(withoutTwin(filename), source), components = componentsOf(source, filename, options)): Compiled {
   const server = options.target === 'ssr'
   const file = withoutTwin(filename)
   const isTwin = file !== filename
@@ -256,7 +266,7 @@ function compile(source: string, filename: string, options: TransformOptions, si
   const root = options.root ?? process.cwd()
   // A page of the routes directory, whose root `@failed` fills a layout outlet rather than being a component's own block.
   const page = isPageFile(file, options.pages ?? [projectPaths(root).routes]) ? true : undefined
-  const { tsx, map, diagnostics } = compileKay(source, throughLinks(root, file), { root: options.root, page, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, awaitAlert: awaitAlertOf(root, file), importedSignals: signals, namedRefresh: server && namedRefresh(file, root), ui: uiEntryOf(options.root ?? process.cwd(), file), writtenProps: options.writtenProps })
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(root, file), { root: options.root, page, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, awaitAlert: awaitAlertOf(root, file), importedSignals: signals, components, namedRefresh: server && namedRefresh(file, root), ui: uiEntryOf(options.root ?? process.cwd(), file), writtenProps: options.writtenProps })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))

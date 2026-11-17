@@ -48,6 +48,8 @@ export interface KayPluginOptions {
   inspect?: boolean | undefined
   // The classes a later Tailwind class overrides, with which an island's literal classes resolve while compiling.
   classTable?: ClassTable | undefined
+  // False draws every component at once: the bundle of a component mounted by a test, which has no server markup to claim and nothing to wait for.
+  lazy?: boolean | undefined
   // A browser build's API trees, whose modules islands get as stubs, and the modules it leaves to the page, which a worker's bundle takes as the islands do.
   api?: RouteMount[] | undefined
   external?: string[] | undefined
@@ -263,7 +265,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         const original = await Bun.file(withoutTwin(file)).text()
         const source = features === undefined ? original : specializedSource(original, features, withoutTwin(file))
 
-        const compiled = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, pages: options.pages, cacheDir: options.cacheDir, inspect: options.inspect, classTable: options.classTable, variant: features === undefined ? undefined : `${[...features].sort().join('.')}${written === undefined ? '' : `~${[...written].sort().join('.')}`}`, writtenProps: written })
+        const compiled = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, pages: options.pages, cacheDir: options.cacheDir, inspect: options.inspect, classTable: options.classTable, lazy: options.lazy, variant: features === undefined ? undefined : `${[...features].sort().join('.')}${written === undefined ? '' : `~${[...written].sort().join('.')}`}`, writtenProps: written })
         const code = target === 'dom' ? await variantIndex.variantImports(compiled, withoutTwin(file), original) : compiled
         const contents = await pointed(await shippingFiles(expandGlobs(code, withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
 

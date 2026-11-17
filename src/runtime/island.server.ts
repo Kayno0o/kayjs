@@ -40,6 +40,8 @@ export interface RenderedIslands {
   chunks?: Record<string, string> | undefined
   // The message keys the islands use, which go to the browser with them.
   messages: Set<string>
+  // The keys of the components an eager island drew that load on their own (`lazyNote`), whose chunks the page preloads.
+  lazies: Set<string>
   // Set to what the first island handed an action says of it, which a build that left out the code reviving one cannot serve.
   actions?: string | undefined
 }
@@ -57,6 +59,7 @@ export function islandCheckpoint(): (() => void) | undefined {
   const immediate = islands.immediate.size
   const waiting = islands.waiting.size
   const messages = islands.messages.size
+  const lazies = islands.lazies.size
   const actions = islands.actions
 
   return () => {
@@ -68,6 +71,7 @@ export function islandCheckpoint(): (() => void) | undefined {
     trim(islands.immediate, immediate)
     trim(islands.waiting, waiting)
     trim(islands.messages, messages)
+    trim(islands.lazies, lazies)
   }
 }
 
@@ -89,7 +93,7 @@ function trim(set: Set<string>, size: number): void {
 
 // Runs a synchronous page render and lists the islands it rendered.
 export function collectIslands<T>(render: () => T, salt?: string, chunks?: Record<string, string>): { result: T, islands: RenderedIslands } {
-  const islands: RenderedIslands = { used: new Set(), eager: new Set(), immediate: new Set(), waiting: new Set(), lazy: 0, count: 0, messages: new Set(), chunks }
+  const islands: RenderedIslands = { used: new Set(), eager: new Set(), immediate: new Set(), waiting: new Set(), lazy: 0, count: 0, messages: new Set(), lazies: new Set(), chunks }
 
   rendered = islands
 
@@ -99,6 +103,28 @@ export function collectIslands<T>(render: () => T, salt?: string, chunks?: Recor
   finally {
     rendered = undefined
   }
+}
+
+// The keys of the components the island being rendered draws that load on their own in the browser.
+let drawn: Set<string> | undefined
+
+// A component the browser loads when it draws (`KayLazy` in the island's code): drawing it here is the same call, which tells the island its code is needed before it hydrates.
+export function lazyNote<P>(key: string, component: (props: P) => unknown): (props: P) => unknown {
+  return (props) => {
+    drawn?.add(key)
+
+    return component(props)
+  }
+}
+
+// The components the island drew that load on their own, which the browser loads before it hydrates it, and the page preloads unless the island waits.
+function lazyAttribute(keys: Set<string>, waits: boolean): string {
+  if (!waits) {
+    for (const key of keys)
+      rendered?.lazies.add(key)
+  }
+
+  return keys.size === 0 ? '' : ` data-lazy="${escapeAttribute([...keys].join(' '))}"`
 }
 
 // What renders inside an island renders in the browser as well, so its markup carries the markers hydration claims.
@@ -212,6 +238,11 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       }
     }
 
+    const keys = new Set<string>()
+    const outer = drawn
+
+    drawn = keys
+
     try {
       // Detached, as in the browser, where an island reads nothing the page's components provide.
       const { result: html, count } = browserOnly ? { result: placeholder((props as Record<string, unknown>)[USE_FALLBACK] as JSX.Element | undefined, ownFallback), count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => issueScope(undefined, () => child(component!(given)))), true)))
@@ -221,12 +252,14 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       // `load` is written out too, so a visitor asking to save data, whose islands wait by default, sees the one that asked to go at once.
       const marked = waits || when === 'load' ? ` data-hydrate="${escapeAttribute(when!)}"` : ''
       const chunk = rendered?.chunks?.[id]
-      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${cause === undefined ? '' : ` data-why=${quotedAttribute(cause)}`}${marked}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
+      const lazies = lazyAttribute(keys, waits)
+      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazies}${cause === undefined ? '' : ` data-why=${quotedAttribute(cause)}`}${marked}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
 
       return markup as unknown as JSX.Element
     }
     finally {
       depth--
+      drawn = outer
     }
   }
 

@@ -250,12 +250,12 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
 if ((rest as { onSelect?: unknown }).onSelect !== undefined)
   throw new KayError('argument-invalid', 'kayjs-ui: a Table has no onSelect since 1.91; use onSelectedChange')
 
-if (expandable && virtual)
+if (expandable && (uses('virtual') && virtual))
   throw new KayError('argument-invalid', 'kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
 
 const list = uses('items') || uses('list') ? infinite ?? legacy : undefined
 
-if (pageSize !== undefined && (virtual || list))
+if (pageSize !== undefined && ((uses('virtual') && virtual) || list))
   throw new KayError('argument-invalid', 'kayjs-ui: a Table with a pageSize cannot be virtual or take a list, which already hold their rows by the window or by the page')
 
 const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: failure => onError?.(failure) })
@@ -278,15 +278,17 @@ const searching = () => filter !== undefined || (list !== undefined && filterPar
 const fielded = () => (search?.extra.length ?? 0) > 0
 const filtering = () => search?.active() ?? false
 
-effect(() => {
-  const next = sort
+if (uses('sort')) {
+  effect(() => {
+    const next = sort
 
-  // The URL's sort stands over the one the table starts from, until the parent passes a new one.
-  if (following)
-    current = next
+    // The URL's sort stands over the one the table starts from, until the parent passes a new one.
+    if (following)
+      current = next
 
-  following = true
-})
+    following = true
+  })
+}
 
 if (uses('items') || uses('list'))
   followList(() => list, current, () => search?.asked() ?? { text: '', fields: {} })
@@ -296,18 +298,20 @@ const kept = memo(() => uses('filter') && filter !== undefined && !list ? rowsMa
 const counted = uses('filter') || uses('filterParam') || uses('fields') ? (count: number) => countLabel ? countLabel(count) : wording('ui.table.rowCount', count === 1 ? '1 row' : '{count} rows', { count }) : undefined
 const hiddenKeys = signal(hiddenColumns ?? given.filter(column => column.hidden).map(column => column.key))
 
-effect(() => {
-  const next = hiddenColumns
+if (uses('hiddenColumns')) {
+  effect(() => {
+    const next = hiddenColumns
 
-  if (next)
-    hiddenKeys = next
-})
+    if (next)
+      hiddenKeys = next
+  })
+}
 
 const shownColumns = memo(() => columns().filter(column => !hiddenKeys().includes(column.key)))
 const hasFoot = () => footer !== undefined || shownColumns().some(column => column.footer !== undefined)
-const columnCount = () => shownColumns().length + (selectable ? 1 : 0) + (expandable ? 1 : 0)
+const columnCount = () => shownColumns().length + (uses('selectable') && selectable ? 1 : 0) + (uses('expandable') && expandable ? 1 : 0)
 const regionName = () => (rest as { 'aria-label'?: string })['aria-label'] ?? label
-const scrolls = signal(virtual || plain)
+const scrolls = signal((uses('virtual') && virtual) || plain)
 const countChosen = uses('selectable') ? (count: number) => selectedLabel ? selectedLabel(count) : wording('ui.table.selected', '{count} selected', { count }) : undefined
 const shown = memo(() => !uses('sortable', true) || serverSort || list ? kept() : sortedRows(kept(), columns(), current()))
 const waiting = () => busy || (list ? list.pending() && !list.failed() : source.loading())
@@ -345,7 +349,7 @@ let body: HTMLElement | undefined
 
 function measure() {
   // One pixel of tolerance: sub-pixel rounding can make the scroll size exceed the client size on a box that does not scroll.
-  const now = virtual || box!.scrollWidth - box!.clientWidth > 1 || box!.scrollHeight - box!.clientHeight > 1
+  const now = (uses('virtual') && virtual) || box!.scrollWidth - box!.clientWidth > 1 || box!.scrollHeight - box!.clientHeight > 1
 
   if (now === scrolls())
     return
@@ -417,7 +421,7 @@ const ariaSort = uses('sortable', true)
   }
   : undefined
 ---
-div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={scrolls() ? '0' : undefined} role={scrolls() && regionName() ? 'region' : undefined} aria-label={scrolls() ? regionName() : (rest as { 'aria-label'?: string })['aria-label']})
+div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={(uses('virtual') && virtual) ? '' : undefined} tabindex={scrolls() ? '0' : undefined} role={scrolls() && regionName() ? 'region' : undefined} aria-label={scrolls() ? regionName() : (rest as { 'aria-label'?: string })['aria-label']})
   if (uses('filter') || uses('filterParam') || uses('fields')) && (searching() || fielded())
     div(part="filter")
       if searching()
@@ -458,11 +462,11 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
       p(part="message") {failureLabel}
       if source.retryable()
         Button(label={retryLabel} variant="ghost" size="sm" onClick={source.retry})
-  table(part="table" aria-busy={waiting() ? 'true' : undefined} aria-rowcount={virtual ? shown().length + (hasFoot() ? 2 : 1) : undefined})
+  table(part="table" aria-busy={waiting() ? 'true' : undefined} aria-rowcount={(uses('virtual') && virtual) ? shown().length + (hasFoot() ? 2 : 1) : undefined})
     if label
       caption(part="caption") {label}
     thead(part="head")
-      tr(part="headRow" aria-rowindex={virtual ? 1 : undefined})
+      tr(part="headRow" aria-rowindex={(uses('virtual') && virtual) ? 1 : undefined})
         if uses('expandable') && expandable
           th(part="toggleHead" scope="col")
             span(part="selectText") {wording('ui.table.details', 'Details')}
@@ -545,7 +549,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
           td(colspan={columnCount()} style="padding: 0; border: 0")
     if hasFoot()
       tfoot(part="foot")
-        tr(part="footRow" aria-rowindex={virtual ? shown().length + 2 : undefined})
+        tr(part="footRow" aria-rowindex={(uses('virtual') && virtual) ? shown().length + 2 : undefined})
           if uses('expandable') && expandable
             td(part="footCell")
           if uses('selectable') && selectable

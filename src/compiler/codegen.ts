@@ -2,6 +2,7 @@ import type { ClassTable } from '../runtime/class-table'
 import type { UiEntry } from '../runtime/ui'
 import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, SlotNode, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { IslandCause } from './island-cause'
+import type { LazyImport } from './lazy-imports'
 import type { LoadPlan } from './load-plan'
 import type { Rewrite } from './mapping'
 import type { AwaitAlert, WRITE_HELPERS } from './names'
@@ -15,10 +16,12 @@ import { domHelperImport, DomTemplate } from './dom'
 import { addIslandShorthandTitle, addShorthandChecks, addShorthandGroup, hasShorthandTitle } from './head-shorthand'
 import { emitHeadTag, emitHeadText } from './head-tags'
 import { awaitAlertTail, htmlHelperImport, HtmlTemplate } from './html'
+import { withoutComma } from './import-edits'
 import { sourceLocator } from './inspect'
 import { asksOf, exportsIslandOptions, islandMessages, withAlertKeys } from './island-arguments'
 import { ambientHelpers, constDeclaration } from './items'
 import { JsxTemplate } from './jsx'
+import { lazyDomImport, lazyEdits, lazyNoteImport } from './lazy-imports'
 import { planLoads } from './load-plan'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
@@ -104,6 +107,7 @@ export interface GenerateOptions {
   ui?: UiEntry | undefined
   // Type checking's counterpart of `ui`: the variants and values `src/ui.ts` adds to the component's props.
   uiAdded?: UiEntry | undefined
+  lazy?: ReadonlyMap<string, LazyImport> | undefined
   // Browser variant builds: the props the project's call sites write, so the rest list omits only those (the others cannot arrive); absent, every declared prop is omitted.
   writtenProps?: ReadonlySet<string> | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
@@ -119,8 +123,6 @@ export interface Generated {
 
 const CTX_REFERENCE = /\bctx\b/
 const IDENTIFIER = /[\p{ID_Start}$_][\p{ID_Continue}$]*/gu
-const IMPORT_COMMA_AFTER = /^\s*,\s*/
-const IMPORT_COMMA_BEFORE = /,\s*$/
 // The specifier of an import that did not parse, quoted and closed or not.
 const BROKEN_SPECIFIER = /^((?:\s*(?:\/\/.*\n|\/\*(?:[^*]|\*(?!\/))*\*\/))*\s*import\b(?:[^'"]*[^\w$'"]from)?\s*)((['"])[^'";\s]*\3?)/
 // `kay build` renders the page once when it is `true`.
@@ -382,13 +384,13 @@ class ModuleShell {
     b.add(this.slotTypes().imports)
 
     if (mode === 'html')
-      b.add(htmlHelperImport(this.options.awaitAlert, facts.await))
+      b.add(htmlHelperImport(this.options.awaitAlert, facts.await) + lazyNoteImport(this.options.lazy, mode))
 
     if (this.loadPlan)
       b.add(`import { loadScope as ${helperName('loadScope')} } from 'kay/html'\n`)
 
     if (mode === 'dom')
-      b.add(domHelperImport(this.options.awaitAlert, facts.await))
+      b.add(domHelperImport(this.options.awaitAlert, facts.await) + lazyDomImport(this.options.lazy))
 
     // Apart from the DOM helpers, which the entry shares with every page, so only a site using it ships its code.
     if (mode === 'dom' && this.kind === 'island' && titled)
@@ -695,7 +697,7 @@ class ModuleShell {
     if (left.length > 0 && left.length === imports.filter(inside).length)
       return
 
-    const edits: { start: number, end: number, text?: string }[] = left.map(binding => this.withoutComma(binding.span, binding.declaration))
+    const edits: { start: number, end: number, text?: string }[] = [...left.map(binding => withoutComma(this.src, binding.span, binding.declaration)), ...lazyEdits(imports, span, this.options.lazy, this.mode, this.options.moduleId)]
 
     for (const specifier of specifiers) {
       const quoted = this.src.slice(specifier.start, specifier.end)
@@ -728,18 +730,6 @@ class ModuleShell {
       start--
 
     return start === 0 || this.src[start - 1] === '\n' ? start : offset
-  }
-
-  // An import specifier with the comma that separates it from its neighbour.
-  private withoutComma(specifier: Span, declaration: Span): Span {
-    const after = IMPORT_COMMA_AFTER.exec(this.src.slice(specifier.end, declaration.end))
-
-    if (after)
-      return { start: specifier.start, end: specifier.end + after[0].length }
-
-    const before = IMPORT_COMMA_BEFORE.exec(this.src.slice(declaration.start, specifier.start))
-
-    return { start: specifier.start - (before?.[0].length ?? 0), end: specifier.end }
   }
 
   // Server exports stay at module level; the rest of the fence becomes `load(ctx)`, returning every name it declares.

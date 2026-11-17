@@ -30,13 +30,16 @@ import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './as
 import { AWAIT_ALERT_FILE } from './await-alert'
 import { pruneNodes, pruneUtilityLayer } from './class-rules'
 import { buildClassTable, mergesAtRuntime } from './class-table'
+import { entryFile, KAY_OUTPUT, lazyEntryKey } from './entry-files'
 import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, liftSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
 import { Increments, realPaths, sameEntries } from './increments'
 import { keepBundleMapCached, pruneKeptMaps } from './kept-maps'
 import { hoistLayerOrder } from './layer-order'
+import { eagerKeys, lazyKey } from './lazy-components'
+import { noteLazy, staticClosure } from './lazy-manifest'
+import { foldStubs, inRounds } from './lazy-stubs'
 import { fileWords, importEdges, libraryOf, reachedFrom, reachingAny } from './libraries'
 import { packagesOf } from './licenses'
-import { throughLinks } from './links'
 import { isPageFile, pageDirs } from './page-dirs'
 import { kay } from './plugin'
 import { unusedLibraryClasses } from './prune'
@@ -91,6 +94,7 @@ type Outputs = Record<string, MetafileOutput>
 
 const LEADING_DOT_SLASH = /^\.\//
 const JS_OUTPUT = /\.js$/
+
 const COMPILES_WASM = /\bWebAssembly\./
 const STARTS_WORKER = /\bnew\s+(?:Shared)?Worker\(/
 const OBJECT_URL = /\bcreateObjectURL\(/
@@ -501,7 +505,14 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
 }
 
 // `inputs` holds the modules of each chunk, `maps` the source maps written.
-async function bundleIslands(root: string, islands: Map<string, string>, files: string[], actionForms: boolean, actionProps: boolean, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
+interface Bundled { manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }
+
+async function bundleIslands(root: string, islands: Map<string, string>, files: string[], actionForms: boolean, actionProps: boolean, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<Bundled> {
+  return inRounds(async last => bundleRound(root, islands, files, actionForms, actionProps, options, last, classTable, islandTable))
+}
+
+// One build of the islands, which `foldStubs` ends when lazy components that do not pay were left.
+async function bundleRound(root: string, islands: Map<string, string>, files: string[], actionForms: boolean, actionProps: boolean, options: ClientOptions, last: boolean, classTable?: ClassTable, islandTable?: ClassTable): Promise<Bundled> {
   const navigation = options.client?.navigation ?? true
 
   if (islands.size === 0 && !navigation)
@@ -562,7 +573,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, files: 
 
   // Without the registry in the boot, each island is an entry point of its own.
   const islandFiles = options.hot ? [] : [...entries.values()]
-  const chunk = await runtimeChunk(entryFile, { plugins: plugins(), define, external, islands: islandFiles, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.librarySettings, options.inspect, options.client?.navigation, trees, islandFiles])}\0${await Bun.file(bootFile).text()}` } })
+  const chunk = await runtimeChunk(entryFile, { plugins: plugins(), define, external, islands: islandFiles, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.librarySettings, options.inspect, options.client?.navigation, trees, islandFiles, eagerKeys()])}\0${await Bun.file(bootFile).text()}` } })
 
   // In development the entry keeps its own code, the islands it imports by their hashed names included: the runtime's chunk then stays as it was through an edit of an island, which swaps in alone.
   // A second entry point importing the runtime alone has Bun give it that chunk of its own, which it would otherwise merge into the entry's.
@@ -591,6 +602,8 @@ async function bundleIslands(root: string, islands: Map<string, string>, files: 
   const since = raisedMark()
   // A production page posting forms and holding no island loads navigation alone, from a build of its own: in the islands' build it would move the navigation code out of their runtime's chunk, adding a file to every page. A static export has no server to post to, and an app rendering no such form has no page loading it.
   const [build, nav] = await Promise.all([Bun.build({ ...config, outdir: clientDir(root) }), navigation && actionForms && !options.hot && options.exported !== true ? bundleNavigation(root, options, { ...config, plugins: plugins() }) : undefined])
+
+  await foldStubs(build, nav, last, lazyEntryKey(root, new Set(islands.values())))
 
   if (!build.success) {
     await refuseBuiltinImports(root, build.logs, islands.values(), config)
@@ -790,6 +803,10 @@ export function islandManifest(root: string, outputs: Outputs, islands: Map<stri
 
     const file = entryFile(root, meta.entryPoint, files)
 
+    // A `.kay` entry, an island or not, is a component another island may load lazily, which the page preloads when its server drew it.
+    if (KAY_OUTPUT.test(meta.entryPoint))
+      noteLazy(manifest, lazyKey(root, resolve(variantFile(meta.entryPoint))), meta.entryPoint, [...closure(output)].map(assetUrl))
+
     // Any other entry point is the entry, or a chunk some code imports dynamically, loaded when it asks for it.
     if (file === undefined)
       continue
@@ -819,20 +836,6 @@ export function islandManifest(root: string, outputs: Outputs, islands: Map<stri
   return manifest
 }
 
-// Every chunk a chunk needs before it can run, itself included.
-function staticClosure(outputs: Outputs, output: string, seen = new Set<string>()): Set<string> {
-  if (seen.has(output))
-    return seen
-
-  seen.add(output)
-  for (const imported of outputs[output]?.imports ?? []) {
-    if (imported.kind === 'import-statement')
-      staticClosure(outputs, imported.path, seen)
-  }
-
-  return seen
-}
-
 // The URL a page loads an entry by, and the chunks it imports statically, which the page preloads.
 function entryChunks(root: string, outputs: Outputs, entry: string): { entry: string, imports: string[] } | undefined {
   const entries = new Set([entry])
@@ -851,13 +854,6 @@ function entryChunks(root: string, outputs: Outputs, entry: string): { entry: st
 
 function islandPath(root: string, input: string): string {
   return relative(root, resolve(input)).replaceAll('\\', '/')
-}
-
-// Bun names entry points relative to the working directory, not the root: from a library holding a test app, its layout and the app's share a path.
-function entryFile(root: string, entryPoint: string, files: Set<string>): string | undefined {
-  const point = resolve(variantFile(entryPoint))
-
-  return [point, throughLinks(root, point)].find(file => files.has(file))
 }
 
 function assetUrl(output: string): string {

@@ -1,0 +1,10 @@
+---
+import Heavy from './heavy.kay'
+
+const rows = ['a', 'b']
+---
+ul
+  for row of rows key={row}
+    li
+      if row === 'a'
+        Heavy(label={row})

@@ -355,6 +355,10 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
     const chunk = withBase(chunks[0]!)
 
     if (!document.querySelector(`${ISLAND}[data-component="${CSS.escape(id)}"]`)) {
+      // An island's code an island loaded lazily is not in the page as an island of its own, and keeps the version it loaded: only a reload brings the new one.
+      if ((globalThis as { $kayLazyLoaded?: boolean }).$kayLazyLoaded === true)
+        return false
+
       // Not on this page: a later one rendering it loads the new chunk, unless that would bring code the page runs again.
       if (fits(chunks))
         registry[id] = async () => import(chunk) as ReturnType<IslandRegistry[string]>

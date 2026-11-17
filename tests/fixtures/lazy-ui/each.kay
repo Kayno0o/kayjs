@@ -1,0 +1,13 @@
+---
+import { signal } from 'kay'
+import Heavy from './heavy.kay'
+import Shell from './shell.kay'
+
+const shown = signal(true)
+const labels = ['a', 'b']
+---
+main
+  button.toggle(onClick={() => shown = !shown()}) Toggle
+  Shell(open={shown()})
+    for label of labels key={label}
+      Heavy(label={label})

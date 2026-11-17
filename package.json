@@ -117,6 +117,10 @@
       "types": "./types/runtime/dom-await.d.ts",
       "default": "./src/runtime/dom-await.ts"
     },
+    "./dom-lazy": {
+      "types": "./types/runtime/dom-lazy.d.ts",
+      "default": "./src/runtime/dom-lazy.ts"
+    },
     "./dom-try": {
       "types": "./types/runtime/dom-try.d.ts",
       "default": "./src/runtime/dom-try.ts"

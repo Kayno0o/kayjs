@@ -1,0 +1,6 @@
+---
+const { open } = props<{ open: boolean }>()
+---
+section.shell
+  if open
+    slot

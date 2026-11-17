@@ -1,0 +1,13 @@
+---
+import { signal } from 'kay'
+import Broken from './broken.kay'
+
+const shown = signal(false)
+---
+main
+  button.toggle(onClick={() => shown = !shown()}) Toggle
+  try
+    if shown()
+      Broken
+  catch
+    p.fallback Fallback

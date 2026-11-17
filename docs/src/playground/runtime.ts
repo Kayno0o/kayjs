@@ -2,6 +2,7 @@ import * as kay from '../../../src/runtime'
 import * as dom from '../../../src/runtime/dom'
 import * as domAwait from '../../../src/runtime/dom-await'
 import * as domImage from '../../../src/runtime/dom-image'
+import * as domLazy from '../../../src/runtime/dom-lazy'
 import * as domLoop from '../../../src/runtime/dom-loop'
 import * as domSpread from '../../../src/runtime/dom-spread'
 import * as domTry from '../../../src/runtime/dom-try'
@@ -16,7 +17,7 @@ type Modules = Record<string, unknown>
 
 // What `kay/...` is for the code of the server's output and of the browser's, which differ for an island as the package's `browser` condition picks them; `kay/i18n-links` localizes the links of a site with locales, which the playground is not, so it is empty. `kay/await` is in neither: its server side reads `process`, so an example with an `await` block does not run.
 const SERVER: Modules = { 'kay': kay, 'kay/html': html, 'kay/island': islandServer, 'kay/internal': internal, 'kay/internal/title': title }
-const BROWSER: Modules = { 'kay': kay, 'kay/dom': dom, 'kay/dom-loop': domLoop, 'kay/dom-await': domAwait, 'kay/dom-try': domTry, 'kay/dom-spread': domSpread, 'kay/dom-image': domImage, 'kay/pending': pending, 'kay/i18n-links': {}, 'kay/island': islandClient, 'kay/internal': internal }
+const BROWSER: Modules = { 'kay': kay, 'kay/dom': dom, 'kay/dom-loop': domLoop, 'kay/dom-await': domAwait, 'kay/dom-lazy': domLazy, 'kay/dom-try': domTry, 'kay/dom-spread': domSpread, 'kay/dom-image': domImage, 'kay/pending': pending, 'kay/i18n-links': {}, 'kay/island': islandClient, 'kay/internal': internal }
 
 type Component = (props: object) => unknown
 

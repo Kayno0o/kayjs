@@ -45,3 +45,18 @@ export function importEdits(file: KayFile, fence: Span | undefined, imports: rea
 
   return edits
 }
+
+const COMMA_AFTER = /^\s*,\s*/
+const COMMA_BEFORE = /,\s*$/
+
+// An import specifier with the comma that separates it from its neighbour.
+export function withoutComma(src: string, specifier: Span, declaration: Span): Span {
+  const after = COMMA_AFTER.exec(src.slice(specifier.end, declaration.end))
+
+  if (after)
+    return { start: specifier.start, end: specifier.end + after[0].length }
+
+  const before = COMMA_BEFORE.exec(src.slice(declaration.start, specifier.start))
+
+  return { start: specifier.start - (before?.[0].length ?? 0), end: specifier.end }
+}

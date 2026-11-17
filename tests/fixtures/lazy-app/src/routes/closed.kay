@@ -1,0 +1,4 @@
+---
+import Closed from '../components/closed.kay'
+---
+Closed

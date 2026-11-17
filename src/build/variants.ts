@@ -9,6 +9,8 @@ import { parseExpanded } from '../compiler/markdown-block'
 // A component names the features an app may leave out with `uses('selectable')`, the `uses` it imports from kayjs-ui's marker module: a call that is true while the prop is there to be written, and that a browser build replaces with `true` or `false` once it has read the props the files of the project write at their call sites. See `specializedSource`.
 const USES_CALL = /\buses\(\s*'(\w+)'(\s*,\s*true)?\s*\)/y
 const KAY_IMPORT = /^import\s+(\w+)\s+from\s+(["'])([^"'\n]+\.kay)\2/gm
+// A component the compiler imports lazily, `KayLazy(key, () => import("./it.kay"))`.
+const LAZY_IMPORT = /\bimport\(\s*(["'])([^"'\n]+\.kay)\1\s*\)/g
 const USES_IMPORT = /^import\s*\{[^}]*\buses\b[^}]*\}\s*from\s*(["'])([^"'\n]+)\1/m
 // The marker module, by where the library keeps it: an app's own `uses` is another function.
 const MARKER_FILE = /(?:packages\/ui|@kayjs\/ui)\/src\/uses\.ts$/
@@ -452,11 +454,11 @@ interface Candidate {
 async function candidatesOf(code: string, file: string): Promise<Candidate[]> {
   const found: Candidate[] = []
 
-  for (const [, local, , specifier] of code.matchAll(KAY_IMPORT)) {
+  for (const [local, specifier] of [...code.matchAll(KAY_IMPORT).map(([, name, , from]) => [name!, from!] as const), ...code.matchAll(LAZY_IMPORT).map(([, , from]) => ['', from!] as const)]) {
     let path: string
 
     try {
-      path = Bun.resolveSync(specifier!, dirname(file))
+      path = Bun.resolveSync(specifier, dirname(file))
     }
     catch {
       continue
@@ -465,7 +467,7 @@ async function candidatesOf(code: string, file: string): Promise<Candidate[]> {
     const { names: features, defaults } = await declaredFeatures(path)
 
     if (features.length > 0)
-      found.push({ local: local!, specifier: specifier!, path, features, defaults })
+      found.push({ local, specifier, path, features, defaults })
   }
 
   return found
@@ -503,7 +505,7 @@ export class VariantIndex {
   }
 
   private async read(file: string, source: string): Promise<void> {
-    const candidates = await candidatesOf(source, file)
+    const candidates = (await candidatesOf(source, file)).filter(candidate => candidate.local !== '')
 
     if (candidates.length === 0)
       return
@@ -563,6 +565,7 @@ export class VariantIndex {
       const used = this.usedOf(path, features, defaults)
 
       result = result.replace(new RegExp(`^(import\\s+\\w+\\s+from\\s+)(["'])${RegExp.escape(specifier)}\\2`, 'm'), (_import, head: string, quote: string) => `${head}${quote}${specifier}?uses=${used}${quote}`)
+      result = result.replace(new RegExp(`(\\bimport\\(\\s*)(["'])${RegExp.escape(specifier)}\\2`, 'g'), (_import, head: string, quote: string) => `${head}${quote}${specifier}?uses=${used}${quote}`)
     }
 
     return result

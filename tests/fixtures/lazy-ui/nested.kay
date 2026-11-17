@@ -1,0 +1,11 @@
+---
+import { signal } from 'kay'
+import Deep from './deep.kay'
+import Shell from './shell.kay'
+
+const shown = signal(false)
+---
+main
+  button.toggle(onClick={() => shown = !shown()}) Toggle
+  Shell(open={shown()})
+    Deep(open={shown()})

@@ -170,6 +170,22 @@ A visitor who asks for less data (`Save-Data: on` or `prefers-reduced-data`) get
 
 The code that sends an action call is not in the island's first load. An island that holds an action loads it once the browser is idle, so a call made as the page goes away finds it in, and the first call fetches it otherwise. A failed fetch is tried again after one second and after three before the call fails as any call that could not be sent.
 
+## What loads when
+
+An island's code is not all needed at first paint. A component it draws only inside an `if`, a `match` case or a `@failed` block loads when that branch first draws. So does one drawn inside a component that shows its lines only in such a branch, like a closed `Dialog` or `FormDialog`. You declare nothing: the compiler finds it.
+
+What the server drew comes with the page: its code is preloaded and ready before the island hydrates.
+
+Splitting has a price, a request and a small loader. kay keeps a component in the island when it is small, when its code is already in the island's other chunks, or when everything the app could split off weighs under 6 KB minified together.
+
+What the server did not draw is fetched when the visitor reaches for the island, with a pointer over it or focus inside it, so the click that opens it finds the code in. A visitor saving data loads it when it opens instead.
+
+Until the code arrives the branch shows nothing, then the component. A chunk that fails to load is tried again twice, then reported in the console and to your error reporter, not to `@failed`, and the next opening tries again.
+
+The code that sends an action call is not in the island's first load either. It loads when the browser is idle, or with the first call when that comes first, and a failed fetch is tried again after one second and after three before the call fails as any call that could not be sent.
+
+A component also drawn outside such a branch, a `snippet` used as a value and a dynamic tag keep their import eager.
+
 ## Shared and persisted state
 
 A signal exported from a `.ts` module is one state for every island on the page that imports it. This is `src/cart.ts`.

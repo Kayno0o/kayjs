@@ -1,0 +1,4 @@
+---
+import Opened from '../components/opened.kay'
+---
+Opened

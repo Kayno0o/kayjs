@@ -236,3 +236,19 @@ describe('a variant of Table specialised for a call that uses almost nothing', (
     expect(full).toContain('sticky left-0')
   })
 })
+
+describe('a component imported lazily', () => {
+  it('names the variant the call sites need, as a static import does', async () => {
+    const dir = await scratchDir('variants-lazy')
+    const table = join(import.meta.dir, '../packages/ui/src/table.kay')
+    const page = join(dir, 'page.kay')
+
+    await Bun.write(page, `---\nimport Table from '${table}'\n---\nTable(rows={r} columns={c} rowKey="id")\n`)
+
+    const code = `const Table = KayLazy("table-x", () => import("${table}"))\n`
+    const out = await new VariantIndex([page]).variantImports(code, page, await Bun.file(page).text())
+
+    expect(out).toMatch(/import\("[^"]+table\.kay\?uses=[^"]+"\)/)
+    await rm(dir, { recursive: true, force: true })
+  })
+})

@@ -33,6 +33,8 @@ export interface ClientManifest {
   hydrateWhen?: string[]
   // Each island's chunk and every chunk it imports statically, by island id.
   islands: Record<string, string[]>
+  // Each component an island loads when it first draws it, by its key (its path from the root): its chunk and every chunk that imports statically.
+  lazies?: Record<string, string[]>
   // The islands whose code holds `installPrompt`, which a page rendering one carries the small script keeping the browser's install offer from the first moment.
   installs?: string[]
   // The stylesheet of each page, layout and special page that imports any, by path relative to the root.

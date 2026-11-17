@@ -447,6 +447,12 @@ function awaited(element: Node | null, start: Node | null, end: Node | null, val
 [./dom-image] image
 function image(element: Element, src: unknown, sized: boolean, sizes?: unknown, aspect?: unknown, quality?: unknown): void
 
+[./dom-lazy] lazy
+function lazy(key: string, load: () => Promise<{ default: unknown; }>): (props: never) => unknown
+
+[./dom-lazy] ready
+function ready(id: string, keys: readonly string[]): Promise<void>
+
 [./dom-loop] loop
 function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => Iterable<T> | false | null | undefined, key: ((item: T, index: number) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: (() => unknown) | undefined): void
 
@@ -838,6 +844,9 @@ class IslandPropsError
   name: "IslandPropsError"
   status: number | undefined
 
+[./island] lazyNote
+function lazyNote<P>(key: string, component: (props: P) => unknown): (props: P) => unknown
+
 [./island] noteMessage
 function noteMessage(key: string): void
 
@@ -848,6 +857,7 @@ interface RenderedIslands
   count: number
   eager: Set<string>
   immediate: Set<string>
+  lazies: Set<string>
   lazy: number
   messages: Set<string>
   used: Set<string>

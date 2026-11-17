@@ -1,0 +1,9 @@
+---
+import { signal } from 'kay'
+import Inner from './inner.kay'
+
+const shown = signal(true)
+---
+main
+  button.toggle(onClick={() => shown = !shown()}) Toggle
+  Inner(shown={shown()})

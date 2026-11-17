@@ -1,0 +1,13 @@
+--- module
+export const island = { persist: true } as const
+--- island
+import { signal } from 'kay'
+import Heavy from './heavy.kay'
+import Shell from './shell.kay'
+
+const shown = signal(false)
+---
+main
+  button.toggle(onClick={() => shown = !shown()}) Toggle
+  Shell(open={shown()})
+    Heavy(label="Persisted")

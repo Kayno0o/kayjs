@@ -287,6 +287,11 @@ export function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unkn
   return attribute('aria-describedby', fieldDescription(own)) + requiredAttributes(fieldRequired(), type, ownRequired, ownNative) + invalidAttribute(type, ownInvalid)
 }
 
+// A property of a source that a later source sets again is the later one's, and a spread `children` the element's own lines replace is not read at all, as reading it renders it: a closed dialog spreading its other props would draw what it does not show.
+function isSkipped(sources: readonly object[], index: number, name: string, inner: unknown, isVoid: boolean): boolean {
+  return sources.some((later, position) => position > index && later != null && Object.hasOwn(later, name)) || ((inner !== undefined || isVoid) && CONTENT_PROPERTIES.has(name))
+}
+
 // An element whose attributes are only known at render time: spreads, or a component tag that names an element.
 // An attribute set by several sources takes the last one's value and place; `content`, the markup of the lines under the tag, wins over a `children` or `innerHTML` property.
 export function element(written: string, sources: readonly object[], content?: () => string): Html {
@@ -306,7 +311,7 @@ export function element(written: string, sources: readonly object[], content?: (
       continue
 
     for (const name of Object.keys(source)) {
-      if (sources.some((later, position) => position > index && later != null && Object.hasOwn(later, name)))
+      if (isSkipped(sources, index, name, inner, isVoid))
         continue
 
       const value = (source as Record<string, unknown>)[name]
