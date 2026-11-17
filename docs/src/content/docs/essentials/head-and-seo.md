@@ -278,6 +278,8 @@ export default defineConfig({
 })
 ```
 
+The icon files keep their paths, so `/favicon.ico` still answers crawlers that ask for it. Every link to them and the icons in the manifest end in `?v=` and a hash of the source image, so a CDN or browser that kept the old icon fetches the new one after you change the image.
+
 ## Offline
 
 `client: { offline: true }` turns on a service worker. It keeps the build's scripts, stylesheets and fonts, the pages listed in `pages` and the prerendered pages no guard covers. An installed site then still opens without a connection.

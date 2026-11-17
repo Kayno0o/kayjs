@@ -52,7 +52,7 @@ import { entryUrls } from './entry-urls'
 import { servePublicEnv } from './env'
 import { browserStackMapper, devStackMapper } from './error-maps'
 import { serveErrorReports } from './errors'
-import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
+import { FAVICON_DIR, faviconSource, faviconVersion, serveFavicons } from './favicon'
 import { loadGuard, requiredGuards } from './guards'
 import { refuseUnknownHosts } from './host-allowlist'
 
@@ -768,7 +768,7 @@ export async function siteFiles(boot: Boot) {
   const favicon = faviconSource(root, options.assets?.favicon, options.assets?.manifest)
 
   if (favicon !== undefined)
-    serveFavicons(app, served, { source: favicon, builtDir: env.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, cache: source.embedded ? undefined : cacheDir(root, 'favicons'), name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.assets?.manifest, appManifest, base: env.base })
+    serveFavicons(app, served, { source: favicon, version: await faviconVersion(favicon, join(client.dir, '..', FAVICON_DIR)), builtDir: env.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, cache: source.embedded ? undefined : cacheDir(root, 'favicons'), name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.assets?.manifest, appManifest, base: env.base })
 
   const prerendered = await loadPrerendered(client, dictionaryUsed)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))

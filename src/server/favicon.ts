@@ -60,8 +60,41 @@ export function faviconSource(root: string, favicon: string | FaviconConfig | bo
   return { image: resolve(root, favicon.image), svg: resolve(root, favicon.svg), ...maskable }
 }
 
+// A short hash of the source files the icons are drawn from, which the icon links and the manifest's icons carry as `?v=`, so a CDN or browser holding an older icon asks again once the source changes while the files keep their paths. The sources are read where they are, else the icons a build wrote; undefined when there are none to read.
+export async function faviconVersion(source: FaviconSource, builtDir?: string): Promise<string | undefined> {
+  const sources = [source.image, source.svg, source.maskable].filter(file => file !== undefined)
+  const hash = async (files: string[]) => {
+    const hasher = new Bun.CryptoHasher('sha256')
+
+    for (const file of files)
+      hasher.update(await Bun.file(file).bytes())
+
+    return hasher.digest('hex').slice(0, 10)
+  }
+
+  if (await allExist(sources))
+    return hash(sources)
+
+  const built = builtDir === undefined ? [] : [ICO, ...Object.keys(PNG_FILES), SVG, ...Object.keys(MASKABLE_FILES)].map(path => join(builtDir, path.slice(1)))
+  const found = await Promise.all(built.map(async file => await Bun.file(file).exists() ? file : undefined))
+  const files = found.filter(file => file !== undefined)
+
+  return files.length === 0 ? undefined : hash(files)
+}
+
+async function allExist(files: string[]): Promise<boolean> {
+  return (await Promise.all(files.map(async file => Bun.file(file).exists()))).every(Boolean)
+}
+
+// A path with the icons' version as its query, as is when there is none.
+export function versioned(path: string, version: string | undefined): string {
+  return version === undefined ? path : `${path}?v=${version}`
+}
+
 export interface FaviconOptions {
   source: FaviconSource
+  // The version the icon links and the manifest's icons carry, `faviconVersion` of the source.
+  version?: string | undefined
   // Where `kay build` wrote the files, read instead of the source when there; a server not serving a build leaves it out, so an older build never shadows the source.
   builtDir?: string | undefined
   // Where the icons drawn from the source are kept, so a reload or a restart of the server draws them once; `kay build` keeps its own there.
@@ -202,16 +235,16 @@ export function isOwnManifest(tag: HeadTag): boolean {
 }
 
 // The links every page carries for them, which a page's own replace; an SVG is linked after the ICO, which browsers drawing SVG icons then prefer.
-export function faviconTags(favicon: string | FaviconConfig | undefined): HeadTag[] {
+export function faviconTags(favicon: string | FaviconConfig | undefined, version?: string): HeadTag[] {
   // Sent with the visitor's cookies, as the page was: a login proxy in front of the app otherwise redirects it to its sign-in page.
-  const manifest: HeadTag = { tag: 'link', props: { rel: 'manifest', href: MANIFEST, crossorigin: 'use-credentials' } }
+  const manifest: HeadTag = { tag: 'link', props: { rel: 'manifest', href: versioned(MANIFEST, version), crossorigin: 'use-credentials' } }
 
   OWN_MANIFEST.add(manifest)
 
   return [
-    { tag: 'link', props: { rel: 'icon', href: ICO, sizes: ICO_SIZES.map(size => `${size}x${size}`).join(' ') } },
-    ...servesSvg(favicon) ? [{ tag: 'link', props: { rel: 'icon', href: SVG, type: 'image/svg+xml' } } satisfies HeadTag] : [],
-    { tag: 'link', props: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
+    { tag: 'link', props: { rel: 'icon', href: versioned(ICO, version), sizes: ICO_SIZES.map(size => `${size}x${size}`).join(' ') } },
+    ...servesSvg(favicon) ? [{ tag: 'link', props: { rel: 'icon', href: versioned(SVG, version), type: 'image/svg+xml' } } satisfies HeadTag] : [],
+    { tag: 'link', props: { rel: 'apple-touch-icon', href: versioned('/apple-touch-icon.png', version) } },
     manifest,
   ]
 }
@@ -244,7 +277,7 @@ export function localeManifests(texts: { name?: Localized | undefined, descripti
 }
 
 // Its icons, pages and scope under the site's mount point.
-export function manifestJson(name: string | undefined, description: string | undefined, manifest: ManifestConfig = {}, base = ''): string {
+export function manifestJson(name: string | undefined, description: string | undefined, manifest: ManifestConfig = {}, base = '', version?: string): string {
   const scope = manifest.scope === undefined ? undefined : sitePath(manifest.scope, 'scope')
   // A browser ignores the scope when the start page lies outside it, and a shortcut outside it.
   const page = (path: string, what: string) => {
@@ -253,7 +286,7 @@ export function manifestJson(name: string | undefined, description: string | und
 
     return base + sitePath(path, what)
   }
-  const icon = (kind: string, purpose?: string) => (size: number) => ({ src: `${base}/${kind}-${size}.png`, sizes: `${size}x${size}`, type: 'image/png', purpose })
+  const icon = (kind: string, purpose?: string) => (size: number) => ({ src: versioned(`${base}/${kind}-${size}.png`, version), sizes: `${size}x${size}`, type: 'image/png', purpose })
 
   return JSON.stringify({
     name,
@@ -335,7 +368,7 @@ export function serveFavicons(app: Elysia, served: ServedPaths, options: Favicon
     if (!served.offer({ path, owner: 'the web app manifest', kind: 'kay', exported: true }))
       continue
 
-    const manifest = manifestJson(localizedText(options.name, locale, defaultLocale), localizedText(options.description, locale, defaultLocale), options.manifest, options.base)
+    const manifest = manifestJson(localizedText(options.name, locale, defaultLocale), localizedText(options.description, locale, defaultLocale), options.manifest, options.base, options.version)
 
     app.get(path, ({ request }) => respond(request, manifest, 'application/manifest+json'))
   }

@@ -14,7 +14,7 @@ import { localizedText } from '../runtime/localized'
 import { jsonLd } from '../runtime/seo'
 import { CUSTOM_SCRIPT_PATH, TRACKER_TAGS } from './analytics'
 import { basePath } from './base'
-import { faviconTags, isOwnManifest, manifestPath } from './favicon'
+import { FAVICON_DIR, faviconSource, faviconTags, faviconVersion, isOwnManifest, manifestPath } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
 import { localeCopies } from './i18n'
 import { imageHeader } from './image-format'
@@ -22,6 +22,9 @@ import { imageHeader } from './image-format'
 import { publicFiles } from './public'
 import { slashedPath } from './routes'
 import { lightFontCss } from './save-data'
+
+// What follows the path of the manifest link, its version, which a locale's own manifest keeps.
+const MANIFEST_PATH = /^[^?]*/
 
 // The file a prerendered page's `shareCard()` links, where a page served per request links the card route.
 const CARD_FILE = /^\/_kay\/images\/card-[\da-z]+\.jpg$/
@@ -54,8 +57,11 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
 
   const favicon = switchOf(config.assets?.favicon)
 
+  const source = favicon === false ? undefined : faviconSource(root, favicon, config.assets?.manifest)
+  const version = source === undefined ? undefined : await faviconVersion(source, join(dir, FAVICON_DIR))
+
   if (favicon !== false)
-    extra.push(...faviconTags(favicon))
+    extra.push(...faviconTags(favicon, version))
 
   // A site linking its own icons still colours the browser around its pages.
   extra.push(...themeColorTags(config.seo?.themeColor ?? config.assets?.manifest?.themeColor))
@@ -140,7 +146,7 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
     const text = (value: Localized | undefined) => localizedText(value, locale, defaultLocale)
     // The manifest link follows the locale, its text read in it, unless the app serves the manifest itself.
     const manifest = appServesManifest ? undefined : manifestPath(locale, seo, defaultLocale)
-    const own = manifest === undefined ? extra : extra.map(tag => isOwnManifest(tag) ? { ...tag, props: { ...tag.props, href: manifest } } : tag)
+    const own = manifest === undefined ? extra : extra.map(tag => isOwnManifest(tag) ? { ...tag, props: { ...tag.props, href: manifest + String(tag.props.href).replace(MANIFEST_PATH, '') } } : tag)
     const tags: HeadTag[] = social ? [...own, meta('property', 'og:type', 'website')] : [...own]
     const name = text(seo.name)
     const description = text(seo.description)

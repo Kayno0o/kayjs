@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-ui's `Badge` takes `color`, any CSS colour, in place of a tone ([Badge](/ui/badge#any-colour)); the new `IconTile` draws an icon, or a letter, on a rounded tile tinted in a tone or any `color`, and `Stat` and `Widget` draw their `icon` as one with `iconTile` ([IconTile](/ui/icon-tile)); an `AppSwitcher` app takes a `color` that tints its tile and icon, and an `@appIcon(app)` block replaces the icon ([AppSwitcher](/ui/app-switcher#a-colour-per-app)).
+- The favicon, touch icon and manifest links, and the icons the manifest lists, end in `?v=` and a hash of the favicon source, so a CDN or browser holding the old icon fetches the new one after the source changes; the files keep their paths ([favicon](sitemap-search-fonts.md)).
 - A redirect whose target has a query of its own (`'/calendar': '/?tab=calendar'`) keeps it and adds the request's params it does not name, the target's winning on a clash, in `redirects` and in the runtime set alike ([routing](routing-endpoints-and-base.md)).
 - kayjs-ui's `Slider` and `AudioPlayer` fill their track in the accent up to the thumb (the danger colour when invalid, the muted when disabled): the range input carries `--range-fill`, its share from `0%` to `100%`, in its `style`, and Firefox draws `::-moz-range-progress`.
 - kayjs-ui's `Slider` draws its value on the label's row, at its end, in place of a row under the track: the `value` part now comes before the `input` part in its markup.

@@ -23,20 +23,60 @@ async function get(path: string, headers: Record<string, string> = {}): Promise<
   return app.handle(new Request(`http://localhost${path}`, { headers }))
 }
 
+// The icon links with their `?v=` version taken off, to compare the rest of the tag.
+function unversioned(html: string): string {
+  return html.replaceAll(/\?v=[\da-f]{10}(?=")/g, '')
+}
+
 async function widthOf(bytes: Uint8Array): Promise<number> {
   return (await new Bun.Image(bytes).metadata()).width
 }
 
 describe('favicon', () => {
   it('links the favicon, the touch icon, the manifest and the theme colour from every page', async () => {
-    const html = await (await get('/about')).text()
+    const page = await (await get('/about')).text()
+    const html = unversioned(page)
 
+    expect(page).toMatch(/<link rel="icon" href="\/favicon\.ico\?v=[\da-f]{10}" sizes=/)
+    expect(page).toMatch(/<link rel="apple-touch-icon" href="\/apple-touch-icon\.png\?v=[\da-f]{10}">/)
+    expect(page).toMatch(/<link rel="manifest" href="\/manifest\.webmanifest\?v=[\da-f]{10}" crossorigin/)
     expect(html).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">')
     expect(html).not.toContain('favicon.svg')
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png">')
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">')
     expect(html).toContain('<meta name="theme-color" content="#1e1e2e">')
     expect(html).toContain('<title>About</title>')
+  })
+
+  it('versions every icon link and the manifest\'s icons by the source, keeping the paths', async () => {
+    const dir = await scratchDir('favicon-version-')
+    const first = join(dir, 'first.svg')
+    const second = join(dir, 'second.svg')
+
+    await Bun.write(first, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M0 0h32v32z"/></svg>')
+    await Bun.write(second, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M0 0h16v16z"/></svg>')
+
+    const versions = async (favicon: string) => {
+      const own = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon })
+      const html = await (await own.handle(new Request('http://localhost/about'))).text()
+      const manifest = await (await own.handle(new Request('http://localhost/manifest.webmanifest'))).text()
+      const links = [...html.matchAll(/<link rel="(?:icon|apple-touch-icon|manifest)" href="([^"]+)"/g)].map(match => match[1]!)
+
+      expect(links.map(link => link.replace(/\?v=.*/, ''))).toEqual(['/favicon.ico', '/favicon.svg', '/apple-touch-icon.png', '/manifest.webmanifest'])
+      expect((await own.handle(new Request(`http://localhost${links[0]}`))).status).toBe(200)
+
+      return { links: links.map(link => link.slice(link.indexOf('?'))), icons: (JSON.parse(manifest) as { icons: { src: string }[] }).icons.map(icon => icon.src) }
+    }
+    const one = await versions(first)
+    const again = await versions(first)
+    const two = await versions(second)
+
+    expect(new Set(one.links).size).toBe(1)
+    expect(one.links[0]).toMatch(/^\?v=[\da-f]{10}$/)
+    expect(one.icons).toEqual(['/icon-192.png', '/icon-512.png'].map(icon => `${icon}${one.links[0]}`))
+    expect(again).toEqual(one)
+    expect(two.links[0]).not.toBe(one.links[0])
+    expect(two.icons[0]).toBe(`/icon-192.png${two.links[0]}`)
   })
 
   it('serves an ICO holding a PNG per size, and each PNG at its size', async () => {
@@ -73,7 +113,7 @@ describe('favicon', () => {
     const response = await get('/manifest.webmanifest')
 
     expect(response.headers.get('content-type')).toBe('application/manifest+json')
-    expect(await response.json()).toEqual({
+    expect(JSON.parse(unversioned(await response.text()).replaceAll(/\?v=[\da-f]{10}/g, ''))).toEqual({
       name: 'Kay site',
       short_name: 'Kay',
       description: 'A site made with kay',
@@ -91,12 +131,12 @@ describe('favicon', () => {
 
     const installed = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: resolve(SOURCE), seo: { name: 'Kay site' }, manifest: { maskable: maskableSource, startUrl: '/notes', scope: '/', orientation: 'any', shortcuts: [{ name: 'New note', shortName: 'New', description: 'Write a note', url: '/notes/new' }] } })
     const fetch = async (path: string, headers: Record<string, string> = {}) => installed.handle(new Request(`http://localhost${path}`, { headers }))
-    const manifest = await (await fetch('/manifest.webmanifest')).json() as { icons: unknown[] }
+    const manifest = await (await fetch('/manifest.webmanifest')).json() as { icons: { src: string, sizes: string, type: string, purpose?: string }[] }
     const maskable = await fetch('/icon-maskable-512.png')
     const maskableBytes = await maskable.bytes()
 
     expect(manifest).toMatchObject({ start_url: '/notes', scope: '/', orientation: 'any', shortcuts: [{ name: 'New note', short_name: 'New', description: 'Write a note', url: '/notes/new' }] })
-    expect(manifest.icons.slice(2)).toEqual([{ src: '/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' }, { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }])
+    expect(manifest.icons.slice(2).map(icon => ({ ...icon, src: icon.src.replace(/\?v=[\da-f]{10}$/, '') }))).toEqual([{ src: '/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' }, { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }])
     expect(maskable.headers.get('content-type')).toBe('image/png')
     expect(await widthOf(maskableBytes)).toBe(512)
     expect(maskableBytes).not.toEqual(await (await fetch('/icon-512.png')).bytes())
@@ -156,7 +196,7 @@ describe('favicon', () => {
     expect(await icon.bytes()).toEqual((await faviconFiles({ image: 'src/server/favicon.png' })).get('/icon-512.png')!)
     expect(svg.headers.get('content-type')).toBe('image/svg+xml')
     expect(await svg.text()).toBe(await Bun.file('src/server/favicon.svg').text())
-    expect(await (await plain.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">')
+    expect(unversioned(await (await plain.handle(new Request('http://localhost/about'))).text())).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">')
     expect(await (await off.handle(new Request('http://localhost/about'))).text()).not.toContain('rel="icon"')
 
     for (const path of ['/favicon.ico', '/favicon.svg', '/manifest.webmanifest'])
@@ -174,7 +214,7 @@ describe('favicon', () => {
     expect(served.headers.get('content-type')).toBe('image/svg+xml')
     expect(await served.text()).toBe(await Bun.file(svg).text())
     expect(await widthOf(await (await own.handle(new Request('http://localhost/icon-512.png'))).bytes())).toBe(512)
-    expect(await (await own.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">')
+    expect(unversioned(await (await own.handle(new Request('http://localhost/about'))).text())).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">')
 
     await writeFavicons({ image: SOURCE, svg }, join(scratch, 'built-svg'))
 
@@ -193,7 +233,7 @@ describe('favicon', () => {
     const view = new DataView(ico.buffer)
 
     expect(await served.text()).toBe(await Bun.file(svg).text())
-    expect(await (await own.handle(new Request('http://localhost/about'))).text()).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">')
+    expect(unversioned(await (await own.handle(new Request('http://localhost/about'))).text())).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">')
     expect(await widthOf(await (await own.handle(new Request('http://localhost/icon-192.png'))).bytes())).toBe(192)
     expect(await Promise.all([0, 1, 2].map(async index => widthOf(ico.slice(view.getUint32(6 + 16 * index + 12, true), view.getUint32(6 + 16 * index + 12, true) + view.getUint32(6 + 16 * index + 8, true)))))).toEqual([16, 32, 48])
     expect(await Promise.all(['/apple-touch-icon.png', '/icon-512.png'].map(async path => widthOf(files.get(path)!)))).toEqual([180, 512])

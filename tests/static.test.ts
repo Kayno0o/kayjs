@@ -7,6 +7,7 @@ import { eagerJs, lazyChunks, scriptUrls } from '../scripts/eager-js'
 import { headersFile, nginxHeaders } from '../src/build/header-files'
 import { IMAGE_LINK } from '../src/server/prerender'
 import { kayBuild } from './check-helper'
+import { MARK_VERSION } from './favicon-version'
 import { fixtureCopy } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/static')
@@ -396,7 +397,7 @@ describe('kay build --static', () => {
     expect((await get('/sitemap.xml')).text).toContain('<loc>https://x.example/repo/posts/first</loc><lastmod>2026-03-04T10:00:00.000Z</lastmod>')
     expect((await get('/robots.txt')).text).toContain('Disallow: /repo/private\n\nSitemap: https://x.example/repo/sitemap.xml')
     expect((await get('/favicon.svg')).text).toBe(await Bun.file('src/server/favicon.svg').text())
-    expect((await get('/about')).text).toContain('<link rel="icon" href="/repo/favicon.svg" type="image/svg+xml">')
+    expect((await get('/about')).text).toContain(`<link rel="icon" href="/repo/favicon.svg?v=${MARK_VERSION}" type="image/svg+xml">`)
 
     const missing = await get('/nowhere')
 

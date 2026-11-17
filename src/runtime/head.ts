@@ -69,6 +69,7 @@ const OG_IMAGE = 'meta:property:og:image'
 const IMAGE_DETAILS = ['meta:property:og:image:width', 'meta:property:og:image:height', 'meta:property:og:image:alt', 'meta:name:twitter:image:alt']
 const CHARSET = 'charset'
 const SPACES = /\s+/
+const MANIFEST_QUERY = /\?.*$/
 const NO_ATTRIBUTES: ReadonlyMap<string, string | true> = new Map()
 
 // Renders are synchronous, so the head of the one in progress can live here; a `head` outside a page render sets nothing.
@@ -354,7 +355,8 @@ function replaceableIdentity({ tag, props }: HeadTag): string | undefined {
     if (rel === 'icon' || rel === 'apple-touch-icon')
       return `link:${rel}${props.sizes != null ? `:sizes=${String(props.sizes)}` : ''}${props.type != null ? `:type=${String(props.type)}` : ''}`
 
-    return `link:${rel}:${String(props.href ?? '')}`
+    // A manifest is one link whatever version its URL carries.
+    return `link:${rel}:${rel === 'manifest' ? String(props.href ?? '').replace(MANIFEST_QUERY, '') : String(props.href ?? '')}`
   }
 
   return undefined
