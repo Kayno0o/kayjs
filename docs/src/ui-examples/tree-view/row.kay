@@ -1,0 +1,21 @@
+---
+island()
+import type { TreeNode } from '@kayjs/ui'
+import TreeView from '@kayjs/ui/tree-view.kay'
+
+const notes = [
+  { key: 'ideas', label: 'Ideas', age: '2d' },
+  { key: 'plan', label: 'Plan', age: '5h' },
+]
+const nodes: TreeNode[] = [
+  { key: 'work', label: 'Work', children: notes.map(({ key, label }) => ({ key, label })) },
+]
+const age = (key: string | number) => notes.find(note => note.key === key)?.age
+---
+.max-w-xs
+  TreeView(nodes={nodes} label="Notes" expanded={['work']} trailingShown)
+    @row(node)
+      span.grid.size-5.place-items-center.rounded.bg-accent.text-xs.text-accent-foreground {node.label.slice(0, 1)}
+      span.truncate {node.label}
+    @actions(node)
+      span.text-xs.text-muted {age(node.key)}

@@ -41,3 +41,11 @@ A node's `children` may be a function returning the nodes below it, or a promise
 ## Which branches are open
 
 `expanded` lists the branches open. The tree follows it when the page passes a new list, and the reader opens and closes branches from then on. `onOpenChange({ id, open, node })` is called whenever the reader opens or closes a branch, by a click or a key, so a page can keep the open branches in a URL or a cookie.
+
+## Your own row
+
+A `@row(node)` block draws a row's icon and label yourself, such as a tinted tile and a name. The row keeps its chevron, its indentation, its link when the node has an `href`, its keys and its place in the tab order, so the arrows work as they do with the default row.
+
+`trailingShown` keeps the `@actions` block visible on every row instead of dimming it until hover, for information such as an age or a count. The block is still `part="trailing"`, and the content of a `@row` is `part="body"`.
+
+<Demo name="tree-view/row" />

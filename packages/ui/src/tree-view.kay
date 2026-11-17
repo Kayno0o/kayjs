@@ -11,9 +11,9 @@ import { ORIGIN } from './tab-nav'
 import { treeHasMenu, treeHere, treeKey, treePath, treeRows } from './tree'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', spinner: 'kui-tree-view-spinner animate-spin motion-reduce:animate-none', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label', link: 'kui-tree-view-link', failed: 'kui-tree-view-failed', retry: 'kui-tree-view-retry', trailing: 'kui-tree-view-trailing' } })
+const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', spinner: 'kui-tree-view-spinner animate-spin motion-reduce:animate-none', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label', link: 'kui-tree-view-link', failed: 'kui-tree-view-failed', retry: 'kui-tree-view-retry', trailing: 'kui-tree-view-trailing', body: 'kui-tree-view-body' } })
 
-const { nodes, label, selected, expanded = [], onSelectedChange, onOpenChange, actions, emptyLabel, empty, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
+const { nodes, label, selected, expanded = [], onSelectedChange, onOpenChange, actions, trailingShown = false, row: content, emptyLabel, empty, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
   nodes: readonly TreeNode<Id>[]
   // Names the tree for screen readers.
   label: string
@@ -30,6 +30,10 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onOpenChange, a
   onSelectedChange?: ((event: { id: Id, node: TreeNode<Id> }) => unknown) | undefined
   // Controls at the end of a row, such as a star or a count, dimmed away until the row is hovered or holds focus: `@actions(node)`.
   actions?: Snippet<[TreeNode<Id>]> | undefined
+  // Keeps the `actions` controls visible on every row, such as an age or a count that is information rather than a control.
+  trailingShown?: boolean | undefined
+  // Draws a row's icon and label in place of the default ones: `@row(node)`. The row keeps its chevron, indentation, link, roving focus and keys, and the `actions` still end it.
+  row?: Snippet<[TreeNode<Id>]> | undefined
   // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
   emptyLabel?: string | undefined
   empty?: Snippet | undefined
@@ -298,17 +302,26 @@ else
               Icon(icon="chevron")
         else
           span(part="toggle")
-        if row.node.icon
-          Icon(icon={row.node.icon} part="icon")
-        if row.node.href !== undefined
-          a(part="link" href={row.node.href} {...tabOf(row.node.href, row.node.newTab)} tabindex="-1" aria-current={row.node.key === current() ? 'page' : undefined}) {row.node.label}
+        if content
+          if row.node.href !== undefined
+            a(part="link" href={row.node.href} {...tabOf(row.node.href, row.node.newTab)} tabindex="-1" aria-current={row.node.key === current() ? 'page' : undefined})
+              span(part="body")
+                | {content(row.node)}
+          else
+            span(part="body")
+              | {content(row.node)}
         else
-          span(part="label") {row.node.label}
+          if row.node.icon
+            Icon(icon={row.node.icon} part="icon")
+          if row.node.href !== undefined
+            a(part="link" href={row.node.href} {...tabOf(row.node.href, row.node.newTab)} tabindex="-1" aria-current={row.node.key === current() ? 'page' : undefined}) {row.node.label}
+          else
+            span(part="label") {row.node.label}
         if failed().has(row.node.key)
           span(part="failed" role="alert") {failureLabel}
           button(part="retry" type="button") {retryLabel}
         if actions
-          span(part="trailing")
+          span(part="trailing" data-shown={trailingShown ? '' : undefined})
             | {actions(row.node)}
   if hasMenu()
     Menu(items={menu()?.items ?? []} label={menu()?.name ?? label} at={menu()?.at ?? { x: 0, y: 0 }} open={menu() !== undefined} onOpenChange={({ open: shown }) => { if (!shown) menu = undefined }})

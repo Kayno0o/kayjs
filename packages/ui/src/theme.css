@@ -1446,6 +1446,15 @@
     @apply size-4 shrink-0;
   }
 
+  /* The app's own row content, which fills what the chevron and the controls leave. */
+  .kui-tree-view-body {
+    @apply flex min-w-0 flex-1 items-center gap-2;
+  }
+
+  .kui-tree-view-link:has(> .kui-tree-view-body) {
+    @apply flex-1;
+  }
+
   .kui-tree-view-label {
     @apply min-w-0 truncate;
   }
@@ -1481,13 +1490,14 @@
     @apply ml-auto flex shrink-0 items-center gap-1 opacity-0 transition-opacity pointer-coarse:opacity-100;
   }
 
-  .kui-tree-view-item:is(:hover, :focus-within) > .kui-tree-view-trailing {
+  .kui-tree-view-item:is(:hover, :focus-within) > .kui-tree-view-trailing,
+  .kui-tree-view-trailing[data-shown] {
     @apply opacity-100;
   }
 
   /* Out of the tab order too while hidden, so the tree stays one stop and only the focused row's controls are reachable. */
   @media (hover: hover) {
-    .kui-tree-view-item:not(:hover, :focus-within) > .kui-tree-view-trailing {
+    .kui-tree-view-item:not(:hover, :focus-within) > .kui-tree-view-trailing:not([data-shown]) {
       visibility: hidden;
     }
   }

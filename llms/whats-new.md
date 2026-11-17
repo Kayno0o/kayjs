@@ -11,6 +11,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's `infiniteList` starts over only when the first rows or what an `input` function returns change, compared by value: the same rows handed again, a new array of them too, keep the pages loaded ([LoadMore](/ui/load-more)).
 - kayjs-ai's `Chat` takes `toolIcons`, an icon per tool by its name, drawn before the tool's label in the folded line and before its name in an opened call, in the `toolIcon` part; a tool without one keeps its row ([Chat](../packages/ai/llms/chat.md))
 - Keys typed into a field during a query `navigate()` reach its island once it has hydrated, so an island that writes the value it was given back into the field, as kayjs-ui's `TextInput` does, no longer overwrites them ([navigation](navigation.md)).
+- kayjs-ui's `TreeView` takes a `@row(node)` block that draws a row's icon and label, such as a tinted tile and a name, the row keeping its chevron, link, keys and roving focus, and `trailingShown` keeps the `@actions` block visible on every row, for an age or a count ([TreeView](/ui/tree-view#your-own-row)).
 
 ## 1.105.0
 

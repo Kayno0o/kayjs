@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import TreeLazy from '../tests/fixture/src/components/tree-lazy.kay'
+import TreeRow from '../tests/fixture/src/components/tree-row.kay'
 import Tree from '../tests/fixture/src/components/tree.kay'
 import { click } from './dom'
 
@@ -196,4 +197,26 @@ test('expanded is followed when the parent passes a new list, and the reader\'s 
   await settle()
   expect(labels()).toEqual(['Remote', 'Flaky', 'Plain', 'Leaf'])
   expect(calls).toEqual([])
+})
+
+test('a @row block draws the row while the arrows, the chevron and the trailing age stay the tree\'s', async () => {
+  mounted = await mountComponent(TreeRow, {})
+
+  const root = mounted.root.querySelector('#tree')!
+  const names = () => [...root.querySelectorAll('[role="treeitem"] .name')].map(name => name.textContent)
+
+  expect([names(), root.querySelectorAll('.kui-tree-view-label').length, root.querySelectorAll('.kui-tree-view-trailing[data-shown]').length]).toEqual([['Work', 'Inbox'], 0, 2])
+
+  root.querySelector<HTMLElement>('[tabindex="0"]')!.focus()
+  press(root, 'ArrowRight')
+  await settle()
+  press(root, 'ArrowRight')
+  await settle()
+
+  expect([names(), document.activeElement?.querySelector('.name')?.textContent, document.activeElement?.getAttribute('aria-level')]).toEqual([['Work', 'Specs', 'Notes', 'Inbox'], 'Specs', '2'])
+
+  press(root, 'End')
+  await settle()
+
+  expect(document.activeElement?.querySelector('.name')?.textContent).toBe('Inbox')
 })

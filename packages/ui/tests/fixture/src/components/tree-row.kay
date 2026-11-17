@@ -1,0 +1,16 @@
+---
+island()
+import type { TreeNode } from '@kayjs/ui'
+import TreeView from '@kayjs/ui/tree-view.kay'
+
+const nodes: TreeNode[] = [
+  { key: 'work', label: 'Work', children: [{ key: 'specs', label: 'Specs' }, { key: 'notes', label: 'Notes' }] },
+  { key: 'inbox', label: 'Inbox' },
+]
+---
+TreeView#tree(nodes={nodes} label="Folders" trailingShown)
+  @row(node)
+    span.tile {node.key.slice(0, 1)}
+    span.name {node.label}
+  @actions(node)
+    span.age {node.key === 'work' ? '2d' : '5h'}

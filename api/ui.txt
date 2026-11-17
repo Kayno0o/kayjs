@@ -3859,17 +3859,20 @@ component default
   spinner?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
+  link?: string | undefined;
+  body?: string | undefined;
   icon?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
-  link?: string | undefined;
   label?: string | undefined;
   failed?: string | undefined;
   retry?: string | undefined;
   trailing?: string | undefined;
 }
   retryLabel?: string | undefined
+  row?: ((args_0: TreeNode<Id>) => Element) | undefined
   selected?: Id | undefined
+  trailingShown?: boolean | undefined
 
 [./virtual-list.kay] default
 component default
