@@ -814,7 +814,9 @@ interface Mounted<P extends object>
   update: (props: P) => void
 
 [.] navigate
-function navigate(to: { query: Readonly<Record<string, null | number | string | undefined>>; }, options?: NavigateOptions | undefined): Promise<boolean>
+function navigate(to: {
+  query: Readonly<Record<string, null | number | readonly (number | string)[] | string | undefined>>;
+}, options?: NavigateOptions | undefined): Promise<boolean>
 function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions | undefined): Promise<boolean>
 
 [.] NavigateEvent
@@ -1080,7 +1082,7 @@ type PushState = 'unsupported' | 'denied' | 'subscribed' | 'off'
 type PushSubscribeResult = PushState | 'needs-gesture' | 'signed-out' | 'failed'
 
 [.] QueryChanges
-type QueryChanges = Readonly<Record<string, string | number | null | undefined>>
+type QueryChanges = Readonly<Record<string, string | number | readonly (string | number)[] | null | undefined>>
 
 [.] QueryHistoryOptions
 interface QueryHistoryOptions
@@ -1639,7 +1641,7 @@ function withBase(path: string): string
 interface WithPublicFields<Spec extends Schema>
 
 [.] withQuery
-function withQuery(changes: Readonly<Record<string, null | number | string | undefined>>): string
+function withQuery(changes: Readonly<Record<string, null | number | readonly (number | string)[] | string | undefined>>): string
 
 [./analytics] analytics
 function analytics(written: AnalyticsOptions): KayExtension<AnyElysia>

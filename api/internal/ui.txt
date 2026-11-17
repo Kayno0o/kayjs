@@ -2689,13 +2689,26 @@ function paramChange<Value extends string | null | number, Option = never>(param
   option: Option;
 }) => unknown) | undefined
 
+[./lib/param-change] paramChanges
+function paramChanges<Value extends string | number, Event extends {
+  value: Value[];
+}>(param: string | undefined, paramDefault: readonly Value[] | undefined, onChange: ((event: Event) => unknown) | undefined): ((event: Event) => unknown) | undefined
+
 [./lib/param-value] paramPick
 function paramPick<Choice extends string | null | number>(options: readonly {
   value: Choice;
 }[], param: string | undefined, paramDefault: number | string | undefined): Choice | undefined
 
+[./lib/param-value] paramPicks
+function paramPicks<Choice extends string | number>(options: readonly {
+  value: Choice;
+}[], param: string | undefined, paramDefault: readonly Choice[] | undefined): Choice[] | undefined
+
 [./lib/param-value] paramText
 function paramText(name: string | undefined): string | undefined
+
+[./lib/param-value] paramTexts
+function paramTexts(name: string | undefined): string[] | undefined
 
 [./lib/plot] axisExtent
 function axisExtent(values: readonly number[], axis: ScatterAxis): [number, number]

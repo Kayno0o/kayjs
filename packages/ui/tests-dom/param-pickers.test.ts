@@ -77,3 +77,37 @@ test('a refused Select move puts back the value the app renders now, not the one
   expect(await pick('?period=7d', async root => choose(root, '24h', 'stale'))).toBeUndefined()
   expect(mounted!.root.querySelector<HTMLSelectElement>('#stale')?.value).toBe('30d')
 })
+
+test('a RadioGroup with a param does what a Segmented does: the option set, the default left out, the param as its name', async () => {
+  expect(await pick('?site=a', root => radio(root, '30d', 'radios'))).toBe('/traffic?site=a&period=30d')
+  expect(await pick('?period=30d&site=a', root => radio(root, '7d', 'radios'))).toBe('/traffic?site=a')
+  expect(mounted!.root.querySelector('#radios input')?.getAttribute('name')).toBe('period')
+  expect(await pick('?period=30d', root => radio(root, '24h', 'refused-radios'))).toBeUndefined()
+  expect(mounted!.root.querySelector<HTMLInputElement>('#refused-radios input:checked')?.value).toBe('30d')
+})
+
+test('a RadioGroup shows the option the address names, else its default', async () => {
+  await pick('?period=30d', () => undefined)
+  expect(mounted!.root.querySelector<HTMLInputElement>('#radios input:checked')?.value).toBe('30d')
+
+  await pick('', () => undefined)
+  expect(mounted!.root.querySelector<HTMLInputElement>('#radios input:checked')?.value).toBe('7d')
+})
+
+test('a ChipGroup with a param sets it once per picked option, the others kept, and leaves it out for none or its default', async () => {
+  expect(await pick('?site=a', root => radio(root, '24h', 'chips'))).toBe('/traffic?site=a&range=24h&range=7d')
+  expect(await pick('?range=7d&range=30d', root => radio(root, '30d', 'chips'))).toBe('/traffic')
+  expect(await pick('?range=24h', root => radio(root, '24h', 'chips'))).toBe('/traffic')
+  expect(mounted!.root.querySelector('#chips input')?.getAttribute('name')).toBe('range')
+})
+
+test('a ChipGroup shows the options the address names, else its default, and a refused pick is put back', async () => {
+  await pick('?range=24h&range=30d', () => undefined)
+  expect([...mounted!.root.querySelectorAll<HTMLInputElement>('#chips input:checked')].map(box => box.value)).toEqual(['24h', '30d'])
+
+  await pick('', () => undefined)
+  expect([...mounted!.root.querySelectorAll<HTMLInputElement>('#chips input:checked')].map(box => box.value)).toEqual(['7d'])
+
+  expect(await pick('?range=30d', root => radio(root, '24h', 'refused-chips'))).toBeUndefined()
+  expect([...mounted!.root.querySelectorAll<HTMLInputElement>('#refused-chips input:checked')].map(box => box.value)).toEqual(['30d'])
+})

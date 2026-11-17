@@ -17,16 +17,24 @@ export interface NavigateOptions {
   transition?: boolean | undefined
 }
 
-// Query params to set on the current page, a null, undefined or empty one dropped.
-export type QueryChanges = Readonly<Record<string, string | number | null | undefined>>
+// Query params to set on the current page, a null, undefined or empty one dropped; a list sets the param once per item (`?tag=a&tag=b`), an empty list dropping it.
+export type QueryChanges = Readonly<Record<string, string | number | readonly (string | number)[] | null | undefined>>
 
-// Sets each param of `changes` on `params`, a null, undefined or empty one dropped and the others kept: the rule of `navigate({ query })` and of `withQuery`.
+// Sets each param of `changes` on `params`, a null, undefined or empty one dropped and the others kept: the rule of `navigate.query` and of `withQuery`.
 export function mergeQuery(params: URLSearchParams, changes: QueryChanges): void {
   for (const [name, value] of Object.entries(changes)) {
-    if (value == null || value === '')
+    if (value == null || value === '' || (typeof value === 'object' && value.length === 0)) {
       params.delete(name)
-    else
+    }
+    else if (typeof value === 'object') {
+      params.delete(name)
+
+      for (const item of value)
+        params.append(name, String(item))
+    }
+    else {
       params.set(name, String(value))
+    }
   }
 }
 

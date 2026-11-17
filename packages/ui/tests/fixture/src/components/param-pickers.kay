@@ -1,5 +1,7 @@
 ---
 island({ render: 'client' })
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
 import Segmented from '@kayjs/ui/segmented.kay'
 import Select from '@kayjs/ui/select.kay'
 import { signal } from 'kay'
@@ -15,3 +17,7 @@ Select#refused-select(options={periods} value={period} param="period" onChange={
 Select#sizes(options={[{ value: 10, label: '10' }, { value: 25, label: '25' }]} value={25} param="size" paramDefault="25")
 Select#select(options={periods} value={period} param="period" paramDefault="7d" emptyOption="Any")
 Select#stale(options={periods} value={shown()} param="period" onChange={() => { shown = '30d'; return false }})
+RadioGroup#radios(options={periods} param="period" paramDefault="7d" label="Radios")
+RadioGroup#refused-radios(options={periods} param="period" onChange={() => false} label="Refused radios")
+ChipGroup#chips(options={periods} param="range" paramDefault={['7d']} label="Chips")
+ChipGroup#refused-chips(options={periods} param="range" onChange={() => false} label="Refused chips")

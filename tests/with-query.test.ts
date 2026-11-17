@@ -106,3 +106,16 @@ describe('withQuery in the browser', () => {
     expect(await linkFrom('https://example.com//evil.example', {})).toBe('/evil.example')
   })
 })
+
+describe('mergeQuery with a list', () => {
+  it('sets the param once per item, replacing what it held, and drops it for an empty list', async () => {
+    const { mergeQuery } = await import('../src/runtime/navigate-api')
+    const params = new URLSearchParams('tag=x&site=a&tag=y')
+
+    mergeQuery(params, { tag: ['a', 2] })
+    expect(params.toString()).toBe('site=a&tag=a&tag=2')
+
+    mergeQuery(params, { tag: [] })
+    expect(params.toString()).toBe('site=a')
+  })
+})

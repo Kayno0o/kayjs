@@ -4,6 +4,8 @@ import { postedValue, recipe, uid, untrack } from 'kay'
 import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
 import { LABEL_TEXT, RADIO_INVALID } from './field-look'
+import { paramChange } from './param-change'
+import { paramPick } from './param-value'
 import { loadOptions } from './options-source'
 import type { OptionsSource } from './options-source'
 import { wording } from 'kay/words'
@@ -25,7 +27,7 @@ const look = recipe({
   },
 })
 
-const { options, value, label, showLabel = false, name, invalid, required, disabled = false, loadingLabel = wording('ui.radioGroup.loading', 'Loading…'), retryLabel = wording('ui.radioGroup.retry', 'Try again'), failureLabel = wording('ui.radioGroup.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
+const { options, value, label, showLabel = false, name, invalid, required, param, paramDefault, disabled = false, loadingLabel = wording('ui.radioGroup.loading', 'Loading…'), retryLabel = wording('ui.radioGroup.retry', 'Try again'), failureLabel = wording('ui.radioGroup.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
   // `description` is a quieter line under the label, which screen readers hear after it; `disabled` keeps that option from being picked.
   // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the group busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
   options: OptionsSource<{ value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }> & NullOption<Value, Held>
@@ -49,6 +51,10 @@ const { options, value, label, showLabel = false, name, invalid, required, disab
   required?: boolean | undefined
   // The radios' name, which the group submits under inside a form, and which a FormField reads the field's message by; one unique on the page is drawn when none is given.
   name?: string | undefined
+  // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option and every other param kept, the group busy until the page shows it. Left without `value`, the group shows the option the address names, else `paramDefault`. The radios take its name, so a GET form around the group sends it without JavaScript.
+  param?: string | undefined
+  // The value the page shows while `param` is left out: picking it leaves the param out.
+  paramDefault?: string | number | undefined
   // A promise holds the group busy until it settles, and puts the previous option back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   // Hears `null` as well, for a reset to none, only when `value` is typed nullable.
@@ -58,20 +64,22 @@ const { options, value, label, showLabel = false, name, invalid, required, disab
   option?: Snippet<[option: { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }]> | undefined
 }>()
 
-// A group with no callback is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
+// A group with no callback or param is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
 const source = loadOptions<{ value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }>(() => options, { onLoad, onError, label: 'RadioGroup' })
 const list = source.options
 // The option a group without a `value` starts on: the first that is not disabled, once the options are there.
 const first = () => list().find(option => !option.disabled)?.value ?? null
-const sent = onChange ? undefined : postedValue(name, value === undefined ? first() : value)
+const sent = onChange || param !== undefined ? undefined : postedValue(name, value === undefined ? first() : value)
+// The option the group starts on and follows: the app's `value`, else the one a param holds, else the first.
+const start = () => value === undefined ? paramPick(list(), param, paramDefault) ?? first() : value
 
 const { group, picked, busy, ref, pick } = controlledRadios({
   control: 'RadioGroup',
   input: '[data-part=input]',
   options: list,
-  value: () => sentOption(sent, list(), value === undefined ? first() : value),
-  name: () => name,
-  onChange: () => onChange as ((event: { value: string | number | null, option: unknown }) => unknown) | undefined,
+  value: () => sentOption(sent, list(), start()),
+  name: () => name ?? param,
+  onChange: () => paramChange(param, paramDefault, onChange as ((event: { value: string | number | null, option: unknown }) => unknown) | undefined),
   appRef: rest.ref,
 })
 
@@ -85,7 +93,7 @@ snippet radios()
     for option, index of list() key={option.value}
       div(part="radio")
         label(part="choice")
-          input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, list(), value === undefined ? first() : value))} type="radio" name={group} required={required} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
+          input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, list(), start()))} type="radio" name={group} required={required} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
           span(part="label")
             if drawRow
               | {drawRow(option)}

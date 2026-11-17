@@ -1322,6 +1322,8 @@ component default
 }) => unknown) | undefined
   option?: ((option: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: OptionsSource<{ value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }>
+  param?: string | undefined
+  paramDefault?: readonly Value[] | undefined
   parts?: undefined | {
   root?: string | undefined;
   chip?: string | undefined;
@@ -2672,6 +2674,8 @@ component default
 }) => unknown) | undefined
   option?: ((option: { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: OptionsSource<{ value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }> & NullOption<Value, Held>
+  param?: string | undefined
+  paramDefault?: number | string | undefined
   parts?: undefined | {
   root?: string | undefined;
   radio?: string | undefined;

@@ -2,6 +2,21 @@ import { navigate } from 'kay'
 
 // The change handler of a control that holds a query param: the app's own `onChange` first, which can refuse the change by answering false, then `navigate.query()` setting the param and keeping the others.
 // The default, an empty value and none leave the param out, so the page's plain address stays plain.
+// The same for a control holding a list in one param, set once per item: a pick equal to `paramDefault`, in any order, or none leaves the param out.
+export function paramChanges<Value extends string | number, Event extends { value: Value[] }>(param: string | undefined, paramDefault: readonly Value[] | undefined, onChange: ((event: Event) => unknown) | undefined): ((event: Event) => unknown) | undefined {
+  if (param === undefined)
+    return onChange
+
+  return async (event) => {
+    if (onChange && await onChange(event) === false)
+      return false
+
+    const same = paramDefault !== undefined && event.value.length === paramDefault.length && event.value.every(value => paramDefault.includes(value))
+
+    return navigate.query({ [param]: same ? null : event.value })
+  }
+}
+
 export function paramChange<Value extends string | number | null, Option = never>(param: string | undefined, paramDefault: string | number | undefined, onChange: ((event: { value: Value, option: Option }) => unknown) | undefined): ((event: { value: Value, option: Option }) => unknown) | undefined {
   if (param === undefined)
     return onChange

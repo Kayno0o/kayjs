@@ -160,6 +160,8 @@ Button(label="Save" tone="accent" onClick={save})
 
 A field control needs no `value`: Select, RadioGroup, Slider, ColorInput, Rating, Segmented and ChipGroup, like the text fields, keep what is picked and post it under their `name` without JavaScript, and a form reset goes back to what they first showed (a Select's first option, a Slider's `min`). [Forms](/llms/kayjs-ui-forms).
 
+A control that keeps its state in the address spells it the same way: `param` names the query param and `paramDefault` the value shown while it is left out, on Tabs, TabNav, Segmented, Select, RadioGroup and ChipGroup. A ChipGroup, which holds several options, sets the param once per picked option (`?tag=a&tag=b`). Pagination's `param` is its page, and a Table's other params are `filterParam`, `sortParam`, `pageParam` and `limitParam`.
+
 Every field follows one convention: `onInput` is the live value and `onChange` the committed one, and a choice control passes the picked option as a second argument (`onChange({ value, option })`, `onChange({ value, options })` for ChipGroup and MultiSelect). TextInput, Textarea, MarkdownEditor, DateInput, TimeInput, ColorInput and Slider have both. [Forms](/llms/kayjs-ui-forms).
 
 A title, a heading or a tab is a string by default, and a block puts markup in its place: `@title` on Card, PageHeader and the other heads, `@title` on Dialog, SidePanel and FormDialog, and a block named after one entry, such as `@tab(tab)`, on Tabs, TabNav, Breadcrumb, SiteNav, Carousel and MediaGallery. Card, CardRow, Avatar, Badge and a Timeline entry take `href` and become a link. [All of them](/llms/kayjs-ui-slots-and-links).

@@ -8,6 +8,8 @@ import { GROUP_INVALID, LABEL_TEXT } from './field-look'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 import { linkChoice } from './choice-link'
 import Icon from './icon.kay'
+import { paramChanges } from './param-change'
+import { paramPicks } from './param-value'
 import { loadOptions } from './options-source'
 import type { OptionsSource } from './options-source'
 import { wording } from 'kay/words'
@@ -29,7 +31,7 @@ const look = recipe({
   },
 })
 
-const { options, value = NONE, label, showLabel = false, name, invalid, required, requiredLabel = wording('ui.chipGroup.required', 'Pick at least one'), disabled = false, loadingLabel = wording('ui.chipGroup.loading', 'Loading…'), retryLabel = wording('ui.chipGroup.retry', 'Try again'), failureLabel = wording('ui.chipGroup.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
+const { options, value = NONE, label, showLabel = false, name, param, paramDefault, invalid, required, requiredLabel = wording('ui.chipGroup.required', 'Pick at least one'), disabled = false, loadingLabel = wording('ui.chipGroup.loading', 'Loading…'), retryLabel = wording('ui.chipGroup.retry', 'Try again'), failureLabel = wording('ui.chipGroup.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
   // `icon` sits before the label; `disabled` keeps that chip as it is.
   // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the group busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
   options: OptionsSource<{ value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }>
@@ -54,6 +56,10 @@ const { options, value = NONE, label, showLabel = false, name, invalid, required
   requiredLabel?: string | undefined
   // The checkboxes' name, which the group submits under inside a form, once per picked option; one unique on the page is drawn when none is given.
   name?: string | undefined
+  // Holds the picked options in a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set once per picked option (`?tag=a&tag=b`), every other param kept, and left out for none. Left without `value`, the group shows the options the address names, else `paramDefault`. The checkboxes take its name, so a GET form around the group sends it without JavaScript.
+  param?: string | undefined
+  // The options the page shows while `param` is left out: picking exactly these, in any order, leaves the param out.
+  paramDefault?: readonly Value[] | undefined
   // Gets every picked option, in the order of `options`.
   // A promise holds the group busy until it settles, and puts the previous pick back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
@@ -65,13 +71,15 @@ const { options, value = NONE, label, showLabel = false, name, invalid, required
 
 const source = loadOptions<{ value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }>(() => options, { onLoad, onError, label: 'ChipGroup' })
 const list = source.options
-const group = name ?? uid()
+const group = name ?? param ?? uid()
 // The heading's id while `showLabel` writes it, which then names the group in place of `aria-label`.
 const heading = showLabel ? uid() : undefined
 // Held as string or number: a signal cannot take a type parameter that might be a function.
 // A group with no callback is plain: a refused post of its form, which the server renders it for, gives its choices back in place of its own.
-const sent = onChange ? undefined : postedValues(name, value)
-const picked = signal<readonly (string | number)[]>(sent === undefined ? value : list().map(one => one.value).filter(one => sent.includes(String(one))))
+const sent = onChange || param !== undefined ? undefined : postedValues(name, value)
+// The options the group starts on and follows: the app's `value`, else the ones a param holds, else none.
+const start = () => value === NONE ? paramPicks(list(), param, paramDefault) ?? NONE : value
+const picked = signal<readonly (string | number)[]>(sent === undefined ? start() : list().map(one => one.value).filter(one => sent.includes(String(one))))
 const busy = signal(false)
 let root: HTMLElement | undefined
 // How often the parent's `value` reached the group, so a change under way knows whether the parent answered it.
@@ -81,7 +89,7 @@ let synced = 0
 let refilled = sent !== undefined
 
 effect(() => {
-  const next = value
+  const next = start()
 
   if (refilled) {
     refilled = false
@@ -111,7 +119,7 @@ async function pick(next: Value[]) {
   picked = next
 
   // Put back unless the parent set `value` meanwhile, which has the last word.
-  if (!(await changeAccepted('ChipGroup', () => onChange?.({ value: next, options: list().filter(one => next.includes(one.value)) }), busy.set)) && synced === syncedBefore) {
+  if (!(await changeAccepted('ChipGroup', () => paramChanges(param, paramDefault, onChange)?.({ value: next, options: list().filter(one => next.includes(one.value)) }), busy.set)) && synced === syncedBefore) {
     picked = before
     check(before)
   }
