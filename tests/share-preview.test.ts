@@ -73,6 +73,7 @@ describe('an entry-scoped preview link', () => {
     expect(bare.html).not.toContain('kay_preview')
     // A param the schema lacks is dropped as on any page, the token gone alike.
     const other = await visit(app, `/news-strict/roadmap?other=1&${token}`)
+
     expect(other.status).toBe(200)
     expect(other.html).not.toContain('kay_preview')
   })
