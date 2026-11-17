@@ -71,8 +71,10 @@ describe('an entry-scoped preview link', () => {
     expect(shared.html).not.toContain('kay_preview')
     expect(bare.status).toBe(200)
     expect(bare.html).not.toContain('kay_preview')
-    // A param the schema refuses is still refused, token or not.
-    expect((await visit(app, `/news-strict/roadmap?other=1&${token}`)).status).not.toBe(200)
+    // A param the schema lacks is dropped as on any page, the token gone alike.
+    const other = await visit(app, `/news-strict/roadmap?other=1&${token}`)
+    expect(other.status).toBe(200)
+    expect(other.html).not.toContain('kay_preview')
   })
 
   it('shows no other entry\'s draft, on any page', async () => {
