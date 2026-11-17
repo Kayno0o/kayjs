@@ -475,6 +475,36 @@ describe('the receive phase', () => {
 })
 
 describe('kay in front of the Elysia app', () => {
+  it('hands Bun the routes of the table that took the server over, and of a table that grew', async () => {
+    const first = kayServer([record('/a', () => 'one', { kind: 'kay' })])
+    const app = new Elysia().get('/x', () => 'x') as unknown as Elysia
+
+    serveThrough(app, first)
+    app.listen({ port: 0, hostname: '127.0.0.1' })
+    stopped.push(() => void app.stop(true))
+    await Bun.sleep(10)
+
+    const server = app.server!
+    const get = async (path: string) => (await fetch(`${server.url.origin}${path}`)).text()
+
+    // A table that grows is laid again by the next reload.
+    first.add(record('/b', () => 'grown', { kind: 'kay' }))
+    server.reload({ fetch: app.fetch, routes: {} })
+    expect(await get('/b')).toBe('grown')
+
+    // The next run's table takes the server over: its routes, not the ones of the run before, are Bun's.
+    const next = kayServer([record('/a', () => 'two', { kind: 'kay' })])
+    const later = new Elysia().get('/x', () => 'x') as unknown as Elysia
+
+    serveThrough(later, next)
+    later.server = server
+    for (const start of later.event.start ?? [])
+      await (start.fn as (app: Elysia) => unknown)(later)
+
+    expect(await get('/a')).toBe('two')
+    expect(await get('/b')).toBe('NOT_FOUND')
+  })
+
   it('answers a request through the app a later reload hands the server, with no gap for a table without one', async () => {
     const kay = kayServer([])
     const first = new Elysia().get('/who', () => 'first') as unknown as Elysia
