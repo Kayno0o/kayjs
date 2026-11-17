@@ -56,6 +56,31 @@ describe('schema-without-json-schema', () => {
     expect(await reported({ 'src/routes/index.kay': valibot })).toEqual(['src/routes/index.kay:5'])
   })
 
+  it('leaves a valibot expression toStandardJsonSchema wraps at any depth', async () => {
+    const head = 'import { action } from \'kay\'\nimport { toStandardJsonSchema } from \'@valibot/to-json-schema\'\nimport * as v from \'valibot\'\n\n'
+
+    expect(await reported({ 'src/a.ts': `${head}export const add = action({ input: v.pipe(v.object({ title: v.string() }), toStandardJsonSchema) }, ({ title }) => title)\n` })).toEqual([])
+    expect(await reported({ 'src/a.ts': `${head}export const add = action({ input: v.pipe(toStandardJsonSchema(v.object({})), v.check(() => true)) }, ({ title }) => title)\n` })).toEqual([])
+  })
+
+  it('does not read a local binding that shadows the valibot import as valibot', async () => {
+    const source = 'import { action } from \'kay\'\nimport * as v from \'valibot\'\n\nexport function make(v: { object: () => unknown }) {\n  return action({ input: v.object() }, () => 1)\n}\n\nexport const keep = v.string()\n'
+
+    expect(await reported({ 'src/a.ts': source })).toEqual([])
+  })
+
+  it('follows an action called through a namespace import', async () => {
+    expect(await reported({ 'src/a.ts': `import * as kay from 'kay'\n\nconst input = ${WITHOUT}\n\nexport const add = kay.action({ input }, () => 1)\n` })).toEqual(['src/a.ts:5'])
+  })
+
+  it('follows a default import and a one-hop re-export of a validator', async () => {
+    const use = (from: string, import_: string) => `import { action } from 'kay'\nimport ${import_} from '${from}'\n\nexport const add = action({ input: login }, () => 1)\n`
+
+    expect(await reported({ 'src/schemas.ts': `export default ${WITHOUT}\n`, 'src/a.ts': use('./schemas', 'login') })).toEqual(['src/a.ts:4'])
+    expect(await reported({ 'src/schemas.ts': `export const login = ${WITHOUT}\n`, 'src/index.ts': 'export { login } from \'./schemas\'\n', 'src/a.ts': use('./index', '{ login }') })).toEqual(['src/a.ts:4'])
+    expect(await reported({ 'src/schemas.ts': `export default ${WITH}\n`, 'src/a.ts': use('./schemas', 'login') })).toEqual([])
+  })
+
   it('leaves kay\'s own schemas, a plain record, and a level of allow', async () => {
     expect(await reported({ 'src/a.ts': 'import { action, s } from \'kay\'\n\nexport const add = action({ input: { title: s.string() } }, ({ title }) => title)\nexport const two = action({ input: s.object({ title: s.string() }) }, ({ title }) => title)\n' })).toEqual([])
     expect(await reported({ 'src/a.ts': action(WITHOUT) }, { 'schema-without-json-schema': 'allow' })).toEqual([])
