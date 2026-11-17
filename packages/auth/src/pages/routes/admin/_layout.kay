@@ -16,7 +16,7 @@ const acting = features.admin ? await ctx.locals.auth.impersonator() : null
 if (acting)
   ctx.status(403)
 else
-  await ctx.locals.auth.requireAdmin()
+  await ctx.locals.auth.admin.require()
 
 await loadViewer(ctx.request)
 

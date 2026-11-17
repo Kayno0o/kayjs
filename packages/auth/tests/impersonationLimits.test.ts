@@ -64,19 +64,19 @@ describe('an admin acting as a user', () => {
     expect(await root.browser.call('organizations.update', org, { name: 'Renamed' })).toMatchObject(refused)
     expect(await root.browser.call('organizations.invite', org, 'new@example.com')).toMatchObject(refused)
     expect(await root.browser.call('organizations.revokeInvitation', org, sent.invitation.id)).toMatchObject(refused)
-    expect(await root.browser.call('organizations.setMemberRoles', org, grace.id, ['admin'])).toMatchObject(refused)
-    expect(await root.browser.call('organizations.removeMember', org, grace.id)).toMatchObject(refused)
+    expect(await root.browser.call('organizations.updateMemberRoles', org, grace.id, ['admin'])).toMatchObject(refused)
+    expect(await root.browser.call('organizations.deleteMember', org, grace.id)).toMatchObject(refused)
     expect(await root.browser.call('organizations.leave', org)).toMatchObject(refused)
     expect(await root.browser.call('organizations.delete', org)).toMatchObject(refused)
 
     // Reads stay open.
     expect(await root.browser.call('organizations.list')).toMatchObject([{ organization: { id: org } }])
-    expect(await root.browser.call('organizations.members', org)).toMatchObject({ ok: true })
-    expect(await root.browser.call('organizations.invitations', org)).toMatchObject({ ok: true })
+    expect(await root.browser.call('organizations.listMembers', org)).toMatchObject({ ok: true })
+    expect(await root.browser.call('organizations.listInvitations', org)).toMatchObject({ ok: true })
 
     await root.browser.call('admin.stopImpersonating')
 
-    expect(await ada.browser.call('organizations.members', org)).toMatchObject({ ok: true, members: [{}, { roles: ['member'] }] })
+    expect(await ada.browser.call('organizations.listMembers', org)).toMatchObject({ ok: true, members: [{}, { roles: ['member'] }] })
     expect(await ada.browser.call('organizations.get', org)).toMatchObject({ organization: { name: 'Acme' } })
 
     // Accepting or declining an invitation is a write of the invited user's too.

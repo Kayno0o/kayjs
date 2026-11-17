@@ -6,7 +6,13 @@
 
 The methods of a feature live under it on the request's `auth`, so an editor lists one feature at a time: `ctx.locals.auth.admin.listUsers()`, `ctx.locals.auth.password.signIn(input)`, `ctx.locals.auth.organizations.invite(ref, email)`. A group is there whether its feature is on or not; a method of a feature that is off answers `{ ok: false, error: { code: 'off' } }` as before.
 
-The methods no feature owns stay on `auth` itself: the user (`user()`, `bareUser()`, `requireUser()`, `requireAdmin()`, `guarded()`, `signInUrl()`, `via`), signing in and out (`signIn`, `signOut`, `signOutEverywhere`, `signInAsGuest`), what the request may do (`features()`, `scopes()`, `hasScope`, `provedLately`, `reprove`, `captchaRequired`, `captchaChallenge`, `impersonator()`, `userIdsHolding`) and the OAuth server's resource (`oauthResource`, `oauthOrigin`, `oauthFixed`).
+The methods no feature owns stay on `auth` itself: the user (`user()`, `bareUser()`, `requireUser()`, `guarded()`, `signInUrl()`, `via`), signing in and out (`signIn`, `signOut`, `signOutEverywhere`, `signInAsGuest`), what the request may do (`features()`, `impersonator()`, `userIdsHolding`).
+
+### Use the verbs of the groups
+
+A group lists with `list` (`organizations.list()`, `organizations.listMembers(ref)`), reads with `get` (`organizations.getInvitation(id)`, `account.getProfile()`), writes with `create` and `update` (`account.updateProfile(values)`, `passkeys.update(id, name)`), removes with `delete` (`organizations.deleteMember(ref, userId)`, `account.delete(proof)`) and takes back with `revoke` (`sessions.revoke(id)`, `tokens.revoke(id)`). The admin's methods name what they act on (`admin.listUsers()`, `admin.deleteUser(id)`), and `password.change` and `email.change` keep `change`. What was on `auth` itself sits in the group it belongs to: `admin.require()` for an admin page, `captcha.required(action)` and `captcha.challenge(action)` for a form's CAPTCHA, `proof.recent(fresh?)` and `proof.renew(proof)` before a sensitive change, `tokens.scopes()` and `tokens.hasScope(scope)` for a token's scopes, `oauthServer.resource(path, name)`, `origin()` and `fixed()` for the OAuth documents, and `email.signInWithCode(code)` for the code a mail carried.
+
+The names before 1.105 (`organizations.members`, `admin.roles`, `auth.requireAdmin()`, `magicLink.signInWithCode`...) work until 1.108: `kay check` reports each call as `deprecated-auth-methods` and `kay upgrade` writes the new name.
 
 ### Move off the flat names
 
@@ -23,15 +29,19 @@ The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassw
 | `password` | `requestReset` | `requestPasswordReset` |
 | `password` | `reset` | `resetPassword` |
 | `password` | `change` | `changePassword` |
+| `captcha` | `required` | `captchaRequired` (on `auth` until 1.105) |
+| `captcha` | `challenge` | `captchaChallenge` (on `auth` until 1.105) |
+| `proof` | `recent` | `provedLately` (on `auth` until 1.105) |
+| `proof` | `renew` | `reprove` (on `auth` until 1.105) |
 | `email` | `sendVerification` | `sendVerification` |
 | `email` | `verify` | `verifyEmail` |
 | `email` | `verifyCode` | `verifyEmailCode` |
+| `email` | `signInWithCode` | `signInWithEmailCode` |
 | `email` | `pendingCode` | `emailCodePending` |
 | `email` | `change` | `changeEmail` |
 | `email` | `confirmChange` | `confirmEmailChange` |
 | `magicLink` | `request` | `requestMagicLink` |
 | `magicLink` | `signIn` | `signInWithMagicLink` |
-| `magicLink` | `signInWithCode` | `signInWithEmailCode` |
 | `twoFactor` | `pending` | `twoFactorPending` |
 | `twoFactor` | `verify` | `verifyTwoFactor` |
 | `twoFactor` | `setUp` | `setUpTwoFactor` |
@@ -44,7 +54,7 @@ The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassw
 | `passkeys` | `registrationOptions` | `passkeyRegistrationOptions` |
 | `passkeys` | `register` | `registerPasskey` |
 | `passkeys` | `list` | `listPasskeys` |
-| `passkeys` | `rename` | `updatePasskeyName` |
+| `passkeys` | `update` | `updatePasskeyName` |
 | `passkeys` | `revoke` | `revokePasskey` |
 | `passkeys` | `signInOptions` | `passkeySignInOptions` |
 | `passkeys` | `signIn` | `signInWithPasskey` |
@@ -54,19 +64,25 @@ The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassw
 | `tokens` | `create` | `createToken` |
 | `tokens` | `list` | `listTokens` |
 | `tokens` | `revoke` | `revokeBearerToken` |
+| `tokens` | `scopes` | `scopes` (on `auth` until 1.105) |
+| `tokens` | `hasScope` | `hasScope` (on `auth` until 1.105) |
 | `oauthServer` | `authorize` | `oauthAuthorize` |
 | `oauthServer` | `decide` | `oauthDecide` |
-| `oauthServer` | `clients` | `listOAuthClients` |
+| `oauthServer` | `listClients` | `listOAuthClients` |
 | `oauthServer` | `revokeGrant` | `revokeOAuthGrant` |
+| `oauthServer` | `resource` | `oauthResource` (on `auth` until 1.105) |
+| `oauthServer` | `origin` | `oauthOrigin` (on `auth` until 1.105) |
+| `oauthServer` | `fixed` | `oauthFixed` (on `auth` until 1.105) |
 | `admin` | `listUsers` | `listUsers` |
 | `admin` | `getUser` | `getUser` |
-| `admin` | `roles` | `adminRoles` |
+| `admin` | `require` | `requireAdmin` (on `auth` until 1.105) |
+| `admin` | `listRoles` | `adminRoles` |
 | `admin` | `grantRole` | `grantRole` |
 | `admin` | `revokeRole` | `revokeRole` |
 | `admin` | `ban` | `banUser` |
 | `admin` | `unban` | `unbanUser` |
 | `admin` | `deleteUser` | `deleteUser` |
-| `admin` | `auditLog` | `listAdminAuditLog` |
+| `admin` | `listAuditLog` | `listAdminAuditLog` |
 | `admin` | `impersonate` | `impersonate` |
 | `admin` | `stopImpersonating` | `stopImpersonating` |
 | `organizations` | `create` | `createOrganization` |
@@ -75,15 +91,15 @@ The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassw
 | `organizations` | `isMember` | `isMember` |
 | `organizations` | `update` | `updateOrganization` |
 | `organizations` | `delete` | `deleteOrganization` |
-| `organizations` | `members` | `listMembers` |
-| `organizations` | `setMemberRoles` | `setMemberRoles` |
-| `organizations` | `removeMember` | `deleteMember` |
+| `organizations` | `listMembers` | `listMembers` |
+| `organizations` | `updateMemberRoles` | `setMemberRoles` |
+| `organizations` | `deleteMember` | `deleteMember` |
 | `organizations` | `leave` | `leaveOrganization` |
 | `organizations` | `invite` | `invite` |
-| `organizations` | `invitations` | `listInvitations` |
+| `organizations` | `listInvitations` | `listInvitations` |
 | `organizations` | `revokeInvitation` | `revokeInvitation` |
-| `organizations` | `myInvitations` | `listMyInvitations` |
-| `organizations` | `invitation` | `getInvitation` |
+| `organizations` | `listMyInvitations` | `listMyInvitations` |
+| `organizations` | `getInvitation` | `getInvitation` |
 | `organizations` | `acceptInvitation` | `acceptInvitation` |
 | `organizations` | `rejectInvitation` | `rejectInvitation` |
 
@@ -91,16 +107,16 @@ The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassw
 
 | Group | Method | Flat name (gone in 1.91) |
 | --- | --- | --- |
-| `account` | `changeUsername` | `changeUsername` |
+| `account` | `updateUsername` | `changeUsername` |
 | `account` | `updateLocale` | `updateLocale` |
 | `account` | `delete` | `deleteAccount` |
 | `account` | `deletionImpact` | `deletionImpact` |
-| `account` | `profile` | `profile` |
-| `account` | `saveProfile` | `saveProfile` |
+| `account` | `getProfile` | `profile` |
+| `account` | `updateProfile` | `saveProfile` |
 | `account` | `export` | `exportData` |
 | `oauth` | `link` | `linkProvider` |
 | `oauth` | `unlink` | `unlink` |
-| `oauth` | `identities` | `listIdentities` |
-| `oauth` | `providerToken` | `providerToken` |
+| `oauth` | `listIdentities` | `listIdentities` |
+| `oauth` | `getProviderToken` | `providerToken` |
 | `audit` | `list` | `listAuditLog` |
 | `admin` (on the `authCore` result) | `createUser` | `createUser` |

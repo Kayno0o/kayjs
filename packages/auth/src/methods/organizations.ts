@@ -41,17 +41,17 @@ export class OrganizationMethods<OrgRole extends string = string> {
   }
 
   // Every member, oldest first, for any member to see.
-  async members(ref: string): Promise<Result<{ members: AuthMember<OrgRole>[] }, OrganizationFailure>> {
+  async listMembers(ref: string): Promise<Result<{ members: AuthMember<OrgRole>[] }, OrganizationFailure>> {
     return (await load.organizations()).listMembers(this.state, ref) as Promise<Result<{ members: AuthMember<OrgRole>[] }, OrganizationFailure>>
   }
 
   // Replaces a member's roles: for members holding `manage`, giving only roles they hold, to a member holding none above theirs.
-  async setMemberRoles(ref: string, userId: string, roles: OrgRole[]): Promise<Result<object, OrganizationWriteFailure | 'unknown-role' | 'last-owner'>> {
+  async updateMemberRoles(ref: string, userId: string, roles: OrgRole[]): Promise<Result<object, OrganizationWriteFailure | 'unknown-role' | 'last-owner'>> {
     return (await load.organizations()).setMemberRoles(this.state, ref, userId, roles)
   }
 
   // For members holding `manage`, of a member holding no role above theirs.
-  async removeMember(ref: string, userId: string): Promise<Result<object, OrganizationWriteFailure | 'unknown-role' | 'last-owner'>> {
+  async deleteMember(ref: string, userId: string): Promise<Result<object, OrganizationWriteFailure | 'unknown-role' | 'last-owner'>> {
     return (await load.organizations()).removeMember(this.state, ref, userId)
   }
 
@@ -67,7 +67,7 @@ export class OrganizationMethods<OrgRole extends string = string> {
   }
 
   // The organization's open invitations, for members holding `manage`.
-  async invitations(ref: string): Promise<Result<{ invitations: Invitation<OrgRole>[] }, OrganizationFailure>> {
+  async listInvitations(ref: string): Promise<Result<{ invitations: Invitation<OrgRole>[] }, OrganizationFailure>> {
     return (await load.organizations()).listInvitations(this.state, ref) as Promise<Result<{ invitations: Invitation<OrgRole>[] }, OrganizationFailure>>
   }
 
@@ -76,12 +76,12 @@ export class OrganizationMethods<OrgRole extends string = string> {
   }
 
   // The invitations open to the signed-in user's verified address.
-  async myInvitations(): Promise<Invitation<OrgRole>[]> {
+  async listMyInvitations(): Promise<Invitation<OrgRole>[]> {
     return (await load.organizations()).myInvitations(this.state) as Promise<Invitation<OrgRole>[]>
   }
 
   // What the invitation link's page shows; null once revoked, accepted or expired.
-  async invitation(invitationId: string): Promise<Invitation<OrgRole> | null> {
+  async getInvitation(invitationId: string): Promise<Invitation<OrgRole> | null> {
     return (await load.organizations()).getInvitation(this.state, invitationId) as Promise<Invitation<OrgRole> | null>
   }
 
@@ -93,5 +93,35 @@ export class OrganizationMethods<OrgRole extends string = string> {
   // Turns down an invitation open to the user; `not-found` for any other.
   async rejectInvitation(invitationId: string): Promise<Result<object, 'signed-out' | 'impersonating' | 'not-found'>> {
     return (await load.organizations()).declineInvitation(this.state, invitationId)
+  }
+
+  /** @deprecated Use `organizations.listMembers`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async members(...args: Parameters<OrganizationMethods<OrgRole>['listMembers']>): ReturnType<OrganizationMethods<OrgRole>['listMembers']> {
+    return this.listMembers(...args)
+  }
+
+  /** @deprecated Use `organizations.updateMemberRoles`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async setMemberRoles(...args: Parameters<OrganizationMethods<OrgRole>['updateMemberRoles']>): ReturnType<OrganizationMethods<OrgRole>['updateMemberRoles']> {
+    return this.updateMemberRoles(...args)
+  }
+
+  /** @deprecated Use `organizations.deleteMember`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async removeMember(...args: Parameters<OrganizationMethods<OrgRole>['deleteMember']>): ReturnType<OrganizationMethods<OrgRole>['deleteMember']> {
+    return this.deleteMember(...args)
+  }
+
+  /** @deprecated Use `organizations.listInvitations`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async invitations(...args: Parameters<OrganizationMethods<OrgRole>['listInvitations']>): ReturnType<OrganizationMethods<OrgRole>['listInvitations']> {
+    return this.listInvitations(...args)
+  }
+
+  /** @deprecated Use `organizations.listMyInvitations`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async myInvitations(...args: Parameters<OrganizationMethods<OrgRole>['listMyInvitations']>): ReturnType<OrganizationMethods<OrgRole>['listMyInvitations']> {
+    return this.listMyInvitations(...args)
+  }
+
+  /** @deprecated Use `organizations.getInvitation`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async invitation(...args: Parameters<OrganizationMethods<OrgRole>['getInvitation']>): ReturnType<OrganizationMethods<OrgRole>['getInvitation']> {
+    return this.getInvitation(...args)
   }
 }

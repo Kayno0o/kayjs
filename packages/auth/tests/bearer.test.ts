@@ -80,7 +80,7 @@ describe('bearer tokens', () => {
     expect(await post('twoFactor.setUp', { password: PASSWORD })).toMatchObject(refused)
     expect(await post('twoFactor.disable', { password: PASSWORD })).toMatchObject(refused)
     expect(await post('twoFactor.regenerateRecoveryCodes', { password: PASSWORD })).toMatchObject(refused)
-    expect(await post('reprove', { password: PASSWORD })).toMatchObject(refused)
+    expect(await post('proof.renew', { password: PASSWORD })).toMatchObject(refused)
     expect(await ada.call('twoFactor.setUp', { password: PASSWORD })).toMatchObject({ ok: true })
   })
 
@@ -174,7 +174,7 @@ describe('scoped and expiring tokens', () => {
 
   test('a request reads its token\'s scopes', async () => {
     const app = await withToken({ scopes: ['posts:read', 'posts:read'] })
-    const device = browserOf(new Elysia().use(app.app).get('/scopes', async ({ auth }) => ({ scopes: await auth.scopes(), write: await auth.hasScope('posts:write') })))
+    const device = browserOf(new Elysia().use(app.app).get('/scopes', async ({ auth }) => ({ scopes: await auth.tokens.scopes(), write: await auth.tokens.hasScope('posts:write') })))
 
     expect(await device.json('/scopes', { headers: app.bearer })).toEqual({ scopes: ['posts:read'], write: false })
     expect(await device.json('/scopes')).toEqual({ scopes: null, write: true })

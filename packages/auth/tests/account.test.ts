@@ -189,7 +189,7 @@ describe('the profile without pages.profile', () => {
   test('saveProfile throws, as the app asked for a form it did not declare', async () => {
     const { ada } = await registered()
 
-    expect((await ada.fetch('/call/account.saveProfile', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ bio: 'x' }]) })).status).toBe(500)
+    expect((await ada.fetch('/call/account.updateProfile', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ bio: 'x' }]) })).status).toBe(500)
   })
 })
 
@@ -197,11 +197,11 @@ describe('changing the username', () => {
   test('names a user without one, the name then signing in, and lets them recase it', async () => {
     const { ada, browser } = await registered()
 
-    expect(await ada.call('account.changeUsername', ' Ada  Lovelace ')).toMatchObject({ ok: true, user: { username: 'Ada Lovelace' } })
+    expect(await ada.call('account.updateUsername', ' Ada  Lovelace ')).toMatchObject({ ok: true, user: { username: 'Ada Lovelace' } })
     expect(await ada.json('/me')).toMatchObject({ username: 'Ada Lovelace' })
     expect(await browser().post('/password', { identifier: 'ada lovelace', password: PASSWORD })).toMatchObject({ ok: true })
-    expect(await ada.call('account.changeUsername', 'ada lovelace')).toMatchObject({ ok: true, user: { username: 'ada lovelace' } })
-    await ada.call('account.changeUsername', 'countess')
+    expect(await ada.call('account.updateUsername', 'ada lovelace')).toMatchObject({ ok: true, user: { username: 'ada lovelace' } })
+    await ada.call('account.updateUsername', 'countess')
 
     expect(await browser().post('/password', { identifier: 'ada lovelace', password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
@@ -210,12 +210,12 @@ describe('changing the username', () => {
     const { ada, browser, store } = await registered()
 
     await store.users.create(userRecord({ id: 'u2', username: 'Bob' }))
-    await ada.call('account.changeUsername', 'ada')
+    await ada.call('account.updateUsername', 'ada')
 
-    expect(await ada.call('account.changeUsername', 'a')).toMatchObject({ ok: false, errors: { username: 'length' } })
-    expect(await ada.call('account.changeUsername', 'bob')).toMatchObject({ ok: false, errors: { username: 'taken' } })
-    expect(await ada.call('account.changeUsername', 'ada')).toMatchObject({ ok: false, errors: { username: 'unchanged' } })
-    expect(await browser().call('account.changeUsername', 'carol')).toMatchObject({ ok: false, error: { code: 'signed-out' } })
+    expect(await ada.call('account.updateUsername', 'a')).toMatchObject({ ok: false, errors: { username: 'length' } })
+    expect(await ada.call('account.updateUsername', 'bob')).toMatchObject({ ok: false, errors: { username: 'taken' } })
+    expect(await ada.call('account.updateUsername', 'ada')).toMatchObject({ ok: false, errors: { username: 'unchanged' } })
+    expect(await browser().call('account.updateUsername', 'carol')).toMatchObject({ ok: false, error: { code: 'signed-out' } })
   })
 
   // Each test builds its own store, so the stubs below need no restoring.
@@ -228,13 +228,13 @@ describe('changing the username', () => {
       throw new Error('unique violation')
     }
 
-    expect(await ada.call('account.changeUsername', 'ada')).toMatchObject({ ok: false, errors: { username: 'taken' } })
+    expect(await ada.call('account.updateUsername', 'ada')).toMatchObject({ ok: false, errors: { username: 'taken' } })
 
     store.users.update = async () => {
       throw new Error('connection lost')
     }
 
-    expect((await ada.fetch('/call/account.changeUsername', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).status).toBe(500)
+    expect((await ada.fetch('/call/account.updateUsername', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).status).toBe(500)
   })
 
   test('refuses a device\'s bearer token, which is no session', async () => {
@@ -242,7 +242,7 @@ describe('changing the username', () => {
     const { token } = await ada.callOk('tokens.create', { password: PASSWORD }, 'Phone')
     const device = browser()
 
-    expect(await device.json('/call/account.changeUsername', { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).toMatchObject({ ok: false, error: { code: 'signed-out' } })
+    expect(await device.json('/call/account.updateUsername', { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).toMatchObject({ ok: false, error: { code: 'signed-out' } })
   })
 
   test('shows the new name to the rest of the same request', async () => {
@@ -251,7 +251,7 @@ describe('changing the username', () => {
 
     // Added before the first request, which compiles the routes.
     app.post('/rename', async ({ auth }) => {
-      await auth.account.changeUsername('ada')
+      await auth.account.updateUsername('ada')
 
       return auth.user()
     })
@@ -271,14 +271,14 @@ describe('unlinking a provider', () => {
 
     await ada.fetch('/sign-in/u1', POST)
 
-    expect(await ada.call('oauth.identities')).toEqual(['discord'])
+    expect(await ada.call('oauth.listIdentities')).toEqual(['discord'])
     expect(await ada.call('oauth.unlink', 'github', {})).toMatchObject({ ok: false, error: { code: 'not-linked' } })
     expect(await ada.call('oauth.unlink', 'discord', {})).toMatchObject({ ok: false, error: { code: 'last-way-in' } })
 
     await ada.call('password.change', {}, 'a first password')
 
     expect(await ada.call('oauth.unlink', 'discord', { password: 'a first password' })).toEqual({ ok: true })
-    expect(await ada.call('oauth.identities')).toEqual([])
+    expect(await ada.call('oauth.listIdentities')).toEqual([])
   })
 })
 

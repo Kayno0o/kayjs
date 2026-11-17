@@ -25,7 +25,7 @@ export class MagicLinkMethods {
     return !this.state.core.switches.magicLink ? OFF : (await load.email()).signInWithMagicLink(this.state, token)
   }
 
-  // Signs in with the code a magic link mail carried, typed in the browser that asked for it.
+  /** @deprecated Use `email.signInWithCode`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   async signInWithCode(code: string): Promise<Result<{ redirect: string }, 'invalid' | 'expired' | 'limited' | 'banned'> | Off> {
     return !this.state.core.switches.magicLink ? OFF : (await load.email()).signInWithEmailCode(this.state, code)
   }

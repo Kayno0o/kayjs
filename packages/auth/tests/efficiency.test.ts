@@ -161,7 +161,7 @@ describe('lists', () => {
 
     const orgId = first.membership.organization.id
 
-    const sender = (await owner.callOk('organizations.members', orgId)).members[0]?.user.id ?? ''
+    const sender = (await owner.callOk('organizations.listMembers', orgId)).members[0]?.user.id ?? ''
 
     for (const email of ['b@example.com', 'c@example.com', 'd@example.com']) {
       await store.users.create(userRecord({ id: email, email }))
@@ -171,7 +171,7 @@ describe('lists', () => {
 
     log.reset()
 
-    expect((await owner.callOk('organizations.members', orgId)).members).toHaveLength(4)
+    expect((await owner.callOk('organizations.listMembers', orgId)).members).toHaveLength(4)
     expect(log.count('users.getMany')).toBe(1)
     expect(log.calls.filter(call => call.name === 'users.get').map(call => call.args[0])).not.toContain('b@example.com')
 
@@ -181,7 +181,7 @@ describe('lists', () => {
     expect(log.count('organizations.get')).toBe(0)
 
     log.reset()
-    expect((await owner.callOk('organizations.invitations', orgId)).invitations).toHaveLength(3)
+    expect((await owner.callOk('organizations.listInvitations', orgId)).invitations).toHaveLength(3)
     expect(log.count('invitations.listByOrganization')).toBe(1)
   })
 
@@ -193,7 +193,7 @@ describe('lists', () => {
     await store.invitations!.create({ id: 'late', organizationId: membership.organization.id, email: 'late@example.com', roles: ['member'], invitedBy: null, createdAt: new Date(), expiresAt: new Date(Date.now() - 1000) })
     log.reset()
 
-    expect((await owner.callOk('organizations.invitations', membership.organization.id)).invitations).toEqual([])
+    expect((await owner.callOk('organizations.listInvitations', membership.organization.id)).invitations).toEqual([])
     expect(log.count('invitations.delete')).toBe(0)
   })
 
@@ -210,7 +210,7 @@ describe('lists', () => {
     await store.users.create(userRecord({ id: 'b', email: 'b@example.com' }))
     await store.members!.add({ organizationId: organization.id, userId: 'b', roles: ['member'], createdAt: new Date() })
 
-    expect((await owner.callOk('organizations.members', organization.id)).members).toHaveLength(2)
+    expect((await owner.callOk('organizations.listMembers', organization.id)).members).toHaveLength(2)
     expect(await owner.call('organizations.list')).toHaveLength(1)
   })
 })

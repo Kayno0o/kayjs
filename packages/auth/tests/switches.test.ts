@@ -45,7 +45,7 @@ describe('feature switches', () => {
     expect(await ada.call('features')).toMatchObject({ email: true, magicLink: false })
     expect(await ada.call('magicLink.request', 'ada@example.com')).toMatchObject(OFF)
     expect(await ada.call('magicLink.signIn', 'token')).toMatchObject(OFF)
-    expect(await ada.call('magicLink.signInWithCode', '123456')).toMatchObject(OFF)
+    expect(await ada.call('email.signInWithCode', '123456')).toMatchObject(OFF)
     expect(mails.mails).toHaveLength(0)
   })
 

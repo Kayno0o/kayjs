@@ -1,8 +1,10 @@
+import type { Off } from '../core'
 import type { PendingEmailCode } from '../email'
 import type { Result } from '../failure'
 import type { Proof, ProofFailure } from '../proof'
 import type { EmailProblem } from '../rules'
 import type { RequestState } from '../state'
+import { OFF } from '../core'
 import { load } from '../load'
 
 // `auth.email`: verifying the address and changing it.
@@ -17,6 +19,11 @@ export class EmailMethods {
   // Spends a verification link's token in the browser signed in as the account, that registered it or that proved its password, or given the account's password: `{ ok: false, error: { code: 'confirm' } }` asks for one of them, the link still usable.
   async verify(token: string, password?: string): Promise<Result<{ redirect: string }, 'invalid' | 'limited' | 'banned' | 'confirm'>> {
     return (await load.email()).verifyEmail(this.state, token, password)
+  }
+
+  // Signs in with the code a magic link mail carried, typed in the browser that asked for it.
+  async signInWithCode(code: string): Promise<Result<{ redirect: string }, 'invalid' | 'expired' | 'limited' | 'banned'> | Off> {
+    return !this.state.core.switches.magicLink ? OFF : (await load.email()).signInWithEmailCode(this.state, code)
   }
 
   // Verifies the address with the code its verification mail carried, typed in the browser that asked for it.

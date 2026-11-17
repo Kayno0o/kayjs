@@ -36,9 +36,9 @@ describe('emailed codes', () => {
     const code = mail!.code!
 
     for (let miss = 0; miss < 6; miss++)
-      await thief.call('magicLink.signInWithCode', code === '000000' ? '111111' : '000000')
+      await thief.call('email.signInWithCode', code === '000000' ? '111111' : '000000')
 
-    expect(await ada.call('magicLink.signInWithCode', code)).toMatchObject({ ok: true })
+    expect(await ada.call('email.signInWithCode', code)).toMatchObject({ ok: true })
   })
 })
 

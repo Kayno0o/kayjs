@@ -530,7 +530,9 @@ function resourceMetadata(request: Request, base: string, origin: string | undef
 
 // The origin the auth library serves its documents at, which the pointer to them must agree with.
 function originOf(served: unknown): string | undefined {
-  return (served as { auth?: ResourceOwner }).auth?.oauthOrigin?.()
+  const owner = (served as { auth?: ResourceOwner }).auth
+
+  return owner?.oauthServer?.origin() ?? owner?.oauthOrigin?.()
 }
 
 export const mcpBodyLimit: BodyLimit = {
@@ -540,6 +542,8 @@ export const mcpBodyLimit: BodyLimit = {
 
 // What an auth library with an OAuth server of its own, kayjs-auth, tells of it through the `auth` of the context.
 interface ResourceOwner {
+  oauthServer?: { resource: (path: string, name: string) => Record<string, unknown> | null, origin: () => string | undefined, fixed: () => boolean }
+  // The names before 1.105 kayjs-auth, an older one, answers to.
   oauthResource?: (path: string, name: string) => Record<string, unknown> | null
   oauthOrigin?: () => string | undefined
   oauthFixed?: () => boolean
@@ -552,9 +556,9 @@ function serveResourceMetadata(app: Elysia, name: string, paths: string[], endpo
   for (const route of paths) {
     app.get(route, (served) => {
       const owner = (served as unknown as { auth?: ResourceOwner }).auth
-      const document = owner?.oauthResource?.(endpoint, name)
+      const document = owner?.oauthServer?.resource(endpoint, name) ?? owner?.oauthResource?.(endpoint, name)
       // An origin taken from the request is whatever its Host header said, so no shared cache keeps the document.
-      const cache = configuredSite() !== undefined || owner?.oauthFixed?.() === true ? 'public, max-age=300' : 'private, max-age=300'
+      const cache = configuredSite() !== undefined || (owner?.oauthServer?.fixed() ?? owner?.oauthFixed?.()) === true ? 'public, max-age=300' : 'private, max-age=300'
 
       return document ? new Response(JSON.stringify(document), { headers: { ...headers, 'cache-control': cache } }) : new Response(null, { status: 404 })
     })

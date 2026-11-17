@@ -119,7 +119,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     await join(grace, ['owner'])
     race.arm()
 
-    const answers = await Promise.all([ada.browser.call('organizations.removeMember', org, grace.id), grace.browser.call('organizations.removeMember', org, ada.id)])
+    const answers = await Promise.all([ada.browser.call('organizations.deleteMember', org, grace.id), grace.browser.call('organizations.deleteMember', org, ada.id)])
 
     expect(race.overlapped()).toBe(true)
     expect((await owners()).length).toBeGreaterThanOrEqual(1)
@@ -134,7 +134,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     await join(grace, ['owner'])
     race.arm()
 
-    const answers = await Promise.all([ada.browser.call('organizations.setMemberRoles', org, ada.id, ['admin']), grace.browser.call('organizations.removeMember', org, grace.id)])
+    const answers = await Promise.all([ada.browser.call('organizations.updateMemberRoles', org, ada.id, ['admin']), grace.browser.call('organizations.deleteMember', org, grace.id)])
 
     expect(race.overlapped()).toBe(true)
     expect((await owners()).length).toBeGreaterThanOrEqual(1)
@@ -147,7 +147,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
 
     await join(grace, ['owner'])
     race.arm()
-    const answers = await Promise.all([ada.browser.call('organizations.setMemberRoles', org, grace.id, ['admin']), grace.browser.call('organizations.setMemberRoles', org, ada.id, ['admin'])])
+    const answers = await Promise.all([ada.browser.call('organizations.updateMemberRoles', org, grace.id, ['admin']), grace.browser.call('organizations.updateMemberRoles', org, ada.id, ['admin'])])
 
     expect(race.overlapped()).toBe(true)
     expect((await owners()).length).toBeGreaterThanOrEqual(1)
@@ -162,7 +162,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     await join(grace, ['owner'])
     await join(alan, ['member'])
     race.arm()
-    await Promise.all([ada.browser.call('organizations.removeMember', org, ada.id), grace.browser.call('account.delete', { password: PASSWORD })])
+    await Promise.all([ada.browser.call('organizations.deleteMember', org, ada.id), grace.browser.call('account.delete', { password: PASSWORD })])
 
     expect(race.overlapped()).toBe(true)
     expect(await store.organizations!.get(org)).toBeTruthy()
@@ -336,7 +336,7 @@ describe('an undo meeting a store outage', () => {
     race.arm()
     outage = true
 
-    const answers = await Promise.allSettled([ada.browser.call('organizations.removeMember', org, grace.id), grace.browser.call('organizations.removeMember', org, ada.id)])
+    const answers = await Promise.allSettled([ada.browser.call('organizations.deleteMember', org, grace.id), grace.browser.call('organizations.deleteMember', org, ada.id)])
 
     expect(race.overlapped()).toBe(true)
     expect((await app.store.members!.listByOrganization(org)).length).toBe(0)

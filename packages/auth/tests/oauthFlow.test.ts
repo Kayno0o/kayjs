@@ -498,7 +498,7 @@ describe('linking a provider', () => {
 
 describe('provider tokens', () => {
   function withTokenRoute(app: ReturnType<typeof setup>) {
-    return app.app.get('/token', async ({ auth }) => (await auth.oauth.providerToken('discord')) ?? 'none')
+    return app.app.get('/token', async ({ auth }) => (await auth.oauth.getProviderToken('discord')) ?? 'none')
   }
 
   test('gives the signed-in user\'s access token, refreshed once it is about to expire', async () => {

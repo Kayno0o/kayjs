@@ -1,4 +1,5 @@
 import type { AdminChangeFailure, AdminFailure, ManagedUser } from '../admin'
+import type { User } from '../core'
 import type { AuditCursorInput, AuditEntry } from '../events'
 import type { Result } from '../failure'
 import type { RequestState } from '../state'
@@ -6,7 +7,12 @@ import { load } from '../load'
 
 // `auth.admin`: what the `admin` option's users may do to other users, every method answering `forbidden` for anyone else.
 export class AdminMethods<Role extends string = string> {
-  constructor(private readonly state: RequestState) {}
+  constructor(private readonly state: RequestState, private readonly asking: () => Promise<User>) {}
+
+  // The signed-in admin, as themselves, for an admin page to ask for: 404 while the `admin` option names no one (a `Denied`, which a plain Elysia app answers too), a visitor sent to sign in as `requireUser()` does, and 403 for anyone else, an admin acting as a user and a bearer token included.
+  async require(): Promise<User> {
+    return this.asking()
+  }
 
   // The users, newest first, a page of `limit` (50 by default) from `offset`; `search` matches part of an email or a username, or a whole id.
   async listUsers(query: { search?: string, offset?: number, limit?: number } = {}): Promise<Result<{ users: ManagedUser[], total: number }, 'forbidden' | 'two-factor-required'>> {
@@ -19,7 +25,7 @@ export class AdminMethods<Role extends string = string> {
   }
 
   // The roles an admin may give, those `roles` declares; none without it.
-  roles(): string[] {
+  listRoles(): string[] {
     return [...this.state.core.roles ?? []]
   }
 
@@ -48,7 +54,7 @@ export class AdminMethods<Role extends string = string> {
   }
 
   // Everyone's audit log, or `userId`'s, newest first.
-  async auditLog(query: { userId?: string, before?: AuditCursorInput, limit?: number } = {}): Promise<Result<{ entries: AuditEntry[] }, 'forbidden' | 'two-factor-required'>> {
+  async listAuditLog(query: { userId?: string, before?: AuditCursorInput, limit?: number } = {}): Promise<Result<{ entries: AuditEntry[] }, 'forbidden' | 'two-factor-required'>> {
     return (await load.admin()).adminAuditLog(this.state, query)
   }
 
@@ -60,5 +66,15 @@ export class AdminMethods<Role extends string = string> {
   // Signs the admin back in as themselves; signed out when their own sign-in ended meanwhile. False when not impersonating.
   async stopImpersonating(): Promise<boolean> {
     return (await load.admin()).stopImpersonating(this.state)
+  }
+
+  /** @deprecated Use `admin.listRoles`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  roles(...args: Parameters<AdminMethods<Role>['listRoles']>): ReturnType<AdminMethods<Role>['listRoles']> {
+    return this.listRoles(...args)
+  }
+
+  /** @deprecated Use `admin.listAuditLog`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async auditLog(...args: Parameters<AdminMethods<Role>['listAuditLog']>): ReturnType<AdminMethods<Role>['listAuditLog']> {
+    return this.listAuditLog(...args)
   }
 }

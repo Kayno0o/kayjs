@@ -45,10 +45,10 @@ export function guardOf<Role extends string, Scope extends string>(core: Core, o
     if (options.require !== undefined && !(await core.access.authorize(user, options.require, reading ? 'read' : 'write', { params: ctx.params })))
       ctx.deny(403)
 
-    if (!scopeAllows(await authOf(ctx.locals).scopes(), options.scope))
+    if (!scopeAllows(await authOf(ctx.locals).tokens.scopes(), options.scope))
       ctx.deny(403)
 
-    if (fresh !== undefined && !(await authOf(ctx.locals).provedLately(options.fresh)))
+    if (fresh !== undefined && !(await authOf(ctx.locals).proof.recent(options.fresh)))
       ctx.deny(403, STALE_PROOF)
 
     if (user !== null && await lacksTwoFactor(authOf(ctx.locals)[STATE], user, { wanted: options.twoFactor, path: ctx.url.pathname, locale: ctx.locale, ctx: { params: ctx.params } }))
@@ -64,7 +64,7 @@ export function gateOf<Role extends string, Scope extends string>(core: Core, op
     // A user lacking the two-factor the app asks of them is denied like one missing a role, bar the library's own enrolment pages.
     refuse: async (ctx, user) => lacksTwoFactor(authOf(ctx)[STATE], user, { path: new URL((ctx as { request: Request }).request.url).pathname, ctx: { params: (ctx as PolicyContext).params, body: (ctx as PolicyContext).body, query: (ctx as PolicyContext).query } }),
     defaultRequirement: options.require ?? signedIn,
-    scopes: async ctx => authOf(ctx).scopes(),
+    scopes: async ctx => authOf(ctx).tokens.scopes(),
     defaultScope: options.scope,
   })
 }

@@ -211,7 +211,7 @@ describe('exporting a user\'s data', () => {
       expect(response.status).toBe(403)
       expect(response.headers.get('content-disposition')).toBeNull()
 
-      await ada.call('reprove', { password: PASSWORD })
+      await ada.call('proof.renew', { password: PASSWORD })
 
       expect((await ada.call('account.export')).ok).toBe(true)
     })
@@ -223,13 +223,13 @@ describe('exporting a user\'s data', () => {
       await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
       setSystemTime(new Date(Date.now() + LATER))
 
-      expect(await ada.call('reprove', { password: 'wrong password' })).toMatchObject({ ok: false, error: { code: 'proof' } })
+      expect(await ada.call('proof.renew', { password: 'wrong password' })).toMatchObject({ ok: false, error: { code: 'proof' } })
       expect((await ada.fetch('/auth/export')).status).toBe(403)
-      expect(await ada.call('provedLately')).toBe(false)
+      expect(await ada.call('proof.recent')).toBe(false)
 
-      await ada.call('reprove', { password: PASSWORD })
+      await ada.call('proof.renew', { password: PASSWORD })
 
-      expect(await ada.call('provedLately')).toBe(true)
+      expect(await ada.call('proof.recent')).toBe(true)
       expect((await ada.fetch('/auth/export')).status).toBe(200)
     })
 
@@ -244,7 +244,7 @@ describe('exporting a user\'s data', () => {
       setSystemTime(new Date(Date.now() + LATER))
 
       expect(await ada.call('account.export')).toMatchObject({ ok: false, error: { code: 'stale' } })
-      expect(await ada.call('reprove', {})).toMatchObject({ ok: false, error: { code: 'stale' } })
+      expect(await ada.call('proof.renew', {})).toMatchObject({ ok: false, error: { code: 'stale' } })
       expect((await ada.fetch('/auth/export')).status).toBe(403)
     })
 
@@ -260,10 +260,10 @@ describe('exporting a user\'s data', () => {
       setSystemTime(new Date(Date.now() + LATER))
 
       expect(await ada.call('account.export')).toMatchObject({ ok: false, error: { code: 'stale' } })
-      expect(await ada.call('reprove', { code: '000000' })).toMatchObject({ ok: false, error: { code: 'proof' } })
+      expect(await ada.call('proof.renew', { code: '000000' })).toMatchObject({ ok: false, error: { code: 'proof' } })
       expect(await ada.call('account.export')).toMatchObject({ ok: false, error: { code: 'stale' } })
 
-      await ada.call('reprove', { password: PASSWORD })
+      await ada.call('proof.renew', { password: PASSWORD })
 
       expect((await ada.call('account.export')).ok).toBe(true)
     })

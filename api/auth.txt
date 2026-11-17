@@ -61,10 +61,12 @@ class Auth
   new <Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>>(session: Session<AuthSessionData>, core: Core, request: Request, client: string, address: string): Auth<Scope, Role, OrgRole, UserData>
   account: AccountMethods
   admin: AdminMethods<Role>
+  adminUser: () => Promise<User<UserData>>
   audit: AuditMethods
   bareUser: () => Promise<BareUser<UserData> | null>
-  captchaChallenge: (action: CaptchaAction) => Promise<null | string>
-  captchaRequired: (action: CaptchaAction) => Promise<boolean>
+  captcha: CaptchaMethods
+  /** @deprecated Use `captcha.challenge()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ captchaChallenge: (action: CaptchaAction) => Promise<null | string>
+  /** @deprecated Use `captcha.required()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ captchaRequired: (action: CaptchaAction) => Promise<boolean>
   cookies: string[]
   core: Core
   email: EmailMethods
@@ -78,7 +80,8 @@ class Auth
   scope?: false | string | string[] | undefined;
   twoFactor?: true | undefined;
 }) => Promise<void>
-  hasScope: (scope: Scope) => Promise<boolean>
+  /** @deprecated Use `tokens.hasScope()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ hasScope: (scope: Scope) => Promise<boolean>
+  heldScopes: () => Promise<null | string[]>
   impersonator: () => Promise<User<Record<string, unknown>> | null>
   known?: undefined | { record: Promise<UserRecord | null>; at: number; }
   leave: () => Promise<void>
@@ -87,19 +90,20 @@ class Auth
   magicLink: MagicLinkMethods
   markBrowser: (signedIn: boolean, maxAge?: number | undefined) => void
   oauth: OAuthMethods
-  oauthFixed: () => boolean
-  oauthOrigin: () => string | undefined
-  oauthResource: (path: string, name: string) => Record<string, unknown> | null
+  /** @deprecated Use `oauthServer.fixed()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ oauthFixed: () => boolean
+  /** @deprecated Use `oauthServer.origin()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ oauthOrigin: () => string | undefined
+  /** @deprecated Use `oauthServer.resource()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ oauthResource: (path: string, name: string) => Record<string, unknown> | null
   oauthServer: OAuthServerMethods
   organizations: OrganizationMethods<OrgRole>
   passkeys: PasskeyMethods
   password: PasswordMethods
-  provedLately: (fresh?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined) => Promise<boolean>
+  proof: ProofMethods
+  /** @deprecated Use `proof.recent()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ provedLately: (fresh?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined) => Promise<boolean>
   providersOf: (record: UserRecord) => Promise<Record<string, { id: string; }>>
   record: () => Promise<UserRecord | null>
-  reprove: (proof: Proof) => Promise<Result<object, ProofFailure>>
+  /** @deprecated Use `proof.renew()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ reprove: (proof: Proof) => Promise<Result<object, ProofFailure>>
   request: Request
-  requireAdmin: () => Promise<User<UserData>>
+  /** @deprecated Use `admin.require()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ requireAdmin: () => Promise<User<UserData>>
   requireUser: {
   (options: RequireUserOptions<Scope, Role> & {
     bare: true;
@@ -110,7 +114,7 @@ class Auth
 }
   resolve: () => Promise<UserRecord | null>
   resolving: Promise<UserRecord | null> | undefined
-  scopes: () => Promise<null | string[]>
+  /** @deprecated Use `tokens.scopes()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ scopes: () => Promise<null | string[]>
   session: Session<AuthSessionData>
   sessions: SessionMethods
   signIn: (user: Pick<User<Record<string, unknown>>, "id">, options?: { remember?: boolean | undefined; }) => Promise<void>

@@ -32,6 +32,16 @@ ai [.] TranscribeOptions.language	1.108	deprecated-ai-language	Written `locale`,
 ai [.] TranscribeOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] TranscribeOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 auth [./test] authTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
+auth [.] Auth.captchaChallenge	1.108.0	deprecated-auth-methods	Use `captcha.challenge()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
+auth [.] Auth.captchaRequired	1.108.0	deprecated-auth-methods	Use `captcha.required()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
+auth [.] Auth.hasScope	1.108.0	deprecated-auth-methods	Use `tokens.hasScope()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
+auth [.] Auth.oauthFixed	1.108.0	deprecated-auth-methods	Use `oauthServer.fixed()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
+auth [.] Auth.oauthOrigin	1.108.0	deprecated-auth-methods	Use `oauthServer.origin()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
+auth [.] Auth.oauthResource	1.108.0	deprecated-auth-methods	Use `oauthServer.resource()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
+auth [.] Auth.provedLately	1.108.0	deprecated-auth-methods	Use `proof.recent()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
+auth [.] Auth.reprove	1.108.0	deprecated-auth-methods	Use `proof.renew()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
+auth [.] Auth.requireAdmin	1.108.0	deprecated-auth-methods	Use `admin.require()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
+auth [.] Auth.scopes	1.108.0	deprecated-auth-methods	Use `tokens.scopes()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
 auth [.] AuthMailMessage.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 auth [.] AuthOptions.onSignUp	1.108	deprecated-hook-names	Written `afterSignUp`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 auth [.] AuthProofOfWorkOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.

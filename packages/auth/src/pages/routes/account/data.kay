@@ -11,7 +11,7 @@ import PageSection from '@kayjs/ui/page-section.kay'
 
 // Re-proves the user, so the export link below shows for the next ten minutes.
 export const prove = action(schemas.proof, async (input, ctx) => {
-  const result = await ctx.locals.auth.reprove(proofOf(input))
+  const result = await ctx.locals.auth.proof.renew(proofOf(input))
 
   return !result.ok ? ctx.deny(400, { data: { error: result.error.code } }) : undefined
 })
@@ -51,7 +51,7 @@ const user = await auth.requireUser()
 const features = auth.features()
 const refused = remove.form.failed()?.data?.error
 const notProved = prove.form.failed()?.data?.error
-const proved = await auth.provedLately()
+const proved = await auth.proof.recent()
 // Neither proof form can pass: an admin acting as the user proves nothing, and an account with nothing to prove it by has only its sign-in, now old.
 const impersonated = await auth.impersonator() !== null
 const impact = await auth.account.deletionImpact()

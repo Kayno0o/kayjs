@@ -7,6 +7,7 @@ import { actionReaders } from '../src/check/action-readers'
 import { actionType } from '../src/check/action-type'
 import { aiLanguage } from '../src/check/ai-language'
 import { appHooks } from '../src/check/app-hooks'
+import { authMethods } from '../src/check/auth-methods'
 import { authRateLimits } from '../src/check/auth-rate-limits'
 import { clientKeys } from '../src/check/client-keys'
 import { cmsOptions } from '../src/check/cms-options'
@@ -56,6 +57,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-ctx-fail': refusalCalls,
   'deprecated-refuse-call': refusalCalls,
   'deprecated-auth-rate-limits': authRateLimits,
+  'deprecated-auth-methods': authMethods,
   'deprecated-job-handler': jobHandlers,
   'deprecated-schedule-call': scheduleCalls,
   'deprecated-job-options': jobOptions,

@@ -234,7 +234,7 @@ describe('the authorization request', () => {
 
     await again.post('/call/oauthServer.decide', [params(client_id), true])
 
-    expect(await again.call('oauthServer.clients')).toEqual([expect.objectContaining({ scopes: ['posts:read'] })])
+    expect(await again.call('oauthServer.listClients')).toEqual([expect.objectContaining({ scopes: ['posts:read'] })])
     expect(await again.call('oauthServer.authorize', params(client_id))).toMatchObject({ kind: 'redirect' })
     expect(await again.call('oauthServer.authorize', params(client_id, { scope: 'posts:write' }))).toMatchObject({ kind: 'consent' })
   })
@@ -331,7 +331,7 @@ describe('the token endpoint', () => {
 
     expect(second.status).toBe(200)
     expect((await get('/posts', second.body.access_token)).status).toBe(403)
-    expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ scopes: [] })])
+    expect(await ada.call('oauthServer.listClients')).toEqual([expect.objectContaining({ scopes: [] })])
   })
 
   test('refuses a wrong PKCE verifier, and the code is spent by the try', async () => {
@@ -472,24 +472,24 @@ describe('refresh tokens', () => {
   test('the last use of an approved app is its last call, not its last refresh', async () => {
     const { app, ada, client_id, first } = await signedInClient()
 
-    expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ lastUsedAt: null })])
+    expect(await ada.call('oauthServer.listClients')).toEqual([expect.objectContaining({ lastUsedAt: null })])
 
     const second = await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })
 
-    expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ lastUsedAt: null })])
+    expect(await ada.call('oauthServer.listClients')).toEqual([expect.objectContaining({ lastUsedAt: null })])
 
     await app.browser().json('/me', { headers: { authorization: `Bearer ${second.body.access_token}` } })
 
-    expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ lastUsedAt: expect.any(String) })])
+    expect(await ada.call('oauthServer.listClients')).toEqual([expect.objectContaining({ lastUsedAt: expect.any(String) })])
   })
 
   test('stop working once the user revokes the client, with its access token', async () => {
     const { app, ada, client_id, first } = await signedInClient()
 
-    expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ id: client_id, name: 'Claude Code', scopes: ['posts:read'] })])
+    expect(await ada.call('oauthServer.listClients')).toEqual([expect.objectContaining({ id: client_id, name: 'Claude Code', scopes: ['posts:read'] })])
     expect(await ada.call('oauthServer.revokeGrant', client_id)).toEqual({ ok: true })
     expect(await ada.call('oauthServer.revokeGrant', client_id)).toMatchObject({ ok: false, error: { code: 'not-found' } })
-    expect(await ada.call('oauthServer.clients')).toEqual([])
+    expect(await ada.call('oauthServer.listClients')).toEqual([])
     expect((await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })).body.error).toBe('invalid_grant')
     expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${first.body.access_token}` } })).toBe('anonymous')
     expect(await ada.call('oauthServer.authorize', params(client_id))).toMatchObject({ kind: 'consent' })

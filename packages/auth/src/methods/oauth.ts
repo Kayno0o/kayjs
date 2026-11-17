@@ -21,14 +21,24 @@ export class OAuthMethods {
   }
 
   // The providers the signed-in user has linked.
-  async identities(): Promise<string[]> {
+  async listIdentities(): Promise<string[]> {
     const record = await this.state.current()
 
     return record ? (await this.state.core.store.identities.listByUser(record.id)).map(identity => identity.provider) : []
   }
 
   // A fresh access token for the signed-in user's account at `provider`, refreshed when about to expire; null without one, or once the provider refuses a refresh.
-  async providerToken(provider: string): Promise<string | null> {
+  async getProviderToken(provider: string): Promise<string | null> {
     return (await load.flow()).providerToken(this.state, provider)
+  }
+
+  /** @deprecated Use `oauth.listIdentities`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async identities(...args: Parameters<OAuthMethods['listIdentities']>): ReturnType<OAuthMethods['listIdentities']> {
+    return this.listIdentities(...args)
+  }
+
+  /** @deprecated Use `oauth.getProviderToken`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async providerToken(...args: Parameters<OAuthMethods['getProviderToken']>): ReturnType<OAuthMethods['getProviderToken']> {
+    return this.getProviderToken(...args)
   }
 }

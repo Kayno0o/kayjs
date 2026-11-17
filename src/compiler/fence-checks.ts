@@ -745,7 +745,7 @@ export function missingCaptchas(fence: ParsedFence): Diagnostic[] {
       code: 'missing-captcha',
       message: `\`${name}\` is called with no \`captcha\`, which kayjs-auth asks of it by default`,
       note: 'with the default proof of work, a call without the token answers `{ ok: false, error: \'captcha\' }`, and a form that does not post one fails with no message',
-      help: 'add `input(type="hidden" name="captcha" data-kay-work={await auth.captchaChallenge(action)})` to the form and pass `{ captcha: input.captcha }`, or set `captcha: false` on `authCore`',
+      help: 'add `input(type="hidden" name="captcha" data-kay-work={await auth.captcha.challenge(action)})` to the form and pass `{ captcha: input.captcha }`, or set `captcha: false` on `authCore`',
     })
   })
 

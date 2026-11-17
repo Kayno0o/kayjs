@@ -73,7 +73,7 @@ async function guessingCodes(limits: LimitsOption) {
 
   await ada.call('magicLink.request', 'ada@example.com')
 
-  return async () => ada.call('magicLink.signInWithCode', '000000')
+  return async () => ada.call('email.signInWithCode', '000000')
 }
 
 // Every limiter that guards one action and is walked here: attempts up to the maximum are answered, the next one is `limited`.

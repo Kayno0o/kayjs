@@ -14,7 +14,7 @@ export default authGuard({ redirect: '/login', require: 'editor' })
 
 ### Ask for the password or passkey again
 
-`fresh: '10m'` on a guard, or on `requireUser({ fresh })`, asks that the user signed in or re-proved within that long, as before changing a password, an email or a payment method. A session signed in longer ago is refused with a 403 whose `data.code` is `'stale'`, and a bearer token, which has no session to prove with, always is. The page or the app's client then shows a proof form, calls `auth.reprove({ password })` (or `{ passkey }`, `{ code }`) and retries; `auth.provedLately('10m')` tells whether to show it first. `reprove` resets the clock for every `fresh` of the session, and a `fresh` that is no duration fails where the guard is made.
+`fresh: '10m'` on a guard, or on `requireUser({ fresh })`, asks that the user signed in or re-proved within that long, as before changing a password, an email or a payment method. A session signed in longer ago is refused with a 403 whose `data.code` is `'stale'`, and a bearer token, which has no session to prove with, always is. The page or the app's client then shows a proof form, calls `auth.proof.renew({ password })` (or `{ passkey }`, `{ code }`) and retries; `auth.proof.recent('10m')` tells whether to show it first. `reprove` resets the clock for every `fresh` of the session, and a `fresh` that is no duration fails where the guard is made.
 
 ```ts
 export default authGuard({ require: 'admin', fresh: '10m' })

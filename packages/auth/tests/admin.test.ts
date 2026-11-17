@@ -30,7 +30,7 @@ async function setup(options: Parameters<typeof testApp>[0] = {}) {
   })
 
   app.app.get('/admin-only', async ({ auth }) => {
-    await auth.requireAdmin()
+    await auth.admin.require()
 
     return 'admin'
   })
@@ -69,7 +69,7 @@ describe('admin', () => {
     expect(await ada.browser.call('admin.ban', admin.id)).toMatchObject({ ok: false, error: { code: 'forbidden' } })
     expect(await ada.browser.call('admin.deleteUser', admin.id)).toMatchObject({ ok: false, error: { code: 'forbidden' } })
     expect(await ada.browser.call('admin.impersonate', admin.id)).toMatchObject({ ok: false, error: { code: 'forbidden' } })
-    expect(await ada.browser.call('admin.auditLog')).toMatchObject({ ok: false, error: { code: 'forbidden' } })
+    expect(await ada.browser.call('admin.listAuditLog')).toMatchObject({ ok: false, error: { code: 'forbidden' } })
   })
 
   test('an admin\'s bearer token manages no one, whatever it may do elsewhere', async () => {
@@ -86,7 +86,7 @@ describe('admin', () => {
     expect(await withToken('admin.grantRole', ada.id, 'admin')).toMatchObject({ ok: false, error: { code: 'forbidden' } })
     expect(await withToken('admin.ban', ada.id)).toMatchObject({ ok: false, error: { code: 'forbidden' } })
     expect(await withToken('admin.deleteUser', ada.id)).toMatchObject({ ok: false, error: { code: 'forbidden' } })
-    expect(await withToken('admin.auditLog')).toMatchObject({ ok: false, error: { code: 'forbidden' } })
+    expect(await withToken('admin.listAuditLog')).toMatchObject({ ok: false, error: { code: 'forbidden' } })
   })
 
   test('an admin changes users only within ten minutes of signing in or re-proving, and reads them any time', async () => {
@@ -103,7 +103,7 @@ describe('admin', () => {
     expect(await admin.browser.call('admin.getUser', ada.id)).toMatchObject({ ok: true, admin: false })
     expect(await admin.browser.call('admin.getUser', admin.id)).toMatchObject({ ok: true, admin: true })
 
-    expect(await admin.browser.call('reprove', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await admin.browser.call('proof.renew', { password: PASSWORD })).toEqual({ ok: true })
     expect(await admin.browser.call('admin.ban', ada.id)).toMatchObject({ ok: true })
   })
 
@@ -304,12 +304,12 @@ describe('admin', () => {
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'invalid' } })
 
     // The entry stays, under a name that no longer leads to the user.
-    const log = await admin.browser.callOk('admin.auditLog', {})
+    const log = await admin.browser.callOk('admin.listAuditLog', {})
     const entry = log.entries.find((found: { event: string }) => found.event === 'account-deleted')
 
     expect(entry).toMatchObject({ actorId: admin.id })
     expect(entry!.userId).not.toBe(ada.id)
-    expect((await admin.browser.callOk('admin.auditLog', { userId: ada.id })).entries).toEqual([])
+    expect((await admin.browser.callOk('admin.listAuditLog', { userId: ada.id })).entries).toEqual([])
   })
 
   test('a deleted admin is no longer named in what they did to others', async () => {
@@ -336,7 +336,7 @@ describe('admin', () => {
     expect(await admin.browser.json('/me')).toMatchObject({ email: 'ada@example.com' })
     expect(await admin.browser.call('impersonator')).toMatchObject({ email: 'root@example.com' })
     expect(await ada.browser.call('impersonator')).toBeFalsy()
-    expect(await admin.browser.call('reprove', { password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'impersonating' } })
+    expect(await admin.browser.call('proof.renew', { password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'impersonating' } })
     expect(await admin.browser.call('admin.listUsers')).toMatchObject({ ok: false, error: { code: 'forbidden' } })
     expect(await ada.browser.call('sessions.list')).toHaveLength(2)
 
@@ -401,8 +401,8 @@ describe('admin', () => {
     setSystemTime(new Date(Date.now() + 1000))
     await admin.browser.call('admin.grantRole', ada.id, 'editor')
 
-    const everyone = await admin.browser.callOk('admin.auditLog')
-    const hers = await admin.browser.callOk('admin.auditLog', { userId: ada.id, limit: 1 })
+    const everyone = await admin.browser.callOk('admin.listAuditLog')
+    const hers = await admin.browser.callOk('admin.listAuditLog', { userId: ada.id, limit: 1 })
 
     expect(new Set(everyone.entries.map((entry: { userId: string }) => entry.userId))).toEqual(new Set([admin.id, ada.id]))
     expect(hers.entries).toEqual([expect.objectContaining({ event: 'role-granted', detail: 'editor', actorId: admin.id })])

@@ -25,7 +25,7 @@ export const changeEmail = action(schemas.changeEmail, async (input, ctx) => {
 })
 
 export const changeUsername = action(schemas.changeUsername, async ({ username }, ctx) => {
-  const result = await ctx.locals.auth.account.changeUsername(username)
+  const result = await ctx.locals.auth.account.updateUsername(username)
 
   if (!result.ok)
     return ctx.deny(400, { data: 'errors' in result ? { username: result.errors.username } : { error: result.error.code } })
@@ -34,7 +34,7 @@ export const changeUsername = action(schemas.changeUsername, async ({ username }
 })
 
 export const saveProfile = action(schemas.profile, async (input, ctx) => {
-  const result = await ctx.locals.auth.account.saveProfile(input)
+  const result = await ctx.locals.auth.account.updateProfile(input)
 
   if (!result.ok)
     return ctx.deny(400, { data: 'errors' in result ? { errors: result.errors } : { error: 'form' as const } })
@@ -51,7 +51,7 @@ const emailSent = changeEmail.data()
 const emailRefused = changeEmail.form.failed()?.data
 const usernameSaved = changeUsername.status() === 'ready'
 const usernameRefused = changeUsername.form.failed()?.data
-const profile = await auth.account.profile(ctx.locale)
+const profile = await auth.account.getProfile(ctx.locale)
 const profileSaved = saveProfile.status() === 'ready'
 const profileRefused = saveProfile.form.failed()?.data
 const profileProblems = profileRefused && 'errors' in profileRefused ? profileRefused.errors : {}

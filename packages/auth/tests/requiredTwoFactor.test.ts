@@ -59,9 +59,9 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
     app.app.get(path, verdict as never).post(path, verdict as never)
 
   app.app.use(new Elysia().use(app.auth.gate()).get('/gated', () => 'in').get('/gated-editor', () => 'in', { auth: 'editor' }).get('/gated/auth/account/security', () => 'in').get('/auth/two-factor', () => 'in'))
-  const adminPage = async ({ auth }: { auth: { requireAdmin: () => Promise<unknown> } }) => {
+  const adminPage = async ({ auth }: { auth: { admin: { require: () => Promise<unknown> } } }) => {
     try {
-      await auth.requireAdmin()
+      await auth.admin.require()
     }
     catch (outcome) {
       const stopped = outcome as { location?: string, status?: number }

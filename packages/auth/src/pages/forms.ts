@@ -115,11 +115,11 @@ export function refusedFor<Code extends string>(error: Code, input: Parameters<t
 }
 
 // Whether the page shows its CAPTCHA for `action`, with the proof of work's challenge, reading the client's attempts once.
-export async function captchaFor(auth: Pick<Auth, 'captchaRequired' | 'captchaChallenge'>, captcha: AuthFeatures['captcha'], action: CaptchaAction): Promise<{ shown: boolean, challenge: string | null }> {
+export async function captchaFor(auth: { captcha: Pick<Auth['captcha'], 'required' | 'challenge'> }, captcha: AuthFeatures['captcha'], action: CaptchaAction): Promise<{ shown: boolean, challenge: string | null }> {
   if (captcha !== 'proof-of-work')
-    return { shown: captcha !== null && await auth.captchaRequired(action), challenge: null }
+    return { shown: captcha !== null && await auth.captcha.required(action), challenge: null }
 
-  const challenge = await auth.captchaChallenge(action)
+  const challenge = await auth.captcha.challenge(action)
 
   return { shown: challenge !== null, challenge }
 }

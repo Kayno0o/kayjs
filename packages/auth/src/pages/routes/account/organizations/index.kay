@@ -43,7 +43,7 @@ export const reject = action(schemas.id, async ({ id }, ctx) => {
 
 const auth = ctx.locals.auth
 const features = auth.features()
-const [memberships, invitations] = await Promise.all([auth.organizations.list(), auth.organizations.myInvitations()])
+const [memberships, invitations] = await Promise.all([auth.organizations.list(), auth.organizations.listMyInvitations()])
 const refused = [create, accept, reject].map(action => action.form.failed()?.data?.error).find(error => error !== undefined)
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
 ---

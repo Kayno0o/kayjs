@@ -285,7 +285,7 @@ describe('a passkey as second factor and as proof', () => {
 
     const { options } = await ada.callOk('passkeys.proofOptions')
 
-    expect(await ada.call('reprove', { passkey: await device.get(options) })).toEqual({ ok: true })
+    expect(await ada.call('proof.renew', { passkey: await device.get(options) })).toEqual({ ok: true })
 
     const again = await ada.callOk('passkeys.proofOptions')
 
@@ -350,7 +350,7 @@ describe('a passkey as second factor and as proof', () => {
 
     const { options } = await ada.callOk('passkeys.proofOptions')
 
-    expect(await ada.call('reprove', { passkey: await device.get(options) })).toEqual({ ok: true })
+    expect(await ada.call('proof.renew', { passkey: await device.get(options) })).toEqual({ ok: true })
     expect(await ada.call('passkeys.list')).toMatchObject([{ userVerified: true }])
 
     const again = await ada.callOk('passkeys.proofOptions')
@@ -365,9 +365,9 @@ describe('a passkey as second factor and as proof', () => {
     const bob = await registered(app, 'bob@example.com')
     const id = device.credentials[0]!.id
 
-    expect(await bob.call('passkeys.rename', id, 'Mine')).toMatchObject({ ok: false, error: { code: 'not-found' } })
-    expect(await ada.call('passkeys.rename', id, ' ')).toMatchObject({ ok: false, error: { code: 'invalid-name' } })
-    expect(await ada.call('passkeys.rename', id, 'Work laptop')).toEqual({ ok: true })
+    expect(await bob.call('passkeys.update', id, 'Mine')).toMatchObject({ ok: false, error: { code: 'not-found' } })
+    expect(await ada.call('passkeys.update', id, ' ')).toMatchObject({ ok: false, error: { code: 'invalid-name' } })
+    expect(await ada.call('passkeys.update', id, 'Work laptop')).toEqual({ ok: true })
     expect(await ada.call('passkeys.list')).toMatchObject([{ name: 'Work laptop' }])
   })
 })

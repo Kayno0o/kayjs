@@ -12,9 +12,9 @@ import type { Requirement } from './types'
 import { localPath } from 'kay'
 import { durationSeconds, KayError, nameUser, overHttps, READ_METHODS, stoppers } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, forgetLocalMirrors, forgetPushDevice, rateKey, toolCall } from 'kay/server'
-import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
+
 import { bearerRequest, bearerToken } from './bearerHeader'
-import { admit, captchaChallenge, captchaRequired } from './captcha'
+import { admit } from './captcha'
 import { banned, guardPageOf, isNavigation, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked, withBack } from './core'
 import { report } from './events'
 import { failed } from './failure'
@@ -24,6 +24,7 @@ import { acceptedLocales } from './locale'
 import { AccountMethods } from './methods/account'
 import { AdminMethods } from './methods/admin'
 import { AuditMethods } from './methods/audit'
+import { CaptchaMethods } from './methods/captcha'
 import { EmailMethods } from './methods/email'
 import { MagicLinkMethods } from './methods/magicLink'
 import { OAuthMethods } from './methods/oauth'
@@ -31,11 +32,12 @@ import { OAuthServerMethods } from './methods/oauthServer'
 import { OrganizationMethods } from './methods/organizations'
 import { PasskeyMethods } from './methods/passkeys'
 import { PasswordMethods } from './methods/password'
+import { ProofMethods } from './methods/proof'
 import { SessionMethods } from './methods/sessions'
 import { TokenMethods } from './methods/tokens'
 import { TwoFactorMethods } from './methods/twoFactor'
 import { featuresOf } from './pages'
-import { completeSignIn, provedLately, reprove } from './proof'
+import { completeSignIn } from './proof'
 import { pruneWhenDue } from './prune'
 import { sendToEnrolment } from './requiredTwoFactor'
 import { roleHierarchy } from './roles'
@@ -116,6 +118,8 @@ interface Groups<Scope extends string, Role extends string, OrgRole extends stri
   account: AccountMethods
   oauth: OAuthMethods
   audit: AuditMethods
+  captcha: CaptchaMethods
+  proof: ProofMethods
 }
 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
@@ -246,7 +250,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // The signed-in user's bearer tokens.
   get tokens(): TokenMethods<Scope> {
-    return this.groups.tokens ??= new TokenMethods<Scope>(this[STATE])
+    return this.groups.tokens ??= new TokenMethods<Scope>(this[STATE], async () => this.heldScopes())
   }
 
   // The consent page MCP clients send the user to, and the apps they approved.
@@ -256,7 +260,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // Listing, banning and impersonating users and granting them roles, for the `admin` option's users.
   get admin(): AdminMethods<Role> {
-    return this.groups.admin ??= new AdminMethods<Role>(this[STATE])
+    return this.groups.admin ??= new AdminMethods<Role>(this[STATE], async () => this.adminUser() as unknown as Promise<User>)
   }
 
   // The organizations of the `organizations` option.
@@ -279,6 +283,16 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // The signed-in user's own audit log.
   get audit(): AuditMethods {
     return this.groups.audit ??= new AuditMethods(this[STATE])
+  }
+
+  // What a page needs to show the CAPTCHA the next action asks for.
+  get captcha(): CaptchaMethods {
+    return this.groups.captcha ??= new CaptchaMethods(this[STATE])
+  }
+
+  // Whether the user proved themselves lately, and proving again before a sensitive change.
+  get proof(): ProofMethods {
+    return this.groups.proof ??= new ProofMethods(this[STATE], freshMs)
   }
 
   // The signed-in user, or the owner of the request's `Authorization: Bearer` token, or null; read on first use, and again past 30 seconds on a websocket.
@@ -328,17 +342,22 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (options.require !== undefined && !(await this.core.access.authorize(user as BareUser, options.require, READ_METHODS.has(this.request.method) ? 'read' : 'write', {})))
       return deny(403)
 
-    if (!scopeAllows(await this.scopes(), options.scope))
+    if (!scopeAllows(await this.heldScopes(), options.scope))
       return deny(403)
 
-    if (options.fresh !== undefined && !(await this.provedLately(options.fresh)))
+    if (options.fresh !== undefined && !(await this.proof.recent(options.fresh)))
       return deny(403, STALE_PROOF)
 
     return options.bare ? user : { ...user, providers: await this.providersOf(record) }
   }
 
-  // The signed-in admin, as themselves, for an admin page to ask for: 404 while the `admin` option names no one (a `Denied`, which a plain Elysia app answers too), a visitor sent to sign in as `requireUser()` does, and 403 for anyone else, an admin acting as a user and a bearer token included.
+  /** @deprecated Use `admin.require()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   async requireAdmin(): Promise<User<UserData>> {
+    return this.admin.require() as Promise<User<UserData>>
+  }
+
+  // What `admin.require()` answers with.
+  private async adminUser(): Promise<User<UserData>> {
     if (!this.core.admin)
       return stoppers(this.request).deny(404)
 
@@ -481,58 +500,56 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return featuresOf(this.core)
   }
 
-  // The RFC 9728 metadata of the protected resource `name` served at `path`, which kay's MCP endpoint asks for; null while the OAuth server is off. It points MCP clients at the app's own authorization server.
+  /** @deprecated Use `oauthServer.resource()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   oauthResource(path: string, name: string): Record<string, unknown> | null {
-    if (!this.core.oauthServer || !rootUsable(this.core))
-      return null
-
-    const root = siteRoot(this.core, this.request)
-
-    return protectedResourceMetadata(this.core, root, `${root}${path}`, name)
+    return this.oauthServer.resource(path, name)
   }
 
-  // The origin the OAuth documents are served at, which kay's 401 pointer to them names; undefined while the OAuth server is off.
+  /** @deprecated Use `oauthServer.origin()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   oauthOrigin(): string | undefined {
-    return this.core.oauthServer && rootUsable(this.core) ? new URL(siteRoot(this.core, this.request)).origin : undefined
+    return this.oauthServer.origin()
   }
 
-  // Whether that origin is configured, so the documents may be cached for everyone; else it is the request's own.
+  /** @deprecated Use `oauthServer.fixed()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   oauthFixed(): boolean {
-    return rootIsFixed(this.core)
+    return this.oauthServer.fixed()
   }
 
-  // Whether this client's next `action` needs a CAPTCHA token, for the page to show the widget.
+  /** @deprecated Use `captcha.required()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   async captchaRequired(action: CaptchaAction): Promise<boolean> {
-    return captchaRequired(this[STATE], action)
+    return this.captcha.required(action)
   }
 
-  // The proof-of-work challenge for this client's next `action`, for a form field kay's script posts the solution of; null when none is needed.
+  /** @deprecated Use `captcha.challenge()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   async captchaChallenge(action: CaptchaAction): Promise<string | null> {
-    return captchaChallenge(this[STATE], action)
+    return this.captcha.challenge(action)
   }
 
-  // Whether this session signed in or re-proved its user within `fresh`, a duration such as `'5m'` (ten minutes when left out, as `exportData()` and the admin methods ask), for a page to show a form for `reprove` first. A bearer token has no session to prove with, so it never has.
+  /** @deprecated Use `proof.recent()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   async provedLately(fresh?: Duration): Promise<boolean> {
-    return provedLately(this[STATE], fresh === undefined ? undefined : freshMs(fresh))
+    return this.proof.recent(fresh)
   }
 
-  // Re-proves the signed-in user, as before an app's own sensitive change: a proof counts for ten minutes, as a sign-in does.
+  /** @deprecated Use `proof.renew()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   async reprove(proof: Proof): Promise<Result<object, ProofFailure>> {
-    const proved = await reprove(this[STATE], proof)
+    return this.proof.renew(proof)
+  }
 
-    return proved.ok ? { ok: true } : proved
+  /** @deprecated Use `tokens.scopes()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async scopes(): Promise<string[] | null> {
+    return this.heldScopes()
   }
 
   // The scopes of the bearer token this request came with; null for a session, or a token with every scope.
-  async scopes(): Promise<string[] | null> {
+  private async heldScopes(): Promise<string[] | null> {
     await this.record()
 
     return this.tokenScopes && [...this.tokenScopes]
   }
 
-  // Whether this request may reach what `scope` guards: a session may, and a token given that scope or every one.
+  /** @deprecated Use `tokens.hasScope()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   async hasScope(scope: Scope): Promise<boolean> {
-    return scopeAllows(await this.scopes(), scope)
+    return this.tokens.hasScope(scope)
   }
 
   // The ids of the users holding `role`, one of the `roles` option or a role above it in its hierarchy, banned users left out, for server code that tells them something (a notification). Needs a signed-in user, and reads the 10,000 newest users at most.

@@ -37,6 +37,7 @@ import { actionReaders } from './action-readers'
 import { actionType } from './action-type'
 import { aiLanguage } from './ai-language'
 import { appHooks } from './app-hooks'
+import { authMethods } from './auth-methods'
 import { authRateLimits } from './auth-rate-limits'
 import { clientKeys } from './client-keys'
 import { cmsOptions } from './cms-options'
@@ -235,6 +236,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => rateEnforce(root, options),
   async ({ root, options }) => refusalCalls(root, options),
   async ({ root, options }) => authRateLimits(root, options),
+  async ({ root, options }) => authMethods(root, options),
   async ({ root, options }) => envFiles(root, options),
   async ({ root, options }) => contextImport(root, options),
 ]

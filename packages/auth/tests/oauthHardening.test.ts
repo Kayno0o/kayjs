@@ -604,9 +604,9 @@ describe('the documents', () => {
       // What kay's MCP endpoint asks the auth library for its 401 pointer: no origin of its own, so it falls back to the request's.
       const unsaid = server({ url: null })
 
-      expect(await unsaid.browser().call('oauthOrigin')).toBeFalsy()
-      expect(await unsaid.browser().call('oauthResource', '/mcp', 'API')).toBeFalsy()
-      expect(await server().browser().call('oauthOrigin')).toBe('http://localhost')
+      expect(await unsaid.browser().call('oauthServer.origin')).toBeFalsy()
+      expect(await unsaid.browser().call('oauthServer.resource', '/mcp', 'API')).toBeFalsy()
+      expect(await server().browser().call('oauthServer.origin')).toBe('http://localhost')
     }
     finally {
       if (before === undefined)

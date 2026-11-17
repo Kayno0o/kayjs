@@ -29,7 +29,7 @@ export class PasskeyMethods {
   }
 
   // Renames one of the signed-in user's passkeys; refused with `not-found` for one that is not theirs and `invalid-name` for a blank name.
-  async rename(id: string, name: string): Promise<Result<object, 'signed-out' | 'not-found' | 'invalid-name'>> {
+  async update(id: string, name: string): Promise<Result<object, 'signed-out' | 'not-found' | 'invalid-name'>> {
     return (await load.passkeys()).renamePasskey(this.state, id, name)
   }
 
@@ -58,5 +58,10 @@ export class PasskeyMethods {
   // The options for re-proving with a passkey, its answer then passed as `{ passkey }` wherever a proof is asked.
   async proofOptions(): Promise<Result<{ options: PublicKeyCredentialRequestOptionsJSON }, 'signed-out' | 'none' | 'expired' | 'off'>> {
     return !this.state.core.switches.passkeys ? OFF : (await load.passkeys()).passkeyProofOptions(this.state)
+  }
+
+  /** @deprecated Use `passkeys.update`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async rename(...args: Parameters<PasskeyMethods['update']>): ReturnType<PasskeyMethods['update']> {
+    return this.update(...args)
   }
 }

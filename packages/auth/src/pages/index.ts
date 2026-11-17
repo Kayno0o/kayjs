@@ -94,7 +94,7 @@ export interface AuthFeatures {
   magicLink: boolean
   // Whether users can turn on two-step verification, `twoFactor: false` switching that off.
   twoFactor: boolean
-  // The CAPTCHA widget to show where `captchaRequired` says one is needed, `'proof-of-work'` for kay's, whose field carries `captchaChallenge`, or null without one.
+  // The CAPTCHA widget to show where `captcha.required` says one is needed, `'proof-of-work'` for kay's, whose field carries `captcha.challenge`, or null without one.
   captcha: CaptchaWidget | 'proof-of-work' | null
   // What a bearer token may be limited to; any token may do anything without them.
   scopes: string[]

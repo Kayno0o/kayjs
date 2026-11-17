@@ -34,7 +34,7 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
 
 // The proof-of-work challenge the browser is handed, which a test reading it expects to exist.
 async function challengeOf(browser: ReturnType<ReturnType<typeof testApp>['browser']>, action: CaptchaAction) {
-  const challenge = await browser.call('captchaChallenge', action)
+  const challenge = await browser.call('captcha.challenge', action)
 
   if (challenge === null)
     throw new Error(`No ${action} challenge`)
@@ -84,21 +84,21 @@ describe('a CAPTCHA', () => {
 
     await store.users.create(userRecord({ id: 'u1', email: 'bob@example.com' }))
 
-    expect(await ada.call('captchaRequired', 'sign-in')).toBe(false)
+    expect(await ada.call('captcha.required', 'sign-in')).toBe(false)
     expect(await ada.post('/password', { identifier: 'bob@example.com', password: 'wrong password' })).toMatchObject({ ok: false, error: { code: 'invalid' } })
     expect(await ada.post('/password', { identifier: 'bob@example.com', password: 'wrong password' })).toMatchObject({ ok: false, error: { code: 'invalid' } })
-    expect(await ada.call('captchaRequired', 'sign-in')).toBe(true)
+    expect(await ada.call('captcha.required', 'sign-in')).toBe(true)
     expect(await ada.post('/password', { identifier: 'bob@example.com', password: 'wrong password' })).toMatchObject({ ok: false, error: { code: 'captcha' } })
-    expect(await ada.call('captchaRequired', 'reset')).toBe(false)
+    expect(await ada.call('captcha.required', 'reset')).toBe(false)
     expect(await ada.call('password.requestReset', 'bob@example.com')).toEqual({ ok: true })
-    expect(await ada.call('captchaRequired', 'register')).toBe(true)
-    expect(await browser().call('captchaRequired', 'sign-in')).toBe(true)
+    expect(await ada.call('captcha.required', 'register')).toBe(true)
+    expect(await browser().call('captcha.required', 'sign-in')).toBe(true)
   })
 
   test('is never asked with `captcha: false`', async () => {
     const { browser } = setup()
 
-    expect(await browser().call('captchaRequired', 'register')).toBe(false)
+    expect(await browser().call('captcha.required', 'register')).toBe(false)
   })
 
   test('a check that throws refuses', async () => {
@@ -146,7 +146,7 @@ describe('the proof-of-work CAPTCHA', () => {
     const grace = browser()
 
     for (let attempt = 0; attempt < 3; attempt++) {
-      expect(await grace.call('captchaChallenge', 'sign-in')).toBeFalsy()
+      expect(await grace.call('captcha.challenge', 'sign-in')).toBeFalsy()
       expect(await grace.post('/password', { identifier: 'bob@example.com', password: 'wrong password' })).toMatchObject({ ok: false, error: { code: 'invalid' } })
     }
 
@@ -212,7 +212,7 @@ describe('the proof-of-work CAPTCHA', () => {
     expect((await setup({ captcha: undefined }).browser().call('features')).captcha).toBe('proof-of-work')
     expect((await setup({ captcha: { verify: () => true, widget: turnstileWidget('key') } }).browser().call('features')).captcha).toMatchObject({ siteKey: 'key' })
     expect((await setup().browser().call('features')).captcha).toBeNull()
-    expect(await setup({ captcha: { verify: () => true } }).browser().call('captchaChallenge', 'register')).toBeFalsy()
+    expect(await setup({ captcha: { verify: () => true } }).browser().call('captcha.challenge', 'register')).toBeFalsy()
   })
 })
 

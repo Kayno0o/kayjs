@@ -26,13 +26,13 @@ export const rename = action(schemas.organization, async ({ name, slug }, ctx) =
 })
 
 export const setRoles = action(schemas.memberRoles, async ({ userId, roles }, ctx) => {
-  const result = await ctx.locals.auth.organizations.setMemberRoles(String(ctx.params.org), userId, (roles ?? []) as never[])
+  const result = await ctx.locals.auth.organizations.updateMemberRoles(String(ctx.params.org), userId, (roles ?? []) as never[])
 
   return result.ok ? 'done' : ctx.deny(400, { data: { error: result.error.code } })
 })
 
 export const removeMember = action(schemas.member, async ({ userId }, ctx) => {
-  const result = await ctx.locals.auth.organizations.removeMember(String(ctx.params.org), userId)
+  const result = await ctx.locals.auth.organizations.deleteMember(String(ctx.params.org), userId)
 
   return result.ok ? 'done' : ctx.deny(400, { data: { error: result.error.code } })
 })
@@ -84,9 +84,9 @@ const held = new Set(found.roles.flatMap(role => settings.grants[role] ?? []))
 
 const manages = held.has(settings.manage)
 const owns = held.has(settings.owner)
-const members = await auth.organizations.members(organization.id)
+const members = await auth.organizations.listMembers(organization.id)
 const people = members.ok ? members.members : []
-const open = manages ? await auth.organizations.invitations(organization.id) : null
+const open = manages ? await auth.organizations.listInvitations(organization.id) : null
 const invitations = open?.ok ? open.invitations : []
 // A manager changes only members holding no role above theirs, and gives only roles they hold.
 const editable = (roles: string[]) => manages && roles.every(role => held.has(role))

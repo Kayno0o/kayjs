@@ -31,7 +31,7 @@ export const magicLink = action(schemas.magicLink, async (input, ctx) => {
 }, guarded)
 
 export const emailCode = action(schemas.emailCode, async ({ code }, ctx) => {
-  const result = await ctx.locals.auth.magicLink.signInWithCode(code)
+  const result = await ctx.locals.auth.email.signInWithCode(code)
 
   if (!result.ok)
     return ctx.deny(400, { data: { error: result.error.code === 'invalid' ? 'code' : result.error.code } })

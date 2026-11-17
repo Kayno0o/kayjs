@@ -67,7 +67,7 @@ describe('where a flow lands when nothing asked for another page', () => {
 
     const [mail] = await take({ kind: 'magic-link' })
 
-    expect(await ada.call('magicLink.signInWithCode', mail!.code!)).toEqual({ ok: true, redirect: HOME })
+    expect(await ada.call('email.signInWithCode', mail!.code!)).toEqual({ ok: true, redirect: HOME })
   })
 
   test('a redirect asked for wins, and without pages the fallback stays /', async () => {
@@ -150,7 +150,7 @@ describe('the lifetime of a sign-in by emailed code', () => {
 
       const [mail] = await take({ kind: 'magic-link' })
 
-      expect(await visitor.call('magicLink.signInWithCode', mail!.code!)).toMatchObject({ ok: true })
+      expect(await visitor.call('email.signInWithCode', mail!.code!)).toMatchObject({ ok: true })
 
       const [session] = await store.sessions.listByUser(`u${index}`)
 

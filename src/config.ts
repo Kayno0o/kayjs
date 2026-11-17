@@ -139,7 +139,7 @@ export interface OpsConfig {
   health?: HealthConfig | boolean | undefined
   // Serves `/_kay/metrics` in the Prometheus text format for a collector: requests by method, route and status, their durations, scheduled runs, cache reads and live connections. Read only from this machine or a private network by a request no proxy forwarded, or from anywhere with the `Authorization: Bearer` token `KAY_METRICS_TOKEN` holds; `endpoints.metrics` moves it. Off by default, and under `kay dev`.
   metrics?: boolean | MetricsConfig | undefined
-  // Serves a page of the app's queues at `/_kay/jobs` in production: each queue's waiting, running and failed jobs with payload and error, and a button to retry or delete one. It mounts only with a `guard`, a kay guard or a list of them such as `ctx => ctx.locals.auth.requireAdmin()`, which runs on every request, and without one the boot stops. `endpoints.jobs` moves it. Off by default, and under `kay dev`, whose dev tool has a Jobs tab.
+  // Serves a page of the app's queues at `/_kay/jobs` in production: each queue's waiting, running and failed jobs with payload and error, and a button to retry or delete one. It mounts only with a `guard`, a kay guard or a list of them such as `ctx => ctx.locals.auth.admin.require()`, which runs on every request, and without one the boot stops. `endpoints.jobs` moves it. Off by default, and under `kay dev`, whose dev tool has a Jobs tab.
   jobs?: JobsConfig | undefined
 }
 

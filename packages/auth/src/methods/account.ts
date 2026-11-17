@@ -16,7 +16,7 @@ export class AccountMethods {
   constructor(private readonly state: RequestState) {}
 
   // Names the signed-in user, or renames them, under the rules register checks; no proof, a name being no credential.
-  async changeUsername(username: string): Promise<Result<{ user: BareUser }, 'signed-out', { username: UsernameProblem | 'taken' | 'unchanged' }>> {
+  async updateUsername(username: string): Promise<Result<{ user: BareUser }, 'signed-out', { username: UsernameProblem | 'taken' | 'unchanged' }>> {
     return (await load.account()).changeUsername(this.state, username)
   }
 
@@ -48,7 +48,7 @@ export class AccountMethods {
   }
 
   // The fields of the profile form the account page shows beside the username, with what this user holds in each, or null when `pages.profile` is not set or the user is not signed in with a session.
-  async profile(locale?: string): Promise<ProfileFieldView[] | null> {
+  async getProfile(locale?: string): Promise<ProfileFieldView[] | null> {
     const profile = this.state.core.pages?.profile
     const record = profile && await this.state.current()
 
@@ -59,7 +59,7 @@ export class AccountMethods {
   }
 
   // Stores the values posted from that form through `pages.profile.save`, once trimmed and checked against each field's `required` and `maxLength`: names that are no field are dropped, and nothing is stored while any field is refused.
-  async saveProfile(values: Record<string, unknown>): Promise<Result<object, 'signed-out', Record<string, ProfileProblem>>> {
+  async updateProfile(values: Record<string, unknown>): Promise<Result<object, 'signed-out', Record<string, ProfileProblem>>> {
     const profile = this.state.core.pages?.profile
 
     if (!profile)
@@ -77,5 +77,20 @@ export class AccountMethods {
   // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `exportData`: for a download of their data.
   async export(): Promise<Result<{ data: DataExport }, 'signed-out' | 'limited' | 'impersonating' | 'stale'>> {
     return (await load.exports()).exportData(this.state)
+  }
+
+  /** @deprecated Use `account.updateUsername`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async changeUsername(...args: Parameters<AccountMethods['updateUsername']>): ReturnType<AccountMethods['updateUsername']> {
+    return this.updateUsername(...args)
+  }
+
+  /** @deprecated Use `account.getProfile`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async profile(...args: Parameters<AccountMethods['getProfile']>): ReturnType<AccountMethods['getProfile']> {
+    return this.getProfile(...args)
+  }
+
+  /** @deprecated Use `account.updateProfile`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
+  async saveProfile(...args: Parameters<AccountMethods['updateProfile']>): ReturnType<AccountMethods['updateProfile']> {
+    return this.updateProfile(...args)
   }
 }

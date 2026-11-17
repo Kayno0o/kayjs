@@ -450,7 +450,7 @@ export const auth = authCore({
 
 A `label` is a string, or an object by locale such as `{ en: 'Bio', fr: 'Biographie' }`. The page shows the one for its own locale.
 
-A page of your own calls `auth.account.profile(locale)` and `auth.account.saveProfile(values)`. `saveProfile` throws when `pages` has no `profile`.
+A page of your own calls `auth.account.getProfile(locale)` and `auth.account.updateProfile(values)`. `saveProfile` throws when `pages` has no `profile`.
 
 ## Switching features off
 
@@ -513,7 +513,7 @@ export const register = action(s.Object({
   return ctx.redirect('/')
 })
 
-const challenge = await ctx.locals.auth.captchaChallenge('register')
+const challenge = await ctx.locals.auth.captcha.challenge('register')
 ---
 form(action={register})
   input(name="email" type="email" autocomplete="email")
@@ -611,7 +611,7 @@ With `admin` set, the prebuilt pages also serve an admin area under their prefix
 
 A visitor is sent to sign in, anyone else gets a 403, and a site with no `admin` option gets a 404.
 
-While an admin acts as a user, the admin pages answer 403 with the banner and the way back, and every prebuilt page shows a banner with a button back to their own account. With `viewer: true`, the banner shows on every page of your app; elsewhere, put `ImpersonationBanner` from `@kayjs/auth/components/impersonation-banner.kay` in your layout. `auth.requireAdmin()` gives your own admin pages the same check.
+While an admin acts as a user, the admin pages answer 403 with the banner and the way back, and every prebuilt page shows a banner with a button back to their own account. With `viewer: true`, the banner shows on every page of your app; elsewhere, put `ImpersonationBanner` from `@kayjs/auth/components/impersonation-banner.kay` in your layout. `auth.admin.require()` gives your own admin pages the same check.
 
 ## Organizations
 

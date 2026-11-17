@@ -1,4 +1,5 @@
 import type { Lint } from './lints'
+import { AUTH_LINTS } from './deprecated-auth-lints'
 
 // The lints of the `deprecated` group, with the other lints in `LINTS`; each stays three minors from its `since`.
 export const DEPRECATED_LINTS = {
@@ -179,6 +180,7 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport SignedIn from \'@kayjs/auth/components/signed-in.kay\'\n---\nSignedIn(role="admin")\n  a(href="/admin") Admin',
     right: '---\nimport SignedIn from \'@kayjs/auth/components/signed-in.kay\'\n---\nSignedIn(require="admin")\n  a(href="/admin") Admin',
   },
+  ...AUTH_LINTS,
   'deprecated-ui-callbacks': {
     level: 'warn',
     group: 'deprecated',
