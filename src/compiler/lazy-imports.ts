@@ -349,8 +349,8 @@ export function lazyEdits(imports: readonly ImportBinding[], span: Span, lazy: R
     const specifier = JSON.stringify(found.specifier)
     const eager = `${helperName('lazy')}_${binding.local}`
 
-    // The island module says which keys it imports lazily and how to load the ones its server markup drew, once, after the last, so every key is registered by then.
-    const ready = found.declaration.start === last ? `\nawait ${helperName('ready')}(${JSON.stringify(moduleId)}, ${JSON.stringify([...lazy?.values() ?? []].map(other => other.key))})` : ''
+    // The module says which keys it imports lazily, once, after the last, so every key is registered by then.
+    const ready = found.declaration.start === last ? `\n${helperName('ready')}(${JSON.stringify(moduleId)}, ${JSON.stringify([...lazy?.values() ?? []].map(other => other.key))})` : ''
 
     return [{ ...found.declaration, text: mode === 'dom' ? `const ${binding.local} = ${helperName('lazy')}(${key}, () => import(${specifier}))${ready}` : `import ${eager} from ${specifier}\nconst ${binding.local} = ${helperName('lazyNote')}(${key}, ${eager})` }]
   })

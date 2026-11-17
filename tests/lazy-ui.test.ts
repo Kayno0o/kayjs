@@ -62,6 +62,8 @@ describe('lazy components', () => {
   it('imports a component lazily in the browser only where every use is in a branch that may not render', () => {
     expect(compiled('page', 'dom')).toContain(`const Heavy = KayLazy("${HEAVY}", () => import("./heavy.kay"))`)
     expect(compiled('page', 'dom')).toMatch(/^import Shell from/m)
+    // No top-level await: a chunk importing the module that asks for it would wait on itself, so the island loads what it drew before it hydrates.
+    expect(compiled('page', 'dom')).not.toMatch(/await\s+\w*[rR]eady\(/)
   })
 
   it('keeps a component eager that a branch inside a loop body draws, as the rows of a page mostly draw every branch', () => {
@@ -348,7 +350,7 @@ describe('warming on intent', () => {
 
       return { default: () => null }
     })
-    void ready('warm-a', ['tests/warm-a.kay'])
+    ready('warm-a', ['tests/warm-a.kay'])
     document.querySelector('slot[data-component=warm-a] button')!.dispatchEvent(new Event('pointerover', { bubbles: true }))
     await eventually(() => expect(loads).toEqual(['a']))
 
@@ -357,9 +359,27 @@ describe('warming on intent', () => {
 
       return { default: () => null }
     })
-    void ready('warm-b', ['tests/warm-b.kay'])
+    ready('warm-b', ['tests/warm-b.kay'])
     document.querySelector('slot[data-component=warm-b] button')!.dispatchEvent(new Event('pointerdown', { bubbles: true }))
     await eventually(() => expect(loads).toEqual(['a', 'b']))
+  })
+
+  it('loads the keys an island drew before it hydrates, and no other island\'s', async () => {
+    const { loadDrawn } = await import('../src/runtime/dom-lazy')
+    const loads: string[] = []
+
+    document.body.innerHTML = '<slot id="mine" data-component="mine" data-lazy="tests/mine.kay"><div data-lazy="tests/inner.kay"></div></slot><slot data-component="other" data-lazy="tests/other.kay"></slot>'
+
+    for (const name of ['mine', 'inner', 'other']) {
+      lazy(`tests/${name}.kay`, async () => {
+        loads.push(name)
+
+        return { default: () => null }
+      })
+    }
+
+    await loadDrawn(document.getElementById('mine')!)
+    expect(loads.toSorted()).toEqual(['inner', 'mine'])
   })
 
   it('waits for the part to open when the visitor saves data', async () => {
@@ -373,7 +393,7 @@ describe('warming on intent', () => {
 
       return { default: () => null }
     })
-    void ready('warm-save', ['tests/warm-save.kay'])
+    ready('warm-save', ['tests/warm-save.kay'])
     navigatorWithConnection.connection = { saveData: true }
 
     try {

@@ -450,8 +450,11 @@ function image(element: Element, src: unknown, sized: boolean, sizes?: unknown, 
 [./dom-lazy] lazy
 function lazy(key: string, load: () => Promise<{ default: unknown; }>): (props: never) => unknown
 
+[./dom-lazy] loadDrawn
+function loadDrawn(island: HTMLElement): Promise<void>
+
 [./dom-lazy] ready
-function ready(id: string, keys: readonly string[]): Promise<void>
+function ready(id: string, keys: readonly string[]): void
 
 [./dom-loop] loop
 function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => Iterable<T> | false | null | undefined, key: ((item: T, index: number) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: (() => unknown) | undefined): void

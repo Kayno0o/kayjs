@@ -229,6 +229,9 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
 
   try {
     loaded = await Promise.all([load(), staticSlots(registry, element), livePropsOf(element), reviveActionsIn(element.dataset.props)])
+
+    // What the server drew of its lazy components loads first, so the markup is claimed as it stands.
+    await (globalThis as { $kayLoadDrawn?: (island: HTMLElement) => Promise<void> }).$kayLoadDrawn?.(element)
   }
   catch (error) {
     // A chunk that failed to load is dropped like a missing one.

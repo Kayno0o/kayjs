@@ -109,7 +109,7 @@ async function warmScope(id: string): Promise<void> {
 }
 
 // A component imported as `KayLazy(key, () => import('./it.kay'))`: it draws as the component does once loaded, and before that a place the component renders into when it arrives.
-// A visitor reaching for the island loads it ahead, and one the server drew is loaded before its island's module is done (`ready`), so the markup is claimed as it stands.
+// A visitor reaching for the island loads it ahead, and one the server drew is loaded before its island hydrates (`loadDrawn`), so the markup is claimed as it stands.
 export function lazy(key: string, load: () => Promise<{ default: unknown }>): (props: never) => unknown {
   let loadable = loadables.get(key)
 
@@ -178,7 +178,6 @@ function placeholder(entry: Loadable, props: never, key: string): Range {
     // A render error goes to the nearest `catch` above the place, as an eager component's does, and is no load failure.
     try {
       runWithOwner(parent, () => unrecorded(() => swap(block, () => component(props), true)))
-      focusArrival(start)
     }
     catch (error) {
       handleError(parent, error)
@@ -186,16 +185,6 @@ function placeholder(entry: Loadable, props: never, key: string): Range {
   }))
 
   return new Range(start, end)
-}
-
-const FOCUSABLE = '[autofocus], a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
-
-// A part arriving in a dialog opened a moment ago, where the focus waits on the dialog itself, gives it to its first control, unless the visitor moved it meanwhile.
-function focusArrival(anchor: Node): void {
-  const dialog = anchor.parentElement?.closest('dialog')
-
-  if (dialog?.open && document.activeElement === dialog)
-    dialog.querySelector<HTMLElement>(FOCUSABLE)?.focus()
 }
 
 // The places waiting for their component, which a test's `settle()` waits for through `$kayLazyIdle`.
@@ -258,9 +247,9 @@ async function land(entry: Loadable, key: string, anchor: Node, gone: () => bool
     draw(component)
 }
 
-// Loads the keys the server markup of the page drew, and what their modules import in turn, so the markup is claimed as it stands. A chunk that fails to load is left: its branch draws afresh and loads again, which retries and reports.
-async function loadDrawn(): Promise<void> {
-  const asked = typeof document === 'undefined' ? [] : [...document.querySelectorAll<HTMLElement>('[data-lazy]')].flatMap(element => element.dataset.lazy!.split(' '))
+// Loads the keys the server markup of an island drew, and what their modules import in turn, so the markup is claimed as it stands. It runs before the island hydrates, not in a module's own top level: a chunk may import the module that asks for it, which then waits on itself. A chunk that fails to load is left: its branch draws afresh and loads again, which retries and reports.
+export async function loadDrawn(island: HTMLElement): Promise<void> {
+  const asked = [...island.querySelectorAll<HTMLElement>('[data-lazy]'), island].flatMap(element => element.dataset.lazy?.split(' ') ?? [])
   const tried = new Set<string>()
 
   // The modules loaded may register keys the markup drew, which load in the next round.
@@ -277,9 +266,11 @@ async function loadDrawn(): Promise<void> {
   }
 }
 
-// What a module with lazy imports awaits at its top level: it records the keys it imports lazily for the island `id`, which a visitor reaching for the island loads ahead, and the module is not done until what the server drew is loaded. A page that swaps in an island of a module already run finds its drawn keys not loaded, and the island draws afresh.
-export async function ready(id: string, keys: readonly string[]): Promise<void> {
+// Read by the island's hydration, which this module's loading precedes: a page with no lazy import never loads it.
+;(globalThis as { $kayLoadDrawn?: typeof loadDrawn }).$kayLoadDrawn = loadDrawn
+
+// What a module with lazy imports calls at its top level: it records the keys it imports lazily for the island `id`, which a visitor reaching for the island loads ahead.
+export function ready(id: string, keys: readonly string[]): void {
   scopes.set(id, new Set([...scopes.get(id) ?? [], ...keys]))
   version++
-  await loadDrawn()
 }
