@@ -378,6 +378,15 @@
     font-family: ui-monospace, monospace;
   }
 
+  /* A tool's icon, before its label in the folded line and before its name in an opened call. */
+  .kai-chat-call-icon {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-inline-end: 0.375em;
+    vertical-align: -0.125em;
+  }
+
   .kai-chat-call-status {
     margin-inline-start: 0.5rem;
   }

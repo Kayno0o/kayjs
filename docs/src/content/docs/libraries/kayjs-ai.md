@@ -122,6 +122,7 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 - A screen reader hears each finished turn once, not word by word, and each tool call as it starts and ends.
 - An empty chat says `greeting` and offers the `suggestions` you give it, a few questions that send on a click.
 - The visitor's messages are bubbles at the right; answers take the full width. The tools a reply used fold into one muted line, such as `Searched the docs x2, Read a page`, which opens to the list; an action words its own calls with `tool: { label: 'Searched the docs' }`, `toolLabels` words a tool by its name instead, `{ search_docs: 'Searched the docs' }`, and a tool without either shows its name.
+- `toolIcons` adds an icon per tool, `{ search_docs: SearchIcon }`, imported from `~icons/<prefix>/<name>` or named in your icon set, drawn before the tool's label in that line and before its name in an opened call; a tool without one keeps its plain row, and the `toolIcon` part restyles the icon.
 - Send and Stop are round icon buttons, `icons` (`send`, `stop`) replacing the arrow and the square, which are kayjs-ui icon slots (`send`, `stop`, `chat`, `expand`, `collapse`) an app restyles through `settings.icons`.
 - A table wider than the chat scrolls sideways inside it, and the keyboard can scroll it.
 - A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.

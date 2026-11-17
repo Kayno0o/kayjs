@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `s` is kay's own schema builder: lowercase builders with short options (`s.string({ min, max })`, `s.email()`, `s.int()`, `s.enum(values | record)`, `s.list()`, `s.object()`, `s.file({ maxSize: '5mb' })`), the same field options on every one (`optional`, `default`, `error`, `label`, `description`, `example`), strings and lists bounded by default, and a plain record of fields taken as the object schema by `action` and `defineEnv`; the PascalCase builders and `s.Optional` are deprecated (`deprecated-schema-builders`), `s.typebox` is gone ([Schemas](schemas.md#schemas)).
 - kay and the apps `kay new` writes lint with `@kaynooo/eslint` 8, which installs about 30 MB less as it no longer pulls in the formatters ([upgrading](upgrading.md)).
 - kayjs-ui's `infiniteList` starts over only when the first rows or what an `input` function returns change, compared by value: the same rows handed again, a new array of them too, keep the pages loaded ([LoadMore](/ui/load-more)).
+- kayjs-ai's `Chat` takes `toolIcons`, an icon per tool by its name, drawn before the tool's label in the folded line and before its name in an opened call, in the `toolIcon` part; a tool without one keeps its row ([Chat](../packages/ai/llms/chat.md))
 
 ## 1.105.0
 

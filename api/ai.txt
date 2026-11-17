@@ -910,12 +910,16 @@ component default
   details: boolean
   doneLabel: string
   failedLabel: string
+  icons?: Record<string, ChatIconValue> | undefined
   labels: Record<string, string>
   parts?: undefined | {
   root?: string | undefined;
   list?: string | undefined;
   call?: string | undefined;
   summary?: string | undefined;
+  toolIcon?: readonly unknown[] | string | undefined | {
+    root?: string | undefined;
+  };
   name?: string | undefined;
   status?: string | undefined;
   title?: string | undefined;
@@ -1051,6 +1055,7 @@ component default
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
   tone?: "accent" | "neutral" | undefined
   toolDetails?: boolean | undefined
+  toolIcons?: Record<string, ChatIconValue> | undefined
   toolLabels?: Record<string, string> | undefined
   transcribe?: Action<{ audio: File; }, Failure<unknown> | string | { text: string; }, never> | undefined
   turn?: ((turn: ChatTurnView, index: number) => Element) | undefined
@@ -1225,6 +1230,7 @@ component default
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
   tone?: "accent" | "neutral" | undefined
   toolDetails?: boolean | undefined
+  toolIcons?: Record<string, ChatIconValue> | undefined
   toolLabels?: Record<string, string> | undefined
   transcribe?: Action<{ audio: File; }, Failure<unknown> | string | { text: string; }, never> | undefined
   turn?: ((turn: ChatTurnView, index: number) => Element) | undefined

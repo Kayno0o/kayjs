@@ -156,6 +156,33 @@ describe('the chat\'s icons from kayjs-ui\'s settings.icons', () => {
   }, 60_000)
 })
 
+describe('the icon of a tool call', () => {
+  // The folded line and the rows of the calls that name the tool.
+  const calls = (tool: string) => html.slice(html.lastIndexOf('<details class="kai-chat-calls', html.indexOf(tool)), html.indexOf('</ul>', html.indexOf(tool)))
+  const drawing = (name: string) => body(name).match(PATH)![1]!
+
+  test('the folded line draws each tool\'s icon before its label, a tool without one keeping its words alone', () => {
+    const line = calls('Read the home').match(/<summary[^>]*kai-chat-calls-summary[^>]*>(.*?)<\/summary>/)![1]!
+
+    expect(line).toMatch(/^<svg[^>]*class="kui-icon kai-chat-call-icon opacity-70"[^>]*>.*?<\/svg>Read the home, <svg[^>]*kai-chat-call-icon[^>]*>.*?<\/svg>Checked the weather, plain_tool \(Running\)$/)
+    expect(line).toContain(drawing('square-x'))
+    expect(line).toContain(drawing('bell'))
+  })
+
+  test('an opened call draws it before the name, the name and the call part keeping their classes', () => {
+    const list = calls('Read the home')
+
+    expect(list).toMatch(/<li class="kai-chat-call"[^>]*><details><summary><svg[^>]*kai-chat-call-icon[^>]*>.*?<\/svg><span class="kai-chat-call-name tracking-wide"[^>]*>home_state<\/span>/)
+    expect(list).toMatch(/<span class="kai-chat-call-name tracking-wide"[^>]*>plain_tool<\/span>/)
+    expect(list.match(/kai-chat-call-icon/g)?.length).toBe(4)
+  })
+
+  test('without details a call row holds the icon before its name, and a line with no icon at all stays plain text', () => {
+    expect(html).toMatch(/<li class="kai-chat-call"[^>]*><svg[^>]*kai-chat-call-icon[^>]*>.*?<\/svg><span class="kai-chat-call-name tracking-wide"[^>]*>home_state<\/span>/)
+    expect(html).toMatch(/<summary[^>]*kai-chat-calls-summary[^>]*>search<\/summary>/)
+  })
+})
+
 describe('a static page giving the launcher a block with parameters', () => {
   test('fails to render naming the prop, as the launcher is no island of the app\'s', () => {
     expect(() => child(staticPage({}))).toThrow('cannot reach the browser')

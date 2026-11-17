@@ -2,6 +2,7 @@
 island()
 import type { Action, Failure } from 'kay'
 import type { AiMessage, Progress } from '@kayjs/ai'
+import Bell from '~icons/tabler/bell'
 import Chat from '@kayjs/ai/chat.kay'
 import Calls from '@kayjs/ai/chat-calls.kay'
 import Sources from '@kayjs/ai/chat-sources.kay'
@@ -12,6 +13,7 @@ import Panel from '@kayjs/ai/chat-panel.kay'
 const reply = (() => undefined) as unknown as Action<{ messages: AiMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>
 
 const calls = [{ id: 'a', name: 'search', status: 'done' as const, input: {}, result: 'ok' }]
+const iconCalls = [{ id: 'b', name: 'home_state', status: 'done' as const, input: {}, result: 'ok' }, { id: 'c', name: 'weather', status: 'running' as const, input: {} }, { id: 'd', name: 'plain_tool', status: 'done' as const, input: {} }]
 ---
 //- Renders the chat `src/ui.ts` restyles, for the library's restyle test.
 Chat(action={reply} initial={[{ role: 'user', content: 'Hello' }, { role: 'assistant', content: 'Hi there' }]} parts={{ log: 'max-h-96' }})
@@ -23,6 +25,8 @@ Chat(action={reply} layout="bubble" variant="plain" class="both-names")
 Chat(action={reply} label="Icons prop" icons={{ send: 'close' }})
 Launcher(action={reply} layout="plain" tone="neutral" size="lg" class="mb-2")
 Calls(calls={calls} labels={{}} details={true} runningLabel="Running" doneLabel="Done" failedLabel="Failed" argumentsLabel="Arguments" resultLabel="Result")
+Calls(calls={iconCalls} labels={{ home_state: 'Read the home', weather: 'Checked the weather' }} icons={{ home_state: 'close', weather: Bell }} details={true} runningLabel="Running" doneLabel="Done" failedLabel="Failed" argumentsLabel="Arguments" resultLabel="Result")
+Calls(calls={iconCalls} labels={{}} icons={{ home_state: 'close' }} details={false} runningLabel="Running" doneLabel="Done" failedLabel="Failed" argumentsLabel="Arguments" resultLabel="Result")
 Sources(sources={[{ n: 1, title: 'Tides', href: '/tides' }]} label="Sources" here={true})
 Panel(label="Ask" icon={() => undefined} closeIcon={() => undefined} newIcon={() => undefined} expandIcon={() => undefined} collapseIcon={() => undefined})
   p body

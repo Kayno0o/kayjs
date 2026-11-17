@@ -1,11 +1,13 @@
 ---
 import type { Snippet } from 'kay'
-import type { AiToolCall } from './types'
+import type { IconProps } from 'kay/icons'
+import type { AiToolCall, ChatIconValue } from './types'
 import { recipe } from 'kay'
+import Icon from '@kayjs/ui/icon.kay'
 
-const look = recipe({ parts: { root: 'kai-chat-calls', summary: 'kai-chat-calls-summary', list: 'kai-chat-calls-list', call: 'kai-chat-call', name: 'kai-chat-call-name', status: 'kai-chat-call-status', title: 'kai-chat-call-title', code: 'kai-chat-call-code' } })
+const look = recipe({ parts: { root: 'kai-chat-calls', summary: 'kai-chat-calls-summary', list: 'kai-chat-calls-list', call: 'kai-chat-call', name: 'kai-chat-call-name', toolIcon: 'kai-chat-call-icon', status: 'kai-chat-call-status', title: 'kai-chat-call-title', code: 'kai-chat-call-code' } })
 
-const { calls, block, pending = false, labels, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel, approvalLabel } = props<{
+const { calls, block, pending = false, labels, icons, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel, approvalLabel } = props<{
   calls: AiToolCall[]
   // The app's own drawing of one call, which replaces the folded list.
   block?: Snippet<[call: AiToolCall]> | undefined
@@ -13,6 +15,8 @@ const { calls, block, pending = false, labels, details, runningLabel, doneLabel,
   pending?: boolean
   // The phrase for a tool by its name, in the folded line.
   labels: Record<string, string>
+  // The icon for a tool by its name, drawn before its label in the folded line and before its name in an opened call: an icon of the app's set or one imported from `~icons/<prefix>/<name>`. A tool without one keeps the plain row.
+  icons?: Record<string, ChatIconValue> | undefined
   // Whether a call opens to its arguments and result.
   details: boolean
   runningLabel: string
@@ -30,8 +34,10 @@ function status(call: AiToolCall) {
   return call.approval === undefined ? statusLabels()[call.status] : approvalLabel
 }
 
-// The calls in one line, each tool once with its count: `Searched the docs x2, read_page`, ended by the status of what is not done.
-function summary() {
+const iconOf = (name: string) => icons?.[name] as IconProps | undefined
+
+// Each tool once with its count: `Searched the docs x2`, `read_page`.
+function tools() {
   const counts = new Map<string, number>()
   const labelled = new Map<string, string>()
 
@@ -42,18 +48,28 @@ function summary() {
       labelled.set(call.name, call.label)
   }
 
-  const line = [...counts].map(([name, count]) => `${labels[name] ?? labelled.get(name) ?? name}${count > 1 ? ` x${count}` : ''}`).join(', ')
+  return [...counts].map(([name, count]) => ({ name, text: `${labels[name] ?? labelled.get(name) ?? name}${count > 1 ? ` x${count}` : ''}` }))
+}
+
+// What ends the line: the status of what is not done.
+function ending() {
   const failed = calls.some(call => call.status === 'failed' && call.approval === undefined)
   const held = calls.some(call => call.approval !== undefined)
 
   if (calls.some(call => call.status === 'running'))
-    return `${line} (${statusLabels().running})`
+    return ` (${statusLabels().running})`
 
   if (failed)
-    return `${line} (${statusLabels().failed})`
+    return ` (${statusLabels().failed})`
 
-  return held ? `${line} (${approvalLabel})` : line
+  return held ? ` (${approvalLabel})` : ''
 }
+
+// The calls in one line: `Searched the docs x2, read_page (Failed)`.
+const summary = () => tools().map(tool => tool.text).join(', ') + ending()
+
+// Whether the line is drawn tool by tool, as it holds an icon.
+const iconed = () => icons !== undefined && tools().some(tool => iconOf(tool.name) !== undefined)
 ---
 if block
   div(part="root")
@@ -63,13 +79,24 @@ if block
           slot block(call)
 else
   details(part="root")
-    summary(part="summary" tabindex={pending ? -1 : undefined}) {summary()}
+    summary(part="summary" tabindex={pending ? -1 : undefined})
+      if iconed()
+        for tool, index of tools() key={tool.name}
+          | {index === 0 ? '' : ', '}
+          if iconOf(tool.name) !== undefined
+            Icon(part="toolIcon" icon={iconOf(tool.name)!})
+          | {tool.text}
+        | {ending()}
+      else
+        | {summary()}
     ul(part="list")
       for call of calls key={call.id}
         li(part="call" data-status={call.status} data-held={call.approval === undefined ? undefined : ''})
           if details
             details
               summary(tabindex={pending ? -1 : undefined})
+                if iconOf(call.name) !== undefined
+                  Icon(part="toolIcon" icon={iconOf(call.name)!})
                 span(part="name") {call.name}
                 |
                 span(part="status") {status(call)}
@@ -79,6 +106,8 @@ else
                 p(part="title") {resultLabel}
                 pre(part="code") {call.result}
           else
+            if iconOf(call.name) !== undefined
+              Icon(part="toolIcon" icon={iconOf(call.name)!})
             span(part="name") {call.name}
             |
             span(part="status") {status(call)}
