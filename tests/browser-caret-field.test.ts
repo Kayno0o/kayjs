@@ -171,7 +171,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
   }, 60_000)
 
   // The island writes the value it was given back into the field as it hydrates, as kayjs-ui's TextInput does: the kept keys survive it and are the ones searched for.
-  for (const [kind, route] of Object.entries({ 'an island': '/slow-bound', 'an island under another island': '/slow-bound-nested' })) {
+  for (const [kind, route] of Object.entries({ 'an island': '/slow-bound', 'an island under another island': '/slow-bound-nested', 'a textarea': '/slow-bound-area' })) {
     it(`keeps what was typed while the navigate was in flight over a field ${kind} writes its value to`, async () => {
       const site = await testSite({ root: 'tests/fixtures/caret-field', browser: { path } })
 

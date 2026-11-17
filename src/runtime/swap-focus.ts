@@ -4,8 +4,13 @@ import { announce } from './announce'
 import { HYDRATED, ISLAND } from './markers'
 import { hashTarget } from './navigation'
 
-// The field whose kept keys wait for its island to hydrate before the island hears them, read by the watch the swap starts next.
-let carried: HTMLElement | undefined
+const WATCH_BOUND_MS = 30_000
+
+type Island = HTMLElement & { _$k?: boolean }
+type Field = HTMLInputElement | HTMLTextAreaElement
+interface Typed { value: string, start: number | null, end: number | null, direction: 'forward' | 'backward' | 'none', replay?: boolean }
+
+const noteOf = (field: Field): Typed => ({ value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection ?? 'none' })
 
 function byName(element: Element | null): Element | null {
   const name = element?.getAttribute('name') ?? ''
@@ -58,21 +63,46 @@ function carryCaret(from: Element | null, to: HTMLElement, held: string | undefi
   if (!(from instanceof HTMLInputElement || from instanceof HTMLTextAreaElement) || !(to instanceof HTMLInputElement || to instanceof HTMLTextAreaElement))
     return
 
-  const { selectionStart, selectionEnd, selectionDirection, value } = from
+  const { value } = from
 
   // Keys typed while the page was fetched are kept, and the island is told so it asks for them next, once it has hydrated: its own write of the value it was given (kayjs-ui's TextInput) would otherwise land over them.
   const typed = held !== undefined && value !== held && value !== to.value
 
+  const island = typed ? to.closest<Island>(ISLAND) : null
+  const waits = island !== null && !island._$k
+
   if (typed) {
     to.value = value
 
-    const island = to.closest<Island>(ISLAND)
-
-    if (island && !island._$k)
-      carried = to
-    else
+    if (!waits)
       to.dispatchEvent(new InputEvent('input', { bubbles: true }))
   }
+
+  placeCaret(from, to)
+
+  if (waits)
+    replayOnHydrate(to, island)
+}
+
+// The island hears the kept keys once it has hydrated, by this field's own listener so that no path of the swap can drop them: the text is put back if hydration wrote the server's over it, and `input` fires either way. The latest text typed meanwhile is the one kept, and the bound of 30 s ends the wait for an island that never hydrates.
+function replayOnHydrate(field: Field, island: Island): void {
+  let typed = noteOf(field)
+  const heard = new AbortController()
+  const timer = setTimeout(() => heard.abort(), WATCH_BOUND_MS)
+
+  island.addEventListener('input', (event) => {
+    if (event.target === field)
+      typed = noteOf(field)
+  }, { signal: heard.signal, capture: true })
+  island.addEventListener(HYDRATED, () => {
+    clearTimeout(timer)
+    heard.abort()
+    putBack(found(field), { ...typed, replay: true })
+  }, { signal: heard.signal, once: true })
+}
+
+function placeCaret(from: Field, to: Field): void {
+  const { selectionStart, selectionEnd, selectionDirection, value } = from
 
   // A number or email field has no selection, so no caret.
   if (selectionStart === null || selectionEnd === null || to.selectionStart === null)
@@ -110,15 +140,8 @@ async function showRefusal(form: HTMLFormElement | undefined, control: number): 
   return refusal.showRefusal(form, control, announce)
 }
 
-const WATCH_BOUND_MS = 30_000
 // What ends each watch, so a newer swap leaves the ones before it restoring nothing.
 const watching = new Set<() => void>()
-
-type Island = HTMLElement & { _$k?: boolean }
-type Field = HTMLInputElement | HTMLTextAreaElement
-interface Typed { value: string, start: number | null, end: number | null, direction: 'forward' | 'backward' | 'none', replay?: boolean }
-
-const noteOf = (field: Field): Typed => ({ value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection ?? 'none' })
 
 // Hydration kept what was typed when the field already holds it, and the island heard it through the events queued for it. A number or email field has no selection, so no caret.
 function putBack(now: Element | null, typed: Typed | undefined): void {
@@ -144,16 +167,13 @@ export function watchTyped(): void {
 
   const field = document.activeElement
   const island = field?.closest<Island>(ISLAND)
-  const kept = carried
-
-  carried = undefined
 
   // A field outside an island, or in one hydrated already, nothing overwrites.
   if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) || !island || island._$k)
     return
 
   const id = field.id
-  let typed: Typed | undefined = kept === field ? { ...noteOf(field), replay: true } : undefined
+  let typed: Typed | undefined
   const note = (event: Event) => {
     if (event.target === field)
       typed = noteOf(field)

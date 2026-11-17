@@ -1,0 +1,17 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ q: s.Optional(s.String()) }) }
+
+const q = ctx.query.q ?? ''
+
+// The round trip outlasts the visitor's next keys.
+await Bun.sleep(q === '' ? 0 : 600)
+--- script
+import BoundField from '../components/bound-field.kay'
+---
+head
+  title Caret slow bound area
+h1 Caret
+p.searched {q}
+BoundField(value={q} area={true})
