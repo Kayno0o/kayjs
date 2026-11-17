@@ -400,6 +400,37 @@ describe('infiniteList following its island', () => {
     expect(list.data().map(row => row.id)).toEqual([100, 101, 102])
   })
 
+  test('the same rows handed again, as a new array too, load nothing and keep the pages', async () => {
+    const nodes = signal(bans(1, 3))
+    const repo = signal('a')
+    const calls: object[] = []
+    const action = (async (input: object) => {
+      calls.push(input)
+
+      return bans(4, 3)
+    }) as never
+    const list = infiniteList(() => nodes(), { limit: 3, key: row => row.id, action, failure: 'no', input: (() => ({ repo: repo() })) as never })
+
+    flush()
+    await list.more()
+    calls.length = 0
+
+    nodes.set([...nodes()])
+    flush()
+    nodes.set(nodes())
+    flush()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(calls).toEqual([])
+    expect(list.data().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
+
+    repo.set('b')
+    flush()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(calls).toEqual([{ repo: 'b', offset: 0, limit: 3 }])
+  })
+
   test('rows changed before the effect first ran still replace the first ones', () => {
     const given = signal(bans(1, 3))
     const list = infiniteList(() => given(), { limit: 3, load: source().load })

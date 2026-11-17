@@ -133,6 +133,25 @@ function sameRow(a: unknown, b: unknown): boolean {
   return left.length === right.length && left.every(([name, value]) => Object.is(value, (b as Record<string, unknown>)[name]))
 }
 
+// Whether two lists hold the same rows, in the same order.
+const sameRows = (a: unknown[], b: unknown[]): boolean => a === b || (a.length === b.length && a.every((row, at) => sameRow(row, b[at])))
+
+// Whether two values hold the same data, as a query key compares them: objects by their fields, arrays by their items.
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b))
+    return true
+
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null)
+    return false
+
+  if (Array.isArray(a) !== Array.isArray(b))
+    return false
+
+  const [left, right] = [Object.entries(a), Object.entries(b)]
+
+  return left.length === right.length && left.every(([name, value]) => Object.hasOwn(b, name) && sameValue(value, (b as Record<string, unknown>)[name]))
+}
+
 const filterOf = (given: Partial<ListFilter> | undefined): ListFilter => ({ text: given?.text ?? '', fields: given?.fields ?? {} })
 
 // The page loader of an action source.
@@ -370,15 +389,18 @@ export function infiniteList<Row, Target extends Action = never>(given: Row[] | 
   const follows = typeof watched === 'function' ? watched : undefined
   let current = first
   let watching = false
+  // What `input` answered at the last run, to tell a change of the query from a run caused by something else.
+  let asked: unknown
 
   if (typeof given === 'function' || follows !== undefined) {
     effect(() => {
       // Reads what the list follows, so a change to any of it runs this again.
       const next = typeof given === 'function' ? given() : first
+      let query: unknown
 
       if (follows !== undefined) {
         try {
-          follows({ offset: 0, last: undefined, sort, filter })
+          query = follows({ offset: 0, last: undefined, sort, filter })
         }
         catch {
           // A throwing input fails the page that asks for it, not the watch.
@@ -391,17 +413,17 @@ export function infiniteList<Row, Target extends Action = never>(given: Row[] | 
       watching = true
 
       untrack(() => {
-        // The first run compares with the rows the same function gave a moment before, which a fresh but equal array is not a change from.
-        if (initial && next !== current && next.length === current.length && next.every((row, at) => sameRow(row, current[at]))) {
-          current = next
-        }
-        else if (next !== current) {
-          current = next
+        // The same rows handed again, a fresh array of them too, are no change: the pages loaded stay.
+        const same = sameRows(next, current)
+        const queried = !sameValue(query, asked)
+
+        asked = query
+        current = next
+
+        if (!same)
           reset(next)
-        }
-        else if (!initial && follows !== undefined) {
+        else if (!initial && queried && follows !== undefined)
           void restart({})
-        }
       })
     })
   }

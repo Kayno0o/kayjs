@@ -32,7 +32,7 @@ The table's `sort` and the URL's `sortParam` sort reach the list too, and a sort
 
 ## Over an action
 
-A list follows what it reads, which the props a `persist` island gets from the next page change. An action source whose `input` is a function reading a signal or a prop starts over from the first page that input asks for.
+A list follows what it reads, which the props a `persist` island gets from the next page change. An action source whose `input` is a function reading a signal or a prop starts over from the first page when what that input returns changes, compared by value. The same rows handed again, a new array of them too, change nothing and keep the pages loaded.
 
 Pass the first rows as a function, `infiniteList(() => rows, ...)`, to start over from new rows when the `rows` prop changes. A plain array and an `input` that reads nothing keep the rows: give the island another `persist` value for each input.
 
