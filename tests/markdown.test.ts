@@ -214,6 +214,12 @@ describe('markdownHtml autolinks', () => {
       expect(islandMarkdown(markdown)).toBe(markdownHtml(markdown))
   })
 
+  // Bun.markdown links the closing `*` of `**url**` with the URL (oven-sh/bun#43980), which the island does not copy: when Bun fixes it this fails, and this test and the line of the docs naming the bug can go.
+  it('still differs from Bun.markdown where it links a URL with the marks of its own emphasis', () => {
+    expect<string>(markdownHtml('**https://example.com/a**')).toContain('href="https://example.com/a*"')
+    expect<string>(islandMarkdown('**https://example.com/a**')).toContain('href="https://example.com/a"')
+  })
+
   it('links what Bun.markdown links, and reads a hostile text in bounded time', () => {
     expect<string>(islandMarkdown('[[https://x.y/?a=1&b=2]]')).toContain('<a href="https://x.y/?a=1&amp;b=2"')
     expect<string>(islandMarkdown('a@b.co')).toContain('<a href="mailto:a@b.co"')

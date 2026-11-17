@@ -529,7 +529,7 @@ Text set through `innerHTML`, from `markdownHtml`, `renderMarkdown` or `sanitize
 
 A link leaving your site opens in a new tab with `rel="nofollow ugc noopener"`, the server and the island alike, unless you set `client: { links: { outside: 'same-tab' } }`.
 
-A bare URL or address in the text becomes a link on the server and in an island alike, cut at the same place: a `.`, `,` or closing bracket after it stays outside, and `[[https://example.com/?a=1&b=2]]` links the URL, not its brackets. One URL a writer closes with its emphasis, such as `**https://example.com/a**`, still differs: Bun links the closing marks too. A URL stuck to an HTML tag, a code span, an image or an escape before it is linked in an island and left as text by Bun.
+A bare URL or address in the text becomes a link on the server and in an island alike, cut at the same place: a `.`, `,` or closing bracket after it stays outside, and `[[https://example.com/?a=1&b=2]]` links the URL, not its brackets. One URL a writer closes with its emphasis, such as `**https://example.com/a**`, still differs: Bun links the closing marks too (Bun.markdown's own bug, oven-sh/bun#43980). A URL stuck to an HTML tag, a code span, an image or an escape before it is linked in an island and left as text by Bun.
 
 A fenced block keeps its language as `class="language-ts"` on its `code`, so a page can name the language over the block; `code` keeps no other class.
 
