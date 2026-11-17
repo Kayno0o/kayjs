@@ -1,0 +1,18 @@
+---
+import type { AudioChapter } from '@kayjs/ui'
+import AudioPlayer from '@kayjs/ui/audio-player.kay'
+import IconTile from '@kayjs/ui/icon-tile.kay'
+import { SILENCE } from './clip'
+
+const chapters: AudioChapter[] = [
+  { label: 'Welcome', subtitle: 'Who is here', start: 0, peaks: [0.2, 0.6, 0.9, 0.5, 0.3, 0.7] },
+  { label: 'The news', subtitle: 'What happened', start: 5, peaks: [0.4, 0.8, 1, 0.6, 0.9, 0.5, 0.3] },
+  { label: 'Goodbye', subtitle: 'See you soon', start: 10, peaks: [0.5, 0.3, 0.6, 0.2, 0.1] },
+]
+---
+.max-w-xl
+  AudioPlayer(src={SILENCE} chapters={chapters})
+    @lead
+      IconTile(icon="star" tone="accent")
+    @status(chapter)
+      | {chapter.label}

@@ -11,6 +11,11 @@ const chapters = [
   { label: 'News', start: 30, href: 'https://example.com/news' },
   { label: 'Outro', start: 90 },
 ]
+const rich = [
+  { label: 'Intro', start: 0, subtitle: 'The headlines', peaks: [0.2, 0.8, 0.5, 1] },
+  { label: 'News', start: 30, peaks: [0.5, 0.5] },
+  { label: 'Outro', start: 90 },
+]
 const cues = [
   { start: 0, end: 10, text: 'Hello.' },
   { start: 10, end: 30, text: 'Welcome.' },
@@ -21,6 +26,11 @@ const cues = [
 AudioPlayer#player(src="/episode.mp3" title="Episode" artist="Show" chapters={chapters} cues={cues} position={seconds()} onPositionChange={({ seconds: value }) => { seconds = value; onPosition(value) }} onChapterChange={({ index }) => onChapter(index)} onPlay={() => events?.push('play')} onPause={() => events?.push('pause')} onEnd={() => events?.push('ended')} onError={({ error, event }) => events?.push(`error ${error instanceof DOMException ? error.name : 'media'} ${event?.type}`)})
   @actions(chapter, index)
     button.act(type="button") {`Like ${chapter.label} ${index}`}
+AudioPlayer#rich(src="/rich.mp3" chapters={rich})
+  @lead(chapter, index)
+    span.tile {`Tile ${index}`}
+  @status(chapter)
+    | {`Now ${chapter.label}`}
 AudioPlayer#plain(src="/plain.mp3")
 button#jump(type="button" onClick={() => seconds = 45}) Jump
 button#late(type="button" onClick={() => seconds = 90}) Late

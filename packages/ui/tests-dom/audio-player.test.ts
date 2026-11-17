@@ -394,3 +394,51 @@ test('leaving the page lifts the lock screen handlers and metadata, and a player
   mounted = undefined
   expect([handlers.previoustrack, handlers.nexttrack, handlers.seekto, metadata]).toEqual([null, null, null, null])
 })
+
+test('a chapter shows its lead and subtitle, and the status in the bar follows the chapter playing', async () => {
+  mounted = await mountComponent(AudioPlayers, { onPosition: (seconds: number) => positions.push(seconds), onChapter: (index: number) => chapters.push(index) })
+  const rich = mounted.root.querySelector<HTMLElement>('#rich')!
+  const move = fake(rich.querySelector('audio')!)
+  const part = (name: string) => [...rich.querySelectorAll<HTMLElement>(`[data-part="${name}"]`)]
+
+  await settle()
+  expect(part('lead').map(lead => lead.textContent)).toEqual(['Tile 0', 'Tile 1', 'Tile 2'])
+  expect(part('subtitle').map(subtitle => subtitle.textContent)).toEqual(['The headlines'])
+  expect([part('status')[0]!.textContent, part('now')]).toEqual(['Now Intro', []])
+
+  move(40)
+  await settle()
+  expect(part('status')[0]!.textContent).toBe('Now News')
+})
+
+test('the peaks follow the time, the played ones marked, and the slider over them keeps seeking by key', async () => {
+  mounted = await mountComponent(AudioPlayers, { onPosition: (seconds: number) => positions.push(seconds), onChapter: (index: number) => chapters.push(index) })
+  const rich = mounted.root.querySelector<HTMLElement>('#rich')!
+  const audio = rich.querySelector('audio')!
+  const move = fake(audio)
+  const played = () => [...rich.querySelectorAll('[data-part="peak"]')].map(peak => peak.getAttribute('data-played') === 'true')
+  const track = rich.querySelector<HTMLInputElement>('[data-part="track"]')!
+
+  await settle()
+  expect(rich.querySelectorAll('[data-part="segment"]')).toHaveLength(3)
+  expect(played()).toEqual([false, false, false, false, false, false])
+  expect(track.hasAttribute('data-wave')).toBe(true)
+
+  // The bars' middles fall at 3.75, 11.25, 18.75 and 26.25 seconds in the first chapter and at 45 and 75 in the second.
+  move(16)
+  await settle()
+  expect(played()).toEqual([true, true, false, false, false, false])
+
+  move(80)
+  await settle()
+  expect(played()).toEqual([true, true, true, true, true, true])
+
+  move(0)
+  await settle()
+  expect(played()).toEqual([false, false, false, false, false, false])
+
+  track.value = '5'
+  track.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect([audio.currentTime, track.disabled]).toEqual([5, false])
+})

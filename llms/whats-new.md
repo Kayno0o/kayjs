@@ -17,6 +17,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `defineConfig` takes `{ env }` and `{ file }` where an option takes a secret (`mcp.token`, `metrics.token`), which 1.105.0 refused as an unknown option, and still refuses a mistyped key inside them ([MCP](mcp.md)).
 - A page's `--- server` fence reads a `persisted.cookie()` signal by calling it: the value is the request's, decoded and checked against `values` as the render does, so an app no longer reads `ctx.cookies` and decodes kay's format itself ([shared and persisted state](islands-state-to-ids.md)).
 - kayjs-ui's `starfield` scatters about 270 stars over the viewport with CSS `random()` where the browser supports it, tiles everywhere else; a custom `.starfield::before` tile list goes in `@supports not (top: random(0px, 1px))` ([starfield](/libraries/kayjs-ui)).
+- kayjs-ui's `AudioPlayer` takes `@lead(chapter, index)` before each chapter's button, a `subtitle` on a chapter, `@status(chapter, index)` for the chapter playing in the bar after the time, and `peaks` on a chapter, drawn as bars split by chapter in place of the seek groove ([AudioPlayer](/ui/audio-player#a-waveform)).
 
 ## 1.105.0
 

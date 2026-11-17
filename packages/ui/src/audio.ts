@@ -10,6 +10,10 @@ export interface AudioChapter {
   href?: string | undefined
   // Opens the page in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
   newTab?: NewTab | undefined
+  // A line under the label.
+  subtitle?: string | undefined
+  // The chapter's loudness, each from 0 to 1 and evenly spread over its length, drawn as bars in the timeline when any chapter has some.
+  peaks?: readonly number[] | undefined
 }
 
 export interface AudioCue {
@@ -61,6 +65,34 @@ export function cuesByChapter(chapters: readonly AudioChapter[], cues: readonly 
   }
 
   return groups.filter(group => group.cues.length > 0)
+}
+
+export interface WaveSegment {
+  // The chapter it draws, or -1 for the time before the first.
+  chapter: number
+  // Its length in seconds: the width it takes in the timeline.
+  seconds: number
+  // Each bar's height from 0 to 1 and the second its middle falls on.
+  bars: { height: number, time: number }[]
+}
+
+// The chapters' peaks laid on the timeline, one segment per chapter in order, none when no chapter has peaks. A chapter runs to the next one's start, the last to `length`, or, while that is unknown, as long as the others do on average.
+export function waveform(chapters: readonly AudioChapter[], length: number): WaveSegment[] {
+  if (!chapters.some(chapter => chapter.peaks && chapter.peaks.length > 0))
+    return []
+
+  const spans = chapters.slice(0, -1).map((chapter, index) => chapters[index + 1]!.start - chapter.start)
+  const last = chapters.at(-1)!
+  const average = spans.length > 0 ? spans.reduce((sum, seconds) => sum + seconds, 0) / spans.length : 1
+  const tail = length > last.start ? length - last.start : average
+  const segments = chapters.map((chapter, index) => {
+    const seconds = Math.max(spans[index] ?? tail, 0)
+    const peaks = chapter.peaks ?? []
+
+    return { chapter: index, seconds, bars: peaks.map((peak, bar) => ({ height: Math.min(Math.max(Number.isFinite(peak) ? peak : 0, 0), 1), time: chapter.start + (bar + 0.5) / peaks.length * seconds })) }
+  })
+
+  return chapters[0]!.start > 0 ? [{ chapter: -1, seconds: chapters[0]!.start, bars: [] }, ...segments] : segments
 }
 
 const SECONDS_PER_MINUTE = 60

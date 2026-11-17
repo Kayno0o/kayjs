@@ -1,0 +1,14 @@
+---
+island()
+import AudioPlayer from '@kayjs/ui/audio-player.kay'
+
+const chapters = [
+  { label: 'Intro', start: 0, subtitle: 'The headlines', peaks: [0.2, 1] },
+  { label: 'News', start: 30, peaks: [0.5] },
+]
+---
+AudioPlayer(src="/episode.mp3" chapters={chapters})
+  @lead(chapter, index)
+    span(data-tile={index}) {chapter.label[0]}
+  @status(chapter)
+    | {`Now: ${chapter.label}`}

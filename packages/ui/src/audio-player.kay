@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { AudioChapter, AudioCue } from './audio'
 import { effect, memo, onCleanup, onMount, recipe, signal } from 'kay'
-import { chapterAt, clock, cueAt, cuesByChapter, lockScreen, previousStart } from './audio'
+import { chapterAt, clock, cueAt, cuesByChapter, lockScreen, previousStart, waveform } from './audio'
 import CollapsibleSection from './collapsible-section.kay'
 import IconButton from './icon-button.kay'
 
@@ -28,16 +28,23 @@ const look = recipe({
     audio: '',
     play: '',
     time: 'text-xs tabular-nums text-muted',
-    seek: 'relative flex min-w-0 flex-1 basis-56 items-center',
-    track: `relative ${rangeTrack}`,
+    seek: 'relative flex min-w-0 flex-1 basis-56 items-center has-[[data-wave]:focus-visible]:rounded-sm has-[[data-wave]:focus-visible]:outline-2 has-[[data-wave]:focus-visible]:outline-offset-2 has-[[data-wave]:focus-visible]:outline-accent',
+    track: `relative ${rangeTrack} data-wave:h-10 data-wave:opacity-0 data-wave:[&::-webkit-slider-thumb]:w-px data-wave:[&::-moz-range-thumb]:w-px`,
+    wave: 'pointer-events-none absolute inset-0 flex items-center gap-1',
+    segment: 'flex h-full min-w-0 items-center gap-px',
+    peak: 'min-h-0.5 flex-1 rounded-full bg-muted/40 data-[played=true]:bg-accent',
     marks: 'pointer-events-none absolute inset-0 m-0 list-none p-0',
     mark: 'absolute top-1/2 -ms-px h-3 w-0.5 -translate-y-1/2 bg-muted',
+    status: 'min-w-0 text-sm text-foreground',
     now: 'm-0 text-sm text-foreground',
     chapters: 'm-0 flex list-none flex-col gap-1 p-0 text-sm',
     chapter: 'flex items-center gap-2',
+    lead: 'flex shrink-0 items-center',
     jump: 'flex min-w-0 flex-1 cursor-pointer items-baseline gap-3 rounded-md px-2 py-1.5 text-start text-muted hover:bg-surface-strong hover:text-foreground aria-[current=true]:bg-accent/15 aria-[current=true]:text-foreground',
     start: 'min-w-16 shrink-0 text-xs tabular-nums',
+    text: 'flex min-w-0 flex-col',
     title: 'min-w-0',
+    subtitle: 'min-w-0 text-xs text-muted',
     actions: 'flex shrink-0 items-center gap-1',
     transcript: 'relative flex max-h-96 flex-col gap-3 overflow-y-auto text-sm',
     group: 'flex flex-col gap-1',
@@ -47,7 +54,7 @@ const look = recipe({
   },
 })
 
-const { src, title, artist, artwork, chapters = [], cues = [], position, onPositionChange, onChapterChange, onPlay, onPause, onEnd, onError, preload = 'metadata', actions, playLabel = wording('ui.audioPlayer.play', 'Play'), pauseLabel = wording('ui.audioPlayer.pause', 'Pause'), previousLabel = wording('ui.audioPlayer.previous', 'Previous chapter'), nextLabel = wording('ui.audioPlayer.next', 'Next chapter'), seekLabel = wording('ui.audioPlayer.seek', 'Position'), chaptersLabel = wording('ui.audioPlayer.chapters', 'Chapters'), transcriptLabel = wording('ui.audioPlayer.transcript', 'Transcript'), linkLabel = wording('ui.audioPlayer.link', 'Open {title}'), failureLabel = wording('ui.audioPlayer.failure', 'Could not play the audio.'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onPlay' | 'onPause' | 'onEnded' | 'onError'> & {
+const { src, title, artist, artwork, chapters = [], cues = [], position, onPositionChange, onChapterChange, onPlay, onPause, onEnd, onError, preload = 'metadata', actions, lead, status, playLabel = wording('ui.audioPlayer.play', 'Play'), pauseLabel = wording('ui.audioPlayer.pause', 'Pause'), previousLabel = wording('ui.audioPlayer.previous', 'Previous chapter'), nextLabel = wording('ui.audioPlayer.next', 'Next chapter'), seekLabel = wording('ui.audioPlayer.seek', 'Position'), chaptersLabel = wording('ui.audioPlayer.chapters', 'Chapters'), transcriptLabel = wording('ui.audioPlayer.transcript', 'Transcript'), linkLabel = wording('ui.audioPlayer.link', 'Open {title}'), failureLabel = wording('ui.audioPlayer.failure', 'Could not play the audio.'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onPlay' | 'onPause' | 'onEnded' | 'onError'> & {
   // The audio file or stream.
   src: string
   // Names the audio on the lock screen, with the chapter playing as the song when there are chapters.
@@ -77,6 +84,10 @@ const { src, title, artist, artwork, chapters = [], cues = [], position, onPosit
   preload?: 'none' | 'metadata' | 'auto' | undefined
   // Fills a chapter's row after its link: `@actions(chapter, index)`.
   actions?: Snippet<[chapter: AudioChapter, index: number]> | undefined
+  // Fills the start of a chapter's row, before its button: `@lead(chapter, index)`, such as a tile or an icon.
+  lead?: Snippet<[chapter: AudioChapter, index: number]> | undefined
+  // Fills the bar after the time with the chapter playing, `@status(chapter, index)`, and takes the place of the line under the bar that names it.
+  status?: Snippet<[chapter: AudioChapter, index: number]> | undefined
   playLabel?: string | undefined
   pauseLabel?: string | undefined
   previousLabel?: string | undefined
@@ -115,6 +126,7 @@ const token = {}
 
 // Where the thumb's centre sits for a position: its travel is inset by half its 1rem width on each side, and the start flips in RTL.
 const placed = (seconds: number) => `inset-inline-start: calc(0.5rem + (100% - 1rem) * ${seconds / length()})`
+const waves = memo(() => waveform(chapters, length()))
 const marked = () => length() > 0 ? chapters.map((chapter, index) => ({ chapter, index })).filter(({ chapter }) => chapter.start > 0 && chapter.start < length()) : []
 
 function finished() {
@@ -355,22 +367,38 @@ div(part="root" {...rest})
     if chapters.length > 1
       IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" disabled={current() >= chapters.length - 1} onClick={next})
     span(part="time") {clock(at())} / {clock(length())}
+    if status && chapters[current()]
+      span(part="status")
+        | {status(chapters[current()]!, current())}
     div(part="seek")
+      // The peaks stand in for the marks, as each chapter has a stretch of its own, and the slider above them is invisible.
+      if waves().length > 0
+        div(part="wave" aria-hidden="true")
+          for segment of waves() key={segment.chapter}
+            div(part="segment" style={`flex: ${segment.seconds} 1 0`})
+              for bar, index of segment.bars key={index}
+                span(part="peak" style={`height: ${bar.height * 100}%`} data-played={bar.time <= at() ? 'true' : undefined})
       // Before the slider, so its thumb paints over the marks.
-      if marked().length > 0
+      if waves().length === 0 && marked().length > 0
         ol(part="marks" aria-hidden="true")
           for entry of marked() key={entry.index}
             li(part="mark" style={placed(entry.chapter.start)})
-      input(part="track" style={rangeFill(at(), 0, length())} type="range" min="0" max={length()} step="1" value={at()} disabled={length() === 0} aria-label={seekLabel} aria-valuetext={`${clock(at())} / ${clock(length())}`} onInput={scrub})
-  if chapters[current()]
+      input(part="track" data-wave={waves().length > 0 ? '' : undefined} style={rangeFill(at(), 0, length())} type="range" min="0" max={length()} step="1" value={at()} disabled={length() === 0} aria-label={seekLabel} aria-valuetext={`${clock(at())} / ${clock(length())}`} onInput={scrub})
+  if chapters[current()] && !status
     p(part="now") {chapters[current()]!.label}
   if chapters.length > 0
     ol(part="chapters" aria-label={chaptersLabel})
       for chapter, index of chapters key={index}
         li(part="chapter")
+          if lead
+            span(part="lead")
+              | {lead(chapter, index)}
           button(part="jump" type="button" aria-current={index === current() ? 'true' : undefined} onClick={() => void seek(chapter.start, true)})
             span(part="start") {clock(chapter.start)}
-            span(part="title") {chapter.label}
+            span(part="text")
+              span(part="title") {chapter.label}
+              if chapter.subtitle
+                span(part="subtitle") {chapter.subtitle}
           if chapter.href then href
             IconButton(href={href} {...tabOf(href, chapter.newTab)} icon="external" label={linkLabel.replaceAll('{title}', chapter.label)} variant="ghost" size="sm")
           if actions

@@ -548,6 +548,18 @@ describe('content', () => {
     expect((await find('/content', '#audio [data-part="cue"]')).map(found => found.text)).toEqual(['Hello.'])
   })
 
+  test('AudioPlayer draws a chapter\'s lead and subtitle, its status in the bar and the peaks as bars split by chapter in place of the marks', async () => {
+    expect((await find('/content', '#audio-rich [data-part="chapter"] > [data-part="lead"]')).map(found => found.text)).toEqual(['I', 'N'])
+    expect((await find('/content', '#audio-rich [data-part="jump"] [data-part="subtitle"]')).map(found => found.text)).toEqual(['The headlines'])
+    expect((await find('/content', '#audio-rich [data-part="bar"] > [data-part="status"]')).map(found => found.text)).toEqual(['Now: Intro'])
+    expect(await find('/content', '#audio-rich [data-part="now"]')).toEqual([])
+    expect(await find('/content', '#audio-rich [data-part="mark"]')).toEqual([])
+    expect(await attributes('/content', '#audio-rich [data-part="segment"]', ['style'])).toEqual([{ style: 'flex: 30 1 0' }, { style: 'flex: 30 1 0' }])
+    expect(await attributes('/content', '#audio-rich [data-part="peak"]', ['style', 'data-played'])).toEqual([{ 'style': 'height: 20%', 'data-played': null }, { 'style': 'height: 100%', 'data-played': null }, { 'style': 'height: 50%', 'data-played': null }])
+    expect(await attributes('/content', '#audio-rich [data-part="track"]', ['data-wave'])).toEqual([{ 'data-wave': '' }])
+    expect(await find('/content', '#audio [data-part="wave"], #audio [data-part="lead"], #audio [data-part="subtitle"], #audio [data-part="status"]')).toEqual([])
+  })
+
   test('Carousel draws no controls for a single slide', async () => {
     expect(await attributes('/content', '#lone-slide [aria-label]', ['aria-label'])).toContainEqual({ 'aria-label': 'Slide 1 of 1' })
     expect(await find('/content', '#lone-slide [data-part="controls"]')).toEqual([])

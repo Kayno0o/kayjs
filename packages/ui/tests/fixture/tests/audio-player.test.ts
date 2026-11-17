@@ -124,6 +124,43 @@ inBrowser('AudioPlayer in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('the peaks fill the bar, played ones in the accent, and the invisible slider over them still answers the keys', async () => {
+    await using page = await open()
+
+    await page.waitUntil(() => document.querySelector<HTMLInputElement>('#peaks [data-part=track]')?.max === '30')
+
+    const bars = () => page.evaluate(() => {
+      const seek = document.querySelector('#peaks [data-part=seek]')!.getBoundingClientRect()
+      const track = document.querySelector('#peaks [data-part=track]')!
+      const peaks = [...document.querySelectorAll<HTMLElement>('#peaks [data-part=peak]')]
+      const accent = getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim()
+
+      return {
+        count: peaks.length,
+        played: peaks.filter(peak => peak.getAttribute('data-played') === 'true').length,
+        within: peaks.every((peak) => {
+          const box = peak.getBoundingClientRect()
+
+          return box.left >= seek.left - 1 && box.right <= seek.right + 1 && box.height > 0
+        }),
+        slider: getComputedStyle(track).opacity,
+        accentShown: accent !== '' && getComputedStyle(peaks.find(peak => peak.getAttribute('data-played') === 'true') ?? peaks[0]!).backgroundColor !== getComputedStyle(peaks.at(-1)!).backgroundColor,
+      }
+    })
+
+    expect(await bars()).toEqual({ count: 15, played: 0, within: true, slider: '0', accentShown: false })
+
+    await page.evaluate(() => document.querySelector<HTMLElement>('#peaks [data-part=track]')!.focus())
+
+    for (let step = 0; step < 12; step++)
+      await page.press('ArrowRight')
+
+    expect(await page.value('#peaks [data-part=track]')).toBe('12')
+    expect(await page.evaluate(() => document.querySelector<HTMLAudioElement>('#peaks audio')!.currentTime)).toBe(12)
+    expect(await bars()).toMatchObject({ played: 6, accentShown: true })
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   for (const dir of ['ltr', 'rtl'] as const) {
     test(`the cue arrows follow the reading direction, ${dir}`, async () => {
       await using page = await open(dir === 'rtl' ? dir : undefined)

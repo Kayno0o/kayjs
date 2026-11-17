@@ -12,6 +12,11 @@ const long = [
   { label: 'Start', start: 0 },
   { label: 'Late', start: 36_003_661 },
 ]
+const peaked = [
+  { label: 'Intro', start: 0, peaks: [0.3, 0.9, 0.6, 0.4, 0.8] },
+  { label: 'News', start: 10, peaks: [0.5, 1, 0.2, 0.7, 0.6] },
+  { label: 'Outro', start: 20, peaks: [0.4, 0.4, 0.9, 0.3, 0.5] },
+]
 const cues = [
   { start: 0, end: 10, text: 'Hello.' },
   { start: 10, end: 20, text: 'The news.' },
@@ -20,4 +25,5 @@ const cues = [
 ---
 main
   AudioPlayer#player(src="/episode.wav" title="Episode" chapters={chapters} cues={cues})
+  AudioPlayer#peaks(src="/episode.wav" chapters={peaked})
   AudioPlayer#long(src="/none.wav" chapters={long})

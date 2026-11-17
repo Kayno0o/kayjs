@@ -31,7 +31,9 @@ interface AudioChapter
   href?: string | undefined
   label: string
   newTab?: NewTab | undefined
+  peaks?: readonly number[] | undefined
   start: number
+  subtitle?: string | undefined
 
 [.] AudioCue
 interface AudioCue
@@ -857,6 +859,7 @@ component default
 }
   cues?: readonly AudioCue[] | undefined
   failureLabel?: string | undefined
+  lead?: ((chapter: AudioChapter, index: number) => Element) | undefined
   linkLabel?: string | undefined
   nextLabel?: string | undefined
   onChapterChange?: ((event: { index: number; }) => unknown) | undefined
@@ -880,16 +883,23 @@ component default
     };
   };
   time?: string | undefined;
+  status?: string | undefined;
   seek?: string | undefined;
+  wave?: string | undefined;
+  segment?: string | undefined;
+  peak?: string | undefined;
   marks?: string | undefined;
   mark?: string | undefined;
   track?: string | undefined;
   now?: string | undefined;
   chapters?: string | undefined;
   chapter?: string | undefined;
+  lead?: string | undefined;
   jump?: string | undefined;
   start?: string | undefined;
+  text?: string | undefined;
   title?: string | undefined;
+  subtitle?: string | undefined;
   actions?: string | undefined;
   transcript?: string | undefined;
   group?: string | undefined;
@@ -904,6 +914,7 @@ component default
   previousLabel?: string | undefined
   seekLabel?: string | undefined
   src: string
+  status?: ((chapter: AudioChapter, index: number) => Element) | undefined
   title?: string | undefined
   transcriptLabel?: string | undefined
 

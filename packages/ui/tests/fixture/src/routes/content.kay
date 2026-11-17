@@ -1,5 +1,6 @@
 ---
 import AudioPlayer from '@kayjs/ui/audio-player.kay'
+import AudioRich from '../components/audio-rich.kay'
 import Avatar from '@kayjs/ui/avatar.kay'
 import AvatarGroup from '@kayjs/ui/avatar-group.kay'
 import Badge from '@kayjs/ui/badge.kay'
@@ -61,5 +62,7 @@ main
     Carousel(items={[{ src: '/a.png', alt: 'Le jardin' }, { src: '/b.png', alt: 'La maison' }]} index={1} ratio="4 / 3" label="Galerie photos" slideLabel="{n} sur {count}" dotLabel="Aller à l'image {n}")
   article#audio
     AudioPlayer(src="/episode.mp3" title="Episode" chapters={[{ label: 'Intro', start: 0 }, { label: 'News', start: 30, href: '/news' }]} cues={[{ start: 0, end: 10, text: 'Hello.' }]} playLabel="Lire" chaptersLabel="Chapitres" transcriptLabel="Transcription")
+  article#audio-rich
+    AudioRich
   article#lone-slide
     Carousel(items={[{ src: '/a.png', alt: 'Le jardin' }]})

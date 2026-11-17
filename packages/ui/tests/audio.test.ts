@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { chapterAt, clock, cueAt, cuesByChapter, previousStart } from '../src/audio'
+import { chapterAt, clock, cueAt, cuesByChapter, previousStart, waveform } from '../src/audio'
 
 const chapters = [{ label: 'A', start: 0 }, { label: 'B', start: 30 }, { label: 'C', start: 90 }]
 const cues = [{ start: 0, end: 10, text: 'one' }, { start: 10, end: 30, text: 'two' }, { start: 30, end: 60, text: 'three' }, { start: 95, end: 100, text: 'four' }]
@@ -27,4 +27,13 @@ test('cues group under the chapter they start in, keeping each one its index, an
 
 test('the clock reads minutes and seconds, and hours from the hour', () => {
   expect([clock(0), clock(59.9), clock(61), clock(3599), clock(3600), clock(3725), clock(Number.NaN), clock(Infinity), clock(-4)]).toEqual(['0:00', '0:59', '1:01', '59:59', '1:00:00', '1:02:05', '0:00', '0:00', '0:00'])
+})
+
+test('the peaks of each chapter spread over its stretch, the last one running to the length or, until it is known, as long as the others', () => {
+  const peaked = [{ label: 'A', start: 10, peaks: [0.5, 2] }, { label: 'B', start: 30, peaks: [-1, Number.NaN] }, { label: 'C', start: 70 }]
+
+  expect(waveform(peaked, 100).map(segment => [segment.chapter, segment.seconds, segment.bars.map(bar => [bar.height, bar.time])])).toEqual([[-1, 10, []], [0, 20, [[0.5, 15], [1, 25]]], [1, 40, [[0, 40], [0, 60]]], [2, 30, []]])
+  expect(waveform(peaked, 0).at(-1)!.seconds).toBe(30)
+  expect(waveform(chapters, 120)).toEqual([])
+  expect(waveform([], 120)).toEqual([])
 })

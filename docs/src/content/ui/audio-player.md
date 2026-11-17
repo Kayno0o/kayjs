@@ -26,6 +26,18 @@ Once the audio has played, the lock screen and the headset buttons show the chap
 
 <Demo name="audio-player/actions" />
 
+## A tile, a subtitle and the chapter in the bar
+
+`@lead(chapter, index)` fills the start of each chapter's row, before its button: a tile, an icon or a cover. A chapter's `subtitle` is drawn under its label. `@status(chapter, index)` puts the chapter playing in the bar, after the time, and takes the place of the line under the bar that names it.
+
+## A waveform
+
+`peaks` on a chapter are its loudness, each from 0 to 1 and evenly spread over the chapter's length. When any chapter has some, the timeline draws them as bars, one stretch per chapter as wide as the chapter is long, in place of the groove and its marks. The bars already played are in the accent and the rest are muted. A chapter with none leaves its stretch empty.
+
+The slider is still there, invisible over the bars, so a click or a drag seeks and the arrows, Home, End and Page keys work as before; its focus is drawn around the bars.
+
+<Demo name="audio-player/waveform" />
+
 ## Reading the position
 
 `onPositionChange` gets the seconds played, and `onChapterChange` the index of the chapter now playing, or -1 before the first. `position` goes the other way: a player whose parent passes a position more than a second away from its own seeks to it, so `position={at()} onPositionChange={({ seconds }) => at = seconds}` keeps both in step. A position the player reported in the last second is taken as an echo and never seeks. One that comes back later is behind the audio and seeks it backwards.
