@@ -1,2 +1,0 @@
-kay [./server] s
-kay [.] s
