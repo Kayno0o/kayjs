@@ -5,7 +5,7 @@ import TreeView from '@kayjs/ui/tree-view.kay'
 
 const nodes: TreeNode[] = [
   { key: 'work', label: 'Work', children: [{ key: 'specs', label: 'Specs' }, { key: 'notes', label: 'Notes' }] },
-  { key: 'inbox', label: 'Inbox' },
+  { key: 'inbox', label: 'Inbox', href: '/inbox' },
 ]
 ---
 TreeView#tree(nodes={nodes} label="Folders" trailingShown)

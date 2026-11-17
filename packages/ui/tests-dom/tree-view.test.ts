@@ -220,3 +220,11 @@ test('a @row block draws the row while the arrows, the chevron and the trailing 
 
   expect(document.activeElement?.querySelector('.name')?.textContent).toBe('Inbox')
 })
+
+test('a @row block inside a link row sits in the anchor, which stays out of the tab order', async () => {
+  mounted = await mountComponent(TreeRow, {})
+
+  const link = mounted.root.querySelector<HTMLElement>('#tree a.kui-tree-view-link')!
+
+  expect([link.getAttribute('href'), link.querySelector('.name')?.textContent, link.tabIndex]).toEqual(['/inbox', 'Inbox', -1])
+})
