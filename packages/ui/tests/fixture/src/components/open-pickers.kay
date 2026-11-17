@@ -46,7 +46,12 @@ button#pin(onClick={() => pinned = !pinned()}) Pin
 HoverCard#tcard(open={pinned()} openDelay={300} closeDelay={50} placement="right-end" onOpenChange={({ open: shown }) => calls.push(`tcard ${shown}`)})
   @trigger(attributes)
     button#thover({...attributes}) Hover me
+    button#thover2({...attributes}) Hover me too
   | Trigger detail
+HoverCard#zcard(closeDelay={0} onOpenChange={({ open: shown }) => calls.push(`zcard ${shown}`)})
+  @trigger(attributes)
+    button#zhover({...attributes}) Quick
+  | Quick detail
 Menu(id="menu" label="Actions" icon="plus" items={[{ label: 'One' }]} data-testid="menu" style="color: blue")
 ConfirmDelete(message="Sure?" failureLabel="No" onConfirm={() => undefined} data-testid="confirm")
 Toaster(data-testid="toaster")

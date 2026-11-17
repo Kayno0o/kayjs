@@ -150,6 +150,43 @@ test('a HoverCard with a trigger shows after openDelay, hides after closeDelay, 
   expect(calls).toEqual(['tcard true', 'tcard false', 'tcard true', 'tcard false'])
 })
 
+test('open shows the card beside the trigger last used, among several', async () => {
+  const { root } = await picker()
+  const card = root.querySelector<HTMLElement>('#tcard')!
+  const second = root.querySelector<HTMLElement>('#thover2')!
+
+  second.dispatchEvent(new Event('focus'))
+  await clock.elapse(10)
+  second.dispatchEvent(new Event('blur'))
+  await clock.elapse(100)
+
+  expect(card.matches(':popover-open')).toBe(false)
+
+  click(root.querySelector('#pin'))
+  await clock.elapse(10)
+
+  expect(card.matches(':popover-open')).toBe(true)
+  expect(second.getAttribute('aria-describedby')).toBe('tcard')
+  expect(root.querySelector('#thover')!.hasAttribute('aria-describedby')).toBe(false)
+})
+
+test('closeDelay of 0 closes the card as the pointer leaves, with no timer', async () => {
+  const { root, calls } = await picker()
+  const card = root.querySelector<HTMLElement>('#zcard')!
+  const trigger = root.querySelector<HTMLElement>('#zhover')!
+
+  trigger.dispatchEvent(new Event('focus'))
+  await clock.elapse(10)
+
+  expect(card.matches(':popover-open')).toBe(true)
+
+  trigger.dispatchEvent(new Event('blur'))
+  await clock.flush()
+
+  expect(card.matches(':popover-open')).toBe(false)
+  expect(calls).toEqual(['zcard true', 'zcard false'])
+})
+
 test('Menu, AppSwitcher, ConfirmDelete and Toaster spread their attributes on the trigger or root', async () => {
   const { root } = await picker()
 

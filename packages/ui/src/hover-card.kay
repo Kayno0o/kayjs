@@ -48,11 +48,14 @@ let leaving: ReturnType<typeof setTimeout> | undefined
 // The element a `trigger` was entered or focused on, and the wait before the pointer shows the card.
 const hot = signal<Element | null>(null)
 let waking: ReturnType<typeof setTimeout> | undefined
+// The last trigger element entered or focused, which `open` shows the card beside when the `trigger` block drew several.
+let last: Element | undefined
 // Where the stand-in was last put, so a frame with nothing moved writes nothing.
 let placed = ''
 
 function wake(target: Element, delay: number) {
   clearTimeout(waking)
+  last = target
 
   if (hot() === target)
     return
@@ -166,7 +169,10 @@ function closeSoon() {
   if (hovered)
     return
 
-  leaving = setTimeout(close, closeDelay)
+  if (closeDelay <= 0)
+    close()
+  else
+    leaving = setTimeout(close, closeDelay)
 }
 
 function close() {
@@ -214,8 +220,16 @@ effect(() => {
   }
 })
 
+// The trigger the last hover or focus used, else the first one drawn.
+function opened(): Element | undefined {
+  if (last?.isConnected)
+    return last
+
+  return (panel?.getRootNode() as ParentNode | undefined)?.querySelector(`[data-hover-card="${panelId}"]`) ?? undefined
+}
+
 effect(() => {
-  const target = anchor ?? hot() ?? (open ? (panel?.getRootNode() as ParentNode | undefined)?.querySelector(`[data-hover-card="${panelId}"]`) ?? undefined : undefined)
+  const target = anchor ?? hot() ?? (open ? opened() : undefined)
 
   clearTimeout(leaving)
 
