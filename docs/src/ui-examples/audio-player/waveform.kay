@@ -13,7 +13,7 @@ const chapters: AudioChapter[] = [
 ---
 .max-w-xl
   AudioPlayer(src={SILENCE} chapters={chapters})
-    @lead(chapter)
+    @lead(_chapter)
       IconTile(icon="star" tone="accent")
     @status(chapter)
       | {chapter.label}
