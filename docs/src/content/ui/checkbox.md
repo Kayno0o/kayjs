@@ -29,3 +29,7 @@ Inside a form posting to an action, a box with no `onChange` starts from what a 
 ## Required
 
 `required` is the native attribute: the form cannot be submitted until the box is ticked, with or without JavaScript. A [FormField](/ui/form-field) with `required` around a single checkbox sets it too.
+
+## Inner elements
+
+`id`, `title` and `data-*` land on the root, as on every component; `inputProps` takes the input's other attributes, `inputProps={{ id: 'field', autocomplete: 'off' }}`. `name`, `disabled`, `required`, `value`, `aria-*`, `ref` and the event handlers still reach the input.

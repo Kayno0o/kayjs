@@ -31,3 +31,7 @@ Opening the panel focuses the current tile. The arrow keys move between tiles, t
 ## Opened by the app
 
 `open` shows the panel when your code sets it, and `onOpenChange({ open })` is called whenever it shows or hides. When you drive `open`, set your own value back in `onOpenChange`. Other attributes, such as a `data-testid`, an `aria-describedby` or a `style`, go on the default icon button.
+
+## Inner elements
+
+`panelProps` takes attributes for the floating panel, typed as its element's, such as `data-*`, `aria-*` and event handlers; an app handler runs before the component's own for the same event, and the panel's id, role and popover state stay the component's. `...rest` stays on the root.

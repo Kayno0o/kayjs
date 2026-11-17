@@ -23,3 +23,7 @@ Return a promise from `onChange` to hold the switch busy until it settles. If it
 ## Required
 
 `required` is the native attribute: the form cannot be submitted until the switch is on, with or without JavaScript.
+
+## Inner elements
+
+`id`, `title` and `data-*` land on the root, as on every component; `inputProps` takes the input's other attributes, `inputProps={{ id: 'field', autocomplete: 'off' }}`. `name`, `disabled`, `required`, `value`, `aria-*`, `ref` and the event handlers still reach the input.

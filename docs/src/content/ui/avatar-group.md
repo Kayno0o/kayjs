@@ -19,3 +19,7 @@ description: A row of overlapping avatars with a +N chip for the people past a l
 ## Your own markup
 
 `@avatar(person)` replaces the avatar drawn for a person, in the stack and in the list, and `@rest(people)` replaces the popover's list. `open` and `onOpenChange` drive the popover, `placement` sets its side.
+
+## Inner elements
+
+`panelProps` takes attributes for the floating panel, typed as its element's, such as `data-*`, `aria-*` and event handlers; an app handler runs before the component's own for the same event, and the panel's id, role and popover state stay the component's. `triggerProps` does the same for the button that opens it, and `variant`, `size` and `label` there are yours to change. `...rest` stays on the root.

@@ -23,3 +23,7 @@ Return a promise from `onChange` to hold the input busy until it settles, for a 
 `label` always names the control for screen readers, and `showLabel` chooses whether it is also written as text: on by default here, so `showLabel={false}` keeps it for screen readers alone. Every control with a `label` takes `showLabel`, as on [Segmented](/ui/segmented#label).
 
 `id`, `disabled` and the other input attributes go on the input. A `value` that is not `#rrggbb` shows as black, as the native input does.
+
+## Inner elements
+
+`id`, `title` and `data-*` land on the root, as on every component; `inputProps` takes the input's other attributes, `inputProps={{ id: 'field', autocomplete: 'off' }}`. `name`, `disabled`, `required`, `value`, `aria-*`, `ref` and the event handlers still reach the input.

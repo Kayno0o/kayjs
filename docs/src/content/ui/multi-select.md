@@ -40,3 +40,7 @@ The status line says `loadingLabel` while it waits and `failureLabel` when it fa
 ## Size and invalid
 
 `size` is `sm`, `md` or `lg`, `md` by default, and changes the padding and the type of the button. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid` on the trigger, a button with the `combobox` role opening a dialog, for a refusal the page knows of. A FormField marks its control itself while it shows a message.
+
+## Inner elements
+
+`panelProps` takes attributes for the floating panel, typed as its element's, such as `data-*`, `aria-*` and event handlers; an app handler runs before the component's own for the same event, and the panel's id, role and popover state stay the component's. `triggerProps` does the same for the button that opens it, and `variant`, `size` and `label` there are yours to change. `...rest` stays on the root.

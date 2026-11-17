@@ -93,3 +93,7 @@ A column takes `width` and `minWidth` (a number is pixels, a string any CSS leng
 ## Name and scrolling
 
 `label` adds a caption only screen readers see, naming the table. When the table is wider or taller than its box it scrolls, and its box then takes the focus so a keyboard can scroll it, as a region named by `aria-label` or else by `label`. A table that fits adds no focus stop, and `onScrollChange({ scrolls })` hears when that changes.
+
+## Inner elements
+
+`panelProps` takes attributes for the column list's panel (with `columnToggle`), typed as its element's, such as `data-*`, `aria-*` and event handlers; an app handler runs before the component's own for the same event, and the panel's id, role and popover state stay the component's. `triggerProps` does the same for the button that opens it, and `variant`, `size` and `label` there are yours to change. `...rest` stays on the root.

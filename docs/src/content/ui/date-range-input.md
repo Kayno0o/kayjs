@@ -16,3 +16,7 @@ To post the range in a plain form, give `fromName` and `toName`, and read the tw
 ## Size and invalid
 
 `size` is `sm`, `md` or `lg`, `md` by default, and changes both boxes. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid="true"`, for a refusal the page knows of. A FormField marks its control itself while it shows a message.
+
+## Inner elements
+
+`panelProps` takes attributes for the floating panel, typed as its element's, such as `data-*`, `aria-*` and event handlers; an app handler runs before the component's own for the same event, and the panel's id, role and popover state stay the component's. `triggerProps` does the same for the button that opens it, and `variant`, `size` and `label` there are yours to change. `...rest` stays on the root.

@@ -13,3 +13,7 @@ Use `BellInbox` inside an island when your notifications live elsewhere and load
 ## Your own trigger
 
 `@trigger(attributes, unread)` replaces the icon button: spread the attributes on any element, and `unread()` is the count, for a badge of your own, as the one over the default button is not drawn. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup`, the style that anchors the list and an `aria-label` of the `label` and the unread count, so the count stays in the button's name.
+
+## Inner elements
+
+`panelProps` takes attributes for the floating panel, typed as its element's, such as `data-*`, `aria-*` and event handlers; an app handler runs before the component's own for the same event, and the panel's id, role and popover state stay the component's. `triggerProps` does the same for the button that opens it, and `variant`, `size` and `label` there are yours to change. `...rest` stays on the root.

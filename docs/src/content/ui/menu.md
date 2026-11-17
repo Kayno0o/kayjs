@@ -61,3 +61,7 @@ Other attributes, such as a `data-testid`, an `aria-describedby` or a `style`, g
 ## Drawing an entry
 
 `@item(entry)` draws an entry's content in place of its icon and label, such as a shortcut hint, a check mark or a badge. The entry stays a button or a link, with its keys and its tone.
+
+## Inner elements
+
+`panelProps` takes attributes for the floating panel, typed as its element's, such as `data-*`, `aria-*` and event handlers; an app handler runs before the component's own for the same event, and the panel's id, role and popover state stay the component's. `...rest` stays on the root.
