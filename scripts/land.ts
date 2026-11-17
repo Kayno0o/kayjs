@@ -216,6 +216,23 @@ async function run(label: string, argv: string[], cwd: string, lock?: string) {
   fail(hung ? `${label} ran past ${STEP_LIMIT_MS / 1000} s, so it was killed with what it started: its output up to then is in ${LOG}` : `${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)
 }
 
+// The tests lock held from the first test run to the last library's suite, so a run started elsewhere on the host waits for the whole phase instead of taking the memory between two of its steps; a landing that exits mid-phase frees it with its holder.
+async function holdTests() {
+  const prefix = process.env.KAY_LAND_LOCKED === TESTS_LOCK ? undefined : slotPrefix(TESTS_LOCK)
+  const held = prefix === undefined ? undefined : await holder(prefix)
+
+  if (held !== undefined)
+    process.env.KAY_LAND_LOCKED = TESTS_LOCK
+
+  return async () => {
+    if (held === undefined)
+      return
+
+    delete process.env.KAY_LAND_LOCKED
+    await held.release()
+  }
+}
+
 // A test step, as KAY_LAND_SHARDS runs one after another when the suite outgrows the session's memory (a worker keeps the global of each file that loaded a native addon, oven-sh/bun#46561).
 async function sharded(label: string, argv: string[]) {
   if (SHARDS === 1)
@@ -290,6 +307,8 @@ async function verify(): Promise<string> {
   if (!whole && changed.some(path => WHOLE_SUITE.test(path)))
     console.log('tests, the whole suite: left to CI, as only dependencies changed')
 
+  const releaseTests = await holdTests()
+
   if (whole) {
     await sharded('tests, the whole suite', [BUN, 'run', 'test', WORKERS])
   }
@@ -328,6 +347,8 @@ async function verify(): Promise<string> {
     await step(`packages/${name} check`, [BUN, 'run', 'check'], `packages/${name}`)
     await step(`packages/${name} tests`, [BUN, 'run', 'test'], `packages/${name}`)
   }
+
+  await releaseTests()
 
   return base
 }
