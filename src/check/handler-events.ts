@@ -7,12 +7,15 @@ const PARAMETER_TYPE = /(?:to type|from type) '([\s\S]*?)'(?:\.|:)/
 const FIELD = /^(\w+)\??:/
 const CALLBACK_NAME = /^on[A-Z]\w*$/
 const HANDLER_NAME = /^[A-Z_$][\w$]*(?:\??\.[A-Z_$][\w$]*)*$/i
+// An object literal type or a named type, which no old argument was apart from a `File`: the handler may be written for the event already.
+const OBJECT_TYPE = /^(?:\{|(?!File\b)[A-Z])/
 const COMPONENT = /^([A-Z][\w$]*)(?:[.#][^\s(]*)?\(/
 const NAME_AT = /^[\w$]+/
 const EVENT_WORD = /\bevent\b/
 const ELEMENT = /^[a-z.#][^\s(]*\(/
 
-export interface HandlerEventLint {
+// What an old-form lint of the type check reports.
+export interface OldFormLint {
   message: string
   help: string
   span: Span
@@ -60,7 +63,7 @@ function parameterCount(type: string): number {
   return 1
 }
 
-// Whether the first parameter of a function type written as `(a: A, b: B) => R` is typed as an object literal.
+// Whether the first parameter of a function type written as `(a: A, b: B) => R` is typed as an object, a literal or a named type.
 function takesObject(type: string): boolean {
   if (!type.startsWith('('))
     return false
@@ -68,7 +71,7 @@ function takesObject(type: string): boolean {
   const first = splitTop(type.slice(1), ',')[0] ?? ''
   const colon = first.indexOf(':')
 
-  return colon !== -1 && first.slice(colon + 1).trim().startsWith('{')
+  return colon !== -1 && OBJECT_TYPE.test(first.slice(colon + 1).trim())
 }
 
 // The component an attribute is written on, read off its line or, for an attribute on a line of its own, the line above it that opens the call.
@@ -97,7 +100,7 @@ function componentAt(source: string, at: number): string | undefined {
 
 // A callback a component of a kayjs library takes as one event object since 1.105, given a function written for its positional arguments: the handler of `onValueChange={query.set}`, `onCheckedChange={toggle}` or `onFiles={upload}`.
 // The fix wraps a handler written as a name, `event => query.set(event.value)`, passing the fields the handler took, first ones first. It is applied where the handler's parameter is no object, which the old arguments were; a handler taking an object may be written for the event already, so its fix is offered.
-export function handlerEventLint(message: string, source: string, span: Span | undefined): HandlerEventLint | undefined {
+export function handlerEventLint(message: string, source: string, span: Span | undefined): OldFormLint | undefined {
   const found = EVENT_CALLBACK.exec(message)
 
   if (found === null || span === undefined)

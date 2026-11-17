@@ -4,6 +4,7 @@ import type { Fix, Span } from '../compiler/ast'
 import type { LintLevel, LintName } from '../compiler/lints'
 import type { I18nConfig } from '../config'
 import type { RouteMount } from '../server/routes'
+import type { OldFormLint } from './handler-events'
 import type { ShadowFile } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, relative, resolve, sep } from 'node:path'
@@ -131,7 +132,7 @@ function blockWithoutParameters(diagnostic: TsgoDiagnostic, source: string, span
 }
 
 // What the types say of a callback given a function written for its arguments before 1.105, or of an island's call read as data: the deprecated lint that names it, with its fix.
-function oldForm(message: string, source: string, span: Span | undefined): (Pick<Diagnosed, 'message' | 'help' | 'span' | 'fixes'> & { code: LintName }) | undefined {
+function oldForm(message: string, source: string, span: Span | undefined): (OldFormLint & { code: LintName }) | undefined {
   const handler = handlerEventLint(message, source, span)
 
   if (handler !== undefined)

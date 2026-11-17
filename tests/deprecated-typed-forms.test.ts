@@ -161,17 +161,49 @@ describe('1.105 forms the type check finds', () => {
     }
   })
 
-  it('leaves a handler already in the new form and a local component alone', async () => {
+  it('leaves a handler already in the new form alone', async () => {
     const root = await project({
       ...FILES,
       'src/routes/index.kay': PAGE.replaceAll('onChange={toggle}', 'onChange={event => toggle(event.checked)}').replace('onValueChange={setQuery}', 'onValueChange={event => setQuery(event.value)}').replace('onFiles={pick}', 'onFiles={event => pick(event.files)}').replace('onChange={setQuery}', 'onChange={event => setQuery(event.value)}'),
-      'src/components/mine.kay': '---\nconst { onPick }: { onPick: (value: string) => void } = props()\n---\nbutton(onClick={() => onPick(\'a\')}) x\n',
     })
 
     try {
-      const found = (await check(root)).filter(one => one.file.endsWith('index.kay') || one.file.endsWith('mine.kay'))
+      expect((await check(root)).filter(one => one.code === 'deprecated-callback-handler')).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves the type error of a component that is no library\'s', async () => {
+    const root = await project({
+      ...FILES,
+      'src/components/pick.kay': '---\nconst { onPick } = props<{ onPick: (event: { value: string }) => unknown }>()\n---\nbutton(onClick={() => onPick({ value: \'a\' })}) x\n',
+      'src/routes/index.kay': '---\nimport Pick from \'../components/pick.kay\'\n\nfunction take(value: string) {\n  return value\n}\n---\nPick(onPick={take})\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(one => one.file.endsWith('index.kay'))
 
       expect(found.filter(one => one.code === 'deprecated-callback-handler')).toEqual([])
+      expect(found.some(one => one.code?.startsWith('TS'))).toBe(true)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('wraps a member handler, a signal\'s set, with the field it took', async () => {
+    const root = await project({
+      ...FILES,
+      'src/routes/index.kay': '---\nimport { signal } from \'kay\'\nimport Tabs from \'@kayjs/ui/tabs.kay\'\n\nconst query = signal(\'a\')\n---\nTabs(\n  items={[{ value: \'a\', label: \'A\' }]}\n  value={query()}\n  label="t"\n  onValueChange={query.set}\n)\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(one => one.code === 'deprecated-callback-handler')
+
+      expect(found).toHaveLength(1)
+      expect(found[0]?.fixes?.[0]?.edits[0]?.text).toBe('event => query.set(event.value)')
     }
     finally {
       await rm(root, { recursive: true, force: true })

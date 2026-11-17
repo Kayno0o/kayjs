@@ -1,7 +1,8 @@
 import type { CheckDiagnostic } from '.'
-import type { Fix, Span } from '../compiler/ast'
+import type { Span } from '../compiler/ast'
 import type { Node, Program } from '../compiler/estree'
 import type { LintLevels } from '../compiler/lints'
+import type { OldFormLint } from './handler-events'
 import { parseProgram } from '../compiler/estree'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt } from '../compiler/mapping'
@@ -14,13 +15,6 @@ const MODULE = /\.[cm]?tsx?$/
 const MISMATCH = /^(?:Type|Argument of type) 'CallResult</
 // What a result has of its own: a use of one of these means the code already reads a `CallResult`.
 const RESULT_KEYS = new Set(['ok', 'data', 'error', 'errors', 'status', 'message', 'orThrow'])
-
-export interface CallResultLint {
-  message: string
-  help: string
-  span: Span
-  fixes?: Fix[]
-}
 
 // The spans of a `.kay` file's script, server and module fences, or the whole file for a module.
 function codeSpans(source: string, kay: boolean): Span[] {
@@ -108,7 +102,7 @@ function readsResult(all: Walked[], bound: Node | undefined): boolean {
 
 // A read on a call's answer that is no field of a `CallResult`, an island call awaited as data as it was before 1.105: the answer is `{ ok: true, data }` or `{ ok: false, error }` since, so `.orThrow()` after the call gives the data and throws a refusal as it did.
 // Fixed where the call is written on a name the file imports and nothing reads `ok`, `data` or `error` of the answer; offered, not applied, otherwise.
-export function callResultLint(message: string, source: string, span: Span | undefined, kay: boolean): CallResultLint | undefined {
+export function callResultLint(message: string, source: string, span: Span | undefined, kay: boolean): OldFormLint | undefined {
   const missing = MISSING.test(message)
 
   if (span === undefined || (!missing && !MISMATCH.test(message)))
