@@ -441,6 +441,18 @@ describe('which islands load components lazily', () => {
     expect(out(read)).not.toContain('KayLazy(')
   })
 
+  it('keeps a component eager that code reads on a line with an escape, a regular expression or a template literal', () => {
+    const lines = ['const a = [1].join("\\n") ? Heavy : "x"', 'const b = /\'/g.test("s") ? Heavy : \'a\'', 'const c = `it\'s ${Heavy}` + \'b\'']
+    const out = (line: string) => {
+      const source = `---\nimport Heavy from './heavy.kay'\n${line}\nconst { on } = props<{ on: boolean }>()\n---\nif on\n  Heavy(label="x")\n`
+
+      return compileKay(source, file('eager'), { root, output: 'dom', components: importedComponents(file('eager'), source, root) }).tsx
+    }
+
+    for (const line of lines)
+      expect(out(line), line).not.toContain('KayLazy(')
+  })
+
   it('keeps a small component eager', () => {
     const source = '---\nimport Shell from \'./shell.kay\'\n---\nmain\n  if true\n    Shell(open=true)\n'
     const facts = importedComponents(join(fixtures, 'eager.kay'), source, root)

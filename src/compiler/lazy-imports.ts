@@ -27,12 +27,14 @@ export interface LazyImport {
 // The smallest source a component loads lazily: below it the request and the stub cost more than the code saves.
 export const LAZY_FLOOR = 2000
 const CHILDREN = 'children'
-const LINE_COMMENT = /^[ \t]*\/\/.*$/gm
-const PLAIN_STRING = /'[^'\\\n$`]*'|"[^"\\\n$`]*"/g
+const LINE_COMMENT = /^[ \t]*\/\/.*$/
+const PLAIN_STRING = /'(?:[^'\\\n$`]|\\.)*'|"(?:[^"\\\n$`]|\\.)*"/g
+// A line where a quote may open something other than a string: a template literal, or a regular expression, which starts where a value is expected.
+const UNSURE_LINE = /`|[(,=:?!&|{;[]\s*\/(?![/*])/
 // An import of a component's default export on a line of its own, the one form a lazy import can replace.
 const PLAIN_IMPORT = /^import\s+[\w$]+\s+from\s*(['"])[^'"]+\1\s*;?$/
 
-// How often a name is written as a word of the text, in code, a string or a comment alike: a count the tag uses do not account for is another reference to it.
+// How often a name is written as a word of the text, as `codeOf` leaves it: a count the tag uses do not account for is another reference to it.
 function occurrences(text: string, name: string): number {
   return text.match(new RegExp(`(?<![\\w$.])${name.replaceAll('$', '\\$')}(?![\\w$])`, 'g'))?.length ?? 0
 }
@@ -182,9 +184,16 @@ function codeOf(file: KayFile): string {
   return blankLiterals(code)
 }
 
-// The whole-line comments and the one-line strings that hold no `${` or backtick, blanked: a word in them, as the `Select all` of a label, is text no code reads, so it is no reference to a component of that name.
-function blankLiterals(script: string): string {
-  return script.replace(LINE_COMMENT, blank => ' '.repeat(blank.length)).replace(PLAIN_STRING, blank => ' '.repeat(blank.length))
+// The whole-line comments and the one-line strings that hold no `${`, blanked: a word in them, as the `Select all` of a label, is text no code reads, so it is no reference to a component of that name. A line that may hold a template literal or a regular expression is left as it is, since a quote there may pair with another that is no string's, and a word hidden by mistake would load a component lazily that code reads.
+function blankLiterals(code: string): string {
+  const blank = (text: string) => ' '.repeat(text.length)
+
+  return code.split('\n').map((line) => {
+    if (LINE_COMMENT.test(line))
+      return blank(line)
+
+    return UNSURE_LINE.test(line) ? line : line.replace(PLAIN_STRING, blank)
+  }).join('\n')
 }
 
 // The text before a file's template, which is all of its script.

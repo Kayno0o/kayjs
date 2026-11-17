@@ -11,7 +11,8 @@ import { takeFiles } from './file-limits'
 import { FIELD_MESSAGE, GROUP_INVALID } from './field-look'
 import { linkChoice } from './choice-link'
 import { onFormReset, startRef } from './form-reset'
-import { fieldIssueList, fieldNamed } from './forms'
+import { fieldNamed } from './form-context'
+import { fieldIssueList } from './forms'
 import IconButton from './icon-button.kay'
 
 // 'kui-file-drop' stays as the component's name for an app's CSS and the skins; the border colour reads --_control-line, which a skin sets.

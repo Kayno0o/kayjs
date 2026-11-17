@@ -1256,6 +1256,9 @@ function checkSchema(form: HTMLFormElement, action: Validating, issues: Signal<R
 [./lib/form-calls] checkSent
 function checkSent(form: HTMLFormElement, action: Validating, issues: Signal<Record<string, string>>, failure: string, checking: Signal<boolean>): Promise<boolean>
 
+[./lib/form-calls] notify
+function notify(tone: "error" | "success", message: string): Promise<void>
+
 [./lib/form-calls] showIssues
 function showIssues(form: HTMLFormElement, byField: Record<string, string>): Promise<boolean>
 
@@ -1320,14 +1323,8 @@ interface FieldLinks
   issues: string
   label: string
 
-[./lib/forms] fieldNamed
-const fieldNamed: Context<(() => string | undefined) | undefined>
-
 [./lib/forms] fieldsOf
 function fieldsOf(frame: string): HTMLElement[]
-
-[./lib/forms] formIssues
-const formIssues: Context<(() => Record<string, string>) | undefined>
 
 [./lib/forms-send] callAction
 function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined, onError?: ((failure: {

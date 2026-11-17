@@ -5,9 +5,8 @@ import Button from './button.kay'
 import type { FormValidation } from './form-context'
 
 import { formIssues, leftField } from './form-context'
-import { callAction, checkSchema, checkSent, showIssues } from './form-calls'
+import { callAction, checkSchema, checkSent, notify, showIssues } from './form-calls'
 import { holdDefaults, onFormReset } from './form-reset'
-import { toast } from './toast'
 import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-save-form', grid: 'kui-form-grid', bar: 'kui-save-bar', status: 'kui-save-bar-status', actions: 'kui-save-bar-actions', confirm: '' } })
@@ -92,7 +91,7 @@ async function loadConfirm() {
     // A preload fails quietly: only a Save waiting on the question says it cannot be asked.
     if (asking()) {
       asking = false
-      toast.error(failureText())
+      void notify('error', failureText())
     }
   }
 }
@@ -248,7 +247,7 @@ async function submit(event: SubmitEvent) {
   check()
 
   if (saved)
-    toast.success(saved)
+    void notify('success', saved)
 
   if (!run)
     onSave?.({ data: done.result as Answer<Success<Output>> })

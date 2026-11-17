@@ -3,7 +3,8 @@ import type { JSX, Snippet } from 'kay'
 import { recipe } from 'kay'
 import { FIELD_MESSAGE, LABEL_TEXT } from './field-look'
 import { wording } from 'kay/words'
-import { fieldIssueList, fieldLinks, fieldNamed } from './forms'
+import { fieldNamed } from './form-context'
+import { fieldIssueList, fieldLinks } from './forms'
 
 // One wrapping row, the label taking no box of its own: the head and the action share the first line, the action wrapping under the head rather than over the control, and the rest take a line each.
 // A floated legend is no longer the fieldset's rendered legend, so it sits in the row like the label's head, its padding zeroed so an app's own `legend` styles do not indent it.

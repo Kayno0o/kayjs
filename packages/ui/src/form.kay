@@ -4,8 +4,7 @@ import { recipe, signal } from 'kay'
 import type { FormValidation } from './form-context'
 
 import { formIssues, leftField } from './form-context'
-import { callAction, checkSchema, checkSent, showIssues } from './form-calls'
-import { toast } from './toast'
+import { callAction, checkSchema, checkSent, notify, showIssues } from './form-calls'
 import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-form-grid' } })
@@ -55,7 +54,7 @@ async function submit(event: SubmitEvent) {
   await showIssues(form, {})
 
   if (saved)
-    toast.success(saved)
+    void notify('success', saved)
 
   onSave?.({ data: done.result })
 }

@@ -1,9 +1,8 @@
 import { describeField, effect, formErrors, markInvalid, uid } from 'kay'
 import { CHOICE, CONTROL, controlOf } from './choice-link'
 import { liveElements } from './field-look'
-import { fieldNamed, formIssues } from './form-context'
+import { formIssues } from './form-context'
 
-export { fieldNamed, formIssues }
 export { CONTROL, controlOf }
 
 // What a group marks while its message shows: the fields of the group, which take `aria-invalid`, not the buttons of a picker.
