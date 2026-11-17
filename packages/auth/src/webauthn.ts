@@ -248,7 +248,7 @@ function parseAuthData(bytes: Uint8Array): AuthData {
     const [extensions, end] = decodeCbor(bytes, offset)
 
     if (!(extensions instanceof Map))
-      throw new Error('invalid extensions')
+      throw new TypeError('invalid extensions')
 
     offset = end
   }
@@ -286,7 +286,7 @@ async function importCoseKey(bytes: Uint8Array): Promise<CoseKey> {
   const [cose] = decodeCbor(bytes)
 
   if (!(cose instanceof Map))
-    throw new Error('COSE key is not a map')
+    throw new TypeError('COSE key is not a map')
 
   const kty = cose.get(1)
   const alg = cose.get(3)

@@ -28,7 +28,7 @@ export function clobber(form: HTMLFormElement, ...names: string[]): void {
 
 export function click(element: Element | null): void {
   if (!(element instanceof HTMLElement))
-    throw new Error('nothing to click')
+    throw new TypeError('nothing to click')
 
   element.click()
 }

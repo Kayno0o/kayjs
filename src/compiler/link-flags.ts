@@ -2,6 +2,7 @@ import type { Attribute, Diagnostic, KayFile, Span } from './ast'
 import type { Lint } from './lints'
 import { editDistance } from './aria'
 import { elementsIn } from './ast'
+
 export interface Renamed {
   name: string
   value: string

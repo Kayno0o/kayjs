@@ -498,7 +498,7 @@ async function loadLibrary(dir: string, name: string, project: LibraryProject, f
   const feature = typeof module.default === 'function' ? module.default(project) : module.default
 
   if (typeof feature?.description !== 'string')
-    throw new Error(`kay add: ${LIBRARIES[name]![0]!}/add does not export a feature as its default`)
+    throw new TypeError(`kay add: ${LIBRARIES[name]![0]!}/add does not export a feature as its default`)
 
   return feature
 }

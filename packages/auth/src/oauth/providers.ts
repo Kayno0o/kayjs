@@ -194,7 +194,7 @@ export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: stri
 
       for (const field of ['authorization_endpoint', 'token_endpoint', 'jwks_uri']) {
         if (typeof doc[field] !== 'string')
-          throw new Error(`discovery document has no ${field}`)
+          throw new TypeError(`discovery document has no ${field}`)
       }
 
       for (const field of ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint', 'revocation_endpoint', 'jwks_uri']) {

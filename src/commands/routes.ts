@@ -163,7 +163,7 @@ async function apiRoutes(root: string, config: KayConfig, modules: ApiModule[], 
       const instance = typeof exported === 'function' && extension !== undefined ? await (exported as (app: ExtensionApp) => unknown)(await appOf(extension)) : exported
 
       if (!(instance instanceof Elysia))
-        throw new Error('it exports no Elysia instance by default')
+        throw new TypeError('it exports no Elysia instance by default')
 
       for (const route of instance.routes.filter(route => ROUTE_METHODS.test(route.method)))
         listed.push({ methods: route.method.toUpperCase(), path: apiRoutePath(module.mount, route.path), kind: 'api', by: shown(module.file), file: shown(module.file), notes, guards })

@@ -427,10 +427,7 @@ export function propsWritten(source: string, locals: readonly string[], defaults
     }
 
     for (const child of element.children) {
-      if (child.kind === 'slot')
-        props.add(source.slice(child.name.start, child.name.end))
-      else
-        props.add('children')
+      props.add(child.kind === 'slot' ? source.slice(child.name.start, child.name.end) : 'children')
     }
   }
 

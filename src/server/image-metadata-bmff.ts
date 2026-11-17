@@ -144,7 +144,7 @@ function locations(view: DataView, iloc: Box, wanted: Set<number>): Map<number, 
     const value = unsigned(view, at, size)
 
     if (!Number.isSafeInteger(value))
-      throw new Error('a size it cannot read')
+      throw new TypeError('a size it cannot read')
 
     at += size
 

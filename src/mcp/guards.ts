@@ -50,7 +50,7 @@ export function optionalString(value: unknown, name: string): string | undefined
     return undefined
 
   if (typeof value !== 'string')
-    throw new Error(`${name} takes a string`)
+    throw new TypeError(`${name} takes a string`)
 
   return value
 }

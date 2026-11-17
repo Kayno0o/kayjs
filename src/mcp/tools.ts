@@ -216,7 +216,7 @@ function tools(root: string, write: boolean): Tool[] {
             return []
 
           if (typeof value !== 'number' || !Number.isInteger(value))
-            throw new Error(`${name} takes a whole number of pixels`)
+            throw new TypeError(`${name} takes a whole number of pixels`)
 
           return [`--${name}=${value}`]
         })
