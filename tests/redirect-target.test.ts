@@ -85,9 +85,14 @@ it('ignores an empty configured host, so ///evil.com is refused', () => {
     expect(() => runInLocale(state, () => redirect(location)), location).toThrow('which a browser reads as another site')
 })
 
-it('carries the request query before the target fragment, unless the target has a query of its own', () => {
+it('carries the request query before the target fragment, merged into a query of the target\'s own', () => {
   expect(redirectLocation('/new#top', '?utm=1')).toBe('/new?utm=1#top')
-  expect(redirectLocation('/new?a=1#top', '?utm=1')).toBe('/new?a=1#top')
+  expect(redirectLocation('/new?a=1#top', '?utm=1')).toBe('/new?a=1&utm=1#top')
+  expect(redirectLocation('/?tab=calendar', '?month=2026-11')).toBe('/?tab=calendar&month=2026-11')
+  expect(redirectLocation('/?tab=calendar', '?tab=other&month=2026-11')).toBe('/?tab=calendar&month=2026-11')
+  expect(redirectLocation('/new?a=1', '?a=2&a=3')).toBe('/new?a=1')
+  expect(redirectLocation('/new?a%20b=1', '?a+b=2&c=%2F')).toBe('/new?a%20b=1&c=%2F')
+  expect(redirectLocation('/new?', '?utm=1')).toBe('/new?utm=1')
   expect(redirectLocation('/new#a?b', '?utm=1')).toBe('/new?utm=1#a?b')
   expect(redirectLocation('//new#top', '?utm=1')).toBe('/new?utm=1#top')
   expect(redirectLocation('/new#top', '')).toBe('/new#top')

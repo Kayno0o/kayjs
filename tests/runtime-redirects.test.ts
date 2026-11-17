@@ -101,6 +101,9 @@ describe('answering a missing path', () => {
 
     set.add('/framed', '/new#top', 301, rules)
     expect(await answerFor(set, '/framed', '?a=1', [])).toEqual({ location: '/new?a=1#top', status: 301 })
+
+    set.add('/tabbed', '/new?tab=calendar', 301, rules)
+    expect(await answerFor(set, '/tabbed', '?month=2026-11&tab=x', [])).toEqual({ location: '/new?tab=calendar&month=2026-11', status: 301 })
     expect(await answerFor(set, '/Old', '', [])).toBeUndefined()
     expect(await answerFor(set, '/other', '', [])).toBeUndefined()
   })

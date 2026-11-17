@@ -153,13 +153,40 @@ export function fillTarget(to: string, param: (name: string) => string, rest: st
   return to.replaceAll(TARGET_PART, (_part, name: string | undefined) => name === undefined ? rest : param(name))
 }
 
-// Where a redirect to `target` goes: a target on the site loses extra leading slashes, which would read as another host, and the request's query is carried over, before the target's fragment, unless the target gives its own.
+// The name of a query pair, decoded as a form reads it (`+` is a space), so `a+b` and `a%20b` clash.
+function queryKey(pair: string): string {
+  const equals = pair.indexOf('=')
+  const name = (equals === -1 ? pair : pair.slice(0, equals)).replaceAll('+', ' ')
+
+  try {
+    return decodeURIComponent(name)
+  }
+  catch {
+    return name
+  }
+}
+
+// Where a redirect to `target` goes: a target on the site loses extra leading slashes, which would read as another host, and the request's query is carried over, before the target's fragment. A target with a query of its own keeps it, the request's params it does not name added after it.
 export function redirectLocation(target: string, search: string): string {
   const path = target.startsWith('/') ? target.replace(LEADING_SLASHES, '/') : target
   const hash = path.indexOf('#')
   const before = hash === -1 ? path : path.slice(0, hash)
+  const fragment = hash === -1 ? '' : path.slice(hash)
+  const asked = search.slice(1)
 
-  return search !== '' && !before.includes('?') ? `${before}${search}${hash === -1 ? '' : path.slice(hash)}` : path
+  if (asked === '')
+    return path
+
+  const mark = before.indexOf('?')
+
+  if (mark === -1)
+    return `${before}${search}${fragment}`
+
+  const own = before.slice(mark + 1).split('&').filter(Boolean)
+  const named = new Set(own.map(queryKey))
+  const added = asked.split('&').filter(pair => pair !== '' && !named.has(queryKey(pair)))
+
+  return `${before.slice(0, mark)}?${[...own, ...added].join('&')}${fragment}`
 }
 
 // Registered before the pages, the query carried over unless the target gives its own.

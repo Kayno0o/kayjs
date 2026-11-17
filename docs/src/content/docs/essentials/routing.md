@@ -310,7 +310,7 @@ export default defineConfig({
 })
 ```
 
-A redirect answers 308. `status` names another: 301 or 302 for clients and crawlers that expect them, or 307 for a move you may undo. `{ status: 410 }` takes no `to` and answers `Gone` for a page that ended for good, and `kay check` reports a 410 that has one. A static export writes it to `_redirects`, for a host that answers a 4xx status there (Netlify does, Cloudflare Pages takes redirects only), and no page, as a page cannot answer 410.
+The request's query goes along. A target with a query of its own keeps it and takes the request's params it does not name, so `'/calendar': '/?tab=calendar'` sends `/calendar?month=2026-11` to `/?tab=calendar&month=2026-11`; when both name a param, the target's value wins. A redirect answers 308. `status` names another: 301 or 302 for clients and crawlers that expect them, or 307 for a move you may undo. `{ status: 410 }` takes no `to` and answers `Gone` for a page that ended for good, and `kay check` reports a 410 that has one. A static export writes it to `_redirects`, for a host that answers a 4xx status there (Netlify does, Cloudflare Pages takes redirects only), and no page, as a page cannot answer 410.
 
 A link to the old path is valid too: `kay check` counts the source of a redirect as a page, so `a(href="/old")` passes. A source ending in `*`, such as `/docs/*`, does not make `/docs` itself count. A redirect added while the site runs counts only while that file is there, so for a link that must pass everywhere, such as in CI, add the redirect to `redirects`.
 
