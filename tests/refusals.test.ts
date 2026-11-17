@@ -1,3 +1,4 @@
+import type { ActionStream } from '../src/runtime'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
@@ -115,6 +116,16 @@ describe('ctx.deny in an action', () => {
     expect(await first.text()).toContain('Stopped before')
     expect(midway.status).toBe(200)
     expect(midway.headers.get('content-type')).toContain('text/event-stream')
+
+    const stream = await readActionResponse<ActionStream<number>>(midway, `${ACTION}/streamed`)
+
+    await expect(stream.ended()).rejects.toBeInstanceOf(ActionError)
+  })
+
+  it('keeps the answer of a guard for a status that is no integer', async () => {
+    const response = await post('computedStatus', { status: '1.5' }, true)
+
+    expect(response.status).toBe(500)
   })
 
   it('stops with plain text for an empty message, as for none', async () => {

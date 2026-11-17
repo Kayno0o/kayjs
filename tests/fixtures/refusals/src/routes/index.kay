@@ -32,6 +32,8 @@ export const streamedFirst = action(s.Object({}), async function* (input, ctx) {
   ctx.deny(409, { message: 'Stopped before' })
 })
 
+export const computedStatus = action(s.Object({ status: s.String() }), ({ status }, ctx) => ctx.deny(Number(status), { message: 'Odd' }))
+
 export const emptyMessage = action(s.Object({}), (input, ctx) => ctx.deny(403, { message: '' }))
 
 export const thrown = action(s.Object({}), () => refuse(409, { message: 'Over', data: 'over' }))
