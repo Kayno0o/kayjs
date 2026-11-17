@@ -1,7 +1,7 @@
 import type { KayLibrary } from '../build/libraries'
 import { realpathSync } from 'node:fs'
-import { dirname, relative, sep } from 'node:path'
-import { componentsNamed, forgetNames, uiOf } from '../build/ui'
+import { dirname, join, relative, sep } from 'node:path'
+import { componentsNamed, forgetNames, UI_FILE, uiLayerPathsOf, uiOf } from '../build/ui'
 import { componentName } from '../compiler'
 import { offered } from './ui'
 
@@ -29,7 +29,8 @@ function realOf(file: string): string {
 
 // The `UiComponents` of `kay`, declared from the components `src/ui.ts` can restyle: each by the name a template calls it and by its specifier, with its part names and the values of its variants, so `defineUi` completes and checks an entry in the editor. An app with no `src/ui.ts` declares none.
 export function uiTypes(root: string, libraries: KayLibrary[], own: string[]): string {
-  const ui = uiOf(root)
+  // An app with no `src/ui.ts` still takes the entries of its extensions' `ui` files, which a template's props are checked against.
+  const ui = uiOf(root) ?? (uiLayerPathsOf(root).length === 0 ? undefined : { file: join(root, UI_FILE), source: '', components: [], problems: [] })
 
   if (ui === undefined)
     return 'export {}\n'

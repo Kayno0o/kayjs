@@ -6,6 +6,8 @@ import { clientDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { liftRecipes } from '../src/build/recipe-classes'
 import { transformKayCached } from '../src/build/transform'
+import { setUiLayers } from '../src/build/ui'
+import { loadConfig } from '../src/config-loader'
 import { devBuilder } from '../src/dev/builder'
 import { modeOf, resolveProject } from '../src/project'
 import { installClassTable } from '../src/runtime/class-table'
@@ -482,4 +484,35 @@ describe('a test run', () => {
       await Promise.all([rm(copy, { recursive: true, force: true }), rm(cacheDir, { recursive: true, force: true })])
     }
   })
+})
+
+describe('an extension ui file outside the project', () => {
+  it('reaches the built CSS with the utilities it writes, from node_modules', async () => {
+    const copy = resolve(await fixtureCopy('recipe-classes'))
+    const layer = join(copy, 'node_modules/extui/ui.ts')
+
+    process.env.KAY_RECIPE_CLASSES = '1'
+
+    try {
+      await Bun.write(layer, 'import { defineUi } from \'kay\'\n\nexport default defineUi({ \'./components/tag.kay\': { parts: { root: \'py-9\' }, variants: { tone: { brand: { root: \'bg-blue-700\' } } } } })\n')
+      await Bun.write(join(copy, 'src/routes/index.kay'), (await Bun.file(join(copy, 'src/routes/index.kay')).text()).replace('Tag(tone="danger") danger', 'Tag(tone="brand") brand'))
+      await Bun.write(join(copy, 'kay.config.ts'), 'export default { extensions: [{ name: \'extui\', ui: \'./node_modules/extui/ui.ts\' }] }\n')
+      await loadConfig(copy)
+
+      const client = await buildClient(copy, { plugins: [tailwind] })
+      const app = await servePages(resolveProject(copy, { dirs: { routes: 'src/routes' }, serve: { compress: false } }, modeOf({ dev: false, prebuilt: true })), () => client)
+      const html = await (await app.handle(new Request('http://localhost/'))).text()
+      const css = await Bun.file(join(client.dir, client.styles.get(join(copy, 'src/routes/index.kay'))!.slice('/_kay/'.length))).text()
+
+      expect(html.match(/<span[^>]*data-tone="brand"[^>]*>/)?.[0]).toContain('bg-blue-700')
+      expect(css).toMatch(/\.py-9\s*\{/)
+      expect(css).toMatch(/\.bg-blue-700\s*\{/)
+    }
+    finally {
+      setUiLayers(copy, [])
+      delete process.env.KAY_RECIPE_CLASSES
+      installClassTable(undefined)
+      await rm(copy, { recursive: true, force: true })
+    }
+  }, 120_000)
 })

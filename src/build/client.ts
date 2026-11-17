@@ -54,7 +54,7 @@ import { styleImports, withoutStyles, writeComponentStylesheets } from './styles
 import { mergingSupports } from './supports'
 import { warnBuiltThemeVariables } from './theme-vars'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
-import { uiFilesOf, uiPathsOf } from './ui'
+import { uiFilesOf, uiLayerClasses, uiPathsOf } from './ui'
 import { kayFiles, variantFile, VariantIndex } from './variants'
 
 export interface ClientOptions extends Pick<KayConfig, ClientBuildKey> {
@@ -429,7 +429,7 @@ async function writeClasses(root: string, classes: Set<string>): Promise<void> {
   const file = projectPaths(root).classes
 
   await writeIfChanged(join(dirname(file), '.gitignore'), '*\n!/scratch/\n!/scratch/**\n')
-  await writeIfChanged(file, [...classes].sort().join('\n'))
+  await writeIfChanged(file, [...new Set([...classes, ...uiLayerClasses(root)])].sort().join('\n'))
 }
 
 // The table of Tailwind classes a later one overrides, from every word of the components and of the other files an app writes markup in; none when the app has no Tailwind.

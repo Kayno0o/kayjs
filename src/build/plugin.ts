@@ -22,6 +22,7 @@ import { liveIds } from './live-ids'
 import { withLocaleLinks } from './navigation-locale'
 import { embeddedMapTail } from './sourcemap'
 import { embeddedMapCached, transformKayCached } from './transform'
+import { uiLayerPathsOf } from './ui'
 import { specializedSource, USES_QUERY, VariantIndex } from './variants'
 
 export interface KayPluginOptions {
@@ -164,11 +165,12 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       const dist = clientDir(root)
 
       const bundleWorker = async (path: string): Promise<string> => {
-        const bundle: WorkerBundle = { entry: path, outdir: join(dist, 'assets'), minify: config.minify ?? false, define: config.define ?? {}, options: { ...options, root, anchor: undefined, anchored: undefined }, workers: [...workers, path] }
+        const layers = uiLayerPathsOf(root)
+        const bundle: WorkerBundle = { entry: path, outdir: join(dist, 'assets'), minify: config.minify ?? false, define: config.define ?? {}, options: { ...options, root, anchor: undefined, anchored: undefined, variants: undefined }, workers: [...workers, path], uiLayers: layers }
         const key = JSON.stringify(bundle)
         const kept = bundledWorkers.get(key)
 
-        if (kept !== undefined && kept.result.outputs.every(output => existsSync(output)) && stampOf(kept.result.inputs) === kept.stamp)
+        if (kept !== undefined && kept.result.outputs.every(output => existsSync(output)) && stampOf([...kept.result.inputs, ...layers]) === kept.stamp)
           return kept.result.name
 
         const started = Date.now()
@@ -194,7 +196,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
 
         // A file written while the bundle ran may not be the one it read.
         if (!result.ships && result.inputs.every(input => (statSync(input, { throwIfNoEntry: false })?.mtimeMs ?? 0) < started))
-          bundledWorkers.set(key, { result, stamp: stampOf(result.inputs) })
+          bundledWorkers.set(key, { result, stamp: stampOf([...result.inputs, ...layers]) })
 
         return result.name
       }

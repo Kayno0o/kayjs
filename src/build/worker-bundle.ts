@@ -5,6 +5,7 @@ import process from 'node:process'
 import { apiStubs } from '../server/api-modules'
 import { kayPlugin } from './plugin'
 import { withoutStyles } from './styles'
+import { setUiLayers } from './ui'
 
 // What a browser build hands the process bundling one of its workers.
 export interface WorkerBundle {
@@ -15,6 +16,8 @@ export interface WorkerBundle {
   options: KayPluginOptions
   // The modules started as workers on the way to this one, itself last.
   workers: string[]
+  // The `ui` files of the project's extensions, which the worker's components are compiled with as the app's are.
+  uiLayers: string[]
 }
 
 // What the process prints: the name of the worker's file, every file the bundle wrote and every file it read.
@@ -38,6 +41,9 @@ function readText(file: string): string | undefined {
 // Bun cannot start a build while a plugin of another waits, so a worker is bundled by a process of its own, which prints its file's name.
 if (import.meta.main) {
   const bundle = JSON.parse(await Bun.stdin.text()) as WorkerBundle
+
+  setUiLayers(bundle.options.root ?? process.cwd(), bundle.uiLayers.map(ui => ({ ui })))
+
   const out = await Bun.build({
     entrypoints: [bundle.entry],
     outdir: bundle.outdir,

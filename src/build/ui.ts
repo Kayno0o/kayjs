@@ -50,6 +50,7 @@ export const KAY_EXTENSION = /\.kay$/
 // A key written as a component's name, `Card`, rather than as a specifier.
 const COMPONENT_NAME = /^[A-Z_$][\w$]*$/i
 const WORD_BOUNDARY = /(?<=[a-z0-9])(?=[A-Z])/g
+const WHITESPACE = /\s+/
 // The package whose components a bare name reaches besides the app's own.
 const UI_LIBRARY = '@kayjs/ui'
 // What `src/ui.ts` was last read as, by file: it is read for every component the build compiles.
@@ -465,9 +466,23 @@ export function uiLayersOf(root: string): UiSource[] {
   return found
 }
 
+// The classes the extensions' `ui` files write, for Tailwind to make rules of: a file outside the project, in `node_modules`, is not one it scans on its own.
+export function uiLayerClasses(root: string): string[] {
+  const words = (classes: string | Record<string, string>): string[] => Object.values(typeof classes === 'string' ? { root: classes } : classes).flatMap(text => text.split(WHITESPACE))
+  const entries = uiLayersOf(root).flatMap(({ components }) => components.map(({ entry }) => entry))
+  const variants = entries.flatMap(({ variants }) => Object.values(variants ?? {}).flatMap(values => Object.values(values).flatMap(words)))
+
+  return [...entries.flatMap(({ parts }) => parts === undefined ? [] : words(parts)), ...variants].filter(word => word !== '')
+}
+
 // Where classes of components may be set from: the extensions' `ui` files and the app's `src/ui.ts`, whether they exist now or not, for a rebuild when one is written or removed.
 export function uiPathsOf(root: string): string[] {
   return [...layerFiles.get(rootKey(root)) ?? [], join(root, UI_FILE)]
+}
+
+// The `ui` files of the project's extensions, as the config listed them.
+export function uiLayerPathsOf(root: string): string[] {
+  return layerFiles.get(rootKey(root)) ?? []
 }
 
 // Every file that sets a component's classes now: the extensions' `ui` files, then the app's `src/ui.ts` when there is one.

@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { check } from '../src/check'
+import { loadConfig } from '../src/config-loader'
 import { fixtureCopy } from './scratch'
 
 setDefaultTimeout(120_000)
@@ -43,6 +44,9 @@ async function problems(ui: string, use = 'Tile(title="t")\nUnion\n', extra: Rec
       Bun.write(join(root, 'src/ui.ts'), ui),
       ...Object.entries(extra).map(async ([file, text]) => Bun.write(join(root, file), text)),
     ])
+
+    if (Object.hasOwn(extra, 'kay.config.ts'))
+      await loadConfig(root)
 
     return (await check(root)).map(problem => problem.message)
   }
@@ -163,5 +167,23 @@ describe('a value added to a kayjs-ui component', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('an extension ui file', () => {
+  const config = 'export default { extensions: [{ name: \'shared\', ui: \'./node_modules/shared/ui.ts\' }] }\n'
+  const layer = (entry: string) => `export default { Tile: ${entry} }\n`
+
+  it('adds a variant value templates may pass, with no entry in the app\'s own src/ui.ts', async () => {
+    const extra = { 'kay.config.ts': config, 'node_modules/shared/ui.ts': layer('{ variants: { tone: { brand: { head: \'bg-blue-700\' } } } }') }
+
+    expect(await problems('export default {}\n', 'Tile(title="t" tone="brand")\nUnion\n', extra)).toEqual([])
+    expect((await problems('export default {}\n', 'Tile(title="t" tone="other")\nUnion\n', extra)).length).toBeGreaterThan(0)
+  })
+
+  it('reports a part the component lacks, in the extension\'s file', async () => {
+    const extra = { 'kay.config.ts': config, 'node_modules/shared/ui.ts': layer('{ parts: { nope: \'p-1\' } }') }
+
+    expect((await problems('export default {}\n', 'Tile(title="t")\n', extra)).some(message => message.includes('no part `nope`'))).toBe(true)
   })
 })

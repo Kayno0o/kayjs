@@ -322,6 +322,37 @@ describe('kay build', () => {
     }
   })
 
+  it('compiles a component a worker imports with the ui files of the extensions, as the app\'s own are', async () => {
+    const project = await scratchDir('kay-worker-ui-')
+    const files = {
+      'kay.config.ts': 'export default { extensions: [{ name: \'shared\', ui: \'./ext/ui.ts\' }] }\n',
+      'ext/ui.ts': 'export default { Thing: { parts: { head: \'layer-marker-xyz\' } } }\n',
+      'src/thing.kay': 'section\n  header(part="head") a\n',
+      'src/echo.ts': 'import Thing from \'./thing.kay\'\n\npostMessage(Thing)\n',
+      'src/lab.kay': '---\nimport { onMount } from \'kay\'\n\nonMount(() => {\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n})\n---\np lab\n',
+      'src/routes/index.kay': '---\nimport Lab from \'../lab.kay\'\n---\nLab\n',
+    }
+
+    await Promise.all(Object.entries(files).map(async ([file, content]) => Bun.write(join(project, file), content)))
+
+    const build = devBuilder(project, {})
+    const cwd = process.cwd()
+
+    try {
+      process.chdir(project)
+      await loadConfig(project)
+      expect((await build(null)).failed).toBe(false)
+
+      const written = await Promise.all((await Array.fromAsync(new Bun.Glob('**/*.js').scan(clientDir(project)))).map(async file => Bun.file(join(clientDir(project), file)).text()))
+
+      expect(written.some(text => text.includes('layer-marker-xyz'))).toBe(true)
+    }
+    finally {
+      process.chdir(cwd)
+      await rm(project, { recursive: true, force: true })
+    }
+  })
+
   it('bundles a worker again in kay dev when it names a file by import.meta.url, whose own files its inputs do not list', async () => {
     const project = await scratchDir('kay-worker-ships-')
     const files = {

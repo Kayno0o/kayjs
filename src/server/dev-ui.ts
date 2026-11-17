@@ -6,7 +6,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { findKayLibraries } from '../build/libraries'
-import { classesOf, componentFile, componentsNamed, exported, forgetNames, isComponentName, keyOf, UI_FILE, uiOf } from '../build/ui'
+import { classesOf, componentFile, componentsNamed, exported, forgetNames, isComponentName, keyOf, UI_FILE, uiEntryOf, uiOf } from '../build/ui'
 import { appSpecifier, styleInfo, themeTokens, tokensNamedBy } from '../build/ui-info'
 import { parseProgram } from '../compiler/estree'
 import { unwrapped } from '../compiler/object-literal'
@@ -221,7 +221,7 @@ export async function devUi(root: string, request: Request): Promise<Response> {
 
   const { info, libraries } = found
   const ui = uiOf(root)
-  const set = ui?.components.findLast(component => componentFile(ui, component) === info.file)?.entry
+  const set = uiEntryOf(root, info.file)
   const own = (part: string): string | undefined => {
     if (typeof set?.parts === 'string')
       return part === 'root' ? set.parts : undefined
