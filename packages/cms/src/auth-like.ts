@@ -21,7 +21,7 @@ interface AuthLike {
 interface OrganizationsLike {
   list?: () => Promise<MembershipLike[]>
   isMember?: (organization: string, role?: string) => Promise<boolean>
-  members?: (organization: string) => Promise<{ ok: true, members: { user: { id: unknown }, roles: readonly string[] }[] } | { ok: false }>
+  listMembers?: (organization: string) => Promise<{ ok: true, members: { user: { id: unknown }, roles: readonly string[] }[] } | { ok: false }>
 }
 
 interface MemberLike {
@@ -128,7 +128,7 @@ export async function organizationMembers(auth: AuthLike, keys: readonly string[
 
   const organizations = auth.organizations
 
-  if (wanted.length === 0 || typeof organizations?.list !== 'function' || typeof organizations.members !== 'function')
+  if (wanted.length === 0 || typeof organizations?.list !== 'function' || typeof organizations.listMembers !== 'function')
     return []
 
   const memberships = await organizations.list()
@@ -141,7 +141,7 @@ export async function organizationMembers(auth: AuthLike, keys: readonly string[
       if (organization !== undefined && !inOrganization(membership, organization))
         continue
 
-      const listed = await organizations.members(membership.organization.id)
+      const listed = await organizations.listMembers(membership.organization.id)
 
       for (const member of listed.ok ? listed.members : []) {
         if (member.roles.includes(role) && String(member.user.id) !== except)

@@ -21,7 +21,7 @@ The rest is split by topic, each file read whole with one command:
 - [The prebuilt admin pages](llms/admin-pages.md): users, roles, bans, impersonation, the audit log and the banner
 - [The prebuilt organization pages](llms/organization-pages.md): the account tab for organizations, members, roles and invitations, and the invitation page
 - [Bots, breached passwords, limits, stores, testing and the dev tool](llms/hardening-and-testing.md): proof of work, breached passwords, limits, stores, testing, the dev tool
-- [The signed-in user in templates](llms/signed-in-components.md): SignedIn, SignedOut, UserMenu and ImpersonationBanner, read in the first bytes of the pages using them
+- [The signed-in user in templates](llms/signed-in-components.md): SignedIn (with `require` and `@else`), SignOutButton, SignInLink, UserMenu and ImpersonationBanner, read in the first bytes of the pages using them
 
 ## Environment
 

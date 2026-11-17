@@ -47,7 +47,7 @@ function authOf(id: string, siteRoles: string[], orgs: Org[]) {
 
         return org !== undefined && (role === undefined || heldIn(org).some(held => hierarchy[held]?.includes(role)))
       },
-      members: async (ref: string) => ({ ok: true as const, members: orgs.find(org => org.id === ref || org.slug === ref)!.members }),
+      listMembers: async (ref: string) => ({ ok: true as const, members: orgs.find(org => org.id === ref || org.slug === ref)!.members }),
     },
     userIdsHolding: async (role: string) => siteUsers.filter(user => user.roles.some(held => hierarchy[held]?.includes(role))).map(user => user.id),
   }
