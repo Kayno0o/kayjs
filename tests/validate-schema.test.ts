@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { t } from 'elysia'
 import { s } from '../src/runtime/schema'
 import { isRefusal, messagesOf, validate, validateNow } from '../src/server/validate'
 
@@ -55,6 +56,12 @@ describe('validate', () => {
     expect(await refusedPaths({ name: 'ab', extra: 'x' }, 'query')).toEqual(['extra'])
     expect(await validate(schema, { name: 'ab', extra: 'x', go: 'Save' }, { source: 'form' })).toEqual({ value: { name: 'ab' } })
     expect(await validate(s.object({ a: s.string() }, { extra: 'strip' }), { a: 'x', b: 1 }, { source: 'json' })).toEqual({ value: { a: 'x' } })
+  })
+
+  it('keeps the fields a form posts to an object that takes any key, as a form of fields the app names at run time is', async () => {
+    const open = t.Object({}, { additionalProperties: true })
+
+    expect(await validate(open, { displayName: 'Ada', bio: 'Maths' }, { source: 'form' })).toEqual({ value: { displayName: 'Ada', bio: 'Maths' } })
   })
 
   it('drops a key an object of the old builders does not name, inside a union and a list too', async () => {

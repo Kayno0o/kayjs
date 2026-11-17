@@ -138,7 +138,7 @@ function withDefaults(schema: unknown, value: unknown): unknown {
   return fields
 }
 
-// The keys an object that opted into `extra: 'strip'` is sent with that its shape lacks, dropped; `dropUnknown` does it for the top level whatever the object says.
+// The keys an object that opted into `extra: 'strip'` is sent with that its shape lacks, dropped; `dropUnknown` does it for the top level unless the object takes any key, as `additionalProperties: true` or a schema for them says.
 function stripped(schema: unknown, value: unknown, dropUnknown = false): unknown {
   if (!isNode(schema))
     return value
@@ -150,7 +150,8 @@ function stripped(schema: unknown, value: unknown, dropUnknown = false): unknown
     return value
 
   const shape = schema.properties
-  const keep = schema['x-kay-extra'] !== 'strip' && !dropUnknown
+  const open = schema.additionalProperties === true || isNode(schema.additionalProperties)
+  const keep = schema['x-kay-extra'] !== 'strip' && (!dropUnknown || open)
 
   return Object.fromEntries(Object.entries(value).filter(([name]) => keep || name in shape).map(([name, field]) => [name, name in shape ? stripped(shape[name], field) : field]))
 }
