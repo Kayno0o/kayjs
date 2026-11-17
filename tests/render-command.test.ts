@@ -194,7 +194,7 @@ describe('kay render under a base path', () => {
 
     expect(linked.code).toBe(0)
     expect(linked.out).toContain('<p>Survey</p>')
-    expect(linked.out).toContain('href="/docs/favicon.svg"')
+    expect(linked.out).toContain('href="/docs/favicon.svg?v=')
     expect(routed.code).toBe(0)
     expect(routed.out).toContain('<p>Survey</p>')
   })

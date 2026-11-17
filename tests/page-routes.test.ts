@@ -184,7 +184,7 @@ describe('pageResponder', () => {
       expect({ path, status: response.status }).toEqual({ path, status })
       expect(html).toContain(`<h1>Error ${status}</h1>`)
       expect(html).toContain('<a href="/b/home">Home</a>')
-      expect(html).toContain('href="/b/favicon.ico"')
+      expect(html).toContain('href="/b/favicon.ico?v=')
     }
   })
 })
