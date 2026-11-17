@@ -263,6 +263,9 @@ const goalStyle = (goal: ChartGoal) => {
 // The goals the plot draws, each with its style.
 const goalsDrawn = () => drawnGoals().map(goal => ({ goal, style: goalStyle(goal) })).filter((item): item is { goal: ChartGoal, style: string } => item.style !== undefined)
 
+// The goals the tooltip, the readings and the table name: those the drawn plot reaches, or all of them before it is drawn.
+const namedGoals = () => plot() ? goalsDrawn().map(item => item.goal) : drawnGoals()
+
 // The link of a mark that has an address, with the tab it opens in.
 const markLink = (item: PlacedEvent) => ({ href: item.event.href ?? '', ...tabOf(item.event.href, newTab) })
 
@@ -367,7 +370,7 @@ const announced = () => {
   const picked = span && span.from !== span.to ? `; ${heading(Math.min(span.from, span.to))} - ${heading(Math.max(span.from, span.to))}` : ''
 
   const to = linkAt(index)
-  const events = [...titlesAt(index), ...drawnGoals().map(goal => goalText(goal, formatValue))].map(title => `; ${title}`).join('')
+  const events = [...titlesAt(index), ...namedGoals().map(goal => goalText(goal, formatValue))].map(title => `; ${title}`).join('')
 
   return `${heading(index)}: ${readings}${events}${picked}${to ? `; ${to}` : ''}`
 }
@@ -739,7 +742,7 @@ div(part="root" {...rest} role="figure" aria-label={label})
         for title, at of titlesAt(hovered()!.index) key={at}
           div(part="tooltipEvent") {title}
       if uses('goals')
-        for goal, at of drawnGoals() key={at}
+        for goal, at of namedGoals() key={at}
           div(part="tooltipGoal") {goalText(goal, formatValue)}
   // A table box ignores the 1px size and clip of sr-only and would scroll the page by its full height, so the table sits in a block that carries them.
   div(part="data")
@@ -764,9 +767,9 @@ div(part="root" {...rest} role="figure" aria-label={label})
               td {totalText(index)}
             if uses('marks') && placed().length > 0
               td {titlesAt(index).join('; ')}
-      if uses('goals') && drawnGoals().length > 0
+      if uses('goals') && namedGoals().length > 0
         tfoot
-          for goal, at of drawnGoals() key={at}
+          for goal, at of namedGoals() key={at}
             tr
               th(scope="row") {goal.title}
               td(colSpan={series.length + (stacked ? 1 : 0) + (uses('marks') && placed().length > 0 ? 1 : 0)}) {formatValue(goal.value)}
