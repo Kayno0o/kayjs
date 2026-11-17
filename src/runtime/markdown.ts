@@ -45,12 +45,20 @@ function plain(text: string): string {
 
 const ENTITY_SPAN = /&#?\w+;/g
 
-// Whether a match starts or ends inside an entity, which would cut it in two: `amp` of `&amp;`.
-function cutsEntity(text: string, start: number, end: number): boolean {
-  for (const { index, 0: entity } of text.matchAll(ENTITY_SPAN)) {
-    const to = index + entity.length
+// The entities of a text as `[from, to)`, found in one pass.
+function entitySpans(text: string): [number, number][] {
+  return [...text.matchAll(ENTITY_SPAN)].map(({ index, 0: entity }) => [index, index + entity.length])
+}
 
-    if ((start > index && start < to) || (end > index && end < to))
+// Whether a match starts or ends inside an entity, which would cut it in two: `amp` of `&amp;`. Matches come in order, so `at` only moves forward over the spans.
+function cutsEntity(spans: [number, number][], at: { index: number }, start: number, end: number): boolean {
+  while (at.index < spans.length && spans[at.index]![1] <= start)
+    at.index++
+
+  for (let index = at.index; index < spans.length && spans[index]![0] < end; index++) {
+    const [from, to] = spans[index]!
+
+    if ((start > from && start < to) || (end > from && end < to))
       return true
   }
 
@@ -79,10 +87,12 @@ function inlined(text: string, inline: readonly { global: RegExp, render: Markdo
         return [part]
 
       const pieces: typeof parts = []
+      const spans = entitySpans(part.text)
+      const at = { index: 0 }
       let last = 0
 
       for (const match of part.text.matchAll(global)) {
-        const answer = match[0] === '' || cutsEntity(part.text, match.index, match.index + match[0].length) ? undefined : render([...match].map(group => plain(group ?? '')))
+        const answer = match[0] === '' || cutsEntity(spans, at, match.index, match.index + match[0].length) ? undefined : render([...match].map(group => plain(group ?? '')))
 
         // A hook answering anything but text or a link, `undefined` included, leaves the match as written.
         if (!isAnswer(answer))
