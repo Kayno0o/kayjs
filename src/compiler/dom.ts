@@ -1,5 +1,5 @@
 import type { ClassTable } from '../runtime/class-table'
-import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, PendingNode, SnippetNode, Span, TemplateFacts, TryNode } from './ast'
+import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, PendingNode, Span, TemplateFacts, TryNode } from './ast'
 import type { Declaration, DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import type { BindingPlan, LinkPlan } from './plan'
@@ -123,7 +123,7 @@ export class DomTemplate extends TemplateWriter {
     switch (item.kind) {
       case 'expression':
         b.add(`KayInsert(${at}, () => `)
-        this.here.expression(b, item.node.expression, this.src, this.formOf(item.line), helperName(this.scoping))
+        this.here.expression(b, item.node.expression, this.src, this.formOf(item.line))
         b.add(');')
 
         break
@@ -205,16 +205,11 @@ export class DomTemplate extends TemplateWriter {
     }
   }
 
-  protected override snippetDeclaration(node: SnippetNode): void {
-    if (!this.here.declare(this.b, node, this.source(node.name), this.facts.forms, helperName('formHere'), () => this.childrenValue(node.children)))
-      super.snippetDeclaration(node)
-  }
-
   private declaration(item: Declaration): void {
-    if (item.kind === 'snippet')
-      this.snippetDeclaration(item.node)
-    else
+    if (item.kind === 'const')
       this.b.wrap(item.node, () => constDeclaration(this.b, item.node, this.src, helperName('memo')))
+    else
+      this.snippetDeclaration(this.here.declared(item.node, this.src))
   }
 
   private if(node: IfNode, at: string): void {
@@ -773,20 +768,19 @@ export class DomTemplate extends TemplateWriter {
       b.add(`(${helperName('holdSubmits')}(), `)
 
     // The component's script runs inside the form's scope, so the fields it draws show the form's action's messages with no prop.
-    if (form)
-      b.add(`${helperName(this.scoping)}((`).addSource(form).add('), () => ')
+    const scoped = this.here.scope(b, form)
 
     b.add(dynamic ? 'KayDynamic(' : 'KayComponent(').addSource(element.tag).add(', ')
 
     this.componentProps(element, true)
     b.add(holds ? '))' : ')')
 
-    if (form)
+    if (scoped)
       b.add(')')
   }
 
   protected rendered(nodes: Node[]): void {
-    this.block(nodes)
+    this.here.within(this.b, nodes, this.facts.forms, () => this.block(nodes))
   }
 
   // Inside an island a server island is a component as any other.

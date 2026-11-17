@@ -3119,6 +3119,9 @@ describe('an error and a pending line outside the form they render in, in an isl
   const awaited = site({ 'page.kay': PAGE, 'row.kay': ROW, 'main.kay': `${HEAD}---\nsnippet note\n  await ready\n    p Loading\n  then value\n    p.after {value}\n    error title\nform.a(action={add})\n  {note()}\n${BUTTONS}` })
   const rerendered = site({ 'page.kay': PAGE, 'row.kay': ROW, 'main.kay': `${HEAD}---\nsnippet note\n  if shown()\n    error title\nform.a(action={add})\n  {note()}\n${BUTTONS}` })
   const child = site({ 'page.kay': PAGE, 'row.kay': ROW, 'main.kay': `${HEAD}---\nform.a(action={add})\n  Row\nform.b(action={other})\n  Row\n${BUTTONS}` })
+  const PANEL = '---\nimport { add } from \'./page.kay\'\n---\nform.panel(action={add})\n  slot\n'
+  const given = site({ 'page.kay': PAGE, 'row.kay': ROW, 'panel.kay': PANEL, 'main.kay': `${HEAD.replace('import Row from \'./row.kay\'', 'import Panel from \'./panel.kay\'')}---\nPanel\n  error title\n${BUTTONS}` })
+  const chained = site({ 'page.kay': PAGE, 'row.kay': ROW, 'main.kay': `${HEAD}---\nsnippet inner(label)\n  error title\nsnippet outer(label)\n  {inner(label)}\nform.a(action={add})\n  {shown() ? outer('a') : null}\nform.b(action={other})\n  {outer('b')}\n${BUTTONS}` })
   const childLater = site({ 'page.kay': PAGE, 'row.kay': ROW_LATER, 'main.kay': `${HEAD}---\nform.a(action={add})\n  Row\n${BUTTONS}` })
 
   const refuse = () => spyOn(globalThis, 'fetch').mockImplementation((async () => new Response(stringify({ errors: { title: 'Too short' }, data: undefined }), { status: 422, headers: { 'x-kay-failure': '1' } })) as unknown as typeof fetch)
@@ -3189,6 +3192,18 @@ describe('an error and a pending line outside the form they render in, in an isl
       root.querySelector<HTMLElement>('.reveal')!.click()
       await settle()
       expect(shown(root)).toEqual(['Too short'])
+    })
+  })
+
+  it('shows the line of children handed to a component that draws its own form around them', async () => {
+    await posted(given, '#add', async (root) => {
+      expect(shown(root)).toEqual(['Too short'])
+    })
+  })
+
+  it('shows a snippet with parameters, called in a ternary and by another snippet, its own form', async () => {
+    await posted(chained, '#other', async (root) => {
+      expect(shown(root)).toEqual([null, 'Too short'])
     })
   })
 })
