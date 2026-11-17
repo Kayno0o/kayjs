@@ -8,17 +8,17 @@ async function* held() {
   await Bun.sleep(30_000)
 }
 
-export const reply = action({ messages: chatMessages({ maxItems: 50, attachments: { type: 'image/png' } }) }, ({ messages }) => messages.at(-1)?.content === 'Hold' ? held() : ask(messages), { maxSize: '2mb' })
+export const reply = action({ input: { messages: chatMessages({ maxItems: 50, attachments: { type: 'image/png' } }) }, maxSize: '2mb' }, ({ messages }) => messages.at(-1)?.content === 'Hold' ? held() : ask(messages))
 
 // The fake recorder's bytes are their own transcript, so a test says what was heard: `refuse` is refused as a provider's error would be, and `slow ...` takes a second.
-export const transcribe = action({ audio: s.file() }, async ({ audio }, ctx) => {
+export const transcribe = action({ input: { audio: s.file() }, maxSize: '1mb' }, async ({ audio }, ctx) => {
   const text = await audio.text()
 
   if (text.startsWith('slow '))
     await Bun.sleep(1000)
 
   return text === 'refuse' ? ctx.deny(422, { data: 'Too noisy to write down.' }) : { text }
-}, { maxSize: '1mb' })
+})
 
 // Reads a reply aloud: the fake speaks silence. A reply that says `Refuse` is refused as a provider's error would be.
 export const say = action({ text: s.string() }, async ({ text }, ctx) => text.includes('Refuse') ? ctx.deny(422, { data: 'Too long to read.' }) : speakData(text))

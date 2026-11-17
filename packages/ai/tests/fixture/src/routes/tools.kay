@@ -27,14 +27,14 @@ export const slow = action({}, async () => {
   return 'slow done'
 })
 
-export const limited = action({}, () => 'counted', { protect: { rateLimit: { max: 1, window: '1m' } } })
+export const limited = action({ input: {}, protect: { rateLimit: { max: 1, window: '1m' } } }, () => 'counted')
 
-export const vetoed = action({}, () => 'vetoed', { tool: false })
+export const vetoed = action({ input: {}, tool: false }, () => 'vetoed')
 
 export const upload = action({ photo: s.file() }, () => 'stored')
 
 // A read that names its calls for a chat.
-export const homeState = action({}, () => 'lit', { tool: { description: 'Reads the home', label: 'Read the home', readOnly: true } })
+export const homeState = action({ input: {}, tool: { description: 'Reads the home', label: 'Read the home', readOnly: true } }, () => 'lit')
 
 const tools = [addNote, refuses, sendsAway, breaks, slow, limited, wipe, homeState]
 
@@ -45,7 +45,7 @@ export const converse = action({ prompt: s.string({ max: 200 }), maxSteps: s.int
 })
 
 // A posted file shown to a model that calls tools, as an app's scan reader would.
-export const looks = action({ photo: s.file({ type: 'image/png' }) }, async ({ photo }) => await ask([{ role: 'user', content: 'look', attachments: [photo] }], { tools: [addNote], approval: false, provider: testing.provider }), { maxSize: '1mb' })
+export const looks = action({ input: { photo: s.file({ type: 'image/png' }) }, maxSize: '1mb' }, async ({ photo }) => await ask([{ role: 'user', content: 'look', attachments: [photo] }], { tools: [addNote], approval: false, provider: testing.provider }))
 
 export const watch = action({ prompt: s.string({ max: 200 }) }, ({ prompt }) => ask(prompt, { tools: [addNote, slow], approval: false, provider: testing.provider }).progress())
 
@@ -78,7 +78,7 @@ export const mixed = action({ prompt: s.string({ max: 200 }), twin: s.boolean({ 
 // A tool loop whose every call the visitor has not confirmed.
 export const unconfirmed = action({ prompt: s.string({ max: 200 }) }, ({ prompt }) => ask(prompt, { tools: [addNote], approval: () => false, provider: testing.provider }).progress())
 
-export const lookup = action({}, () => 'found', { tool: { description: 'Looks something up', readOnly: true } })
+export const lookup = action({ input: {}, tool: { description: 'Looks something up', readOnly: true } }, () => 'found')
 
 // A chat whose tools are asked about by default: the write waits for the visitor's Allow, the read does not.
 export const approving = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }) }), { min: 1, max: 50 }) }, ({ messages }) => ask(messages, { tools: [addNote, lookup], provider: testing.provider }).progress())

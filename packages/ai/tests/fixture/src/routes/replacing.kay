@@ -15,7 +15,7 @@ async function* say(text: string, mode: string | undefined) {
 
 let failed = false
 
-export const reply = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }), attachments: s.list(s.file({ type: 'image/png' }), { optional: true, max: 4 }) }), { min: 1, max: 50 }) }, ({ messages }) => {
+export const reply = action({ input: { messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }), attachments: s.list(s.file({ type: 'image/png' }), { optional: true, max: 4 }) }), { min: 1, max: 50 }) }, maxSize: '2mb' }, ({ messages }) => {
   const replacing = replaces()
   const last = messages.at(-1)!
 
@@ -27,6 +27,6 @@ export const reply = action({ messages: s.list(s.object({ role: s.enum(['user', 
   const mode = replacing && (last.content === 'hold' || last.content === 'silent') ? last.content : undefined
 
   return say(`${replacing ? `${replacing.kind}:${replacing.turns}` : 'fresh'} roles=${messages.map(message => message.role[0]).join('')} last=${last.content} files=${messages.reduce((sum, message) => sum + (message.attachments?.length ?? 0), 0)}`, mode)
-}, { maxSize: '2mb' })
+})
 ---
 p Replacing

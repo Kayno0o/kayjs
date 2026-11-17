@@ -1,7 +1,7 @@
 [.] action
 function action<const Honeypot extends string = never, Output = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & {
   input?: undefined;
-}, handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>): NoInputAction<Settled<Output>, Honeypot>
+}, handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>, ctxAfterEmptyInput: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>): NoInputAction<Settled<Output>, Honeypot>
 function action<Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & {
   input: Spec;
 }, handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof Static<Spec>, string>, object>) => Output | Promise<Output>): ServerAction<Spec, Settled<Output>, Honeypot>

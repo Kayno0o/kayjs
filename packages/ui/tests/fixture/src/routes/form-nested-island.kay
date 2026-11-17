@@ -1,7 +1,7 @@
 --- server
 import { action, s } from 'kay'
 
-export const nested = action({ name: s.string({ min: 2, max: 100 }) }, async () => undefined, { protect: { honeypot: 'website', minTime: '3s' } })
+export const nested = action({ input: { name: s.string({ min: 2, max: 100 }) }, protect: { honeypot: 'website', minTime: '3s' } }, async () => undefined)
 --- script
 import { signal } from 'kay'
 

@@ -1,11 +1,11 @@
 --- server
 import { action, s } from 'kay'
 
-export const contact = action({
+export const contact = action({ input: {
   name: s.string({ min: 2, max: 100 }),
   email: s.string({ format: 'email', max: 254 }),
   message: s.string({ min: 5, max: 2000 }),
-}, async () => undefined, { protect: { honeypot: 'website', minTime: '3s' } })
+}, protect: { honeypot: 'website', minTime: '3s' } }, async () => undefined)
 ---
 ---
 import ContactForm from '@kayjs/ui/contact-form.kay'
