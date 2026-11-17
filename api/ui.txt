@@ -3514,6 +3514,7 @@ component default
   status?: string | undefined;
   failure?: string | undefined;
   message?: string | undefined;
+  retry?: string | undefined;
   table?: string | undefined;
   caption?: string | undefined;
   head?: string | undefined;
@@ -3579,6 +3580,7 @@ component default
   status?: string | undefined;
   failure?: string | undefined;
   message?: string | undefined;
+  retry?: string | undefined;
   table?: string | undefined;
   caption?: string | undefined;
   head?: string | undefined;
@@ -3644,6 +3646,7 @@ component default
   status?: string | undefined;
   failure?: string | undefined;
   message?: string | undefined;
+  retry?: string | undefined;
   table?: string | undefined;
   caption?: string | undefined;
   head?: string | undefined;

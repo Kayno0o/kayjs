@@ -13,6 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - One `validate(schema, value, { source })` reads every input of an app, an action's, an API route's, a socket's and `defineEnv`'s, and refuses with `{ errors: [{ path, key, params, message }], status: 422 }` worded in the request's locale; a JSON body is never coerced, and a Standard Schema validator (Zod, ArkType) is accepted where a schema is ([schemas](schemas.md))
 - An island validates with the same schema: `validate(schema, value, { source })` from `kay` is the server's `validate` in the browser (JSON Schema built by the browser's `s`, a Standard Schema validator called as it is), its code a chunk the first call loads ([Schemas](schemas.md#schemas)).
 - `kay check` names a Standard Schema validator with no `~standard.jsonSchema` (`schema-without-json-schema`) where an action's `input` or an API route's `body`, `query`, `params`, `headers` or `cookie` takes it, in `.ts` modules and `.kay` fences ([Schemas](schemas.md#schemas)).
+- kayjs-ui's `Table` draws its failure row's retry as a plain button with a `retry` part, so an island holding a plain Table ships 6 KB less (the `Button`, its busy state and the icon set stay out unless the page uses them) ([restyle](https://git.kaynooo.fr/kaynooo/kayjs/src/branch/main/packages/ui/llms/restyle.md)).
 
 ## 1.106.0
 

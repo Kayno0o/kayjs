@@ -77,7 +77,7 @@ describe('Table rows from a source', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('Could not load the rows.')
     expect((errors[0] as Error).message).toBe('down')
 
-    click(root.querySelector('[role="alert"] button'))
+    click(root.querySelector('[role="alert"] [data-part="retry"]'))
     await settle()
 
     expect(root.querySelector('[role="alert"]')).toBeNull()
