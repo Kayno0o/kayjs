@@ -69,6 +69,26 @@ describe('deprecated-link-flags in the app\'s tests', () => {
     })
   })
 
+  it('finds a selector on a line after a regex literal holding a quote or slashes', async () => {
+    await withFiles({ 'tests/a.test.ts': 'const re = /\'/; page.find(\'[data-keep-scroll]\')\nconst url = /^https?:\\/\\//; page.find("[data-no-prefetch]")\nconst t = `${x} [data-no-transition] ${y}`\n' }, async (root) => {
+      const found = await linkFlagTests(root, undefined)
+
+      expect(found.map(d => [d.line, d.fixes?.[0]?.safe])).toEqual([[1, true], [2, true], [3, true]])
+    })
+  })
+
+  it('reports a read of dataset with a fix that is not safe, and a write with none', async () => {
+    const test = 'expect(link.dataset.keepScroll).toBe(\'\')\nif (!nav.dataset.noPrefetch) go()\nlink.dataset.keepScroll = \'\'\ndelete link.dataset.noTransition\nconst other = link.dataset.scroll\n'
+
+    await withFiles({ 'tests/a.test.ts': test }, async (root) => {
+      const found = await linkFlagTests(root, undefined)
+
+      expect(found.map(d => [d.line, d.fixes?.[0]?.safe])).toEqual([[1, false], [2, false], [3, undefined], [4, undefined]])
+      expect(found.flatMap(d => d.fixes?.[0]?.edits.map(edit => edit.text) ?? [])).toEqual(['(link.dataset.scroll === \'keep\')', '(nav.dataset.prefetch === \'false\')'])
+      expect(await applySafeFixes(root, found)).toBe(0)
+    })
+  })
+
   it('takes the level the config gives', async () => {
     await withFiles({ 'tests/a.test.ts': 'page.find(\'[data-keep-scroll]\')\n' }, async (root) => {
       expect((await linkFlagTests(root, { 'deprecated-link-flags': 'deny' })).map(d => d.severity)).toEqual(['error'])
