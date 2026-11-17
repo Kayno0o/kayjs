@@ -102,8 +102,7 @@ export const LOADED_HTML: SanitizeOptions = { ...MARKDOWN_KEPT, relativeUrls: tr
 const LOADED: SanitizeOptions = { ...LOADED_HTML, attributes: { ...MARKDOWN_KEPT.attributes, h1: ['id'], h2: ['id'], h3: ['id'], h4: ['id'], h5: ['id'], h6: ['id'], code: ['class'] } }
 // A link the sanitizer wrote that stays on the site: its `href` names no http(s) URL.
 const OWN_LINK = /<a href="((?!https?:\/\/)[^"]*)" rel="nofollow ugc">/gi
-// The only class and id kept on a code block and a heading: the language Markdown writes, and a slug in its shape, so a loader's text cannot pick a utility class or a camelCase global name.
-const CODE_CLASS = /<code class="(?!language-[\w+#.-]+")[^"]*">/g
+// The only id kept on a heading: a slug in its shape, so a loader's text cannot pick a camelCase global name (the sanitizer keeps no class on a code block but its language).
 const HEADING_ID = /<(h[1-6]) id="(?![\p{Ll}\p{N}][\p{Ll}\p{N}_-]*")[^"]*"/gu
 // The private characters standing for a component's placeholder while the sanitizer, which reads no tag name with a hyphen, goes over the rest.
 const HELD_PLACEHOLDER = /\uE010(\d+)\uE011|\uE012(\d+)\uE011|\uE013/g
@@ -241,7 +240,7 @@ export function countWords(html: string): number {
 function sanitizedComponents(html: string): string {
   const held = html.replace(PRIVATE_CHARS, char => `&#${char.codePointAt(0)};`).replace(PLACEHOLDER_TAG, (_, selfClosing: string | undefined, opening: string | undefined) => heldPlaceholder(selfClosing, opening))
 
-  return withoutInnerRel(sanitizedMarkdown(held, LOADED, false).replace(CODE_CLASS, '<code>').replace(HEADING_ID, '<$1').replace(HELD_PLACEHOLDER, (_, selfClosing: string | undefined, opening: string | undefined) => restoredPlaceholder(selfClosing, opening)))
+  return withoutInnerRel(sanitizedMarkdown(held, LOADED, false).replace(HEADING_ID, '<$1').replace(HELD_PLACEHOLDER, (_, selfClosing: string | undefined, opening: string | undefined) => restoredPlaceholder(selfClosing, opening)))
 }
 
 // The sanitizer marks every link as a user's; a link to the site or to a heading is the entry's own, so only one leaving the site keeps its `rel`.

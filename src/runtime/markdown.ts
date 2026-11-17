@@ -43,21 +43,37 @@ function plain(text: string): string {
   })
 }
 
+const ENTITY_SPAN = /&#?\w+;/g
+
+// Whether a match starts or ends inside an entity, which would cut it in two: `amp` of `&amp;`.
+function cutsEntity(text: string, start: number, end: number): boolean {
+  for (const { index, 0: entity } of text.matchAll(ENTITY_SPAN)) {
+    const to = index + entity.length
+
+    if ((start > index && start < to) || (end > index && end < to))
+      return true
+  }
+
+  return false
+}
+
+function isAnswer(answer: unknown): answer is string | { text: string, href: string } {
+  return typeof answer === 'string' || (typeof answer === 'object' && answer !== null && typeof (answer as { text?: unknown }).text === 'string' && typeof (answer as { href?: unknown }).href === 'string')
+}
+
 function drawn(answer: string | { text: string, href: string }, opensApart: boolean): string {
   if (typeof answer === 'string')
     return escapeText(answer)
 
   // The link goes through the sanitizer as any other, so an app's `href` built from a user's text cannot run script.
-  return sanitizeMarkup(`<a href="${escapeText(String(answer.href))}">${escapeText(String(answer.text))}</a>`, undefined, opensApart)
+  return sanitizeMarkup(`<a href="${escapeText(answer.href)}">${escapeText(answer.text)}</a>`, undefined, opensApart)
 }
 
 // The text of `html` with each match of `inline` replaced by what it renders to; every piece the app returns is escaped or sanitized, whatever the text holds.
-function inlined(text: string, inline: readonly MarkdownInline[], opensApart: boolean): string {
+function inlined(text: string, inline: readonly { global: RegExp, render: MarkdownInline['render'] }[], opensApart: boolean): string {
   let parts: { text: string, done: boolean }[] = [{ text, done: false }]
 
-  for (const { pattern, render } of inline) {
-    const global = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`)
-
+  for (const { global, render } of inline) {
     parts = parts.flatMap((part) => {
       if (part.done)
         return [part]
@@ -66,9 +82,10 @@ function inlined(text: string, inline: readonly MarkdownInline[], opensApart: bo
       let last = 0
 
       for (const match of part.text.matchAll(global)) {
-        const answer = match[0] === '' ? undefined : render([...match].map(group => plain(group ?? '')))
+        const answer = match[0] === '' || cutsEntity(part.text, match.index, match.index + match[0].length) ? undefined : render([...match].map(group => plain(group ?? '')))
 
-        if (answer === undefined)
+        // A hook answering anything but text or a link, `undefined` included, leaves the match as written.
+        if (!isAnswer(answer))
           continue
 
         pieces.push({ text: part.text.slice(last, match.index), done: false }, { text: drawn(answer, opensApart), done: true })
@@ -89,6 +106,7 @@ export function withInline(html: SafeHtml, inline: readonly MarkdownInline[] | u
   if (!inline || inline.length === 0)
     return html
 
+  const compiled = inline.map(({ pattern, render }) => ({ global: new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`), render }))
   let skipped = 0
   let result = ''
   let last = 0
@@ -96,7 +114,7 @@ export function withInline(html: SafeHtml, inline: readonly MarkdownInline[] | u
   for (const match of html.matchAll(MARKUP)) {
     const text = html.slice(last, match.index)
 
-    result += skipped > 0 ? text : inlined(text, inline, opensApart)
+    result += skipped > 0 ? text : inlined(text, compiled, opensApart)
     result += match[0]
     last = match.index + match[0].length
 
@@ -106,7 +124,7 @@ export function withInline(html: SafeHtml, inline: readonly MarkdownInline[] | u
 
   const tail = html.slice(last)
 
-  return vouch(result + (skipped > 0 ? tail : inlined(tail, inline, opensApart)))
+  return vouch(result + (skipped > 0 ? tail : inlined(tail, compiled, opensApart)))
 }
 
 // What Bun.markdown renders a user's Markdown with on the server, heading anchors aside.

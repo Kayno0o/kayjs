@@ -154,11 +154,16 @@ export function markdownHtml(markdown: string, options?: MarkdownOptions): SafeH
   if (markdown.length > MAX_LENGTH)
     return asWritten(markdown)
 
+  let html: SafeHtml
+
   try {
-    return withInline(sanitizedMarkdown(marked.parse(markdown) as string), options?.inline)
+    html = sanitizedMarkdown(marked.parse(markdown) as string)
   }
   // Thousands of nested quotes overflow marked's stack.
   catch {
     return asWritten(markdown)
   }
+
+  // Outside the guard above: a hook of the app's that throws is its bug, as it is on the server.
+  return withInline(html, options?.inline)
 }

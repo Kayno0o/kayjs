@@ -143,3 +143,14 @@ describe('sanitizeHtml outside links', () => {
     expect(clean('<a href="javascript:alert(1)">x</a>')).toBe('<a>x</a>')
   })
 })
+
+describe('the class of a code element', () => {
+  const options = { attributes: { code: ['class'] } }
+
+  it('keeps a language class and nothing else', () => {
+    expect(clean('<code class="language-ts">x</code>', options)).toBe('<code class="language-ts">x</code>')
+    expect(clean('<code class="fixed inset-0">x</code>', options)).toBe('<code>x</code>')
+    expect(clean('<code class="language-ts fixed">x</code>', options)).toBe('<code>x</code>')
+    expect(clean('<code class="language-ts">x</code>')).toBe('<code>x</code>')
+  })
+})

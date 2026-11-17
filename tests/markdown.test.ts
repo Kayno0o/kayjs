@@ -358,3 +358,37 @@ describe('markdownHtml inline extensions', () => {
     expect<string>(markdownHtml('@no @yes #t', { inline: [{ pattern: /x*/, render: () => 'z' }] })).toBe('<p>@no @yes #t</p>\n')
   })
 })
+
+describe('markdownHtml inline extensions on hostile text', () => {
+  it('never cuts an entity: a match inside &amp; or &quot; is left', () => {
+    const inline = [{ pattern: /amp|quot|gt|#(\d+)/, render: ([word]: string[]) => ({ text: word!, href: '/g' }) }]
+
+    for (const render of [markdownHtml, islandMarkdown]) {
+      expect<string>(render('Tom & Jerry say "hi" a > b ', { inline })).not.toContain('<a')
+      expect<string>(render('Tom & Jerry say "hi"', { inline })).toBe('<p>Tom &amp; Jerry say &quot;hi&quot;</p>\n')
+    }
+  })
+
+  it('lets a throwing hook throw on the server and in an island, and leaves an answer of no shape as written', () => {
+    const boom = [{ pattern: /xx/, render: () => {
+      throw new Error('boom')
+    } }]
+
+    for (const render of [markdownHtml, islandMarkdown])
+      expect(() => render('xx', { inline: boom })).toThrow('boom')
+
+    for (const render of [markdownHtml, islandMarkdown]) {
+      expect<string>(render('xx', { inline: [{ pattern: /xx/, render: () => null as never }] })).toBe('<p>xx</p>\n')
+      expect<string>(render('xx', { inline: [{ pattern: /xx/, render: () => ({ text: 'a' }) as never }] })).toBe('<p>xx</p>\n')
+    }
+  })
+
+  it('draws no href for a protocol-relative or data address, and works with a lookbehind pattern', () => {
+    const link = (pattern: RegExp) => [{ pattern, render: ([, to]: string[]) => ({ text: 't', href: to! }) }]
+
+    for (const render of [markdownHtml, islandMarkdown]) {
+      expect<string>(render('[[//evil.com]] [[data:text/html,x]]', { inline: link(/\[\[(.+?)\]\]/) })).toBe('<p><a>t</a> <a>t</a></p>\n')
+      expect<string>(render('a [[/x]]', { inline: link(/(?<=a )\[\[(.+?)\]\]/) })).toContain('<a')
+    }
+  })
+})
