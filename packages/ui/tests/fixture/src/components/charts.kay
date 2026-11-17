@@ -30,4 +30,5 @@ ContributionGraph#graph(label="Commits" color="green" today="2026-09-09" days={A
 BarChart#goaled(label="Mock exams" labels={['One', 'Two']} max={40} goals={[{ value: 29, title: 'Pass mark' }, { value: 50, title: 'Out of reach' }]} series={[{ name: 'Score', values: [18, 33] }]})
 BarChart#reaching(label="Mock exams" labels={['One']} goals={[{ value: 29, title: 'Pass mark' }]} series={[{ name: 'Score', values: [18] }]})
 LineChart#goaledLine(label="Scores" labels={DAYS} goals={[{ value: 29, title: 'Pass mark', color: 'green' }]} series={[{ name: 'Score', values: [18, 20, 25] }]})
+ScatterChart#widened(label="Games" goals={[{ value: 150, title: 'Ceiling' }]} points={[{ key: 1, label: 'Hades', x: 10, y: 90 }, { key: 2, label: 'Celeste', x: 30, y: 30 }]})
 ScatterChart#goaledDots(label="Games" y={{ domain: [0, 100] }} goals={[{ value: 70, title: 'Target' }, { value: 400, title: 'Off the chart' }]} points={[{ key: 1, label: 'Hades', x: 10, y: 90 }]})

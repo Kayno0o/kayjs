@@ -31,7 +31,7 @@ const { points, x = {}, y = {}, quadrant, goals, corners, onSelect, href, newTab
   points: Point[]
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined
-  // Goals across the y axis, such as a pass mark: a dashed rule at each `value` with its `title` written on it, named for screen readers; a goal outside the axis is left out.
+  // Goals across the y axis, such as a pass mark: a dashed rule at each `value` with its `title` written on it, named for screen readers; a goal beyond every point widens the axis to take it in, unless `y.domain` fixes it, and a goal outside a fixed domain is left out.
   goals?: ChartGoal[] | undefined
   // Guides through this point, splitting the plot into four regions that `corners` name.
   quadrant?: { x: number, y: number } | undefined
@@ -59,7 +59,7 @@ const { points, x = {}, y = {}, quadrant, goals, corners, onSelect, href, newTab
 }>()
 
 const xExtent = memo(() => axisExtent(points.map(point => point.x), x))
-const yExtent = memo(() => axisExtent(points.map(point => point.y), y))
+const yExtent = memo(() => axisExtent([...points.map(point => point.y), ...uses('goals') ? validGoals(goals).map(goal => goal.value) : []], y))
 const heaviest = memo(() => Math.max(...points.map(point => point.weight ?? 1)))
 
 // The goals the y axis reaches, in the order given.

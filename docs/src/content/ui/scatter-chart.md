@@ -12,7 +12,7 @@ A point has a `key`, a `label`, `x` and `y`, and a `weight` its dot's area follo
 
 ## Quadrants
 
-`goals={[{ value: 70, title: 'Target' }]}` draws a dashed rule across the plot at each value of the y axis, its `title` on it and read by screen readers; a goal outside the axis is left out. `quadrant` draws guides through a point and `corners` names the four regions they split.
+`goals={[{ value: 70, title: 'Target' }]}` draws a dashed rule across the plot at each value of the y axis, its `title` on it and read by screen readers. A goal beyond every point widens the y axis to take it in, unless `y.domain` fixes it; a goal outside a fixed domain is left out. `quadrant` draws guides through a point and `corners` names the four regions they split.
 
 ## Selecting a point
 

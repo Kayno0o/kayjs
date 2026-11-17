@@ -268,6 +268,15 @@ describe('goals', () => {
     expect(slider.getAttribute('aria-valuetext')).toBe('Wed: Score 25; Pass mark: 29')
   })
 
+  test('a ScatterChart widens its y axis to a goal beyond every point, and a fixed domain does not move', async () => {
+    const root = await charts()
+    const dots = root.querySelectorAll<HTMLElement>('#widened [data-part="dot"]')
+
+    expect(root.querySelector<HTMLElement>('#widened [data-part="goal"]')!.style.bottom).toBe('100%')
+    expect(dots[0]!.style.bottom).toBe('50%')
+    expect(dots[1]!.style.bottom).toBe('0%')
+  })
+
   test('a ScatterChart draws a goal inside its y axis, named for screen readers, and leaves one outside out', async () => {
     const root = await charts()
     const goals = root.querySelectorAll<HTMLElement>('#goaledDots [data-part="goal"]')
