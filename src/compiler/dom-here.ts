@@ -31,9 +31,9 @@ export class FormHere {
       b.add(this.current)
   }
 
-  // Opens the scope a component's script runs in, the form's action for the content of a block capturing it too; false when it has none.
+  // Opens the scope a component's script runs in, the action of the form around it in the file; false when it has none.
   scope(b: CodeBuilder, form: Span | undefined): boolean {
-    if (!form && this.names.length === 1)
+    if (!form)
       return false
 
     b.add(`${helperName('issueScope')}(`)

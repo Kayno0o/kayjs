@@ -40,4 +40,20 @@ describe('the same lines in an island', () => {
     expect(tsx).toMatch(/import \{[^}]*formHere as KayFormHere[^}]*\} from 'kay\/internal'/)
     expect(tsx).toMatch(/import \{[^}]*formError as KayFormError[^}]*\} from 'kay\/internal'/)
   })
+
+  it('capture the form once per snippet and per block of children holding one, and scope nothing in a file with no form', () => {
+    const file = join(process.cwd(), 'row.kay')
+    const children = compileKay('---\nimport Panel from \'./panel.kay\'\nimport Other from \'./other.kay\'\n---\nPanel\n  error title\n  Other\n', file, { output: 'dom', hydratable: true }).tsx
+    const snippet = compileKay('---\nimport Other from \'./other.kay\'\n---\nsnippet note\n  error title\n  Other\n{note()}\n', file, { output: 'dom', hydratable: true }).tsx
+    const nested = compileKay('---\nimport { add } from \'./add\'\n---\nsnippet inner(label)\n  error title\nsnippet outer(label)\n  {inner(label)}\nform(action={add})\n  {label ? outer(\'a\') : null}\n', file, { output: 'dom', hydratable: true }).tsx
+
+    expect(children).toContain('const KayHere1 = KayFormHere() ?? KayHere')
+    expect(snippet).toContain('const KayHere1 = KayFormHere() ?? KayHere')
+
+    for (const tsx of [children, snippet])
+      expect(tsx).not.toContain('KayIssueScope')
+
+    expect(nested).toContain('const KayHere1 = KayFormHere() ?? KayHere;')
+    expect(nested).toContain('KayIssueScope((add), () => (label ? outer(')
+  })
 })
