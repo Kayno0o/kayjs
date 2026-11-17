@@ -10,7 +10,7 @@ const FENCE = /^((?: {0,3}> ?)*)([ \t]*)(?:([-*+]|\d{1,9}[.)])([ \t]+))?(`{3,}|~
 const LIST_ITEM = /^(?: {0,3}> ?)*([ \t]*)([-*+]|\d{1,9}[.)])( {1,4})\S/
 const INDENT = /^(?: {0,3}> ?)*([ \t]*)\S/
 // The class naming a block's language does not survive the sanitizing of a reply, so the language is read from the fence.
-const RENDERED_BLOCK = /<pre><code>([\s\S]*?)<\/code><\/pre>/
+const RENDERED_BLOCK = /<pre><code(?: class="language-[^"]*")?>([\s\S]*?)<\/code><\/pre>/
 const FIRST_WORD = /^\S+/
 const ENTITY = /&(amp|lt|gt|quot);/g
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"' }
