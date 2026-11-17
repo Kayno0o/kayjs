@@ -32,6 +32,7 @@ export const LLMS_SCAN = /[`'"](?:packages\/\*\/)?llms\/[^`'"]*\*/
 export const SOURCE_FILE_READERS: [RegExp, string[]][] = [
   [/^packages\/ui\/src\/theme\.css$/, ['tests/add.test.ts', 'tests/apply-theme.test.ts', 'tests/format-tailwind.test.ts', 'tests/new-starter.test.ts', 'tests/prune-styles.test.ts', 'tests/inbox.test.ts', 'tests/command-options.test.ts']],
   [/^packages\/ui\/src\/bell\.kay$/, ['tests/library-context-check.test.ts']],
+  [/^packages\/ui\/src\/table\.kay$/, ['tests/variants.test.ts']],
 ]
 
 // What marks a test as reading one source file other than a `.ts`: a quoted path of a file in `src/` or `packages/<library>/src/` from the repo root (`../`, `packages/` or `resolve('src/`), on a line reading it.
