@@ -21,8 +21,19 @@ FormatRegistry.Set('url', isUrl)
 
 const HTTP_URL = /^https?:/i
 
+// `new URL` in a try, as URL.canParse is past the browsers kay supports (Safari 17).
 function isUrl(value: string): boolean {
-  return URL.canParse(value) && HTTP_URL.test(value)
+  if (!HTTP_URL.test(value))
+    return false
+
+  try {
+    void new URL(value)
+
+    return true
+  }
+  catch {
+    return false
+  }
 }
 
 // The most items a list takes when its builder is given no `max`.
