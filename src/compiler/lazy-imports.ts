@@ -357,6 +357,6 @@ export function lazyEdits(imports: readonly ImportBinding[], span: Span, lazy: R
     // The module says which keys it imports lazily, once, after the last, so every key is registered by then.
     const ready = found.declaration.start === last ? `\n${helperName('ready')}(${JSON.stringify(moduleId)}, ${JSON.stringify([...lazy?.values() ?? []].map(other => other.key))})` : ''
 
-    return [{ ...found.declaration, text: mode === 'dom' ? `const ${binding.local} = ${helperName('lazy')}(${key}, () => import(${specifier}))${ready}` : `import ${eager} from ${specifier}\nconst ${binding.local} = ${helperName('lazyNote')}(${key}, ${eager})` }]
+    return [{ ...found.declaration, text: mode === 'dom' ? `const ${binding.local} = ${helperName('lazy')}(${key}, () => import(${specifier}))${ready}` : `import ${eager} from ${specifier}\nconst ${binding.local} = ${helperName('lazyNote')}(${key}, () => ${eager})` }]
   })
 }

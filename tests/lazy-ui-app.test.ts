@@ -1,5 +1,6 @@
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { testSite } from '../src/test'
+import { browserPath, testSite } from '../src/test'
 
 const PRELOADS = /<link rel="modulepreload" href="([^"]*)"/g
 const FIXTURE = 'tests/fixtures/lazy-app'
@@ -38,4 +39,31 @@ describe('a component an island draws lazily', () => {
       }
     }, 90_000)
   }
+})
+
+const path = browserPath()
+
+// CI installs Chromium for these: there, a missing browser fails rather than skipping.
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island whose lazy part imports it back', () => {
+  it('hydrates what the server drew, and loads the part when a closed branch opens', async () => {
+    const site = await testSite({ root: FIXTURE, browser: { path } })
+
+    try {
+      const page = await site.open('/')
+
+      await page.click('button.heavy')
+      await page.waitFor('button.heavy', { text: 'Heavy 1' })
+
+      const closed = await site.open('/closed')
+
+      await closed.click('button.toggle')
+      await closed.click('button.heavy')
+      await closed.waitFor('button.heavy', { text: 'Heavy 1' })
+
+      expect([...page.errors, ...closed.errors]).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 90_000)
 })

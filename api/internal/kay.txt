@@ -848,7 +848,7 @@ class IslandPropsError
   status: number | undefined
 
 [./island] lazyNote
-function lazyNote<P>(key: string, component: (props: P) => unknown): (props: P) => unknown
+function lazyNote<P>(key: string, component: () => (props: P) => unknown): (props: P) => unknown
 
 [./island] noteMessage
 function noteMessage(key: string): void

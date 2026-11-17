@@ -109,11 +109,12 @@ export function collectIslands<T>(render: () => T, salt?: string, chunks?: Recor
 let drawn: Set<string> | undefined
 
 // A component the browser loads when it draws (`KayLazy` in the island's code): drawing it here is the same call, which tells the island its code is needed before it hydrates.
-export function lazyNote<P>(key: string, component: (props: P) => unknown): (props: P) => unknown {
+// The component is read when it draws, as a module importing it back may still be loading when this one is.
+export function lazyNote<P>(key: string, component: () => (props: P) => unknown): (props: P) => unknown {
   return (props) => {
     drawn?.add(key)
 
-    return component(props)
+    return component()(props)
   }
 }
 

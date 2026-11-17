@@ -247,7 +247,7 @@ async function land(entry: Loadable, key: string, anchor: Node, gone: () => bool
     draw(component)
 }
 
-// Loads the keys the server markup of an island drew, and what their modules import in turn, so the markup is claimed as it stands. It runs before the island hydrates, not in a module's own top level: a chunk may import the module that asks for it, which then waits on itself. A chunk that fails to load is left: its branch draws afresh and loads again, which retries and reports.
+// Loads the keys an island's server markup drew before it hydrates, not in a module's top level, where a chunk importing its asker would wait on itself. A failed chunk is left to its branch, which draws afresh, retries and reports.
 export async function loadDrawn(island: HTMLElement): Promise<void> {
   const asked = [...island.querySelectorAll<HTMLElement>('[data-lazy]'), island].flatMap(element => element.dataset.lazy?.split(' ') ?? [])
   const tried = new Set<string>()
