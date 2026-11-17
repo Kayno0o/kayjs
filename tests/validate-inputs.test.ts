@@ -44,6 +44,17 @@ describe('the inputs of an API route', () => {
   })
 })
 
+describe('a guard\'s schema beside the route\'s', () => {
+  it('reads each schema from what was posted, a form as JSON', async () => {
+    const form = await app.handle(new Request(`${ORIGIN}/api/inputs/both`, { method: 'POST', body: new URLSearchParams({ guarded: 'g', own: 'o' }) }))
+    const json = await app.handle(new Request(`${ORIGIN}/api/inputs/both`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ guarded: 'g', own: 'o' }) }))
+
+    expect(form.status).toBe(200)
+    expect(await form.json()).toEqual({ guarded: 'g', own: 'o' })
+    expect(json.status).toBe(200)
+  })
+})
+
 describe('validate in a locale', () => {
   const schema = s.object({ name: s.string({ min: 3 }) })
   const state = (messages: [string, string][]): LocaleState => ({ locale: 'fr', messages: new Map(messages), settings: { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false }, path: '/' })

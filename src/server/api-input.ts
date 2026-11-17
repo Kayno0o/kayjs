@@ -31,7 +31,7 @@ export function declaredInputs(hooks: unknown): Partial<Record<Input, object>> {
   return (hooks as Hooks | undefined)?.[DECLARED] ?? {}
 }
 
-// A query, the headers and the cookies of a request carry what the schema does not name, which is dropped, not refused.
+// A query, the headers and the cookies of a request carry what the schema does not name, which is dropped, not refused; so does a body or params with several schemas, a guard's beside the route's, each naming fields the others lack.
 function lenient(schema: object): object {
   if (isStandardSchema(schema))
     return schema
@@ -94,7 +94,7 @@ export function validatingInputs(hooks: unknown, inLocale: <T>(request: Request,
   if (Object.keys(declared).length === 0)
     return
 
-  const checked: Partial<Record<Input, object[]>> = Object.fromEntries(Object.entries(all).map(([input, schemas]) => [input, input === 'body' || input === 'params' ? schemas : schemas.map(lenient)]))
+  const checked: Partial<Record<Input, object[]>> = Object.fromEntries(Object.entries(all).map(([input, schemas]) => [input, (input === 'body' || input === 'params') && schemas.length === 1 ? schemas : schemas.map(lenient)]))
 
   route[DECLARED] = declared
 
@@ -105,14 +105,15 @@ export function validatingInputs(hooks: unknown, inLocale: <T>(request: Request,
     if (schemas === undefined)
       return given
 
-    let value = given
+    // Each schema reads what was sent, not what another dropped from it: a form post loses the fields a schema does not name, and a guard's schema names others than the route's.
+    const outputs: unknown[] = []
     const refused = new Map<string, Issue>()
 
     for (const schema of schemas) {
-      const result = await inLocale(request, async () => validate(schema, value, { source: sourceOf(input, request) }))
+      const result = await inLocale(request, async () => validate(schema, given, { source: sourceOf(input, request) }))
 
       if (!isRefusal(result)) {
-        value = result.value
+        outputs.push(result.value)
 
         continue
       }
@@ -126,7 +127,9 @@ export function validatingInputs(hooks: unknown, inLocale: <T>(request: Request,
     if (refused.size > 0)
       throw new InputRefused(input, [...refused.values()])
 
-    return value
+    const plain = outputs.every(output => typeof output === 'object' && output !== null && !Array.isArray(output))
+
+    return plain ? Object.assign({}, ...outputs) as unknown : outputs.at(-1)
   }
 
   // One hook per input, each naming its own property and never passing the context on: Elysia reads a hook's source to know what to parse, so a route declaring only a `query` leaves its body to the handler.
