@@ -463,7 +463,7 @@ The title is text, never HTML. The link is kept only when it is a path of your s
 
 ### Push
 
-Add `push()` to `extensions` and a person who opts in also gets each `notify` as a push on their phone or computer, with no second call. `kay push keys` prints the two `VAPID_*` variables for production. An island opts the visitor in from a click:
+Add `push()` to `extensions` and a person who opts in also gets each `notify` as a push on their phone or computer, with no second call. `kay push keys` prints the two `VAPID_*` variables for production. The push carries the person's unread count, which the worker shows as the badge on the installed app's icon while no page is open; `badge: false` in `notify` leaves the badge alone. An island opts the visitor in from a click:
 
 ```kay
 ---

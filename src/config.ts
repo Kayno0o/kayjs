@@ -439,6 +439,17 @@ export interface ManifestConfig {
   maskable?: string | undefined
   // The pages a launcher offers from the app's icon.
   shortcuts?: ManifestShortcut[] | undefined
+  // Lists the installed app among the apps a device's share sheet offers, the shared title, text, link and files posted to an action.
+  shareTarget?: ManifestShareTarget | undefined
+}
+
+export interface ManifestShareTarget {
+  // Where a share is posted: an action as `'src/routes/share.kay#receive'`, the page file relative to the root and the exported action's name, or a path of the site (`'/share'`) for a route of your own taking a POST. The action reads `title`, `text`, `url` and `files`, whichever the sharing app sent, all optional.
+  action: string
+  // The kinds of file the app takes, as MIME types or extensions (`['image/*', '.pdf']`); with some the share is posted as `multipart/form-data` and the action reads them as `files`, without any only text and a link are shared.
+  files?: string[] | undefined
+  // The field each part of a share is posted as, `title`, `text`, `url` and `files` by default.
+  params?: { title?: string | undefined, text?: string | undefined, url?: string | undefined, files?: string | undefined } | undefined
 }
 
 export interface ManifestShortcut {

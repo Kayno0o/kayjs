@@ -63,6 +63,8 @@ export interface NotifyOptions {
   ttl?: Duration | undefined
   // `false` keeps the notification in the inbox alone, without the push a person who opted in would get with `push()` listed.
   push?: boolean | undefined
+  // `false` leaves the installed app's badge alone: the push otherwise carries the person's unread count, which the worker shows as the app badge.
+  badge?: boolean | undefined
 }
 
 export const MAX_TITLE = 200
@@ -278,7 +280,7 @@ function changed(user: string): void {
 
 // Puts a notification in a person's inbox, which the `Bell` of kayjs-ui shows with its unread count and updates in every open tab. `user` is the id kayjs-auth, or whatever names the request's user, gives.
 // The store is the app's `store.notifications`, which `sqliteData` and `pgData` fill; with none it is this process's memory. A notification is dropped after `ttl`, 90 days by default.
-export async function notify(user: string, { title, url, ttl, push }: NotifyOptions): Promise<Notification> {
+export async function notify(user: string, { title, url, ttl, push, badge }: NotifyOptions): Promise<Notification> {
   const id = checkedUser(user)
   const text = typeof title === 'string' ? title.replaceAll('\0', '').trim() : ''
 
@@ -297,7 +299,7 @@ export async function notify(user: string, { title, url, ttl, push }: NotifyOpti
   changed(id)
 
   if (push !== false)
-    pushAlongside(id, { title: text, url: link })
+    pushAlongside(id, { title: text, url: link }, badge === false ? undefined : async () => notificationStore().unread(id, Date.now()))
 
   return { id: note.id, title: note.title, ...link === undefined ? {} : { url: link }, createdAt: new Date(createdAt), read: false }
 }

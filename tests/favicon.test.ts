@@ -454,3 +454,26 @@ describe('favicon', () => {
     expect((await readdir(join(scratch, 'built'))).sort()).toEqual(['apple-touch-icon.png', 'favicon.ico', 'icon-192.png', 'icon-512.png'])
   })
 })
+
+describe('the manifest\'s share target', () => {
+  it('posts a link and text as a urlencoded form to a route of the site, under the mount point', () => {
+    const manifest = JSON.parse(manifestJson('Kay site', undefined, { shareTarget: { action: '/share', params: { url: 'link' } } }, '/docs')) as { share_target: unknown }
+
+    expect(manifest.share_target).toEqual({ action: '/docs/share', method: 'POST', enctype: 'application/x-www-form-urlencoded', params: { title: 'title', text: 'text', url: 'link' } })
+  })
+
+  it('leaves it out unless asked', () => {
+    expect(JSON.parse(manifestJson('Kay site', undefined, {}))).not.toHaveProperty('share_target')
+  })
+
+  it.each([
+    ['an action with no export name', { action: 'src/routes/share.kay' }],
+    ['a protocol-relative action', { action: '//example.com/share' }],
+  ])('refuses %s', (_name, shareTarget) => {
+    expect(() => manifestJson('Kay site', undefined, { shareTarget })).toThrow('kay: the manifest\'s shareTarget.action is an action as')
+  })
+
+  it('refuses an action outside the scope', () => {
+    expect(() => manifestJson('Kay site', undefined, { scope: '/app/', shareTarget: { action: 'src/routes/share.kay#receive' } })).toThrow('shareTarget.action, /_kay/action/src/routes/share.kay/receive, lies outside its scope /app/')
+  })
+})

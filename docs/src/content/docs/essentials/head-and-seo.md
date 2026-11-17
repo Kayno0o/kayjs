@@ -263,6 +263,8 @@ kay serves the sizes browsers ask for, plus a web manifest, and links them from 
 
 The manifest also takes the installed app's `startUrl`, `scope`, `orientation`, `shortcuts` and a `maskable` image for launchers that crop icons.
 
+`shareTarget` lists the installed app in a device's share sheet. The shared title, text, link and files are posted to an action, named as its page file and export: `shareTarget: { action: 'src/routes/share.kay#receive', files: ['image/*'] }`. The action reads `title`, `text`, `url` and `files`, each optional, and usually ends with `ctx.redirect` to the page showing what was saved. `params` renames the fields.
+
 ```ts
 export default defineConfig({
   assets: {

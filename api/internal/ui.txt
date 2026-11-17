@@ -93,6 +93,9 @@ const addedIcons: Record<AddedSlot, IconProps>
 [./lib/announce] announce
 function announce(text: string, within?: Element | null): void
 
+[./lib/app-badge] setAppBadge
+function setAppBadge(count: number): Promise<void>
+
 [./lib/app-switcher] SwitcherApp
 interface SwitcherApp
   color?: string | undefined

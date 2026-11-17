@@ -249,6 +249,8 @@ describe('sendPush', () => {
     await expect(sendPush('ada', { title: 'a'.repeat(201) })).rejects.toMatchObject({ code: 'argument-invalid' })
     await expect(sendPush('ada', { title: 'x', body: 'a'.repeat(501) })).rejects.toMatchObject({ code: 'argument-invalid' })
     await expect(sendPush('ada', { title: 'x', tag: 'a'.repeat(65) })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(sendPush('ada', { title: 'x', badge: -1 })).rejects.toMatchObject({ code: 'argument-invalid' })
+    await expect(sendPush('ada', { title: 'x', badge: 1.5 })).rejects.toMatchObject({ code: 'argument-invalid' })
     await expect(sendPush('ada', { title: 'x' }, { topic: 'bad topic' })).rejects.toMatchObject({ code: 'argument-invalid' })
     await expect(sendPush('ada', { title: 'x' }, { urgency: 'now' as 'high' })).rejects.toMatchObject({ code: 'argument-invalid' })
     await expect(sendPush('', { title: 'x' })).rejects.toMatchObject({ code: 'argument-invalid' })
@@ -398,8 +400,26 @@ describe('notify', () => {
 
     await pushesSettled()
     expect(received).toHaveLength(1)
-    expect(JSON.parse(new TextDecoder().decode(await decryptPayload(received[0]!.body, phone.keys, phone.auth)))).toEqual({ title: 'Order shipped', url: '/orders/12' })
+    expect(JSON.parse(new TextDecoder().decode(await decryptPayload(received[0]!.body, phone.keys, phone.auth)))).toEqual({ title: 'Order shipped', url: '/orders/12', badge: 1 })
     expect(note.title).toBe('Order shipped')
+  })
+
+  it('carries the unread count for the app badge, none with badge false', async () => {
+    const phone = await device('phone')
+
+    await notifications.erase('ada')
+    await subscribe('ada', phone)
+    // The count is read as each push goes out, so each settles before the next notification.
+    await notify('ada', { title: 'One' })
+    await pushesSettled()
+    await notify('ada', { title: 'Two' })
+    await pushesSettled()
+    await notify('ada', { title: 'Three', badge: false })
+    await pushesSettled()
+
+    const payloads = await Promise.all(received.map(async each => JSON.parse(new TextDecoder().decode(await decryptPayload(each.body, phone.keys, phone.auth))) as { title: string, badge?: number }))
+
+    expect(Object.fromEntries(payloads.map(({ title, badge }) => [title, badge]))).toEqual({ One: 1, Two: 2, Three: undefined })
   })
 
   it('pushes nothing to a person who did not opt in, nor when push is false', async () => {

@@ -1,5 +1,5 @@
 import type { Elysia } from 'elysia'
-import type { FaviconConfig, ManifestConfig } from '../config'
+import type { FaviconConfig, ManifestConfig, ManifestShareTarget } from '../config'
 import type { HeadTag } from '../runtime/head'
 import type { Localized } from '../runtime/localized'
 import type { ServedPaths } from './served-paths'
@@ -7,6 +7,7 @@ import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { SVG_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
+import { actionUrl } from '../runtime/action'
 import { localizedText } from '../runtime/localized'
 import { kayLog } from '../runtime/log'
 import { revalidated } from './public'
@@ -316,7 +317,28 @@ export function manifestJson(name: string | undefined, description: string | und
     theme_color: typeof manifest.themeColor === 'object' ? manifest.themeColor.light : manifest.themeColor,
     background_color: manifest.backgroundColor,
     shortcuts: manifest.shortcuts?.map((shortcut, index) => ({ name: shortcut.name, short_name: shortcut.shortName, description: shortcut.description, url: page(shortcut.url, `shortcuts[${index}].url`) })),
+    share_target: manifest.shareTarget === undefined ? undefined : shareTargetJson(manifest.shareTarget, page),
   })
+}
+
+// An action written as its page file and export name is served at the URL `actionUrl` gives it; a path is a route of the site.
+const ACTION_REFERENCE = /^(?:\.\/)?([^#\\]+\.kay)#([A-Z_a-z$][\w$]*)$/
+
+function shareTargetJson(share: ManifestShareTarget, page: (path: string, what: string) => string): object {
+  const reference = ACTION_REFERENCE.exec(share.action)
+
+  if (reference === null && !SITE_PATH.test(share.action))
+    throw new KayError('favicon-invalid', `kay: the manifest's shareTarget.action is an action as 'src/routes/share.kay#receive' or a path of the site such as '/share', not ${JSON.stringify(share.action)}`)
+
+  const files = share.files ?? []
+  const { title = 'title', text = 'text', url = 'url', files: field = 'files' } = share.params ?? {}
+
+  return {
+    action: page(reference === null ? share.action : actionUrl(reference[1]!, reference[2]!), 'shareTarget.action'),
+    method: 'POST',
+    enctype: files.length > 0 ? 'multipart/form-data' : 'application/x-www-form-urlencoded',
+    params: { title, text, url, ...files.length > 0 && { files: [{ name: field, accept: files }] } },
+  }
 }
 
 function sitePath(path: string, what: string): string {

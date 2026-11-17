@@ -7,6 +7,7 @@ import type { PopoverLookButtonProps, PopoverPanelProps, PopoverPlacement, Popov
 import { call, effect, memo, recipe, resource, signal } from 'kay'
 import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
+import { setAppBadge } from './app-badge'
 import IconButton from './icon-button.kay'
 import { withPopup } from './menu'
 import { MENU_FOOTER, MENU_ITEM, MENU_LIST } from './menu-look'
@@ -30,7 +31,7 @@ const look = recipe({
   },
 })
 
-const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, onRead, open, onOpenChange, item: drawRow, trigger, panelProps = {}, triggerProps = {}, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
+const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, appBadge = true, onRead, open, onOpenChange, item: drawRow, trigger, panelProps = {}, triggerProps = {}, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   // Names the button and the list it opens; the `ui.bell.label` message by default.
   label?: string | undefined
   placement?: PopoverPlacement | undefined
@@ -38,6 +39,8 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
   items?: BellItems<Item> | undefined
   // The unread count of a custom source; the unread items of `items` by default.
   unread?: number | undefined
+  // Shows the unread count on the installed app's icon (`navigator.setAppBadge`, cleared at 0), once the list has loaded and wherever the browser has the Badging API; `false` leaves the badge alone. A push from `notify()` sets it as well, while no page is open.
+  appBadge?: boolean | undefined
   // Called with the key of an item opened, or `undefined` for "Mark all as read". The inbox is marked first when it is the source; a custom source marks here, and a promise is awaited before the list is asked again.
   onRead?: ((event: { id: string | undefined }) => unknown) | undefined
   // Shows the list when the page sets it; the button, a click outside and Escape open and close it on their own.
@@ -81,6 +84,12 @@ function named(attributes: PopoverTriggerProps): BellTriggerProps {
   return Object.defineProperty(withPopup(attributes, 'true'), 'aria-label', { get: name, enumerable: true }) as BellTriggerProps
 }
 
+
+// The count reaches the app's icon once it is known: before the first answer the badge a push set stays.
+effect(() => {
+  if (appBadge && (typeof source === 'function' ? asked?.data() !== undefined : custom || inbox?.data() !== undefined))
+    void setAppBadge(unread())
+})
 
 // A live region naming a notification that arrives while the page is open; the first load announces nothing.
 const announced = signal('')

@@ -40,7 +40,8 @@ export function pushLoose(): boolean {
 const pending = new Set<Promise<void>>()
 
 // Pushes what `notify()` stored to the person's devices without making `notify` wait for the push services, and never fails it.
-export function pushAlongside(user: string, message: { title: string, url?: string | undefined }): void {
+// `badge` reads the unread count the app badge shows, once a device is known to be listening.
+export function pushAlongside(user: string, message: { title: string, url?: string | undefined }, badge?: () => Promise<number> | number): void {
   if (current === undefined)
     return
 
@@ -49,7 +50,7 @@ export function pushAlongside(user: string, message: { title: string, url?: stri
       const { sendPush } = await import('./push')
 
       if ((await pushStore().list(user)).length > 0)
-        await sendPush(user, message)
+        await sendPush(user, badge === undefined ? message : { ...message, badge: await badge() })
     }
     catch (error) {
       kayLog('warn', `notify() could not push a notification to ${user}`, error)

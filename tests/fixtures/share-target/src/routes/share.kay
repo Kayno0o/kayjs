@@ -1,0 +1,10 @@
+--- server
+import { action, s } from 'kay'
+
+// What a device's share sheet posts: every part is optional, whichever the sharing app sent.
+export const receive = action(
+  s.Object({ title: s.Optional(s.String()), text: s.Optional(s.String()), url: s.Optional(s.String()), files: s.Optional(s.Files({ maxSize: '1mb' })) }),
+  ({ title, text, url, files }, ctx) => ctx.redirect(`/?${new URLSearchParams({ title: title ?? '', text: text ?? '', url: url ?? '', files: (files ?? []).map(file => `${file.name}:${file.size}`).join(',') })}`),
+)
+---
+h1 Share

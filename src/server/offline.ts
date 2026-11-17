@@ -30,7 +30,7 @@ const BACKSLASH = /\\/g
 // A rule of the fonts' stylesheet naming its file and the range of characters it holds.
 const FACE_RANGE = /url\("([^"]+)"\)[^}]*?unicode-range:([^;}]+)/g
 // Bumped whenever the worker's own code changes, so every site installs it again.
-const WORKER_VERSION = 8
+const WORKER_VERSION = 9
 // Past this many pages kept by default, the boot says to list the ones worth it.
 const MANY_PAGES = 100
 
@@ -195,13 +195,30 @@ self.addEventListener('push', (event) => {
   }
   catch {}
 
-  event.waitUntil(self.registration.showNotification(typeof data.title === 'string' && data.title !== '' ? data.title : location.hostname, {
-    body: typeof data.body === 'string' ? data.body : undefined,
-    tag: typeof data.tag === 'string' ? data.tag : undefined,
-    icon: typeof data.icon === 'string' ? linkOf(data.icon) : undefined,
-    data: { url: typeof data.url === 'string' ? linkOf(data.url) : linkOf('/') },
-  }))
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(typeof data.title === 'string' && data.title !== '' ? data.title : location.hostname, {
+      body: typeof data.body === 'string' ? data.body : undefined,
+      tag: typeof data.tag === 'string' ? data.tag : undefined,
+      icon: typeof data.icon === 'string' ? linkOf(data.icon) : undefined,
+      data: { url: typeof data.url === 'string' ? linkOf(data.url) : linkOf('/') },
+    }),
+    badge(data.badge),
+  ]))
 })
+
+// The app badge a push carries the unread count of: a count sets it, 0 clears it, and a browser without the Badging API leaves it.
+async function badge(count) {
+  if (!Number.isSafeInteger(count) || count < 0)
+    return
+
+  try {
+    if (count > 0 && self.navigator.setAppBadge)
+      await self.navigator.setAppBadge(count)
+    else if (count === 0 && self.navigator.clearAppBadge)
+      await self.navigator.clearAppBadge()
+  }
+  catch {}
+}
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()

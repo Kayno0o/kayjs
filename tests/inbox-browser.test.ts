@@ -81,6 +81,26 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
     expect(second.errors).toEqual([])
   }, 60_000)
 
+  it('sets the app badge to the unread count and clears it once all are read', async () => {
+    await using page = await main.open('/')
+
+    await page.waitFor('.kui-bell button')
+    // Headless Chromium has no installed app to badge, so the Badging API is played by a stub that keeps what it was told.
+    await page.evaluate(() => {
+      const told: (number | null)[] = []
+
+      Object.assign(window, { told })
+      Object.assign(navigator, { setAppBadge: async (count: number) => void told.push(count), clearAppBadge: async () => void told.push(null) })
+    })
+    await notify('ada', { title: 'Order shipped' })
+    await notify('ada', { title: 'Invoice paid' })
+    await page.waitUntil(() => (window as unknown as { told: unknown[] }).told.at(-1) === 2)
+    await page.click('.kui-bell button')
+    await page.click('.kui-bell [data-part=all]')
+    await page.waitUntil(() => (window as unknown as { told: unknown[] }).told.at(-1) === null)
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('marks one read when its notification is opened, and follows its link', async () => {
     await notify('ada', { title: 'Order shipped', url: '/plain' })
     await notify('ada', { title: 'Other', url: '/plain?x=1' })

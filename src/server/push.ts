@@ -42,6 +42,8 @@ export interface PushMessage {
   tag?: string | undefined
   // A path of the site or an http(s) URL of an image.
   icon?: string | undefined
+  // The unread count the installed app's badge shows, set by the worker (`navigator.setAppBadge`) when the push arrives, `0` clearing it; a whole number from 0 to 999999. `notify()` sends the person's unread count.
+  badge?: number | undefined
 }
 
 export interface PushSendOptions {
@@ -61,6 +63,7 @@ export interface PushResult {
 
 const MAX_BODY = 500
 const MAX_TAG = 64
+const MAX_BADGE = 999_999
 
 export const MOST_DEVICES = 10
 const MAX_ENDPOINT = 2000
@@ -258,7 +261,12 @@ function payloadOf(message: PushMessage): Uint8Array<ArrayBuffer> {
   const tag = text(message.tag, MAX_TAG, 'tag')
   const url = linked(message.url, 'url')
   const icon = linked(message.icon, 'icon')
-  const bytes = new TextEncoder().encode(JSON.stringify({ title, ...body === undefined ? {} : { body }, ...url === undefined ? {} : { url }, ...tag === undefined ? {} : { tag }, ...icon === undefined ? {} : { icon } }))
+  const { badge } = message
+
+  if (badge !== undefined && (!Number.isSafeInteger(badge) || badge < 0 || badge > MAX_BADGE))
+    throw new KayError('argument-invalid', `kay: a push's badge is a whole number from 0 to ${MAX_BADGE}; got ${JSON.stringify(badge)}`)
+
+  const bytes = new TextEncoder().encode(JSON.stringify({ title, ...body === undefined ? {} : { body }, ...url === undefined ? {} : { url }, ...tag === undefined ? {} : { tag }, ...icon === undefined ? {} : { icon }, ...badge === undefined ? {} : { badge } }))
 
   if (bytes.length > MAX_PAYLOAD_BYTES)
     throw new KayError('argument-invalid', `kay: a push payload is at most ${MAX_PAYLOAD_BYTES} bytes; got ${bytes.length}`)

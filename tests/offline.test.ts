@@ -440,6 +440,6 @@ describe('the worker activating', () => {
     await waited
 
     expect([...names].toSorted()).toEqual([settings!.cache, 'other-cache'].toSorted())
-    expect(settings!.cache).toBe('kay-w8')
+    expect(settings!.cache).toBe('kay-w9')
   })
 })

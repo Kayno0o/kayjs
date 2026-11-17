@@ -1067,6 +1067,7 @@ component default
 
 [./bell-inbox.kay] default
 component default
+  appBadge?: boolean | undefined
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
@@ -1100,6 +1101,7 @@ component default
 
 [./bell.kay] default
 component default
+  appBadge?: boolean | undefined
   items?: readonly BellItem[] | undefined
   label?: string | undefined
   placement?: PopoverPlacement | undefined

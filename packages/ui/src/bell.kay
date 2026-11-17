@@ -6,7 +6,7 @@ import type { PopoverPlacement } from './popover'
 import BellInbox from './bell-inbox.kay'
 
 // The attributes it does not name reach the BellInbox island, so they are only those an island can be sent: no handler or ref.
-const { label, placement, items, unread, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'ref' | `on${string}`> & {
+const { label, placement, items, unread, appBadge, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'ref' | `on${string}`> & {
   // Names the button and the list it opens; the `ui.bell.label` message by default.
   label?: string | undefined
   placement?: PopoverPlacement | undefined
@@ -14,8 +14,10 @@ const { label, placement, items, unread, ...rest } = props<Omit<JSX.IntrinsicEle
   items?: readonly BellItem[] | undefined
   // The unread count of `items`; their unread ones by default.
   unread?: number | undefined
+  // Shows the unread count on the installed app's icon, on by default; `false` leaves the badge alone.
+  appBadge?: boolean | undefined
 }>()
 ---
 // A signed-in visitor's notifications, with the unread count: nothing at all for anyone else, and no JavaScript for them. A custom `items` list skips that check.
 if items !== undefined || ctx.inbox
-  BellInbox({...rest} label={label} placement={placement} items={items} unread={unread})
+  BellInbox({...rest} label={label} placement={placement} items={items} unread={unread} appBadge={appBadge})

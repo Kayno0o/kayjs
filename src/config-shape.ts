@@ -1,5 +1,5 @@
 import type { BudgetConfig } from './build/budget'
-import type { ActionsConfig, AssetsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DeprecatedMcp, DeprecatedOpenApi, DeprecatedPath, DeprecatedServe, DirsConfig, EndpointsConfig, FaviconConfig, HealthConfig, I18nInput, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveInput, OfflineConfig, OpsConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
+import type { ActionsConfig, AssetsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DeprecatedMcp, DeprecatedOpenApi, DeprecatedPath, DeprecatedServe, DirsConfig, EndpointsConfig, FaviconConfig, HealthConfig, I18nInput, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, ManifestShareTarget, MarkdownConfig, MetricsConfig, ObserveInput, OfflineConfig, OpsConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
 import type { Rule } from './config-rules'
 import type { McpConfig } from './server/api-modules'
 import type { OpenApiConfig } from './server/openapi'
@@ -45,7 +45,7 @@ const JOBS: Record<keyof (JobsConfig & DeprecatedPath), Rule> = { guards: guardO
 const METRICS: Record<keyof (MetricsConfig & DeprecatedPath), Rule> = { path: str, token: either(lit(true), SECRET) }
 const BUDGET: Record<keyof BudgetConfig, Rule> = { js: bytes, css: bytes, weight: bytes, grade: oneOf('A', 'B', 'C', 'D', 'E', 'F', 'G') }
 const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
-const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: either(str, bag({ light: str, dark: str })), backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
+const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: either(str, bag({ light: str, dark: str })), backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj), shareTarget: bag({ action: str, files: list(str), params: bag({ title: str, text: str, url: str, files: str }) } satisfies Record<keyof ManifestShareTarget, Rule>) }
 const MARKDOWN: Record<keyof MarkdownConfig, Rule> = { highlight: fn, transform: fn, preprocess: fn, containers: bool, footnotes: bool, headingLinks: bool, readingSpeed: num, imageSizes: str }
 const CARD: Record<keyof CardConfig, Rule> = { font: bag({ family: str, weight: num }), background: str, color: str, logo: str }
 const AVIF = either(bool, bag({ quality: num }))

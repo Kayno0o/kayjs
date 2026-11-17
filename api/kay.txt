@@ -3422,10 +3422,11 @@ interface NotificationStore extends StoreBase
   unread: (user: string, now: number) => MaybePromise<number>
 
 [./server] notify
-function notify(user: string, { title, url, ttl, push }: NotifyOptions): Promise<Notification>
+function notify(user: string, { title, url, ttl, push, badge }: NotifyOptions): Promise<Notification>
 
 [./server] NotifyOptions
 interface NotifyOptions
+  badge?: boolean | undefined
   push?: boolean | undefined
   title: string
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
@@ -3588,6 +3589,7 @@ function push(options?: PushOptions): KayExtension<AnyElysia>
 
 [./server] PushMessage
 interface PushMessage
+  badge?: number | undefined
   body?: string | undefined
   icon?: string | undefined
   tag?: string | undefined
