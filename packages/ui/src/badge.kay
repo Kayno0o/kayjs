@@ -9,6 +9,7 @@ import Icon from './icon.kay'
 const look = recipe({
   parts: {
     root: 'kui-badge inline-flex items-center gap-1 border-solid bg-surface px-1.5 py-px text-xs tracking-normal whitespace-nowrap [border-color:var(--_badge-color,var(--color-border))] [border-width:var(--border-width)] [color:var(--_badge-color,var(--color-muted))] [font-family:inherit] [text-transform:none] no-underline data-stamp:bg-[var(--color-background)] data-stamp:px-2.5 data-stamp:py-1 data-stamp:font-mono data-stamp:text-[0.625rem]/[1.4] data-stamp:font-normal data-stamp:tracking-[0.14em] data-stamp:uppercase data-stamp:transition-colors data-stamp:duration-[calc(150ms*var(--motion-scale))] data-stamp:[border-color:var(--_badge-color,var(--color-foreground))] data-stamp:[border-width:var(--border-width)] data-stamp:[color:var(--_badge-color,var(--color-foreground))] group-hover:data-stamp:bg-[var(--color-surface-strong)] data-solid:[background-color:var(--_badge-color,var(--color-muted))] data-solid:[border-color:var(--_badge-color,var(--color-muted))] data-solid:[color:var(--color-accent-foreground)]',
+    dot: 'size-1.5 shrink-0 rounded-full bg-current',
     icon: 'size-3',
   },
   // A tone sets one variable that the base colours read, so no tone class has to beat a neutral colour of the base.
@@ -25,11 +26,13 @@ const look = recipe({
   defaults: { tone: 'neutral' },
 })
 
-const { tone = 'neutral', color, variant, icon, label, href, style, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'style'> & {
+const { tone = 'neutral', color, variant, dot = false, icon, label, href, style, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'style'> & {
   style?: string | undefined
   // Any CSS colour, such as `#8fb8f4`, in place of the tone's: the outline and text are drawn in it, a `solid` badge filled with it.
   color?: string | undefined
   icon?: IconSlot | IconProps | undefined
+  // Draws a small dot in the badge's colour before the label (and before the `icon`), such as a status or a severity.
+  dot?: boolean | undefined
   label?: string | number | undefined
   // Makes the badge a link, such as a tag leading to the list it names.
   href?: string | undefined
@@ -41,6 +44,8 @@ const stamped = () => variant === 'stamp'
 const filled = () => variant === 'solid'
 ---
 snippet content()
+  if dot
+    span(part="dot" aria-hidden="true")
   if icon
     Icon(icon={icon} part="icon")
   | {label}

@@ -33,3 +33,4 @@ CardRow#row-link(href="https://example.com/io")
 CardRow#row-plain
   | Europa
 Timeline#timeline(items={entries} selected="c" onSelectedChange={({ key }) => onSelect(key)} label="Day")
+Badge#badge-dot(label="1 critical" tone="danger" dot)

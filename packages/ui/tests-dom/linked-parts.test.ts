@@ -83,3 +83,13 @@ test('the stretched link is marked so the controls and labels inside a linked ca
   expect(page.querySelector('#card-link [data-part=link]')!.hasAttribute('data-stretched')).toBe(true)
   expect(page.querySelector('#row-link [data-part=link]')!.hasAttribute('data-stretched')).toBe(true)
 })
+
+test('a Badge with dot draws a decorative dot part before its label, and without it none', async () => {
+  const page = await root()
+  const dot = root_(page, 'badge-dot').querySelector('[data-part="dot"]')
+
+  expect(dot?.getAttribute('aria-hidden')).toBe('true')
+  expect(root_(page, 'badge-dot').firstElementChild).toBe(dot)
+  expect(root_(page, 'badge-dot').textContent).toBe('1 critical')
+  expect(root_(page, 'badge-plain').querySelector('[data-part="dot"]')).toBeNull()
+})

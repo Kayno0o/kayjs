@@ -24,6 +24,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The former `/mcp` answers the MCP endpoint in place until 2.0 for an app that did not set `endpoints.mcp`, where 1.105 sent it to `/_kay/mcp` with a 308 an MCP client does not follow; a page or route of the app at `/mcp` keeps it ([MCP](mcp.md), [upgrading](upgrading.md)).
 - The installed app's icon badge shows the unread count: kayjs-ui's `Bell` sets it (`appBadge={false}` opts out) and a push from `notify()` carries the count for the worker to set (`notify(..., { badge: false })` opts out, `sendPush` takes `badge`) ([notifications](notifications.md)).
 - `assets.manifest.shareTarget` lists the installed app in a device's share sheet, posting the shared title, text, link and files to an action ([web manifest](sitemap-search-fonts.md#favicon-and-web-manifest)).
+- kayjs-ui's `Badge` takes `dot`, a small dot in its colour before the label ([Badge](/ui/badge#a-dot)).
 
 ## 1.105.0
 

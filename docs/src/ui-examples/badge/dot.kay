@@ -1,0 +1,7 @@
+---
+import Badge from '@kayjs/ui/badge.kay'
+---
+.flex.flex-wrap.items-center.gap-2
+  Badge(label="1 critical" tone="danger" dot)
+  Badge(label="20 open" tone="warning" dot)
+  Badge(label="Clean" tone="success" dot variant="solid")

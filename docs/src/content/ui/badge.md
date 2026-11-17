@@ -31,3 +31,9 @@ Set `variant="solid"` to fill the badge with its tone. The text takes `--color-a
 ## Stamp
 
 Set `variant="stamp"` to draw the badge as a rubber stamp: a hairline in its text color and small spaced capitals. It fills again while a `.group` holding it is hovered. The default `variant` is `outline`.
+
+## A dot
+
+`dot` draws a small dot in the badge's colour before the label, for a status or a severity. It is decoration, hidden from screen readers, so the label says it all. Style it as the `dot` part.
+
+<Demo name="badge/dot" />
