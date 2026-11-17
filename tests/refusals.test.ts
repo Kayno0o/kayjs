@@ -4,6 +4,7 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { applySafeFixes } from '../src/check/fixes'
 import { refusalCalls } from '../src/check/refusal-calls'
+import { ActionError, readActionResponse } from '../src/runtime/action'
 import { refuse, thrownRefusal } from '../src/runtime/refuse'
 import { decodeServerValue, encodeValue } from '../src/runtime/wire'
 import { scratchDir } from './scratch'
@@ -87,6 +88,33 @@ describe('ctx.deny in an action', () => {
     expect(decodeServerValue(await island.text())).toMatchObject({ errors: { '': 'Members only' } })
     expect(page.status).toBe(403)
     expect(page.headers.get('content-type')).toContain('text/html')
+  })
+
+  it('fails the form with the message of a helper given the action context, the retry-after header kept', async () => {
+    const response = await post('limited', {}, true)
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).not.toBeNull()
+    expect((decodeServerValue(await response.text()) as { errors: Record<string, string> }).errors['']).toMatch(/\S/)
+  })
+
+  it('reaches an island call as an ActionError carrying the message', async () => {
+    const response = await (await app()).handle(new Request(`${ORIGIN}${ACTION}/messageOnly`, { method: 'POST', headers: { 'origin': ORIGIN, 'x-kay-action': '1', 'content-type': 'application/json' }, body: encodeValue({}) }))
+    const failure = readActionResponse(response, `${ACTION}/messageOnly`)
+
+    await expect(failure).rejects.toBeInstanceOf(ActionError)
+    await expect(failure).rejects.toMatchObject({ status: 403, message: 'Members only' })
+  })
+
+  it('answers a stream denying before its first value as a failure, and one denying after it as a failed stream', async () => {
+    const call = async (name: string) => (await app()).handle(new Request(`${ORIGIN}${ACTION}/${name}`, { method: 'POST', headers: { 'origin': ORIGIN, 'x-kay-action': '1', 'content-type': 'application/json' }, body: encodeValue({}) }))
+    const first = await call('streamedFirst')
+    const midway = await call('streamed')
+
+    expect(first.status).toBe(409)
+    expect(await first.text()).toContain('Stopped before')
+    expect(midway.status).toBe(200)
+    expect(midway.headers.get('content-type')).toContain('text/event-stream')
   })
 
   it('stops with plain text for an empty message, as for none', async () => {
