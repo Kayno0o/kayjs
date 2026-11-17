@@ -267,13 +267,13 @@
     "@happy-dom/global-registrator": {
       "optional": true
     },
-    "happy-dom": {
-      "optional": true
-    },
     "@kaynooo/pg-orm": {
       "optional": true
     },
     "axe-core": {
+      "optional": true
+    },
+    "happy-dom": {
       "optional": true
     },
     "typescript7": {
