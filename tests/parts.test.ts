@@ -7,7 +7,7 @@ import { kay } from '../src/build/plugin'
 import { compileKay } from '../src/compiler'
 import { installClassTable } from '../src/runtime/class-table'
 import { child } from '../src/runtime/html'
-import { partClass } from '../src/runtime/values'
+import { handParts, partClass, partHanded, partsClass } from '../src/runtime/values'
 import { settle } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -396,6 +396,23 @@ describe('kay check on parts', () => {
     expect(partClass({ class: 'mt-4' }, 'head')).toBeUndefined()
     expect(partClass({ class: 'mt-4' }, 'root')).toBe('mt-4')
     expect(partClass(undefined, 'root')).toBeUndefined()
+  })
+
+  it('reads class as the root\'s only, and a part that is a component from parts', () => {
+    expect(partClass({ class: { head: 'p-6' } }, 'head')).toBeUndefined()
+    expect(partClass({ class: 'mt-4', parts: { root: 'p-2', head: { root: 'p-6' } } }, 'root')).toEqual(['p-2', 'mt-4'])
+    expect(partClass({ parts: { head: { root: 'p-6' } } }, 'head')).toEqual({ root: 'p-6' })
+  })
+
+  it('hands a call its classes as class, or as the root of its parts once it hands parts on', () => {
+    const handed = partHanded('spinner', ['size-5'])
+
+    expect(partsClass(['mt-4', ['p-2']])).toBe('mt-4 p-2')
+    expect(handParts(['mt-4'])).toBeUndefined()
+    expect(partsClass(['mt-4', handed])).toBeUndefined()
+    expect(handParts(['mt-4', handed])).toEqual({ root: ['mt-4', undefined], spinner: 'size-5' })
+    expect(handParts([handed], { head: 'p-6' })).toEqual({ head: 'p-6', spinner: 'size-5' })
+    expect(handParts(['mt-4'], { head: 'p-6' })).toEqual({ head: 'p-6' })
   })
 
   it('lets a page or layout with parts and a class prop through', () => {

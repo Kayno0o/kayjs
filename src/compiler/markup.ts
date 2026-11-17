@@ -1,5 +1,6 @@
 import type { ClassTable } from '../runtime/class-table'
 import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode } from './ast'
+import type { ClassItem } from './class-items'
 import type { FormInfo } from './form-info'
 import type { ImageOptionAttributes } from './image-attributes'
 import type { CodeBuilder } from './mapping'
@@ -9,13 +10,14 @@ import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
 import { addBoundWrites, calledByBinds, changeOf } from './bound-props'
+import { joinTexts } from './class-items'
 import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
 import { IMAGE_OPTIONS, imageDefaults as imageDefaultsOf, imageOptions, NO_PLACEHOLDER, placeholderOff, writeImageArguments } from './image-attributes'
 import { contentOf } from './items'
 import { controlId, fieldAttribute, inheritedAttributes, inheritedField } from './markup-fields'
 import { PROPS } from './names'
-import { oldPartsEntry } from './old-parts'
+import { closeHandParts, oldPartsEntry, openClassList, writtenParts } from './old-parts'
 import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, shapeOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
 import { bindEvent } from './validate'
 
@@ -513,7 +515,7 @@ export abstract class TemplateWriter {
       }
 
       // The `class` of before 1.105 is the component's `parts`.
-      if (oldPartsEntry(element, this.src, attribute, b, entry))
+      if (oldPartsEntry(element, this.src, attribute, b, entry, element.component && parts.length > 0))
         continue
 
       const name = this.source(attribute.name)
@@ -555,6 +557,9 @@ export abstract class TemplateWriter {
 
     if (mergedClass)
       entry('class', () => this.mergedClass(element, classAttribute, spreads), true)
+
+    if (element.component && parts.length > 0)
+      entry('parts', () => this.mergedClass(element, classAttribute, spreads, writtenParts(element, this.src)), true)
 
     if (!keepOpen)
       close()
@@ -688,8 +693,8 @@ export abstract class TemplateWriter {
       this.b.add(`, { ${defaults.map(([name, value]) => `${JSON.stringify(name)}: ${JSON.stringify(value)}`).join(', ')} }`)
   }
 
-  // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, an array of every source, which a component gets merged into one string, as its `class?: string` prop takes it.
-  protected mergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined, spreads: boolean): void {
+  // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, an array of every source, which a component gets merged into one string, as its `class?: string` prop takes it. With `handing`, the `parts` a component call that hands parts on gets in its place, laid over the `parts` it writes.
+  protected mergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined, spreads: boolean, handing?: readonly Attribute[]): void {
     const { b } = this
     const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
     const parts = partsOf(element, this.src, this.facts.parts)
@@ -703,7 +708,7 @@ export abstract class TemplateWriter {
     }
 
     // A literal is kept as text, so the ones side by side resolve together.
-    const items: ({ text: string } | { emit: () => void })[] = []
+    const items: ClassItem[] = []
 
     if (shorthand !== undefined)
       items.push({ text: shorthand })
@@ -736,20 +741,9 @@ export abstract class TemplateWriter {
     for (const part of parts)
       items.push(...this.recipeItem(part).map(emit => ({ emit })), { emit: () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`) })
 
-    const written = this.classTable === undefined
-      ? items
-      : items.reduce<typeof items>((merged, item) => {
-        const last = merged.at(-1)
+    const written = this.classTable === undefined ? items : joinTexts(items, texts => this.joinLiterals(texts))
 
-        if ('text' in item && last !== undefined && 'text' in last)
-          merged[merged.length - 1] = { text: this.joinLiterals([last.text, item.text]) }
-        else
-          merged.push(item)
-
-        return merged
-      }, [])
-
-    b.add(element.component ? `${helperName(parts.length > 0 || handed.length > 0 ? 'partsClass' : 'componentClass')}([` : '[')
+    openClassList(b, element.component, parts.length > 0, handing)
     for (const [index, item] of written.entries()) {
       if (index > 0)
         b.add(', ')
@@ -759,7 +753,7 @@ export abstract class TemplateWriter {
       else
         item.emit()
     }
-    b.add(element.component ? '])' : ']')
+    closeHandParts(b, element.component, handing)
   }
 
   // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else rendered.

@@ -346,11 +346,14 @@ export interface AwaitProps<T> {
 
 type PropsOf<Tag> = Tag extends keyof JSX.IntrinsicElements ? JSX.IntrinsicElements[Tag] : Tag extends Component<infer Props> ? Props : Record<string, unknown>
 
+// The `parts` object a component takes, of its own parts.
+type PartsOf<Component> = Component extends (props: infer Props) => unknown ? 'parts' extends keyof Props ? NonNullable<Props['parts' & keyof Props]> : never : never
+
 // What a part that is a call of this component takes, as the component types it: a string or an array for its root, or its `parts` object of its own parts.
 export type PartClass<Component> = Component extends (props: infer Props) => unknown ? ('class' extends keyof Props ? Extract<NonNullable<Props['class' & keyof Props]>, string | readonly unknown[]> : never) | ('parts' extends keyof Props ? NonNullable<Props['parts' & keyof Props]> : never) : never
 
-// The type of the part `Name` of a component, which a call of it receives from the part of the same name this component hands on: its own parts object entry for it.
-export type HandedPart<Component, Name extends string> = PartClass<Component> extends infer Class ? Class extends object ? Name extends keyof Class ? Class[Name] : never : never : never
+// The type of the part `Name` of a component, which a call of it receives from the part of the same name this component hands on: its `parts` entry for it.
+export type HandedPart<Component, Name extends string> = PartsOf<Component> extends infer Parts ? Parts extends object ? Name extends keyof Parts ? Parts[Name] : never : never : never
 
 // What `part="root spinner"` checks of the called component: it names a part `Name`, or the call is refused.
 export type HandsPart<Component, Name extends string> = 0 extends 1 & Component ? unknown : [HandedPart<Component, Name>] extends [never] ? { kayError: `The called component has no part ${Name}` } : unknown
@@ -377,6 +380,7 @@ export interface TemplateHelpers {
   partClass: (props: unknown, part: string) => unknown
   partHanded: (part: string, list: readonly unknown[]) => unknown
   partsClass: (list: readonly unknown[]) => unknown
+  handParts: (list: readonly unknown[], written?: unknown) => unknown
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
   head: (tags: { tag: string, props: Record<string, unknown> }[]) => void
   Try: (props: { block: JSX.Element, failed?: JSX.Element }) => JSX.Element

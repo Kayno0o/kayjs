@@ -111,7 +111,6 @@
     "max-lines": 927
   },
   "src/compiler/markup.ts": {
-    "max-lines": 604,
     "complexity": 69
   },
   "src/compiler/parser.ts": {

@@ -184,12 +184,12 @@ export function componentClass(list: readonly unknown[]): string | undefined {
   return classText(list) || undefined
 }
 
-// The class of a call that hands a part's entry on, which is the parts object of a component with parts of its own, or a string: the rest of the call's classes join that component's root.
-export function partsClass(list: readonly unknown[]): unknown {
+// The parts a list holds as one object, the rest of its classes joining its root; none when it holds no parts.
+function partsIn(list: readonly unknown[]): Parts | undefined {
   const found = list.filter(isParts)
 
   if (found.length === 0)
-    return componentClass(list)
+    return undefined
 
   const parts = found.length === 1 ? found[0]! : mergeParts(found)
   const rest = list.filter(item => !isParts(item))
@@ -197,9 +197,23 @@ export function partsClass(list: readonly unknown[]): unknown {
   return rest.length === 0 ? parts : taggedParts({ ...parts, root: [...rest, parts.root] })
 }
 
+// The `class` of a call that hands parts on: the classes of the list as a string, none once the list holds parts, which carry them as their `root` (see `handParts`).
+export function partsClass(list: readonly unknown[]): string | undefined {
+  return list.some(isParts) ? undefined : componentClass(list)
+}
+
+// The `parts` of a call that hands parts on: the parts its list holds, with the rest of its classes at their root, laid over the `written` parts object of the call; none when there are neither.
+export function handParts(list: readonly unknown[], written?: unknown): unknown {
+  const own = typeof written === 'object' && written !== null ? [taggedParts(written as Record<string, unknown>)] : []
+  const handed = partsIn(list)
+  const all = handed === undefined ? own : [...own, handed]
+
+  return all.length < 2 ? all[0] : mergeParts(all)
+}
+
 // A part of this component handed to the called one under its name, `{ spinner: ... }`, which joins the entries the call hands it: its value is what the part's classes and the caller's entry make.
 export function partHanded(part: string, list: readonly unknown[]): unknown {
-  return taggedParts({ [part]: partsClass(list) })
+  return taggedParts({ [part]: partsIn(list) ?? componentClass(list) })
 }
 
 // Whether a part's classes can be listed beside another's: a string, an array, or an object of conditions, which the class normalizer reads inside an array as well.
@@ -226,7 +240,7 @@ const PARTS = Symbol.for('kay.parts')
 
 type Parts = Record<string, unknown> & { readonly [PARTS]?: true }
 
-// An object of classes by part name, as a part that is a component hands it: told from a `{ class: condition }` object, which a plain `class` takes.
+// An object of classes by part name, as a part that is a component hands it: told from a `{ class: condition }` object, which a plain `class` takes, inside the list of classes of a call.
 function isParts(value: unknown): value is Parts {
   return typeof value === 'object' && value !== null && (value as Parts)[PARTS] === true
 }
@@ -235,27 +249,15 @@ function taggedParts(parts: Record<string, unknown>): Parts {
   return Object.defineProperty({ ...parts }, PARTS, { value: true })
 }
 
-// What a component's `class` and `parts` props give a part, `class` winning: a `class` string, array or object of conditions is the root's, and `parts` holds one entry per part, its own object when that part is a component. The parts a component hands on come tagged through `class`.
+// What a component's `class` and `parts` props give a part, `class` winning: a `class` string, array or object of conditions is the root's, and `parts` holds one entry per part, its own object when that part is a component.
 export function partClass(props: unknown, part: string): unknown {
-  const { class: value, parts } = (props ?? {}) as { class?: unknown, parts?: unknown }
-  const own = (from: unknown): unknown => {
-    // A `class` that is no handed-on parts object is the root's.
-    if (typeof from !== 'object' || from === null || Array.isArray(from) || (from === value && !isParts(from)))
-      return part === 'root' && from === value ? from : undefined
+  const { class: root, parts } = (props ?? {}) as { class?: unknown, parts?: unknown }
+  const entry = typeof parts === 'object' && parts !== null && !Array.isArray(parts) && Object.hasOwn(parts, part) ? (parts as Record<string, unknown>)[part] : undefined
+  const added = typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
+  const given = part === 'root' ? root : undefined
 
-    const entry = Object.hasOwn(from, part) ? (from as Record<string, unknown>)[part] : undefined
-
-    return typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
-  }
-  const given = own(value)
-  const added = typeof parts === 'object' && parts !== null ? own(parts) : undefined
-
-  // The `class` entry comes last: a component handing a part on gives its caller's entry as `class` beside the `parts` its own template writes, and the caller has the last word.
   if (given === undefined || added === undefined)
     return added ?? given
-
-  if (isParts(given) && isParts(added))
-    return mergeParts([added, given])
 
   return joinable(given) && joinable(added) ? [added, given] : given
 }

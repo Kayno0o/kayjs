@@ -29,7 +29,7 @@ type CheckedHtml<Markup> = [UnsafeHtml<Markup>] extends [never] ? unknown : {
 type FunctionProp<Component> = Component extends IslandBrand ? { kayLint: 'island-prop', kayAlways: true, kayError: Unsendable } : 0
 
 [.] HandedPart
-type HandedPart<Component, Name extends string> = PartClass<Component> extends infer Class ? Class extends object ? Name extends keyof Class ? Class[Name] : never : never : never
+type HandedPart<Component, Name extends string> = PartsOf<Component> extends infer Parts ? Parts extends object ? Name extends keyof Parts ? Parts[Name] : never : never : never
 
 [.] HandedSignal
 type HandedSignal<Parameter> = 0 extends 1 & Parameter ? {
@@ -76,6 +76,7 @@ interface TemplateHelpers
   Try: (props: { block: Element; failed?: Element; }) => Element
   awaited: <T>(value: T) => Settled<T>
   componentClass: <const List extends readonly unknown[]>(list: List) => ComponentClass<List>
+  handParts: (list: readonly unknown[], written?: unknown) => unknown
   head: (tags: { tag: string; props: Record<string, unknown>; }[]) => void
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
   partClass: (props: unknown, part: string) => unknown
@@ -272,6 +273,9 @@ function fragment(build: (parent: Node) => void): Unit | null
 [./dom] fresh
 function fresh<T>(render: () => T): T
 
+[./dom] handParts
+function handParts(list: readonly unknown[], written?: unknown): unknown
+
 [./dom] holdSubmits
 function holdSubmits(): void
 
@@ -346,7 +350,7 @@ function partClass(props: unknown, part: string): unknown
 function partHanded(part: string, list: readonly unknown[]): unknown
 
 [./dom] partsClass
-function partsClass(list: readonly unknown[]): unknown
+function partsClass(list: readonly unknown[]): string | undefined
 
 [./dom] playTransitions
 function playTransitions(given: Transitions): void
@@ -538,6 +542,9 @@ function formOptions(target: unknown, name: string): string
 [./html] formType
 function formType(target: unknown, name: string): string | undefined
 
+[./html] handParts
+function handParts(list: readonly unknown[], written?: unknown): unknown
+
 [./html] head
 function head(tags: HeadTag[]): void
 
@@ -603,7 +610,7 @@ function partClass(props: unknown, part: string): unknown
 function partHanded(part: string, list: readonly unknown[]): unknown
 
 [./html] partsClass
-function partsClass(list: readonly unknown[]): unknown
+function partsClass(list: readonly unknown[]): string | undefined
 
 [./html] prerendering
 function prerendering(): boolean
