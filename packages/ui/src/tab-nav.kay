@@ -26,6 +26,7 @@ const look = recipe({
       segmented: {
         root: 'w-fit max-w-full border-solid bg-surface [border-color:var(--_control-line,var(--color-border))] [border-width:var(--border-width)]',
         link: 'px-3 py-1.5 text-xs aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:hover:text-accent-foreground',
+        badge: 'in-aria-[current=page]:bg-accent-foreground/20 in-aria-[current=page]:text-accent-foreground',
       },
     },
   },
