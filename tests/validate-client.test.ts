@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { s as serverS } from '../src/runtime/schema'
 import { schemaOf } from '../src/runtime/schema-record'
 import { s as browserS } from '../src/runtime/schema.client'
-import { validate as browserValidate } from '../src/runtime/validate.client'
+import { validate as browserValidate } from '../src/runtime/validate-run.client'
 import { validate as serverValidate } from '../src/server/validate'
 
 type Builders = typeof serverS

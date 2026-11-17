@@ -1,0 +1,13 @@
+---
+import { signal, validate } from 'kay'
+import { contact } from '../schemas'
+
+const message = signal('')
+
+async function check() {
+  const result = await validate(contact, { email: 'a@b.fr', message: 'hello' }, { source: 'json' })
+
+  message.set('errors' in result ? 'refused' : 'valid')
+}
+---
+button.checker(onClick={check}) Check {message()}

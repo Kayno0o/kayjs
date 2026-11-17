@@ -1,0 +1,7 @@
+---
+import Checker from '../components/checker.kay'
+import Plain from '../components/plain.kay'
+---
+h1 Home
+Checker
+Plain

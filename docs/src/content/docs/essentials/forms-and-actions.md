@@ -120,7 +120,7 @@ An action in it can read the params of every page below it.
 
 ## One schema for the server and the browser
 
-A schema is built with `s`. An island may import the module holding it and read the type off it, which is the one type both sides use, or call `validate(schema, value, { source })` from `kay` on it to check a value before it posts. The validator loads with the island that calls it and with no other. Write the schema once in a `.ts` module, with its type beside it.
+A schema is built with `s`. An island may import the module holding it and read the type off it, which is the one type both sides use, or call `validate(schema, value, { source })` from `kay` on it to check a value before it posts. The validator is a chunk of its own, loaded by the first call and by no page that never calls it. Write the schema once in a `.ts` module, with its type beside it.
 
 ```ts
 // src/schemas.ts
