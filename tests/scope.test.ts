@@ -28,6 +28,8 @@ interface Facts {
   globals: string[]
   // The names of bodiless class methods, which Babel reads as values, so they land among its globals.
   declareKeys: Set<string>
+  // Babel 8 leaves a type parameter out of its bindings and reads each of its names as a global, where Babel 7 and kay's pass bind it, so these names are left out of the comparison.
+  typeParameters: Set<string>
   error?: string
 }
 
@@ -48,12 +50,19 @@ function note(facts: Facts, key: string, value: string) {
 }
 
 function babelFacts(code: string, lang: Lang = 'tsx'): Facts {
-  const facts: Facts = { identifiers: new Map(), bindings: [], globals: [], declareKeys: new Set() }
+  const facts: Facts = { identifiers: new Map(), bindings: [], globals: [], declareKeys: new Set(), typeParameters: new Set() }
 
   try {
     const file = parse(code, parseOptions(lang))
 
     traverse(file, {
+      // Babel 8 keeps a mapped type's key outside TSTypeParameter.
+      TSMappedType(path: NodePath<t.TSMappedType>) {
+        facts.typeParameters.add(path.node.key.name)
+      },
+      TSTypeParameter(path: NodePath<t.TSTypeParameter>) {
+        facts.typeParameters.add(typeof path.node.name === 'string' ? path.node.name : path.node.name.name)
+      },
       Identifier(path: NodePath<t.Identifier>) {
         // The name inside a `#private` is an identifier for Babel, a node of its own for oxc, and the right side of a qualified name is read as a value by Babel though no scope takes it for one.
         if (path.parent.type === 'PrivateName' || (path.parent.type === 'TSQualifiedName' && path.parent.right === path.node))
@@ -86,7 +95,7 @@ function babelFacts(code: string, lang: Lang = 'tsx'): Facts {
 }
 
 function kayFacts(program: Program): Facts {
-  const facts: Facts = { identifiers: new Map(), bindings: [], globals: [], declareKeys: new Set() }
+  const facts: Facts = { identifiers: new Map(), bindings: [], globals: [], declareKeys: new Set(), typeParameters: new Set() }
 
   try {
     const { events, program: root } = analyze(program)
@@ -141,12 +150,19 @@ function compare(code: string, label: string, lang: Lang = 'tsx') {
   if (PARAMETER_PROPERTY.test(code))
     return true
 
-  expect({ label, globals: kay.globals }).toEqual({ label, globals: babel.globals.filter(name => !babel.declareKeys.has(name) || kay.globals.includes(name)) })
-  expect({ label, bindings: kay.bindings }).toEqual({ label, bindings: babel.bindings })
+  const typed = babel.typeParameters
+  const untyped = (names: string[]) => names.filter(name => !typed.has(name))
+
+  expect({ label, globals: untyped(kay.globals) }).toEqual({ label, globals: untyped(babel.globals.filter(name => !babel.declareKeys.has(name) || kay.globals.includes(name))) })
+  const named = (line: string) => line.slice(0, line.indexOf(' '))
+
+  expect({ label, bindings: kay.bindings.filter(line => !typed.has(named(line))) }).toEqual({ label, bindings: babel.bindings.filter(line => !typed.has(named(line))) })
 
   // The identifiers oxc has that Babel has not (a type parameter's name, a method's value) are left out.
-  for (const [key, expected] of babel.identifiers)
-    expect({ label, key, found: kay.identifiers.get(key) }).toEqual({ label, key, found: expected })
+  for (const [key, expected] of babel.identifiers) {
+    if (!typed.has(key.slice(0, key.lastIndexOf('@'))))
+      expect({ label, key, found: kay.identifiers.get(key) }).toEqual({ label, key, found: expected })
+  }
 
   return true
 }
