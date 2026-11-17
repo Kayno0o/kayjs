@@ -568,7 +568,7 @@ function serveResourceMetadata(app: Elysia, name: string, paths: string[], endpo
   }
 }
 
-// Serves the tools of `document` at `/mcp` over Streamable HTTP: one JSON-RPC message per POST, answered with JSON.
+// Serves the tools of `document` at its path over Streamable HTTP: one JSON-RPC message per POST, answered with JSON; `former`, where it was before 1.105, answers POST in place until 2.0.
 export function serveMcp(app: Elysia, document: Schema, options: McpOptions): void {
   const calls = new AsyncLocalStorage<CallContext>()
   const build = () => {
@@ -641,11 +641,13 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
     return new Response(JSON.stringify(reply), { status, headers })
   }
 
-  for (const path of options.former === undefined ? [options.path] : [options.path, options.former]) {
-    app.post(path, answer, { parse: 'none' })
-    app.get(path, notAllowed)
-    app.delete(path, notAllowed)
-  }
+  app.post(options.path, answer, { parse: 'none' })
+  app.get(options.path, notAllowed)
+  app.delete(options.path, notAllowed)
+
+  // Only the POST is taken at the former path, so a catch-all or parameter route of the app keeps its GET and DELETE.
+  if (options.former !== undefined)
+    app.post(options.former, answer, { parse: 'none' })
 
   serveResourceMetadata(app, options.title, options.metadataPaths, options.path)
 }

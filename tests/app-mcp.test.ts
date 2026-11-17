@@ -218,12 +218,9 @@ describe('the endpoint', () => {
     expect((await ask(mounted, '/mcp/')).status).toBe(200)
     expect((await ask(dev, '/mcp')).status).toBe(200)
 
-    for (const method of ['GET', 'DELETE']) {
-      const refused = await ask(site, '/mcp', method)
-
-      expect(refused.status).toBe(405)
-      expect(refused.headers.get('allow')).toBe('POST')
-    }
+    // Only the POST is taken, so an app's catch-all route keeps GET and DELETE there.
+    for (const method of ['GET', 'DELETE'])
+      expect((await ask(site, '/mcp', method)).status).toBe(404)
   })
 
   it('holds the former /mcp to the limits and the checks of the endpoint', async () => {

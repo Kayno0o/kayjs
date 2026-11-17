@@ -310,7 +310,7 @@ export interface EndpointsConfig {
   api?: string | undefined
   // Where the OpenAPI document is served, `/api/openapi.json` under the API prefix by default; its reference page is set in `openapi.reference`.
   openapi?: string | undefined
-  // Where the MCP endpoint is served, `/_kay/mcp` by default. `/mcp`, where it was served before 1.105, redirects there with a 308 until 1.108 when this is not set.
+  // Where the MCP endpoint is served, `/_kay/mcp` by default. `/mcp`, where it was served before 1.105, is answered in place until 2.0 when this is not set.
   mcp?: string | undefined
   // Where the health check is served, `/_kay/health` by default.
   health?: string | undefined

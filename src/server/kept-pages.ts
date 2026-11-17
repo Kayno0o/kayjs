@@ -39,18 +39,18 @@ function withoutTrailingSlashes(path: string): string {
 // A request that is not a GET, a HEAD or an OPTIONS can change what a page renders, an action as much as a route of the app, once a route answers it: one to no route, and kay's own routes in `own` (the MCP endpoint among them, whose tool calls reach the app's actions and count there), write nothing, so no visitor can force a page to render again by sending them.
 // Counted when its route is matched and again as its response is made, so a visit between the two is checked once more, and the visit that follows the response sees the finished write; one a guard or the validation refuses (a 400, 401, 403, 405, 413, 415, 422 or 429) is counted by neither, so no visitor can make a page render again by sending those.
 // The end count is a `mapResponse` and an `afterResponse`, never an `afterHandle` or `onError`, which would change how an API module answers; called before any route is added, as a hook reaches only the routes added after it.
-export function countWrites(app: Elysia, own: string[] = []): Writes {
+export function countWrites(app: Elysia, own: () => string[] = () => []): Writes {
   let done = 0
   let active = 0
   const writes: Writes = { get count() {
     // A write in flight counts half a step, so a visit during it is checked once more after it, and a refused one leaves the count where it was.
     return active > 0 ? done + 0.5 : done
   } }
-  const kay = new Set([...KAY_ROUTES, ...own])
+  const kay = new Set(KAY_ROUTES)
   const started = new WeakSet<Request>()
 
   app.onTransform({ as: 'global' }, ({ request }) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS' && !kay.has(withoutTrailingSlashes(pathOf(request.url)))) {
+    if (request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS' && !kay.has(withoutTrailingSlashes(pathOf(request.url))) && !own().includes(withoutTrailingSlashes(pathOf(request.url)))) {
       started.add(request)
       active++
     }

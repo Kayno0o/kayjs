@@ -195,8 +195,9 @@ export function bootOf(input: BootInput) {
   // Offered, so an app file at the path keeps it; only a running server counts, as `kay dev` restarts on every change and an export serves nothing.
   const metricsConfig = env.serving ? metricsOf(options.ops?.metrics) : undefined
   const metrics: Claim | undefined = metricsConfig && { path: options.endpoints?.metrics ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
-  // Where the metrics were served before 1.105, answered as well until 1.108 by an app that did not move them, unless an app file serves something there.
+  // Where the MCP endpoint was served before 1.105, answered in place until 2.0 by an app that did not move it, unless an app file serves something there.
   const formerMcp: Claim | undefined = input.mcpAt !== undefined && options.endpoints?.mcp === undefined ? { path: FORMER_MCP_PATH, owner: '`mcp`', kind: 'kay', method: 'ALL' } : undefined
+  // Where the metrics were served before 1.105, answered as well until 1.108 by an app that did not move them, unless an app file serves something there.
   const formerMetrics: Claim | undefined = metrics && options.endpoints?.metrics === undefined ? { path: FORMER_METRICS_PATH, owner: 'the metrics route', kind: 'kay' } : undefined
   // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
   const health: Claim | undefined = options.ops?.health === false ? undefined : { path: options.endpoints?.health ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
@@ -265,8 +266,11 @@ export function knowPages({ app, env, options, setup: { matchers }, routes, tabl
 }
 
 // Only a kept page reads the count, so a build keeping none registers no hook for it.
-export function keptPageWrites({ app, setup: { client }, mcpAt }: Boot): Writes {
-  return [...client.pages.values()].some(page => page.kept === true) ? countWrites(app, [mcpAt].filter(path => path !== undefined)) : NO_WRITES
+export function keptPageWrites({ app, setup: { client }, mcpAt, formerMcp, served }: Boot): Writes {
+  // The former path is exempt only where kay serves it: a route of the app at `/mcp` keeps counting.
+  const own = () => [...mcpAt === undefined ? [] : [mcpAt], ...formerMcp !== undefined && served.holds(formerMcp) ? [formerMcp.path] : []]
+
+  return [...client.pages.values()].some(page => page.kept === true) ? countWrites(app, own) : NO_WRITES
 }
 
 // The routes under `/_kay/files/` carry the security headers themselves, as the build's files and the image route do.

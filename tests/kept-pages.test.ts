@@ -1458,6 +1458,19 @@ describe('a layout reading ctx.locals', () => {
 })
 
 describe('the requests that count as writes', () => {
+  it('leaves out the former MCP path only where kay serves it', async () => {
+    const app = new Elysia()
+    let held = true
+    const writes = countWrites(app, () => held ? ['/mcp'] : [])
+
+    app.post('/mcp', () => 'ok')
+    await app.handle(new Request('http://localhost/mcp/', { method: 'POST' }))
+    expect(writes.count).toBe(0)
+    held = false
+    await app.handle(new Request('http://localhost/mcp', { method: 'POST' }))
+    expect(writes.count).toBe(1)
+  })
+
   it('leaves out every POST route kay lists as its own', async () => {
     const paths = ownPostPaths()
     const app = new Elysia()

@@ -46,20 +46,27 @@ describe('endpoints in the config', () => {
 })
 
 describe('the MCP path', () => {
-  it('is /_kay/mcp, and /mcp redirects to it with the query', async () => {
+  it('is /_kay/mcp, and /mcp answers in place with the query', async () => {
     const site = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false })
     const ok = await site.fetch('/_kay/mcp', post)
-    const old = await site.fetch('/mcp?x=1', { method: 'POST', body: '{}' })
+    const old = await site.fetch('/mcp?x=1', { ...post, redirect: 'manual' })
 
     expect(ok.status).toBe(200)
-    expect(old.status).toBe(308)
-    expect(old.headers.get('location')).toBe('/_kay/mcp?x=1')
+    expect(old.status).toBe(200)
+    expect(old.headers.get('location')).toBeNull()
+    expect(await old.json()).toEqual({ jsonrpc: '2.0', id: 1, result: {} })
   })
 
-  it('keeps the base in the redirect', async () => {
+  it('answers /mcp in place under a base', async () => {
     const site = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, base: '/shop' })
+    const old = await site.fetch('/mcp', { ...post, redirect: 'manual' })
 
-    expect((await site.fetch('/mcp', { method: 'POST', body: '{}' })).headers.get('location')).toBe('/shop/_kay/mcp')
+    expect(old.status).toBe(200)
+    expect(old.headers.get('location')).toBeNull()
+  })
+
+  it('refuses endpoints.mcp set to the default path, so no app pins it and keeps /mcp', async () => {
+    await expect(testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, endpoints: { mcp: '/_kay/mcp' } })).rejects.toThrow('under /_kay')
   })
 
   it('moves to endpoints.mcp, leaving /mcp unserved', async () => {
