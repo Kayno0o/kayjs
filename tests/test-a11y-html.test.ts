@@ -78,6 +78,14 @@ describe('normalizeHtml', () => {
     expect(normalizeHtml('<a href="/img/my-products.svg">x</a><input value="9" type="hidden" name="kay_since">')).toBe('<a href="/img/my-products.svg">\n  x\n</a>\n<input value="STAMP" type="hidden" name="kay_since">\n')
   })
 
+  it('replaces an unquoted nonce', () => {
+    expect(normalizeHtml('<script nonce=abc123 src="/x.js"></script>')).toBe('<script nonce="NONCE" src="/x.js"></script>\n')
+  })
+
+  it('keeps a tag whole when a quoted attribute holds a >', () => {
+    expect(normalizeHtml('<div><a title="a > b" href="/x">go</a></div>')).toBe('<div>\n  <a title="a > b" href="/x">\n    go\n  </a>\n</div>\n')
+  })
+
   it('keeps a script and a pre as they are', () => {
     expect(normalizeHtml('<pre>a\n  b</pre><script>let x = 1 < 2</script>')).toBe('<pre>a\n  b</pre>\n<script>let x = 1 < 2</script>\n')
   })

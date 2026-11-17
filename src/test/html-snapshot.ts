@@ -4,7 +4,7 @@ import process from 'node:process'
 import { callingTestFile } from './screenshot-match'
 
 const NAME = /^[\w.-]+(?:\/[\w.-]+)*$/
-const TOKEN = /<!--[\s\S]*?-->|<(script|style|pre|textarea)\b[\s\S]*?<\/\1\s*>|<[^>]+>|[^<]+/gi
+const TOKEN = /<!--[\s\S]*?-->|<(script|style|pre|textarea)\b[\s\S]*?<\/\1\s*>|<(?:[^>"']|"[^"]*"|'[^']*')+>|[^<]+/gi
 const COMMENT = /^<!--/
 const OPEN_TAG = /^<([a-z][\w:-]*)/i
 const CLOSE_TAG = /^<\/\s*[a-z]/i
@@ -14,7 +14,7 @@ const WHITESPACE = /\s+/g
 const HASHED_FILE = /(\/_kay\/[\w./-]*?)-[\da-z]{8}(?=\.[a-z\d]+(?:[?"'\s)#]|$))/gi
 // A `?v=` cache-busting version, such as a favicon's.
 const VERSION = /([?&]v=)[\da-f]{6,}/gi
-const NONCE = /(\bnonce=)(["'])[^"']*\2/gi
+const NONCE = /(\bnonce=)(?:"[^"]*"|'[^']*'|[^\s>"']+)/gi
 const STAMP_INPUT = /<input\s[^>]*\bname=["']?kay_since\b[^>]*>/gi
 const STAMP_VALUE = /(\bvalue=)(?:"[^"]*"|'[^']*'|[^\s>]+)/i
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'])
@@ -24,7 +24,7 @@ export function normalizeHtml(html: string): string {
   const lines: string[] = []
   let depth = 0
 
-  for (const token of html.replace(HASHED_FILE, '$1-HASH').replace(VERSION, '$1HASH').replace(NONCE, '$1$2NONCE$2').replace(STAMP_INPUT, input => input.replace(STAMP_VALUE, '$1"STAMP"')).match(TOKEN) ?? []) {
+  for (const token of html.replace(HASHED_FILE, '$1-HASH').replace(VERSION, '$1HASH').replace(NONCE, '$1"NONCE"').replace(STAMP_INPUT, input => input.replace(STAMP_VALUE, '$1"STAMP"')).match(TOKEN) ?? []) {
     if (COMMENT.test(token))
       continue
 
