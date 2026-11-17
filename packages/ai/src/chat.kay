@@ -19,7 +19,10 @@ import { citedAsWritten, linkAsWritten, linkSources, mayLeave, opensApart, REL_A
 import { conversationKey, filesOf, POSTED_CHARACTERS } from './chat-history'
 import { createAttachments, fileKey, fileSizeLimit } from './chat-attachments'
 import { chatIcon } from './chat-icon'
+import type { SpeakAction } from './chat-reader'
+import { createReader, spokenText } from './chat-reader'
 import { createChatSession } from './chat-session'
+import { safely } from './safely'
 import { eventText } from './chat-events'
 import { imagePrefixes, keepReplyImages } from './reply-images'
 import Calls from './chat-calls.kay'
@@ -28,7 +31,7 @@ import './chat.css'
 
 // The chat's own classes are its parts, so an app restyles them from src/ui.ts or a `class` object. The table of a reply is built as a string and keeps its class.
 const look = recipe({
-  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text kui-prose', thinking: 'kai-chat-text kai-chat-thinking', reasoning: 'kai-chat-reasoning', reasoningText: 'kai-chat-reasoning-text', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', editField: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', actions: 'kai-chat-actions', regenerate: 'kai-chat-action', edit: 'kai-chat-action', save: 'kai-chat-save kui-btn', cancel: 'kai-chat-cancel kui-btn', send: 'kai-chat-send', new: 'kai-chat-new', retry: 'kui-btn', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kui-btn', deny: 'kui-btn', attach: 'kai-chat-attach', files: 'kai-chat-files', file: 'kai-chat-file', remove: 'kai-chat-file-remove', record: 'kai-chat-record', recordSpinner: 'animate-spin motion-reduce:animate-none', conversations: 'kai-chat-conversations', newConversation: 'kai-chat-conversation-new', conversationList: 'kai-chat-conversation-list', conversation: 'kai-chat-conversation', conversationLink: 'kai-chat-conversation-link', renameField: 'kai-chat-rename-field', rename: 'kai-chat-action', delete: 'kai-chat-action', deleteConfirm: 'kai-chat-delete-confirm', confirm: 'kui-btn kui-btn-danger' },
+  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text kui-prose', thinking: 'kai-chat-text kai-chat-thinking', reasoning: 'kai-chat-reasoning', reasoningText: 'kai-chat-reasoning-text', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', editField: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', actions: 'kai-chat-actions', regenerate: 'kai-chat-action', edit: 'kai-chat-action', play: 'kai-chat-action kai-chat-play', save: 'kai-chat-save kui-btn', cancel: 'kai-chat-cancel kui-btn', send: 'kai-chat-send', new: 'kai-chat-new', retry: 'kui-btn', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kui-btn', deny: 'kui-btn', attach: 'kai-chat-attach', files: 'kai-chat-files', file: 'kai-chat-file', remove: 'kai-chat-file-remove', record: 'kai-chat-record', recordSpinner: 'animate-spin motion-reduce:animate-none', conversations: 'kai-chat-conversations', newConversation: 'kai-chat-conversation-new', conversationList: 'kai-chat-conversation-list', conversation: 'kai-chat-conversation', conversationLink: 'kai-chat-conversation-link', renameField: 'kai-chat-rename-field', rename: 'kai-chat-action', delete: 'kai-chat-action', deleteConfirm: 'kai-chat-delete-confirm', confirm: 'kui-btn kui-btn-danger' },
   variants: {
     // The structure: `bubble` frames the visitor's messages, `plain` draws them as bare text.
     layout: { bubble: '', plain: '' },
@@ -58,7 +61,7 @@ const SANITIZED_LINK = /<a href="([^"]*)"(?: target="_blank")? rel="nofollow ugc
 // The images and documents a model reads.
 const ATTACHABLE = 'image/png,image/jpeg,image/gif,image/webp,application/pdf'
 
-const { action, initial = [], labels = {}, label = wording('ai.chat.label', 'Chat'), fieldLabel = labels.field ?? wording('ai.chat.field', 'Message'), startedLabel = labels.started ?? wording('ai.chat.started', 'New conversation started'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = labels.send ?? wording('ai.chat.send', 'Send'), stopLabel = labels.stop ?? wording('ai.chat.stop', 'Stop'), retryLabel = labels.retry ?? wording('ai.chat.retry', 'Try again'), waitingLabel, sourcesLabel = labels.sources ?? wording('ai.chat.sources', 'Sources'), showReasoning, reasoningLabel = labels.reasoning ?? wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = labels.stopped ?? wording('ai.chat.stopped', 'Stopped'), failureLabel, history: lastMessages, maxChars = POSTED_CHARACTERS, tableLabel = labels.table ?? wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], onSend, onReply, onStop, onError, onToolCall, onRegenerate, onEdit, onSuggestion, toolLabels = {}, toolIcons, icons, newButton = false, newLabel = labels.new ?? wording('ai.chat.new', 'New conversation'), remember, links, newTab: newTabProp, images, runningLabel = labels.running ?? wording('ai.chat.running', 'Running'), doneLabel = labels.done ?? wording('ai.chat.done', 'Done'), failedLabel = labels.failed ?? wording('ai.chat.failed', 'Failed'), argumentsLabel = labels.arguments ?? wording('ai.chat.arguments', 'Arguments'), resultLabel = labels.result ?? wording('ai.chat.result', 'Result'), approvalLabel = labels.approval ?? wording('ai.chat.approval', 'Needs your approval'), allowLabel = labels.allow ?? wording('ai.chat.allow', 'Allow'), denyLabel = labels.deny ?? wording('ai.chat.deny', 'Deny'), allowedLabel = labels.allowed ?? wording('ai.chat.allowed', 'Allowed:'), deniedLabel = labels.denied ?? wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxSize, attachLabel = labels.attach ?? wording('ai.chat.attach', 'Attach a file'), removeLabel = labels.remove ?? wording('ai.chat.remove', 'Remove'), attachRefusedLabel = labels.attachRefused ?? wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = labels.attachTooBig ?? wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = labels.attachFull ?? wording('ai.chat.attachFull', 'No more files can be attached.'), regenerate = false, editable = false, regenerateLabel = labels.regenerate ?? wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = labels.edit ?? wording('ai.chat.edit', 'Edit the message'), saveLabel = labels.save ?? wording('ai.chat.save', 'Save and send'), cancelLabel = labels.cancel ?? wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = labels.editEmpty ?? wording('ai.chat.editEmpty', 'Write a message to send.'), editBusyLabel = labels.editBusy ?? wording('ai.chat.editBusy', 'Wait for the reply to finish.'), transcribe, recordLabel = labels.record ?? wording('ai.chat.record', 'Speak a message'), transcribingLabel = labels.transcribing ?? wording('ai.chat.transcribing', 'Writing down what was said…'), unheardLabel = labels.unheard ?? wording('ai.chat.unheard', 'Nothing was heard.'), transcribeFailedLabel = labels.transcribeFailed ?? wording('ai.chat.transcribeFailed', 'What was said could not be written down.'), fill = false, layout, variant, tone = 'accent', size = 'md', keepOnServer = false, conversations = false, conversationIn = 'address', conversationsLabel = labels.conversations ?? wording('ai.chat.conversations', 'Conversations'), untitledLabel = labels.untitled ?? wording('ai.chat.untitled', 'Untitled conversation'), renameLabel = labels.rename ?? wording('ai.chat.rename', 'Rename the conversation'), deleteLabel = labels.delete ?? wording('ai.chat.delete', 'Delete the conversation'), deleteConfirmLabel = labels.deleteConfirm ?? wording('ai.chat.deleteConfirm', 'Delete for good?'), conflictLabel = labels.conflict ?? wording('ai.chat.conflict', 'This conversation changed in another tab, so it was reloaded.'), loadFailedLabel = labels.loadFailed ?? wording('ai.chat.loadFailed', 'The conversation could not be loaded.'), changeFailedLabel = labels.changeFailed ?? wording('ai.chat.changeFailed', 'The change could not be saved.'), signedOutLabel = labels.signedOut ?? wording('ai.chat.signedOut', 'You are signed out, so this conversation is no longer saved.'), turn: turnBlock, actions: actionsBlock, call: callBlock, source: sourceBlock, empty: emptyBlock, footer } = props<{
+const { action, initial = [], labels = {}, label = wording('ai.chat.label', 'Chat'), fieldLabel = labels.field ?? wording('ai.chat.field', 'Message'), startedLabel = labels.started ?? wording('ai.chat.started', 'New conversation started'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = labels.send ?? wording('ai.chat.send', 'Send'), stopLabel = labels.stop ?? wording('ai.chat.stop', 'Stop'), retryLabel = labels.retry ?? wording('ai.chat.retry', 'Try again'), waitingLabel, sourcesLabel = labels.sources ?? wording('ai.chat.sources', 'Sources'), showReasoning, reasoningLabel = labels.reasoning ?? wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = labels.stopped ?? wording('ai.chat.stopped', 'Stopped'), failureLabel, history: lastMessages, maxChars = POSTED_CHARACTERS, tableLabel = labels.table ?? wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], onSend, onReply, onStop, onError, onToolCall, onRegenerate, onEdit, onSuggestion, toolLabels = {}, toolIcons, icons, newButton = false, newLabel = labels.new ?? wording('ai.chat.new', 'New conversation'), remember, links, newTab: newTabProp, images, runningLabel = labels.running ?? wording('ai.chat.running', 'Running'), doneLabel = labels.done ?? wording('ai.chat.done', 'Done'), failedLabel = labels.failed ?? wording('ai.chat.failed', 'Failed'), argumentsLabel = labels.arguments ?? wording('ai.chat.arguments', 'Arguments'), resultLabel = labels.result ?? wording('ai.chat.result', 'Result'), approvalLabel = labels.approval ?? wording('ai.chat.approval', 'Needs your approval'), allowLabel = labels.allow ?? wording('ai.chat.allow', 'Allow'), denyLabel = labels.deny ?? wording('ai.chat.deny', 'Deny'), allowedLabel = labels.allowed ?? wording('ai.chat.allowed', 'Allowed:'), deniedLabel = labels.denied ?? wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxSize, attachLabel = labels.attach ?? wording('ai.chat.attach', 'Attach a file'), removeLabel = labels.remove ?? wording('ai.chat.remove', 'Remove'), attachRefusedLabel = labels.attachRefused ?? wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = labels.attachTooBig ?? wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = labels.attachFull ?? wording('ai.chat.attachFull', 'No more files can be attached.'), regenerate = false, editable = false, regenerateLabel = labels.regenerate ?? wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = labels.edit ?? wording('ai.chat.edit', 'Edit the message'), saveLabel = labels.save ?? wording('ai.chat.save', 'Save and send'), cancelLabel = labels.cancel ?? wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = labels.editEmpty ?? wording('ai.chat.editEmpty', 'Write a message to send.'), editBusyLabel = labels.editBusy ?? wording('ai.chat.editBusy', 'Wait for the reply to finish.'), transcribe, recordLabel = labels.record ?? wording('ai.chat.record', 'Speak a message'), transcribingLabel = labels.transcribing ?? wording('ai.chat.transcribing', 'Writing down what was said…'), unheardLabel = labels.unheard ?? wording('ai.chat.unheard', 'Nothing was heard.'), transcribeFailedLabel = labels.transcribeFailed ?? wording('ai.chat.transcribeFailed', 'What was said could not be written down.'), speak, autoplay = true, speaking, playLabel = labels.play ?? wording('ai.chat.play', 'Read the reply aloud'), stopReadingLabel = labels.stopReading ?? wording('ai.chat.stopReading', 'Stop reading'), speakFailedLabel = labels.speakFailed ?? wording('ai.chat.speakFailed', 'The reply could not be read aloud.'), onSpeak, onSpeakEnd, onSpeakFail, onSpeakingChange, fill = false, layout, variant, tone = 'accent', size = 'md', keepOnServer = false, conversations = false, conversationIn = 'address', conversationsLabel = labels.conversations ?? wording('ai.chat.conversations', 'Conversations'), untitledLabel = labels.untitled ?? wording('ai.chat.untitled', 'Untitled conversation'), renameLabel = labels.rename ?? wording('ai.chat.rename', 'Rename the conversation'), deleteLabel = labels.delete ?? wording('ai.chat.delete', 'Delete the conversation'), deleteConfirmLabel = labels.deleteConfirm ?? wording('ai.chat.deleteConfirm', 'Delete for good?'), conflictLabel = labels.conflict ?? wording('ai.chat.conflict', 'This conversation changed in another tab, so it was reloaded.'), loadFailedLabel = labels.loadFailed ?? wording('ai.chat.loadFailed', 'The conversation could not be loaded.'), changeFailedLabel = labels.changeFailed ?? wording('ai.chat.changeFailed', 'The change could not be saved.'), signedOutLabel = labels.signedOut ?? wording('ai.chat.signedOut', 'You are signed out, so this conversation is no longer saved.'), turn: turnBlock, actions: actionsBlock, call: callBlock, source: sourceBlock, empty: emptyBlock, footer } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -125,6 +128,17 @@ const { action, initial = [], labels = {}, label = wording('ai.chat.label', 'Cha
 
   // An action writing down what the visitor said, `action(s.Object({ audio: s.File() }), ...)` returning the text or `{ text }`: given, a microphone button beside the field records, and the text joins the field and is sent as typed. A reply under way keeps it in the field.
   transcribe?: Action<{ audio: File }, string | { text: string } | Failure<unknown>> | undefined
+  // An action turning the text of a reply into audio, `action({ text: s.string() }, ({ text }) => speakData(text))`, answering the audio as base64 with its type, or the address of audio the browser plays: given, each finished reply is read aloud, until a newer reply, a send or a new conversation stops it. A browser that refuses to play unasked leaves a play button on the turn, and a refusal of the action or a failed reading shows a notice.
+  speak?: SpeakAction | undefined
+  // Whether each finished reply is read as soon as it ends; false leaves a play button on every reply, so the visitor chooses.
+  autoplay?: boolean | undefined
+  // Whether a reply is being read, for the app to control: false stops it, true reads the last reply, and `onSpeakingChange` tells the app when it changes. Left out, the chat keeps it.
+  speaking?: boolean | undefined
+  // The reading starts playing (`onSpeak`), its audio ends (`onSpeakEnd`), or it fails with the message shown (`onSpeakFail`); `onSpeakingChange` hears each change of `speaking`.
+  onSpeak?: ((event: { turn: ChatTurnView }) => unknown) | undefined
+  onSpeakEnd?: ((event: { turn: ChatTurnView }) => unknown) | undefined
+  onSpeakFail?: ((event: { turn: ChatTurnView, message: string }) => unknown) | undefined
+  onSpeakingChange?: ((event: { speaking: boolean }) => unknown) | undefined
 
   // Fills the height of its container, which the app gives a height (a flex column, a grid row or a fixed one): the log takes the space and scrolls, the greeting sits above the form, and the form stays at the bottom, as the launcher's panel does. Without it the log grows to 32rem and scrolls past it.
   fill?: boolean | undefined
@@ -185,7 +199,7 @@ const session = createChatSession({
   get loadFailedMessage() { return loadFailedLabel },
   get signedOutMessage() { return signedOutLabel },
   onSend: sent => onSend?.(sent),
-  onReply: ({ turn }) => onReply?.({ turn: viewOf(turn) }),
+  onReply: ({ turn }) => { onReply?.({ turn: viewOf(turn) }); readAloud(turn) },
   onStop: () => onStop?.(),
   onError: failed => onError?.(failed),
   onToolCall: ({ call }) => onToolCall?.({ call }),
@@ -194,6 +208,72 @@ const session = createChatSession({
 })
 const { history, draft, partial, thought, thoughtOpen, calls, code, found, spoken, failure, takenBack, busy, send, stop } = session
 const { attached, problem: attachProblem } = attachments
+// Reads each finished reply aloud, for a Chat taking `speak`: the turn is told to the app by the id the reader was given.
+const reader = createReader({
+  speak: () => speak,
+  failedLabel: () => speakFailedLabel,
+  onStart: ({ id }) => said(id, turn => onSpeak?.({ turn })),
+  onEnd: ({ id }) => said(id, turn => onSpeakEnd?.({ turn })),
+  onFail: ({ id }, message) => said(id, turn => onSpeakFail?.({ turn, message })),
+})
+
+function said(id: number, tell: (turn: ChatTurnView) => unknown) {
+  const turn = history().find(entry => entry.id === id)
+
+  if (turn !== undefined)
+    safely(() => tell(viewOf(turn)), 'kayjs-ai: a Chat onSpeak')
+}
+
+function readAloud(turn: Turn) {
+  if (speak !== undefined && autoplay && !turn.stopped)
+    void reader.read({ id: turn.id, text: spokenText(withoutApproval(turn.content)) })
+}
+
+// A reply, a send, another conversation or an edit that cut the turn ends the reading: the turn is gone from the log, or a reply is under way.
+effect(() => {
+  const reading = reader.playing()
+
+  if (busy() || (reading !== undefined && !history().some(turn => turn.id === reading)))
+    untrack(reader.stop)
+})
+
+// `speaking` set by the app stops the reading or starts the last reply's, and the app hears each change.
+effect(() => {
+  const wanted = speaking
+
+  untrack(() => {
+    const last = history().findLast(turn => turn.role === 'assistant')
+
+    if (wanted === false && reader.playing() !== undefined)
+      reader.stop()
+    else if (wanted === true && reader.playing() === undefined && last !== undefined && speak !== undefined)
+      void reader.read({ id: last.id, text: spokenText(withoutApproval(last.content)) }, true)
+  })
+})
+
+let reported = false
+
+effect(() => {
+  const now = reader.playing() !== undefined
+
+  if (now !== reported) {
+    reported = now
+    untrack(() => onSpeakingChange?.({ speaking: now }))
+  }
+})
+
+onCleanup(reader.stop)
+
+// The play button of a reply: the one being read (which stops it), the one the browser refused to start, and every reply when `autoplay` is off.
+const playable = (turn: Turn) => speak !== undefined && turn.role === 'assistant' && turn.content !== '' && !turn.stopped && !busy() && (!autoplay || reader.playing() === turn.id || reader.refused() === turn.id)
+
+function toggleReading(turn: Turn) {
+  if (reader.playing() === turn.id)
+    reader.stop()
+  else
+    void reader.read({ id: turn.id, text: spokenText(withoutApproval(turn.content)) }, true)
+}
+
 // The message being edited, and what the field holds.
 // Whether the conversation was started over and has no turn yet, which the status line says once.
 const fresh = signal(false)
@@ -800,7 +880,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
                 small(part="note") {stoppedLabel}
           if turn.role === 'assistant' && turnBlock
             {approvals(turn)}
-          if (turn.role === 'user' ? canEdit(turn) : canRegenerate(turn)) || actionsBlock
+          if (turn.role === 'user' ? canEdit(turn) : canRegenerate(turn) || playable(turn)) || actionsBlock
             div(part="actions")
               if turn.role === 'user'
                 if canEdit(turn)
@@ -809,6 +889,9 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
               else if canRegenerate(turn)
                 BareIconButton(part="regenerate" variant="inline" size="xs" label={regenerateLabel} onClick={session.regenerate})
                   Icon(icon={iconOf('regenerate', 'refresh')})
+              if playable(turn)
+                BareIconButton(part="play" variant="inline" size="xs" label={reader.playing() === turn.id ? stopReadingLabel : playLabel} aria-pressed={reader.playing() === turn.id ? 'true' : 'false'} onClick={() => toggleReading(turn)})
+                  Icon(icon={reader.playing() === turn.id ? iconOf('stop', 'stop') : iconOf('play', 'play')})
               slot actions(viewOf(turn))
     if busy()
       article(part="turn" data-role="assistant" data-pending="" aria-hidden="true")
@@ -848,6 +931,8 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
     Notice(tone="danger") {attachProblem()}
   if voice?.problem()
     Notice(tone="danger") {voice.problem()}
+  if reader.problem()
+    Notice(tone="danger") {reader.problem()}
   if attached().length > 0
     ul(part="files")
       for file of attached() key={fileKey(file)}

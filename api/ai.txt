@@ -191,7 +191,7 @@ interface ChatFailure
   status: number | undefined
 
 [.] ChatIconName
-type ChatIconName = 'send' | 'stop' | 'new' | 'attach' | 'regenerate' | 'edit' | 'record'
+type ChatIconName = 'send' | 'stop' | 'new' | 'attach' | 'regenerate' | 'edit' | 'record' | 'play'
 
 [.] ChatIcons
 type ChatIcons = Partial<Record<ChatIconName, ChatIconValue>>
@@ -229,6 +229,7 @@ interface ChatLabels
   field?: string | undefined
   loadFailed?: string | undefined
   new?: string | undefined
+  play?: string | undefined
   reasoning?: string | undefined
   record?: string | undefined
   regenerate?: string | undefined
@@ -241,8 +242,10 @@ interface ChatLabels
   send?: string | undefined
   signedOut?: string | undefined
   sources?: string | undefined
+  speakFailed?: string | undefined
   started?: string | undefined
   stop?: string | undefined
+  stopReading?: string | undefined
   stopped?: string | undefined
   table?: string | undefined
   thinking?: string | undefined
@@ -288,6 +291,7 @@ interface ChatLauncherLabels extends ChatLabels
   loadFailed?: string | undefined
   new?: string | undefined
   open?: string | undefined
+  play?: string | undefined
   reasoning?: string | undefined
   record?: string | undefined
   regenerate?: string | undefined
@@ -300,8 +304,10 @@ interface ChatLauncherLabels extends ChatLabels
   send?: string | undefined
   signedOut?: string | undefined
   sources?: string | undefined
+  speakFailed?: string | undefined
   started?: string | undefined
   stop?: string | undefined
+  stopReading?: string | undefined
   stopped?: string | undefined
   table?: string | undefined
   thinking?: string | undefined
@@ -700,6 +706,12 @@ interface Source
 [.] speak
 function speak(text: string, options?: SpeakOptions): Promise<Blob>
 
+[.] SpeakAction
+type SpeakAction = Action<{ text: string }, string | { audio: string, type?: string | undefined } | Failure<unknown>>
+
+[.] speakData
+function speakData(text: string, options?: SpeakOptions): Promise<{ audio: string; type: string; }>
+
 [.] SpeakOptions
 interface SpeakOptions extends CallOptions
   afterRequest?: Hook<FinishHookCall> | undefined
@@ -935,6 +947,7 @@ component default
   action: Action<{ messages: ChatMessage[]; }, AsyncIterable<Progress | string> | Failure<unknown>, never>
   actions?: ((turn: ChatTurnView) => Element) | undefined
   attach?: boolean | undefined
+  autoplay?: boolean | undefined
   call?: ((call: AiToolCall) => Element) | undefined
   class?: string | undefined
   conversations?: boolean | undefined
@@ -965,6 +978,10 @@ component default
   onRegenerate?: (() => unknown) | undefined
   onReply?: ((event: { turn: ChatTurnView; }) => unknown) | undefined
   onSend?: ((event: { messages: ChatMessage[]; }) => unknown) | undefined
+  onSpeak?: ((event: { turn: ChatTurnView; }) => unknown) | undefined
+  onSpeakEnd?: ((event: { turn: ChatTurnView; }) => unknown) | undefined
+  onSpeakFail?: ((event: { turn: ChatTurnView; message: string; }) => unknown) | undefined
+  onSpeakingChange?: ((event: { speaking: boolean; }) => unknown) | undefined
   onStop?: (() => unknown) | undefined
   onSuggestion?: ((event: { text: string; }) => unknown) | undefined
   onToolCall?: ((event: { call: AiToolCall; }) => unknown) | undefined
@@ -1019,6 +1036,9 @@ component default
   regenerate?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
+  play?: readonly unknown[] | string | undefined | {
+    root?: string | undefined;
+  };
   thinking?: string | undefined;
   status?: string | undefined;
   retry?: string | undefined;
@@ -1052,6 +1072,8 @@ component default
   showReasoning?: boolean | undefined
   size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
+  speak?: SpeakAction | undefined
+  speaking?: boolean | undefined
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
   tone?: "accent" | "neutral" | undefined
   toolDetails?: boolean | undefined
@@ -1109,6 +1131,7 @@ component default
   action: Action<{ messages: ChatMessage[]; }, AsyncIterable<Progress | string> | Failure<unknown>, never>
   actions?: ((turn: ChatTurnView) => Element) | undefined
   attach?: boolean | undefined
+  autoplay?: boolean | undefined
   call?: ((call: AiToolCall) => Element) | undefined
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
@@ -1141,6 +1164,10 @@ component default
   onRegenerate?: (() => unknown) | undefined
   onReply?: ((event: { turn: ChatTurnView; }) => unknown) | undefined
   onSend?: ((event: { messages: ChatMessage[]; }) => unknown) | undefined
+  onSpeak?: ((event: { turn: ChatTurnView; }) => unknown) | undefined
+  onSpeakEnd?: ((event: { turn: ChatTurnView; }) => unknown) | undefined
+  onSpeakFail?: ((event: { turn: ChatTurnView; message: string; }) => unknown) | undefined
+  onSpeakingChange?: ((event: { speaking: boolean; }) => unknown) | undefined
   onStop?: (() => unknown) | undefined
   onSuggestion?: ((event: { text: string; }) => unknown) | undefined
   onToolCall?: ((event: { call: AiToolCall; }) => unknown) | undefined
@@ -1194,6 +1221,9 @@ component default
   regenerate?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
+  play?: readonly unknown[] | string | undefined | {
+    root?: string | undefined;
+  };
   thinking?: string | undefined;
   status?: string | undefined;
   retry?: string | undefined;
@@ -1227,6 +1257,8 @@ component default
   showReasoning?: boolean | undefined
   size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
+  speak?: SpeakAction | undefined
+  speaking?: boolean | undefined
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
   tone?: "accent" | "neutral" | undefined
   toolDetails?: boolean | undefined

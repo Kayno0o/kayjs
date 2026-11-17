@@ -1,0 +1,5 @@
+---
+import Reading from '../components/reading.kay'
+---
+h1 Reading
+Reading

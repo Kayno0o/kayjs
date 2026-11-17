@@ -1,0 +1,15 @@
+---
+import { signal } from 'kay'
+import { reply, say } from '../routes/speaking.kay'
+import Chat from '@kayjs/ai/chat.kay'
+
+const heard = signal<string[]>([])
+const speaking = signal(false)
+
+const hear = (what: string) => { heard = [...heard(), what] }
+const { auto = true } = props<{ auto?: boolean }>()
+---
+Chat(action={reply} label="Assistant" newButton speak={say} autoplay={auto} bind:speaking={speaking} onSpeak={({ turn }) => hear(`speak:${turn.content}`)} onSpeakEnd={({ turn }) => hear(`end:${turn.content}`)} onSpeakFail={({ turn, message }) => hear(`fail:${turn.content}:${message}`)})
+p.heard {heard().join(';')}
+p.speaking {speaking() ? 'on' : 'off'}
+button.stop-speaking(type="button" onClick={() => { speaking = false }}) Stop from the app

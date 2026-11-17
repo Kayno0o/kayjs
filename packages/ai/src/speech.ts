@@ -66,3 +66,10 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<B
 
   return billed(text.length, signal, async () => send({ text, voice: options.voice ?? voice, speed, format: options.format }), () => 0)
 }
+
+// `speak()` as an action can answer it: the audio as base64 with its type, which a Chat's `speak` action plays. An action's answer is JSON, so the Blob itself cannot go.
+export async function speakData(text: string, options: SpeakOptions = {}): Promise<{ audio: string, type: string }> {
+  const blob = await speak(text, options)
+
+  return { audio: Buffer.from(await blob.arrayBuffer()).toString('base64'), type: blob.type }
+}

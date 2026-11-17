@@ -5,7 +5,7 @@ import type { StoredFile } from './attachments'
 import type { AiErrorKind } from './errors'
 
 // The round buttons of a `Chat` an app draws its own icon on, by `icons`.
-export type ChatIconName = 'send' | 'stop' | 'new' | 'attach' | 'regenerate' | 'edit' | 'record'
+export type ChatIconName = 'send' | 'stop' | 'new' | 'attach' | 'regenerate' | 'edit' | 'record' | 'play'
 
 // An icon of the app's settings, by its slot name, or one imported from `~icons/<prefix>/<name>`, as kayjs-ui's `Icon` takes it.
 export type ChatIconValue = IconProps | (string & {})
@@ -70,6 +70,10 @@ export interface ChatLabels {
   transcribing?: string | undefined
   unheard?: string | undefined
   transcribeFailed?: string | undefined
+  // The play button's name and tooltip, the stop button that replaces it while a reply is read, and what a reading that failed says when the action gave no message of its own.
+  play?: string | undefined
+  stopReading?: string | undefined
+  speakFailed?: string | undefined
   // The list's name, the title of a conversation that opened on files alone, the names of the rename and delete buttons (followed by the conversation's title) and the question a delete asks before it deletes.
   conversations?: string | undefined
   untitled?: string | undefined

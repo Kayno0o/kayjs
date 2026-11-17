@@ -1,5 +1,5 @@
 --- server
-import { ask, chatMessages } from '@kayjs/ai'
+import { ask, chatMessages, speakData } from '@kayjs/ai'
 import { action, s } from 'kay'
 
 // Says one word and keeps working until the visitor stops it, so a test speaks while a reply is under way.
@@ -19,6 +19,9 @@ export const transcribe = action({ audio: s.file() }, async ({ audio }, ctx) => 
 
   return text === 'refuse' ? ctx.deny(422, { data: 'Too noisy to write down.' }) : { text }
 }, { maxSize: '1mb' })
+
+// Reads a reply aloud: the fake speaks silence. A reply that says `Refuse` is refused as a provider's error would be.
+export const say = action({ text: s.string() }, async ({ text }, ctx) => text.includes('Refuse') ? ctx.deny(422, { data: 'Too long to read.' }) : speakData(text))
 --- script
 import Chat from '@kayjs/ai/chat.kay'
 ---

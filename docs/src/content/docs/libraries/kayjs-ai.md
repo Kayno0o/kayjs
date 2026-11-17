@@ -230,6 +230,12 @@ An edit stays open while the visitor sends something else, and Escape, Cancel an
 
 A chat that is the main content of a page, such as a page of its own for the assistant, takes the height of its container with `fill`: give the container a height (a flex column, a grid row, `h-dvh`) and the log scrolls inside it while the form stays at the bottom. Without `fill` the log stops growing at `32rem`.
 
+A chat reads each finished reply aloud when it takes `speak`, an action that answers `speakData(text)` (the audio as base64 with its type, as an action's JSON needs).
+
+A newer reply, a send or a new conversation stops the reading, a browser that refuses to play unasked leaves a play button on the turn, and a refusal of the action or a failed reading shows a notice. `autoplay={false}` leaves the choice to the visitor with a play button under each reply, `bind:speaking` lets the page stop it, and `onSpeak`, `onSpeakEnd` and `onSpeakFail` mark each transition.
+
+<ReadMore href="/llms/kayjs-ai-chat-speaking">The speak action, the play button, its words and callbacks.</ReadMore>
+
 An inline `Chat` can show a New conversation button beside its field with `newButton`. It appears once the conversation has a turn, stops a reply under way and clears the log, the field and what `remember` kept. `labels.new` names it and `icons.new` replaces its plus. To start over from your own control instead, dispatch a `kai:chat-new` event on the `.kai-chat` element.
 
 To let a reload of the tab find the conversation again, give `remember` a name, and it is kept in the tab's session storage under it. Nothing is kept by default, because the next person to use the tab after a sign-out would read it. On a site with sign-in, make the name per visitor, such as `` `kai-chat-${user.id}` ``.

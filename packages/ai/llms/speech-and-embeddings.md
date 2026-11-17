@@ -24,6 +24,8 @@ return new Response(audio)
 
 `speak(text, options?)` returns the audio as a `Blob` typed by its format, so `new Response(audio)` serves it with its `content-type`, `Bun.write(path, audio)` saves it and `await audio.bytes()` reads it. `voice` is `AI_VOICE` unless given, `speed` goes from 0.25 to 4 (another throws), `maxInputChars` caps the text (4,096 by default), `format` is `mp3`, `opus`, `aac`, `flac`, `wav` or `pcm`, the server's own (mp3 for OpenAI) unless given.
 
+A `Chat` reads its replies aloud through an action answering `speakData(text)`, which is `speak()` with the audio as base64 and its type, for an action's JSON: [Reading replies aloud](chat-speaking.md).
+
 ### Options every call takes
 
 `transcribe`, `speak`, `embed` and `describeImage` take what `ask` does: `provider`, `model`, `signal`, `timeout`, `retry`, `fallback` and the hooks `afterStep`, `afterRequest` and `onError` (`CallOptions`: [Asking](asking.md#options-every-call-takes)). A transient failure (`unavailable`, `rate-limited`, `timeout`, `network`) is asked again once, as an ask is, and `ai({ retry, fallback, afterRequest, ... })` apply to them. Their `timeout` is the limit of the whole call, 2 minutes by default, a single duration (`'30s'`), or `{ connect, idle }` which add up. A hook's `afterRequest` is given the transcript as `text` for `transcribe` and an empty one for the others, with one step per request.
