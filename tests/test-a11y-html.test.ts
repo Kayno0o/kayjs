@@ -74,6 +74,10 @@ describe('normalizeHtml', () => {
     expect(normalizeHtml(html)).toBe('<link rel="stylesheet" href="/_kay/app-HASH.css">\n<script type="module" nonce="NONCE" src="/_kay/chunk-HASH.js"></script>\n<form>\n  <input type="hidden" name="kay_since" value="STAMP">\n</form>\n')
   })
 
+  it('keeps an eight-letter slug of the app and a stamp whatever the attribute order', () => {
+    expect(normalizeHtml('<a href="/img/my-products.svg">x</a><input value="9" type="hidden" name="kay_since">')).toBe('<a href="/img/my-products.svg">\n  x\n</a>\n<input value="STAMP" type="hidden" name="kay_since">\n')
+  })
+
   it('keeps a script and a pre as they are', () => {
     expect(normalizeHtml('<pre>a\n  b</pre><script>let x = 1 < 2</script>')).toBe('<pre>a\n  b</pre>\n<script>let x = 1 < 2</script>\n')
   })

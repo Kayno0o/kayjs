@@ -375,7 +375,6 @@ async function siteOf(options: TestOptions): Promise<TestSite> {
         headers: current.headers,
         html,
         ...reading,
-
         css: async () => {
           if (!realClient)
             throw new Error('kay: css() reads the stylesheets the app builds, which a site loads with testSite({ styles: true }) or testSite({ browser: true })')

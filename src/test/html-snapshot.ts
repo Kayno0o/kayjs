@@ -10,12 +10,13 @@ const OPEN_TAG = /^<([a-z][\w:-]*)/i
 const CLOSE_TAG = /^<\/\s*[a-z]/i
 const RAW = /^<(?:script|style|pre|textarea)\b/i
 const WHITESPACE = /\s+/g
-// Bun names a built file `<name>-<hash>.<ext>`, the hash eight letters and digits.
-const HASHED_FILE = /(\/[\w./-]*?)-[\da-z]{8}(?=\.[a-z\d]+(?:[?"'\s)#]|$))/gi
+// Bun names a built file `<name>-<hash>.<ext>`, the hash eight letters and digits; only under `/_kay/`, so an app's own eight-letter slug stays.
+const HASHED_FILE = /(\/_kay\/[\w./-]*?)-[\da-z]{8}(?=\.[a-z\d]+(?:[?"'\s)#]|$))/gi
 // A `?v=` cache-busting version, such as a favicon's.
 const VERSION = /([?&]v=)[\da-f]{6,}/gi
 const NONCE = /(\bnonce=)(["'])[^"']*\2/gi
-const STAMP = /(<input\s[^>]*?\sname="kay_since"[^>]*?\svalue=)"[^"]*"/g
+const STAMP_INPUT = /<input\s[^>]*\bname=["']?kay_since\b[^>]*>/gi
+const STAMP_VALUE = /(\bvalue=)(?:"[^"]*"|'[^']*'|[^\s>]+)/i
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'])
 
 // A page's markup as a snapshot holds it, the same from one build to the next: comments (the hydration markers among them) left out, the hash of each built file's name and of a `?v=` version, each nonce and the stamp of a `minTime` form replaced by a fixed word, and one tag or run of text a line, indented by depth.
@@ -23,7 +24,7 @@ export function normalizeHtml(html: string): string {
   const lines: string[] = []
   let depth = 0
 
-  for (const token of html.replace(HASHED_FILE, '$1-HASH').replace(VERSION, '$1HASH').replace(NONCE, '$1$2NONCE$2').replace(STAMP, '$1"STAMP"').match(TOKEN) ?? []) {
+  for (const token of html.replace(HASHED_FILE, '$1-HASH').replace(VERSION, '$1HASH').replace(NONCE, '$1$2NONCE$2').replace(STAMP_INPUT, input => input.replace(STAMP_VALUE, '$1"STAMP"')).match(TOKEN) ?? []) {
     if (COMMENT.test(token))
       continue
 
