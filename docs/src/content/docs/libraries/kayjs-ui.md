@@ -178,9 +178,9 @@ A Table in an island ships only the features the project's `.kay` files write on
 
 `sortable` is on unless every call site writes `sortable={false}`, and the sort buttons, their links and the sorting code stay out of the chunks then; `header`, `cell` and `noMatch` are the blocks (or props) of the same name.
 
-Nothing is declared. kay reads the props at each `<Table>` call of the project's `.kay` files (not `node_modules`), takes the union, and builds one variant of the Table that every island loads, so two islands share it.
+Nothing is declared. kay reads the props at each `<Table>` call of the project's `.kay` files (the library files the build reaches too, not only your own), takes the union, and builds one variant of the Table that every island loads, so two islands share it.
 
-A BarChart does the same: with no `marks`, `onMark`, `href`, `onSelect` or `tooltip` at any call site, its events, link and button columns and tooltip stay out of the island, about 8 KB less. A LineChart leaves out `marks`, `onMark`, `onSelect` and `href` (about 4.5 KB), and a ScatterChart `onSelect`, `href` and `tooltip` (about 4 KB).
+A BarChart does the same: with no `marks`, `onMark`, `href`, `onSelect` or `tooltip` at any call site, its events, link and button columns and tooltip stay out of the island, about 8 KB less, and the code of `stacked`, `xLabels`, `empty`, `emptyLabel`, `active`, `onActive` and `onActiveChange` stays out while no call site writes it. A LineChart leaves out `marks`, `onMark`, `onSelect` and `href` (about 4.5 KB), and a ScatterChart `onSelect`, `href` and `tooltip` (about 4 KB).
 
 A Table drawn by a page, or a server component, with none of those props except `sortParam`, and no function prop, is plain markup: no island, and no script for the page.
 

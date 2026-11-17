@@ -1514,3 +1514,15 @@ describe('a number attribute in server markup', () => {
     expect(tsx).toContain('KayAttribute("aria-valuetext", ("0"))')
   })
 })
+
+describe('the props the rest object leaves out', () => {
+  const source = '---\nconst { a, b, selected, onSelectedChange, footer, ...rest } = props<{ a?: number, b?: number, selected?: string, onSelectedChange?: (value: string) => void, footer?: string, [key: string]: unknown }>()\n---\ndiv({...rest}) {a}\n'
+  const omitted = (writtenProps?: ReadonlySet<string>) => (/KayOmit\(\w+, ([^)]*)\)/).exec(compileKay(source, 'test.kay', { writtenProps }).tsx)?.[1]
+
+  it('names every declared prop without a written set, and only the written ones with it', () => {
+    expect(omitted()).toBe('"a", "b", "selected", "onSelectedChange", "footer"')
+    // A prop bound with `bind:selected`, written as `selected` and `onSelectedChange`, a hyphenated attribute that is no prop, and a slot.
+    expect(omitted(new Set(['a', 'selected', 'onSelectedChange', 'aria-label', 'footer']))).toBe('"a", "selected", "onSelectedChange", "footer"')
+    expect(omitted(new Set())).toBe('')
+  })
+})

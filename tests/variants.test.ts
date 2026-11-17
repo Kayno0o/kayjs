@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
@@ -184,5 +185,54 @@ describe('the props a variant knows its call sites write', () => {
   it('names every prop written at any call site after a tilde, none when a call spreads', async () => {
     expect(usesOf(await query('rows={r} columns={c}', 'rowKey="id" selectable'))).toBe('selectable-sortable~columns-rowKey-rows-selectable')
     expect(usesOf(await query('rows={r}', '{...rest}'))).not.toContain('~')
+  })
+})
+
+describe('a bind: written at a call site', () => {
+  const head = 'import Table from \'./table.kay\'\n---\n'
+
+  it('writes the prop and the callback the compiler gives it, as written props', () => {
+    const written = propsWritten(`${head}Table(rows={r} bind:selected={chosen})`, ['Table']).get('Table') as Set<string>
+
+    expect([...written].sort()).toEqual(['onSelectedChange', 'rows', 'selected'])
+  })
+
+  it('leaves the bound feature on in the variant of BarChart and of Table', async () => {
+    const dir = await scratchDir('variants-')
+    const parts = (query: string): [string, string] => [query.slice(0, query.indexOf('~')), query.slice(query.indexOf('~') + 1)]
+    const ui = (name: string) => join(import.meta.dir, `../packages/ui/src/${name}.kay`)
+    const entry = async (name: string, call: string) => {
+      const path = join(dir, `${name}.kay`)
+
+      await Bun.write(path, `---\nimport Component from '${ui(name)}'\n---\nComponent(${call})\n`)
+
+      return usesOf(await new VariantIndex([path]).entry(ui(name)))
+    }
+
+    const [features] = parts(await entry('bar-chart', 'labels={l} series={s} bind:active={at}'))
+    const [, props] = parts(await entry('table', 'rows={r} columns={c} rowKey="id" bind:selected={chosen}'))
+
+    expect(features.split('-')).toEqual(expect.arrayContaining(['active', 'onActiveChange']))
+    expect(props).toContain('onSelectedChange')
+    await rm(dir, { recursive: true, force: true })
+  })
+})
+
+describe('a variant of Table specialised for a call that uses almost nothing', () => {
+  const source = readFileSync(join(import.meta.dir, '../packages/ui/src/table.kay'), 'utf8')
+
+  it('drops the recipe parts and the default wording of the features left out, and keeps them when present', () => {
+    const plain = specializedSource(source, new Set())
+
+    expect(plain).not.toMatch(/\.\.\.\(false/)
+    expect(plain).not.toContain('ui.table.columns')
+    expect(plain).not.toContain('ui.table.filter\'')
+    expect(plain).not.toContain('sticky left-0')
+    expect(plain).toContain('skeletonCell')
+
+    const full = specializedSource(source, new Set(['columnToggle', 'filter', 'selectable']))
+
+    expect(full).toContain('ui.table.columns')
+    expect(full).toContain('sticky left-0')
   })
 })

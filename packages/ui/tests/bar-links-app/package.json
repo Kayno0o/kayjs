@@ -1,0 +1,8 @@
+{
+  "name": "kayjs-ui-bar-links-app",
+  "private": true,
+  "dependencies": {
+    "@iconify-json/tabler": "*",
+    "@kayjs/ui": "link:../.."
+  }
+}

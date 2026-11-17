@@ -1,0 +1,15 @@
+---
+island({ render: 'client' })
+import BarChart from '@kayjs/ui/bar-chart.kay'
+import { signal } from 'kay'
+
+const at = signal<number | null>(null)
+---
+div
+  BarChart#links(labels={['a', 'b']} series={[{ name: 'Runs', values: [1, 2] }]} label="Links" href={mark => `#column-${mark.label}`} marks={[{ at: 'a', title: 'Release', href: '#release' }]})
+  BarChart#empty(labels={[]} series={[]} label="Nothing" emptyLabel="Nothing here")
+  BarChart#custom(labels={[]} series={[]} label="Custom")
+    @empty
+      em.own Add the first run
+  BarChart#bound(labels={['a', 'b']} series={[{ name: 'Runs', values: [1, 2] }]} label="Bound" active={at()} onActiveChange={({ index }) => at = index})
+  p#reading {at() ?? 'none'}

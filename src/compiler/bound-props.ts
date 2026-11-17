@@ -6,7 +6,7 @@ type ExpressionAttribute = Extract<NamedAttribute, { kind: 'expression' }>
 const BOUND_NAME = /^\s*[A-Z_$][\w$]*(?:\s*\.\s*[A-Z_$][\w$]*)*\s*$/i
 
 // The callback a bound prop reports its changes through: `open` and `onOpenChange`.
-function changeName(prop: string): string {
+export function changeName(prop: string): string {
   return `on${prop[0]!.toUpperCase()}${prop.slice(1)}Change`
 }
 

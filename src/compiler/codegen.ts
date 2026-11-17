@@ -25,6 +25,7 @@ import { helperName } from './markup'
 import { defaultName, LOAD, LOAD_KEY, LOAD_RUN, LOAD_TABLE, PROPS, VALUES } from './names'
 import { ownMarkupOf } from './own-markup'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
+import { restOmits } from './rest-omits'
 import { reactiveValue } from './script'
 import { kayCtxImport } from './script-shared'
 import { slotTypes } from './slot-types'
@@ -103,6 +104,7 @@ export interface GenerateOptions {
   ui?: UiEntry | undefined
   // Type checking's counterpart of `ui`: the variants and values `src/ui.ts` adds to the component's props.
   uiAdded?: UiEntry | undefined
+  // Browser variant builds: the props the project's call sites write, so the rest list omits only those (the others cannot arrive); absent, every declared prop is omitted.
   writtenProps?: ReadonlySet<string> | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
   rewrites?: ReadonlyMap<number, Rewrite & { end: number }> | undefined
@@ -886,9 +888,7 @@ class ModuleShell {
     }
 
     if (props.rest) {
-      const owned = this.facts.parts?.merges === true
-
-      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${[...props.bindings.filter(binding => this.options.writtenProps?.has(binding.key) ?? true).map(binding => JSON.stringify(binding.key)), ...owned ? ['"class"', '"parts"'] : [], ...owned && this.facts.recipe !== undefined ? [`...${this.facts.recipe}.variants`] : [], ...owned ? Object.keys(this.facts.ui?.variants ?? {}).map(name => JSON.stringify(name)) : []].join(', ')});\n`)
+      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${restOmits(props, this.options.writtenProps, this.facts).join(', ')});\n`)
     }
 
     // The analysis pass declares the destructured names so scope analysis can find every read of them; the final pass rewrites those reads instead.

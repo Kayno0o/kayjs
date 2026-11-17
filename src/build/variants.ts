@@ -3,6 +3,7 @@ import { readdirSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { elementsIn } from '../compiler/ast'
+import { changeName } from '../compiler/bound-props'
 import { parseExpanded } from '../compiler/markdown-block'
 
 // A component names the features an app may leave out with `uses('selectable')`, the `uses` it imports from kayjs-ui's marker module: a call that is true while the prop is there to be written, and that a browser build replaces with `true` or `false` once it has read the props the files of the project write at their call sites. See `specializedSource`.
@@ -406,6 +407,14 @@ export function propsWritten(source: string, locals: readonly string[], defaults
 
       const name = source.slice(attribute.name.start, attribute.name.end)
 
+      // A `bind:x` hands the component `x` and `onXChange`, as the compiler writes them.
+      if (name.startsWith('bind:') && name.length > 5) {
+        props.add(name.slice(5))
+        props.add(changeName(name.slice(5)))
+
+        continue
+      }
+
       props.add(name)
 
       if (attribute.kind === 'expression' && source.slice(attribute.expression.start, attribute.expression.end).trim() === 'false')
@@ -524,9 +533,9 @@ export class VariantIndex {
     const props = this.union.get(path) ?? new Set<string>()
 
     if (props === ANY)
-      return features.sort().join('-')
+      return [...features].sort().join('-')
 
-    return `${features.filter(feature => props.has(defaults.has(feature) ? ON_PREFIX + feature : feature)).sort().join('-')}~${[...props].filter(name => PROP_NAME.test(name)).sort().join('-')}`
+    return `${features.filter(feature => props.has(defaults.has(feature) ? ON_PREFIX + feature : feature)).toSorted().join('-')}~${[...props].filter(name => PROP_NAME.test(name)).sort().join('-')}`
   }
 
   // An island entry that is a component with features, as the variant the project's call sites need; any other file as it is.
