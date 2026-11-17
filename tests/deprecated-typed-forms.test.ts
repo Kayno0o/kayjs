@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { check } from '../src/check'
 import { applySafeFixes } from '../src/check/fixes'
+import { handlerEventLint } from '../src/check/handler-events'
 import { secretKeys } from '../src/check/secret-keys'
 import { scratchDir } from './scratch'
 
@@ -271,5 +272,22 @@ describe('1.105 forms the type check finds', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  describe('which handlers take an object', () => {
+    const SOURCE = 'import Toggle from \'@kayjs/ui/toggle.kay\'\n---\nToggle(onChange={after})'
+    const at = SOURCE.indexOf('onChange')
+    const lint = (handler: string) => handlerEventLint(`Type '${handler}' is not assignable to type '(event: { checked: boolean; }) => unknown'.\n  Types of parameters 'x' and 'event' are incompatible.\n    Type '{ checked: boolean; }' is not assignable to type 'boolean'.`, SOURCE, { start: at, end: at + 8 })
+
+    it('reads the type of the parameter, not the first colon', () => {
+      expect(lint('({ value: v }: Props) => void')?.fixes?.[0]?.safe).toBe(false)
+      expect(lint('(next: boolean) => void')?.fixes?.[0]?.safe).toBe(true)
+    })
+
+    it('takes object and Record types as objects', () => {
+      expect(lint('(state: object) => void')?.fixes?.[0]?.safe).toBe(false)
+      expect(lint('(state: Record<string, boolean>) => void')?.fixes?.[0]?.safe).toBe(false)
+      expect(lint('(files: File[]) => void')?.fixes?.[0]?.safe).toBe(true)
+    })
   })
 })

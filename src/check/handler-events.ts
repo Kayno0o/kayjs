@@ -8,7 +8,7 @@ const FIELD = /^(\w+)\??:/
 const CALLBACK_NAME = /^on[A-Z]\w*$/
 const HANDLER_NAME = /^[A-Z_$][\w$]*(?:\??\.[A-Z_$][\w$]*)*$/i
 // An object literal type or a named type, which no old argument was apart from a `File`: the handler may be written for the event already.
-const OBJECT_TYPE = /^(?:\{|(?!File\b)[A-Z])/
+const OBJECT_TYPE = /^(?:\{|object\b|(?!File\b)[A-Z])/
 const COMPONENT = /^([A-Z][\w$]*)(?:[.#][^\s(]*)?\(/
 const NAME_AT = /^[\w$]+/
 const EVENT_WORD = /\bevent\b/
@@ -69,6 +69,11 @@ function takesObject(type: string): boolean {
     return false
 
   const first = splitTop(type.slice(1), ',')[0] ?? ''
+
+  // A destructured parameter takes an object whatever its type is called.
+  if (first.startsWith('{'))
+    return true
+
   const colon = first.indexOf(':')
 
   return colon !== -1 && OBJECT_TYPE.test(first.slice(colon + 1).trim())
