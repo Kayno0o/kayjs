@@ -47,6 +47,15 @@ describe('schema-without-json-schema', () => {
     expect(await reported({ 'src/schemas.ts': wrapped, 'src/a.ts': use })).toEqual([])
   })
 
+  it('reports valibot and a hand-written validator reached through an import, in a .kay fence', async () => {
+    const schemas = `export const login = ${WITHOUT}\n`
+    const fence = '--- server\nimport { action } from \'kay\'\nimport { login } from \'../schemas\'\n\nexport const add = action({ input: login }, ({ title }) => title)\n---\np x\n'
+    const valibot = '--- server\nimport { action } from \'kay\'\nimport * as v from \'valibot\'\n\nexport const add = action({ input: v.object({ title: v.string() }) }, ({ title }) => title)\n---\np x\n'
+
+    expect(await reported({ 'src/schemas.ts': schemas, 'src/routes/index.kay': fence })).toEqual(['src/routes/index.kay:5'])
+    expect(await reported({ 'src/routes/index.kay': valibot })).toEqual(['src/routes/index.kay:5'])
+  })
+
   it('leaves kay\'s own schemas, a plain record, and a level of allow', async () => {
     expect(await reported({ 'src/a.ts': 'import { action, s } from \'kay\'\n\nexport const add = action({ input: { title: s.string() } }, ({ title }) => title)\nexport const two = action({ input: s.object({ title: s.string() }) }, ({ title }) => title)\n' })).toEqual([])
     expect(await reported({ 'src/a.ts': action(WITHOUT) }, { 'schema-without-json-schema': 'allow' })).toEqual([])
