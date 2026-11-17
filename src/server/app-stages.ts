@@ -9,6 +9,7 @@ import type { OwnRoutes } from './dev'
 import type { GuardRequirement } from './guard-requirement'
 import type { ServedRoute } from './guards'
 import type { ImageRouteOptions } from './image'
+import type { KayServer } from './kay-server'
 import type { Writes } from './kept-pages'
 import type { MountedApi } from './openapi'
 import type { Unmatched } from './page-routes'
@@ -55,8 +56,8 @@ import { serveErrorReports } from './errors'
 import { checkShareAction, FAVICON_DIR, faviconSource, faviconVersion, serveFavicons } from './favicon'
 import { loadGuard, requiredGuards } from './guards'
 import { refuseUnknownHosts } from './host-allowlist'
-
 import { avifQuality, serveImages, webpQuality } from './image'
+
 import { jobsPageOf, serveJobsPage } from './jobs-page'
 import { countWrites, NO_WRITES } from './kept-pages'
 import { joinGuards } from './lazy-guard'
@@ -79,6 +80,7 @@ import { checkProxy, requestId, requestIdHeader, setRequestIdHeader, trustProxy 
 import { requireProxyKey } from './proxy-key'
 import { publicCacheRules, servePublic } from './public'
 import { NOT_PUBLISHING, watchPublishing } from './publishing'
+import { bridgeReceive } from './receive'
 import { redirectSpelling } from './redirect-spelling'
 import { redirectStatus, redirectTarget, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
@@ -165,6 +167,8 @@ export type LateApp = ReturnType<typeof lateApp>
 
 interface BootInput {
   app: App
+  // The route table and the phases, with `app` as the fallback that serves what the table does not.
+  kay: KayServer
   env: ServerEnv
   project: Project<ServedOptions>
   setup: PageSetup
@@ -304,22 +308,25 @@ function hostsToAnswer(setting: SecurityConfig | boolean | undefined, site: stri
   return hosts === false ? undefined : hosts ?? (env.production && site !== undefined ? true : undefined)
 }
 
-// Who the request is from and whether it may come: the proxy it came through, the server's own mark, the proxy key, the hosts, then the security headers on every answer.
-export function trustRequests({ app, env, options, project, served, security, filePaths, setup, mcpAt, mcpKey, metrics, formerMetrics, formerMcp, log, health }: Boot): void {
+// Who the request is from and whether it may come, as the steps of `receive`: the proxy it came through, the server's own mark, the proxy key, the dev hosts, the hosts; then the security headers on every answer.
+// The steps run in kay's pipeline, which Elysia's first `onRequest` hook hands every request to while the routes are not on kay's table.
+export function trustRequests({ app, kay, env, options, project, served, security, filePaths, setup, mcpAt, mcpKey, metrics, formerMetrics, formerMcp, log, health }: Boot): void {
+  const { receive } = kay.pipeline.phases
+
   setRequestIdHeader(options.ops?.observe?.requestIdHeader)
-  trustProxy(app, options.proxy)
+  receive.push(trustProxy(options.proxy))
   defaultCookies(app, cookieDefaults(options.security, env.base))
   // Before the key check reads the mark, and dropped from the request there, so no handler reads it.
-  app.onRequest(({ request }) => {
+  receive.push((request) => {
     receiveInternal(request)
   })
-  requireProxyKey(app, checkProxy(options.proxy), { root: setup.source.runtimeRoot(project.root), dev: env.dev, exported: env.exported, base: env.base, health: health?.path, endpoint: mcpKey === undefined ? undefined : () => mcpEndpoints(mcpAt, formerMcp, served), metrics: () => [metrics, formerMetrics].flatMap(claim => claim !== undefined && served.holds(claim) ? [claim.path] : []), logRefused: requestRefusalLogger(log), security })
-  refuseForeignHosts(app, setup.site, security)
 
+  const key = requireProxyKey(checkProxy(options.proxy), { root: setup.source.runtimeRoot(project.root), dev: env.dev, exported: env.exported, base: env.base, health: health?.path, endpoint: mcpKey === undefined ? undefined : () => mcpEndpoints(mcpAt, formerMcp, served), metrics: () => [metrics, formerMetrics].flatMap(claim => claim !== undefined && served.holds(claim) ? [claim.path] : []), logRefused: requestRefusalLogger(log), security })
+  const foreign = refuseForeignHosts(setup.site, security)
   const hosts = hostsToAnswer(options.security, setup.site, env)
 
-  if (hosts !== undefined)
-    refuseUnknownHosts(app, { site: setup.site, hosts, localeHosts: Object.values(setup.i18n?.settings.hosts ?? {}), security, health: health && [health.path, `${env.base}${health.path}`] })
+  receive.push(...[key, foreign, hosts === undefined ? undefined : refuseUnknownHosts({ site: setup.site, hosts, localeHosts: Object.values(setup.i18n?.settings.hosts ?? {}), security, health: health && [health.path, `${env.base}${health.path}`] })].filter(step => step !== undefined))
+  bridgeReceive(app, (request, server) => kay.pipeline.receive(request, server))
 
   if (security)
     sendSecurityHeaders(app, security, filePaths)

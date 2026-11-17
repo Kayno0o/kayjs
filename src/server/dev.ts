@@ -33,6 +33,7 @@ import { hostName, isLocalHost } from './host-allowlist'
 import { localeCopies } from './i18n'
 import { compileErrorPage } from './overlay'
 import { requestId } from './protection'
+import { bridgeReceive, receiving } from './receive'
 import { apiRoutePath, endpointPath, ROUTE_METHODS } from './routes'
 
 export const DEV_EVENTS = '/_kay/dev/events'
@@ -572,9 +573,9 @@ function broadcast(event: string): void {
 
 // Under `kay dev`, a request naming a host other than localhost, an IP address or the site is refused, as a page of another site renaming itself to this machine's address (DNS rebinding) would send it.
 // `KAY_DEV_HOSTS` lists other names the server answers to, comma-separated, such as a tunnel's; `kay dev --host` adds this machine's own names, as a phone on the network reaches it by.
-export function refuseForeignHosts(app: Elysia, site: string | undefined, security?: Record<string, string>): void {
+export function refuseForeignHosts(site: string | undefined, security?: Record<string, string>): ((request: Request) => Response | undefined) | undefined {
   if (!underKayDev())
-    return
+    return undefined
 
   const allowed = new Set((process.env.KAY_DEV_HOSTS ?? '').split(',').map(name => name.trim().toLowerCase()).filter(Boolean))
   const siteName = site === undefined ? undefined : URL.parse(site)?.hostname
@@ -586,15 +587,12 @@ export function refuseForeignHosts(app: Elysia, site: string | undefined, securi
   if (listening !== 'localhost')
     allowed.add(listening.toLowerCase()).add(hostname().toLowerCase()).add(`${hostname().toLowerCase()}.local`)
 
-  app.onRequest(({ request }) => {
+  return (request) => {
     const host = request.headers.get('host')
     const name = host === null ? undefined : hostName(host)
 
-    if (host === null || (name !== undefined && (isLocalHost(name) || allowed.has(name))))
-      return
-
-    return new Response(`kay dev answers to localhost, an IP address or the site, and ${host} is none of them; list it in KAY_DEV_HOSTS to reach the server by that name\n`, { status: 421, headers: { ...security, 'content-type': 'text/plain; charset=utf-8' } })
-  })
+    return host === null || (name !== undefined && (isLocalHost(name) || allowed.has(name))) ? undefined : new Response(`kay dev answers to localhost, an IP address or the site, and ${host} is none of them; list it in KAY_DEV_HOSTS to reach the server by that name\n`, { status: 421, headers: { ...security, 'content-type': 'text/plain; charset=utf-8' } })
+  }
 }
 
 const DEV_PREFIX = '/_kay/dev/'
@@ -632,7 +630,7 @@ export function bootFailure(error: unknown, root: string, tools = true): Elysia 
   const app = new Elysia({ name: 'kay/pages', seed: root })
 
   rememberBoot(true)
-  refuseForeignHosts(app, siteFromEnv())
+  bridgeReceive(app, receiving([refuseForeignHosts(siteFromEnv())]))
 
   if (tools) {
     refuseRemoteDevTools(app)

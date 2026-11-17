@@ -1,9 +1,10 @@
 import type { Server } from 'bun'
-import type { Elysia, TSchema } from 'elysia'
+import type { TSchema } from 'elysia'
 import type { BlockList } from 'node:net'
 import type { ProxyConfig } from '../config'
 import type { ActionRateLimit, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
+import type { ReceiveStep } from './receive'
 import type { RequestRecord } from './request-record'
 import { linkSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
@@ -903,11 +904,10 @@ export function checkProxy(setting: ProxyConfig | number | boolean | undefined):
 
 // Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.
 // In production a `proxy` left out is one proxy in front, read from private addresses only: a server there is behind one far more often than it faces visitors, and `false` says it is not.
-export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean | undefined): void {
+export function trustProxy(setting: ProxyConfig | number | boolean | undefined): ReceiveStep {
   const proxy = checkProxy(setting) ?? (setting === undefined && process.env.NODE_ENV === 'production' ? INFERRED_PROXY : undefined)
-  const off = setting === false
 
-  app.onRequest(({ request, server }) => {
+  return (request, server) => {
     const record = requestRecord(request)
 
     record.proxy = proxy
@@ -915,8 +915,8 @@ export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean 
     if (server)
       record.server = server
 
-    record.proxyOff = off ? true : undefined
-  })
+    record.proxyOff = setting === false ? true : undefined
+  }
 }
 
 // The socket's address, unless it is a proxy on this machine or network the app's `proxy` setting trusts: then the client's address as that proxy passed it on.

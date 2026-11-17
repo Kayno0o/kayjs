@@ -5,9 +5,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
   "answers": {
     "GET /": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -35,9 +34,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET /_kay/health": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -49,9 +47,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET /admin, refused by its guard": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -78,9 +75,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET /api/items": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -112,9 +108,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET /api/items/broken, which throws": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -162,9 +157,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET /ext, an extension's route": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -190,9 +184,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET /hello.txt": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -216,9 +209,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET /metrics": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -231,9 +223,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET /missing": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -260,9 +251,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET /old, redirected": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -289,15 +279,13 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET /renamed, rewritten": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -324,9 +312,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "GET an entry chunk": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -352,9 +339,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "OPTIONS /api/items, a preflight": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -381,9 +367,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "POST /api/items": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -415,9 +400,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "POST /mcp": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -444,9 +428,8 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     },
     "POST an action": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
@@ -613,6 +596,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /*",
   ],
   "start": [
+    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
     "() => { if (options.holds()) warnMetricsOpen(options.proxy, token); }",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
@@ -643,9 +627,8 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
   "answers": {
     "GET /": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -670,9 +653,8 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     },
     "GET /admin": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -697,9 +679,8 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     },
     "GET /api/items": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -728,9 +709,8 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     },
     "GET /ext": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -754,9 +734,8 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     },
     "GET /missing": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -781,9 +760,8 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     },
     "POST an action": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -834,6 +812,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     "GET /*",
   ],
   "start": [
+    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
@@ -863,9 +842,8 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
   "answers": {
     "GET /": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -888,9 +866,8 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     },
     "GET /admin": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -913,9 +890,8 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     },
     "GET /admin/": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -938,9 +914,8 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     },
     "GET /api/items": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -967,9 +942,8 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     },
     "GET /missing/": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -992,9 +966,8 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     },
     "GET /old": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1044,6 +1017,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     "GET /*",
   ],
   "start": [
+    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
@@ -1071,9 +1045,8 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
   "answers": {
     "GET /": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1097,9 +1070,8 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     },
     "GET /_kay/dev/footprint": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1120,9 +1092,8 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     },
     "GET /_kay/dev/patch.js": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1143,9 +1114,8 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     },
     "GET /_kay/dev/routes": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1166,9 +1136,8 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     },
     "GET /_kay/dev/tool.js": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1189,9 +1158,8 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     },
     "GET /api/items": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1219,9 +1187,8 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     },
     "GET /ext": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1244,9 +1211,8 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     },
     "GET /missing": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1270,9 +1236,8 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     },
     "POST /_kay/dev/stack": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1293,9 +1258,8 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     },
     "POST an action": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1382,6 +1346,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /*",
   ],
   "start": [
+    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
     "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
     "() => { publishing.start(); for (const { track } of tracked) track(); }",
@@ -1403,8 +1368,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
   "answers": {
     "GET /": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
         "request: ({ request }) => { requestRecord(request).app = held; }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
@@ -1416,8 +1380,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     },
     "GET /_kay/env.js": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
         "request: ({ request }) => { requestRecord(request).app = held; }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
@@ -1427,8 +1390,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     },
     "GET /about": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
         "request: ({ request }) => { requestRecord(request).app = held; }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
@@ -1440,8 +1402,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     },
     "GET /admin": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
         "request: ({ request }) => { requestRecord(request).app = held; }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
@@ -1453,8 +1414,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     },
     "GET /api/items": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
         "request: ({ request }) => { requestRecord(request).app = held; }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
@@ -1470,8 +1430,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     },
     "GET /hello.txt": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
         "request: ({ request }) => { requestRecord(request).app = held; }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
@@ -1483,8 +1442,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     },
     "GET /missing": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
         "request: ({ request }) => { requestRecord(request).app = held; }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
@@ -1496,8 +1454,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     },
     "GET /old": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
         "request: ({ request }) => { requestRecord(request).app = held; }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
@@ -1509,8 +1466,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     },
     "GET /sitemap.xml": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
-        "request: ({ request }) => { receiveInternal(request); }",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
         "request: ({ request }) => { requestRecord(request).app = held; }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
@@ -1660,6 +1616,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     "GET /*",
   ],
   "start": [
+    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
@@ -1688,11 +1645,8 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
   "answers": {
     "GET /": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
-        "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1717,21 +1671,15 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     },
     "GET / from a host not listed, refused": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
-        "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
       ],
       "status": 421,
     },
     "GET / on the fr host": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
-        "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1756,20 +1704,15 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     },
     "GET / without the proxy key, refused": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
       ],
       "status": 403,
     },
     "GET /about, a kept page": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
-        "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1794,11 +1737,8 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     },
     "GET the jobs page": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
-        "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1823,11 +1763,8 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     },
     "GET the preview, leaving it": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
-        "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1852,11 +1789,8 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     },
     "GET the public env": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
-        "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1878,11 +1812,8 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     },
     "GET the service worker": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
-        "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1907,11 +1838,8 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     },
     "POST a draft, refused out of edit mode": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
-        "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -1936,11 +1864,8 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     },
     "POST an action, which a kept page counts": {
       "hooks": [
-        "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
         "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
-        "request: ({ request }) => { receiveInternal(request); }",
-        "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
-        "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
+        "request: ({ request, server }) => { const received = receive(request, server); return received instanceof Res...",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: ({ request, set }) => { receiveDispatched(request); set.headers[requestIdHeader()] = requestId(reque...",
@@ -2101,6 +2026,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET /*",
   ],
   "start": [
+    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",

@@ -1,5 +1,5 @@
-import type { Elysia } from 'elysia'
 import type { ProxyConfig } from '../config'
+import type { ReceiveStep } from './receive'
 import type { Secret } from './secret'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
@@ -34,11 +34,11 @@ function isOpen(path: string, open: readonly string[]): boolean {
 // Refuses with 403 every request that does not carry the proxy's shared key in the header `proxy.key` names, so a process or a container reaching the port directly skips nothing the proxy does.
 // The `endpoint` is the MCP endpoint while `mcp.token` guards it: a POST to it carries its own credential, the bearer, and so skips the check.
 // Off under `kay dev`, in a static export, and outside production while no key is given (a warning says so, except in a test run); a production server with `key` and no key to compare with does not boot.
-export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { root: string, dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => readonly string[]) | undefined, endpoint?: (() => readonly string[]) | undefined, logRefused?: ((request: Request, status: number) => void) | undefined, security?: Record<string, string> | undefined }): void {
+export function requireProxyKey(proxy: ProxyConfig | undefined, options: { root: string, dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => readonly string[]) | undefined, endpoint?: (() => readonly string[]) | undefined, logRefused?: ((request: Request, status: number) => void) | undefined, security?: Record<string, string> | undefined }): ReceiveStep | undefined {
   const header = proxy?.key?.header
 
   if (header === undefined || options.dev || options.exported)
-    return
+    return undefined
 
   const secret = proxyKeyValue(proxy?.key?.secret, options.root)
 
@@ -50,7 +50,7 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
       if (process.env.NODE_ENV !== 'test')
         kayLog('warn', `proxy.key is set but ${source} gives none, so requests are not checked for the ${header} header; a production server would not boot`)
 
-      return
+      return undefined
     }
 
     throw new KayError('config-invalid', `kay: proxy.key names the header ${header}, which carries a key read from ${source}, and it gives no non-empty one`)
@@ -58,22 +58,22 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
 
   const open = [...(proxy?.open ?? []).map(entry => entry.length > 1 && entry.endsWith('/') ? entry.slice(0, -1) : entry), ...options.health === undefined ? [] : [options.health]]
 
-  app.onRequest(({ request }) => {
+  return (request) => {
     const path = routerPath(pathOf(request.url), options.base)
     const metrics = options.metrics?.() ?? []
 
     // The metrics route answers by its own rule, so a collector on the private network needs no key.
     if (isInternal(request) || isOpen(path, open) || metrics.some(at => path === at || path === `${at}/`) || (request.method === 'POST' && options.endpoint?.().some(at => path === at || path === `${at}/`) === true))
-      return
+      return undefined
 
     const given = request.headers.get(header)
 
     if (given !== null && sameText(given, secret))
-      return
+      return undefined
 
     // This hook runs before the request id and request log hooks, which a response made here skips.
     options.logRefused?.(request, 403)
 
     return new Response('Forbidden\n', { status: 403, headers: { ...options.security, 'content-type': 'text/plain; charset=utf-8', [requestIdHeader()]: requestId(request) } })
-  })
+  }
 }

@@ -16,6 +16,7 @@ import { action } from '../src/runtime'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, sqliteRates, trustProxy } from '../src/server/protection'
 import { rateLimit } from '../src/server/rate-limit'
+import { bridgeReceive, receiving } from '../src/server/receive'
 import { signStamp } from '../src/server/stamp'
 import { testSite } from '../src/test'
 import { parsingRoutes, routePaths } from './elysia'
@@ -846,14 +847,14 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
     const plain = new Request('http://localhost/')
 
     // What the app's routes see as the client of a request from `peer`, under the environment given.
-    const seen = async (setting: Parameters<typeof trustProxy>[1], peer: string, request: Request, env = 'production') => {
+    const seen = async (setting: Parameters<typeof trustProxy>[0], peer: string, request: Request, env = 'production') => {
       const before = process.env.NODE_ENV
       const app = new Elysia()
 
       process.env.NODE_ENV = env
 
       try {
-        trustProxy(app, setting)
+        bridgeReceive(app, receiving([trustProxy(setting)]))
         app.get('/', ({ request: incoming }) => clientAddress(incoming, socket(peer)))
 
         return await (await app.handle(request)).text()
@@ -882,7 +883,7 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
       try {
         const app = new Elysia()
 
-        fresh.trustProxy(app, undefined)
+        bridgeReceive(app, receiving([fresh.trustProxy(undefined)]))
         app.get('/', ({ request }) => fresh.clientAddress(request, socket('10.0.0.2')))
         await app.handle(forwarded)
         await app.handle(forwarded)
@@ -909,7 +910,7 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
       process.env.NODE_ENV = 'production'
 
       try {
-        trustProxy(app, undefined)
+        bridgeReceive(app, receiving([trustProxy(undefined)]))
         app.get('/', ({ request }) => `${clientAddress(request, socket('10.0.0.2'))} ${clientAddress(request, socket('10.0.0.2'), false)}`)
 
         expect(await (await app.handle(forwarded)).text()).toBe('198.51.100.1 10.0.0.2')
@@ -968,7 +969,7 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
     [{ hops: 1, trustPrivate: false as const }],
     [{ hops: 1, trusted: [], trustPrivate: false as const }],
   ])('refuses the proxy setting %p where it is read', (proxy) => {
-    expect(() => trustProxy(new Elysia(), proxy)).toThrow('kay: proxy')
+    expect(() => trustProxy(proxy)).toThrow('kay: proxy')
   })
 
   it('types the honeypot as one of the form\'s fields for kay check, a misspelt one still refused', async () => {

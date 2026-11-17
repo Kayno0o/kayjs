@@ -10,6 +10,7 @@ import { liveLimits, remoteLimits } from '../src/server/config-limits'
 import { webpQuality } from '../src/server/image'
 import { probeHealth } from '../src/server/lifecycle'
 import { clientAddress, resetRequestIdHeader, trustProxy } from '../src/server/protection'
+import { bridgeReceive, receiving } from '../src/server/receive'
 import { hostedStatus, readRedirects } from '../src/server/redirects'
 import { remoteImages, remotePatterns } from '../src/server/remote'
 import { securityHeaders } from '../src/server/security'
@@ -257,7 +258,7 @@ describe('options that also take false', () => {
     const seen = async (proxy: true | false) => {
       const app = new Elysia()
 
-      trustProxy(app, proxy)
+      bridgeReceive(app, receiving([trustProxy(proxy)]))
       app.get('/', ({ request }) => clientAddress(request, undefined))
 
       return (await app.handle(new Request('http://localhost/', { headers: { 'x-forwarded-for': '9.9.9.9' } }))).text()

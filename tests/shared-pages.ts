@@ -5,7 +5,7 @@ import { inOutput, testWorker } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { clientOptionsOf, resolveProject } from '../src/project'
 import { pages as bundlingPages } from '../src/server'
-import { servePages } from '../src/server/app'
+import { pagesApp, servePages } from '../src/server/app'
 import { projectSource } from '../src/server/source'
 
 type PagesOptions = NonNullable<Parameters<typeof bundlingPages>[0]> & InternalConfig
@@ -43,6 +43,13 @@ export async function builtClient(options: PagesOptions = {}): Promise<ClientBui
   const { mode, root, project } = await projectOf(options)
 
   return sharedClient(root, clientOptionsOf(project.config, mode))
+}
+
+// What the boot of `pages(options)` makes, its Elysia app and kay's server in front of it, built as `pages()` below is.
+export async function bootedPages(options: PagesOptions = {}): Promise<Awaited<ReturnType<typeof pagesApp>>> {
+  const { mode, root, project } = await projectOf(options)
+
+  return pagesApp(project, async () => sharedClient(root, clientOptionsOf(project.config, mode)))
 }
 
 // `pages()` for the tests that bundle the islands as the server boots: the build is made once per root and client options for the whole file, each into an output of its own so a later build never rewrites the files an earlier server serves.

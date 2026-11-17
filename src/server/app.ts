@@ -25,6 +25,7 @@ import { faviconSource, MANIFEST, manifestJson } from './favicon'
 import { guardRequirement, requiredBy } from './guard-requirement'
 import { loadGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
+import { KayServer, serveThrough } from './kay-server'
 import { dropExitListenerOnStop } from './lifecycle'
 import { mcpKeySetting, resolveMcpKey } from './mcp-key'
 import { checkPageLimits } from './page-limits'
@@ -185,10 +186,12 @@ export async function pagesApp(project: Project<ServedOptions>, loadClient: () =
   const required = guardRequirement(requiredBy(options), setup.routes, setup.endpoints, await setup.api)
   const routes = await servedRoutes(setup.routes, setup.claimed.routes, required)
   const app = new Elysia({ name: 'kay/pages', seed: root })
+  const kay = new KayServer({ env: { base: setup.base, trailingSlash: options.trailingSlash ?? 'never' }, dev: running.dev })
 
   dropExitListenerOnStop(app)
+  serveThrough(app, kay)
 
-  const boot = bootOf({ app, env: { ...running, base: setup.base, trailingSlash: options.trailingSlash }, project, setup, served, routes, table, late, mcpAt, mcpKey, required })
+  const boot = bootOf({ app, kay, env: { ...running, base: setup.base, trailingSlash: options.trailingSlash }, project, setup, served, routes, table, late, mcpAt, mcpKey, required })
   const earlier = knowPages(boot)
   const writes = keptPageWrites(boot)
 
@@ -226,5 +229,5 @@ export async function pagesApp(project: Project<ServedOptions>, loadClient: () =
 
   await pageRoutes(boot, { redirects, publicServed, redirector, prerendered, writes })
 
-  return { app, served, locale: setup.locales.settings.defaultLocale, securityOptions: boot.securityOptions, routes }
+  return { app, kay, served, locale: setup.locales.settings.defaultLocale, securityOptions: boot.securityOptions, routes }
 }

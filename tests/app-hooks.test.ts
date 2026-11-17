@@ -14,7 +14,7 @@ import { JOBS_PATH } from '../src/server/jobs-page'
 import { SERVICE_WORKER } from '../src/server/offline'
 import { PREVIEW_ROUTE } from '../src/server/preview'
 import { scratchBuild } from './prerendered'
-import { pages, sharedClient } from './shared-pages'
+import { bootedPages, pages, sharedClient } from './shared-pages'
 
 // Pins the routes `pagesApp` registers, in order, and the hooks each kind of request runs, in order, so moving its stages shows any hook or route that moves.
 const root = 'tests/fixtures/hook-order'
@@ -303,6 +303,25 @@ describe('the hooks pagesApp registers', () => {
     finally {
       await build.remove()
     }
+  })
+
+  it('runs the trust group as the receive phase of kay\'s server, behind one Elysia hook, with a request refused there answered by either', async () => {
+    const options = { root, prebuilt: false, site: 'https://x.example', security: { hosts: ['x.example'] }, observe: { log: quiet }, extensions, proxy: { key: { header: 'x-upstream-key', secret: 'upstream' } } }
+    const { app, kay } = await bootedPages(options)
+    const requestHooks = ((app.event.request ?? []) as Container[]).map(container => sourceOf(container.fn as Hook))
+
+    // The proxy, the server's own mark, the key and the hosts, in this order.
+    expect(kay.pipeline.phases.receive).toHaveLength(4)
+    expect(requestHooks.filter(source => source.includes('receive(request, server)'))).toHaveLength(1)
+    expect(requestHooks.some(source => source.includes('receiveInternal') || source.includes('refuseForeign') || source.includes('x-upstream-key'))).toBe(false)
+
+    const refused = new Request(`${SITE}/`, { headers: { 'host': 'other.example', 'x-upstream-key': 'upstream' } })
+    const keyless = new Request(`${SITE}/`, { headers: { host: 'x.example' } })
+
+    expect((await app.handle(refused)).status).toBe(421)
+    expect((await app.handle(keyless)).status).toBe(403)
+    expect((await kay.fetch(new Request(refused))).status).toBe(421)
+    expect((await kay.fetch(new Request(keyless))).status).toBe(403)
   })
 
   it('lists in the dev tool what registers after its Routes tab: the API module, the actions and the extension\'s route', async () => {

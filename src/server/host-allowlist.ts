@@ -1,4 +1,4 @@
-import type { Elysia } from 'elysia'
+import type { ReceiveStep } from './receive'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { nodeNet } from './builtins'
@@ -26,7 +26,7 @@ export function isLocalHost(name: string): boolean {
 // Names other than a site's own are refused in production when `security.hosts` is set, as a page of another site renaming itself to this server's address (DNS rebinding) would reach it by its own name.
 // Localhost and IP addresses are always let in, as a health check or a collector on the private network reaches the server by them and a rebinding page cannot make a browser send one.
 // A `*.example.com` entry answers any one label under the domain, never the bare domain.
-export function refuseUnknownHosts(app: Elysia, options: { site: string | undefined, hosts: string[] | true, localeHosts: string[], security: Record<string, string> | undefined, health?: string[] | undefined }): void {
+export function refuseUnknownHosts(options: { site: string | undefined, hosts: string[] | true, localeHosts: string[], security: Record<string, string> | undefined, health?: string[] | undefined }): ReceiveStep {
   const listed = [...options.hosts === true ? [] : options.hosts, ...options.localeHosts]
   const wildcards = listed.filter(name => name.startsWith('*.')).map(name => name.slice(1).toLowerCase())
   const allowed = new Set(listed.filter(name => !name.startsWith('*.')).map(name => hostName(name) ?? name.toLowerCase()))
@@ -38,20 +38,20 @@ export function refuseUnknownHosts(app: Elysia, options: { site: string | undefi
   if (allowed.size === 0 && wildcards.length === 0)
     throw new KayError('config-invalid', 'kay: security.hosts answers to no host name, so every named host would get a 421: set `site` in kay.config.ts (or SITE_URL), or list the names in `security.hosts`')
 
-  app.onRequest(({ request }) => {
+  return (request) => {
     const host = request.headers.get('host')
 
     if (host === null)
-      return
+      return undefined
 
     const name = hostName(host)
 
     if (name !== undefined && (allowed.has(name) || isLocalHost(name) || wildcards.some(suffix => name.endsWith(suffix) && !name.slice(0, -suffix.length).includes('.') && name.length > suffix.length)))
-      return
+      return undefined
 
     // The container's own probe reaches the server by its service name.
     if (options.health?.includes(requestPath(request)))
-      return
+      return undefined
 
     if (!warned.has(host) && warned.size < 100) {
       warned.add(host)
@@ -59,5 +59,5 @@ export function refuseUnknownHosts(app: Elysia, options: { site: string | undefi
     }
 
     return new Response(`Misdirected request: this host is not one the site answers to\n${FIX}\n`, { status: 421, headers: { ...options.security, 'content-type': 'text/plain; charset=utf-8' } })
-  })
+  }
 }
