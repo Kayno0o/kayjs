@@ -653,6 +653,13 @@ interface IslandOptions
 [.] IslandProp
 type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value> : unknown
 
+[.] Issue
+interface Issue
+  key: InvalidWord
+  message: string
+  params: Record<string, number | string>
+  path: string
+
 [.] jobs
 function jobs<Payload = unknown, Progress = unknown>(queue: string): QueuedJob<Payload, Progress>[]
 
@@ -1243,6 +1250,11 @@ function refresh(loads?: readonly string[] | string | undefined): Promise<void>
 interface Refreshable
   refresh: () => unknown
 
+[.] Refusal
+interface Refusal
+  errors: Issue[]
+  status: 422
+
 [.] refuse
 /** @deprecated `refuse(status, { message, errors, data })`. Removed in 1.108; `deprecated-refuse-call` rewrites it. */
 function refuse(status?: number | undefined, options?: DenyOptions<unknown, string> | undefined): never
@@ -1665,6 +1677,20 @@ type Unmatched<Rest> = [Rest] extends [never] ? unknown : false extends Finite<R
 
 [.] untrack
 function untrack<T>(fn: () => T): T
+
+[.] validate
+function validate<Value = unknown>(schema: object, value: unknown, { source, locale }: ValidateOptions): Promise<Validated<Value>>
+
+[.] Validated
+type Validated<Value = unknown> = { value: Value } | Refusal
+
+[.] ValidateOptions
+interface ValidateOptions
+  locale?: LocaleState | undefined
+  source: Source
+
+[.] ValidateSource
+type ValidateSource = 'form' | 'query' | 'params' | 'env' | 'json'
 
 [.] watch
 function watch<T>(source: () => T, run: (next: T, previous: T) => unknown, options?: (WatchOptions & { immediate?: false | undefined; }) | undefined): () => void
@@ -2999,6 +3025,10 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   client?: Checked<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig, [unknown]>;
   onError?: unknown;
   base?: unknown;
+  env?: Checked<"env" extends keyof Config ? Config[keyof Config & "env"] : unknown, {
+    compose?: string | string[] | undefined;
+    example?: string | undefined;
+  }, [unknown]>;
   seo?: Checked<"seo" extends keyof Config ? Config[keyof Config & "seo"] : unknown, SeoConfig, [unknown]>;
   live?: Checked<"live" extends keyof Config ? Config[keyof Config & "live"] : unknown, LiveConfig, [unknown]>;
   markdown?: Checked<"markdown" extends keyof Config ? Config[keyof Config & "markdown"] : unknown, MarkdownConfig, [unknown]>;
@@ -3018,9 +3048,7 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   entry?: unknown;
   requireGuards?: unknown;
   rewrite?: unknown;
-  runtimeRedirects?: Checked<"runtimeRedirects" extends keyof Config ? Config[keyof Config & "runtimeRedirects"] : unknown, {
-    hosts?: string[] | undefined;
-  }, [unknown]>;
+  runtimeRedirects?: Checked<"runtimeRedirects" extends keyof Config ? ...#9adc5f2d (3 lines)
   timeZone?: unknown;
   trailingSlash?: unknown;
   plugins?: unknown;
@@ -3029,7 +3057,6 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   secret?: unknown;
   preview?: Checked<"preview" extends keyof Config ? Config[keyof Config & "preview"] : unknown, PreviewConfig, [unknown]>;
   envFiles?: Checked<"envFiles" extends keyof Config ? Config[keyof Co ...#cda223d3 (4 lines)
-  env?: Checked<"env" extends keyof Config ? Config[keyof Config & "en ...#122f7109 (4 lines)
   checks?: unknown;
   beforeRequest?: unknown;
   onResponse?: unknown;

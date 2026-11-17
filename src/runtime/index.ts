@@ -1,5 +1,7 @@
 export { s } from '#schema'
 export type { Schema, Static } from '#schema'
+export type { Issue, Refusal, Validated, ValidateOptions, Source as ValidateSource } from '#validate'
+export { validate } from '#validate'
 export type { CookieDeleteOptions } from '../server/cookies'
 export type { Action, ActionContext, ActionDone, ActionErrorDetail, ActionFailed, ActionFor, ActionForm, ActionHooks, ActionProtect, ActionProtection, ActionRateLimit, ActionRun, ActionStartDetail, ActionStream, ActionSuccessDetail, Answer, Called, CallOptions, CallPromise, CallQueue, CallResult, Failure, FailureData, FailureOf, FieldErrors, FieldName, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, NoInputAction, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateLimitRefusal, RateStore, RateWindow, Refreshable, ResolvedProtection, RetryOptions, ServerAction, Success, SuccessOf, TrackedCall, TrackHooks } from './action'
 export { action, ActionError, ActionRedirectError, carrySchema, formErrors, postedChecked, postedValue, postedValues } from './action'

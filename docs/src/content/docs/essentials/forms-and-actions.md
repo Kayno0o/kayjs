@@ -120,7 +120,7 @@ An action in it can read the params of every page below it.
 
 ## One schema for the server and the browser
 
-A schema is built with `s`, and validates on the server. An island may import the module holding it, where `s` builds an inert stand-in with no validator, and reads the type off it, which is the one type both sides use. Write the schema once in a `.ts` module, with its type beside it.
+A schema is built with `s`. An island may import the module holding it and read the type off it, which is the one type both sides use, or call `validate(schema, value, { source })` from `kay` on it to check a value before it posts. The validator loads with the island that calls it and with no other. Write the schema once in a `.ts` module, with its type beside it.
 
 ```ts
 // src/schemas.ts
@@ -131,7 +131,7 @@ export const choice = s.union([s.literal('smash'), s.literal('pass')])
 export type Choice = Static<typeof choice>
 ```
 
-An action and an API route import `choice`. An island writes `import type { Choice } from '../schemas'`.
+An action and an API route import `choice`. An island writes `import type { Choice } from '../schemas'`, or `validate(choice, answer, { source: 'json' })` to check one.
 
 `InputOf<typeof contact>` from `kay` is the input of an action, for a mail or a module the handler calls to type its argument without writing the fields again.
 

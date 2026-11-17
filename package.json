@@ -28,6 +28,11 @@
       "types": "./types/runtime/schema.d.ts",
       "browser": "./src/runtime/schema.client.ts",
       "default": "./src/runtime/schema.ts"
+    },
+    "#validate": {
+      "types": "./types/server/validate.d.ts",
+      "browser": "./src/runtime/validate.client.ts",
+      "default": "./src/server/validate.ts"
     }
   },
   "exports": {
