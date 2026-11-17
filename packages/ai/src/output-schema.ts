@@ -1,10 +1,12 @@
 // What a provider's JSON-schema output takes of a kay schema: the shape (types, properties, required, items, unions, enums) and every object closed to other fields.
 // A bound it cannot hold (lengths, ranges, formats, patterns) moves into the description for the model to read, and kayjs-ai checks it on the answer.
-import { configError } from 'kay/library'
+import { configError, DEFAULT_MAX_ITEMS, DEFAULT_MAX_LENGTH } from 'kay/library'
 
 const KEPT = new Set(['type', 'properties', 'required', 'items', 'anyOf', 'enum', 'const', 'description', 'title'])
 // Marks of kay's own that tell a model nothing.
 const DROPPED = new Set(['error', 'default', 'examples', '$id', '$schema', 'additionalProperties'])
+// The bounds kay gives a field the app left unbounded: the answer is still held to them, but they would only lengthen the prompt.
+const KAY_DEFAULTS: Record<string, unknown> = { maxLength: DEFAULT_MAX_LENGTH, maxItems: DEFAULT_MAX_ITEMS }
 
 type Node = Record<string, unknown>
 
@@ -21,7 +23,7 @@ function simplify(value: unknown): unknown {
 
   for (const key of UNSUPPORTED) {
     if (key in value)
-      throw configError('ai', 'schema', 'a schema holds an s.Record or an s.Intersect, which a model cannot be held to; name the fields with s.Object({ ... })')
+      throw configError('ai', 'schema', 'a schema holds an s.record or an intersection, which a model cannot be held to; name the fields with s.object({ ... })')
   }
 
   const out: Node = {}
@@ -36,7 +38,7 @@ function simplify(value: unknown): unknown {
       out.anyOf = member.map(simplify)
     else if (KEPT.has(key))
       out[key] = member
-    else if (!DROPPED.has(key))
+    else if (!DROPPED.has(key) && KAY_DEFAULTS[key] !== member)
       moved.push(`${key}: ${JSON.stringify(member)}`)
   }
 

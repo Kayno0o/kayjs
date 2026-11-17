@@ -133,8 +133,8 @@ describe('ask with a schema', () => {
   })
 
   it('refuses a record or an intersection, which a model would be told is empty', () => {
-    expect(() => ask('x', { schema: s.Object({ scores: s.Record(s.String(), s.Number()) }) })).toThrow('s.Record')
-    expect(() => ask('x', { schema: s.Intersect([s.Object({ a: s.String() }), s.Object({ b: s.String() })]) })).toThrow('s.Intersect')
+    expect(() => ask('x', { schema: s.Object({ scores: s.Record(s.String(), s.Number()) }) })).toThrow('s.record')
+    expect(() => ask('x', { schema: s.Intersect([s.Object({ a: s.String() }), s.Object({ b: s.String() })]) })).toThrow('an intersection')
   })
 
   it('types a choice as the string it grows into while it streams', async () => {

@@ -964,6 +964,12 @@ function decide<E extends object, C extends object, Context extends HookContext 
   };
 }>
 
+[./library] DEFAULT_MAX_ITEMS
+const DEFAULT_MAX_ITEMS: 1000
+
+[./library] DEFAULT_MAX_LENGTH
+const DEFAULT_MAX_LENGTH: 10000
+
 [./library] defaultSqliteFile
 function defaultSqliteFile(legacy?: readonly string[], root?: string): string
 

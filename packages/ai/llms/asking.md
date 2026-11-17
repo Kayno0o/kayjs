@@ -34,7 +34,7 @@ const review = s.object({ title: s.string(), score: s.int({ min: 1, max: 5 }), t
 const verdict = await ask('Review the film Alien', { schema: review })
 ```
 
-`ask(messages, { schema })` takes an object schema (`s.object`; anything else throws a `config-invalid` `KayError`, an `s.Record` or `s.Intersect` field too, as a model cannot be held to free keys: name the fields) and returns a `StructuredReply` instead of a `AiReply`: `await` is the value the schema describes, `Static<typeof review>`, with no cast, and `for await` gives the object so far, a `DeepPartial` of it. Nothing is sent until it is first read, and readers share one request, as with text.
+`ask(messages, { schema })` takes an object schema (`s.object`; anything else throws a `config-invalid` `KayError`, an `s.record` or intersection field too, as a model cannot be held to free keys: name the fields; kay's default bounds on a field you left unbounded are checked on the answer but not sent) and returns a `StructuredReply` instead of a `AiReply`: `await` is the value the schema describes, `Static<typeof review>`, with no cast, and `for await` gives the object so far, a `DeepPartial` of it. Nothing is sent until it is first read, and readers share one request, as with text.
 
 ### In a page
 
