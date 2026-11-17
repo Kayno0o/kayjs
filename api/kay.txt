@@ -3243,7 +3243,7 @@ interface KayExtension<Server extends PluginInput = AnyElysia>
   asksConsent?: boolean | undefined
   check?: (() => ExtensionProblem[] | Promise<ExtensionProblem[]>) | undefined
   commands?: Record<string, string> | undefined
-  config?: Omit<KayConfig, "extensions"> | undefined
+  config?: Omit<ConfigInput, "extensions"> | undefined
   context?: string | undefined
   devTool?: undefined | { module: string; }
   editor?: string | undefined

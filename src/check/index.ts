@@ -14,6 +14,7 @@ import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { nativeExe } from '../compiler/native-typescript'
 import { pickConfig } from '../config'
+import { moduleCallResult } from './call-result'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
 import { generatedProblem } from './generated'
@@ -88,6 +89,8 @@ export interface CheckOptions extends Omit<Pick<KayConfig, (typeof CHECK_CONFIG)
   launch?: boolean | undefined
   // Set by `kay build --static`: a static host reads no `SITE_URL` once built, so a missing site is reported.
   exported?: boolean | undefined
+  // The header `proxy.key` names, which the fix of `testSite({ proxyKey })` writes beside the secret.
+  proxyHeader?: string | undefined
 }
 
 export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'severity' | 'fixes'> {
@@ -113,8 +116,9 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
 export function configCheckOptions(config: LoadedConfig): CheckOptions {
   const { ops, ...picked } = pickConfig(config, CHECK_CONFIG)
   const { observe } = ops ?? {}
+  const proxyHeader = typeof config.proxy === 'object' ? config.proxy.key?.header : undefined
 
-  return { ...picked, ...config.store?.database !== undefined && { storeDatabase: config.store.database }, ...ops !== undefined && { ops: { health: ops.health, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader, loadBudget: observe.loadBudget } } } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
+  return { ...picked, ...proxyHeader !== undefined && { proxyHeader }, ...config.store?.database !== undefined && { storeDatabase: config.store.database }, ...ops !== undefined && { ops: { health: ops.health, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader, loadBudget: observe.loadBudget } } } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
@@ -207,7 +211,7 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
 
     const mapped: CheckDiagnostic = shadow && diagnosed
       ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help ?? (shadow.route === true ? helped(diagnostic).help : undefined), ...diagnosed.fixes && { fixes: diagnosed.fixes } }
-      : { ...diagnostic, ...helped(diagnostic) }
+      : { ...diagnostic, ...helped(diagnostic), ...await moduleCallResult(diagnostic, options.lints) }
     const generated = generatedProblem(root, mapped, types, content)
 
     // A guard file imported for two lines of the exports check is reported once.

@@ -3,13 +3,14 @@ import type { Property } from './regroup'
 import type { Edit } from './renamed-exports'
 import { lintLevel } from '../compiler/lints'
 import { configObjects, propertiesOf } from './config-objects'
+import { regrouped } from './regroup'
 import { scan } from './renamed-exports'
 
 const NEEDLE = /\b(?:key|mcpKey|proxyKey)\b/
 const TEST_KEYS = { mcpKey: 'mcp: { token }', proxyKey: 'proxy: { key: { header, secret } }' }
 
 // The `key` of `mcp`, which is `token` since 1.105, and the string `key` of `proxy`, which names its header as `{ header }`, in the config; and the `mcpKey` and `proxyKey` options of `testSite()`, which are `config: { mcp: { token } }` and `config: { proxy: { key: { header, secret } } }`.
-// The fix renames `mcp.key`, except for `false`, which has no token, and wraps the header of `proxy.key`, where the object is written in place; the options of `testSite()` are reported with no fix, as `proxy.key` needs the header the app's config names.
+// The fix renames `mcp.key`, except for `false`, which has no token, and wraps the header of `proxy.key`, where the object is written in place; the options of `testSite()` move into a `config`, `proxyKey` only where the app's config names the header it travels in, and a `config` already written is left as it is.
 export async function secretKeys(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-secret-keys', options.lints) === 'allow')
     return []
@@ -18,9 +19,13 @@ export async function secretKeys(root: string, options: CheckOptions): Promise<C
     for (const { ast, base, text } of parsed) {
       for (const { object, call } of configObjects(file, ast)) {
         if (call === 'testSite') {
+          const header = options.proxyHeader
+          const shaped = (name: string, value: string) => name === 'mcpKey' ? `{ token: ${value} }` : `{ key: { header: '${header}', secret: ${value} } }`
+          const moves = regrouped(object, text, name => testGroup(name, header), false, shaped)
+
           for (const [name, written] of Object.entries(TEST_KEYS)) {
             for (const property of propertiesOf(object, name))
-              report(base + property.start, base + property.end, `\`${name}\` of \`testSite()\` is \`${written}\` in \`config\` since 1.105`, `write \`config: { ${written} }\``, null)
+              report(base + property.start, base + property.end, `\`${name}\` of \`testSite()\` is \`${written}\` in \`config\` since 1.105`, `write \`config: { ${written} }\``, name === 'mcpKey' || header !== undefined ? moves ?? null : null)
           }
         }
 
@@ -53,6 +58,14 @@ export async function secretKeys(root: string, options: CheckOptions): Promise<C
       }
     }
   })
+}
+
+// Where a `testSite()` option moves to in its `config`, `proxyKey` only once the header it travels in is known.
+function testGroup(name: string, header: string | undefined): [string, string] | undefined {
+  if (name === 'mcpKey')
+    return ['config', 'mcp']
+
+  return name === 'proxyKey' && header !== undefined ? ['config', 'proxy'] : undefined
 }
 
 function fixOf(group: 'mcp' | 'proxy', property: Property, text: string, base: number, spread: boolean, off: boolean, taken: boolean): Edit[] | null {

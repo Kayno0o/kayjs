@@ -106,6 +106,24 @@ describe('the old keys of the config', () => {
     expect((await resolveConfig({ i18n: { locales: ['fr'], default: 'fr', mode: 'always', prefixDefault: true, domains: { fr: 'x.fr' } } })).i18n?.mode).toBe('always')
   })
 
+  it('are read in the config of an extension as in the app\'s', async () => {
+    const resolved = await resolveConfig({ extensions: [{ name: 'mine', config: { favicon: 'a.svg', observe: { loadBudget: false }, metrics: true } }, { name: 'bare' }] })
+
+    expect(resolved.extensions?.[0]?.config).toEqual({ assets: { favicon: 'a.svg' }, ops: { observe: { loadBudget: false }, metrics: true } })
+    expect(resolved.extensions?.[1]).toEqual({ name: 'bare' })
+  })
+
+  it('are found and moved in the config of a KayExtension', async () => {
+    const { found, text } = await fixed(configGroups, {
+      'src/mine.ts': 'import type { KayExtension } from \'kay/server\'\n\nexport const mine: KayExtension = { name: \'mine\', config: { favicon: \'a.svg\', health: false } }\n',
+      'src/other.ts': 'export const other = { name: \'x\', config: { favicon: \'a.svg\' } }\n',
+    })
+
+    expect(found).toHaveLength(2)
+    expect(text['src/mine.ts']).toContain('config: { assets: { favicon: \'a.svg\' }, ops: { health: false } }')
+    expect(text['src/other.ts']).toContain('config: { favicon: \'a.svg\' }')
+  })
+
   it('are checked in their groups', () => {
     expect(unknownConfigKeys({ assets: { favicon: true, imges: {} }, ops: { observe: { loadBudgt: 1 } }, i18n: { locales: ['fr'], default: 'fr', mod: 'always' } })).toHaveLength(3)
     expect(invalidConfigValues({ i18n: { locales: ['fr'], default: 'fr', mode: 'sometimes' } })).toHaveLength(1)

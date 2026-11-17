@@ -12,8 +12,8 @@ export function nameOf(property: Node): string {
 }
 
 // The edits that group the old keys, leaving every other property, its comments and the object's layout as written: the first old property of a feature becomes `feature: { part: value }` holding all of its parts, the others are removed. Undefined where that cannot be done without reading what a value is: a spread, a computed or shorthand key, a part named twice, a feature written both ways, or a comment that a removal would take.
-// With `whole`, a part is the property as written (a shorthand or a method included) rather than `part: value`, for a group that takes the keys under their own names.
-export function regrouped(object: NodeOfType<'ObjectExpression'>, text: string, movedTo: (name: string, property: Property) => [string, string] | undefined, whole = false): Edit[] | undefined {
+// With `whole`, a part is the property as written (a shorthand or a method included) rather than `part: value`, for a group that takes the keys under their own names. `shaped` writes the value a part takes from the old key's name and value text, for a part that wraps it.
+export function regrouped(object: NodeOfType<'ObjectExpression'>, text: string, movedTo: (name: string, property: Property) => [string, string] | undefined, whole = false, shaped?: (name: string, value: string) => string): Edit[] | undefined {
   const properties: Property[] = []
 
   for (const property of object.properties) {
@@ -43,7 +43,9 @@ export function regrouped(object: NodeOfType<'ObjectExpression'>, text: string, 
     if ((property.shorthand && !whole) || held.parts.has(part))
       return undefined
 
-    held.parts.set(part, whole ? text.slice(property.start, property.end) : text.slice(property.value.start, property.value.end))
+    const value = text.slice(property.value.start, property.value.end)
+
+    held.parts.set(part, whole ? text.slice(property.start, property.end) : shaped?.(name, value) ?? value)
     features.set(feature, held)
     moved.add(index)
   }

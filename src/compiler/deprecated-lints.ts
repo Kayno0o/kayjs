@@ -1,6 +1,7 @@
 import type { Lint } from './lints'
 import { AUTH_LINTS } from './deprecated-auth-lints'
 import { SCHEMA_BUILDERS } from './deprecated-lints-1-106'
+import { TYPED_DEPRECATIONS } from './deprecated-typed-lints'
 
 // The lints of the `deprecated` group, with the other lints in `LINTS`; each stays three minors from its `since`.
 export const DEPRECATED_LINTS = {
@@ -183,6 +184,7 @@ export const DEPRECATED_LINTS = {
     right: '---\nimport SignedIn from \'@kayjs/auth/components/signed-in.kay\'\n---\nSignedIn(require="admin")\n  a(href="/admin") Admin',
   },
   ...AUTH_LINTS,
+  ...TYPED_DEPRECATIONS,
   'deprecated-ui-callbacks': {
     level: 'warn',
     group: 'deprecated',
@@ -407,7 +409,7 @@ export const DEPRECATED_LINTS = {
     group: 'deprecated',
     since: '1.105',
     site: true,
-    summary: 'The keys `images`, `fonts`, `favicon`, `manifest` and `publicCache` of kay.config.ts, written in `assets` since 1.105, and `observe`, `health`, `metrics` and `jobs`, written in `ops`: `assets: { images, fonts, favicon, manifest, publicCache }`, `ops: { observe, health, metrics, jobs }`. They work until 1.108. Found in the object kay.config.ts exports and in the `config` of `pages()` and `testSite()`. The fix moves the keys into their group as written, unless the object spreads, holds a computed key or has the group already.',
+    summary: 'The keys `images`, `fonts`, `favicon`, `manifest` and `publicCache` of kay.config.ts, written in `assets` since 1.105, and `observe`, `health`, `metrics` and `jobs`, written in `ops`: `assets: { images, fonts, favicon, manifest, publicCache }`, `ops: { observe, health, metrics, jobs }`. They work until 1.108. Found in the object kay.config.ts exports, in the `config` of `pages()` and `testSite()` and in the `config` of an extension a file types `KayExtension`, which takes the same keys. The fix moves the keys into their group as written, unless the object spreads, holds a computed key or has the group already.',
     wrong: '// kay.config.ts\nexport default { images: { widths: [640] }, health: false }',
     right: '// kay.config.ts\nexport default { assets: { images: { widths: [640] } }, ops: { health: false } }',
   },
@@ -434,7 +436,7 @@ export const DEPRECATED_LINTS = {
     group: 'deprecated',
     since: '1.105',
     site: true,
-    summary: 'The secrets of kay.config.ts in one shape since 1.105, each `string | { env } | { file }`: `mcp.key` is `mcp.token`, and `proxy.key`, a header name, is `{ header, secret? }`, so `proxy: { key: { header: \'x-upstream-key\' } }`; the `mcpKey` and `proxyKey` options of `testSite()` are the `token` and the `secret` of its `config`. They work until 1.108. Found in the object kay.config.ts exports and in the `config` of `pages()` and `testSite()`. The fix renames `mcp.key` (a `key: false` and an `mcp` that spreads or has a `token` are reported with no fix) and wraps the header of `proxy.key`; the options of `testSite()` are reported with no fix.',
+    summary: 'The secrets of kay.config.ts in one shape since 1.105, each `string | { env } | { file }`: `mcp.key` is `mcp.token`, and `proxy.key`, a header name, is `{ header, secret? }`, so `proxy: { key: { header: \'x-upstream-key\' } }`; the `mcpKey` and `proxyKey` options of `testSite()` are the `token` and the `secret` of its `config`. They work until 1.108. Found in the object kay.config.ts exports and in the `config` of `pages()` and `testSite()`. The fix renames `mcp.key` (a `key: false` and an `mcp` that spreads or has a `token` are reported with no fix) and wraps the header of `proxy.key`; the options of `testSite()` move into its `config`, `mcpKey` always and `proxyKey` where the app\'s config names the header, and are reported with no fix beside a `config` already written.',
     wrong: '// kay.config.ts\nexport default { mcp: { key: true }, proxy: { key: \'x-upstream-key\' } }',
     right: '// kay.config.ts\nexport default { mcp: { token: true }, proxy: { key: { header: \'x-upstream-key\' } } }',
   },

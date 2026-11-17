@@ -2,7 +2,7 @@ import type { Node, NodeOfType, Program } from '../compiler/estree'
 import type { Property } from './regroup'
 import { basename } from 'node:path'
 import { constBindings, exportedObject, keyName, objectOf } from '../compiler/object-literal'
-import { importsOf, walk } from './ast'
+import { importedName, importsOf, walk } from './ast'
 import { nameOf } from './regroup'
 
 type ObjectExpression = NodeOfType<'ObjectExpression'>
@@ -38,7 +38,12 @@ export function featureProperties(object: ObjectExpression, bindings: ReturnType
   return [...propertiesOf(object, name).slice(0, 1), ...held === undefined ? [] : propertiesOf(held, name).slice(0, 1)]
 }
 
-// The objects of a file that are written as config: kay.config.ts's export, and in any file the options handed to `pages()` or `testSite()` with the `config` object of each.
+// Whether a file names the `KayExtension` type, as one writing an extension does.
+function namesExtension(ast: Program): boolean {
+  return ast.body.some(statement => statement.type === 'ImportDeclaration' && statement.specifiers.some(specifier => specifier.type === 'ImportSpecifier' && importedName(specifier) === 'KayExtension'))
+}
+
+// The objects of a file that are written as config: kay.config.ts's export, the `config` of an extension a file typed `KayExtension` writes, and in any file the options handed to `pages()` or `testSite()` with the `config` object of each.
 export function configObjects(file: string, ast: Program): ConfigObject[] {
   const bindings = constBindings(ast)
   const found: ConfigObject[] = []
@@ -48,6 +53,16 @@ export function configObjects(file: string, ast: Program): ConfigObject[] {
 
     if (exported !== undefined)
       found.push({ object: exported, others: [] })
+  }
+
+  if (namesExtension(ast)) {
+    walk(ast, (node) => {
+      const config = node.type === 'ObjectExpression' && propertyOf(node, 'name') !== undefined ? propertyOf(node, 'config') : undefined
+      const inner = config === undefined ? undefined : objectOf(config.value, bindings)
+
+      if (inner !== undefined && inner === config?.value)
+        found.push({ object: inner, others: [] })
+    })
   }
 
   const calls = (['pages', 'testSite'] as const).map(name => ({ name, ...importsOf(ast, name === 'pages' ? FROM_SERVER : FROM_TEST, name) })).filter(call => call.locals.size > 0 || call.namespaces.size > 0)

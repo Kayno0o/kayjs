@@ -47,6 +47,37 @@ describe('deprecated-secret-keys', () => {
     expect(text['tests/site.test.ts']).toContain('config: { mcp: { token: true } }')
   })
 
+  it('moves the options of testSite into config, proxyKey where the header is known', async () => {
+    const root = await scratchDir('secret-keys-')
+
+    try {
+      await Bun.write(join(root, 'tests/a.test.ts'), 'import { testSite } from \'kay/test\'\nconst site = await testSite({ mcpKey: \'k\', proxyKey: \'p\' })\n')
+
+      const found = await secretKeys(root, { proxyHeader: 'x-up' })
+
+      await applySafeFixes(root, found)
+
+      const text = await Bun.file(join(root, 'tests/a.test.ts')).text()
+
+      expect(text).toContain('mcp: { token: \'k\' }')
+      expect(text).toContain('proxy: { key: { header: \'x-up\', secret: \'p\' } }')
+      expect(text).not.toContain('mcpKey')
+      expect(text).not.toContain('proxyKey')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('moves mcpKey and leaves proxyKey when the header is unknown', async () => {
+    const { text } = await fixed({
+      'tests/a.test.ts': 'import { testSite } from \'kay/test\'\nconst site = await testSite({ mcpKey: \'k\', proxyKey: \'p\' })\n',
+    })
+
+    expect(text['tests/a.test.ts']).toContain('mcp: { token: \'k\' }')
+    expect(text['tests/a.test.ts']).toContain('proxyKey: \'p\'')
+  })
+
   it('leaves the new form, other files and other keys alone', async () => {
     const { found } = await fixed({
       'kay.config.ts': 'export default { mcp: { token: true }, proxy: { key: { header: \'x\', secret: { env: \'A\' } } }, seo: { key: 1 } }\n',

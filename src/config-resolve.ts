@@ -173,13 +173,15 @@ export async function resolveConfig(config: ConfigInput): Promise<KayConfig> {
   ])
   const cors = config.cors === undefined ? undefined : await loadKeys(config.cors, ['origins'])
   const { onStart, ...kept } = config
+  // An extension's config is written as `kay.config.ts` is, so its keys of before 1.105 move as the app's do.
+  const extensions = config.extensions === undefined ? undefined : await Promise.all(config.extensions.map(async extension => extension.config === undefined ? extension : { ...extension, config: await resolveConfig(extension.config) }))
 
   for (const key of MOVED_KEYS)
     delete kept[key]
 
   const { ops, onError, paths } = resolveOps(config)
   const routes = resolveEndpoints(config, paths, resolveMcp(config.mcp))
-  const resolved: Record<string, unknown> = { ...kept, security, proxy: resolveProxy(proxy), ...routes, robots, i18n, redirects, assets, ops, cors, client: resolveClient(config), onListen: config.onListen ?? onStart, onError: config.onError ?? onError }
+  const resolved: Record<string, unknown> = { ...kept, ...extensions !== undefined && { extensions }, security, proxy: resolveProxy(proxy), ...routes, robots, i18n, redirects, assets, ops, cors, client: resolveClient(config), onListen: config.onListen ?? onStart, onError: config.onError ?? onError }
 
   for (const key of Object.keys(resolved)) {
     if (resolved[key] === undefined)

@@ -178,7 +178,7 @@ function attributeList(source: string, span: Span): Span {
 }
 
 // `name={...}` or `name="..."` inside the attributes, as the span of the whole attribute.
-function attributeNamed(source: string, list: Span, name: string): Span | undefined {
+export function attributeNamed(source: string, list: Span, name: string): Span | undefined {
   let start = source.indexOf(`${name}=`, list.start)
 
   while (start !== -1 && start < list.end && NAME_CHAR.test(source[start - 1] ?? ' '))
