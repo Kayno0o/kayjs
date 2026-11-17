@@ -95,6 +95,7 @@ function announce(text: string, within?: Element | null): void
 
 [./lib/app-switcher] SwitcherApp
 interface SwitcherApp
+  color?: string | undefined
   description?: string | undefined
   href: string
   icon?: IconProps | IconSlot | undefined
@@ -732,6 +733,9 @@ function claimed(job: "confirms" | "toaster" | "tooltips"): boolean
 [./lib/claim] Job
 type Job = keyof typeof claimants
 
+[./lib/color] colorStyle
+function colorStyle(property: string, color: string | undefined, style?: string | undefined): string | undefined
+
 [./lib/combobox] ComboboxOption
 interface ComboboxOption<Value extends string | number = string>
   description?: string | undefined
@@ -1301,6 +1305,12 @@ interface IconQuery extends OptionsQuery
 [./lib/icon-picker] nameOf
 function nameOf(icon: string): string
 
+[./lib/icon-tile] IconTileOptions
+interface IconTileOptions
+  color?: string | undefined
+  size?: "lg" | "md" | "sm" | undefined
+  tone?: Tone | undefined
+
 [./lib/index] AccordionItem
 interface AccordionItem
   disabled?: boolean | undefined
@@ -1477,6 +1487,12 @@ interface IconQuery extends OptionsQuery
 
 [./lib/index] IconSlot
 type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'more' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
+
+[./lib/index] IconTileOptions
+interface IconTileOptions
+  color?: string | undefined
+  size?: "lg" | "md" | "sm" | undefined
+  tone?: Tone | undefined
 
 [./lib/index] infiniteList
 function infiniteList<Row, Target extends Action = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
@@ -1847,6 +1863,7 @@ interface StepItem<Key extends string = string>
 
 [./lib/index] SwitcherApp
 interface SwitcherApp
+  color?: string | undefined
   description?: string | undefined
   href: string
   icon?: IconProps | IconSlot | undefined

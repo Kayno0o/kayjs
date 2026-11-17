@@ -10,6 +10,12 @@ description: A small label for a status, a tag or a count.
 
 <Demo name="badge/tones" />
 
+## Any colour
+
+`color` takes any CSS colour, such as `#8fb8f4`, in place of the tone's, for a hue per kind that the tones do not cover. It colours the outline and the text, and fills a `solid` badge. A value that is no colour, such as one holding a `;`, is ignored.
+
+<Demo name="badge/color" />
+
 ## Solid
 
 Set `variant="solid"` to fill the badge with its tone. The text takes `--color-accent-foreground`, which every tone reads at 4.5:1 in both color schemes.

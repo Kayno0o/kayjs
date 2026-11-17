@@ -308,6 +308,22 @@ describe('layout', () => {
     expect((await find('/layout', '#app-switcher #family [data-part="initial"]')).map(found => found.text)).toEqual(['H', 'R'])
   })
 
+  test('an AppSwitcher app with a colour sets it on its tile and marks the letter drawn on it', async () => {
+    expect(await attributes('/layout', '#app-switcher #family [data-part="tile"]', ['style', 'data-color'])).toEqual([{ 'style': '--app-color: #8fb8f4', 'data-color': '' }, { 'style': null, 'data-color': null }, { 'style': '--app-color: #e8a24a', 'data-color': '' }])
+    expect(await attributes('/layout', '#app-switcher #family [data-part="initial"]', ['data-color'])).toEqual([{ 'data-color': null }, { 'data-color': '' }])
+  })
+
+  test('Badge, IconTile, Stat and Widget take any CSS colour, and drop one that would end the declaration', async () => {
+    expect(await attributes('/data', '#badge-color', ['style'])).toEqual([{ style: '--_badge-color: #8fb8f4; margin: 1px' }])
+    expect(await attributes('/data', '#badge-hostile', ['style'])).toEqual([{ style: null }])
+    expect(await attributes('/data', '#tile-color', ['style', 'role', 'aria-label', 'aria-hidden'])).toEqual([{ 'style': '--tile-color: #8fb8f4', 'role': 'img', 'aria-label': 'Private', 'aria-hidden': null }])
+    expect(await attributes('/data', '#tile-tone', ['style', 'data-tone', 'aria-hidden'])).toEqual([{ 'style': null, 'data-tone': 'danger', 'aria-hidden': 'true' }])
+    expect((await one('/data', '#tile-letter')).text).toBe('f')
+    expect(await attributes('/data', '#stat-tile [data-part=tile]', ['data-tone'])).toEqual([{ 'data-tone': 'danger' }])
+    expect(await find('/data', '#stat-tile [data-part=icon]')).toHaveLength(1)
+    expect(await find('/data', '#widget-tile [data-part=tile]')).toHaveLength(1)
+  })
+
   test('SiteNav takes the URL as current, and Select marks itself busy by busy', async () => {
     expect(await attributes('/layout', '#url-links [data-part="link"]', ['aria-current'])).toEqual([{ 'aria-current': null }, { 'aria-current': 'page' }])
     expect(await attributes('/layout', '#busy-select select', ['id', 'aria-busy'])).toEqual([{ 'id': 'busy-new', 'aria-busy': 'false' }, { 'id': 'busy-new-plain', 'aria-busy': 'true' }, { 'id': 'idle', 'aria-busy': null }])

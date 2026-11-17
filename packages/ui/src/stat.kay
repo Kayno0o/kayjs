@@ -4,6 +4,8 @@ import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
+import IconTile from './icon-tile.kay'
+import type { IconTileOptions } from './icon-tile'
 import { deltaIcon } from './stat'
 import type { StatDelta } from './stat'
 
@@ -12,6 +14,7 @@ const look = recipe({
   parts: {
     root: 'kui-stat-badge inline-flex items-center gap-[calc(var(--spacing)*1.25*var(--density))] rounded-lg px-2.25 py-0.75 text-xs [&:is(a)]:no-underline',
     icon: 'size-4 shrink-0',
+    tile: '',
     // The label comes before the change for a screen reader, and `order` puts the change back beside the figure.
     value: 'order-1 font-semibold text-foreground',
     label: 'order-3 text-muted',
@@ -27,6 +30,7 @@ const look = recipe({
       tile: {
         root: 'grid grid-cols-[auto_1fr] items-baseline justify-items-start gap-x-2 gap-y-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3',
         icon: 'col-span-full',
+        tile: 'col-span-full',
         value: 'text-2xl/none',
         label: 'col-span-full [font-size:var(--text-2xs)] [line-height:var(--text-2xs--line-height)] [font-weight:var(--font-weight-normal)] tracking-label [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
       },
@@ -37,6 +41,7 @@ const look = recipe({
       tile: {
         root: 'grid grid-cols-[auto_1fr] items-baseline justify-items-start gap-x-2 gap-y-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3',
         icon: 'col-span-full',
+        tile: 'col-span-full',
         value: 'text-2xl/none',
         label: 'col-span-full [font-size:var(--text-2xs)] [line-height:var(--text-2xs--line-height)] [font-weight:var(--font-weight-normal)] tracking-label [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
       },
@@ -54,10 +59,12 @@ const look = recipe({
   defaults: { layout: 'inline', variant: 'inline', tone: 'neutral' },
 })
 
-const { value, label, icon, href, delta, layout, variant, tone = 'neutral', ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
+const { value, label, icon, iconTile, href, delta, layout, variant, tone = 'neutral', ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   value: number | string
   label?: string | undefined
   icon?: IconSlot | IconProps | undefined
+  // Draws the icon in an IconTile: `true` for the neutral one, or its `tone`, `color` and `size`.
+  iconTile?: boolean | IconTileOptions | undefined
   // Makes the whole stat a link, to the list it counts.
   href?: string | undefined
   // How the figure moved since the period before, beside the figure with an arrow, so colour is not the only signal.
@@ -67,7 +74,9 @@ const { value, label, icon, href, delta, layout, variant, tone = 'neutral', ...r
 const tile = (layout ?? variant) === 'tile'
 ---
 snippet body()
-  if icon
+  if icon && iconTile
+    IconTile({...(iconTile === true ? {} : iconTile)} icon={icon} part="tile")
+  else if icon
     Icon(icon={icon} part="icon")
   span(part="value") {value}
   if label

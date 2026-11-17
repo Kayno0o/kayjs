@@ -1,6 +1,8 @@
 ---
+import Badge from '@kayjs/ui/badge.kay'
 import BarList from '@kayjs/ui/bar-list.kay'
 import CopyButton from '@kayjs/ui/copy-button.kay'
+import IconTile from '@kayjs/ui/icon-tile.kay'
 import MediaGallery from '@kayjs/ui/media-gallery.kay'
 import Meter from '@kayjs/ui/meter.kay'
 import Progress from '@kayjs/ui/progress.kay'
@@ -8,6 +10,7 @@ import Rating from '@kayjs/ui/rating.kay'
 import SiteFavicon from '@kayjs/ui/site-favicon.kay'
 import Skeleton from '@kayjs/ui/skeleton.kay'
 import Stat from '@kayjs/ui/stat.kay'
+import Widget from '@kayjs/ui/widget.kay'
 import '../app.css'
 ---
 main
@@ -66,3 +69,11 @@ main
     Rating(value={Number.NaN} label="No rating")
   article#rating-none
     Rating(value={3} max={0} label="3 out of 0")
+  article#colours
+    Badge#badge-color(label="Private" color="#8fb8f4" style="margin: 1px")
+    Badge#badge-hostile(label="Hostile" color="red; background: url(//x)")
+    IconTile#tile-color(icon="info" color="#8fb8f4" size="lg" label="Private")
+    IconTile#tile-tone(icon="info" tone="danger")
+    IconTile#tile-letter(color="#e8a24a") f
+    Stat#stat-tile(value={3} label="alerts" icon="alert" iconTile={{ tone: 'danger' }})
+    Widget#widget-tile(title="Traffic" icon="info" iconTile)

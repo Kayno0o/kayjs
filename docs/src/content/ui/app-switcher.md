@@ -18,7 +18,11 @@ A tile is a real link. It opens in the same tab, even when it leads to another o
 
 `label` names the trigger and the panel, `Apps` unless the `ui.appSwitcher.label` message says otherwise. `icon` replaces the dots on the trigger, and `placement` is `bottom-end` by default.
 
-`@tile(app)` replaces the text under a tile's icon.
+`@tile(app)` replaces the text under a tile's icon, and `@appIcon(app)` replaces the icon, or the first letter, itself.
+
+## A colour per app
+
+An app's `color` is any CSS colour, such as `#8fb8f4`: it tints the tile behind the icon and draws the icon, or the first letter, in it, the name keeping the text colour. It reaches an `@appIcon` block as the text colour, and sits in one private property, `--app-color`, on the tile.
 
 ## Keyboard
 

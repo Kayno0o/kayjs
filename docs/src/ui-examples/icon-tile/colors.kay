@@ -1,0 +1,8 @@
+---
+import IconTile from '@kayjs/ui/icon-tile.kay'
+---
+.flex.flex-wrap.items-center.gap-3
+  IconTile(icon="globe" color="#8fb8f4")
+  IconTile(icon="star" color="oklch(0.75 0.15 150)")
+  IconTile(icon="search" color="rebeccapurple")
+  IconTile(color="#e8a24a") R

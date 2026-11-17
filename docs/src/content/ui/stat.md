@@ -10,6 +10,8 @@ description: A figure and what it counts, as a compact badge.
 
 <Demo name="stat/with-icon" />
 
+`iconTile` draws the icon as an [IconTile](/ui/icon-tile): `iconTile` alone for the neutral one, or `iconTile={{ color: '#8fb8f4' }}` for a `tone`, a `color` and a `size`. Its part is `tile`.
+
 ## Tiles
 
 `layout="tile"` draws a framed box with the figure above its label, for a grid of stats; the default `inline` is the pill.

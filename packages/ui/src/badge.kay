@@ -3,6 +3,7 @@ import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import { recipe } from 'kay'
 import type { IconSlot } from './defaults'
+import { colorStyle } from './color'
 import Icon from './icon.kay'
 
 const look = recipe({
@@ -24,7 +25,10 @@ const look = recipe({
   defaults: { tone: 'neutral' },
 })
 
-const { tone = 'neutral', variant, icon, label, href, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
+const { tone = 'neutral', color, variant, icon, label, href, style, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'style'> & {
+  style?: string | undefined
+  // Any CSS colour, such as `#8fb8f4`, in place of the tone's: the outline and text are drawn in it, a `solid` badge filled with it.
+  color?: string | undefined
   icon?: IconSlot | IconProps | undefined
   label?: string | number | undefined
   // Makes the badge a link, such as a tag leading to the list it names.
@@ -44,8 +48,8 @@ snippet content()
 
 // A label that does nothing: a count, a status, a tag; with `href`, a link.
 if href !== undefined
-  a(part="root" {...rest} href={href} data-tone={tone} data-stamp={stamped() ? '' : undefined} data-solid={filled() && !stamped() ? '' : undefined})
+  a(part="root" {...rest} href={href} style={colorStyle('--_badge-color', color, style)} data-tone={tone} data-stamp={stamped() ? '' : undefined} data-solid={filled() && !stamped() ? '' : undefined})
     {content()}
 else
-  span(part="root" {...rest} data-tone={tone} data-stamp={stamped() ? '' : undefined} data-solid={filled() && !stamped() ? '' : undefined})
+  span(part="root" {...rest} style={colorStyle('--_badge-color', color, style)} data-tone={tone} data-stamp={stamped() ? '' : undefined} data-solid={filled() && !stamped() ? '' : undefined})
     {content()}

@@ -1,0 +1,55 @@
+---
+import type { JSX } from 'kay'
+import type { IconProps } from 'kay/icons'
+import { recipe } from 'kay'
+import { colorStyle } from './color'
+import type { IconSlot } from './defaults'
+import Icon from './icon.kay'
+
+// A tone or a `color` sets one variable that the tint behind the icon and the icon itself read: the colour at 15% on the page, and in full for the icon.
+const look = recipe({
+  parts: {
+    root: 'kui-icon-tile inline-grid shrink-0 place-items-center rounded-md [background-color:color-mix(in_oklab,var(--tile-color)_15%,transparent)] [color:var(--tile-color)] text-sm [font-weight:var(--font-weight-semibold)] uppercase no-underline',
+    icon: 'size-4',
+  },
+  variants: {
+    tone: {
+      neutral: '[--tile-color:var(--color-muted)]',
+      accent: '[--tile-color:var(--color-accent)]',
+      success: '[--tile-color:var(--color-success)]',
+      warning: '[--tile-color:var(--color-warning)]',
+      danger: '[--tile-color:var(--color-danger)]',
+      info: '[--tile-color:var(--color-info)]',
+    },
+    size: {
+      sm: { root: 'size-6 text-xs', icon: 'size-3.5' },
+      md: 'size-8',
+      lg: { root: 'size-10 text-base', icon: 'size-5' },
+    },
+  },
+  defaults: { tone: 'neutral', size: 'md' },
+})
+
+const { icon, tone = 'neutral', color, size = 'md', label, href, style, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'style'> & {
+  // The icon in the tile. Children draw after it, or alone, such as a feed's first letter.
+  icon?: IconSlot | IconProps | undefined
+  // Any CSS colour, such as `#8fb8f4` or `oklch(0.7 0.1 250)`: it replaces the tone's, the tile tinted with it and the icon drawn in it.
+  color?: string | undefined
+  // Names the tile for screen readers; without it the tile is decorative.
+  label?: string | undefined
+  // Makes the tile a link.
+  href?: string | undefined
+  style?: string | undefined
+}>()
+---
+snippet content()
+  if icon
+    Icon(icon={icon} part="icon")
+  slot
+
+if href !== undefined
+  a(part="root" {...rest} href={href} data-tone={tone} aria-label={label} style={colorStyle('--tile-color', color, style)})
+    {content()}
+else
+  span(part="root" {...rest} data-tone={tone} role={label === undefined ? undefined : 'img'} aria-label={label} aria-hidden={label === undefined ? 'true' : undefined} style={colorStyle('--tile-color', color, style)})
+    {content()}

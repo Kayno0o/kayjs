@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui's `Badge` takes `color`, any CSS colour, in place of a tone ([Badge](/ui/badge#any-colour)); the new `IconTile` draws an icon, or a letter, on a rounded tile tinted in a tone or any `color`, and `Stat` and `Widget` draw their `icon` as one with `iconTile` ([IconTile](/ui/icon-tile)); an `AppSwitcher` app takes a `color` that tints its tile and icon, and an `@appIcon(app)` block replaces the icon ([AppSwitcher](/ui/app-switcher#a-colour-per-app)).
 - kayjs-ui's `Slider` and `AudioPlayer` fill their track in the accent up to the thumb (the danger colour when invalid, the muted when disabled): the range input carries `--range-fill`, its share from `0%` to `100%`, in its `style`, and Firefox draws `::-moz-range-progress`.
 - kayjs-ui's `Slider` draws its value on the label's row, at its end, in place of a row under the track: the `value` part now comes before the `input` part in its markup.
 - `deprecated-package-names` reports an old package name only where it is a specifier, a config key, a stylesheet path or a package.json entry, not a comment or a sentence in a string that mentions it ([deprecated lints](deprecated-lints.md)).

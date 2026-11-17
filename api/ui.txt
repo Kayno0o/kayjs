@@ -172,6 +172,12 @@ interface IconQuery extends OptionsQuery
 [.] IconSlot
 type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'more' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
+[.] IconTileOptions
+interface IconTileOptions
+  color?: string | undefined
+  size?: "lg" | "md" | "sm" | undefined
+  tone?: Tone | undefined
+
 [.] infiniteList
 function infiniteList<Row, Target extends Action = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
@@ -541,6 +547,7 @@ interface StepItem<Key extends string = string>
 
 [.] SwitcherApp
 interface SwitcherApp
+  color?: string | undefined
   description?: string | undefined
   href: string
   icon?: IconProps | IconSlot | undefined
@@ -784,6 +791,7 @@ component default
 
 [./app-switcher.kay] default
 component default
+  appIcon?: ((app: SwitcherApp) => Element) | undefined
   apps: readonly SwitcherApp[]
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
@@ -941,10 +949,12 @@ component default
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
+  color?: string | undefined
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   label?: number | string | undefined
   parts?: undefined | { root?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }
+  style?: string | undefined
   tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
   variant?: "outline" | "solid" | "stamp" | undefined
 
@@ -2003,6 +2013,21 @@ component default
   searchLabel?: string | undefined
   searchingLabel?: string | undefined
   value?: string | undefined
+
+[./icon-tile.kay] default
+component default
+  children?: Element
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
+  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
+}
+  color?: string | undefined
+  href?: string | undefined
+  icon?: IconProps | IconSlot | undefined
+  label?: string | undefined
+  parts?: undefined | { root?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }
+  size?: "lg" | "md" | "sm" | undefined
+  style?: string | undefined
+  tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
 
 [./icon.kay] default
 component default
@@ -3246,10 +3271,17 @@ component default
   delta?: StatDelta | undefined
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
+  iconTile?: IconTileOptions | boolean | undefined
   label?: string | undefined
   layout?: "inline" | "tile" | undefined
   parts?: undefined | {
   root?: string | undefined;
+  tile?: readonly unknown[] | string | undefined | {
+    root?: string | undefined;
+    icon?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+    };
+  };
   icon?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
@@ -3901,8 +3933,19 @@ component default
   empty?: boolean | undefined
   emptyState?: Element
   icon?: IconProps | IconSlot | undefined
+  iconTile?: IconTileOptions | boolean | undefined
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
-  parts?: undefined | { root?: string | undefined; head?: string | undefined; title?: string | undefined; }
+  parts?: undefined | {
+  root?: string | undefined;
+  head?: string | undefined;
+  tile?: readonly unknown[] | string | undefined | {
+    root?: string | undefined;
+    icon?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+    };
+  };
+  title?: string | undefined;
+}
   title?: Element
 
 [./zoom-pane.kay] default

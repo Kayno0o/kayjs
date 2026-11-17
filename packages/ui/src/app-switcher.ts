@@ -9,6 +9,8 @@ export interface SwitcherApp {
   label: string
   // Drawn above the name; an app with none shows the first letter of its name.
   icon?: IconSlot | IconProps | undefined
+  // Any CSS colour, such as `#8fb8f4`: it tints the tile and draws the icon, or the first letter, in it.
+  color?: string | undefined
   // Shown as the tile's tooltip.
   description?: string | undefined
   // Opens this app in a new tab, keeps it in the same one when `false`, or opens it in a new tab when it leaves the site with `'auto'`, whatever the switcher does.
