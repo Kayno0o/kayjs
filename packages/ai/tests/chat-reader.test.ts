@@ -72,7 +72,7 @@ function reader(answer: unknown) {
     failedLabel: () => 'Could not read',
     onStart: ({ id }) => told.push(`start:${id}`),
     onEnd: ({ id }) => told.push(`end:${id}`),
-    onFail: ({ id }, message) => told.push(`fail:${id}:${message}`),
+    onFail: ({ reading: { id }, message }) => told.push(`fail:${id}:${message}`),
   })
 
   return { ...made, told }

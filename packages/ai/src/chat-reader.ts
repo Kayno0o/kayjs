@@ -17,7 +17,7 @@ export interface ReaderOptions {
   // The audio began playing, ended, or could not be made or played; a throw is the caller's to catch.
   readonly onStart?: ((reading: Reading) => unknown) | undefined
   readonly onEnd?: ((reading: Reading) => unknown) | undefined
-  readonly onFail?: ((reading: Reading, message: string) => unknown) | undefined
+  readonly onFail?: ((event: { reading: Reading, message: string }) => unknown) | undefined
 }
 
 const DEFAULT_TYPE = 'audio/mpeg'
@@ -97,7 +97,7 @@ export function createReader(options: ReaderOptions) {
 
     problem.set(message)
     refused.set(reading.id)
-    options.onFail?.(reading, message)
+    options.onFail?.({ reading, message })
   }
 
   // `asked` is a press of the visitor's, which a browser always lets play, so a refusal is only from a reply read unasked.

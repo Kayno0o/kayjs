@@ -214,7 +214,7 @@ const reader = createReader({
   failedLabel: () => speakFailedLabel,
   onStart: ({ id }) => said(id, turn => onSpeak?.({ turn })),
   onEnd: ({ id }) => said(id, turn => onSpeakEnd?.({ turn })),
-  onFail: ({ id }, message) => said(id, turn => onSpeakFail?.({ turn, message })),
+  onFail: ({ reading: { id }, message }) => said(id, turn => onSpeakFail?.({ turn, message })),
 })
 
 function said(id: number, tell: (turn: ChatTurnView) => unknown) {
