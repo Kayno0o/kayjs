@@ -268,6 +268,15 @@ describe('what\'s new', () => {
     expect(trimArchive(archive, 100)).not.toContain('## 1.71.0')
   })
 
+  it('drops the newest release of an archive too when the continued sections above it fill a page alone', () => {
+    const big = 'x'.repeat(MAX_PAGE_BYTES - 200)
+    const archive = `# Old\n\nWhat each release before 1.72 added.\n\n## 1.72.0 (continued)\n\n- ${big}\n\n## 1.71.0\n\n- ${'y'.repeat(400)}\n`
+    const capped = trimArchive(archive, 100, true)
+
+    expect(capped).toContain('## 1.72.0 (continued)')
+    expect(capped).not.toContain('## 1.71.0')
+  })
+
   it('points a link to an anchor a cap moved to the archive at the archive', async () => {
     const before = '# U\n\n## 1.72.0\n\n### Stays\n\n- a\n\n### Moves\n\n- b\n'
     const after = '# U\n\n## 1.72.0\n\n### Stays\n\n- a\n'

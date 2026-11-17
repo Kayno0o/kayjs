@@ -161,7 +161,7 @@ export const capNewest = (page: string, archive: string, cap = NEWEST_CAP, unit 
 // Cuts `## Unreleased` to `cap` bytes between releases the same way, its remaining lines going under `## Unreleased (continued)`, which the release names after its version.
 export const capUnreleased = (page: string, archive: string, cap = NEWEST_CAP) => capSection(page, archive, cap, UNRELEASED)
 
-// Drops an archive's oldest releases while it is over `limit` bytes, keeping its newest and, with `keepNewestRelease`, the newest release it holds, which a cap between releases needs as the release just before the unreleased one; and ends it on where the dropped ones are read: each tag's release notes open with its What's new.
+// Drops an archive's oldest releases while it is over `limit` bytes, keeping its newest and, with `keepNewestRelease`, the newest release it holds, which a cap between releases needs as the release just before the unreleased one, unless the archive would then stay over the size an agent reads at once; and ends it on where the dropped ones are read: each tag's release notes open with its What's new.
 export function trimArchive(archive: string, limit = ARCHIVE_LIMIT, keepNewestRelease = false): string {
   const [intro, ...sections] = archive.split(SECTION)
   const last = sections.at(-1)
@@ -170,8 +170,15 @@ export function trimArchive(archive: string, limit = ARCHIVE_LIMIT, keepNewestRe
   let dropped = false
   // What a cut left at the top of the archive as "(continued)" is no release of its own, so the newest release is the first versioned section after them.
   const floor = keepNewestRelease ? releases.findIndex(section => VERSION_HEADING.test(section) && !CONTINUED.test(section)) + 1 : 0
+  const size = () => Buffer.byteLength([intro, ...releases, RELEASES_NOTE].join(''))
 
-  while (releases.length > Math.max(floor, 1) && Buffer.byteLength([intro, ...releases, RELEASES_NOTE].join('')) > limit) {
+  while (releases.length > Math.max(floor, 1) && size() > limit) {
+    releases.pop()
+    dropped = true
+  }
+
+  // A continued unreleased section that fills the archive alone leaves no room for that release: it goes too rather than leave a page too long to read.
+  while (releases.length > 1 && size() > Math.max(limit, MAX_PAGE_BYTES)) {
     releases.pop()
     dropped = true
   }
