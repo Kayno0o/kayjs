@@ -7,7 +7,7 @@ import { kayRange, PRESETS, projectFiles } from '../src/new'
 // A 1.x minor may break an app, so a new project takes patches (`~`); from 2.0.0 a breaking change is a major, so it takes minors (`^`).
 describe('the range a new project pins kay to', () => {
   it('is a tilde through 1.x and a caret from 2.0.0', () => {
-    expect([kayRange('1.106.0'), kayRange('2.0.0'), kayRange('2.3.1'), kayRange('10.0.0')]).toEqual(['~1.106.0', '^2.0.0', '^2.3.1', '^10.0.0'])
+    expect([kayRange('1.106.0'), kayRange('2.0.0'), kayRange('2.3.1'), kayRange('10.0.0'), kayRange('2.0.0-beta.1'), kayRange('0.5.0')]).toEqual(['~1.106.0', '^2.0.0', '^2.3.1', '^10.0.0', '^2.0.0-beta.1', '~0.5.0'])
   })
 })
 
