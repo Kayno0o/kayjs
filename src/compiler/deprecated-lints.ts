@@ -70,14 +70,6 @@ export const DEPRECATED_LINTS = {
     wrong: '--- script\nconst { title } = props<{ title: string }>()\n---\nh1 {title}',
     right: '---\nconst { title } = props<{ title: string }>()\n---\nh1 {title}',
   },
-  'deprecated-if-alias': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.102',
-    summary: '`if cond as name` and `else if cond as name`, `if cond then name` since 1.102: the alias takes the word `await x then name` uses, so `as` is only ever a TypeScript cast and no longer an alias or a cast by the casing of what follows (`as u` aliased, `as Row` cast, and a lowercase type alias such as `as thing` was read as an alias). The old spelling still aliases until 1.105. The fix writes `then` for the `as`.',
-    wrong: '---\nconst user = { name: \'Ada\' } as { name: string } | null\n---\nif user as u\n  p {u.name}',
-    right: '---\nconst user = { name: \'Ada\' } as { name: string } | null\n---\nif user then u\n  p {u.name}',
-  },
   'deprecated-schema-type': {
     level: 'warn',
     group: 'deprecated',
