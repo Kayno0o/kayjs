@@ -46,7 +46,7 @@ interface Fill {
 
 // A field's `value`, or `checked` for a boolean. An input that writes no `type` takes the one its schema gives it, so which of the two it is is only known as it renders.
 export function addFieldFill(b: CodeBuilder, src: string, element: ElementNode, markup: Markup, fill: Fill, field: FormField, typed: boolean): void {
-  const one = (filled: 'value' | 'checked') => addFilled(b, src, element, { ...fill, filled, own: filled === fill.filled ? fill.own : undefined })
+  const one = (filled: 'value' | 'checked') => addFilled(b, src, element, { ...fill, filled, own: filled === fill.filled ? fill.own : undefined, schemaType: true })
 
   if (!(typed && field.marked && fill.filled === 'value')) {
     markup.dynamic(() => one(fill.filled))
@@ -57,7 +57,7 @@ export function addFieldFill(b: CodeBuilder, src: string, element: ElementNode, 
   markup.dynamic(() => {
     b.add(helperName('schemaFill'))
     fill.fieldArguments()
-    b.add(', () => ')
+    b.add(', (KaySchemaType) => ')
     one('value')
     b.add(', () => ')
     one('checked')
@@ -66,8 +66,8 @@ export function addFieldFill(b: CodeBuilder, src: string, element: ElementNode, 
 }
 
 // Whether a `select(field=...)` writes no options, which its schema's enum gives it.
-export function listsFromSchema(children: Node[], field: FormField | undefined): boolean {
-  return children.length === 0 && field?.marked === true && field.fill === 'selected'
+export function listsFromSchema(element: string, children: Node[], field: FormField | undefined): boolean {
+  return element === 'select' && children.length === 0 && field?.marked === true
 }
 
 // The options of such a `select`, written as the helper that reads them off the schema of the action.

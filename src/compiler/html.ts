@@ -727,9 +727,9 @@ export class HtmlTemplate extends TemplateWriter {
       // A refused post's text takes the place of the textarea's static value.
       const staticContent = field?.fill === 'content' && plan.valueText !== undefined ? undefined : plan.staticContent
 
-      const fromSchema = listsFromSchema(children, field)
+      const fromSchema = listsFromSchema(name, children, field)
 
-      if ((children.length > 0 || fromSchema) && field?.fill === 'selected' && target) {
+      if (field && (fromSchema || (children.length > 0 && field.fill === 'selected')) && target) {
         const own = selected
 
         markup.dynamic(() => {

@@ -10,7 +10,7 @@ import { fieldDescription, fieldInvalid, fieldRequired } from './described'
 import { escape, escapeAttribute } from './escape'
 import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
 import { isBoolean, nativeConstraints } from './form'
-import { optionsOf } from './form-types'
+import { optionsOf, typeAttributes } from './form-types'
 import { DATA_SCRIPT, headCheckpoint, LEADING_NEWLINE, restoreHead } from './head'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
@@ -671,10 +671,13 @@ export function formOptions(target: unknown, name: string): string {
 }
 
 // Which of two fills an `input(field=...)` with no `type` takes: a ticked box for a boolean of the schema, else a value.
-export function schemaFill(target: unknown, name: string, value: () => string, checked: () => string): string {
+export function schemaFill(target: unknown, name: string, value: (type: string | undefined) => string, checked: () => string): string {
   const field = schemaOf(target)?.properties?.[name]
 
-  return field && isBoolean(field) ? checked() : value()
+  if (field && isBoolean(field))
+    return checked()
+
+  return value(field && typeAttributes(field, false, false).some(([key, type]) => key === 'type' && type === 'date') ? 'date' : undefined)
 }
 
 // The `p` an `error` line shows a refused form's message in, nothing while there is none.

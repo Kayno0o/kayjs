@@ -77,7 +77,8 @@ export function autocompleteOf(field: FieldSchema, name: string): string | undef
 
 // The options of a `select(field=...)` that writes none: one per value of the field's enum, worded by the `x-labels` an `s.enum` of a record keeps, and a blank first one for a field the form may leave out.
 export function optionsOf(field: FieldSchema | undefined, required: boolean): string {
-  const values = (field as { enum?: unknown } | undefined)?.enum
+  // An `s.enum`, or an `s.union` of `s.literal`s.
+  const values = (field as { enum?: unknown } | undefined)?.enum ?? (field?.anyOf?.every(member => member.const !== undefined) ? field.anyOf.map(member => member.const) : undefined)
 
   if (!Array.isArray(values))
     return ''
@@ -89,7 +90,7 @@ export function optionsOf(field: FieldSchema | undefined, required: boolean): st
     const text = String(value)
     const label = labels?.[text]
 
-    markup += `<option value="${escapeAttribute(text)}">${escape(typeof label === 'string' ? label : text)}</option>`
+    markup += `<option value="${escapeAttribute(text).replaceAll('>', '&gt;')}">${escape(typeof label === 'string' ? label : text)}</option>`
   }
 
   return markup
