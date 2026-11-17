@@ -10,6 +10,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `@kaynooo/eslint` 8
 
 kay and `kay new` use `@kaynooo/eslint` 8, which has no formatters (Prettier, oxfmt and dprint, about 30 MB, are no longer installed): run `bun add -d @kaynooo/eslint@^8`, and drop a `formatters` option from `eslint.config.ts` if it sets one. `kay fmt` formats as before.
+### `sanitizeHtml` keeps only `language-*` classes on `code`
+
+A call with `attributes: { code: ['class'] }` now keeps a `code` element's class only when it is `language-` and a language name (`language-ts`, `language-c++`); any other class is dropped. Style the element by its parent or by `[class^='language-']` instead of a class of your own on `code`.
 
 ## 1.105.0
 
