@@ -596,7 +596,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /*",
   ],
   "start": [
-    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
+    "(root) => { const server = root.server; if (server === null || server === void 0) return; const { re...",
     "() => { if (options.holds()) warnMetricsOpen(options.proxy, token); }",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
@@ -812,7 +812,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     "GET /*",
   ],
   "start": [
-    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
+    "(root) => { const server = root.server; if (server === null || server === void 0) return; const { re...",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
@@ -1017,7 +1017,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     "GET /*",
   ],
   "start": [
-    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
+    "(root) => { const server = root.server; if (server === null || server === void 0) return; const { re...",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
@@ -1346,7 +1346,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /*",
   ],
   "start": [
-    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
+    "(root) => { const server = root.server; if (server === null || server === void 0) return; const { re...",
     "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
     "() => { publishing.start(); for (const { track } of tracked) track(); }",
@@ -1616,7 +1616,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     "GET /*",
   ],
   "start": [
-    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
+    "(root) => { const server = root.server; if (server === null || server === void 0) return; const { re...",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
@@ -2026,7 +2026,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET /*",
   ],
   "start": [
-    "(root) => { const { server } = root; if (server === null || server === void 0) return; const { respo...",
+    "(root) => { const server = root.server; if (server === null || server === void 0) return; const { re...",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",

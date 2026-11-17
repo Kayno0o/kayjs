@@ -155,8 +155,33 @@ interface Front {
   kay: KayServer
 }
 
-interface Installable {
+interface Installable extends Server<unknown> {
   [INSTALLED]?: Front
+}
+
+// The `reload` of the server is its prototype's, which the patch shadows: it is lifted for the call, then put back.
+function lifted(server: Installable, options: Parameters<Reload>[0]): void {
+  delete (server as { reload?: Reload }).reload
+
+  try {
+    server.reload(options)
+  }
+  finally {
+    server.reload = patched as Reload
+  }
+}
+
+// What the server's `reload` is once kay is in front: the app's `fetch` becomes the fallback of the table's, and its routes are laid under the table's. It is a function of the module, not of one run of the app, so it keeps no run's app or table alive; a wrapper of the server (`kay dev` hands each run one) calls it on the server itself, so `this` is the server whatever object the app holds.
+function patched(this: Installable, options: Parameters<Reload>[0]): void {
+  // Elysia also reloads a server with the server itself, which holds what it already serves.
+  if (typeof (options as { stop?: unknown }).stop === 'function')
+    return lifted(this, options)
+
+  const { kay } = this[INSTALLED]!
+  const { fetch: elysia } = options as { fetch?: ((request: Request, server: ReceiveServer) => Response | Promise<Response>) | undefined }
+
+  kay.fallback = elysia && (async request => elysia(request, this))
+  lifted(this, { ...options, fetch: async (request: Request, bun: ReceiveServer) => kay.fetch(request, bun ?? this), routes: withTable(options.routes, kay.routes) as never })
 }
 
 // Puts kay's server in front of the Elysia app once it listens: Bun is handed `kay.fetch`, with the app's own `fetch` as its fallback, and the routes the table compiled to, beside the ones Elysia hands it.
@@ -164,7 +189,7 @@ interface Installable {
 // Elysia also hands Bun a handler for each of its routes, which Bun calls without `fetch`, so the answer would skip `respond` and `after`: once a step of either is set, Elysia's own router serves them through `fetch` instead. With none set, which is the case until the slices moving the response work onto the phases land, the app is served exactly as before.
 export function serveThrough(app: Elysia, kay: KayServer): void {
   app.onStart((root) => {
-    const { server } = root
+    const server = root.server as Installable | null | undefined
 
     if (server === null || server === undefined)
       return
@@ -174,59 +199,18 @@ export function serveThrough(app: Elysia, kay: KayServer): void {
     if (respond.length > 0 || after.length > 0)
       root.config.systemRouter = false
 
-    const held = (server as Installable)[INSTALLED]
+    const held = server[INSTALLED]
 
     if (held !== undefined) {
+      // The fallback moves to the new table, so no table of an earlier run keeps the app of a later one.
+      kay.fallback = held.kay.fallback
+      held.kay.fallback = undefined
       held.kay = kay
 
       return
     }
 
-    const front: Front = { kay }
-
-    ;(server as Installable)[INSTALLED] = front
-
-    // The `reload` of the server is its prototype's, which the patch shadows: it is lifted for the call. A wrapper of the server (`kay dev` hands each run one) calls it on the server itself, so `this` is the server whatever object the app holds.
-    function patched(this: Server<unknown>, options: Parameters<Reload>[0]): void {
-      const target = this
-      const native = (given: Parameters<Reload>[0]): void => {
-        delete (target as { reload?: Reload }).reload
-
-        try {
-          target.reload(given)
-        }
-        finally {
-          target.reload = patched as Reload
-        }
-      }
-
-      // Elysia also reloads a server with the server itself, which holds what it already serves.
-      if (typeof (options as { stop?: unknown }).stop === 'function')
-        return native(options)
-
-      const { kay: current } = front
-      const { fetch: elysia } = options as { fetch?: ((request: Request, server: ReceiveServer) => Response | Promise<Response>) | undefined }
-
-      current.fallback = elysia && (async request => elysia(request, target))
-      native({ ...options, fetch: async (request: Request, bun: ReceiveServer) => current.fetch(request, bun ?? target), routes: withTable(options.routes, current.routes) as never })
-    }
-
+    server[INSTALLED] = { kay }
     server.reload = patched as Reload
-        }
-      }
-
-      // Elysia also reloads a server with the server itself, which holds what it already serves.
-      if ((options as unknown) === server)
-        return native(options)
-
-      const { kay: current } = front
-      const { fetch: elysia } = options as { fetch?: ((request: Request, server: ReceiveServer) => Response | Promise<Response>) | undefined }
-
-      current.fallback = elysia && (async request => elysia(request, server))
-
-      return native({ ...options, fetch: async (request: Request, bun: ReceiveServer) => current.fetch(request, bun ?? server), routes: withTable(options.routes, current.routes) as never })
-    }
-
-    server.reload = patched
   })
 }
