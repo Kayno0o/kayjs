@@ -5,7 +5,7 @@ import { Elysia } from 'elysia'
 import { applySafeFixes } from '../src/check/fixes'
 import { refusalCalls } from '../src/check/refusal-calls'
 import { refuse, thrownRefusal } from '../src/runtime/refuse'
-import { decodeServerValue } from '../src/runtime/wire'
+import { decodeServerValue, encodeValue } from '../src/runtime/wire'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -70,12 +70,23 @@ describe('ctx.deny in an action', () => {
     expect(response.headers.get('content-type')).toContain('text/html')
   })
 
-  it('stops as a guard does when it carries a message alone, so a guard run with the action context refuses the same way', async () => {
+  it('stops as a guard does when it carries nothing, so a guard run with the action context refuses the same way', async () => {
     const bare = await post('bare', {}, true)
-    const message = await post('messageOnly', {}, true)
 
     expect([bare.status, await bare.text()]).toEqual([409, 'Conflict'])
-    expect([message.status, await message.text()]).toEqual([403, 'Members only'])
+  })
+
+  it('refuses with the message alone as a failure of the form, for a call, an island call and a form post', async () => {
+    const form = await post('messageOnly', {}, true)
+    const island = await (await app()).handle(new Request(`${ORIGIN}${ACTION}/messageOnly`, { method: 'POST', headers: { 'origin': ORIGIN, 'x-kay-action': '1', 'content-type': 'application/json' }, body: encodeValue({}) }))
+    const page = await post('messageOnly')
+
+    expect(form.status).toBe(403)
+    expect(decodeServerValue(await form.text())).toEqual({ errors: { '': 'Members only' }, data: undefined })
+    expect(island.status).toBe(403)
+    expect(decodeServerValue(await island.text())).toMatchObject({ errors: { '': 'Members only' } })
+    expect(page.status).toBe(403)
+    expect(page.headers.get('content-type')).toContain('text/html')
   })
 
   it('puts no form message where only data or fields are given, and a text data is the message', async () => {
@@ -148,6 +159,12 @@ describe('what the refusal fixers write and leave alone', () => {
     const { text } = await fixed('export const f = (ctx: any) => ctx.fail(409, 1, ({ name: \'x\' }))\n')
 
     expect(text).toBe('export const f = (ctx: any) => ctx.deny(409, { data: 1, errors: { name: \'x\' } })\n')
+  })
+
+  it('writes a text data as the message, so the form shows it', async () => {
+    const { text } = await fixed('export const f = (ctx: any) => ctx.fail(409, \'Taken\', { name: \'x\' })\n')
+
+    expect(text).toBe('export const f = (ctx: any) => ctx.deny(409, { message: \'Taken\', errors: { name: \'x\' } })\n')
   })
 
   it('writes 422 for a refuse whose errors name fields, not for an empty or non-literal one', async () => {

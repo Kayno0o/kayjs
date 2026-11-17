@@ -14,7 +14,7 @@ export const messageOnly = action(s.Object({}), (input, ctx) => ctx.deny(403, { 
 
 export const thrown = action(s.Object({}), () => refuse(409, { message: 'Over', data: 'over' }))
 
-export const legacy = action(s.Object({}), (input, ctx) => ctx.deny(403, { message: 'Members only' }))
+export const legacy = action(s.Object({}), (input, ctx) => ctx.deny(403, 'Members only'))
 
 export const old = action(s.Object({}), (input, ctx) => ctx.fail(409, { row: 7 }, { name: 'Already taken' }))
 ---

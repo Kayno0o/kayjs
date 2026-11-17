@@ -258,6 +258,8 @@ if add.form.failed()?.data then data
   p.error {data.message}
 ```
 
+A `message` alone is enough for a text the form shows: `return ctx.deny(401, { message: 'Wrong username or password.' })` is read by `add.form.error()`, and a call throws an `ActionError` with that text.
+
 To blame a field, give `ctx.deny` the messages as `errors`: `return ctx.deny(409, { errors: { email: 'Already taken' } })`. The names are the schema's fields, and `''` is the form's own message. The field then shows it as if the schema had refused it: an `error email` line, `aria-invalid`, `add.form.error('email')` and the value the visitor typed, with or without JavaScript. A call throws an `ActionError` whose `errors` carry it.
 
 A handler that throws is logged, and the form shows `Something went wrong on our side; try again later`. The handler needs no `try`/`catch` of its own.

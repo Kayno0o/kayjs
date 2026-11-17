@@ -71,7 +71,7 @@ function isErrorStatus(node: Node | undefined): boolean {
   return node?.type === 'Literal' && typeof node.value === 'number' && node.value >= 400 && node.value <= 599
 }
 
-// `return ctx.fail(status, data, errors)`, `return ctx.deny(status, { data, errors })` since 1.105: an action refuses as a guard and a page do. A text `data` is the form's message, and a call with neither data nor errors is left, as `deny(status)` stops with plain text.
+// `return ctx.fail(status, data, errors)`, `return ctx.deny(status, { data, errors })` since 1.105: an action refuses as a guard and a page do. A text `data` is the form's message and is written as the `message`, and a call with neither data nor errors is left, as `deny(status)` stops with plain text.
 // Found on `ctx.fail` of a handler's `ctx`; the fix is made where the call is returned, as `deny` throws and `fail` did not.
 function failCalls({ parsed, report }: Found): void {
   for (const { ast, base, text } of parsed) {
@@ -83,7 +83,7 @@ function failCalls({ parsed, report }: Found): void {
       const parts: Part[] = []
 
       if (data !== undefined && !isUndefined(data))
-        parts.push(['data', text.slice(data.start, data.end)])
+        parts.push([isText(data) ? 'message' : 'data', text.slice(data.start, data.end)])
 
       if (errors !== undefined && !isUndefined(errors))
         parts.push(['errors', text.slice(errors.start, errors.end)])
