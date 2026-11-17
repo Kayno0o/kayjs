@@ -16,7 +16,7 @@ button(onClick={() => count++}) Clicked {count()} times
 
 A component is an island when its own code needs the browser: an `on*` handler, a `bind:` or a `ref` in its template, a browser value of `kay` such as `signal` in its script, a `live` or `persisted` value it imports from one of your modules (even through a re-export), or a `island()` declaration. The compiler decides it from the file and its imports, and nothing a component passes makes it one.
 
-The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `byteCount`, `composing`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `escapeHtml`, `formErrors`, `isEmail`, `lengthMs`, `localPath`, `postedChecked`, `postedValue`, `postedValues`, `publicEnv`, `recipe`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` keep a component static.
+The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `byteCount`, `composing`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `escapeHtml`, `formErrors`, `isEmail`, `lengthMs`, `localPath`, `postedChecked`, `postedValue`, `postedValues`, `publicEnv`, `recipe`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `validate`, `withBase` and `withQuery` keep a component static.
 
 A namespace or default import of `kay` or `kay/i18n` (`import * as i18n from 'kay/i18n'`) always makes an island, so import the names you use instead.
 

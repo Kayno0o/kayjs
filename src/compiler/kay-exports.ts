@@ -91,6 +91,7 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   trustHtml: 'shared',
   uid: 'shared',
   untrack: 'browser',
+  validate: 'shared',
   watch: 'browser',
   webPush: 'browser',
   withBase: 'shared',

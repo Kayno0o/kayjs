@@ -31,7 +31,7 @@ function withDefaults(schema: Node, value: unknown): unknown {
 }
 
 // A form or a query posts text and a blank list is the empty one: the top-level fields are read as their schema expects, as the server reads them.
-function readText(schema: Node, value: unknown, form: boolean): unknown {
+function readText(schema: Node, value: unknown, form: boolean, trim: boolean): unknown {
   const input = isNode(value) ? { ...value } : {}
 
   for (const [name, field] of Object.entries(schema.properties ?? {})) {
@@ -41,7 +41,7 @@ function readText(schema: Node, value: unknown, form: boolean): unknown {
       delete input[name]
   }
 
-  return formInput(schema as never, withDefaults(schema, input), form)
+  return formInput(schema as never, withDefaults(schema, input), form, form && trim)
 }
 
 const join = (path: string, step: string): string => path === '' ? step : `${path}.${step}`
@@ -119,9 +119,9 @@ interface StandardResult {
   issues?: readonly { message?: string, path?: unknown }[]
 }
 
-async function standard(schema: object, source: Source, value: unknown): Promise<Validated> {
+async function standard(schema: object, source: Source, value: unknown, trim: boolean): Promise<Validated> {
   const rules = source === 'json' ? undefined : jsonSchemaOf(schema) as Node | undefined
-  const read = rules === undefined ? value : readText(rules, value, source !== 'env' && source !== 'params')
+  const read = rules === undefined ? value : readText(rules, value, source !== 'env' && source !== 'params', trim)
   const result = await (schema as { '~standard': { validate: (value: unknown) => StandardResult | Promise<StandardResult> } })['~standard'].validate(read)
 
   if (result.issues === undefined)
@@ -143,12 +143,12 @@ async function standard(schema: object, source: Source, value: unknown): Promise
 }
 
 // The value a schema reads from `source`, or where and why it is refused: the server's `validate` in the browser, for a form before it posts or a row a local collection takes. A date stays its text, and a file is checked by the server alone, which reads its bytes; the messages are the page's locale.
-export async function validate<Value = unknown>(schema: object, value: unknown, { source }: ValidateOptions): Promise<Validated<Value>> {
+export async function validate<Value = unknown>(schema: object, value: unknown, { source, trim = true }: ValidateOptions): Promise<Validated<Value>> {
   if (isStandardSchema(schema))
-    return await standard(schema, source, value) as Validated<Value>
+    return await standard(schema, source, value, trim) as Validated<Value>
 
   const rules = schemaOf(schema as never) as unknown as Node
-  const read = stripped(rules, source === 'json' ? withDefaults(rules, value) : readText(rules, value, source !== 'env' && source !== 'params'), source === 'form')
+  const read = stripped(rules, source === 'json' ? withDefaults(rules, value) : readText(rules, value, source !== 'env' && source !== 'params', trim), source === 'form')
   const issues: Issue[] = []
 
   walk(rules, read, '', source, issues)

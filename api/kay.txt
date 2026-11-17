@@ -1679,7 +1679,7 @@ type Unmatched<Rest> = [Rest] extends [never] ? unknown : false extends Finite<R
 function untrack<T>(fn: () => T): T
 
 [.] validate
-function validate<Value = unknown>(schema: object, value: unknown, { source, locale }: ValidateOptions): Promise<Validated<Value>>
+function validate<Value = unknown>(schema: object, value: unknown, { source, locale, trim }: ValidateOptions): Promise<Validated<Value>>
 
 [.] Validated
 type Validated<Value = unknown> = { value: Value } | Refusal
@@ -1688,6 +1688,7 @@ type Validated<Value = unknown> = { value: Value } | Refusal
 interface ValidateOptions
   locale?: LocaleState | undefined
   source: Source
+  trim?: boolean | undefined
 
 [.] ValidateSource
 type ValidateSource = 'form' | 'query' | 'params' | 'env' | 'json'
