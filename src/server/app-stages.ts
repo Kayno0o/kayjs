@@ -561,11 +561,13 @@ export function hookLifecycleOf({ app, options }: Boot): void {
 // The actions, the API modules and the endpoints, then the jobs page, after the extensions whose derived values the guards read through `ctx.locals`.
 export async function appRoutes(boot: Boot, actionOptions: ActionOptions, jobsPage: ReturnType<typeof kayEndpoints>, apiMountsServed: string[]) {
   const { app, routes, table, setup } = boot
-  const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, setup.matchers, boot.env.trailingSlash), actionOptions), setup.api])
+  const [{ limits: actionLimits, tools: toolActions, broken }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, setup.matchers, boot.env.trailingSlash), actionOptions), setup.api])
   const api = await serveApi(app, apiModules, actionOptions, setup.extensionApp)
 
   apiMountsServed.push(...apiModules.map(module => module.mount))
-  checkShareAction(boot.options.assets?.manifest?.shareTarget, new Set(actionLimits.keys()), new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]).map(file => relative(boot.project.root, file).replaceAll('\\', '/'))))
+  const rooted = (file: string) => relative(boot.project.root, file).replaceAll('\\', '/')
+
+  checkShareAction(boot.options.assets?.manifest?.shareTarget, new Set(actionLimits.keys()), new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]).map(rooted)), new Map([...broken].map(([file, message]) => [rooted(file), message])))
   boot.registered.actions = actionLimits.size > 0
   boot.registered.api = api.mounted
 

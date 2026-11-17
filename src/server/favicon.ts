@@ -324,18 +324,28 @@ export function manifestJson(name: string | undefined, description: string | und
 // An action written as its page file and export name is served at the URL `actionUrl` gives it; a path is a route of the site.
 const ACTION_REFERENCE = /^(?:\.\/)?([^#\\]+\.kay)#([A-Z_a-z$][\w$]*)$/
 
-// Stops the boot on a share target naming a page file that is no route or layout of the app, or an export of it that is no action; `actions` holds the URLs the server registered, `files` the page files, relative to the root.
-export function checkShareAction(share: ManifestShareTarget | undefined, actions: ReadonlySet<string>, files: ReadonlySet<string>): void {
+// What is wrong with a share target naming a page file that is no route or layout of the app, or an export of it that is no action: `actions` holds the URLs the app serves, `files` the page files relative to the root, and `broken` those that failed to compile, with the failure.
+export function shareActionProblem(share: ManifestShareTarget | undefined, actions: ReadonlySet<string>, files: ReadonlySet<string>, broken: ReadonlyMap<string, string> = new Map()): string | undefined {
   const reference = share === undefined || share.action.startsWith('/') ? null : ACTION_REFERENCE.exec(share.action)
 
   if (reference === null || actions.has(actionUrl(reference[1]!, reference[2]!)))
-    return
+    return undefined
 
-  const file = reference[1]!
+  const [, file, name] = reference
+  const start = `kay: the manifest's shareTarget.action, ${share!.action}, `
 
-  throw new KayError('favicon-invalid', files.has(file)
-    ? `kay: the manifest's shareTarget.action, ${share!.action}, names no action: ${file} exports no action called ${reference[2]}`
-    : `kay: the manifest's shareTarget.action, ${share!.action}, names a file that is no page or layout of the app`)
+  if (broken.has(file!))
+    return `${start}names an action of ${file}, which failed to compile: ${broken.get(file!)}`
+
+  return files.has(file!) ? `${start}names no action: ${file} exports no action called ${name}` : `${start}names a file that is no page or layout of the app`
+}
+
+// Stops the boot on a share target naming an action the app does not have.
+export function checkShareAction(share: ManifestShareTarget | undefined, actions: ReadonlySet<string>, files: ReadonlySet<string>, broken?: ReadonlyMap<string, string>): void {
+  const problem = shareActionProblem(share, actions, files, broken)
+
+  if (problem !== undefined)
+    throw new KayError('favicon-invalid', problem)
 }
 
 function shareTargetJson(share: ManifestShareTarget, page: (path: string, what: string) => string): object {

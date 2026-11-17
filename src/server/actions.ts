@@ -35,8 +35,8 @@ import { actionClash } from './action-clash'
 import { hooksOf, refusedBeforeRun, tellError, tellSuccess, withActionDefaults } from './action-hooks'
 import { withFixedFields, withoutEmptyFiles } from './action-input'
 import { gathering, isAsyncIterable, lastOf, started, streamed } from './action-iterable'
+import { actionModule } from './action-module'
 import { routerPath } from './base'
-import { importModule } from './bundle'
 import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
 import { BACK_PARAMETER, crossSiteResponse, isCrossSite, postedFrom, TEXT } from './cross-site'
@@ -138,24 +138,16 @@ type Back = (request: Request, headers: Headers, flash: Flash, server: Server | 
 const pageBound = new WeakMap<object, boolean>()
 
 // Registers every action the pages and layouts export as a POST route whose body Elysia validates against the action's schema, giving back the body limit of each by its path and the actions that opted in to being MCP tools.
-export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], match: RouteMatch, options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, tools: DocumentedAction[] }> {
+export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], match: RouteMatch, options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, tools: DocumentedAction[], broken: Map<string, string> }> {
   const back: Back = async (request, headers, flash, server) => renderBack(app, options.base ?? '', request, headers, flash, server)
   const served = new Map<string, { file: string, action: ServerAction<TSchema, unknown> }>()
   const limits = new Map<string, BodyLimit>()
   const tools: DocumentedAction[] = []
+  // The files `skipBroken` passed over, with why.
+  const broken = new Map<string, string>()
 
   for (const [file, { guards, ...page }] of actionFiles(routes, options.requireGuards)) {
-    let module: Record<string, unknown> = {}
-
-    try {
-      module = await importModule<Record<string, unknown>>(file)
-    }
-    catch (error) {
-      if (options.skipBroken !== true || !(error instanceof Error) || error.name !== 'KayCompileError')
-        throw error
-    }
-
-    for (const [name, exported] of Object.entries(module)) {
+    for (const [name, exported] of Object.entries(await actionModule(file, options.skipBroken, broken))) {
       if (!isAction(exported))
         continue
 
@@ -282,7 +274,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
     }
   }
 
-  return { limits, tools }
+  return { limits, tools, broken }
 }
 
 // Runs the action under its timeout; one that ran out is reported as a server error and answered as a failed post, 504.

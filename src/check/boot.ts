@@ -16,7 +16,7 @@ import { basePath } from '../server/base'
 import { checkRequestIdHeader, checkTimeZone, healthTimeoutMs, imageLimits, liveLimits, loadBudgetMs, remoteLimits, shutdownSeconds, timeoutMs } from '../server/config-limits'
 import { claimEndpoints } from '../server/endpoint-claims'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
-import { faviconSource, svgFaviconProblems } from '../server/favicon'
+import { faviconSource, shareActionProblem, svgFaviconProblems } from '../server/favicon'
 import { defaultLocaleTranslations, localeSettings, refuseLocaleClashes } from '../server/i18n'
 import { mcpKeySetting } from '../server/mcp-key'
 import { pageFlags } from '../server/page-flags'
@@ -179,6 +179,8 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
 
   diagnostics.push(...await actionClashes(root, [...new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]))]))
 
+  diagnostics.push(...await shareTargetProblems(root, options, config, [...new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]))]))
+
   diagnostics.push(...await queryClashes(routes))
 
   diagnostics.push(...await pageHeadLints(options, routes, routesDir, publicDir, listed))
@@ -207,6 +209,25 @@ export async function actionClashes(root: string, files: string[]): Promise<Chec
   }
 
   return diagnostics
+}
+
+// A manifest share target naming a page file that is no page of the app, or an export that is no action of it, which the server refuses to boot on.
+async function shareTargetProblems(root: string, options: CheckOptions, config: string, files: string[]): Promise<CheckDiagnostic[]> {
+  const share = options.assets?.manifest?.shareTarget
+
+  if (share === undefined)
+    return []
+
+  const actions = new Set<string>()
+
+  for (const file of files) {
+    for (const name of serverFacts(file, await Bun.file(file).text()).server?.actionNames ?? [])
+      actions.add(actionUrl(islandId(file, root), name))
+  }
+
+  const problem = shareActionProblem(share, actions, new Set(files.map(file => islandId(file, root))))
+
+  return problem === undefined ? [] : [{ file: config, line: 1, column: 1, message: problem, help: 'name a page file and the action it exports, as `src/routes/share.kay#receive`, or a path of the site' }]
 }
 
 // What a page lists in `prerender`, as its source writes it.

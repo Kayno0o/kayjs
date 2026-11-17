@@ -1,4 +1,7 @@
+import { resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { bootProblems } from '../src/check/boot'
+import { shareActionProblem } from '../src/server/favicon'
 import { testSite } from '../src/test'
 
 const site = await testSite({ root: 'tests/fixtures/share-target', islands: false, assets: { manifest: { scope: '/', shareTarget: { action: 'src/routes/share.kay#receive', files: ['image/*', '.pdf'] } } } })
@@ -56,5 +59,26 @@ describe('a share target naming an action that is not there', () => {
 
   it('stops the boot on an export that is no action of the page', async () => {
     await expect(booting('src/routes/share.kay#recieve')).rejects.toThrow('src/routes/share.kay#recieve, names no action: src/routes/share.kay exports no action called recieve')
+  })
+})
+
+describe('the check of a share target', () => {
+  const root = resolve('tests/fixtures/share-target')
+  const problems = async (action: string) => (await bootProblems(root, { assets: { manifest: { shareTarget: { action } } } })).map(problem => problem.message).filter(message => message.includes('shareTarget'))
+
+  it('reports a file that is no page and an export that is no action, as the boot refuses them', async () => {
+    expect(await problems('src/routes/shared.kay#receive')).toEqual(['kay: the manifest\'s shareTarget.action, src/routes/shared.kay#receive, names a file that is no page or layout of the app'])
+    expect(await problems('src/routes/share.kay#recieve')).toEqual(['kay: the manifest\'s shareTarget.action, src/routes/share.kay#recieve, names no action: src/routes/share.kay exports no action called recieve'])
+  })
+
+  it('reports nothing for an action of a page, or a path of the site', async () => {
+    expect(await problems('src/routes/share.kay#receive')).toEqual([])
+    expect(await problems('/share')).toEqual([])
+  })
+
+  it('names the compile failure of a page the server skipped', () => {
+    const share = { action: 'src/routes/share.kay#receive' }
+
+    expect(shareActionProblem(share, new Set(), new Set(['src/routes/share.kay']), new Map([['src/routes/share.kay', 'unexpected token']]))).toBe('kay: the manifest\'s shareTarget.action, src/routes/share.kay#receive, names an action of src/routes/share.kay, which failed to compile: unexpected token')
   })
 })
