@@ -41,11 +41,14 @@ export const DEFAULT_MAX_ITEMS = 1000
 
 const SLUG = '^[a-z0-9]+(?:-[a-z0-9]+)*$'
 
+// The words of a refusal: a text, a function called in the request's locale, or a record by the rule that failed (`min`, `max`, `pattern`, `format`, `required`, `type`), with a `default` for the others.
+export type ErrorText = string | (() => string) | { [rule: string]: string | (() => string) | undefined }
+
 // What every builder takes beside its own options: the field is `optional`, takes a `default` when the value is left out, words its refusal with `error` (a text or a function called in the request's locale), and carries a `label`, a `description` and an `example` for the form, OpenAPI and MCP.
 export interface FieldBase<Value = unknown> {
   optional?: boolean | undefined
   default?: Value | undefined
-  error?: string | (() => string) | undefined
+  error?: ErrorText | undefined
   label?: string | undefined
   description?: string | undefined
   example?: Value | undefined
@@ -213,7 +216,7 @@ export interface ObjectOptions extends FieldOptions {
 
 // The fields of an object, `shape` a record of schemas, which is refused with a 422 when it carries a key the shape lacks; `{ extra: 'strip' }` drops it instead. Anywhere kay takes a schema, a plain record is this object, so `s.object()` is rarely written.
 function object<Shape extends Record<string, Schema>, const Options extends ObjectOptions>(shape: Shape, options?: Options): Built<ReturnType<typeof schema.Object<Shape>>, Options> {
-  return wrapped(schema.Object(shape, { ...options?.extra !== 'strip' && { additionalProperties: false }, ...rest(options, [...FIELD_KEYS, 'extra']), ...keywords(options ?? {}) }), options)
+  return wrapped(schema.Object(shape, { ...options?.extra === 'strip' ? { 'x-kay-extra': 'strip' } : { additionalProperties: false }, ...rest(options, [...FIELD_KEYS, 'extra']), ...keywords(options ?? {}) }), options)
 }
 
 // An object of any keys, each holding `value`.
