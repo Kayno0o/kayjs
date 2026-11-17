@@ -2,6 +2,16 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.107.0
+
+### `action({ input, ...options }, handler)`
+
+An action takes its options first, with its input in them, as an API route does: `action({ input: { title: s.string() }, maxSize: '1mb' }, handler)`. `action(schema, handler, options)` and `action(handler, options)` work until 2.0; `kay upgrade` rewrites them (`deprecated-action-options`).
+
+### One validation for every input
+
+Actions, API routes, sockets, `defineEnv` and collections read their input through one `validate(schema, value, { source })`. Text sources (a form, a query, path params, the environment) are read as the numbers, booleans and lists they spell, and a JSON body never is: an action called from an island, a socket message and an API route's JSON body that sent `'3'` for an int, or `'true'` for a boolean, are refused where Elysia's schemas let them by. An object refuses a key its shape lacks in JSON and in a form (`extra: 'strip'` drops it); a query, the headers and the cookies of a request still drop theirs. A refusal is `{ errors: [{ path, key, params, message }], status: 422 }`, worded in the request's locale, and no longer depends on `NODE_ENV`.
+
 ## 1.106.0
 
 ### `s` is kay's own builder, in lowercase

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 
 import { check } from '../src/check'
+import { actionOptions } from '../src/check/action-options'
 import { actionReaders } from '../src/check/action-readers'
 import { actionType } from '../src/check/action-type'
 import { aiLanguage } from '../src/check/ai-language'
@@ -16,13 +17,13 @@ import { configGroups } from '../src/check/config-groups'
 import { configSwitches } from '../src/check/config-switches'
 import { contextImport } from '../src/check/context-import'
 import { envFiles } from '../src/check/env-files'
+
 import { applySafeFixes } from '../src/check/fixes'
 
 import { formatDurationNumbers } from '../src/check/format-duration'
-
 import { guardOptions } from '../src/check/guard-options'
-import { hookContext } from '../src/check/hook-context'
 
+import { hookContext } from '../src/check/hook-context'
 import { hookNames } from '../src/check/hook-names'
 import { i18nKeys } from '../src/check/i18n-keys'
 import { imagesKeys } from '../src/check/images-keys'
@@ -96,6 +97,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-import-path': movedImports,
   'deprecated-schema-type': schemaType,
   'deprecated-schema-builders': schemaBuilders,
+  'deprecated-action-options': actionOptions,
   'deprecated-test-helpers': testHelpers,
   'deprecated-cms-options': cmsOptions,
   'deprecated-hook-names': hookNames,

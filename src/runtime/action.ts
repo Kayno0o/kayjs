@@ -8,7 +8,8 @@ import { minTimeOf, resolveProtection, workOf } from './action-protection'
 import { ACTION, isAction } from './action-shared'
 import { durationSeconds } from './duration'
 import { KayError } from './kay-error'
-import { schemaOf } from './schema-record'
+import { isSchema, schemaOf } from './schema-record'
+import { isStandardSchema } from './standard-schema'
 import { ACTION_PREFIX } from './wire'
 
 export { actionStub, OUTCOME_SCRIPT, setRequestOutcome } from './action-call'
@@ -44,14 +45,21 @@ const emptySchema = () => ({ [Symbol.for('TypeBox.Kind')]: 'Object', type: 'obje
 
 // `action` as `kay check` reads it in a page's server fence, whose `ctx.params` are those of the page's route: not something to write.
 export interface ActionFor<Params extends Readonly<Record<string, unknown>>, Guarded extends object = object> {
+  <const Honeypot extends string = never, Output = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & { input?: undefined }, handler: (ctx: ActionContext<Params, string, Guarded>) => Output | Promise<Output>): NoInputAction<Settled<Output>, Honeypot>
+  <Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & { input: Spec }, handler: (input: Static<Spec>, ctx: ActionContext<Params, Extract<keyof Static<Spec>, string>, Guarded>) => Output | Promise<Output>): ServerAction<Spec, Settled<Output>, Honeypot>
+  <const Fields extends SchemaShape, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & { input: Fields }, handler: (input: Static<ObjectOf<Fields>>, ctx: ActionContext<Params, Extract<keyof Static<ObjectOf<Fields>>, string>, Guarded>) => Output | Promise<Output>): ServerAction<ObjectOf<Fields>, Settled<Output>, Honeypot>
   <Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(handler: (ctx: ActionContext<Params, string, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): NoInputAction<Settled<Output>, Honeypot>
   <Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Spec, handler: (input: Static<Spec>, ctx: ActionContext<Params, Extract<keyof Static<Spec>, string>, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<Spec, Settled<Output>, Honeypot>
   <const Fields extends SchemaShape, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(fields: Fields, handler: (input: Static<ObjectOf<Fields>>, ctx: ActionContext<Params, Extract<keyof Static<ObjectOf<Fields>>, string>, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<ObjectOf<Fields>, Settled<Output>, Honeypot>
 }
 
-// Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs, `schema` a plain record of fields as well as a schema.
-// Without a schema the action takes no input, as with an empty object schema, and its handler gets the context alone.
+// Declares a server action in a page's `--- server` fence: the options come first, as an API route's do, `input` a plain record of fields or any schema that kay checks the post against before `handler` runs.
+// Without an `input` the action takes no input, as with an empty object schema, and its handler gets the context alone.
+// The form before 1.107, `action(schema, handler, options)`, works until 2.0: the `deprecated-action-options` lint rewrites it.
 // kept: free, it registers a route answering a POST, which the page's own render never runs, and a kept page is refreshed after the first request that can write.
+export function action<const Honeypot extends string = never, Output = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & { input?: undefined }, handler: (ctx: ActionContext) => Output | Promise<Output>): NoInputAction<Settled<Output>, Honeypot>
+export function action<Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & { input: Spec }, handler: (input: Static<Spec>, ctx: ActionContext<RouteParams, Extract<keyof Static<Spec>, string>>) => Output | Promise<Output>): ServerAction<Spec, Settled<Output>, Honeypot>
+export function action<const Fields extends SchemaShape, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & { input: Fields }, handler: (input: Static<ObjectOf<Fields>>, ctx: ActionContext<RouteParams, Extract<keyof Static<ObjectOf<Fields>>, string>>) => Output | Promise<Output>): ServerAction<ObjectOf<Fields>, Settled<Output>, Honeypot>
 export function action<Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(handler: (ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): NoInputAction<Settled<Output>, Honeypot>
 export function action<Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Spec, handler: (input: Static<Spec>, ctx: ActionContext<RouteParams, Extract<keyof Static<Spec>, string>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<Spec, Settled<Output>, Honeypot>
 export function action<const Fields extends SchemaShape, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(fields: Fields, handler: (input: Static<ObjectOf<Fields>>, ctx: ActionContext<RouteParams, Extract<keyof Static<ObjectOf<Fields>>, string>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<ObjectOf<Fields>, Settled<Output>, Honeypot>
@@ -62,7 +70,31 @@ export function action(first: unknown, second?: unknown, third?: ActionProtectio
     return declare(emptySchema(), (_input, ctx) => handler(ctx), second as ActionProtection<string> | undefined)
   }
 
+  if (third === undefined && isOptions(first)) {
+    const { input, ...options } = first as { input?: Schema | SchemaShape }
+    const handler = second as (...args: unknown[]) => unknown
+
+    // Without an `input` the handler takes the context alone, though an empty record before 1.107 gave it `(input, ctx)`.
+    return declare(input === undefined ? emptySchema() : schemaOf(input), input === undefined && handler.length < 2 ? (_input, ctx) => handler(ctx) : handler as (input: unknown, ctx: ActionContext) => unknown, options as ActionProtection<string>)
+  }
+
   return declare(schemaOf(first as Schema | SchemaShape), second as (input: unknown, ctx: ActionContext) => unknown, third)
+}
+
+// Whether the first argument is the options of the form since 1.107, not the schema or the record of fields of the form before: an object that names an `input` which is a record or an object schema, or names no field at all.
+function isOptions(first: unknown): boolean {
+  if (typeof first !== 'object' || first === null || isSchema(first) || isStandardSchema(first))
+    return false
+
+  const entries = Object.entries(first)
+
+  if ('input' in first) {
+    const { input } = first as { input: unknown }
+
+    return typeof input === 'object' && input !== null && (isStandardSchema(input) || !isSchema(input) || (input as { type?: unknown }).type === 'object')
+  }
+
+  return !entries.some(([, value]) => isSchema(value) || isStandardSchema(value))
 }
 
 export function declare(schema: Schema, handler: (input: unknown, ctx: ActionContext) => unknown, options: ActionProtection<string> | undefined): ServerAction<Schema, unknown> {

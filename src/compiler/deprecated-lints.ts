@@ -2,10 +2,12 @@ import type { Lint } from './lints'
 import { AUTH_LINTS } from './deprecated-auth-lints'
 import { SCHEMA_BUILDERS } from './deprecated-lints-1-106'
 import { TYPED_DEPRECATIONS } from './deprecated-typed-lints'
+import { ACTION_OPTIONS } from './deprecated-lints-1-107'
 
 // The lints of the `deprecated` group, with the other lints in `LINTS`; each stays three minors from its `since`.
 export const DEPRECATED_LINTS = {
   ...SCHEMA_BUILDERS,
+  ...ACTION_OPTIONS,
   'deprecated-source-readers': {
     level: 'warn',
     group: 'deprecated',
