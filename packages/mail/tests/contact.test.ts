@@ -10,11 +10,12 @@ import { outbox } from '../src/outbox'
 const SINK = Symbol.for('kay.log')
 
 interface Answers { name: string, email: string, phone?: string, topic: 'quote' | 'other', message: string }
+type Basic = Pick<Answers, 'name' | 'email' | 'message'>
 
 // Imported by path, as the fixture is no part of this package's type check.
 const { contact } = await import(`${import.meta.dir}/fixture/src/routes/contact.kay`) as { contact: Action<Answers, unknown> }
-const { consented } = await import(`${import.meta.dir}/fixture/src/routes/consent.kay`) as { consented: Action<Answers & { consent?: boolean, website?: string, nectar?: string }, unknown> }
-const { noRecipient, serverDown, slowRelay, worded, unrendered } = await import(`${import.meta.dir}/fixture/src/routes/broken.kay`) as Record<'noRecipient' | 'serverDown' | 'slowRelay' | 'worded' | 'unrendered', Action<Answers, unknown>>
+const { consented } = await import(`${import.meta.dir}/fixture/src/routes/consent.kay`) as { consented: Action<Basic & { consent?: boolean, website?: string, nectar?: string }, unknown> }
+const { noRecipient, serverDown, slowRelay, worded, unrendered } = await import(`${import.meta.dir}/fixture/src/routes/broken.kay`) as Record<'noRecipient' | 'serverDown' | 'slowRelay' | 'worded' | 'unrendered', Action<Basic, unknown>>
 const { delivery } = await import(`${import.meta.dir}/fixture/src/counter`) as typeof import('./fixture/src/counter')
 
 // Spread into `action`, the form keeps its input typed: the extra field is there, and a field it does not have is refused.
@@ -25,7 +26,7 @@ const dropped: Action<{ nope: number }, unknown, 'website'> = typed
 
 const fields: Answers = { name: 'Ada Lovelace', email: 'ada@example.com', phone: '06 12 34 56 78', topic: 'quote', message: 'Hello,\nI would like a quote.' }
 // What a form with no extra field takes: a call is refused a key its schema does not name.
-const basic = { name: fields.name, email: fields.email, message: fields.message }
+const basic: Basic = { name: fields.name, email: fields.email, message: fields.message }
 
 void [held, dropped]
 
@@ -73,7 +74,7 @@ describe('contactForm', () => {
 
   it('answers 503 with the way else to reach the site when the mail has no recipient', async () => {
     const { refusal } = await site()
-    const refused = await refusal(noRecipient, basic as Answers)
+    const refused = await refusal(noRecipient, basic)
 
     expect(refused.status).toBe(503)
     expect(refused.errors['']).toBe('The form cannot send messages yet: write to hello@fixture.test.')
@@ -82,14 +83,14 @@ describe('contactForm', () => {
   it('answers success while the mail server is down, the mail waiting in the queue to be retried', async () => {
     const { call } = await site()
 
-    expect(await call(serverDown, basic as Answers)).toBeUndefined()
+    expect(await call(serverDown, basic)).toBeUndefined()
   })
 
   it('does not wait on the transport, which a slow relay holds up', async () => {
     const { call } = await site()
 
     delivery.sent = false
-    await call(slowRelay, basic as Answers)
+    await call(slowRelay, basic)
     expect(delivery.sent).toBe(false)
   })
 
@@ -166,7 +167,7 @@ describe('contactForm', () => {
     global[SINK] = (...args: unknown[]) => calls.push(args)
 
     try {
-      expect((await refusal(unrendered, basic as Answers)).status).toBe(502)
+      expect((await refusal(unrendered, basic)).status).toBe(502)
     }
     finally {
       global[SINK] = sink
