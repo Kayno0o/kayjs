@@ -60,7 +60,7 @@ function auth(options: AuthExtensionOptions): AuthPages<PluginInput>
 class Auth
   new <Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>>(session: Session<AuthSessionData>, core: Core, request: Request, client: string, address: string): Auth<Scope, Role, OrgRole, UserData>
   account: AccountMethods
-  admin: AdminMethods<Role>
+  admin: AdminMethods<Role, UserData>
   adminUser: () => Promise<User<UserData>>
   audit: AuditMethods
   bareUser: () => Promise<BareUser<UserData> | null>
@@ -73,7 +73,7 @@ class Auth
   establish: (record: UserRecord, method: string) => Promise<void>
   features: () => AuthFeatures
   genuine: (signedIn: SignedIn) => Promise<boolean>
-  groups: Partial<Groups<Scope, Role, OrgRole>>
+  groups: Partial<Groups<Scope, Role, OrgRole, UserData>>
   guarded: (ctx: GuardContext, options: {
   redirect?: string | undefined;
   require?: Requirement<BareUser<Record<string, unknown>>, string> | undefined;

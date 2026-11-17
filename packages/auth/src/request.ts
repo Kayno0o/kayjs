@@ -104,7 +104,7 @@ function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, 
   }
 }
 
-interface Groups<Scope extends string, Role extends string, OrgRole extends string> {
+interface Groups<Scope extends string, Role extends string, OrgRole extends string, UserData extends object> {
   password: PasswordMethods
   email: EmailMethods
   magicLink: MagicLinkMethods
@@ -113,7 +113,7 @@ interface Groups<Scope extends string, Role extends string, OrgRole extends stri
   sessions: SessionMethods
   tokens: TokenMethods<Scope>
   oauthServer: OAuthServerMethods
-  admin: AdminMethods<Role>
+  admin: AdminMethods<Role, UserData>
   organizations: OrganizationMethods<OrgRole>
   account: AccountMethods
   oauth: OAuthMethods
@@ -131,7 +131,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   private tokenScopes: string[] | null = null
   private linked = new WeakMap<UserRecord, Promise<User['providers']>>()
   // Each group of methods, made on its first use.
-  private readonly groups: Partial<Groups<Scope, Role, OrgRole>> = {}
+  private readonly groups: Partial<Groups<Scope, Role, OrgRole, UserData>> = {}
 
   private readonly session: Session<AuthSessionData>
   // Set-Cookie lines this request's sign-in or sign-out adds to its response, which the plugin sends.
@@ -259,8 +259,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Listing, banning and impersonating users and granting them roles, for the `admin` option's users.
-  get admin(): AdminMethods<Role> {
-    return this.groups.admin ??= new AdminMethods<Role>(this[STATE], async () => this.adminUser() as unknown as Promise<User>)
+  get admin(): AdminMethods<Role, UserData> {
+    return this.groups.admin ??= new AdminMethods<Role, UserData>(this[STATE], async () => this.adminUser())
   }
 
   // The organizations of the `organizations` option.
@@ -353,7 +353,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   /** @deprecated Use `admin.require()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
   async requireAdmin(): Promise<User<UserData>> {
-    return this.admin.require() as Promise<User<UserData>>
+    return this.admin.require()
   }
 
   // What `admin.require()` answers with.

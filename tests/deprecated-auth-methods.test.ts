@@ -44,7 +44,7 @@ describe('deprecated-auth-methods', () => {
 
     expect(text['src/a.ts']).toBe([
       'export async function run(auth: Auth, locals: Locals) {',
-      '  await auth.requireAdmin()',
+      '  await auth.admin.require()',
       '  await locals.auth.organizations.listMembers(org)',
       '  await locals.auth.organizations.deleteMember(org, id)',
       '  await locals.auth.account.updateProfile(values)',
@@ -62,7 +62,7 @@ describe('deprecated-auth-methods', () => {
     })
 
     expect(found).toHaveLength(1)
-    expect(text['src/page.kay']).toBe('--- server\nconst auth = ctx.locals.auth\nawait auth.requireAdmin()\nawait auth.admin.require()\nawait team.members(org)\nawait mailer.reprove()\nawait auth.organizations.listMembers(org)\n---\np x\n')
+    expect(text['src/page.kay']).toBe('--- server\nconst auth = ctx.locals.auth\nawait auth.admin.require()\nawait auth.admin.require()\nawait team.members(org)\nawait mailer.reprove()\nawait auth.organizations.listMembers(org)\n---\np x\n')
   })
 
   it('keeps `members` of a receiver that is not an auth', async () => {

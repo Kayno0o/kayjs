@@ -6,11 +6,11 @@ import type { RequestState } from '../state'
 import { load } from '../load'
 
 // `auth.admin`: what the `admin` option's users may do to other users, every method answering `forbidden` for anyone else.
-export class AdminMethods<Role extends string = string> {
-  constructor(private readonly state: RequestState, private readonly asking: () => Promise<User>) {}
+export class AdminMethods<Role extends string = string, UserData extends object = Record<string, unknown>> {
+  constructor(private readonly state: RequestState, private readonly asking: () => Promise<User<UserData>>) {}
 
   // The signed-in admin, as themselves, for an admin page to ask for: 404 while the `admin` option names no one (a `Denied`, which a plain Elysia app answers too), a visitor sent to sign in as `requireUser()` does, and 403 for anyone else, an admin acting as a user and a bearer token included.
-  async require(): Promise<User> {
+  async require(): Promise<User<UserData>> {
     return this.asking()
   }
 

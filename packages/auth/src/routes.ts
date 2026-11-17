@@ -20,7 +20,7 @@ const UNSAFE_FILE_NAME = /[^\w.-]/g
 
 // What the routes read of Elysia's context.
 interface RouteContext {
-  auth: Pick<Auth, typeof STATE | 'account' | 'signOut' | 'admin'>
+  auth: Pick<Auth, typeof STATE | 'account' | 'signOut'> & { admin: Pick<Auth['admin'], 'stopImpersonating'> }
   request: Request
   body: unknown
   query: Record<string, unknown>
