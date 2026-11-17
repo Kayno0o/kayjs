@@ -4,6 +4,7 @@ import type { MarkdownOptions } from './markdown'
 import { Marked, Tokenizer } from 'marked'
 import { escapeMarkdownText as escape } from './escape'
 import { sanitizedMarkdown, withInline } from './markdown'
+import { autolinkLength, endsAutolink, opensAutolink, startsAutolink } from './markdown-autolink'
 import { vouch } from './safe-html'
 
 const TEXT_ESCAPED = /&(?![a-z][a-z\d]{1,31};)|[<>"]/gi
@@ -11,6 +12,8 @@ const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;'
 const REFERENCE = /&(?:#(\d{1,7})|#x([\da-f]{1,6})|(amp|lt|gt|quot|apos|nbsp));/gi
 const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: '\u00A0' }
 const FIRST_WORD = /^\S*/
+const PROTOCOL = /^(?:mailto|xmpp):/i
+const LABEL = /^(?:https?|ftp):\/\/[\w.-]*|^www\.[\w.-]*/i
 const BARE_TASK = /^\[([ x])\]$/i
 const TRAILING_LINES = /\n+$/
 const LINE_INDENT = /^[ \t]+/gm
@@ -136,7 +139,35 @@ function within(src: string, maskedSrc: string): [string, string] {
   return [src.slice(0, DELIMITER_REACH), maskedSrc.slice(0, maskedSrc.length - src.length + Math.min(src.length, DELIMITER_REACH))]
 }
 
+// marked's address autolink where Bun.markdown ends it too.
+function emailToken(tokenizer: Tokenizer, src: string): Tokens.Link | undefined {
+  const token = DEFAULTS.url.call(tokenizer, src)
+
+  return token && endsAutolink(src, token.raw.length) ? token : undefined
+}
+
+// The tokens Bun.markdown writes for a bare URL: it links where md4c does, and a URL stuck to the text before it stays text.
 const tokenizer: TokenizerObject = {
+  url(src) {
+    if (!startsAutolink(src))
+      return PROTOCOL.test(src) ? undefined : emailToken(this, src)
+
+    const length = autolinkLength(src)
+    const raw = src.slice(0, length)
+
+    return length === 0 ? undefined : { type: 'link', raw, text: raw, href: raw.toLowerCase().startsWith('www.') ? `http://${raw}` : raw, autolink: true, tokens: [{ type: 'text', raw, text: raw }] }
+  },
+  inlineText(src) {
+    const token = DEFAULTS.inlineText.call(this, src)
+
+    if (token === undefined || opensAutolink(token.raw))
+      return token
+
+    const rest = src.slice(token.raw.length)
+    const glued = startsAutolink(rest) ? LABEL.exec(rest)![0] : emailToken(this, rest)?.raw
+
+    return glued === undefined ? token : { ...token, raw: token.raw + glued, text: token.text + glued }
+  },
   emStrong(src, maskedSrc, prevChar) {
     return src.length > DELIMITER_REACH && DEFAULTS.emStrong.call(this, ...within(src, maskedSrc), prevChar)
   },

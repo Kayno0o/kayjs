@@ -152,11 +152,9 @@ describe('markdownHtml', () => {
     expect<string>(markdownHtml('<h2 id="x" class="y">t</h2>')).toBe('<h2>t</h2>\n')
   })
 
-  it('leaves as written the named references Bun.markdown decodes, links a URL with parentheses it leaves as text, and misses a task whose text is a heading', () => {
+  it('leaves as written the named references Bun.markdown decodes and misses a task whose text is a heading', () => {
     expect<string>(islandMarkdown('&copy;')).toBe('<p>&copy;</p>\n')
     expect<string>(markdownHtml('&copy;')).toBe('<p>©</p>\n')
-    expect<string>(islandMarkdown('https://a.b/(c)')).toContain('<a href="https://a.b/(c)"')
-    expect<string>(markdownHtml('https://a.b/(c)')).toBe('<p>https://a.b/(c)</p>\n')
     expect(islandMarkdown('- [ ] title\n  ---')).not.toContain('task-list-item')
     expect(markdownHtml('- [ ] title\n  ---')).toContain('task-list-item')
   })
@@ -190,6 +188,48 @@ describe('markdownHtml', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('markdownHtml autolinks', () => {
+  const AUTOLINKS = [
+    '[[https://x.y/?a=1&b=2]]',
+    '[https://x.y] (https://x.y/a) {https://x.y}',
+    'See https://x.y/a, https://x.y/b. And https://x.y/c! Or https://x.y/d?',
+    'https://x.y/?a=1&b=2 and https://x.y/?a=1&amp;b=2 and https://x.y/?a=1&#38;b=2',
+    '*https://x.y/a* and _https://x.y/b_ and **see https://x.y/c now** and *a https://x.y/d b*.',
+    'www.x.y/a (www.x.y) www.x.y.',
+    'a@b.co, mail a@b.co. (a@b.co) <a@b.co>',
+    'mailto:a@b.co and a@b.co: and a@b.co=',
+    'xhttps://x.y a.https://x.y/a /https://x.y/a "https://x.y/a" \'https://x.y/a\'',
+    'https://x.y/a_ https://x.y/a- https://x.y/a:b https://x.y/a=b http://x ftp://x.y/a',
+    'https://x.y/a_b https://x.y/a-b https://x.y/a~b https://x.y/?q=(a) https://x.y/(a)',
+    'https://x.y/a#frag. https://x.y/a?b=c;d=e https://x.y/a/b/ https://x.y/~u/',
+    '[a](https://x.y) https://x.y `https://x.y` <https://x.y>',
+    '> https://x.y/a.\n\n- https://x.y/b,\n- [ ] https://x.y/c\n\n# https://x.y/d\n\n| https://x.y/e |\n|-|',
+  ]
+
+  it('links a URL where Bun.markdown does, on the server and in an island', () => {
+    for (const markdown of AUTOLINKS)
+      expect(islandMarkdown(markdown)).toBe(markdownHtml(markdown))
+  })
+
+  it('cuts a URL beside any one character as Bun.markdown does', () => {
+    const bases = ['https://x.y', 'https://x.y/a', 'https://x.y/?q=1', 'https://x.y#f', 'www.x.y/a', 'see https://x.y/a', '(https://x.y/a', '[https://x.y/a', 'a@b.co']
+
+    for (const base of bases) {
+      for (const char of '.,!?;:_-~=&%+$#/()[]*\'"@<>{}|^\\` ') {
+        for (const tail of ['', 'b', ' b', 'b)', ']]'])
+          expect(islandMarkdown(`${base}${char}${tail}`)).toBe(markdownHtml(`${base}${char}${tail}`))
+      }
+    }
+  })
+
+  it('draws the app\'s inline syntax around a URL the same on both sides', () => {
+    const inline = [{ pattern: /\[\[([^\]]+)\]\]/, render: ([, name]: string[]) => ({ text: name!, href: `#note:${encodeURIComponent(name!)}` }) }]
+
+    for (const markdown of ['[[https://x.y/?a=1&b=2]] and [[a]] https://x.y/b.', '*[[https://x.y]]* ([[b]])'])
+      expect(islandMarkdown(markdown, { inline })).toBe(markdownHtml(markdown, { inline }))
   })
 })
 

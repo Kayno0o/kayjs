@@ -529,6 +529,8 @@ Text set through `innerHTML`, from `markdownHtml`, `renderMarkdown` or `sanitize
 
 A link leaving your site opens in a new tab with `rel="nofollow ugc noopener"`, the server and the island alike, unless you set `client: { links: { outside: 'same-tab' } }`.
 
+A bare URL or address in the text becomes a link on the server and in an island alike, cut at the same place: a `.`, `,` or closing bracket after it stays outside, and `[[https://example.com/?a=1&b=2]]` links the URL, not its brackets. One URL a writer closes with its emphasis, such as `**https://example.com/a**`, still differs: Bun links the closing marks too.
+
 A fenced block keeps its language as `class="language-ts"` on its `code`, so a page can name the language over the block; `code` keeps no other class.
 
 `markdownHtml(text, { inline })` draws your own inline syntax, such as `[[note]]` links, the same on the server and in an island. Each entry has a `pattern` and a `render` that gets the match with its groups as plain text and returns text, a link `{ text, href }`, or `undefined` to leave the match as written. Text is escaped and a link goes through `sanitizeHtml`, so a hook never opens a way to run script whatever the text holds.
