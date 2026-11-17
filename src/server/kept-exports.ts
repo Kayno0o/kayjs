@@ -91,6 +91,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   trustHtml: 'free',
   uid: 'free',
   untrack: 'free',
+  validate: 'free',
   watch: 'free',
   webPush: 'free',
   withBase: 'free',

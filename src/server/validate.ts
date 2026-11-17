@@ -317,6 +317,7 @@ async function standard(schema: object, source: Source, value: unknown, trim: bo
 }
 
 // The value a schema reads from `source`, or where and why it is refused: the one path every input of kay goes through, an action's, an API route's, a socket's message, the environment and the browser's check of a form. A Standard Schema validator may be async, which a caller that cannot await reads with `validateNow`.
+// kept: free, the locale and source come from its caller.
 export async function validate<Value = unknown>(schema: object, value: unknown, { source, locale, trim = true }: ValidateOptions): Promise<Validated<Value>> {
   const run = async (): Promise<Validated> => {
     if (isStandardSchema(schema))
