@@ -310,7 +310,7 @@
     "kay": "link:.",
     "mitata": "1.0.34",
     "playwright-core": "1.64.1",
-    "shiki": "^4.5.0",
+    "shiki": "^4.6.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "typescript7": "npm:typescript@^7.0.2"
