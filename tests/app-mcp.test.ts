@@ -206,10 +206,57 @@ describe('the endpoint', () => {
     await expect(testSite({ requireGuards: false, dirs: { routes: 'tests/fixtures/mcp-clash/src/routes', api }, mcp: true, endpoints: { mcp: '/mcp' }, islands: false })).rejects.toThrow('`mcp` both serve /mcp')
   })
 
-  it('keeps a page at the former /mcp, which then redirects nowhere', async () => {
+  it('answers the former /mcp in place, as the endpoint does, for an app that did not move it', async () => {
+    const ask = async (target: typeof site, path: string, method = 'POST') => target.fetch(path, { method, headers: { 'content-type': 'application/json' }, body: method === 'POST' ? JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) : null, redirect: 'manual' })
+    const answered = await ask(site, '/mcp')
+
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toEqual({ jsonrpc: '2.0', id: 1, result: {} })
+    expect((await ask(site, '/mcp/')).status).toBe(200)
+    expect((await ask(site, '/mcp?x=1')).status).toBe(200)
+    expect((await ask(mounted, '/mcp')).status).toBe(200)
+    expect((await ask(mounted, '/mcp/')).status).toBe(200)
+    expect((await ask(dev, '/mcp')).status).toBe(200)
+
+    for (const method of ['GET', 'DELETE']) {
+      const refused = await ask(site, '/mcp', method)
+
+      expect(refused.status).toBe(405)
+      expect(refused.headers.get('allow')).toBe('POST')
+    }
+  })
+
+  it('holds the former /mcp to the limits and the checks of the endpoint', async () => {
+    const big = await site.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping', params: { pad: 'x'.repeat(1_100_000) } }) })
+    const foreign = await site.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', 'origin': 'https://evil.example' }, body: '{}' })
+
+    expect(big.status).toBe(413)
+    expect(foreign.status).toBe(403)
+  })
+
+  it('does not serve /mcp once the app moved the endpoint', async () => {
+    const moved = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, endpoints: { mcp: '/tools' } })
+
+    try {
+      expect((await moved.fetch('/mcp', { method: 'POST', body: '{}' })).status).toBe(404)
+      expect((await moved.fetch('/tools', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) })).status).toBe(200)
+    }
+    finally {
+      await moved.close()
+    }
+  })
+
+  it('keeps a page at the former /mcp, while the endpoint answers at its own path', async () => {
     const kept = await testSite({ requireGuards: false, dirs: { routes: 'tests/fixtures/mcp-clash/src/routes', api }, mcp: true, islands: false })
 
-    expect((await kept.fetch('/mcp')).status).toBe(200)
+    try {
+      expect((await kept.fetch('/mcp')).status).toBe(200)
+      expect((await kept.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) })).headers.get('content-type') ?? '').not.toContain('json')
+      expect((await kept.fetch('/_kay/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) })).status).toBe(200)
+    }
+    finally {
+      await kept.close()
+    }
   })
 })
 

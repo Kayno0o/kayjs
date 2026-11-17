@@ -21,6 +21,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check --fix` rewrites what the 1.105 types refuse in an app still on the old forms: a function handed by name to a library component's callback (`deprecated-callback-handler`), an island call read as its data (`deprecated-call-result`, `.orThrow()` after the call), the `mcpKey` and `proxyKey` options of `testSite()`, and the `fonts`, `favicon` and `observe` keys in the `config` of an extension, which work until 1.108 ([upgrading](upgrading.md)).
 - `kay check --fix` rewrites an old package name only where it is a specifier, a `require()` or `import()` argument, a config key, a stylesheet `@import` or `@plugin` path or a package.json entry, no longer a string of data that names one; and `deprecated-link-flags` reaches the app's test files, rewriting `[data-keep-scroll]` selectors to `[data-scroll=keep]` and reporting an attribute read by name ([deprecated lints](deprecated-lints.md)).
 - `ctx.deny(status, { message })` in an action fails the post as `{ data }` does, the form showing the message and a call throwing an `ActionError` carrying it, in place of a bare status; the `deprecated-ctx-fail` fixer writes a text as `message` ([Refused posts](actions.md#refused-posts))
+- The former `/mcp` answers the MCP endpoint in place until 2.0 for an app that did not set `endpoints.mcp`, where 1.105 sent it to `/_kay/mcp` with a 308 an MCP client does not follow; a page or route of the app at `/mcp` keeps it ([MCP](mcp.md), [upgrading](upgrading.md)).
 
 ## 1.105.0
 

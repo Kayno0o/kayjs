@@ -16,7 +16,7 @@ import { configuredSite } from '../runtime/site'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { decodeServerValue, encodeValue } from '../runtime/wire'
 import { boundToPage } from './actions'
-import { FORMER_MCP_PATH, RESOURCE_METADATA } from './api-modules'
+import { RESOURCE_METADATA } from './api-modules'
 import { isCrossSite, postedFrom, unadmittedCrossSite } from './cross-site'
 import { answeredAsPage, currentRequest } from './log'
 import { bearsMcpKey } from './mcp-key'
@@ -403,6 +403,8 @@ export interface McpOptions {
   metadataPaths: string[]
   // Where the endpoint is served, `/mcp` by default.
   path: string
+  // The path before 1.105, answered as `path` is until 2.0, for an app that did not move the endpoint and serves nothing there.
+  former?: string | undefined
   // The requests a client may send it in a window, or undefined for no limit.
   rateLimit: RateWindowMs | undefined
   // Sent as `instructions` of `initialize`, from `mcp.instructions`.
@@ -587,7 +589,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
   }
   const notAllowed = () => new Response(null, { status: 405, headers: { allow: 'POST' } })
 
-  app.post(options.path, async (served) => {
+  const answer = async (served: { request: Request, server: Server | null }) => {
     const { request, server } = served
 
     // A browser page of another site posting here would act with the visitor's cookies.
@@ -637,18 +639,15 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
       status = 401
 
     return new Response(JSON.stringify(reply), { status, headers })
-  }, { parse: 'none' })
-  app.get(options.path, notAllowed)
-  app.delete(options.path, notAllowed)
-  serveResourceMetadata(app, options.title, options.metadataPaths, options.path)
-}
+  }
 
-// Sends a request for `/mcp`, where the endpoint was served before 1.105, to its path now, with the method, the body and the query kept by a 308; removed in 1.108.
-export function redirectFormerMcp(app: Elysia, to: string): void {
-  app.all(FORMER_MCP_PATH, ({ request }) => {
-    // The base goes in front of the location as it does for every redirect.
-    return new Response(null, { status: 308, headers: { 'location': `${to}${requestUrl(request).search}`, 'cache-control': 'no-store' } })
-  })
+  for (const path of options.former === undefined ? [options.path] : [options.path, options.former]) {
+    app.post(path, answer, { parse: 'none' })
+    app.get(path, notAllowed)
+    app.delete(path, notAllowed)
+  }
+
+  serveResourceMetadata(app, options.title, options.metadataPaths, options.path)
 }
 
 // An action a library offers a model: what the model reads of it, and the call it makes.

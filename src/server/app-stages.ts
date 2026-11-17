@@ -64,7 +64,7 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { liveConnections, serveLive } from './live'
 import { warnOfLocalFiles } from './local-files'
 import { announceStart, loggerOf, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
-import { mcpBodyLimit, receiveDispatched, redirectFormerMcp, serveMcp, serveToolCallsThrough } from './mcp'
+import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
 import { FORMER_METRICS_PATH, METRICS_PATH, metricsOf, serveMetrics } from './metrics'
 import { newTabStyles } from './new-tab'
 import { countMissing, knowRedirects } from './not-found'
@@ -218,7 +218,7 @@ export function bootOf(input: BootInput) {
     hasPreview: options.preview !== undefined && options.preview !== false,
     metrics,
     formerMetrics,
-    // Where the MCP endpoint was served before 1.105, redirected to its path now until 1.108 by an app that did not move it, unless an app file serves something there.
+    // Where the MCP endpoint was served before 1.105, answered as the endpoint is until 2.0 by an app that did not move it, unless an app file serves something there.
     formerMcp,
     health,
     registered,
@@ -577,7 +577,7 @@ type Served = Awaited<ReturnType<typeof appRoutes>>
 // The rules a redirect added while the site runs is checked against, the API's claims and the body limits of every route. Returns where the OpenAPI document and the MCP metadata go.
 // Not async, as the closures the runtime redirects keep past the app would hold an async function's parameters, the app among them.
 export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api, endpointLimits }: Served, servers: unknown[]) {
-  const { app, env, options, served, setup: { client }, table, hasPreview, mcpAt } = boot
+  const { app, env, options, served, setup: { client }, table, hasPreview, mcpAt, formerMcp } = boot
   // Claimed before kay's own files, which give way to them.
   const openapi = openApiSettings(options.openapi)
   const apiAt = apiPathOf(options.endpoints?.api)
@@ -604,14 +604,16 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api, endpoint
     }
   }
 
-  limitBodies(app, options.limits?.body ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), mountLimits(api.limits, options.extensions, options.limits?.byPath, servers), [...api.routeLimits, ...endpointLimits])
+  const formerAt = formerMcp && served.offer(formerMcp) ? formerMcp.path : undefined
 
-  return { openapi, apiAt, servesOpenApi, metadataPaths }
+  limitBodies(app, options.limits?.body ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const], ...formerAt === undefined ? [] : [[formerAt, mcpBodyLimit] as const]]), mountLimits(api.limits, options.extensions, options.limits?.byPath, servers), [...api.routeLimits, ...endpointLimits])
+
+  return { openapi, apiAt, servesOpenApi, metadataPaths, formerAt }
 }
 
 // The OpenAPI document and the MCP endpoint, registered last before the pages.
-export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }: Served, actionOptions: ActionOptions, { openapi, apiAt, servesOpenApi, metadataPaths }: ReturnType<typeof limitBodiesAndClaimApi>): Promise<void> {
-  const { app, env, options, required, served, formerMcp, setup: { locales }, project: { paths }, mcpAt, mcpKey } = boot
+export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }: Served, actionOptions: ActionOptions, { openapi, apiAt, servesOpenApi, metadataPaths, formerAt }: ReturnType<typeof limitBodiesAndClaimApi>): Promise<void> {
+  const { app, env, options, required, setup: { locales }, project: { paths }, mcpAt, mcpKey } = boot
 
   // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
   const document = servesOpenApi || mcpAt !== undefined
@@ -626,11 +628,7 @@ export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }:
     serveOpenApi(app, document, openapi, await covering(false), actionOptions, apiAt, options.endpoints?.openapi)
 
   if (mcpAt !== undefined && document) {
-    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base: env.base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt, rateLimit: mcpRateLimit(options.mcp), instructions: mcpInstructions(options.mcp), key: mcpKey, dev: env.dev, outputs: actionOptions.toolOutputs })
-
-    // Where the endpoint was served before 1.105, sent to the new path with a 308 until 1.108 by an app that did not move it, unless the app serves something there.
-    if (formerMcp && served.offer(formerMcp))
-      redirectFormerMcp(app, mcpAt)
+    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base: env.base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt, former: formerAt, rateLimit: mcpRateLimit(options.mcp), instructions: mcpInstructions(options.mcp), key: mcpKey, dev: env.dev, outputs: actionOptions.toolOutputs })
   }
 }
 

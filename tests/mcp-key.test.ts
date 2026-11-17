@@ -417,15 +417,13 @@ describe('behind proxy.key', () => {
     await refused(await post(app, message('ping'), {}, '/tools'))
   })
 
-  it('opens the former /mcp, which redirects, until the app moves the endpoint', async () => {
+  it('opens the former /mcp, answered in place, until the app moves the endpoint', async () => {
     const app = await served(production, { proxy, mcp: { token: true, rateLimit: false } })
     const moved = await served(production, { proxy, mcp: { token: true }, endpoints: { mcp: '/tools' } })
 
-    const redirected = await post(app, message('ping'), bearer(KEY), '/mcp?x=1')
-
-    expect(redirected.status).toBe(308)
-    expect(redirected.headers.get('location')).toBe('/_kay/mcp?x=1')
-    expect((await post(app, message('ping'), bearer(KEY), '/mcp/')).status).toBe(308)
+    expect((await post(app, message('ping'), bearer(KEY), '/mcp?x=1')).status).toBe(200)
+    expect((await post(app, message('ping'), bearer(KEY), '/mcp/')).status).toBe(200)
+    await refused(await post(app, message('ping'), {}, '/mcp'))
     expect((await post(moved, message('ping'), bearer(KEY), '/mcp')).status).toBe(403)
   })
 
