@@ -225,7 +225,7 @@ nav
   SignOutButton(redirect="/goodbye" variant="ghost")
 ```
 
-- `SignedIn` renders its children for a signed-in user, and with `require` for one meeting it, what `auth.guard({ require })` takes: a role under the app's `roles` hierarchy, a list of which any one passes, or a predicate that answers at once. Its `@else` block renders for anyone who does not meet that: a visitor, a guest or a signed-in user lacking `require`.
+- `SignedIn` renders its children for a signed-in user, and with `require` for one meeting it, what `auth.guard({ require })` takes: a role under the app's `roles` hierarchy, a list of which any one passes, or a predicate that answers at once from the user alone, with no route params. Its `@else` block renders for anyone who does not meet that: a visitor, a guest or a signed-in user lacking `require`.
 - `SignedIn(role=)` and `SignedOut` of earlier versions work until 1.108; `kay upgrade` renames `role` to `require`, and the children of a `SignedOut` go into an `@else` block by hand.
 - `UserMenu` shows the username or email, a link to the account when the prebuilt pages are on (`account={false}` leaves it out), its children and a sign-out button (`redirect` names where it goes). A visitor gets a link to the sign-in page instead, `signIn={false}` leaving it out. The account pages' own header is one.
 - `SignOutButton` takes `redirect` (put in the page's locale; the pages' `home` by default), `label` (children follow it), and a Button's `variant`, `tone`, `size` and `icon`; `class` styles the form and `parts={{ button: '...' }}` the button.
