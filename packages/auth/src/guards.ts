@@ -1,4 +1,4 @@
-import type { Guard } from 'kay'
+import type { Duration, Guard } from 'kay'
 import type { BareUser, Core } from './core'
 import type { ScopeRequirement } from './gate'
 import type { AuthRequirement } from './request'
@@ -7,13 +7,15 @@ import { READ_METHODS } from 'kay/library'
 import { guardPageOf, isNavigation, withBack } from './core'
 import { authGate, scopeAllows } from './gate'
 import { load } from './load'
-import { authOf, STATE } from './request'
+import { authOf, freshMs, STALE_PROOF, STATE } from './request'
 import { lacksTwoFactor, sendToEnrolment } from './requiredTwoFactor'
 
 export interface RouteGuardOptions<Role extends string, Scope extends string> {
   redirect?: string | undefined
   require?: AuthRequirement<Role> | undefined
   scope?: ScopeRequirement<Scope> | undefined
+  // A duration such as `'10m'`: the user must have signed in or re-proved (`auth.reprove`) within it, else a 403 whose `data.code` is `'stale'`, for the page to ask for the password or the passkey again. A bearer token never has, so it is refused.
+  fresh?: Duration | undefined
   // true asks every user this guard lets through for two-factor; left out, `twoFactor.require` of the app decides. The security page and the second-factor page are never held back, whatever guard runs.
   twoFactor?: true | undefined
 }
@@ -24,6 +26,8 @@ const signedIn: Predicate<BareUser> = user => user !== null
 // A scoped bearer token passes only with one of `scope`. A user lacking a two-factor the app asks of them (`twoFactor`) goes to the security page when opening a page, else gets a 403.
 export function guardOf<Role extends string, Scope extends string>(core: Core, options: RouteGuardOptions<Role, Scope> = {}): Guard {
   const redirect = options.redirect === undefined || options.redirect === '' ? guardPageOf(core) : options.redirect
+  // Read here so a value that is no duration fails when the guard is made.
+  const fresh = options.fresh === undefined ? undefined : freshMs(options.fresh)
 
   return async (ctx) => {
     const user = await authOf(ctx.locals).bareUser()
@@ -43,6 +47,9 @@ export function guardOf<Role extends string, Scope extends string>(core: Core, o
 
     if (!scopeAllows(await authOf(ctx.locals).scopes(), options.scope))
       ctx.deny(403)
+
+    if (fresh !== undefined && !(await authOf(ctx.locals).provedLately(options.fresh)))
+      ctx.deny(403, STALE_PROOF)
 
     if (user !== null && await lacksTwoFactor(authOf(ctx.locals)[STATE], user, { wanted: options.twoFactor, path: ctx.url.pathname, locale: ctx.locale, ctx: { params: ctx.params } }))
       sendToEnrolment(core, ctx.request, ctx)

@@ -204,7 +204,7 @@ Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: 
 
 ## The signed-in user in templates
 
-`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence. They are sugar over `ctx.user`, `ctx.can(role)` and `ctx.impersonator`, which any template reads the same way, `if ctx.user then user` or `if ctx.can('admin')`, typed in `kay check` and the editor:
+`SignedIn` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence. They are sugar over `ctx.user`, `ctx.can(requirement)` and `ctx.impersonator`, which any template reads the same way, `if ctx.user then user` or `if ctx.can('admin')`, typed in `kay check` and the editor:
 
 ```kay
 ---
@@ -214,19 +214,24 @@ import SignOutButton from '@kayjs/auth/components/sign-out-button.kay'
 import UserMenu from '@kayjs/auth/components/user-menu.kay'
 ---
 nav
-  SignedIn(role="admin")
+  SignedIn
+    a(href="/account") Account
+    @else
+      SignInLink
+  SignedIn(require="admin")
     a(href="/admin") Admin
   UserMenu
   SignInLink(button tone="accent" label="Join")
   SignOutButton(redirect="/goodbye" variant="ghost")
 ```
 
-- `SignedIn` renders its children for a signed-in user, and with `role="admin"` for one holding that role, the app's `roles` hierarchy applied. `SignedOut` renders them for a visitor.
+- `SignedIn` renders its children for a signed-in user, and with `require` for one meeting it, what `auth.guard({ require })` takes: a role under the app's `roles` hierarchy, a list of which any one passes, or a predicate that answers at once. Its `@else` block renders for anyone who does not meet that: a visitor, a guest or a signed-in user lacking `require`.
+- `SignedIn(role=)` and `SignedOut` of earlier versions work until 1.108; `kay upgrade` renames `role` to `require`, and the children of a `SignedOut` go into an `@else` block by hand.
 - `UserMenu` shows the username or email, a link to the account when the prebuilt pages are on (`account={false}` leaves it out), its children and a sign-out button (`redirect` names where it goes). A visitor gets a link to the sign-in page instead, `signIn={false}` leaving it out. The account pages' own header is one.
-- `SignOutButton` takes `redirect` (put in the page's locale; the pages' `home` by default), `label` (children follow it), and a Button's `variant`, `tone`, `size` and `icon`; `class` styles the form and `class={{ button: '...' }}` the button.
+- `SignOutButton` takes `redirect` (put in the page's locale; the pages' `home` by default), `label` (children follow it), and a Button's `variant`, `tone`, `size` and `icon`; `class` styles the form and `parts={{ button: '...' }}` the button.
 - `SignInLink` (its `variant`, `tone`, `size`, `icon`, `busy` and `spinner` apply only with `button`) leads back to the page it is on (`redirect` names another path, `href` another page), takes `label` (children follow it), and draws as a Button with `button`.
 - A guest is signed out for all of them.
-- `role` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
+- `require` only hides markup, the page and its data are still served: guard the route with `auth.guard` for access.
 - They read the request being answered, so a page with `prerender: true` fails the build asking you to render it per request. They nest in one another and in the app's own `await` blocks.
 
 ### Show the impersonation banner
@@ -593,6 +598,8 @@ It can keep the account: return `false`, or throw `refuse(409, { message: 'Ada h
 The impersonated user is mailed that an admin signed in as them, to a verified address only and best effort: a failing mailer is logged and the impersonation goes on. It ends after 30 minutes whatever the activity, the admin then back as themselves and an `impersonation-ended` event recorded as `expired`.
 
 Changing a user needs a sign-in or `reprove()` under ten minutes old. Otherwise the method answers `'stale'`. Reading users takes no such proof.
+
+Your own sensitive routes ask for the same with `fresh`: `auth.guard({ fresh: '10m' })` or `requireUser({ fresh: '10m' })` refuses a session signed in or re-proved longer ago with a 403 whose `data.code` is `'stale'`, a bearer token always, and the page then calls `reprove()` with the password, the passkey or the code and retries.
 
 ### Admin pages
 

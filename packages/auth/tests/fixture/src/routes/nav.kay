@@ -3,7 +3,6 @@ export const page = { guards: false }
 ---
 ---
 import SignedIn from '@kayjs/auth/components/signed-in.kay'
-import SignedOut from '@kayjs/auth/components/signed-out.kay'
 import DeletionBanner from '@kayjs/auth/components/deletion-banner.kay'
 import ImpersonationBanner from '@kayjs/auth/components/impersonation-banner.kay'
 import SignInLink from '@kayjs/auth/components/sign-in-link.kay'
@@ -12,10 +11,18 @@ import UserMenu from '@kayjs/auth/components/user-menu.kay'
 ImpersonationBanner
 DeletionBanner
 nav
-  SignedOut
-    SignInLink#sign-in
   SignedIn
     p#member Member
-  SignedIn(role="admin")
+    @else
+      SignInLink#sign-in
+  SignedIn(require="admin")
     p#admin Admin
   UserMenu(signIn={false})
+  SignedIn(require={['admin', 'editor']})
+    p#either Admin or editor
+    @else
+      p#neither Neither
+  SignedIn(require={user => user?.email === 'nav@example.com'})
+    p#nav-user The nav user
+    @else
+      p#not-nav-user Someone else

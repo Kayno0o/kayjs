@@ -1,5 +1,6 @@
 import type { Auth } from './auth'
 import type { BareUser } from './core'
+import type { AuthRequirement } from './request'
 import { KayError } from 'kay/library'
 import { log } from './log'
 
@@ -47,12 +48,32 @@ export async function loadViewer(request: Request): Promise<void> {
   }
 }
 
-// What templates read off `ctx`: `ctx.user`, the signed-in user (none for a visitor or a guest), `ctx.can(role)`, whether they hold the role under the app's `roles` hierarchy, `ctx.impersonator`, the admin acting as that user (null for none), and `ctx.deletion`, when the user's account is deleted if they do nothing (null unless `account.deleteAfter` marked it pending).
+// What templates read off `ctx`: `ctx.user`, the signed-in user (none for a visitor or a guest), `ctx.can(requirement)`, whether they meet a role under the app's `roles` hierarchy or any requirement `auth.guard({ require })` takes that answers at once, `ctx.impersonator`, the admin acting as that user (null for none), and `ctx.deletion`, when the user's account is deleted if they do nothing (null unless `account.deleteAfter` marked it pending).
 export interface ViewerValues {
   user: BareUser | null
   impersonator: BareUser | null
   deletion: Date | null
-  can: (role: string) => boolean
+  can: (requirement: AuthRequirement<string>) => boolean
+}
+
+// Whether a user meets what `auth.guard({ require })` takes, for a template that cannot wait: a role under the hierarchy, a grant of a type, a list of which any one passes, or a predicate answering at once.
+export function holds(requirement: AuthRequirement<string>, user: BareUser, isGranted: Viewer['isGranted']): boolean {
+  if (typeof requirement === 'string')
+    return isGranted(requirement, user)
+
+  if (Array.isArray(requirement))
+    return requirement.some(rule => holds(rule, user, isGranted))
+
+  if (typeof requirement === 'function') {
+    const answer = requirement(user, {})
+
+    if (typeof answer !== 'boolean')
+      throw new KayError('argument-invalid', 'kayjs-auth: a predicate given to `SignedIn(require)` or `ctx.can` must answer a boolean at once, as a template renders without waiting; check an answer that needs a read in the page\'s server fence and show the part with an `if`')
+
+    return answer
+  }
+
+  return (requirement.resourceId ?? null) === null && isGranted(requirement.type, user)
 }
 
 export async function viewerValues(request: Request): Promise<ViewerValues> {
@@ -61,7 +82,7 @@ export async function viewerValues(request: Request): Promise<ViewerValues> {
   const viewer = viewers.get(request)
   const user = loaded.has(request) ? asViewer(loaded.get(request)!) : null
 
-  return { user, impersonator: user && (impersonators.get(request) ?? null), deletion: user && (deletions.get(request) ?? null), can: role => user !== null && viewer !== undefined && viewer.isGranted(role, user) }
+  return { user, impersonator: user && (impersonators.get(request) ?? null), deletion: user && (deletions.get(request) ?? null), can: requirement => user !== null && viewer !== undefined && holds(requirement, user, viewer.isGranted) }
 }
 
 // The auth and role check of the page being rendered, for `SignedIn`, `SignedOut` and `UserMenu`.

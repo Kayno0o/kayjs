@@ -2,6 +2,7 @@ import type { Details, ElementNode, Span } from './ast'
 import type { LintName } from './lints'
 import { deprecatedAiLabels } from './deprecated-ai-labels'
 import { deprecatedAiLinks } from './deprecated-ai-links'
+import { deprecatedAuthSigned } from './deprecated-auth-signed'
 import { deprecatedUiCallbacks } from './deprecated-ui-callbacks'
 import { deprecatedUiInput } from './deprecated-ui-input'
 import { deprecatedUiItems } from './deprecated-ui-items'
@@ -15,4 +16,5 @@ export function deprecatedLibrary(element: ElementNode, file: string, text: (spa
   deprecatedUiInput(element, file, text, (span, message, details) => lint(span, 'deprecated-ui-input', message, details))
   deprecatedAiLabels(element, file, text, (span, message, details) => lint(span, 'deprecated-ai-labels', message, details))
   deprecatedAiLinks(element, file, text, (span, message, details) => lint(span, 'deprecated-ai-links', message, details))
+  deprecatedAuthSigned(element, file, text, (span, message, details) => lint(span, 'deprecated-auth-signed', message, details))
 }

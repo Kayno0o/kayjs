@@ -2,7 +2,7 @@ import type { Auth } from '../src/auth'
 import type { BareUser as User } from '../src/core'
 import { afterEach, expect, test } from 'bun:test'
 import { requestOfContext } from 'kay/library'
-import { claimBanner, currentUser, isSignedOut, loadViewer, readRequestWith, registerViewer, viewerValues } from '../src/viewer'
+import { claimBanner, currentUser, holds, isSignedOut, loadViewer, readRequestWith, registerViewer, viewerValues } from '../src/viewer'
 
 // Bun shares modules between test files, so the reader `authCore` set goes back after each test.
 afterEach(() => readRequestWith(requestOfContext))
@@ -49,6 +49,19 @@ test('with the layout loading it, the user is the value itself and the store is 
   expect(currentUser('editor')).toBeNull()
   expect(isSignedOut()).toBe(false)
   expect(reads()).toBe(1)
+})
+
+test('holds meets a role, a grant, a list and a predicate answering at once, and refuses one that has to wait', () => {
+  const ada = user({ roles: ['editor'], email: 'ada@example.com' })
+
+  expect(holds('editor', ada, isGranted)).toBe(true)
+  expect(holds('admin', ada, isGranted)).toBe(false)
+  expect(holds({ type: 'editor' }, ada, isGranted)).toBe(true)
+  expect(holds({ type: 'editor', resourceId: 4 }, ada, isGranted)).toBe(false)
+  expect(holds(['admin', 'editor'], ada, isGranted)).toBe(true)
+  expect(holds([], ada, isGranted)).toBe(false)
+  expect(holds(who => who?.email === 'ada@example.com', ada, isGranted)).toBe(true)
+  expect(() => holds(async () => true, ada, isGranted)).toThrow('must answer a boolean at once')
 })
 
 test('a visitor and a guest are signed out', async () => {

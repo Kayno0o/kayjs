@@ -179,6 +179,14 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Chat from \'@kayjs/ai/chat.kay\'\nimport { send } from \'./send\'\n---\nChat(action={send} links="here")',
     right: '---\nimport Chat from \'@kayjs/ai/chat.kay\'\nimport { send } from \'./send\'\n---\nChat(action={send} newTab="auto")',
   },
+  'deprecated-auth-signed': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: 'kayjs-auth\'s `SignedIn(role=...)` and `SignedOut`, one check written three ways before 1.105: `SignedIn` takes `require` since 1.105, which is what `auth.guard({ require })` takes (a role, a list of which any one passes, a predicate), and its `@else` block holds what a visitor sees, in place of a `SignedOut` beside it. The old forms work until 1.108. Found on a component bound to the library\'s file in a template. The fix renames `role` to `require`; `SignedOut` and a `role` written beside a `require` are reported with no fix, since the children of a `SignedOut` join the `SignedIn` beside it by hand.',
+    wrong: '---\nimport SignedIn from \'@kayjs/auth/components/signed-in.kay\'\n---\nSignedIn(role="admin")\n  a(href="/admin") Admin',
+    right: '---\nimport SignedIn from \'@kayjs/auth/components/signed-in.kay\'\n---\nSignedIn(require="admin")\n  a(href="/admin") Admin',
+  },
   'deprecated-ui-callbacks': {
     level: 'warn',
     group: 'deprecated',

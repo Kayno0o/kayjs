@@ -7,6 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `UserMenu` links a visitor to sign in
 
 `UserMenu` now draws a sign-in link for a visitor, where it drew nothing: remove the `SignedOut` link you kept beside it, or pass `signIn={false}`. `SignOutButton` and `SignInLink` ([components](../packages/auth/llms/signed-in-components.md)) replace a hand-written sign-out form and sign-in link.
+### `SignedIn` takes `require` and an `@else` block
+
+`SignedIn(role="admin")` is `SignedIn(require="admin")`, which takes what `auth.guard({ require })` does (a role, a list of which any one passes, a predicate answering at once), and `SignedOut` is the `@else` block of a `SignedIn`: `SignedIn` holds what a user sees and `@else` what anyone else does. The old forms work until 1.108; `deprecated-auth-signed` renames `role`, and the children of a `SignedOut` move into an `@else` block by hand.
 
 ### An island's call answers a result
 

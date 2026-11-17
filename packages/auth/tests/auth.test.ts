@@ -1,6 +1,6 @@
 import type { Guard, GuardContext, LocalsOf } from 'kay'
 import type { AuthSessionData } from '../src/auth'
-import { afterEach, describe, expect, expectTypeOf, spyOn, test } from 'bun:test'
+import { afterEach, describe, expect, expectTypeOf, setSystemTime, spyOn, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
 import { cookieJar } from 'kay/test'
@@ -489,6 +489,36 @@ describe('guard', () => {
 
     expect(await ask('editor')).toBe('u1')
     expect(await ask('admin')).toBe(403)
+  })
+
+  test('requireUser({ fresh }) refuses a session signed in longer ago with a 403, and a re-proof lets it through', async () => {
+    const { auth, browser } = await seeded()
+    const ada = browser()
+
+    await ada.fetch('/sign-in/u1', POST)
+
+    const ask = async (fresh: '10m' | '1h') => {
+      const { auth: signedIn } = (await contextOf(auth.plugin, `kay_session=${ada.cookies.get('kay_session')}`)) as { auth: Auth }
+
+      try {
+        return (await signedIn.requireUser({ fresh })).id
+      }
+      catch (outcome) {
+        return (outcome as { status?: number }).status
+      }
+    }
+
+    expect(await ask('10m')).toBe('u1')
+
+    setSystemTime(new Date(Date.now() + 11 * 60 * 1000))
+
+    try {
+      expect(await ask('10m')).toBe(403)
+      expect(await ask('1h')).toBe('u1')
+    }
+    finally {
+      setSystemTime()
+    }
   })
 
   test('requireUser({ require }) asks the app\'s authorize, with the level of the request, and says it reads require to kayjs-cms', async () => {

@@ -1,3 +1,4 @@
+import type { Duration } from 'kay'
 import type { Auth, AuthRequirement } from './auth'
 import { guard as kayGuard } from 'kay'
 import { KayError } from 'kay/library'
@@ -7,6 +8,7 @@ export interface GuardOptions {
   redirect?: string | undefined
   require?: AuthRequirement<string> | undefined
   scope?: string | string[] | false | undefined
+  fresh?: Duration | undefined
   twoFactor?: true | undefined
 }
 

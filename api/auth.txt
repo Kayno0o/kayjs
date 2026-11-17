@@ -102,7 +102,7 @@ class Auth
   organizations: OrganizationMethods<OrgRole>
   passkeys: PasskeyMethods
   password: PasswordMethods
-  provedLately: () => Promise<boolean>
+  provedLately: (fresh?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined) => Promise<boolean>
   providersOf: (record: UserRecord) => Promise<Record<string, { id: string; }>>
   record: () => Promise<UserRecord | null>
   reprove: (proof: Proof) => Promise<ReproveResult>
@@ -965,6 +965,7 @@ interface GrantStore<P, G extends string>
 
 [.] GuardOptions
 interface GuardOptions
+  fresh?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   redirect?: string | undefined
   require?: AuthRequirement<string> | undefined
   scope?: false | string | string[] | undefined
@@ -1592,6 +1593,7 @@ type Requirement<P, G extends string> = | G | { type: G, resourceId?: number | n
 [.] RequireUserOptions
 interface RequireUserOptions<Scope extends string, Role extends string>
   bare?: true | undefined
+  fresh?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   redirect?: string | undefined
   require?: AuthRequirement<Role> | undefined
   scope?: ScopeRequirement<Scope> | undefined
@@ -1916,6 +1918,8 @@ component default
 [./components/signed-in.kay] default
 component default
   children?: Element
+  else?: Element
+  require?: AuthRequirement<string> | undefined
   role?: string | undefined
 
 [./components/signed-out.kay] default

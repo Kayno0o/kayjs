@@ -120,6 +120,10 @@ describe('the prebuilt pages', () => {
 
     expect(text(anonymous, '#sign-in')).toBe('Sign in')
     expect(anonymous.find('#member, #admin, form')).toHaveLength(0)
+    // A `@else` block shows for whoever does not meet the requirement, a visitor included, and a predicate reads the user.
+    expect(text(anonymous, '#neither')).toBe('Neither')
+    expect(text(anonymous, '#not-nav-user')).toBe('Someone else')
+    expect(anonymous.find('#either, #nav-user')).toHaveLength(0)
 
     const ada = await signedUp('nav@example.com')
     const member = await ada.visit('/nav')
@@ -129,12 +133,19 @@ describe('the prebuilt pages', () => {
     expect(member.html).not.toContain('kay-await')
     expect(text(member, '#member')).toBe('Member')
     expect(member.find('#admin')).toHaveLength(0)
+    expect(text(member, '#neither')).toBe('Neither')
+    expect(text(member, '#nav-user')).toBe('The nav user')
+    expect(member.find('#not-nav-user')).toHaveLength(0)
     expect(text(member, '.kayjs-auth span')).toBe('nav@example.com')
     expect(member.find('.kayjs-auth form button').map(button => button.text)).toEqual(['Sign out'])
     expect(member.find('.kayjs-auth a').map(link => link.attributes.href)).toEqual(['/auth/account'])
 
     await store.users.update((await store.users.findByEmail('nav@example.com'))!.id, { roles: ['admin'] })
-    expect(text(await ada.visit('/nav'), '#admin')).toBe('Admin')
+    const admin = await ada.visit('/nav')
+
+    expect(text(admin, '#admin')).toBe('Admin')
+    expect(text(admin, '#either')).toBe('Admin or editor')
+    expect(admin.find('#neither')).toHaveLength(0)
 
     const nested = await ada.visit('/nested')
 

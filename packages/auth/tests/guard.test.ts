@@ -1,6 +1,6 @@
 import type { AnyElysia } from 'elysia'
 import type { GuardContext } from 'kay'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { setSite } from '../../../src/runtime/site'
 import { authGuard } from '../src/guard'
@@ -9,6 +9,7 @@ import { testApp, userRecord } from './helpers/app'
 
 afterEach(() => {
   setSite(undefined)
+  setSystemTime()
 })
 
 async function run(ctx: GuardContext, options?: Parameters<typeof authGuard>[0]): Promise<string> {
@@ -85,5 +86,30 @@ describe('authGuard() from kayjs-auth', () => {
     expect(await run(guardContext(signedIn))).toBe('passed')
     expect(await run(guardContext(signedIn), { require: 'editor' })).toBe('passed')
     expect(await run(guardContext(signedIn), { require: 'admin' })).toBe('deny 403')
+  })
+
+  test('asks a proof within `fresh`, refusing a session signed in longer ago', async () => {
+    const store = memoryAuth()
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+
+    const { auth } = testApp({ store })
+    const cookie = await auth.sessionCookie('u1')
+
+    expect(await run(guardContext(await contextOf(auth.plugin, cookie)), { fresh: '10m' })).toBe('passed')
+
+    setSystemTime(new Date(Date.now() + 11 * 60 * 1000))
+
+    const later = await contextOf(auth.plugin, cookie)
+
+    expect(await run(guardContext(later), { fresh: '10m' })).toBe('deny 403')
+    expect(await run(guardContext(later), { fresh: '1h' })).toBe('passed')
+    expect(await run(guardContext(later))).toBe('passed')
+  })
+
+  test('a `fresh` that is no duration fails where the guard is made', () => {
+    const { auth } = testApp()
+
+    expect(() => auth.guard({ fresh: 'soon' as '1s' })).toThrow('fresh')
   })
 })

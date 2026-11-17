@@ -102,9 +102,9 @@ export async function reprove(state: RequestState, proof: Proof, options: { seco
   return { ok: true, record }
 }
 
-// Whether this session signed in or re-proved its user in the last ten minutes.
-export async function provedLately(state: RequestState): Promise<boolean> {
+// Whether this session signed in or re-proved its user within `within` milliseconds, the last ten minutes by default.
+export async function provedLately(state: RequestState, within = FRESH_SIGN_IN_MS): Promise<boolean> {
   const signedIn = await state.session.get('auth')
 
-  return signedIn !== undefined && Date.now() - signedIn.at < FRESH_SIGN_IN_MS
+  return signedIn !== undefined && Date.now() - signedIn.at < within
 }

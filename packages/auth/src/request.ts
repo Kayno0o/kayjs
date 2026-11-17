@@ -1,4 +1,4 @@
-import type { GuardContext } from 'kay'
+import type { Duration, GuardContext } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { CaptchaAction } from './captcha'
 import type { AuthSessionData, BareUser, Core, SignedIn, User } from './core'
@@ -47,6 +47,8 @@ export interface RequireUserOptions<Scope extends string, Role extends string> {
   redirect?: string | undefined
   scope?: ScopeRequirement<Scope> | undefined
   require?: AuthRequirement<Role> | undefined
+  // A duration such as `'10m'`: the user signed in or re-proved (`reprove`) within it, else a 403, as `guard({ fresh })` does.
+  fresh?: Duration | undefined
   bare?: true | undefined
 }
 
@@ -70,6 +72,14 @@ const servedSockets = new WeakSet<object>()
 
 // What a route, a guard or a gate asks of the user: a role, a predicate, or a list of which any one passes.
 export type AuthRequirement<Role extends string> = Requirement<BareUser, Role>
+
+// What a request with a `fresh` requirement is refused with while the user's last proof is older: the page or the app's client then asks for the password or the passkey again (`reprove`) and retries.
+export const STALE_PROOF = { message: 'Confirm your identity to continue', data: { code: 'stale' } } as const
+
+// The milliseconds of a `fresh` duration; a value that is no positive duration throws where the guard is made, not on a request.
+export function freshMs(fresh: Duration): number {
+  return durationSeconds(fresh, 'fresh') * 1000
+}
 
 // A session a browser's cross-site POST or websocket upgrade reads as signed out and cannot write, a write answered with a 403: a plain Elysia app has no Origin check of kay's own.
 function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, refusal: () => Response): Session<AuthSessionData> {
@@ -321,6 +331,9 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (!scopeAllows(await this.scopes(), options.scope))
       return deny(403)
 
+    if (options.fresh !== undefined && !(await this.provedLately(options.fresh)))
+      return deny(403, STALE_PROOF)
+
     return options.bare ? user : { ...user, providers: await this.providersOf(record) }
   }
 
@@ -498,9 +511,9 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return captchaChallenge(this[STATE], action)
   }
 
-  // Whether this session signed in or re-proved its user in the last ten minutes, as `exportData()` and the admin methods ask, for a page to show a form for `reprove` first.
-  async provedLately(): Promise<boolean> {
-    return provedLately(this[STATE])
+  // Whether this session signed in or re-proved its user within `fresh`, a duration such as `'5m'` (ten minutes when left out, as `exportData()` and the admin methods ask), for a page to show a form for `reprove` first. A bearer token has no session to prove with, so it never has.
+  async provedLately(fresh?: Duration): Promise<boolean> {
+    return provedLately(this[STATE], fresh === undefined ? undefined : freshMs(fresh))
   }
 
   // Re-proves the signed-in user, as before an app's own sensitive change: a proof counts for ten minutes, as a sign-in does.
