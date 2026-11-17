@@ -1,0 +1,6 @@
+head
+  title Gallery
+main
+  h1 Gallery
+  img(src="/a.png" alt="A kingfisher")
+  button Save

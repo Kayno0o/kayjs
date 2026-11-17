@@ -31,6 +31,26 @@ const page = await site.open('/account', { cookies: cookie })
 expect(await page.path()).toBe('/account')
 ```
 
+### Check accessibility and snapshot HTML without a browser
+
+A visited page (`site.visit`, `site.submit`) and a component from `mountComponent` have `a11y(selector?)` and `matchHtml(name)` too, with no Chrome:
+
+```ts
+const page = await site.visit('/pricing')
+
+expect(await page.a11y()).toEqual([])
+await page.matchHtml('pricing')
+
+const { a11y } = await mountComponent(Menu, { items })
+
+expect(await a11y()).toEqual([])
+```
+
+- `a11y` runs the same axe-core as the browser page's and resolves with the same violations, in a happy-dom document of its own: a visit's scripts never run, and what needs a browser's layout (`color-contrast`, `target-size`, `scrollable-region-focusable`) is left to `page.a11y()` of `site.open`. A mounted component checks its own element, so the rules about a whole page (a heading, a landmark, the title) do not apply to it.
+- It needs `axe-core` (`kay new` adds it) and, for a visit, `@happy-dom/global-registrator`, which `mountComponent` needs already; a test fails naming the `bun add -d` command when one is missing.
+- `matchHtml(name)` compares the HTML with the baseline `__html__/<test file>/<name>.html` beside the test file, written when there is none and rewritten by `KAY_UPDATE_SNAPSHOTS=1 bun test`, a `CI` run failing for a missing one; a difference writes `<name>.actual.html` beside it and names the first line that differs.
+- The snapshot is normalised, so it holds the page and not the build: comments (hydration markers) are left out, the hash in a built file's name (`app-4n8x3k2m.css`) and in a `?v=` is `HASH`, a `nonce` is `NONCE`, the stamp of a `minTime` form is `STAMP`, and each tag or run of text is one indented line, `script`, `style`, `pre` and `textarea` kept as written.
+
 ## Reference
 
 ### Browser tests

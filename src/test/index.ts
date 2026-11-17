@@ -51,6 +51,7 @@ import { checkOnly, lazyNativePlugins } from './lazy-plugins'
 import { NativeRequest, NativeURL, withNatives } from './natives'
 import { pruneTestOutputs, touchOutput, touchOutputIfOld } from './outputs'
 import { readPage, settledHtml, sitemapUrls } from './page'
+import { pageChecks } from './page-checks'
 import { testRoot } from './root'
 import { actionsOf, formUrl, renderedStamp } from './site-actions'
 import { apiOf } from './site-api'
@@ -366,7 +367,7 @@ async function siteOf(options: TestOptions): Promise<TestSite> {
       const html = await withNatives(async () => current.text())
 
       let settled: Visit['settled'] | undefined
-      const reading = readPage(html)
+      const reading = { ...readPage(html), ...pageChecks(html) }
 
       return {
         url: path,
@@ -374,6 +375,7 @@ async function siteOf(options: TestOptions): Promise<TestSite> {
         headers: current.headers,
         html,
         ...reading,
+
         css: async () => {
           if (!realClient)
             throw new Error('kay: css() reads the stylesheets the app builds, which a site loads with testSite({ styles: true }) or testSite({ browser: true })')

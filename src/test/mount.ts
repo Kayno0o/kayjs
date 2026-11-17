@@ -1,5 +1,6 @@
 import type { WebStorage } from '../runtime/persist'
 import type { Interactions } from './interact'
+import type { A11yViolation } from './page-types'
 import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -14,6 +15,8 @@ import { COOKIE_NAME } from '../runtime/persist'
 import { sendValue } from '../runtime/send'
 import { decodeValue } from '../runtime/wire'
 import { apiStubs, apiTrees } from '../server/api-modules'
+import { auditDocument } from './a11y-dom'
+import { matchHtml } from './html-snapshot'
 import { interactions } from './interact'
 import { lazyNativePlugins } from './lazy-plugins'
 import { testRoot } from './root'
@@ -26,6 +29,10 @@ export interface Mounted<Props = Record<string, unknown>> extends Interactions {
   setProps: (props: Partial<Props>) => Promise<void>
   // Disposes of the component, running its cleanups once, and removes the element.
   unmount: () => void
+  // Checks what the component rendered, or only the elements `selector` matches inside it, with axe-core: what it breaks, none when it passes. Rules about a whole page, such as a heading or a landmark, do not apply to a part, and what needs a browser's layout, such as colour contrast, is left out; needs `axe-core`.
+  a11y: (selector?: string) => Promise<A11yViolation[]>
+  // Compares the component's markup, normalised as `visit.matchHtml` does, with the baseline `__html__/<test file>/<name>.html`.
+  matchHtml: (name: string) => Promise<void>
 }
 
 interface MountModule {
@@ -129,7 +136,7 @@ export async function mountComponent(source: (props: never) => unknown, ...given
 
   await settle()
 
-  return { root: element, ...interactions(element, settle), setProps: async (next) => {
+  return { root: element, ...interactions(element, settle), a11y: async selector => auditDocument(window, selector, element), matchHtml: async name => matchHtml(new Error('the call').stack, element.innerHTML, name), setProps: async (next) => {
     if (!mounted)
       return
 

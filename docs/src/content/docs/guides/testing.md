@@ -27,6 +27,12 @@ it('lists the books', async () => {
 })
 ```
 
+A visited page also checks itself. `await page.a11y()` runs axe-core and resolves with the rules the markup breaks, none when it passes. `await page.matchHtml('home')` compares its HTML with a file kept beside the test, `__html__/<test file>/home.html`, written the first time and rewritten when you run the tests with `KAY_UPDATE_SNAPSHOTS=1`.
+
+The snapshot leaves out what changes with each build, such as the hash in a stylesheet's name, so it only changes when the page does. A component from `mountComponent` has both methods too.
+
+Neither needs a browser, so colour contrast and other checks that depend on layout wait for `page.a11y()` of a page opened with `site.open`. `a11y` needs `axe-core`, and for a visited page `@happy-dom/global-registrator`.
+
 The page also has `meta(key)`, `canonical()`, `jsonLd()` and `links()`. `find(selector)` returns `{ tag, attributes, text, html }` for each match. `text(selector)` gives the text a visitor reads in the first match, or in the whole body, with a space between sibling blocks such as list items and paragraphs, and none between inline elements.
 
 A page whose `await` blocks stream holds the pending markup and, after it, the templates that replace it, so `text()` reads the pending text. `page.settled` is the page as the visitor ends up seeing it, each block swapped for its last part, with the same `title()`, `find()` and `text()` and an `html` without the templates: `expect(page.settled.text('main')).not.toContain('Loading')`. No browser is needed.

@@ -12,11 +12,11 @@ const NAME = /^[\w.-]+(?:\/[\w.-]+)*$/
 const TEST_FILE = /^\s*at (?:.*\()?(?:file:\/\/)?(\/.+?\.test\.[cm]?[jt]sx?):\d+:\d+\)?$/m
 
 // The test file calling `matchScreenshot`, read off the stack where the call began, as Bun gives no hook the file of the running test.
-export function callingTestFile(stack: string | undefined): string {
+export function callingTestFile(stack: string | undefined, caller = 'matchScreenshot'): string {
   const found = TEST_FILE.exec(stack ?? '')?.[1]
 
   if (found === undefined)
-    throw new Error('kay: matchScreenshot found no `*.test.ts` file among its callers to keep the baseline beside')
+    throw new Error(`kay: ${caller} found no \`*.test.ts\` file among its callers to keep the baseline beside`)
 
   return found
 }

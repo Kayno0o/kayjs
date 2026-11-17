@@ -4390,7 +4390,9 @@ function mountComponent<Component extends (props: never) => unknown>(component: 
 
 [./test] Mounted
 interface Mounted<Props = Record<string, unknown>> extends Interactions
+  a11y: (selector?: string | undefined) => Promise<A11yViolation[]>
   click: (selector: string) => Promise<void>
+  matchHtml: (name: string) => Promise<void>
   press: (key: string) => Promise<void>
   root: HTMLElement
   setProps: (props: Partial<Props>) => Promise<void>
@@ -4737,6 +4739,7 @@ type TestStream<Client> = Client & {
 
 [./test] Visit
 interface Visit extends PageReading
+  a11y: (selector?: string | undefined) => Promise<A11yViolation[]>
   canonical: () => string | undefined
   css: () => Promise<string>
   find: (selector: string) => Found[]
@@ -4744,6 +4747,7 @@ interface Visit extends PageReading
   html: string
   jsonLd: () => unknown[]
   links: () => string[]
+  matchHtml: (name: string) => Promise<void>
   meta: (key: string) => string | undefined
   settled: PageReading & { html: string; }
   stamp: (action: Pick<Action<never, unknown, never>, "url">) => string | undefined

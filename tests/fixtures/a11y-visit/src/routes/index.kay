@@ -1,0 +1,7 @@
+head
+  title Gallery
+main
+  h1 Gallery
+  img(src="/a.png")
+  button
+    svg

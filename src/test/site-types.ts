@@ -9,7 +9,7 @@ import type { PluginInput } from '../server/plugin'
 import type { TestContent } from './content'
 import type { FetchStub, FetchStubRoutes } from './outgoing'
 import type { PageReading } from './page'
-import type { BrowserOptions, TestPage } from './page-types'
+import type { A11yViolation, BrowserOptions, TestPage } from './page-types'
 
 export interface SignInHook {
   // The library, such as `auth`: a second hook of the same name replaces the first, so `test(site)` called in each test joins once.
@@ -52,6 +52,10 @@ export interface Visit extends PageReading {
   css: () => Promise<string>
   // The stamp the form posting to `action` rendered with, which `submit` takes as its `stamp`; `undefined` for a page with no such form or a form with no stamp.
   stamp: (action: Pick<Action, 'url'>) => string | undefined
+  // Checks the markup with axe-core in a document of its own, or only the elements `selector` matches, as `page.a11y()` of a browser page does: what it breaks, none when it passes. The page's scripts never run and what needs a browser's layout, such as colour contrast and target size, is left out; needs `axe-core` and `@happy-dom/global-registrator` installed.
+  a11y: (selector?: string) => Promise<A11yViolation[]>
+  // Compares the page's HTML, normalised, with the baseline `__html__/<test file>/<name>.html` beside the test file: comments (hydration markers) left out, the hash of each built file's name, nonces and the stamp of a `minTime` form replaced by a fixed word, one tag or run of text a line. The baseline is written when there is none, and rewritten when `KAY_UPDATE_SNAPSHOTS=1` is set; a CI run fails for a missing one.
+  matchHtml: (name: string) => Promise<void>
 }
 
 export interface VisitInit {
