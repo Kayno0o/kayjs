@@ -1873,17 +1873,7 @@ component default
   button?: boolean | undefined
   children?: Element
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  root?: readonly unknown[] | string | undefined | {
-    root?: readonly unknown[] | string | undefined | {
-      root?: string | undefined;
-      spinner?: readonly unknown[] | string | undefined | {
-        root?: string | undefined;
-      };
-    };
-    spinner?: readonly unknown[] | string | undefined | {
-      root?: string | undefined;
-    };
-  };
+  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
   href?: string | undefined
   parts?: undefined | {
@@ -1905,18 +1895,7 @@ component default
 component default
   children?: Element
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  root?: string | undefined;
-  button?: readonly unknown[] | string | undefined | {
-    root?: readonly unknown[] | string | undefined | {
-      root?: string | undefined;
-      spinner?: readonly unknown[] | string | undefined | {
-        root?: string | undefined;
-      };
-    };
-    spinner?: readonly unknown[] | string | undefined | {
-      root?: string | undefined;
-    };
-  };
+  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
   parts?: undefined | {
   root?: string | undefined;
@@ -1947,7 +1926,9 @@ component default
 component default
   account?: boolean
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | { root?: string | undefined; }
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
+  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
+}
   parts?: undefined | { root?: string | undefined; }
   redirect?: string | undefined
   signIn?: boolean
