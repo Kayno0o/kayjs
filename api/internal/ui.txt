@@ -3301,7 +3301,7 @@ const uiDefaults: UiSettings
 function warnUnnamed(element: Probe): void
 
 [./lib/uses] uses
-function uses(_feature: string): boolean
+function uses(_feature: string, _onByDefault?: boolean | undefined): boolean
 
 [./lib/virtual] INITIAL_VIEWPORT
 const INITIAL_VIEWPORT: 640

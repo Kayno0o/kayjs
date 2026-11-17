@@ -119,7 +119,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, items: infinite, list: legacy, rowKey, sort, plain = false, sortable = true, serverSort = false, onSortChange, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, panelProps = {}, triggerProps = {}, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
+const { columns: given, label, header, footer, columnToggle = false, columnsLabel = uses('columnToggle') ? wording('ui.table.columns', 'Columns') : '', hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, items: infinite, list: legacy, rowKey, sort, plain = false, sortable = true, serverSort = false, onSortChange, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = uses('filter') || uses('filterParam') ? wording('ui.table.filter', 'Filter') : '', filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = uses('selectable') ? wording('ui.table.selectAll', 'Select all') : '', selectedLabel, selectRowLabel, exportable = false, exportLabel = uses('exportable') ? wording('ui.table.export', 'Export CSV') : '', exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, panelProps = {}, triggerProps = {}, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
   columns: Column<Row>[]
   // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `items` holds them: one of the two is required.
   rows?: RowsSource<Row> | undefined
@@ -253,7 +253,7 @@ if ((rest as { onSelect?: unknown }).onSelect !== undefined)
 if (expandable && virtual)
   throw new KayError('argument-invalid', 'kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
 
-const list = infinite ?? legacy
+const list = uses('items') || uses('list') ? infinite ?? legacy : undefined
 
 if (pageSize !== undefined && (virtual || list))
   throw new KayError('argument-invalid', 'kayjs-ui: a Table with a pageSize cannot be virtual or take a list, which already hold their rows by the window or by the page')
@@ -268,7 +268,7 @@ const sortKey = uses('sortParam') ? sortParam ?? (plain && sortable ? 'sort' : u
 const keptKey = sortKey === undefined ? undefined : queryParam(sortKey, { default: '' })
 const directionParam = sortKey === undefined ? undefined : sortKey === 'sort' ? 'direction' : `${sortKey}Direction`
 const keptDirection = directionParam === undefined ? undefined : queryParam(directionParam, { default: '' })
-const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())
+const restored = uses('sortable', true) ? restoredSort(columns(), keptKey?.(), keptDirection?.()) : undefined
 const current = signal(restored ?? sort)
 let following = restored === undefined
 // The search box and the extra fields, decided when the table is made.
@@ -293,7 +293,7 @@ if (uses('items') || uses('list'))
 
 // The rows the filter keeps, all of them without one.
 const kept = memo(() => uses('filter') && filter !== undefined && !list ? rowsMatching(rows(), filter, search!.typed()) : rows())
-const counted = (count: number) => countLabel ? countLabel(count) : wording('ui.table.rowCount', count === 1 ? '1 row' : '{count} rows', { count })
+const counted = uses('filter') || uses('filterParam') || uses('fields') ? (count: number) => countLabel ? countLabel(count) : wording('ui.table.rowCount', count === 1 ? '1 row' : '{count} rows', { count }) : undefined
 const hiddenKeys = signal(hiddenColumns ?? given.filter(column => column.hidden).map(column => column.key))
 
 effect(() => {
@@ -308,19 +308,19 @@ const hasFoot = () => footer !== undefined || shownColumns().some(column => colu
 const columnCount = () => shownColumns().length + (selectable ? 1 : 0) + (expandable ? 1 : 0)
 const regionName = () => (rest as { 'aria-label'?: string })['aria-label'] ?? label
 const scrolls = signal(virtual || plain)
-const countChosen = (count: number) => selectedLabel ? selectedLabel(count) : wording('ui.table.selected', '{count} selected', { count })
-const shown = memo(() => serverSort || list ? kept() : sortedRows(kept(), columns(), current()))
+const countChosen = uses('selectable') ? (count: number) => selectedLabel ? selectedLabel(count) : wording('ui.table.selected', '{count} selected', { count }) : undefined
+const shown = memo(() => !uses('sortable', true) || serverSort || list ? kept() : sortedRows(kept(), columns(), current()))
 const waiting = () => busy || (list ? list.pending() && !list.failed() : source.loading())
 const skeleton = () => waiting() && shown().length === 0
 const skeletonIndexes = () => Array.from({ length: Math.max(1, Math.floor(skeletonRows)) }, (_, index) => index)
 const skeletonCells = () => Array.from({ length: columnCount() }, (_, index) => index)
-const openLabel = (row: Row) => (openRowLabel ?? (item => wording('ui.table.openRow', 'Open {row}', { row: rowLabel(item, columns(), rowKey) })))(row)
+const openLabel = uses('rowHref') || uses('onRowClick') ? (row: Row) => (openRowLabel ?? (item => wording('ui.table.openRow', 'Open {row}', { row: rowLabel(item, columns(), rowKey) })))(row) : undefined
 const broke = () => list ? list.failed() : source.failed()
 const select = uses('selectable') ? selection({ rowKey, rows, kept, selected: () => selected, onChange: () => onSelectedChange, enabled: () => selectable, settling: () => waiting() || broke() }) : undefined
 // Drawn whatever the variant, as the server draws it: an id taken only by a Table with `expandable` would shift every later one of the island.
 const tableId = uid()
 const expansion = uses('expandable') ? expanding({ tableId, rowKey, expanded: () => expanded, onOpenChange: () => onOpenChange }) : undefined
-const linked = () => rowHref !== undefined || onRowClick !== undefined
+const linked = () => (uses('rowHref') || uses('onRowClick')) && (rowHref !== undefined || onRowClick !== undefined)
 const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
 
 const endpoint = memo(() => {
@@ -381,35 +381,41 @@ const showColumn = uses('columnToggle')
   }
   : undefined
 
-function toggle(column: Column<Row>) {
-  const next = nextSort(current(), column)
+const toggle = uses('sortable', true)
+  ? (column: Column<Row>) => {
+    const next = nextSort(current(), column)
 
-  current = next
-  keptKey?.set(next.key)
-  keptDirection?.set(next.direction)
-  onSortChange?.({ sort: next })
-  onSort?.(next)
-}
+    current = next
+    keptKey?.set(next.key)
+    keptDirection?.set(next.direction)
+    onSortChange?.({ sort: next })
+    onSort?.(next)
+  }
+  : undefined
 
 // The address of the page sorted as a click on the header would, the other params kept; a page rendered once at build time has no request to read, so its link holds the sort alone.
-function sortHref(column: Column<Row>) {
-  const next = nextSort(current(), column)
-  const changes = { [sortKey!]: next.key, [directionParam!]: next.direction }
+const sortHref = uses('sortable', true)
+  ? (column: Column<Row>) => {
+    const next = nextSort(current(), column)
+    const changes = { [sortKey!]: next.key, [directionParam!]: next.direction }
 
-  try {
-    return withQuery(changes)
+    try {
+      return withQuery(changes)
+    }
+    catch {
+      return `?${new URLSearchParams(changes)}`
+    }
   }
-  catch {
-    return `?${new URLSearchParams(changes)}`
+  : undefined
+
+const ariaSort = uses('sortable', true)
+  ? (column: Column<Row>): 'ascending' | 'descending' | undefined => {
+    if (!sorting(column))
+      return undefined
+
+    return current()?.direction === 'asc' ? 'ascending' : 'descending'
   }
-}
-
-function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
-  if (!sorting(column))
-    return undefined
-
-  return current()?.direction === 'asc' ? 'ascending' : 'descending'
-}
+  : undefined
 ---
 div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={scrolls() ? '0' : undefined} role={scrolls() && regionName() ? 'region' : undefined} aria-label={scrolls() ? regionName() : (rest as { 'aria-label'?: string })['aria-label']})
   if (uses('filter') || uses('filterParam') || uses('fields')) && (searching() || fielded())
@@ -425,7 +431,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
             Select(value={search!.values[index]!()} options={field.options} emptyOption onChange={({ value }) => search!.values[index]!.set(value)})
           else
             input.kui-field-input(part="filterInput" type="search" value={search!.values[index]!()} autocomplete="off" onInput={event => search!.values[index]!.set(event.currentTarget.value)})
-    p(part="count" role="status") {list ? (filtering() && !list.pending() ? counted(rows().length) : '') : (search!.typed() ? counted(kept().length) : '')}
+    p(part="count" role="status") {list ? (filtering() && !list.pending() ? counted!(rows().length) : '') : (search!.typed() ? counted!(kept().length) : '')}
   if (uses('selectable') && selectable) || (uses('exportable') && exportable) || (uses('columnToggle') && columnToggle)
     div(part="selection")
       if uses('columnToggle') && columnToggle
@@ -437,7 +443,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
               Checkbox(label={column.header} checked={!hiddenKeys().includes(column.key)} onChange={({ checked }) => showColumn!(column.key, checked)})
       if uses('selectable') && selectable
         Checkbox(label={selectAllLabel} checked={select!.allChosen()} indeterminate={select!.someChosen() && !select!.allChosen()} disabled={select!.visible().length === 0} onChange={({ checked }) => select!.pickAll(checked)})
-        p(part="selected" role="status") {select!.chosen().length > 0 ? countChosen(select!.chosen().length) : ''}
+        p(part="selected" role="status") {select!.chosen().length > 0 ? countChosen!(select!.chosen().length) : ''}
         if select!.chosen().length > 0 && bulk
           div(part="bulk")
             | {bulk(select!.chosen(), () => select!.commit([]))}
@@ -464,24 +470,24 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
           th(part="selectHead" scope="col")
             span(part="selectText") {selectAllLabel}
         for column of shownColumns() key={column.key}
-          th(part="headCell" class={column.class} style={columnStyle(column)} scope="col" data-align={column.align ?? 'start'} data-sticky={column.sticky} aria-sort={ariaSort(column)})
-            if column.sortValue && plain && keptKey
-              a(part="sortButton" href={sortHref(column)} rel="nofollow" data-direction={sorting(column) ? current()?.direction : undefined})
-                if header
+          th(part="headCell" class={column.class} style={columnStyle(column)} scope="col" data-align={column.align ?? 'start'} data-sticky={column.sticky} aria-sort={ariaSort?.(column)})
+            if uses('sortable', true) && column.sortValue && plain && keptKey
+              a(part="sortButton" href={sortHref!(column)} rel="nofollow" data-direction={sorting(column) ? current()?.direction : undefined})
+                if uses('header') && header
                   | {header(column)}
                 else
                   | {column.header}
                 if sorting(column)
                   Icon(icon="chevron" part="sortIcon")
-            else if column.sortValue
-              button(part="sortButton" type="button" data-direction={sorting(column) ? current()?.direction : undefined} onClick={() => toggle(column)})
-                if header
+            else if uses('sortable', true) && column.sortValue
+              button(part="sortButton" type="button" data-direction={sorting(column) ? current()?.direction : undefined} onClick={() => toggle!(column)})
+                if uses('header') && header
                   | {header(column)}
                 else
                   | {column.header}
                 if sorting(column)
                   Icon(icon="chevron" part="sortIcon")
-            else if header
+            else if uses('header') && header
               | {header(column)}
             else
               | {column.header}
@@ -503,15 +509,15 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
               if narrow === 'stack' && column.header
                 span(part="cellLabel") {column.header}
               div(part="cellBody")
-                if cell && drawnByBlock(column, given)
+                if uses('cell') && cell && drawnByBlock(column, given)
                   | {cell(row, column)}
                 else
                   | {cellText(row, column)}
               if (uses('rowHref') || uses('onRowClick')) && columnIndex === 0 && linked()
                 if rowHref?.(row) then href
-                  a(part="rowLink" href={href} aria-label={openLabel(row)} onClick={event => onRowClick?.({ row, event })})
+                  a(part="rowLink" href={href} aria-label={openLabel!(row)} onClick={event => onRowClick?.({ row, event })})
                 else if onRowClick
-                  button(part="rowButton" type="button" aria-label={openLabel(row)} onClick={event => onRowClick?.({ row, event })})
+                  button(part="rowButton" type="button" aria-label={openLabel!(row)} onClick={event => onRowClick?.({ row, event })})
         if uses('expandable') && expandable && detail && expansion!.openSet().has(rowKeyOf(row, rowKey))
           tr(part="detailRow" id={expansion!.detailId(row)})
             td(part="detailCell" colspan={columnCount()})
@@ -523,7 +529,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
               for cellIndex of skeletonCells() key={cellIndex}
                 td(part="skeletonCell")
                   span(part="skeletonBar")
-        else if !broke() && (list ? filtering() : rows().length > 0) && noMatch
+        else if !broke() && (list ? filtering() : rows().length > 0) && uses('noMatch') && noMatch
           tr
             td(part="emptyCell" colspan={columnCount()})
               | {noMatch}

@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { ANY, propsWritten, specializedSource, usesNames } from '../src/build/variants'
+import { ANY, propsWritten, specializedSource, usesNames, VariantIndex } from '../src/build/variants'
 import { scratchDir } from './scratch'
 
 const CHILD = [
@@ -112,5 +112,48 @@ describe('propsWritten', () => {
   it('leaves out a component called with a spread or read as a value', () => {
     expect(propsWritten(`${head}Table({...rest})`, ['Table']).get('Table')).toBe(ANY)
     expect(propsWritten(`${head}const keep = Table\nTable(rows={r})`, ['Table']).get('Table')).toBe(ANY)
+  })
+})
+
+describe('a feature on when the prop is left out', () => {
+  const head = 'import Table from \'./table.kay\'\n---\n'
+
+  it('reads the second argument of a call and folds a call in a template line', () => {
+    const text = '---\nconst a = uses(\'x\', true)\n---\nspan(data-x={uses(\'x\', true) ? 1 : undefined}) one\n'
+
+    expect(usesNames(text)).toEqual(['x'])
+    expect(specializedSource(text, new Set()).split('\n')).toEqual(['---', 'const a = false', '---', 'span(data-x={false ? 1 : undefined}) one', ''])
+    expect(specializedSource(text, new Set(['x'])).split('\n')[3]).toBe('span(data-x={true ? 1 : undefined}) one')
+  })
+
+  it('marks a call that leaves the prop out, or writes it as anything but a literal false', () => {
+    const defaults = new Map([['Table', new Set(['sortable'])]])
+    const written = propsWritten(`${head}Table(rows={r})\nTable(rows={r} sortable={false})\nTable(sortable={flag})\nTable(sortable)\nTable(sortable="false")`, ['Table'], defaults)
+
+    expect([...written.get('Table') as Set<string>].sort()).toEqual(['+sortable', 'rows', 'sortable'])
+    expect([...propsWritten(`${head}Table(rows={r} sortable={ false })`, ['Table'], defaults).get('Table') as Set<string>].sort()).toEqual(['rows', 'sortable'])
+  })
+
+  it('leaves sorting in a variant while one call site of the project may sort, and out when every one writes sortable={false}', async () => {
+    const dir = await scratchDir('variants-')
+    const table = join(import.meta.dir, '../packages/ui/src/table.kay')
+    const call = (props: string) => `---\nimport Table from '${table}'\n---\nTable(columns={[]} rows={[]} rowKey="id" ${props})\n`
+    const entry = async (...files: string[]) => {
+      const paths = await Promise.all(files.map(async (source, at) => {
+        const path = join(dir, `${at}.kay`)
+
+        await Bun.write(path, source)
+
+        return path
+      }))
+
+      return new VariantIndex(paths).entry(table)
+    }
+
+    expect(await entry(call('sortable={false}'))).not.toContain('sortable')
+    expect(await entry(call('sortable={false}'), call(''))).toContain('sortable')
+    expect(await entry(call('sortable={false}'), call('sortable={flag}'))).toContain('sortable')
+    expect(await entry(call('sortable={false} {...rest}'))).toContain('sortable')
+    await rm(dir, { recursive: true, force: true })
   })
 })

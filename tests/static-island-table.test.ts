@@ -53,7 +53,10 @@ describe('the Table', () => {
     expect(listed).not.toContain('sortable')
     expect(listed).not.toContain('sortParam')
 
+    // Nor do the features a block or the sorting turn on: a plain Table's server markup holds them whole.
+    const quiet = new Set(['sortParam', 'sortable', 'header', 'cell', 'noMatch'])
+
     for (const name of await usesNames(source, file))
-      expect(name === 'sortParam' || listed.includes(name), name).toBe(true)
+      expect(quiet.has(name) || listed.includes(name), name).toBe(true)
   })
 })

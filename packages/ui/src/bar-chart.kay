@@ -40,7 +40,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, marks: events, onMark, emptyLabel, empty, onSelect, href, newTab, onActiveChange, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = uses('stacked') ? wording('ui.barChart.total', 'Total') : '', legend, marks: events, onMark, emptyLabel, empty, onSelect, href, newTab, onActiveChange, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   labels: string[]
   series: BarSeries[]
   // Formats the y-axis labels, the tooltips and the readings screen readers hear.
@@ -81,14 +81,14 @@ const { labels, series, formatValue = (value: number) => formatNumber(value), fo
   label: string
 }>()
 
-const ratios = memo(() => barRatios(series.map(item => item.values), stacked, labels.length))
+const ratios = memo(() => barRatios(series.map(item => item.values), uses('stacked') && stacked, labels.length))
 const ticks = memo(() => valueTicks(ratios().top))
 const times = memo(() => labelTimes(labels))
-const shown = memo(() => new Set(xLabels ? tickIndices(labels.length) : []))
-const axisTexts = memo(() => tickTexts(labels, times(), formatLabel))
+const shown = uses('xLabels') ? memo(() => new Set(xLabels ? tickIndices(labels.length) : [])) : undefined
+const axisTexts = uses('xLabels') ? memo(() => tickTexts(labels, times(), formatLabel)) : undefined
 const headingTexts = memo(() => headings(labels, times(), formatLabel))
 const gaps = () => `--bar-gaps: ${Math.max(labels.length - 1, 1)}`
-const edge = (at: number) => labels.length < 2 ? undefined : at === 0 ? 'start' : at === labels.length - 1 ? 'end' : undefined
+const edge = uses('xLabels') ? (at: number) => labels.length < 2 ? undefined : at === 0 ? 'start' : at === labels.length - 1 ? 'end' : undefined : undefined
 const colors = (item: BarSeries, index: number, at: number) => item.colors?.[at] ?? item.color ?? PALETTE[index % PALETTE.length]!
 // With several series each is also hatched by its place, so the bars and the legend are told apart without their colours.
 const fill = (item: BarSeries, index: number, at: number) => seriesFill(colors(item, index, at), index, series.length > 1)
@@ -127,7 +127,7 @@ function markPressed(event: MouseEvent, item: PlacedEvent) {
 
 // What a bar column reads on hover and focus, and to screen readers: the label, each series' reading, the notes the series carry for it and the events marked on it.
 const summaries = memo(() => labels.map((_, at) => {
-  const total = stacked ? [`${totalLabel} ${formatValue(series.reduce((sum, item) => sum + (item.values[at] ?? 0), 0))}`] : []
+  const total = uses('stacked') && stacked ? [`${totalLabel} ${formatValue(series.reduce((sum, item) => sum + (item.values[at] ?? 0), 0))}`] : []
   const notes = [...series.map(item => item.notes?.[at]), ...placed().filter(item => item.index === at).map(item => item.event.title)].filter(Boolean)
 
   return `${headingTexts()[at]}: ${[...series.map(item => `${item.name} ${reading(item, at)}`), ...total].join(', ')}${notes.length > 0 ? `; ${notes.join('; ')}` : ''}`
@@ -184,9 +184,9 @@ const nothing = () => emptyLabel ?? wording('ui.barChart.empty', 'No data yet.')
 snippet bars(at: number)
   for item, index of series key={item.name}
     if ratios().heights[index]![at]
-      span(part="bar" data-stacked={stacked ? '' : undefined} style={`height: ${ratios().heights[index]![at]! * 100}%; ${fill(item, index, at)}`})
+      span(part="bar" data-stacked={uses('stacked') && stacked ? '' : undefined} style={`height: ${ratios().heights[index]![at]! * 100}%; ${fill(item, index, at)}`})
     else if marked(item, at)
-      span(part="bar" data-stub data-stacked={stacked ? '' : undefined} style={fill(item, index, at)})
+      span(part="bar" data-stub data-stacked={uses('stacked') && stacked ? '' : undefined} style={fill(item, index, at)})
 if labels.length === 0
   // The app's id and class stay on whichever element shows.
   if empty
@@ -203,13 +203,13 @@ else
       div(part="columns" style={gaps()})
         for _, at of labels key={at}
           if uses('href') && markKind(link(at)?.href, onSelect !== undefined) === 'link'
-            a(part="column" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+            a(part="column" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={uses('stacked') && stacked ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
           else if uses('onSelect') && onSelect
-            button(part="column" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={() => void onSelect?.({ item: mark(at) })} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+            button(part="column" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={uses('stacked') && stacked ? '' : undefined} onClick={() => void onSelect?.({ item: mark(at) })} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
           else
-            span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+            span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={uses('stacked') && stacked ? '' : undefined} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
       if uses('marks') && placed().length > 0
         div(part="events" style={gaps()} aria-hidden={placed().some(item => item.event.href) || onMark ? undefined : 'true'})
@@ -228,10 +228,10 @@ else
     if uses('tooltip') && tooltip && marks.current() !== null && marks.anchor()
       div(part="tooltip" ref={tip!.watch} style={tip!.place(marks.anchor()!)} aria-hidden="true")
         {tooltip(mark(marks.current()!))}
-    if xLabels
+    if uses('xLabels') && xLabels
       div(part="axis" aria-hidden="true" style={gaps()})
         for _, at of labels key={at}
-          span(part="axisLabel" data-edge={edge(at)}) {shown().has(at) ? axisTexts()[at] : ''}
+          span(part="axisLabel" data-edge={edge!(at)}) {shown!().has(at) ? axisTexts!()[at] : ''}
     if legend ?? series.length > 1
       ul(part="legend")
         for item, index of series key={item.name}
