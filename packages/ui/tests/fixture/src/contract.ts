@@ -38,6 +38,7 @@ import Form from '@kayjs/ui/form.kay'
 import HoverCard from '@kayjs/ui/hover-card.kay'
 import IconButton from '@kayjs/ui/icon-button.kay'
 import IconPicker from '@kayjs/ui/icon-picker.kay'
+import IconTile from '@kayjs/ui/icon-tile.kay'
 import Icon from '@kayjs/ui/icon.kay'
 import ImageCropper from '@kayjs/ui/image-cropper.kay'
 import LineChart from '@kayjs/ui/line-chart.kay'
@@ -157,6 +158,7 @@ export const COMPONENTS = {
   'icon-button': IconButton,
   'icon-picker': IconPicker,
   'icon': Icon,
+  'icon-tile': IconTile,
   'image-cropper': ImageCropper,
   'line-chart': LineChart,
   'load-more': LoadMore,
@@ -258,6 +260,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'icon-button': { icon, label: 'Add' },
   'icon-picker': { icons: async () => new Promise<never[]>(() => undefined), searchLabel: 'Search icons' },
   'icon': { icon, label: 'Add' },
+  'icon-tile': { icon, color: '#2a5f9e' },
   'image-cropper': { src: '/map.png' },
   'line-chart': { labels: ['a', 'b'], series: [{ name: 'Visits', values: [1, 2] }], label: 'Visits' },
   'load-more': { list: { rows: () => [], ended: () => false, status: () => 'ready', error: () => undefined, pending: () => false, retry: noop, more: noop } },
