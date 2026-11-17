@@ -1430,7 +1430,8 @@ describe('the deprecations', () => {
     const { version } = (await Bun.file(join(import.meta.dir, '../package.json')).json()) as { version: string }
     const [major, minor] = minorOf(version)!
     // Past their three minors, kept until the old form they recognise goes: when one does, its line goes from this list and its lint from LINTS.
-    const overdue = new Set<string>()
+    // `--- script` opening a file goes with its lint in #3408, once the fixtures and apps are rewritten.
+    const overdue = new Set<string>(['deprecated-script-fence'])
     // Kept to 2.0 on purpose: the old form it recognises works until then (#2595 box 14 removes both).
     const untilTwo = new Set(['deprecated-ui-props'])
     const past = Object.entries(LINTS).filter(([name, lint]) => {
@@ -1442,7 +1443,8 @@ describe('the deprecations', () => {
       return since !== undefined && (since[0] < major || since[1] + 3 < minor)
     }).map(([name]) => name)
 
-    expect(past.sort()).toEqual([...overdue])
+    expect(past.filter(name => !overdue.has(name))).toEqual([])
+    expect([...overdue].filter(name => !(name in LINTS))).toEqual([])
   })
 })
 
