@@ -1,0 +1,13 @@
+---
+import { signal } from 'kay'
+import Notice from '@kayjs/ui/notice.kay'
+
+const shown = signal(true)
+const dismissed = signal(0)
+---
+div
+  Notice#plain(label="Plain" dismissible)
+  Notice#framed(label="Framed" icon={true} dismissible onDismiss={() => dismissed = dismissed() + 1})
+  Notice#controlled(label="Controlled" open={shown()} onDismiss={() => shown = false})
+  button#show(type="button" onClick={() => shown = true}) Show
+  output#count {dismissed()}

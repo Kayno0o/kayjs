@@ -1,0 +1,5 @@
+---
+import NoticeDismissView from '../components/notice-dismiss-view.kay'
+---
+main
+  NoticeDismissView

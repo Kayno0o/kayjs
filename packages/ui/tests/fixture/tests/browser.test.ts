@@ -2191,3 +2191,32 @@ inBrowser('a Form checking its fields against the action\'s schema', () => {
     expect([await page.evaluate(() => document.querySelector('dialog[open]')), seen.count, page.errors]).toEqual([null, 0, []])
   }, 120_000)
 })
+
+inBrowser('a dismissed Notice', () => {
+  test('is hidden by its close button, a framed one too, and a controlled one shows again when the page says', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/notice-dismiss')
+    // Whether the notice takes any room, which `hidden` must remove even where the notice is a flex box.
+    const gone = (id: string) => page.evaluate((target: string) => {
+      const notice = document.getElementById(target)!
+
+      return { hidden: notice.hidden, display: getComputedStyle(notice).display, height: notice.getBoundingClientRect().height }
+    }, id)
+
+    for (const id of ['plain', 'framed', 'controlled'])
+      expect((await gone(id)).height).toBeGreaterThan(0)
+
+    for (const id of ['plain', 'framed', 'controlled']) {
+      await page.click(`#${id} button`)
+      await page.waitUntil((target: string) => document.getElementById(target)!.hidden, {}, id)
+      expect(await gone(id)).toEqual({ hidden: true, display: 'none', height: 0 })
+    }
+
+    expect(await page.evaluate(() => document.getElementById('count')!.textContent)).toBe('1')
+    await page.click('#show')
+    await page.waitUntil(() => !document.getElementById('controlled')!.hidden)
+    expect((await gone('controlled')).height).toBeGreaterThan(0)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
