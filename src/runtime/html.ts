@@ -9,8 +9,8 @@ import { NON_ROOT_TRAILING_SLASH } from './base'
 import { fieldDescription, fieldInvalid, fieldRequired } from './described'
 import { escape, escapeAttribute } from './escape'
 import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
-import { isBoolean, nativeConstraints } from './form'
-import { optionsOf, typeAttributes } from './form-types'
+import { isBoolean, nativeConstraints, schemaInputType } from './form'
+import { optionsOf } from './form-types'
 import { DATA_SCRIPT, headCheckpoint, LEADING_NEWLINE, restoreHead } from './head'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
@@ -670,6 +670,13 @@ export function formOptions(target: unknown, name: string): string {
   return optionsOf(schema?.properties?.[name], schema?.required?.includes(name) === true)
 }
 
+// The `type` the schema gives an input that writes none, which a component requiring the field reads to know a file or a checkbox.
+export function formType(target: unknown, name: string): string | undefined {
+  const field = schemaOf(target)?.properties?.[name]
+
+  return field && schemaInputType(field)
+}
+
 // Which of two fills an `input(field=...)` with no `type` takes: a ticked box for a boolean of the schema, else a value.
 export function schemaFill(target: unknown, name: string, value: (type: string | undefined) => string, checked: () => string): string {
   const field = schemaOf(target)?.properties?.[name]
@@ -677,7 +684,7 @@ export function schemaFill(target: unknown, name: string, value: (type: string |
   if (field && isBoolean(field))
     return checked()
 
-  return value(field && typeAttributes(field, false, false).some(([key, type]) => key === 'type' && type === 'date') ? 'date' : undefined)
+  return value(field && schemaInputType(field) === 'date' ? 'date' : undefined)
 }
 
 // The `p` an `error` line shows a refused form's message in, nothing while there is none.

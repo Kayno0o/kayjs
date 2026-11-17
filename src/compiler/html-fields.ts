@@ -46,7 +46,7 @@ interface Fill {
 
 // A field's `value`, or `checked` for a boolean. An input that writes no `type` takes the one its schema gives it, so which of the two it is is only known as it renders.
 export function addFieldFill(b: CodeBuilder, src: string, element: ElementNode, markup: Markup, fill: Fill, field: FormField, typed: boolean): void {
-  const one = (filled: 'value' | 'checked') => addFilled(b, src, element, { ...fill, filled, own: filled === fill.filled ? fill.own : undefined, schemaType: true })
+  const one = (filled: 'value' | 'checked', box = fill.box) => addFilled(b, src, element, { ...fill, filled, box, own: filled === fill.filled ? fill.own : undefined, schemaType: true })
 
   if (!(typed && field.marked && fill.filled === 'value')) {
     markup.dynamic(() => one(fill.filled))
@@ -60,9 +60,25 @@ export function addFieldFill(b: CodeBuilder, src: string, element: ElementNode, 
     b.add(', (KaySchemaType) => ')
     one('value')
     b.add(', () => ')
-    one('checked')
+    one('checked', fill.own)
+
+    // The `value` a box posts when ticked, which the template wrote.
+    if (fill.own) {
+      b.add(` + ${helperName('attribute')}("value", `)
+      fill.own()
+      b.add(')')
+    }
+
     b.add(')')
   })
+}
+
+// The call reading the `type` the schema gives an input that writes none, for a component requiring the field to know what it is.
+export function schemaTypeCall(b: CodeBuilder, element: string, type: unknown, field: FormField | undefined, target: Span | undefined): (() => void) | undefined {
+  if (element !== 'input' || type !== undefined || !field?.marked || !target)
+    return undefined
+
+  return () => void b.add(`${helperName('formType')}((`).addSource(target).add(`), ${JSON.stringify(field.name)})`)
 }
 
 // Whether a `select(field=...)` writes no options, which its schema's enum gives it.

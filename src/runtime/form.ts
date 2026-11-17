@@ -148,6 +148,11 @@ export function nativeConstraints(field: FieldSchema, required: boolean, name?: 
   return found
 }
 
+// The `type` an input takes from the field's schema, none for a field with no particular one.
+export function schemaInputType(field: FieldSchema): string | undefined {
+  return typeAttributes(field, isNumeric(field), isBoolean(field)).find(([name]) => name === 'type')?.[1]
+}
+
 function refusesBlank(field: FieldSchema): boolean {
   if (field.const !== undefined)
     return field.const !== ''

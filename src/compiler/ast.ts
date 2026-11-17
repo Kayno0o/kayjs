@@ -354,7 +354,7 @@ export function formFieldOf(element: ElementNode, source: string, inherited?: st
     field.fill = 'content'
   else if (element.name === 'select')
     field.fill = attributes.has('multiple') ? undefined : 'selected'
-  else if (inputType === 'checkbox' || inputType === 'radio')
+  else if (inputType === 'checkbox' || inputType === 'radio' || (type === undefined && attributes.has('checked')))
     field.fill = 'checked'
   else if (!UNFILLED_TYPES.has(inputType))
     field.fill = 'value'

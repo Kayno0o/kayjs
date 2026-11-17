@@ -1,5 +1,6 @@
 import type { Reader } from './a11y-markup'
 import type { Diagnostic, ElementNode, KayFile, NamedAttribute, Node, SnippetNode } from './ast'
+import { autocompleteByName } from '../runtime/form-types'
 import { elementHasContent, markupLints, reader } from './a11y-markup'
 import { ABSTRACT_ROLES, ARIA_ATTRIBUTES, ARIA_STATE_VALUES, closest, REQUIRED_STATES, ROLES, validAutocomplete } from './aria'
 import { childBlocks, nodeExpressions, sectionOf, visitNodes } from './ast'
@@ -11,6 +12,12 @@ const UNLABELLED_TYPES = new Set(['hidden', 'submit', 'reset', 'button', 'image'
 // What names an element besides its content.
 const NAMING = ['aria-label', 'aria-labelledby', 'title']
 const HEADING = /^h([1-6])$/
+
+// Whether the schema gives a `field` its `autocomplete` at render: `email` for an email field, and what the name of a password asks for.
+function schemaAutocompletes(field: string | undefined, type: string): boolean {
+  return field !== undefined && (type === 'email' || autocompleteByName(field) !== undefined)
+}
+
 const UI_IMPORT = /^import\b[^\n]*['"]@kayjs\/ui\/[^'"\n]*['"];?[ \t]*$/gm
 const TOOLTIP_IMPORT = /^import\s+Tooltip\s+from\s+['"]@kayjs\/ui\/tooltip\.kay['"]/m
 const WHITESPACE_CHAR = /\s/
@@ -556,7 +563,7 @@ function elementLints(file: KayFile): Diagnostic[] {
         lint(pointer.name, 'mouse-only-event', `\`${text(pointer.name)}\` has no keyboard counterpart on this \`${element.name}\``, { note: 'what the pointer reveals or hides is never reached by a keyboard user, whom only focus tells', help: `handle \`${wanted}\` the same way, on an element the keyboard reaches` })
     }
 
-    if (element.name === 'input' && type !== undefined && FILLED_TYPES.has(type) && !has(element, 'autocomplete'))
+    if (element.name === 'input' && type !== undefined && FILLED_TYPES.has(type) && !has(element, 'autocomplete') && !schemaAutocompletes(staticValue(element, 'field'), type))
       lint(element, 'missing-autocomplete', `This \`${type}\` input has no \`autocomplete\``, { note: 'a browser or a password manager fills a field from it, which people with motor or memory difficulties rely on', help: type === 'email' ? 'write `autocomplete="email"`, or `username`' : 'write `autocomplete="current-password"` or `new-password`' })
 
     const autocomplete = staticValue(element, 'autocomplete')

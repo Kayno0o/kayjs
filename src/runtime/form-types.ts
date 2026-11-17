@@ -72,6 +72,11 @@ export function autocompleteOf(field: FieldSchema, name: string): string | undef
   if (field.format === 'email' || field.format === 'url')
     return field.format
 
+  return autocompleteByName(name)
+}
+
+// The token a field name asks for, whatever its schema says.
+export function autocompleteByName(name: string): string | undefined {
   return NAMED_AUTOCOMPLETE.get(name.replace(NAME_SEPARATORS, '').toLowerCase())
 }
 

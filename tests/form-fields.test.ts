@@ -249,3 +249,48 @@ describe('a field typed by its schema', () => {
     expect(refused.html).toContain('<option value="support" selected>Support &amp; help</option>')
   })
 })
+
+describe('a field typed by its schema, the gaps a review found', () => {
+  it('shows a date from the record in the field\'s own format', async () => {
+    const { html } = await site.visit('/typed')
+
+    expect(html).toContain('<input name="born" required type="date" value="2020-01-05">')
+  })
+
+  it('lists the options of a disabled select, an enum value holding a >, and a union of literals', async () => {
+    const { html } = await site.visit('/typed')
+
+    expect(html).toContain('<option value="a&gt;b">Angle</option>')
+    expect(html).toContain('<select name="plan" disabled><option value="basic">basic</option><option value="plus">plus</option></select>')
+  })
+
+  it('reselects an option value holding a > after a refused post', async () => {
+    const { typed } = await import(join(import.meta.dir, 'fixtures/form-fields/src/routes/typed.kay')) as { typed: Action<Record<string, string | boolean>, unknown> }
+    const refused = await site.submit(typed, { email: 'a@b.co', topic: 'a>b', age: '20', price: '1', born: '2020-01-01' }, { from: '/typed' })
+
+    expect(refused.html).toContain('<option value="a&gt;b" selected>Angle</option>')
+  })
+
+  it('keeps the value a boolean input writes, and ticks it back only when a refused post had it', async () => {
+    const { html } = await site.visit('/typed')
+    const { typed } = await import(join(import.meta.dir, 'fixtures/form-fields/src/routes/typed.kay')) as { typed: Action<Record<string, string | boolean>, unknown> }
+    const refused = await site.submit(typed, { email: 'a@b.co', topic: 'sales', age: '20', price: '1', born: '2020-01-01' }, { from: '/typed' })
+
+    expect(html).toMatch(/<input name="consent"[^>]*type="checkbox"[^>]* value="yes"/)
+    expect(refused.html).not.toMatch(/<input name="consent"[^>]*checked/)
+  })
+
+  it('gives a file in a component requiring it no aria-required, as a typed one', async () => {
+    const { html } = await site.visit('/typed')
+    const file = /<div class="required"><input[^>]*>/.exec(html)?.[0] ?? ''
+
+    expect(file).toContain('type="file"')
+    expect(file).not.toContain('aria-required')
+  })
+
+  it('leaves a page of its own autocomplete to the lint where the schema gives it', () => {
+    const diagnostics = compileKay(`${ACTION}form(action={save})\n  input(field="title" type="email" aria-label="A")\n  input(field="newPassword" type="password" aria-label="B")\n  input(field="other" type="password" aria-label="C")\n`, 'page.kay', { check: true }).diagnostics.filter(diagnostic => diagnostic.message.includes('autocomplete'))
+
+    expect(diagnostics).toHaveLength(1)
+  })
+})

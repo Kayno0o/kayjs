@@ -9,7 +9,7 @@ import { actionOf, failedBlockOf, marksServerIsland, sectionOf, serverIslandOf }
 import { decodeEntities } from './expression'
 import { addFieldDescribed, addInvalidAttribute } from './field-described'
 import { valuesOf } from './form-info'
-import { addClassAttribute, addFieldFill, addSchemaOptions, listsFromSchema } from './html-fields'
+import { addClassAttribute, addFieldFill, addSchemaOptions, listsFromSchema, schemaTypeCall } from './html-fields'
 import { addInitial } from './html-initial'
 import { Markup } from './html-parts'
 import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, fixedSource, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
@@ -481,7 +481,8 @@ export class HtmlTemplate extends TemplateWriter {
     const describable = fieldAria !== undefined
     let ownDescribed: (() => void) | undefined
     let refusing: (() => void) | undefined
-    const fieldDescribed = (own: (() => void) | undefined, refusing?: () => void) => addFieldDescribed(b, own, type, fieldAria, refusing)
+    const schemaType = schemaTypeCall(b, name, type, field, target)
+    const fieldDescribed = (own: (() => void) | undefined, refusing?: () => void) => addFieldDescribed(b, own, type, fieldAria, refusing, schemaType)
 
     markup.text(`<${name}${element.fixed ?? ''}`)
 

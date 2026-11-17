@@ -1,7 +1,7 @@
 --- server
 import { action, s } from 'kay'
 
-export const TOPICS = { sales: 'Sales', support: 'Support & help' }
+export const TOPICS = { sales: 'Sales', support: 'Support & help', 'a>b': 'Angle' }
 
 export const typed = action(s.object({
   email: s.email(),
@@ -10,13 +10,20 @@ export const typed = action(s.object({
   price: s.number(),
   born: s.date(),
   agree: s.boolean(),
+  consent: s.boolean({ optional: true }),
   cv: s.file({ type: 'application/pdf' }),
   photos: s.files({ type: ['image/png', 'image/jpeg'] }),
   topic: s.enum(TOPICS),
   tier: s.enum(['free', 'pro'], { optional: true }),
+  plan: s.union([s.literal('basic'), s.literal('plus')]),
   firstName: s.string({ optional: true }),
   code: s.string({ optional: true, autocomplete: 'one-time-code' }),
 }), (_input, ctx) => ctx.fail(409, 'Taken'))
+
+const record = { born: new Date(Date.UTC(2020, 0, 5, 12)) }
+---
+--- script
+import RequiredField from '../components/required-field.kay'
 ---
 form(action={typed})
   input(field="email")
@@ -25,11 +32,20 @@ form(action={typed})
   input(field="price")
   input(field="born")
   input(field="agree")
+  input(field="consent" value="yes" checked)
   input(field="cv")
   input(field="photos")
   select(field="topic")
   select(field="tier")
+  select(field="plan" disabled)
   input(field="firstName")
   input(field="code" autocomplete="off")
   textarea(field="firstName")
   button Send
+form(action={typed} values={record})
+  input(field="born")
+  input(field="email" type="email" aria-label="Email")
+  input(field="newPassword" type="password" aria-label="Password")
+form(action={typed})
+  RequiredField
+    input(field="cv")
