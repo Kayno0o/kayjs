@@ -16,7 +16,8 @@ release level:
 	git fetch -q origin main
 	[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "main differs from origin/main: pull or land first" >&2; exit 1; }
 	# The tests of the commit released pass first, so a red run stops the release before version.ts commits and tags a bump that `ft release --tagged` would leave behind.
-	ft ci "$(git rev-parse HEAD)" --workflow test.yml --job test
+	# test.yml ignores a push of Markdown alone, so a docs-only HEAD is covered by the run of the newest commit that changed anything else.
+	ft ci "$(git log -1 --format=%H -- . ':(exclude)*.md')" --workflow test.yml --job test
 	# The apps on kay run against this commit first, dispatching the Apps workflow when no run covers it; KAY_SKIP_APPS_CI=1 skips it.
 	bun scripts/release-apps.ts
 	# The tag version.ts made, named by its output, so a failure below deletes that one and no other tag on HEAD.

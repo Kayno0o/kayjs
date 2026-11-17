@@ -106,6 +106,16 @@ describe('llms.txt and its docs', () => {
     }
   })
 
+  // A batch that merges two lanes' notes can keep an entry twice, or its older wording beside the newer one, which also pushes a release's archive past its size.
+  it('keeps each release-note entry once across a page and its archive', async () => {
+    for (const pair of ARCHIVES) {
+      const entries = (await Promise.all(pair.map(async file => Bun.file(join(root, file)).text()))).join('\n').split('\n').filter(line => line.startsWith('- '))
+      const seen = new Set<string>()
+
+      expect(entries.filter(line => seen.size === seen.add(line.slice(0, 100)).size)).toEqual([])
+    }
+  })
+
   it('lists every lint at its default level', () => {
     expect(Object.entries(LINTS).filter(([name, lint]) => !spec.includes(`| \`${name}\` | ${lint.level} |`)).map(([name]) => name)).toEqual([])
   })
