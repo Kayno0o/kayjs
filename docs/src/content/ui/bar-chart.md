@@ -42,6 +42,12 @@ With no labels, the chart reads `emptyLabel` instead, `No data yet.` by default.
 
 `onMark({ mark, index })` makes a mark without an `href` a button, as in LineChart. An `at` that is no label is left out, and several on one column stand side by side.
 
+## Goals and a fixed scale
+
+`goals={[{ value: 29, title: 'Pass mark' }]}` draws a dashed rule across the plot at each value, its `title` written on the rule and in every column's tooltip and what screen readers read. `color` changes the rule's colour. When the bars stay under a goal, the axis rises to reach it; a goal past the top is left out.
+
+The value axis ends at the highest reading rounded up to a round number. `max={40}` fixes it instead, so scores out of 40 read against the full scale and a failed exam does not fill the plot; a bar taller than `max` is cut at the top. LineChart and ScatterChart take the same `goals`.
+
 ## Pressing and linking
 
 `onSelect` makes every column a button handing back its mark, and `href` returns an address for a mark (or `undefined`) that makes it a link, so a middle click or a crawler finds it; a plain click on a link still goes to `onSelect` when given. `onActiveChange({ index })` hears the index the pointer or focus is on, `null` when it leaves, and `active` draws one as active, taking over from the pointer.

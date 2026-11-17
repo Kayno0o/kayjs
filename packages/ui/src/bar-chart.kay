@@ -2,12 +2,12 @@
 import type { JSX, Snippet } from 'kay'
 import type { LabelFormat } from './chart-axis'
 import type { BarSeries } from './plot'
-import type { ChartEvent, ChartMark } from './chart-marks'
+import type { ChartEvent, ChartGoal, ChartMark } from './chart-marks'
 import { memo, recipe, signal } from 'kay'
 import { tabOf } from './outside'
 import type { NewTab } from './outside'
 import type { PlacedEvent } from './chart-marks'
-import { activeMarks, chartTooltip, EVENT_LOOK, markKind, placeEvents, TOOLTIP_LOOK } from './chart-marks'
+import { activeMarks, chartTooltip, EVENT_LOOK, GOAL_LOOK, goalColor, goalText, markKind, placeEvents, TOOLTIP_LOOK, validGoals } from './chart-marks'
 import { headings, labelTimes, tickIndices, tickTexts } from './chart-axis'
 import { barRatios, PALETTE, seriesFill, steppedPoint, valueTicks } from './plot'
 import { formatNumber, wording } from 'kay/words'
@@ -33,6 +33,8 @@ const look = recipe({
     axis: 'ml-10 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
     // The first and the last label line up with the plot's edges, so a label wider than its slot spills inward and not out of the figure.
     axisLabel: 'flex min-w-0 flex-1 justify-center data-[edge=start]:justify-start data-[edge=end]:justify-end text-2xs whitespace-nowrap text-[var(--color-muted)]',
+    goal: GOAL_LOOK.goal,
+    goalLabel: GOAL_LOOK.goalLabel,
     tooltip: TOOLTIP_LOOK,
     legend: 'm-0 flex list-none flex-wrap gap-4 p-0 pl-1',
     legendItem: 'flex items-center gap-1.5 text-xs text-muted',
@@ -40,7 +42,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = uses('stacked') ? wording('ui.barChart.total', 'Total') : '', legend, marks: events, onMark, emptyLabel, empty, onSelect, href, newTab, onActiveChange, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = uses('stacked') ? wording('ui.barChart.total', 'Total') : '', legend, marks: events, onMark, goals, max, emptyLabel, empty, onSelect, href, newTab, onActiveChange, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   labels: string[]
   series: BarSeries[]
   // Formats the y-axis labels, the tooltips and the readings screen readers hear.
@@ -57,6 +59,10 @@ const { labels, series, formatValue = (value: number) => formatNumber(value), fo
   legend?: boolean | undefined
   // Events marked on the x axis, such as a change applied between two readings: a dashed rule over the column at `at` (a label, or an index into `labels`), its `title` in that column's tooltip and in what screen readers read, and a link to `href` when given, a tab stop of its own beside the columns. An `at` that is no label is left out, and several on one label stand side by side.
   marks?: ChartEvent[] | undefined
+  // Goals across the value axis, such as a pass mark: a dashed rule at each `value` with its `title` written on it, in every column's tooltip and in what screen readers read. The axis reaches the highest goal when the bars stay under it; a goal past `max` is left out.
+  goals?: ChartGoal[] | undefined
+  // Fixes the top of the value axis, so bars read against a full scale (scores out of 40) rather than the highest reading rounded up; a taller bar is cut at it.
+  max?: number | undefined
   // Makes each mark a button handing back the mark and its place in `marks`; a mark with an `href` stays a link, and a plain click on it goes to `onMark` too. A mark with neither stays a plain rule.
   onMark?: ((event: { mark: ChartEvent, index: number }) => unknown) | undefined
   // Makes every column a button handing back its label, index and each series' value there; with `href` too, a column that has an address stays a link.
@@ -81,7 +87,10 @@ const { labels, series, formatValue = (value: number) => formatNumber(value), fo
   label: string
 }>()
 
-const ratios = memo(() => barRatios(series.map(item => item.values), uses('stacked') && stacked, labels.length))
+const drawnGoals = memo(() => uses('goals') ? validGoals(goals) : [])
+const ratios = memo(() => barRatios(series.map(item => item.values), uses('stacked') && stacked, labels.length, { max: uses('max') ? max : undefined, floor: Math.max(0, ...drawnGoals().map(goal => goal.value)) }))
+const goalsOnAxis = memo(() => drawnGoals().filter(goal => ratios().top > 0 && goal.value >= 0 && goal.value <= ratios().top))
+const goalNotes = memo(() => goalsOnAxis().map(goal => goalText(goal, formatValue)))
 const ticks = memo(() => valueTicks(ratios().top))
 const times = memo(() => labelTimes(labels))
 const shown = uses('xLabels') ? memo(() => new Set(xLabels ? tickIndices(labels.length) : [])) : undefined
@@ -132,7 +141,7 @@ const markPressed = uses('marks')
 // What a bar column reads on hover and focus, and to screen readers: the label, each series' reading, the notes the series carry for it and the events marked on it.
 const summaries = memo(() => labels.map((_, at) => {
   const total = uses('stacked') && stacked ? [`${totalLabel} ${formatValue(series.reduce((sum, item) => sum + (item.values[at] ?? 0), 0))}`] : []
-  const notes = [...series.map(item => item.notes?.[at]), ...placed().filter(item => item.index === at).map(item => item.event.title)].filter(Boolean)
+  const notes = [...series.map(item => item.notes?.[at]), ...placed().filter(item => item.index === at).map(item => item.event.title), ...goalNotes()].filter(Boolean)
 
   return `${headingTexts()[at]}: ${[...series.map(item => `${item.name} ${reading(item, at)}`), ...total].join(', ')}${notes.length > 0 ? `; ${notes.join('; ')}` : ''}`
 }))
@@ -219,6 +228,9 @@ else
           else
             span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={uses('stacked') && stacked ? '' : undefined} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
+      for goal, at of goalsOnAxis() key={at}
+        span(part="goal" aria-hidden="true" style={`bottom: ${goal.value / ratios().top * 100}%${goalColor(goal) ? `; ${goalColor(goal)}` : ''}`})
+          span(part="goalLabel") {goal.title}
       if uses('marks') && placed().length > 0
         div(part="events" style={gaps()} aria-hidden={placed().some(item => item.event.href) || onMark ? undefined : 'true'})
           for _, at of labels key={at}

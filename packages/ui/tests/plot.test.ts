@@ -155,3 +155,14 @@ describe('barRatios', () => {
     expect(valueTicks(5).map(tick => tick.ratio)).toEqual([0, 0.5, 1])
   })
 })
+
+describe('barRatios with a fixed top or a goal', () => {
+  test('a max fixes the top and cuts a taller bar at it', () => {
+    expect(barRatios([[18, 50]], false, 2, { max: 40 })).toEqual({ heights: [[18 / 40, 1]], top: 40 })
+  })
+
+  test('a floor lifts the top to round up from it when the readings are lower', () => {
+    expect(barRatios([[18]], false, 1, { floor: 29 }).top).toBe(40)
+    expect(barRatios([[18]], false, 1, { floor: 5 }).top).toBe(20)
+  })
+})

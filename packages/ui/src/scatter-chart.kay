@@ -4,8 +4,9 @@ import type { ScatterAxis, ScatterPoint } from './plot'
 import { memo, recipe, signal } from 'kay'
 import { tabOf } from './outside'
 import type { NewTab } from './outside'
-import { activeMarks, chartTooltip, markKind, TOOLTIP_LOOK } from './chart-marks'
-import { axisExtent, axisPercent, dotSize, steppedPoint } from './plot'
+import type { ChartGoal } from './chart-marks'
+import { activeMarks, chartTooltip, GOAL_LOOK, goalColor, goalText, markKind, TOOLTIP_LOOK, validGoals } from './chart-marks'
+import { axisExtent, axisPercent, axisReaches, dotSize, steppedPoint } from './plot'
 import { wording } from 'kay/words'
 import { uses } from './uses'
 
@@ -18,16 +19,20 @@ const look = recipe({
     grid: 'absolute bg-border data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
     tick: 'absolute text-2xs whitespace-nowrap text-[var(--color-muted)] tabular-nums data-[axis=x]:top-full data-[axis=x]:mt-1 data-[axis=x]:-translate-x-1/2 data-[axis=y]:right-full data-[axis=y]:mr-2 data-[axis=y]:-translate-y-1/2',
     guide: 'absolute bg-border-strong data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
+    goal: GOAL_LOOK.goal,
+    goalLabel: GOAL_LOOK.goalLabel,
     corner: 'pointer-events-none absolute text-2xs text-[var(--color-muted)] data-[corner=bottomLeft]:bottom-1.5 data-[corner=bottomLeft]:left-2 data-[corner=bottomRight]:right-2 data-[corner=bottomRight]:bottom-1.5 data-[corner=topLeft]:top-1.5 data-[corner=topLeft]:left-2 data-[corner=topRight]:top-1.5 data-[corner=topRight]:right-2',
     tooltip: TOOLTIP_LOOK,
     dot: 'absolute h-(--_dot-size) w-(--_dot-size) -translate-x-1/2 translate-y-1/2 rounded-full bg-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100 data-lit:z-10 data-lit:opacity-100 data-interactive:cursor-pointer data-interactive:focus-visible:opacity-100 data-interactive:focus-visible:outline-2 data-interactive:focus-visible:outline-foreground',
   },
 })
 
-const { points, x = {}, y = {}, quadrant, corners, onSelect, href, newTab, onActiveChange, onActive, active, tooltip, emptyLabel, empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { points, x = {}, y = {}, quadrant, goals, corners, onSelect, href, newTab, onActiveChange, onActive, active, tooltip, emptyLabel, empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   points: Point[]
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined
+  // Goals across the y axis, such as a pass mark: a dashed rule at each `value` with its `title` written on it, named for screen readers; a goal outside the axis is left out.
+  goals?: ChartGoal[] | undefined
   // Guides through this point, splitting the plot into four regions that `corners` name.
   quadrant?: { x: number, y: number } | undefined
   corners?: { topLeft?: string, topRight?: string, bottomLeft?: string, bottomRight?: string } | undefined
@@ -56,6 +61,9 @@ const { points, x = {}, y = {}, quadrant, corners, onSelect, href, newTab, onAct
 const xExtent = memo(() => axisExtent(points.map(point => point.x), x))
 const yExtent = memo(() => axisExtent(points.map(point => point.y), y))
 const heaviest = memo(() => Math.max(...points.map(point => point.weight ?? 1)))
+
+// The goals the y axis reaches, in the order given.
+const reached = memo(() => uses('goals') ? validGoals(goals).filter(goal => axisReaches(goal.value, yExtent(), y.scale)) : [])
 
 // Where a dot sits and how large it is, its area following its weight against the heaviest point.
 const place = (point: Point) => `left: ${axisPercent(point.x, xExtent(), x.scale)}%; bottom: ${axisPercent(point.y, yExtent(), y.scale)}%; --_dot-size: ${dotSize(point.weight ?? 1, heaviest())}rem`
@@ -106,6 +114,8 @@ function focused(event: FocusEvent, at: number) {
   marks.enter(at, event.currentTarget as Element)
 }
 
+const formatGoal = (value: number) => y.ticks?.find(tick => tick.value === value)?.label ?? String(value)
+
 const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => text)
 ---
 if points.length === 0
@@ -129,6 +139,9 @@ else
       if quadrant
         span(part="guide" data-axis="y" style={`bottom: ${axisPercent(quadrant.y, yExtent(), y.scale)}%`})
         span(part="guide" data-axis="x" style={`left: ${axisPercent(quadrant.x, xExtent(), x.scale)}%`})
+      for goal, at of reached() key={at}
+        span(part="goal" role="img" aria-label={goalText(goal, formatGoal)} style={`bottom: ${axisPercent(goal.value, yExtent(), y.scale)}%${goalColor(goal) ? `; ${goalColor(goal)}` : ''}`})
+          span(part="goalLabel" aria-hidden="true") {goal.title}
       for entry of cornerEntries() key={entry[0]}
         span(part="corner" data-corner={entry[0]}) {entry[1]}
       for point, at of points key={point.key}

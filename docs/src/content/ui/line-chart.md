@@ -58,6 +58,10 @@ With an `href` the rule is a link, so a middle click or a new tab works, and a t
 
 `onMark({ mark, index })` makes a mark without an `href` a button handing back the mark and its place in `marks`, and hears a plain click on a link; a mark with neither stays a plain rule. A mark whose `at` matches no label is left out, and several on one label stand side by side. The same prop works on BarChart.
 
+## Goals
+
+`goals={[{ value: 29, title: 'Pass mark' }]}` draws a dashed rule across the plot at each value, with its `title` on it. The title joins the tooltip, the slider's reading and a row at the end of the table screen readers get, with the value. The axis stretches to take in a goal beyond every reading, unless `options.high` or `options.low` fix it, and a goal outside the axis is left out. BarChart and ScatterChart take the same prop.
+
 ## Data and axes
 
 `labels` is the x-axis labels, one per point of every series. `xLabels` draws them under the plot, up to five, spaced by time when every label is a date. `options` is merged over the chart's defaults, for what the props do not cover.

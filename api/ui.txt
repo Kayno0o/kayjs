@@ -998,11 +998,13 @@ component default
   emptyLabel?: string | undefined
   formatLabel?: LabelFormat | undefined
   formatValue?: ((value: number) => string) | undefined
+  goals?: ChartGoal[] | undefined
   href?: ((mark: ChartMark) => string | undefined) | undefined
   label: string
   labels: string[]
   legend?: boolean | undefined
   marks?: ChartEvent[] | undefined
+  max?: number | undefined
   newTab?: NewTab | undefined
   onActive?: ((index: null | number) => unknown) | undefined
   onActiveChange?: ((event: { index: null | number; }) => unknown) | undefined
@@ -1016,6 +1018,8 @@ component default
   tick?: string | undefined;
   columns?: string | undefined;
   column?: string | undefined;
+  goal?: string | undefined;
+  goalLabel?: string | undefined;
   events?: string | undefined;
   eventCell?: string | undefined;
   event?: string | undefined;
@@ -2107,6 +2111,7 @@ component default
   eventsLabel?: string | undefined
   formatLabel?: ((label: string, context: LabelContext) => string) | undefined
   formatValue?: ((value: number) => string) | undefined
+  goals?: ChartGoal[] | undefined
   href?: ((mark: ChartMark) => string | undefined) | undefined
   label: string
   labels: string[]
@@ -2127,6 +2132,8 @@ component default
   dot?: string | undefined;
   event?: string | undefined;
   eventRule?: string | undefined;
+  goal?: string | undefined;
+  goalLabel?: string | undefined;
   band?: string | undefined;
   overlay?: string | undefined;
   empty?: string | undefined;
@@ -2137,6 +2144,7 @@ component default
   tooltipName?: string | undefined;
   tooltipValue?: string | undefined;
   tooltipEvent?: string | undefined;
+  tooltipGoal?: string | undefined;
   data?: string | undefined;
   hint?: string | undefined;
   legend?: string | undefined;
@@ -2933,6 +2941,7 @@ component default
   corners?: undefined | { topLeft?: string; topRight?: string; bottomLeft?: string; bottomRight?: string; }
   empty?: Element
   emptyLabel?: string | undefined
+  goals?: ChartGoal[] | undefined
   href?: ((point: Point) => string | undefined) | undefined
   label: string
   newTab?: NewTab | undefined
@@ -2946,6 +2955,8 @@ component default
   grid?: string | undefined;
   tick?: string | undefined;
   guide?: string | undefined;
+  goal?: string | undefined;
+  goalLabel?: string | undefined;
   corner?: string | undefined;
   dot?: string | undefined;
   tooltip?: string | undefined;

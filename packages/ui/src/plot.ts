@@ -59,6 +59,13 @@ export function axisExtent(values: readonly number[], axis: ScatterAxis): [numbe
   return low === high ? [low, low + 1] : [low, high]
 }
 
+// Whether `value` falls within an axis spanning `extent`.
+export function axisReaches(value: number, extent: readonly [number, number], scale: AxisScale = 'linear'): boolean {
+  const at = scaled(value, scale)
+
+  return at >= extent[0] && at <= extent[1]
+}
+
 // Where `value` sits along an axis spanning `extent`, as a percentage from its start, clamped to the plot.
 export function axisPercent(value: number, extent: readonly [number, number], scale: AxisScale = 'linear'): number {
   const [low, high] = extent
@@ -151,8 +158,8 @@ function niceTop(value: number): number {
   return Number((step * scale).toPrecision(12))
 }
 
-// The height of each of `count` bars as a share of the plot (0 to 1), a stacked series laid on the ones before it, and the top value the plot spans, the highest reading rounded up to a round number. Only positive, finite readings draw a bar.
-export function barRatios(values: readonly (readonly (number | null)[])[], stacked: boolean, count: number): { heights: number[][], top: number } {
+// The height of each of `count` bars as a share of the plot (0 to 1), a stacked series laid on the ones before it, and the top value the plot spans, the highest reading (or `floor`, the highest goal) rounded up to a round number, or `max` as given, which a taller bar is cut at. Only positive, finite readings draw a bar.
+export function barRatios(values: readonly (readonly (number | null)[])[], stacked: boolean, count: number, fixed: { max?: number | undefined, floor?: number } = {}): { heights: number[][], top: number } {
   const positive = (row: readonly (number | null)[], at: number) => {
     const value = row[at]
 
@@ -169,10 +176,14 @@ export function barRatios(values: readonly (readonly (number | null)[])[], stack
     top = Math.max(top, own)
   }
 
-  if (top > 0)
+  top = Math.max(top, fixed.floor ?? 0)
+
+  if (fixed.max !== undefined && Number.isFinite(fixed.max) && fixed.max > 0)
+    top = fixed.max
+  else if (top > 0)
     top = niceTop(top)
 
-  return { heights: values.map(row => Array.from({ length: count }, (_, at) => top > 0 ? positive(row, at) / top : 0)), top }
+  return { heights: values.map(row => Array.from({ length: count }, (_, at) => top > 0 ? Math.min(1, positive(row, at) / top) : 0)), top }
 }
 
 // The grid lines of a bar plot as shares of its height: the baseline, the middle and the top, or the baseline alone when nothing is positive.

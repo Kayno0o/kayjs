@@ -236,3 +236,44 @@ describe('BarChart', () => {
     expect(second.getAttribute('data-tooltip')).toBe('Tue: Minutes 0')
   })
 })
+
+describe('goals', () => {
+  test('a BarChart with max and a goal draws its axis to the max and a rule at the goal\'s share of the plot, read in each column', async () => {
+    const root = await charts()
+    const ticks = [...root.querySelectorAll('#goaled [data-part="tick"]')].map(tick => tick.textContent)
+    const goals = root.querySelectorAll<HTMLElement>('#goaled [data-part="goal"]')
+
+    expect(ticks).toEqual(['0', '20', '40'])
+    expect(goals).toHaveLength(1)
+    expect(goals[0]!.style.bottom).toBe('72.5%')
+    expect(goals[0]!.textContent).toBe('Pass mark')
+    expect(root.querySelector('#goaled [data-part="column"]')?.getAttribute('aria-label')).toBe('One: Score 18; Pass mark: 29')
+    expect(root.querySelectorAll<HTMLElement>('#goaled [data-part="bar"]')[1]!.style.height).toBe('82.5%')
+  })
+
+  test('a BarChart with no max reaches a goal above every reading', async () => {
+    const root = await charts()
+
+    expect([...root.querySelectorAll('#reaching [data-part="tick"]')].map(tick => tick.textContent)).toEqual(['0', '20', '40'])
+    expect(root.querySelector<HTMLElement>('#reaching [data-part="goal"]')!.style.bottom).toBe('72.5%')
+  })
+
+  test('a LineChart names its goals in the tooltip and in a row of the table screen readers get', async () => {
+    const root = await charts()
+    const slider = root.querySelector<HTMLElement>('#goaledLine [role="slider"]')!
+    const row = root.querySelector('#goaledLine [data-part="data"] tfoot tr')!
+
+    expect(row.querySelector('th')?.textContent).toBe('Pass mark')
+    expect(row.querySelector('td')?.textContent).toBe('29')
+    expect(slider.getAttribute('aria-valuetext')).toBe('Wed: Score 25; Pass mark: 29')
+  })
+
+  test('a ScatterChart draws a goal inside its y axis, named for screen readers, and leaves one outside out', async () => {
+    const root = await charts()
+    const goals = root.querySelectorAll<HTMLElement>('#goaledDots [data-part="goal"]')
+
+    expect(goals).toHaveLength(1)
+    expect(goals[0]!.style.bottom).toBe('70%')
+    expect(goals[0]!.getAttribute('aria-label')).toBe('Target: 70')
+  })
+})

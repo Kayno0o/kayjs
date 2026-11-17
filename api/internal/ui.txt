@@ -681,6 +681,12 @@ interface ChartEvent
   href?: string | undefined
   title: string
 
+[./lib/chart-marks] ChartGoal
+interface ChartGoal
+  color?: string | undefined
+  title: string
+  value: number
+
 [./lib/chart-marks] ChartMark
 interface ChartMark
   index: number
@@ -695,6 +701,18 @@ const EVENT_LOOK: {
   readonly event: "pointer-events-none absolute flex w-2 -translate-x-1/2 justify-center bg-transparent p-0 outline-none data-[kind=button]:pointer-events-auto data-[kind=link]:pointer-events-auto data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer data-[kind=link]:no-underline focus-visible:outline-2 focus-visible:outline-foreground";
   readonly eventRule: "h-full border-l border-dashed border-[var(--event-color,var(--color-warning))]";
 }
+
+[./lib/chart-marks] GOAL_LOOK
+const GOAL_LOOK: {
+  readonly goal: "pointer-events-none absolute inset-x-0 h-0 border-t border-dashed border-[var(--goal-color,var(--color-foreground))]";
+  readonly goalLabel: "absolute right-1 bottom-0.5 text-2xs whitespace-nowrap text-[var(--goal-color,var(--color-foreground))]";
+}
+
+[./lib/chart-marks] goalColor
+function goalColor(goal: ChartGoal): string | undefined
+
+[./lib/chart-marks] goalText
+function goalText(goal: ChartGoal, formatValue: (value: number) => string): string
 
 [./lib/chart-marks] markKind
 function markKind(href: string | undefined, selectable: boolean): MarkKind
@@ -719,6 +737,9 @@ interface SparkMark
 
 [./lib/chart-marks] TOOLTIP_LOOK
 const TOOLTIP_LOOK: "pointer-events-none fixed top-0 left-0 z-50 flex w-max max-w-full flex-col gap-0.5 border-solid border-[length:var(--border-width)] border-border-strong bg-surface-strong px-3 py-2 text-xs"
+
+[./lib/chart-marks] validGoals
+function validGoals(goals: readonly ChartGoal[] | undefined): ChartGoal[]
 
 [./lib/chartist] loaders
 const loaders: Loaders
@@ -2663,6 +2684,9 @@ function axisExtent(values: readonly number[], axis: ScatterAxis): [number, numb
 [./lib/plot] axisPercent
 function axisPercent(value: number, extent: readonly [number, number], scale?: AxisScale): number
 
+[./lib/plot] axisReaches
+function axisReaches(value: number, extent: readonly [number, number], scale?: AxisScale): boolean
+
 [./lib/plot] AxisScale
 type AxisScale = 'linear' | 'log'
 
@@ -2681,7 +2705,13 @@ interface BarListRow
   value: number
 
 [./lib/plot] barRatios
-function barRatios(values: readonly (readonly (null | number)[])[], stacked: boolean, count: number): { heights: number[][]; top: number; }
+function barRatios(values: readonly (readonly (null | number)[])[], stacked: boolean, count: number, fixed?: {
+  max?: number | undefined;
+  floor?: number;
+}): {
+  heights: number[][];
+  top: number;
+}
 
 [./lib/plot] BarSeries
 interface BarSeries extends ChartSeries

@@ -144,3 +144,32 @@ export const EVENT_LOOK = {
   event: 'pointer-events-none absolute flex w-2 -translate-x-1/2 justify-center bg-transparent p-0 outline-none data-[kind=button]:pointer-events-auto data-[kind=link]:pointer-events-auto data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer data-[kind=link]:no-underline focus-visible:outline-2 focus-visible:outline-foreground',
   eventRule: 'h-full border-l border-dashed border-[var(--event-color,var(--color-warning))]',
 } as const
+
+// A goal or reference line an app draws across a chart's value axis, such as a pass mark: a dashed rule at `value` with `title` written on it, in the tooltips and to screen readers.
+export interface ChartGoal {
+  value: number
+  title: string
+  // The rule's colour, else `--goal-color` or the foreground.
+  color?: string | undefined
+}
+
+// The look of a goal's rule and its title, shared by every chart with a value axis: the rule is as wide as the plot, the title sits on it at the right.
+export const GOAL_LOOK = {
+  goal: 'pointer-events-none absolute inset-x-0 h-0 border-t border-dashed border-[var(--goal-color,var(--color-foreground))]',
+  goalLabel: 'absolute right-1 bottom-0.5 text-2xs whitespace-nowrap text-[var(--goal-color,var(--color-foreground))]',
+} as const
+
+// The goals that have a finite value, the others being left out.
+export function validGoals(goals: readonly ChartGoal[] | undefined): ChartGoal[] {
+  return (goals ?? []).filter(goal => Number.isFinite(goal.value))
+}
+
+// What a goal reads as in a tooltip or to screen readers: its title and its value as the chart formats values.
+export function goalText(goal: ChartGoal, formatValue: (value: number) => string): string {
+  return `${goal.title}: ${formatValue(goal.value)}`
+}
+
+// The style of a goal's colour, if it has one.
+export function goalColor(goal: ChartGoal): string | undefined {
+  return goal.color === undefined || goal.color === '' ? undefined : `--goal-color: ${goal.color}`
+}
