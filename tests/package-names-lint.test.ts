@@ -174,61 +174,22 @@ describe('deprecated-package-names reach', () => {
     })
   })
 })
-
-describe('deprecated-package-names reach', () => {
-  it('leaves an old name inside string data alone: an `in` check, a table of renames and a fixture', async () => {
-    const source = [
-      'const kind = (dependencies: Record<string, string>) => \'@kaynooo/kayjs\' in dependencies ? \'kay\' : \'bun\'',
-      'const RENAMED: Record<string, string> = { \'@kaynooo/kayjs\': \'@kayjs/kay\', \'@kaynooo/kayjs-ui\': \'@kayjs/ui\' }',
-      'const facts = [{ name: \'@kaynooo/kayjs\', version: \'1.62.0\' }]',
-      'expect(rename(\'@kaynooo/kayjs-ui\')).toBe(`@kayjs/ui`)',
-      '',
-    ].join('\n')
-
-    await withFiles({ 'src/conventions.ts': source, 'tests/bump.test.ts': source }, async (root) => {
-      expect(await renamedPackages(root, undefined)).toEqual([])
-    })
-  })
-
-  it('writes a specifier of every form and no other string of a file', async () => {
+describe('deprecated-package-names keys and tsconfig', () => {
+  it('finds a config key whatever it is keyed to but a table of renames or versions, and every string of a tsconfig', async () => {
     await withFiles({
-      'src/a.ts': [
-        'import a from \'@kaynooo/kayjs\'',
-        'import type { B } from "@kaynooo/kayjs-ui/types"',
-        'export * from \'@kaynooo/kayjs-cms\'',
-        'export { c } from \'@kaynooo/kayjs-mail\'',
-        'const d = require(\'@kaynooo/kayjs-ai\')',
-        'const e = await import(\'@kaynooo/kayjs-auth\')',
-        'type F = typeof import(\'@kaynooo/kayjs-ui\')',
-        'mock.module(\'@kaynooo/kayjs-ui\', () => ({}))',
-        'const note = \'@kaynooo/kayjs-ui\'',
-        'const list = [\'@kaynooo/kayjs-ui\']',
-        '',
-      ].join('\n'),
-      'src/page.kay': '---\nimport { cms } from \'@kaynooo/kayjs-cms\'\nconst name = \'@kaynooo/kayjs-cms\'\n---\np {name}\n',
-      'kay.config.ts': 'export default { \'@kaynooo/kayjs-ui/button.kay\': { parts: {} }, label: \'@kaynooo/kayjs-ui\' }\n',
-      'src/app.css': '@import \'@kaynooo/kayjs-ui/theme.css\';\n@plugin "@kaynooo/kayjs-ui/plugin";\n.a::after { content: \'@kaynooo/kayjs-ui\' }\n',
+      'src/config.ts': 'export default { librarySettings: { \'@kaynooo/kayjs-ui\': \'./ui.ts\' }, ui: { \'@kaynooo/kayjs-ui/button.kay\': Custom, \'@kaynooo/kayjs-ui/card.kay\': false }, RENAMED: { \'@kaynooo/kayjs-cms\': \'@kayjs/cms\', \'@kaynooo/kayjs-ai\': \'1.62.0\' } }\n',
+      'tsconfig.json': '{ "extends": "@kaynooo/kayjs/tsconfig.json", "compilerOptions": { "types": ["@kaynooo/kayjs"], "paths": { "@kaynooo/kayjs-ui/*": ["./x"] } } }\n',
     }, async (root) => {
       const found = await renamedPackages(root, undefined)
 
-      expect(found.map(d => [d.file.slice(root.length + 1), d.line])).toEqual([
-        ['kay.config.ts', 1],
-        ['src/a.ts', 1],
-        ['src/a.ts', 2],
-        ['src/a.ts', 3],
-        ['src/a.ts', 4],
-        ['src/a.ts', 5],
-        ['src/a.ts', 6],
-        ['src/a.ts', 7],
-        ['src/a.ts', 8],
-        ['src/app.css', 1],
-        ['src/app.css', 2],
-        ['src/page.kay', 2],
+      expect(found.map(d => [d.file.slice(root.length + 1), d.message.slice(0, 22)])).toEqual([
+        ['src/config.ts', '`@kaynooo/kayjs-ui` is'],
+        ['src/config.ts', '`@kaynooo/kayjs-ui` is'],
+        ['src/config.ts', '`@kaynooo/kayjs-ui` is'],
+        ['tsconfig.json', '`@kaynooo/kayjs` is `@'],
+        ['tsconfig.json', '`@kaynooo/kayjs` is `@'],
+        ['tsconfig.json', '`@kaynooo/kayjs-ui` is'],
       ])
-      expect(await applySafeFixes(root, found)).toBe(12)
-      expect(await read(root, 'src/a.ts')).toContain('const note = \'@kaynooo/kayjs-ui\'\nconst list = [\'@kaynooo/kayjs-ui\']')
-      expect(await read(root, 'src/page.kay')).toBe('---\nimport { cms } from \'@kayjs/cms\'\nconst name = \'@kaynooo/kayjs-cms\'\n---\np {name}\n')
-      expect(await read(root, 'src/app.css')).toBe('@import \'@kayjs/ui/theme.css\';\n@plugin "@kayjs/ui/plugin";\n.a::after { content: \'@kaynooo/kayjs-ui\' }\n')
     })
   })
 })

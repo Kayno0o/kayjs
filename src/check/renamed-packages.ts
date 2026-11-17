@@ -37,15 +37,18 @@ const BEFORE_NAME_IN_STRING = /^(?:npm:|[\w./-]*node_modules\/)?$/
 const LINE_COMMENT = /(?:^|[^:])\/\//
 const KEY_END = /^"\s*:/
 
+// A tsconfig names a package anywhere a string does: `extends`, `types`, `paths`.
+type Kind = 'manifest' | 'tsconfig' | 'stylesheet' | 'script'
+
 // What opens the string of a module specifier in a script or a component: `from`, `import 'x'`, `import(`, `require(`, `require.resolve(`, `import.meta.resolve(`, `declare module` and a test's `mock.module(`.
 const SPECIFIER_BEFORE = /(?:\b(?:from|import|module)|\b(?:require|require\.resolve|import\.meta\.resolve|import|mock\.module)\s*\()\s*$/
-// A config key: a quoted name whose value is an object or an array, as an extension's options by component path. A name keyed to a string is data (a table of renames, a fixture).
-const CONFIG_KEY_END = /^[\w./-]*["'`]\s*:\s*[{[]/
+// A config key: a quoted name keyed to anything but a string that names a package or a version, which is data (a table of renames, a fixture of versions): `librarySettings: { '@kayjs/ui': './ui.ts' }` or a component path keyed to its options.
+const CONFIG_KEY_END = /^[\w./*-]*["'`]\s*:\s*(?!\s|["'`](?:@kay|[~^]?\d))/
 // What opens the path of a stylesheet that names a package.
 const STYLESHEET_BEFORE = /@(?:import|plugin|source|config|reference)\b[^;'"`]*$/
 
-// Whether the name at `index` is what the project depends on, not a word of a comment, a sentence or a string of data: in a stylesheet the path of an `@import`, `@plugin` or `@source`, in a script the specifier of an import, a `require` or `import()` or a config key, in a manifest a key or an alias.
-function namesAPackage(source: string, index: number, end: number, kind: 'manifest' | 'stylesheet' | 'script', comments: [number, number][]): boolean {
+// Whether the name at `index` is what the project depends on, not a word of a comment, a sentence or a string of data: in a stylesheet the path of an `@import`, `@plugin` or `@source`, in a script the specifier of an import, a `require` or `import()` or a config key, in a manifest a key or an alias, in a tsconfig any string.
+function namesAPackage(source: string, index: number, end: number, kind: Kind, comments: [number, number][]): boolean {
   if (comments.some(([from, to]) => index >= from && index < to))
     return false
 
@@ -62,6 +65,9 @@ function namesAPackage(source: string, index: number, end: number, kind: 'manife
   if (kind === 'manifest')
     return before.endsWith('npm:') || KEY_END.test(source.slice(end))
 
+  if (kind === 'tsconfig')
+    return true
+
   const opening = source.slice(Math.max(0, lineStart + quote - 200), lineStart + quote)
 
   if (kind === 'stylesheet')
@@ -70,9 +76,12 @@ function namesAPackage(source: string, index: number, end: number, kind: 'manife
   return SPECIFIER_BEFORE.test(opening) || (before.slice(quote + 1) === '' && CONFIG_KEY_END.test(source.slice(end)))
 }
 
-function kindOf(file: string): 'manifest' | 'stylesheet' | 'script' {
+function kindOf(file: string): Kind {
   if (basename(file) === 'package.json')
     return 'manifest'
+
+  if (file.endsWith('.json'))
+    return 'tsconfig'
 
   return file.endsWith('.css') ? 'stylesheet' : 'script'
 }
@@ -80,7 +89,7 @@ function kindOf(file: string): 'manifest' | 'stylesheet' | 'script' {
 // The position of each old package name a file depends on, as the lint and `kay upgrade` rewrite them.
 export function oldNamesIn(file: string, source: string): RegExpExecArray[] {
   const kind = kindOf(file)
-  const comments = kind === 'manifest' ? [] : [...source.matchAll(BLOCK_COMMENT)].map((c): [number, number] => [c.index, c.index + c[0].length])
+  const comments = kind === 'manifest' || kind === 'tsconfig' ? [] : [...source.matchAll(BLOCK_COMMENT)].map((c): [number, number] => [c.index, c.index + c[0].length])
 
   return [...source.matchAll(OLD_PACKAGE_NAME)].filter(match => namesAPackage(source, match.index, match.index + match[0].length, kind, comments))
 }
