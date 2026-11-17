@@ -204,18 +204,16 @@ export function partsClass(list: readonly unknown[]): string | undefined {
 
 // The `parts` of a call that hands parts on: the parts its list holds, with the rest of its classes at their root, laid over the `written` parts object of the call; none when there are neither.
 export function handParts(list: readonly unknown[], written?: unknown): unknown {
-  const own = typeof written === 'object' && written !== null && !Array.isArray(written) ? [writtenAsParts(written as Record<string, unknown>)] : []
+  const own = typeof written === 'object' && written !== null && !Array.isArray(written) ? [taggedParts(Object.fromEntries(Object.entries(written).map(([name, entry]) => [name, entryParts(entry)])))] : []
   const handed = partsIn(list)
   const all = handed === undefined ? own : [...own, handed]
 
   return all.length < 2 ? all[0] : mergeParts(all)
 }
 
-// The parts a call writes, the entry of a part that is a component its own parts, as `partClass` reads them from a prop.
-function writtenAsParts(written: Record<string, unknown>): Parts {
-  const entries = Object.entries(written).map(([name, entry]) => [name, typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry])
-
-  return taggedParts(Object.fromEntries(entries) as Record<string, unknown>)
+// The entry of a part that is a component is its own parts, as `partClass` reads it from a prop.
+function entryParts(entry: unknown): unknown {
+  return typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
 }
 
 // A part of this component handed to the called one under its name, `{ spinner: ... }`, which joins the entries the call hands it: its value is what the part's classes and the caller's entry make.
@@ -267,7 +265,7 @@ function taggedParts(parts: Record<string, unknown>): Parts {
 export function partClass(props: unknown, part: string): unknown {
   const { class: root, parts } = (props ?? {}) as { class?: unknown, parts?: unknown }
   const entry = typeof parts === 'object' && parts !== null && !Array.isArray(parts) && Object.hasOwn(parts, part) ? (parts as Record<string, unknown>)[part] : undefined
-  const added = typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry
+  const added = entryParts(entry)
   const given = part === 'root' ? root : undefined
 
   if (given === undefined || added === undefined)

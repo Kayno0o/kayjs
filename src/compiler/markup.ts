@@ -555,8 +555,11 @@ export abstract class TemplateWriter {
     if (element.name === 'img' && ownStyle !== undefined && element.attributes.lastIndexOf(ownStyle) < lastSpread)
       namedEntry(ownStyle, 'style')
 
-    if (mergedClass)
-      entry('class', () => this.mergedClass(element, classAttribute, spreads), true)
+    // A call that hands a part on always holds parts in its list, which carry the classes as their root: its `class` is the one a spread would bring, left off.
+    const hands = element.component && handedParts(element, this.src, this.facts.parts).length > 0
+
+    if (hands ? spreads : mergedClass)
+      entry('class', () => hands ? b.add('undefined') : this.mergedClass(element, classAttribute, spreads), !hands)
 
     if (element.component && parts.length > 0)
       entry('parts', () => this.mergedClass(element, classAttribute, spreads, writtenParts(element, this.src)), true)
