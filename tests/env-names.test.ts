@@ -85,6 +85,6 @@ describe('every variable the source reads', () => {
 
   it('spells the insecure flag <PREFIX>_INSECURE as an optional boolean in kayjs-mail and kayjs-ai', async () => {
     for (const [prefix, file] of [['MAIL', 'packages/mail/src/mailer.ts'], ['AI', 'packages/ai/src/config.ts']] as const)
-      expect(await Bun.file(join(ROOT, file)).text()).toContain(`${prefix}_INSECURE: s.Optional(s.Boolean(`)
+      expect(await Bun.file(join(ROOT, file)).text()).toContain(`${prefix}_INSECURE: s.boolean({ optional: true`)
   })
 })
