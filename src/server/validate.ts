@@ -180,6 +180,40 @@ function prepare(schema: unknown, value: unknown, source: Source, trim: boolean)
 }
 
 // Every place the value fails a schema, once each, the first reason for it.
+// A value that passed, without the keys an object of the old builders, which names no `additionalProperties`, was sent beside its shape: they are dropped as Elysia dropped them, so a handler never reads a key its schema does not name. A union's value is cleaned by the member it matches.
+function cleaned(schema: unknown, value: unknown): unknown {
+  if (!isNode(schema))
+    return value
+
+  if (Array.isArray(schema.anyOf)) {
+    const match = schema.anyOf.find(member => isNode(member) && matches(member, value))
+
+    return match === undefined ? value : cleaned(match, value)
+  }
+
+  if (Array.isArray(value))
+    return isNode(schema.items) ? value.map(item => cleaned(schema.items, item)) : value
+
+  if (!isPlain(value) || !isNode(schema.properties))
+    return value
+
+  const shape = schema.properties
+  // `false` refused the extra keys already; `true` or a schema keeps them.
+  const open = schema.additionalProperties !== undefined
+
+  return Object.fromEntries(Object.entries(value).filter(([name]) => open || Object.hasOwn(shape, name)).map(([name, field]) => [name, Object.hasOwn(shape, name) ? cleaned(shape[name], field) : field]))
+}
+
+function matches(member: Node, value: unknown): boolean {
+  try {
+    return compiledCheck(member as TSchema).Check(value)
+  }
+  catch {
+    // A member referring to a model by name compiles only with it: the value is then cleaned by none.
+    return false
+  }
+}
+
 function checked(schema: TSchema, source: Source, value: unknown, trim = true): Validated {
   const view = source === 'json' ? strictView(schema) : schema
   const check = compiledCheck(view)
@@ -187,7 +221,7 @@ function checked(schema: TSchema, source: Source, value: unknown, trim = true): 
 
   if (check.Check(read)) {
     try {
-      return { value: check.Decode(read) }
+      return { value: check.Decode(cleaned(view, read)) }
     }
     catch (error) {
       return refused([{ path: '', key: 'kay.invalid.type', params: {}, message: invalidWord('kay.invalid.type', error instanceof Error ? error.message : undefined) }])

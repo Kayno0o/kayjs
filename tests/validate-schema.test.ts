@@ -57,6 +57,13 @@ describe('validate', () => {
     expect(await validate(s.object({ a: s.string() }, { extra: 'strip' }), { a: 'x', b: 1 }, { source: 'json' })).toEqual({ value: { a: 'x' } })
   })
 
+  it('drops a key an object of the old builders does not name, inside a union and a list too', async () => {
+    const old = s.Union([s.Object({ type: s.Literal('a'), list: s.Array(s.Object({ n: s.Integer() })) }), s.Object({ type: s.Literal('b') })])
+
+    expect(await validate(old, JSON.parse('{"type":"a","x":1,"__proto__":{"y":1},"list":[{"n":1,"z":2}]}'), { source: 'json' })).toEqual({ value: { type: 'a', list: [{ n: 1 }] } })
+    expect(await validate(old, { type: 'b', x: 1 }, { source: 'json' })).toEqual({ value: { type: 'b' } })
+  })
+
   it('drops the spaces around a form\'s text, and keeps them with trim: false', async () => {
     const line = s.object({ prefix: s.string() })
 

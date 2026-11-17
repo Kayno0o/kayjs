@@ -71,15 +71,13 @@ describe('a websocket route with a body schema', () => {
     expect(await socket.next()).toEqual({ type: 'echo', body: { type: 'say', text: 'hi' }, kinds: ['type:string', 'text:string'] })
   })
 
-  it('coerces a valid message as an HTTP body is', async () => {
-    const socket = site.socket(rooms, '/')
-
-    socket.send({ type: 'move', at: '1' } as never)
-    expect(await socket.next()).toEqual({ type: 'echo', body: { type: 'move', at: 1 }, kinds: ['type:string', 'at:number'] })
+  it('refuses a number sent as text, as an HTTP JSON body is', async () => {
+    expect(refusals(await frames('/api/rooms', '{"type":"move","at":"1"}'))).toEqual(['kay.socket.invalid'])
+    expect(await frames('/api/rooms', '{"type":"move","at":1}')).toEqual([{ type: 'echo', body: { type: 'move', at: 1 }, kinds: ['type:string', 'at:number'] }])
 
     const http = await site.fetch('/api/rooms/h', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"at":"1"}' })
 
-    expect(await http.json()).toEqual({ at: 1 })
+    expect(http.status).toBe(422)
   })
 
   it('refuses a number past what the schema holds, a wrong kind and a missing field', async () => {
