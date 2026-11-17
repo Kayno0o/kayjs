@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { findProjectFiles } from '../build/files'
 import { lintLevel } from '../compiler/lints'
-import { OLD_PACKAGE_NAME, RENAMED_IN, RENAMED_PACKAGES, renamePackages } from '../package-names'
+import { OLD_PACKAGE_NAME, RENAMED_IN, RENAMED_PACKAGES } from '../package-names'
 
 // The files that name a package: the scripts, components and stylesheets of the project, and its manifest and tsconfigs.
 const NAMING_FILE = /^(?:package\.json|tsconfig[\w.-]*\.json)$|\.(?:[cm]?[jt]sx?|kay|css)$/
@@ -37,8 +37,15 @@ const BEFORE_NAME_IN_STRING = /^(?:npm:|[\w./-]*node_modules\/)?$/
 const LINE_COMMENT = /(?:^|[^:])\/\//
 const KEY_END = /^"\s*:/
 
-// Whether the name at `index` is what the project depends on, not a word of a comment or a sentence: it opens a quoted string (or follows `npm:` or a node_modules path in one), and in a manifest is a key or an alias.
-function namesAPackage(source: string, index: number, end: number, manifest: boolean, comments: [number, number][]): boolean {
+// What opens the string of a module specifier in a script or a component: `from`, `import 'x'`, `import(`, `require(`, `require.resolve(`, `import.meta.resolve(`, `declare module` and a test's `mock.module(`.
+const SPECIFIER_BEFORE = /(?:\b(?:from|import|module)|\b(?:require|require\.resolve|import\.meta\.resolve|import|mock\.module)\s*\()\s*$/
+// A config key: a quoted name whose value is an object or an array, as an extension's options by component path. A name keyed to a string is data (a table of renames, a fixture).
+const CONFIG_KEY_END = /^[\w./-]*["'`]\s*:\s*[{[]/
+// What opens the path of a stylesheet that names a package.
+const STYLESHEET_BEFORE = /@(?:import|plugin|source|config|reference)\b[^;'"`]*$/
+
+// Whether the name at `index` is what the project depends on, not a word of a comment, a sentence or a string of data: in a stylesheet the path of an `@import`, `@plugin` or `@source`, in a script the specifier of an import, a `require` or `import()` or a config key, in a manifest a key or an alias.
+function namesAPackage(source: string, index: number, end: number, kind: 'manifest' | 'stylesheet' | 'script', comments: [number, number][]): boolean {
   if (comments.some(([from, to]) => index >= from && index < to))
     return false
 
@@ -52,7 +59,30 @@ function namesAPackage(source: string, index: number, end: number, manifest: boo
   if (LINE_COMMENT.test(before.slice(0, quote)))
     return false
 
-  return !manifest || before.endsWith('npm:') || KEY_END.test(source.slice(end))
+  if (kind === 'manifest')
+    return before.endsWith('npm:') || KEY_END.test(source.slice(end))
+
+  const opening = source.slice(Math.max(0, lineStart + quote - 200), lineStart + quote)
+
+  if (kind === 'stylesheet')
+    return STYLESHEET_BEFORE.test(opening)
+
+  return SPECIFIER_BEFORE.test(opening) || (before.slice(quote + 1) === '' && CONFIG_KEY_END.test(source.slice(end)))
+}
+
+function kindOf(file: string): 'manifest' | 'stylesheet' | 'script' {
+  if (basename(file) === 'package.json')
+    return 'manifest'
+
+  return file.endsWith('.css') ? 'stylesheet' : 'script'
+}
+
+// The position of each old package name a file depends on, as the lint and `kay upgrade` rewrite them.
+export function oldNamesIn(file: string, source: string): RegExpExecArray[] {
+  const kind = kindOf(file)
+  const comments = kind === 'manifest' ? [] : [...source.matchAll(BLOCK_COMMENT)].map((c): [number, number] => [c.index, c.index + c[0].length])
+
+  return [...source.matchAll(OLD_PACKAGE_NAME)].filter(match => namesAPackage(source, match.index, match.index + match[0].length, kind, comments))
 }
 
 // Every file of the project that names a package, but its manifest, written with the new names: what `kay upgrade` does before it runs the kay it installed, which loads the project's config and so cannot meet an old name.
@@ -62,14 +92,24 @@ export async function renameProjectFiles(root: string): Promise<void> {
       continue
 
     const source = await Bun.file(file).text()
-    const renamed = renamePackages(source)
+    const names = oldNamesIn(file, source)
 
-    if (renamed !== source)
-      await writeFile(file, renamed)
+    if (names.length === 0)
+      continue
+
+    let renamed = ''
+    let from = 0
+
+    for (const match of names) {
+      renamed += source.slice(from, match.index) + RENAMED_PACKAGES[match[0]]!
+      from = match.index + match[0].length
+    }
+
+    await writeFile(file, renamed + source.slice(from))
   }
 }
 
-// kay and its libraries under the `@kaynooo` scope, named in an import, a config key, a stylesheet or package.json, which are `@kayjs/*` since 1.104: each name found gets a safe fix writing the new one.
+// kay and its libraries under the `@kaynooo` scope, named as an import, `require` or `import()` specifier, a config key, a stylesheet's `@import` or `@plugin` path or a package.json entry, which are `@kayjs/*` since 1.104: each name found gets a safe fix writing the new one.
 // A package.json that lists the new name already would get the entry twice, so its names are reported with a fix that is not safe; one that does not has the range raised to the first version under the new name.
 export async function renamedPackages(root: string, levels: LintLevels | undefined): Promise<CheckDiagnostic[]> {
   const level = lintLevel('deprecated-package-names', levels)
@@ -83,13 +123,8 @@ export async function renamedPackages(root: string, levels: LintLevels | undefin
     const source = await Bun.file(file).text()
     const manifest = basename(file) === 'package.json'
 
-    const comments = manifest ? [] : [...source.matchAll(BLOCK_COMMENT)].map((c): [number, number] => [c.index, c.index + c[0].length])
-
-    for (const match of source.matchAll(OLD_PACKAGE_NAME)) {
+    for (const match of oldNamesIn(file, source)) {
       const name = match[0]
-
-      if (!namesAPackage(source, match.index, match.index + name.length, manifest, comments))
-        continue
 
       const next = RENAMED_PACKAGES[name]!
       const before = source.slice(0, match.index).split('\n')

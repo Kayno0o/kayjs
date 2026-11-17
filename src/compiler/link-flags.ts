@@ -3,7 +3,7 @@ import type { Lint } from './lints'
 import { editDistance } from './aria'
 import { elementsIn } from './ast'
 
-interface Renamed {
+export interface Renamed {
   name: string
   value: string
   // What a `false` value of the old name becomes, for a flag that was off by that word.
@@ -23,13 +23,14 @@ export const LINK_LINTS = {
 
 // The attributes a link, or an element around links, takes to say how the swap follows it, named as the options of `navigate()` are: `scroll`, `transition`, `prefetch`, and `reload` for a full load.
 const FLAGS = new Set(['data-scroll', 'data-transition', 'data-prefetch', 'data-reload'])
+
 // The names before 1.105 and what each became: `data-keep-scroll` is `data-scroll="keep"`, `data-no-transition` is `data-transition="false"`, `data-no-prefetch` is `data-prefetch="false"`.
-const OLD: Record<string, Renamed> = {
+export const OLD_LINK_FLAGS: Record<string, Renamed> = {
   'data-keep-scroll': { name: 'data-scroll', value: 'keep', off: 'top' },
   'data-no-transition': { name: 'data-transition', value: 'false' },
   'data-no-prefetch': { name: 'data-prefetch', value: 'false' },
 }
-const NEARBY = [...FLAGS, ...Object.keys(OLD)]
+const NEARBY = [...FLAGS, ...Object.keys(OLD_LINK_FLAGS)]
 
 // The name an attribute is written with, none for a spread or a `{name}` shorthand.
 function nameOf(attribute: Attribute): Span | undefined {
@@ -66,7 +67,7 @@ export function linkFlags(file: KayFile): Diagnostic[] {
         continue
 
       const name = file.source.slice(at.start, at.end)
-      const old = OLD[name]
+      const old = OLD_LINK_FLAGS[name]
 
       if (old !== undefined) {
         found.push(oldFlag(file.source, attribute, at, name, old))
@@ -79,7 +80,7 @@ export function linkFlags(file: KayFile): Diagnostic[] {
       if (meant === undefined)
         continue
 
-      const renamed = OLD[meant]
+      const renamed = OLD_LINK_FLAGS[meant]
       const to = renamed === undefined ? meant : `${renamed.name}="${renamed.value}"`
       // An old name written with a value keeps that value after the name, so writing `name="value"` there would leave two: that case gets the help alone.
       const fixes = renamed !== undefined && attribute.kind !== 'boolean' ? [] : [{ title: `Write \`${to}\``, safe: false, edits: [{ ...at, text: to }] }]

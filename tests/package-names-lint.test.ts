@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { applySafeFixes } from '../src/check'
-import { renamedPackages } from '../src/check/renamed-packages'
+import { renamedPackages, renameProjectFiles } from '../src/check/renamed-packages'
 import { OLD_PACKAGE_NAME, RENAMED_PACKAGES, renamePackages } from '../src/package-names'
 import { scratchDir } from './scratch'
 
@@ -113,6 +113,132 @@ describe('deprecated-package-names', () => {
       expect((await renamedPackages(root, { 'deprecated-package-names': 'deny' })).map(d => d.severity)).toEqual(['error'])
       expect(await renamedPackages(root, { deprecated: 'allow' })).toEqual([])
       expect(await renamedPackages(root, { 'deprecated-package-names': 'allow' })).toEqual([])
+    })
+  })
+})
+
+describe('deprecated-package-names reach', () => {
+  it('leaves an old name inside string data alone: an `in` check, a table of renames and a fixture', async () => {
+    const source = [
+      'const kind = (dependencies: Record<string, string>) => \'@kaynooo/kayjs\' in dependencies ? \'kay\' : \'bun\'',
+      'const RENAMED: Record<string, string> = { \'@kaynooo/kayjs\': \'@kayjs/kay\', \'@kaynooo/kayjs-ui\': \'@kayjs/ui\' }',
+      'const facts = [{ name: \'@kaynooo/kayjs\', version: \'1.62.0\' }]',
+      'expect(rename(\'@kaynooo/kayjs-ui\')).toBe(`@kayjs/ui`)',
+      '',
+    ].join('\n')
+
+    await withFiles({ 'src/conventions.ts': source, 'tests/bump.test.ts': source }, async (root) => {
+      expect(await renamedPackages(root, undefined)).toEqual([])
+    })
+  })
+
+  it('writes a specifier of every form and no other string of a file', async () => {
+    await withFiles({
+      'src/a.ts': [
+        'import a from \'@kaynooo/kayjs\'',
+        'import type { B } from "@kaynooo/kayjs-ui/types"',
+        'export * from \'@kaynooo/kayjs-cms\'',
+        'export { c } from \'@kaynooo/kayjs-mail\'',
+        'const d = require(\'@kaynooo/kayjs-ai\')',
+        'const e = await import(\'@kaynooo/kayjs-auth\')',
+        'type F = typeof import(\'@kaynooo/kayjs-ui\')',
+        'mock.module(\'@kaynooo/kayjs-ui\', () => ({}))',
+        'const note = \'@kaynooo/kayjs-ui\'',
+        'const list = [\'@kaynooo/kayjs-ui\']',
+        '',
+      ].join('\n'),
+      'src/page.kay': '---\nimport { cms } from \'@kaynooo/kayjs-cms\'\nconst name = \'@kaynooo/kayjs-cms\'\n---\np {name}\n',
+      'kay.config.ts': 'export default { \'@kaynooo/kayjs-ui/button.kay\': { parts: {} }, label: \'@kaynooo/kayjs-ui\' }\n',
+      'src/app.css': '@import \'@kaynooo/kayjs-ui/theme.css\';\n@plugin "@kaynooo/kayjs-ui/plugin";\n.a::after { content: \'@kaynooo/kayjs-ui\' }\n',
+    }, async (root) => {
+      const found = await renamedPackages(root, undefined)
+
+      expect(found.map(d => [d.file.slice(root.length + 1), d.line])).toEqual([
+        ['kay.config.ts', 1],
+        ['src/a.ts', 1],
+        ['src/a.ts', 2],
+        ['src/a.ts', 3],
+        ['src/a.ts', 4],
+        ['src/a.ts', 5],
+        ['src/a.ts', 6],
+        ['src/a.ts', 7],
+        ['src/a.ts', 8],
+        ['src/app.css', 1],
+        ['src/app.css', 2],
+        ['src/page.kay', 2],
+      ])
+      expect(await applySafeFixes(root, found)).toBe(12)
+      expect(await read(root, 'src/a.ts')).toContain('const note = \'@kaynooo/kayjs-ui\'\nconst list = [\'@kaynooo/kayjs-ui\']')
+      expect(await read(root, 'src/page.kay')).toBe('---\nimport { cms } from \'@kayjs/cms\'\nconst name = \'@kaynooo/kayjs-cms\'\n---\np {name}\n')
+      expect(await read(root, 'src/app.css')).toBe('@import \'@kayjs/ui/theme.css\';\n@plugin "@kayjs/ui/plugin";\n.a::after { content: \'@kaynooo/kayjs-ui\' }\n')
+    })
+  })
+})
+
+describe('deprecated-package-names reach', () => {
+  it('leaves an old name inside string data alone: an `in` check, a table of renames and a fixture', async () => {
+    const source = [
+      'const kind = (dependencies: Record<string, string>) => \'@kaynooo/kayjs\' in dependencies ? \'kay\' : \'bun\'',
+      'const RENAMED: Record<string, string> = { \'@kaynooo/kayjs\': \'@kayjs/kay\', \'@kaynooo/kayjs-ui\': \'@kayjs/ui\' }',
+      'const facts = [{ name: \'@kaynooo/kayjs\', version: \'1.62.0\' }]',
+      'expect(rename(\'@kaynooo/kayjs-ui\')).toBe(`@kayjs/ui`)',
+      '',
+    ].join('\n')
+
+    await withFiles({ 'src/conventions.ts': source, 'tests/bump.test.ts': source }, async (root) => {
+      expect(await renamedPackages(root, undefined)).toEqual([])
+    })
+  })
+
+  it('writes a specifier of every form and no other string of a file', async () => {
+    await withFiles({
+      'src/a.ts': [
+        'import a from \'@kaynooo/kayjs\'',
+        'import type { B } from "@kaynooo/kayjs-ui/types"',
+        'export * from \'@kaynooo/kayjs-cms\'',
+        'export { c } from \'@kaynooo/kayjs-mail\'',
+        'const d = require(\'@kaynooo/kayjs-ai\')',
+        'const e = await import(\'@kaynooo/kayjs-auth\')',
+        'type F = typeof import(\'@kaynooo/kayjs-ui\')',
+        'mock.module(\'@kaynooo/kayjs-ui\', () => ({}))',
+        'const note = \'@kaynooo/kayjs-ui\'',
+        'const list = [\'@kaynooo/kayjs-ui\']',
+        '',
+      ].join('\n'),
+      'src/page.kay': '---\nimport { cms } from \'@kaynooo/kayjs-cms\'\nconst name = \'@kaynooo/kayjs-cms\'\n---\np {name}\n',
+      'kay.config.ts': 'export default { \'@kaynooo/kayjs-ui/button.kay\': { parts: {} }, label: \'@kaynooo/kayjs-ui\' }\n',
+      'src/app.css': '@import \'@kaynooo/kayjs-ui/theme.css\';\n@plugin "@kaynooo/kayjs-ui/plugin";\n.a::after { content: \'@kaynooo/kayjs-ui\' }\n',
+    }, async (root) => {
+      const found = await renamedPackages(root, undefined)
+
+      expect(found.map(d => [d.file.slice(root.length + 1), d.line])).toEqual([
+        ['kay.config.ts', 1],
+        ['src/a.ts', 1],
+        ['src/a.ts', 2],
+        ['src/a.ts', 3],
+        ['src/a.ts', 4],
+        ['src/a.ts', 5],
+        ['src/a.ts', 6],
+        ['src/a.ts', 7],
+        ['src/a.ts', 8],
+        ['src/app.css', 1],
+        ['src/app.css', 2],
+        ['src/page.kay', 2],
+      ])
+      expect(await applySafeFixes(root, found)).toBe(12)
+      expect(await read(root, 'src/a.ts')).toContain('const note = \'@kaynooo/kayjs-ui\'\nconst list = [\'@kaynooo/kayjs-ui\']')
+      expect(await read(root, 'src/page.kay')).toBe('---\nimport { cms } from \'@kayjs/cms\'\nconst name = \'@kaynooo/kayjs-cms\'\n---\np {name}\n')
+      expect(await read(root, 'src/app.css')).toBe('@import \'@kayjs/ui/theme.css\';\n@plugin "@kayjs/ui/plugin";\n.a::after { content: \'@kaynooo/kayjs-ui\' }\n')
+    })
+  })
+})
+
+describe('renameProjectFiles', () => {
+  it('writes the names `kay upgrade` must move before the installed kay runs, and leaves the strings of data', async () => {
+    await withFiles({ 'src/a.ts': 'import \'@kaynooo/kayjs-ui\'\nconst data = \'@kaynooo/kayjs-ui\'\n', 'package.json': '{ "dependencies": { "@kaynooo/kayjs-ui": "~1.103.0" } }\n' }, async (root) => {
+      await renameProjectFiles(root)
+      expect(await read(root, 'src/a.ts')).toBe('import \'@kayjs/ui\'\nconst data = \'@kaynooo/kayjs-ui\'\n')
+      expect(await read(root, 'package.json')).toBe('{ "dependencies": { "@kaynooo/kayjs-ui": "~1.103.0" } }\n')
     })
   })
 })
