@@ -1,4 +1,5 @@
 ---
+island()
 import type { AudioChapter } from '@kayjs/ui'
 import AudioPlayer from '@kayjs/ui/audio-player.kay'
 import IconTile from '@kayjs/ui/icon-tile.kay'
@@ -12,7 +13,7 @@ const chapters: AudioChapter[] = [
 ---
 .max-w-xl
   AudioPlayer(src={SILENCE} chapters={chapters})
-    @lead
+    @lead(chapter)
       IconTile(icon="star" tone="accent")
     @status(chapter)
       | {chapter.label}
