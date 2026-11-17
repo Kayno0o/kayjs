@@ -416,7 +416,6 @@ export function uiOf(root: string): UiSource | undefined {
 
 const layerReads = new Map<string, { stamp: string, ui: UiSource | undefined }>()
 
-
 // What the extensions' `ui` files say, in config order, each read as `src/ui.ts` is and resolving names against the app; a file that does not exist is skipped.
 export function uiLayersOf(root: string): UiSource[] {
   const base = join(resolve(root), 'src')
