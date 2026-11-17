@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui's `Slider` and `AudioPlayer` fill their track in the accent up to the thumb (the danger colour when invalid, the muted when disabled): the range input carries `--kui-range-fill`, its share from `0%` to `100%`, in its `style`, and Firefox draws `::-moz-range-progress`.
 - kayjs-ui's `Slider` draws its value on the label's row, at its end, in place of a row under the track: the `value` part now comes before the `input` part in its markup.
 - `deprecated-package-names` reports an old package name only where it is a specifier, a config key, a stylesheet path or a package.json entry, not a comment or a sentence in a string that mentions it ([deprecated lints](deprecated-lints.md)).
 - kayjs-auth's `SignedIn` takes `require`, what `auth.guard({ require })` takes (a role, a list, a predicate), and an `@else` block for everyone who does not meet it, so `SignedOut` and `role=` are deprecated (`deprecated-auth-signed` renames `role`); `fresh: '10m'` on `auth.guard()` and `requireUser()` asks for the password or passkey again before a sensitive action, `auth.provedLately('10m')` and `reprove()` being its two halves ([The signed-in user in templates](../packages/auth/llms/signed-in-components.md), [Ask for the password or passkey again](../packages/auth/llms/sessions-and-guards.md#ask-for-the-password-or-passkey-again), [upgrading](upgrading.md)).

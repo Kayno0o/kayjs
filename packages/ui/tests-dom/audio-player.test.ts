@@ -146,6 +146,17 @@ test('the slider seeks, and speaks the time', async () => {
   expect([audio.currentTime, positions.at(-1)]).toEqual([75, 75])
 })
 
+test('the slider writes the share played as its fill, keeping up with the playback', async () => {
+  const { part, move } = await players()
+  const track = part('track')[0] as HTMLInputElement
+
+  await move(60)
+  expect(track.style.getPropertyValue('--kui-range-fill')).toBe('50%')
+
+  await move(30)
+  expect(track.style.getPropertyValue('--kui-range-fill')).toBe('25%')
+})
+
 test('chapters are listed with their start and marked on the timeline, the one playing aria-current, with a link and the actions slot beside each', async () => {
   const { part, current, move } = await players()
 

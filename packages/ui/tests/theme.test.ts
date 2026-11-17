@@ -550,6 +550,11 @@ describe('theme.css', () => {
     expect(sourceOf('toggle')).toMatch(/track: '[^']*\bborder-input\b/)
     expect(rangeTrackSource).toMatch(/slider-runnable-track\]:bg-input/)
     expect(rangeTrackSource).toMatch(/moz-range-track\]:bg-input/)
+    // Both engines fill the track up to the thumb, in the danger colour when invalid and the muted when disabled.
+    expect(rangeTrackSource).toMatch(/slider-runnable-track\]:bg-\[linear-gradient\([^\]]*--kui-range-fill/)
+    expect(rangeTrackSource).toMatch(/moz-range-progress\]:bg-\[var\(--kui-range-tint\)\]/)
+    expect(rangeTrackSource).toMatch(/aria-invalid:\[--kui-range-tint:var\(--color-danger\)\]/)
+    expect(rangeTrackSource).toMatch(/disabled:\[--kui-range-tint:var\(--color-muted\)\]/)
 
     const skins = await Promise.all(['brutalist', 'soft', 'space'].map(async name => withSkin(await Bun.file(`${ROOT}src/skins/${name}.css`).text())))
 

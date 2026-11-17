@@ -3177,7 +3177,7 @@ component default
   min?: number | undefined
   onChange?: ((event: { value: number; }) => unknown) | undefined
   onInput?: ((event: { value: number; }) => unknown) | undefined
-  parts?: undefined | { root?: string | undefined; label?: string | undefined; input?: string | undefined; value?: string | undefined; }
+  parts?: undefined | { root?: string | undefined; label?: string | undefined; value?: string | undefined; input?: string | undefined; }
   showLabel?: boolean | undefined
   showValue?: boolean | undefined
   size?: FieldSize | undefined

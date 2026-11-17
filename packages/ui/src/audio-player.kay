@@ -7,7 +7,7 @@ import CollapsibleSection from './collapsible-section.kay'
 import IconButton from './icon-button.kay'
 
 import { tabOf } from './outside'
-import { rangeTrack } from './range-track'
+import { rangeFill, rangeTrack } from './range-track'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 
@@ -361,7 +361,7 @@ div(part="root" {...rest})
         ol(part="marks" aria-hidden="true")
           for entry of marked() key={entry.index}
             li(part="mark" style={placed(entry.chapter.start)})
-      input(part="track" type="range" min="0" max={length()} step="1" value={at()} disabled={length() === 0} aria-label={seekLabel} aria-valuetext={`${clock(at())} / ${clock(length())}`} onInput={scrub})
+      input(part="track" style={rangeFill(at(), 0, length())} type="range" min="0" max={length()} step="1" value={at()} disabled={length() === 0} aria-label={seekLabel} aria-valuetext={`${clock(at())} / ${clock(length())}`} onInput={scrub})
   if chapters[current()]
     p(part="now") {chapters[current()]!.label}
   if chapters.length > 0

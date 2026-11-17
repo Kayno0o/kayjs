@@ -5,7 +5,7 @@ import { postedValue, recipe } from 'kay'
 import { controlProps } from './control-props'
 import { controlledInput } from './controlled-input'
 import { fieldInvalid, fieldSize, keepInvalid, LABEL_TEXT, SLIDER_STATE } from './field-look'
-import { rangeTrack } from './range-track'
+import { rangeFill, rangeTrack } from './range-track'
 
 const look = recipe({
   parts: {
@@ -93,4 +93,4 @@ div({...root} part="root")
   if showValue
     // Not an `output`, which a form reset empties; the input itself speaks the value. Before the track, so the grid puts it on the label's row.
     span(part="value" aria-hidden="true") {words(shown())}
-  input({...field} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? field['aria-invalid']} part="input" ref={sliderRef} type="range" aria-label={field['aria-label'] || label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} aria-busy={busy() ? 'true' : undefined} onInput={moved} onChange={event => released(event.currentTarget)} onMouseDown={held} onTouchStart={held} onKeyDown={held})
+  input({...field} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? field['aria-invalid']} part="input" style={rangeFill(shown(), min, max, field.style)} ref={sliderRef} type="range" aria-label={field['aria-label'] || label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} aria-busy={busy() ? 'true' : undefined} onInput={moved} onChange={event => released(event.currentTarget)} onMouseDown={held} onTouchStart={held} onKeyDown={held})

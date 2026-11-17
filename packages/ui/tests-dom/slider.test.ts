@@ -66,6 +66,27 @@ test('tells onInput the number while dragging and the shown value follows', asyn
   expect(root.querySelector('#delay')?.getAttribute('aria-valuetext')).toBe('70 ms')
 })
 
+test('writes the share up to the thumb as its fill, by drag, by its parent and after a reset', async () => {
+  const { input, drag, root } = await open()
+  const fill = () => input.style.getPropertyValue('--kui-range-fill')
+  const form = root.querySelector<HTMLFormElement>('#form')!
+
+  expect(fill()).toBe('40%')
+
+  await drag('70')
+  expect(fill()).toBe('70%')
+
+  click(root.querySelector('#reset'))
+  await untilHolds(() => new FormData(form).get('delay') === '40')
+  await settle()
+  expect(fill()).toBe('40%')
+
+  click(root.querySelector('#set'))
+  await settle()
+  expect(fill()).toBe('80%')
+  expect(root.querySelector<HTMLInputElement>('#named')!.style.getPropertyValue('--kui-range-fill')).toBe('20%')
+})
+
 test('follows a value its parent sets', async () => {
   const { input, shown, root } = await open()
 
