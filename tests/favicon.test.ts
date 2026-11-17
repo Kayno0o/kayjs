@@ -6,7 +6,8 @@ import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { bootProblems } from '../src/check/boot'
-import { FAVICON_DIR, faviconFiles, manifestJson, serveFavicons, writeFavicons } from '../src/server/favicon'
+import { collectHead, head } from '../src/runtime/head'
+import { FAVICON_DIR, faviconFiles, faviconVersion, manifestJson, serveFavicons, writeFavicons, writeFaviconVersion } from '../src/server/favicon'
 import { ServedPaths } from '../src/server/served-paths'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -46,6 +47,38 @@ describe('favicon', () => {
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">')
     expect(html).toContain('<meta name="theme-color" content="#1e1e2e">')
     expect(html).toContain('<title>About</title>')
+  })
+
+  it('keeps one manifest link whatever version its href carries', () => {
+    const { head: rendered } = collectHead(() => {
+      head([{ tag: 'link', props: { rel: 'manifest', href: '/manifest.webmanifest?v=0123456789' } }])
+      head([{ tag: 'link', props: { rel: 'manifest', href: '/manifest.webmanifest' } }])
+    })
+
+    expect(rendered.html.match(/rel="manifest"/g)).toHaveLength(1)
+  })
+
+  it('takes the version of a run without the sources from the one the build recorded, else from the built icons', async () => {
+    const dir = await scratchDir('favicon-recorded-')
+    const source = { image: join(dir, 'gone.svg') }
+    const built = join(dir, 'built')
+
+    expect(await faviconVersion(source, built)).toBeUndefined()
+
+    await Bun.write(join(built, 'favicon.ico'), 'ico')
+    const fromIcons = await faviconVersion(source, built)
+
+    expect(fromIcons).toMatch(/^[\da-f]{10}$/)
+
+    const real = join(dir, 'real.svg')
+
+    await Bun.write(real, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M0 0h32v32z"/></svg>')
+    await writeFaviconVersion({ image: real }, built)
+
+    const recorded = await faviconVersion({ image: real }, built)
+
+    expect(await faviconVersion(source, built)).toBe(recorded)
+    expect(recorded).not.toBe(fromIcons)
   })
 
   it('versions every icon link and the manifest\'s icons by the source, keeping the paths', async () => {

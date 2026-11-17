@@ -32,7 +32,7 @@ import { compressFiles } from '../server/compress'
 import { remoteLimits } from '../server/config-limits'
 import { CONTEXT_RECORD, writeContextRecord } from '../server/context-record'
 import { writeDictionaryCopies } from '../server/dictionary'
-import { FAVICON_DIR, faviconSource } from '../server/favicon'
+import { FAVICON_DIR, faviconSource, writeFaviconVersion } from '../server/favicon'
 import { fontFiles } from '../server/fonts'
 import { avifQuality, webpQuality, writeImageVariants, writeRemoteVariants } from '../server/image'
 import { setImageColors } from '../server/image-color'
@@ -492,6 +492,9 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   // The check warned of what an SVG draws poorly already.
   if (favicon !== undefined)
     await writeCachedFavicons(favicon, join(client.dir, '..', FAVICON_DIR), cacheDir(root, 'favicons'), checking ? () => undefined : undefined)
+
+  if (favicon !== undefined)
+    await writeFaviconVersion(favicon, join(client.dir, '..', FAVICON_DIR))
 
   lap('favicons')
 

@@ -23,8 +23,8 @@ import { publicFiles } from './public'
 import { slashedPath } from './routes'
 import { lightFontCss } from './save-data'
 
-// What follows the path of the manifest link, its version, which a locale's own manifest keeps.
-const MANIFEST_PATH = /^[^?]*/
+// The path of a link without its query, which holds the version a locale's own manifest keeps.
+const PATH_ONLY = /^[^?]*/
 
 // The file a prerendered page's `shareCard()` links, where a page served per request links the card route.
 const CARD_FILE = /^\/_kay\/images\/card-[\da-z]+\.jpg$/
@@ -146,7 +146,7 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
     const text = (value: Localized | undefined) => localizedText(value, locale, defaultLocale)
     // The manifest link follows the locale, its text read in it, unless the app serves the manifest itself.
     const manifest = appServesManifest ? undefined : manifestPath(locale, seo, defaultLocale)
-    const own = manifest === undefined ? extra : extra.map(tag => isOwnManifest(tag) ? { ...tag, props: { ...tag.props, href: manifest + String(tag.props.href).replace(MANIFEST_PATH, '') } } : tag)
+    const own = manifest === undefined ? extra : extra.map(tag => isOwnManifest(tag) ? { ...tag, props: { ...tag.props, href: manifest + String(tag.props.href).replace(PATH_ONLY, '') } } : tag)
     const tags: HeadTag[] = social ? [...own, meta('property', 'og:type', 'website')] : [...own]
     const name = text(seo.name)
     const description = text(seo.description)

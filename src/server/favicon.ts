@@ -60,26 +60,42 @@ export function faviconSource(root: string, favicon: string | FaviconConfig | bo
   return { image: resolve(root, favicon.image), svg: resolve(root, favicon.svg), ...maskable }
 }
 
-// A short hash of the source files the icons are drawn from, which the icon links and the manifest's icons carry as `?v=`, so a CDN or browser holding an older icon asks again once the source changes while the files keep their paths. The sources are read where they are, else the icons a build wrote; undefined when there are none to read.
+const VERSION_FILE = 'version.txt'
+
+// A short hash of the source files the icons are drawn from, which the icon links and the manifest's icons carry as `?v=`, so a CDN or browser holding an older icon asks again once the source changes while the files keep their paths. The sources are read where they are, else the version the build recorded from them (so an executable and the pages prerendered at build carry the same one), else the icons a build wrote; undefined when there are none to read.
 export async function faviconVersion(source: FaviconSource, builtDir?: string): Promise<string | undefined> {
   const sources = [source.image, source.svg, source.maskable].filter(file => file !== undefined)
-  const hash = async (files: string[]) => {
-    const hasher = new Bun.CryptoHasher('sha256')
-
-    for (const file of files)
-      hasher.update(await Bun.file(file).bytes())
-
-    return hasher.digest('hex').slice(0, 10)
-  }
 
   if (await allExist(sources))
-    return hash(sources)
+    return hashFiles(sources)
+
+  const recorded = builtDir === undefined ? undefined : Bun.file(join(builtDir, VERSION_FILE))
+
+  if (recorded !== undefined && await recorded.exists())
+    return (await recorded.text()).trim()
 
   const built = builtDir === undefined ? [] : [ICO, ...Object.keys(PNG_FILES), SVG, ...Object.keys(MASKABLE_FILES)].map(path => join(builtDir, path.slice(1)))
   const found = await Promise.all(built.map(async file => await Bun.file(file).exists() ? file : undefined))
   const files = found.filter(file => file !== undefined)
 
-  return files.length === 0 ? undefined : hash(files)
+  return files.length === 0 ? undefined : hashFiles(files)
+}
+
+async function hashFiles(files: string[]): Promise<string> {
+  const hasher = new Bun.CryptoHasher('sha256')
+
+  for (const file of files)
+    hasher.update(await Bun.file(file).bytes())
+
+  return hasher.digest('hex').slice(0, 10)
+}
+
+// Written next to the built icons, so a run without the source files reads the version the build took from them.
+export async function writeFaviconVersion(source: FaviconSource, builtDir: string): Promise<void> {
+  const version = await faviconVersion(source)
+
+  if (version !== undefined)
+    await Bun.write(join(builtDir, VERSION_FILE), version)
 }
 
 async function allExist(files: string[]): Promise<boolean> {
