@@ -110,9 +110,14 @@ describe('the request context', () => {
       expect(answer.cookie).toContain('seen=1')
     })
 
-    it('stops with redirect, deny and notFound as a page does', async () => {
+    it('stops with redirect and notFound as a page does, and fails the post on a deny with a message', async () => {
       expect(await post('open/index.kay', 'act', { 'x-do': 'redirect' })).toMatchObject({ status: 303, moved: '/elsewhere' })
-      expect(await post('open/index.kay', 'act', { 'x-do': 'deny' })).toMatchObject({ status: 402, body: 'Pay first' })
+
+      const denied = await post('open/index.kay', 'act', { 'x-do': 'deny' })
+
+      expect(denied.status).toBe(402)
+      expect(denied.body).toContain('"Pay first"')
+      expect(denied.body).toContain('"errors"')
       expect(await post('open/index.kay', 'act', { 'x-do': 'not-found' })).toMatchObject({ status: 404 })
     })
 
