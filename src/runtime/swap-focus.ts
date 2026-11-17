@@ -4,6 +4,9 @@ import { announce } from './announce'
 import { HYDRATED, ISLAND } from './markers'
 import { hashTarget } from './navigation'
 
+// The field whose kept keys wait for its island to hydrate before the island hears them, read by the watch the swap starts next.
+let carried: HTMLElement | undefined
+
 function byName(element: Element | null): Element | null {
   const name = element?.getAttribute('name') ?? ''
 
@@ -57,12 +60,18 @@ function carryCaret(from: Element | null, to: HTMLElement, held: string | undefi
 
   const { selectionStart, selectionEnd, selectionDirection, value } = from
 
-  // Keys typed while the page was fetched are kept, and the island is told so it asks for them next.
+  // Keys typed while the page was fetched are kept, and the island is told so it asks for them next, once it has hydrated: its own write of the value it was given (kayjs-ui's TextInput) would otherwise land over them.
   const typed = held !== undefined && value !== held && value !== to.value
 
   if (typed) {
     to.value = value
-    to.dispatchEvent(new InputEvent('input', { bubbles: true }))
+
+    const island = to.closest<Island>(ISLAND)
+
+    if (island && !island._$k)
+      carried = to
+    else
+      to.dispatchEvent(new InputEvent('input', { bubbles: true }))
   }
 
   // A number or email field has no selection, so no caret.
@@ -107,13 +116,13 @@ const watching = new Set<() => void>()
 
 type Island = HTMLElement & { _$k?: boolean }
 type Field = HTMLInputElement | HTMLTextAreaElement
-interface Typed { value: string, start: number | null, end: number | null, direction: 'forward' | 'backward' | 'none' }
+interface Typed { value: string, start: number | null, end: number | null, direction: 'forward' | 'backward' | 'none', replay?: boolean }
 
 const noteOf = (field: Field): Typed => ({ value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection ?? 'none' })
 
 // Hydration kept what was typed when the field already holds it, and the island heard it through the events queued for it. A number or email field has no selection, so no caret.
 function putBack(now: Element | null, typed: Typed | undefined): void {
-  if (!typed || !(now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement) || now.value === typed.value)
+  if (!typed || !(now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement) || (now.value === typed.value && !typed.replay))
     return
 
   now.value = typed.value
@@ -135,13 +144,16 @@ export function watchTyped(): void {
 
   const field = document.activeElement
   const island = field?.closest<Island>(ISLAND)
+  const kept = carried
+
+  carried = undefined
 
   // A field outside an island, or in one hydrated already, nothing overwrites.
   if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) || !island || island._$k)
     return
 
   const id = field.id
-  let typed: Typed | undefined
+  let typed: Typed | undefined = kept === field ? { ...noteOf(field), replay: true } : undefined
   const note = (event: Event) => {
     if (event.target === field)
       typed = noteOf(field)

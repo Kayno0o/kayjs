@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kay and the apps `kay new` writes lint with `@kaynooo/eslint` 8, which installs about 30 MB less as it no longer pulls in the formatters ([upgrading](upgrading.md)).
 - kayjs-ui's `infiniteList` starts over only when the first rows or what an `input` function returns change, compared by value: the same rows handed again, a new array of them too, keep the pages loaded ([LoadMore](/ui/load-more)).
 - kayjs-ai's `Chat` takes `toolIcons`, an icon per tool by its name, drawn before the tool's label in the folded line and before its name in an opened call, in the `toolIcon` part; a tool without one keeps its row ([Chat](../packages/ai/llms/chat.md))
+- Keys typed into a field during a query `navigate()` reach its island once it has hydrated, so an island that writes the value it was given back into the field, as kayjs-ui's `TextInput` does, no longer overwrites them ([navigation](navigation.md)).
 
 ## 1.105.0
 

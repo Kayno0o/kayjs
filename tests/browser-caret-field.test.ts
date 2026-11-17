@@ -170,6 +170,38 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
     }
   }, 60_000)
 
+  // The island writes the value it was given back into the field as it hydrates, as kayjs-ui's TextInput does: the kept keys survive it and are the ones searched for.
+  it('keeps what was typed while the navigate was in flight over a field the island writes its value to', async () => {
+    const site = await testSite({ root: 'tests/fixtures/caret-field', browser: { path } })
+
+    try {
+      const page = await site.open('/slow-bound')
+
+      const { promise: sent, resolve: send } = Promise.withResolvers<void>()
+      const { promise: typed, resolve: answer } = Promise.withResolvers<void>()
+
+      await page.route(url => url.pathname === '/slow-bound' && url.searchParams.get('q') === 'pro', async (request) => {
+        const held = await request.fetch()
+
+        send()
+        await typed
+        await request.fulfill({ ...held, body: held.text() })
+      })
+      await page.click('.field')
+      await page.type('pro')
+      await sent
+      await page.type('x')
+      answer()
+      await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'prox')
+
+      expect(await page.evaluate(() => document.querySelector<HTMLInputElement>('.field')!.value)).toBe('prox')
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+
   // A number field has no selection, so the keys typed in flight are kept without a caret.
   it('keeps what was typed into a number field while the navigate was in flight', async () => {
     const site = await testSite({ root: 'tests/fixtures/caret-field', browser: { path } })
