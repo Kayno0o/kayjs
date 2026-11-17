@@ -27,7 +27,7 @@ const look = recipe({
   },
 })
 
-const { items, centre, max = 10, selected, label, emptyLabel, empty, loadingLabel = wording('ui.relationGraph.loading', 'Loading…'), failureLabel = wording('ui.relationGraph.failure', 'Could not load the neighbours'), retryLabel = wording('ui.relationGraph.retry', 'Try again'), onSelect, onLoad, onError, neighbour: drawNeighbour, middle: drawMiddle, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect' | 'onLoad' | 'onError'> & {
+const { items, centre, max = 10, selected, label, emptyLabel, empty, loadingLabel = wording('ui.relationGraph.loading', 'Loading…'), failureLabel = wording('ui.relationGraph.failure', 'Could not load the neighbours'), retryLabel = wording('ui.relationGraph.retry', 'Try again'), onSelectedChange, onLoad, onError, neighbour: drawNeighbour, middle: drawMiddle, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onLoad' | 'onError'> & {
   // The item at the middle.
   centre: RelationNode
   // The items around it, in the order a keyboard and a screen reader reach them, which is the order of the ring too: a list, a promise of one, or a function answering it, such as an action, asked in the browser, the graph busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
@@ -45,7 +45,7 @@ const { items, centre, max = 10, selected, label, emptyLabel, empty, loadingLabe
   failureLabel?: string | undefined
   retryLabel?: string | undefined
   // Makes every neighbour without an `href`, and not missing, a button handing back the item pressed.
-  onSelect?: ((event: { item: RelationNeighbour }) => unknown) | undefined
+  onSelectedChange?: ((event: { selected: string | number, item: RelationNeighbour }) => unknown) | undefined
   // Called with each answer of a function or promise `items`, and with what it rejected with.
   onLoad?: ((event: { options: readonly RelationNeighbour[], query: string }) => unknown) | undefined
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
@@ -89,8 +89,8 @@ div(part="root" {...rest} role="group" aria-label={label} aria-busy={source.load
           if item.missing !== true && item.href !== undefined
             a(part="node" href={item.href} {...tabOf(item.href, item.newTab)} data-tone={toneOf(item, 'neutral')} style={colorStyle('--node-color', item.color)} aria-current={selected === item.key ? 'true' : undefined})
               {name(item, index)}
-          else if item.missing !== true && onSelect
-            button(part="node" type="button" data-tone={toneOf(item, 'neutral')} style={colorStyle('--node-color', item.color)} aria-current={selected === item.key ? 'true' : undefined} onClick={() => void onSelect?.({ item })})
+          else if item.missing !== true && onSelectedChange
+            button(part="node" type="button" data-tone={toneOf(item, 'neutral')} style={colorStyle('--node-color', item.color)} aria-current={selected === item.key ? 'true' : undefined} onClick={() => void onSelectedChange?.({ selected: item.key, item })})
               {name(item, index)}
           else
             span(part="node" data-tone={toneOf(item, 'neutral')} data-missing={item.missing === true ? '' : undefined} style={colorStyle('--node-color', item.color)} aria-current={selected === item.key ? 'true' : undefined})

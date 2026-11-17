@@ -11,5 +11,5 @@ const notes: RelationNeighbour[] = [
 ]
 ---
 .max-w-sm
-  RelationGraph(centre={{ label: 'Linked lists' }} items={notes} label="Notes around Linked lists" selected={picked()} onSelect={({ item }) => picked = item.key})
+  RelationGraph(centre={{ label: 'Linked lists' }} items={notes} label="Notes around Linked lists" selected={picked()} onSelectedChange={({ selected }) => picked = selected})
   p.text-sm Picked: {picked() ?? 'nothing'}.

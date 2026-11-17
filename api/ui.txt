@@ -2795,7 +2795,7 @@ component default
   neighbour?: ((item: RelationNeighbour, index: number) => Element) | undefined
   onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
   onLoad?: ((event: { options: readonly RelationNeighbour[]; query: string; }) => unknown) | undefined
-  onSelect?: ((event: { item: RelationNeighbour; }) => unknown) | undefined
+  onSelectedChange?: ((event: { selected: number | string; item: RelationNeighbour; }) => unknown) | undefined
   parts?: undefined | {
   root?: string | undefined;
   label?: string | undefined;

@@ -24,7 +24,7 @@ test('the neighbours read in the order of the list, as a link, a button for the 
   expect([...root.querySelectorAll('#bound [data-part="line"]')].map(line => line.hasAttribute('data-missing'))).toEqual([false, true, false])
 })
 
-test('pressing a button tells onSelect and the app marks the neighbour it holds', async () => {
+test('pressing a button tells onSelectedChange and the app marks the neighbour it holds', async () => {
   const picks: (string | number)[] = []
   const root = await graphs({ onSelect: (key: string | number) => picks.push(key) })
 

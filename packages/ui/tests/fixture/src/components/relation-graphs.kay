@@ -13,7 +13,7 @@ function pick(item: RelationNeighbour) {
   onSelect(item.key)
 }
 ---
-RelationGraph#bound(centre={{ label: 'Mars' }} items={moons} label="Around Mars" selected={picked()} onSelect={({ item }) => pick(item)})
+RelationGraph#bound(centre={{ label: 'Mars' }} items={moons} label="Around Mars" selected={picked()} onSelectedChange={({ item }) => pick(item)})
 RelationGraph#late(centre={{ label: 'Venus' }} items={items ?? moons} label="Around Venus")
 RelationGraph#blocks(centre={{ label: 'Earth' }} items={moons} label="Around Earth")
   @neighbour(item, index)

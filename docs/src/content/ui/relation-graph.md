@@ -10,7 +10,7 @@ The neighbours are an `ol` in the order of `items`, so the keyboard and a screen
 
 ## Links, buttons and gaps
 
-A neighbour with an `href` is a link. `onSelect({ item })` makes every other neighbour a button, and `selected` marks one by its key with `aria-current`, the app's to move. A neighbour with `missing` is drawn muted with a dashed line and is neither: a link that points nowhere yet. The centre takes an `href` too. `newTab` works as on any link.
+A neighbour with an `href` is a link. `onSelectedChange({ selected, item })` makes every other neighbour a button, and `selected` marks one by its key with `aria-current`, the app's to move. A neighbour with `missing` is drawn muted with a dashed line and is neither: a link that points nowhere yet. The centre takes an `href` too. `newTab` works as on any link.
 
 <Demo name="relation-graph/select" />
 
