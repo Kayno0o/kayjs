@@ -114,6 +114,11 @@ export function importedComponents(file: string, source: string, root: string): 
 
   for (const { source: specifier } of importsOf(source)) {
     const path = resolveFrom(specifier, file)
+
+    // A component drawing itself stays eager whatever its import is written as: its module is the one loading, so a chunk would only make its nested draws late.
+    if (path !== undefined && realOf(path) === realOf(file))
+      continue
+
     const facts = path === undefined ? undefined : factsOf(path, new Set())
 
     if (path !== undefined && facts !== undefined)

@@ -73,6 +73,11 @@ describe('lazy components', () => {
     const { default: Tree } = await import(join(fixtures, 'tree.kay')) as { default: (props: object) => unknown }
 
     expect(String(child(Tree({ depth: 1 })))).toContain('Level')
+
+    // However the import is written: here by its full path rather than relative to itself.
+    const file = join(fixtures, 'tree.kay')
+
+    expect(importedComponents(file, readFileSync(file, 'utf8').replace('"./tree.kay"', JSON.stringify(file)), root)).toEqual({})
   })
 
   it('keeps a component eager that a branch inside a loop body draws, as the rows of a page mostly draw every branch', () => {

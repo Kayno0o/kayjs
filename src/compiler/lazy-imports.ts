@@ -1,6 +1,5 @@
 import type { ElementNode, KayFile, Node, Span } from './ast'
 import type { ImportBinding } from './script-shared'
-import { dirname, resolve } from 'node:path'
 import { serverIslandOf, visitNodes } from './ast'
 import { helperName } from './markup'
 
@@ -28,7 +27,6 @@ export interface LazyImport {
 // The smallest source a component loads lazily: below it the request and the stub cost more than the code saves.
 export const LAZY_FLOOR = 2000
 const CHILDREN = 'children'
-const RELATIVE = /^\.\.?\//
 const LINE_COMMENT = /^[ \t]*\/\/.*$/
 const PLAIN_STRING = /'(?:[^'\\\n$`]|\\.)*'|"(?:[^"\\\n$`]|\\.)*"/g
 // A line where a quote may open something other than a string: a template literal, or a regular expression, which starts where a value is expected.
@@ -320,11 +318,8 @@ function positionsLazy(file: KayFile, imports: readonly ImportBinding[], known: 
 }
 
 // Whether the file's output holds lazy imports: the browser's, and the server's render of an island or of a twin, which tells the island what it drew.
-// A component importing itself stays eager: its module is the one loading, and the server's render would read its default export before it is set.
-export function lazyImportsOf(file: KayFile, filename: string, imports: readonly ImportBinding[], options: { components?: ImportedComponents | undefined, output?: string | undefined }, hydrated: boolean, routeFile: boolean, clientOnly: boolean): ReadonlyMap<string, LazyImport> | undefined {
-  const others = imports.filter(binding => !RELATIVE.test(binding.source) || resolve(dirname(filename), binding.source) !== resolve(filename))
-
-  return options.components !== undefined && !(routeFile || clientOnly) && (options.output === 'dom' || hydrated) ? lazyImports(file, others, options.components) : undefined
+export function lazyImportsOf(file: KayFile, imports: readonly ImportBinding[], options: { components?: ImportedComponents | undefined, output?: string | undefined }, hydrated: boolean, routeFile: boolean, clientOnly: boolean): ReadonlyMap<string, LazyImport> | undefined {
+  return options.components !== undefined && !(routeFile || clientOnly) && (options.output === 'dom' || hydrated) ? lazyImports(file, imports, options.components) : undefined
 }
 
 // The import the server's output adds for a lazy import: what tells the island its code is wanted.
