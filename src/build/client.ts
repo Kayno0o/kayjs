@@ -54,7 +54,7 @@ import { styleImports, withoutStyles, writeComponentStylesheets } from './styles
 import { mergingSupports } from './supports'
 import { warnBuiltThemeVariables } from './theme-vars'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
-import { UI_FILE } from './ui'
+import { uiFilesOf } from './ui'
 import { kayFiles, variantFile, VariantIndex } from './variants'
 
 export interface ClientOptions extends Pick<KayConfig, ClientBuildKey> {
@@ -215,7 +215,7 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
 
     const classTableText = JSON.stringify([classTable, islandTable])
     // `src/ui.ts` is written into the components it restyles, none of which imports it, so no chunk lists it among its inputs.
-    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE) || file === join(realRoot, AWAIT_ALERT_FILE)) || previous.classTable !== classTableText || (!options.hot && (previous.sources.actionForms !== sources.actionForms || previous.sources.actionProps !== sources.actionProps))
+    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || uiFilesOf(realRoot).includes(file) || file === join(realRoot, AWAIT_ALERT_FILE)) || previous.classTable !== classTableText || (!options.hot && (previous.sources.actionForms !== sources.actionForms || previous.sources.actionProps !== sources.actionProps))
     const stylesAgain = !previous || await increments!.stylesChanged(previous, sources, texts)
 
     if (previous && islandsAgain)
@@ -483,12 +483,11 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
   const bundled = await reachedFrom([...entries], edges)
   const renderers = new Set([...shorthand.keys(), ...(await markupFiles(root, sources)).filter(file => RENDERING_FILE.test(file))])
   const outside = [...renderers].filter(file => !bundled.has(realpathSync(file)))
-  const ui = join(root, UI_FILE)
   // `src/ui.ts` is written into the components it restyles, none of which imports it.
   const reaching = await reachingAny(outside.map(file => realpathSync(file)), entries, edges)
   const reachingOutside = outside.filter(file => reaching.has(realpathSync(file)))
   const alert = join(root, AWAIT_ALERT_FILE)
-  const written = [...bundled, ...existsSync(ui) ? [ui] : [], ...existsSync(alert) ? [alert] : [], ...reachingOutside]
+  const written = [...bundled, ...uiFilesOf(root), ...existsSync(alert) ? [alert] : [], ...reachingOutside]
 
   // The browser merges classes only where a component writes a class that is not a literal, a spread or a part; two literals side by side were resolved while compiling.
   if (!written.some(file => mergesAtRuntime(file)))

@@ -2,8 +2,8 @@ import type { CheckDiagnostic } from '.'
 import type { UiComponent, UiSource } from '../build/ui'
 import type { Diagnostic, Span } from '../compiler/ast'
 import { readFileSync, realpathSync } from 'node:fs'
-import { basename, dirname, relative, sep } from 'node:path'
-import { componentFile, componentMatches, forgetNames, isComponentName, KAY_EXTENSION, uiOf } from '../build/ui'
+import { basename, relative, sep } from 'node:path'
+import { baseOf, componentFile, componentMatches, forgetNames, isComponentName, KAY_EXTENSION, uiLayersOf, uiOf } from '../build/ui'
 import { ROUTE_FILES } from '../compiler'
 import { templateFacts } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
@@ -30,7 +30,7 @@ export function offered(file: string): { parts: Set<string>, variants: Record<st
 
 // The specifier `src/ui.ts` writes a component by: a path from it for the app's own, the package's for a library's.
 function specifierOf(ui: UiSource, file: string): string {
-  const from = realpathSync(dirname(ui.file))
+  const from = realpathSync(baseOf(ui))
 
   return file.startsWith(from + sep) ? `./${relative(from, file).split(sep).join('/')}` : `@kayjs/ui/${basename(file)}`
 }
@@ -75,13 +75,8 @@ function componentProblems(ui: UiSource, component: UiComponent, report: (span: 
   }
 }
 
-// What `src/ui.ts` sets that the components it names do not have: an unknown or ambiguous component, an unknown part, and a file the compiler cannot read as written.
-export function uiProblems(root: string): CheckDiagnostic[] {
-  const ui = uiOf(root)
-
-  if (ui === undefined)
-    return []
-
+// What one `defineUi` file sets that the components it names do not have: an unknown or ambiguous component, an unknown part, and a file the compiler cannot read as written. An extension's file may name components this app lacks, so it is not told of those.
+function sourceProblems(ui: UiSource, own: boolean): CheckDiagnostic[] {
   forgetNames(ui)
 
   const found: Diagnostic[] = [...ui.problems]
@@ -98,8 +93,16 @@ export function uiProblems(root: string): CheckDiagnostic[] {
     else if (file !== undefined)
       named.set(file, component)
 
-    componentProblems(ui, component, report)
+    if (own || file !== undefined)
+      componentProblems(ui, component, report)
   }
 
   return found.map(diagnostic => fromCompile(ui.file, ui.source, diagnostic))
+}
+
+// What `src/ui.ts` and the extensions' `ui` files set that the components they name do not have.
+export function uiProblems(root: string): CheckDiagnostic[] {
+  const ui = uiOf(root)
+
+  return [...uiLayersOf(root).flatMap(layer => sourceProblems(layer, false)), ...ui === undefined ? [] : sourceProblems(ui, true)]
 }

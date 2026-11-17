@@ -639,6 +639,8 @@ export interface KayExtension<Server extends PluginInput = AnyElysia> {
   serverModule?: { path: string, export?: string | undefined, prepare?: ((exported: unknown) => void | Promise<void>) | undefined } | undefined
   // Config laid under the app's `kay.config.ts`: objects merged key by key, arrays joined with the extension's items first, any other value the app sets winning. Bun plugins the library's files need go in its `plugins`. It takes what `kay.config.ts` does, the keys of before 1.105 included (`fonts`, `favicon`, `observe`...), which work until 1.108 under `deprecated-config-groups`.
   config?: Omit<ConfigInput, 'extensions'> | undefined
+  // A module whose default export is `defineUi({ ... })`, written as `src/ui.ts` is (string and object literals only), absolute or relative to the project root: the parts and variants it sets for components, the app's own or a library's, reach every app listing the extension, under the app's own `src/ui.ts`. A part or a variant value the app sets replaces the extension's, and a later extension's replaces an earlier one's. Names and relative specifiers resolve from the app's `src/`.
+  ui?: string | undefined
   // A directory of `.kay` pages, layouts and guards laid over the app's routes under `prefix`, the root by default: a file of the app at the same path replaces the library's.
   // Its directories are absolute, as a library gives them from `import.meta.dir`, or relative to the project root.
   routes?: { dir: string, prefix?: string | undefined } | undefined

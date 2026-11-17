@@ -18,7 +18,7 @@ import { globbedFiles } from './glob'
 import { importsOf, libraryOf } from './libraries'
 import { outOfStore, throughLinks } from './links'
 import { recipeLifter } from './recipe-classes'
-import { UI_FILE, uiEntryOf } from './ui'
+import { uiEntryOf, uiFilesOf } from './ui'
 
 const ABSOLUTE_URL = /^\//
 const FONT_FILE = /\.(?:woff2?|ttf|otf)(?:[?#].*)?$/i
@@ -273,8 +273,8 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
           server ? serverAssets(source.slice(server.start, server.end), path, 'ts') : undefined,
         ])
 
-        // A component `src/ui.ts` restyles has the classes written there, which the page using it keeps the rules of.
-        const restyled = uiEntryOf(root, path) === undefined ? '' : importing(note(path, [join(root, UI_FILE)]))
+        // A component `src/ui.ts` or an extension's `ui` file restyles has the classes written there, which the page using it keeps the rules of.
+        const restyled = uiEntryOf(root, path) === undefined ? '' : importing(note(path, uiFilesOf(root)))
 
         // A component with an `await` may draw the app's `await-failed.kay`, which the compiler imports, so its styles go to the page too.
         const alert = AWAIT_LINE.test(source) ? awaitAlertOf(root, path) : undefined

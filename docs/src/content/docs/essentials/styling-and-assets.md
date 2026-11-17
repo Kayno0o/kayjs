@@ -197,6 +197,7 @@ export default defineUi({
 - `defineUi` is typed from the components `kay check` writes to `.kay/types/kay-ui.d.ts`: your editor completes each key, and a part, a variant or a value the component lacks fails `bun run check`.
 - A variant or value the component's recipe lacks is added to it, with the classes the entry gives: `Badge(tone="brand")` above is valid, and your editor completes `brand` and `bun run check` accepts it, with nothing declared elsewhere. The recipe's `defaults` stay.
 - The component must have parts or a recipe. `kay check` reports an unknown component or part, a value a template passes that neither the recipe nor `src/ui.ts` declares, a page, a layout or a server-fenced file, two keys naming one component, a class that is not a plain string and a file with no default export. The dev server rebuilds when `src/ui.ts` changes.
+- A package restyles components for every app using it through its extension's `ui` file (see [component libraries](/guides/component-libraries)); `src/ui.ts` itself is read as written and follows no import or spread, so an app takes a package's entries by listing its extension, and wins over them.
 
 ## Public files
 

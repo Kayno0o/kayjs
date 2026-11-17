@@ -4,7 +4,7 @@ import type { Span } from '../compiler/ast'
 import type { Node, Program } from '../compiler/estree'
 import type { UiEntry } from '../runtime/ui'
 import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { componentName, ROUTE_FILES } from '../compiler'
 import { parseProgram } from '../compiler/estree'
 import { constBindings, exportedObject, propertiesOf, unwrapped } from '../compiler/object-literal'
@@ -42,6 +42,8 @@ export interface UiSource {
   problems: UiProblem[]
   // The app's components by name and what each name stood for, as of `at`.
   index?: NameIndex | undefined
+  // Where names and relative specifiers resolve from when it is not the folder of `file`: the app's `src/` for an extension's file.
+  base?: string | undefined
 }
 
 export const KAY_EXTENSION = /\.kay$/
@@ -276,13 +278,17 @@ export function forgetNames(ui: UiSource): void {
   ui.index = undefined
 }
 
+export function baseOf(ui: UiSource): string {
+  return ui.base ?? dirname(ui.file)
+}
+
 function nameIndex(ui: UiSource): NameIndex {
   if (ui.index !== undefined && Date.now() - ui.index.at < INDEX_LIFETIME)
     return ui.index
 
   const app = new Map<string, string[]>()
 
-  appComponents(dirname(ui.file), app)
+  appComponents(baseOf(ui), app)
   ui.index = { at: Date.now(), app, matches: new Map() }
 
   return ui.index
@@ -299,7 +305,7 @@ export function componentsNamed(ui: UiSource, name: string): string[] {
   const found = (index.app.get(name) ?? []).map(realOf)
 
   try {
-    const library = realpathSync(Bun.resolveSync(`${UI_LIBRARY}/${name.replace(WORD_BOUNDARY, '-').toLowerCase()}.kay`, dirname(ui.file)))
+    const library = realpathSync(Bun.resolveSync(`${UI_LIBRARY}/${name.replace(WORD_BOUNDARY, '-').toLowerCase()}.kay`, baseOf(ui)))
 
     if (componentName(library) === name && !found.includes(library))
       found.push(library)
@@ -337,14 +343,14 @@ export function componentFile(ui: UiSource, component: UiComponent): string | un
     return component.file
 
   try {
-    component.file = realpathSync(Bun.resolveSync(component.specifier, dirname(ui.file)))
+    component.file = realpathSync(Bun.resolveSync(component.specifier, baseOf(ui)))
   }
   catch {}
 
   return component.file
 }
 
-function readUi(file: string): UiSource | undefined {
+function readUi(file: string, base?: string): UiSource | undefined {
   let source: string
 
   try {
@@ -361,7 +367,7 @@ function readUi(file: string): UiSource | undefined {
     program = parseProgram(source).program
   }
   catch (error) {
-    return { file, source, components: [], problems: [{ start: 0, end: 0, message: `src/ui.ts does not parse: ${error instanceof Error ? error.message : String(error)}` }] }
+    return { file, source, base, components: [], problems: [{ start: 0, end: 0, message: `src/ui.ts does not parse: ${error instanceof Error ? error.message : String(error)}` }] }
   }
 
   const config = exported(program)
@@ -379,7 +385,7 @@ function readUi(file: string): UiSource | undefined {
     })
   }
 
-  return { file, source, components, problems }
+  return { file, source, base, components, problems }
 }
 
 // The project's `src/ui.ts` as it is written, read again only when the file changed; none when the project has none.
@@ -406,11 +412,86 @@ export function uiOf(root: string): UiSource | undefined {
   return ui
 }
 
-// What `src/ui.ts` sets for a component file, as Bun loads it; none for a component it does not name.
-export function uiEntryOf(root: string, file: string): UiEntry | undefined {
-  const ui = uiOf(root)
+// The files extensions contribute `defineUi` entries from, by project root, in the order of the config; set as the config loads.
+const layerFiles = new Map<string, string[]>()
+const layerReads = new Map<string, { stamp: string, ui: UiSource | undefined }>()
 
-  if (ui === undefined || ui.components.length === 0)
+// Records the `ui` files of the extensions for a project: absolute, or relative to its root.
+export function setUiLayers(root: string, extensions: readonly { ui?: string | undefined }[] | undefined): void {
+  const files = (extensions ?? []).flatMap(({ ui }) => ui === undefined ? [] : [resolve(root, ui)])
+
+  if (files.length === 0)
+    layerFiles.delete(resolve(root))
+  else
+    layerFiles.set(resolve(root), files)
+}
+
+// What the extensions' `ui` files say, in config order, each read as `src/ui.ts` is and resolving names against the app; a file that does not exist is skipped.
+export function uiLayersOf(root: string): UiSource[] {
+  const base = join(resolve(root), 'src')
+  const found: UiSource[] = []
+
+  for (const file of layerFiles.get(resolve(root)) ?? []) {
+    const stat = statSync(file, { throwIfNoEntry: false })
+    const key = `${base}\0${file}`
+
+    if (stat === undefined) {
+      layerReads.delete(key)
+
+      continue
+    }
+
+    const stamp = `${stat.mtimeMs}:${stat.size}`
+    let kept = layerReads.get(key)
+
+    if (kept?.stamp !== stamp)
+      layerReads.set(key, kept = { stamp, ui: readUi(file, base) })
+
+    if (kept.ui !== undefined)
+      found.push(kept.ui)
+  }
+
+  return found
+}
+
+// Every file that sets a component's classes: the extensions' `ui` files, then the app's `src/ui.ts` when there is one.
+export function uiFilesOf(root: string): string[] {
+  const app = join(root, UI_FILE)
+
+  return [...uiLayersOf(root).map(({ file }) => file), ...statSync(app, { throwIfNoEntry: false }) === undefined ? [] : [app]]
+}
+
+function partsOf(parts: UiEntry['parts']): Record<string, string> {
+  return typeof parts === 'string' ? { root: parts } : { ...parts }
+}
+
+// `over` laid on `under`: a part or a variant value it sets replaces the one under it whole, so the app's classes never fight an extension's.
+function mergeEntries(under: UiEntry, over: UiEntry): UiEntry {
+  const merged: UiEntry = {}
+
+  if (under.parts !== undefined || over.parts !== undefined)
+    merged.parts = { ...partsOf(under.parts), ...partsOf(over.parts) }
+
+  if (under.variants !== undefined || over.variants !== undefined) {
+    const variants = record<Record<string, string | Record<string, string>>>()
+
+    for (const source of [under.variants ?? {}, over.variants ?? {}]) {
+      for (const [name, values] of Object.entries(source))
+        variants[name] = Object.assign(record<string | Record<string, string>>(), variants[name], values)
+    }
+
+    merged.variants = variants
+  }
+
+  return merged
+}
+
+// What `src/ui.ts` and the extensions' `ui` files set for a component file, as Bun loads it, the app's over the extensions' and a later extension's over an earlier one's; none for a component none of them names.
+export function uiEntryOf(root: string, file: string): UiEntry | undefined {
+  const app = uiOf(root)
+  const sources = [...uiLayersOf(root), ...app === undefined ? [] : [app]]
+
+  if (sources.every(({ components }) => components.length === 0))
     return undefined
 
   let real = file
@@ -420,7 +501,16 @@ export function uiEntryOf(root: string, file: string): UiEntry | undefined {
   }
   catch {}
 
-  return ui.components.findLast(component => componentFile(ui, component) === real)?.entry
+  let entry: UiEntry | undefined
+
+  for (const ui of sources) {
+    const found = ui.components.findLast(component => componentFile(ui, component) === real)?.entry
+
+    if (found !== undefined)
+      entry = entry === undefined ? found : mergeEntries(entry, found)
+  }
+
+  return entry
 }
 
 // Whatever `src/ui.ts` changes in a component's compiled output, as text for a cache key.

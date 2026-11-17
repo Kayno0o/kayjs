@@ -4,6 +4,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { APP_DEPENDENCIES, dependencyNames, libraryMessageExtensions, readManifest } from './build/manifests'
+import { setUiLayers } from './build/ui'
 import { KayError } from './compiler/errors'
 import { APP_CONTEXT, CONFIG_FILE } from './config'
 import { resolveConfig } from './config-resolve'
@@ -14,7 +15,14 @@ import { publicEnvFiles } from './server/env-state'
 
 // `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
 export async function loadConfig(root: string, fresh = false): Promise<LoadedConfig> {
-  return withTailwind(root, withSiteUrl(withPublicFields(root, withExtensions(withAppContext(root, withLibraryMessages(root, await importConfig(root, fresh)))))))
+  return withUiLayers(root, await withTailwind(root, withSiteUrl(withPublicFields(root, withExtensions(withAppContext(root, withLibraryMessages(root, await importConfig(root, fresh))))))))
+}
+
+// The config, once the `ui` files of its extensions are known to the build of the project.
+function withUiLayers<Config extends KayConfig>(root: string, config: Config): Config {
+  setUiLayers(root, config.extensions)
+
+  return config
 }
 
 const CONFIG_TIMEOUT = 30_000
@@ -332,7 +340,7 @@ export async function withConfig<Options extends ConfigInput>(root: string, opti
   // The options are resolved as the file is, so a code call may pass a list's function or an old key as `kay.config.ts` may.
   const given = await resolveConfig(options) as KayConfig & Omit<Options, keyof ConfigInput>
 
-  return withTailwind(root, withPublicFields(root, withAppContext(root, mergeConfig(withLibraryMessages(root, await importConfig(root)), given))))
+  return withUiLayers(root, await withTailwind(root, withPublicFields(root, withAppContext(root, mergeConfig(withLibraryMessages(root, await importConfig(root)), given)))))
 }
 
 // `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.

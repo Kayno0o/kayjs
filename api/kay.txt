@@ -3270,6 +3270,7 @@ interface KayExtension<Server extends PluginInput = AnyElysia>
   staticFiles?: Record<string, string> | undefined
   transformPage?: PageHook | undefined
   transformServedPage?: PageHook | undefined
+  ui?: string | undefined
 
 [./server] KayPlugin
 type KayPlugin<Locals extends SingletonBase['resolve'] = Empty, Scope extends 'global' | 'scoped' = 'global'> = Elysia< '', {

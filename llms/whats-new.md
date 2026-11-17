@@ -28,6 +28,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's `TabNav` takes `variant="segmented"`, its links drawn as Segmented's tray of keys, still links with `aria-current` ([TabNav](/ui/tab-nav#segmented)).
 - `markdownHtml` keeps a fence's `language-*` class on its `code` (`sanitizeHtml` with `attributes: { code: ['class'] }` keeps only that class), and takes `{ inline }`, custom inline syntax such as `[[name]]` links drawn the same on the server and in an island, every result escaped or sanitized ([Render Markdown a user writes](/guides/content)).
 - kayjs-ui's `MarkdownEditor` takes `view` (`edit`, `split` or `preview`) and `onViewChange`, so a note can show the preview alone, with the field kept in the form and no toolbar, or the field alone ([MarkdownEditor](/ui/markdown-editor)).
+- A kay extension takes `ui`, a module whose default export is `defineUi({ ... })`, so a package restyles components for every app listing it, under the app's own `src/ui.ts` ([component libraries](component-libraries.md)); `src/ui.ts` itself follows no import or spread.
 
 ## 1.105.0
 

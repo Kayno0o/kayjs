@@ -121,6 +121,7 @@ An extension may set these fields. Only `name` is required.
 - `check`: a function returning the problems with how the app configured the extension, as `{ message, file?, severity?, help? }`. `kay check` and the editor show them beside kay's own without starting the server, so a mistake the library would only log once the server listens is seen as you type. A warning at `kay.config.ts` unless it names a file.
 - `devTool`: a browser module adding a tab to the dev tool.
 - `references`: stylesheets the app's own can `@apply` and read `theme()` tokens of with no `@reference` line, as if each began with one. kayjs-ui lists its `theme.css`. kay adds the line after the Tailwind import of each stylesheet of the app, which writes no rule, so the stylesheet you write stays as it is.
+- `ui`: a module whose default export is `defineUi({ ... })`, written as the app's `src/ui.ts` is. It restyles components in every app listing the extension. The app's `src/ui.ts` wins over it, and a later extension over an earlier one. A key naming a component the app lacks is ignored.
 - `commands`: commands added to `kay`, such as `kay i18n translate`. Each names a module whose default export is a `KayCommand` from `kay/library`. It runs in the project of the current directory and gets its root and config.
 
 A command takes `--quiet`, `--format json` and `--dry-run` like kay's own, and reads them as `quiet`, `format` and `dryRun`. It reports a failure with `fail(message)`, so `--format json` gets a document. It lists a reason in `refuses` for each of the three it does not take.
