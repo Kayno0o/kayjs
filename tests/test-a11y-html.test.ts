@@ -100,8 +100,19 @@ describe('matchHtml', () => {
     const dir = await scratchDir('match-html-')
     const file = join(dir, 'home.test.ts')
     const baseline = join(dir, '__html__', 'home.test.ts', 'home.html')
+    const ci = process.env.CI
 
-    await matchHtmlFile('<p>\n  one\n</p>\n', 'home', file)
+    // A run outside CI writes the missing baseline; CI itself refuses to, which the next test holds.
+    delete process.env.CI
+
+    try {
+      await matchHtmlFile('<p>\n  one\n</p>\n', 'home', file)
+    }
+    finally {
+      if (ci !== undefined)
+        process.env.CI = ci
+    }
+
     expect(await Bun.file(baseline).text()).toBe('<p>\n  one\n</p>\n')
     await matchHtmlFile('<p>\n  one\n</p>\n', 'home', file)
     await expect(matchHtmlFile('<p>\n  two\n</p>\n', 'home', file)).rejects.toThrow(/differs from .*home\.html from line 2: expected " {2}one", got " {2}two"/)
@@ -109,6 +120,24 @@ describe('matchHtml', () => {
 
     await matchHtmlFile('<p>\n  one\n</p>\n', 'home', file)
     expect(existsSync(`${baseline.slice(0, -5)}.actual.html`)).toBe(false)
+  })
+
+  it('writes no missing baseline in a CI run', async () => {
+    const dir = await scratchDir('match-html-ci-')
+    const ci = process.env.CI
+
+    process.env.CI = 'true'
+
+    try {
+      await expect(matchHtmlFile('<p>one</p>\n', 'home', join(dir, 'home.test.ts'))).rejects.toThrow('a CI run writes none')
+      expect(existsSync(join(dir, '__html__'))).toBe(false)
+    }
+    finally {
+      if (ci === undefined)
+        delete process.env.CI
+      else
+        process.env.CI = ci
+    }
   })
 
   it('refuses a name that leaves the folder', async () => {
