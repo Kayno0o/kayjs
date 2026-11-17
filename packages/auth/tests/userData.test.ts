@@ -334,4 +334,18 @@ describe('app data and provider ids on the user', () => {
       return 'ok'
     })
   })
+
+  // Checked by `bun run check`: `requireAdmin()` keeps the user's data typed, which `admin.require()` does not, so `deprecated-auth-methods` leaves it unfixed.
+  test('requireAdmin answers the schema\'s data', () => {
+    const auth = authCore({ sessions: session<AuthSessionData>({ secret: SECRET }), store: memoryAuth(), user: schema, admin: 'admin' })
+
+    new Elysia().use(auth.plugin).get('/', async ({ auth }) => {
+      const admin = await auth.requireAdmin()
+
+      expectTypeOf(admin.data.avatar).toEqualTypeOf<string | undefined>()
+      expectTypeOf(admin.data.level).toEqualTypeOf<number | undefined>()
+
+      return 'ok'
+    })
+  })
 })

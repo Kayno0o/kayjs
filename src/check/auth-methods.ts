@@ -78,7 +78,10 @@ export async function authMethods(root: string, options: CheckOptions): Promise<
         if (to === undefined)
           return
 
-        report(base + callee.property.start, base + callee.property.end, `\`${name}\` of kayjs-auth is \`${to}\` since 1.105`, `write \`${to}\``, [{ start: base + from, end: base + callee.property.end, text: to }])
+        // `admin.require()` answers a plain `User`, where `requireAdmin()` answers the app's own user data, so a rewrite would take its types away.
+        const edits = name === 'requireAdmin' ? null : [{ start: base + from, end: base + callee.property.end, text: to }]
+
+        report(base + callee.property.start, base + callee.property.end, `\`${name}\` of kayjs-auth is \`${to}\` since 1.105`, `write \`${to}\``, edits)
       })
     }
   })
