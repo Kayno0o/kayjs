@@ -364,6 +364,20 @@ export function currentServerScope(): ServerScope | undefined {
   return serverScope?.()
 }
 
+// What a page's server fence reads of its request while it loads: its cookies, which a persisted signal answers with; a query param is the render's alone.
+export type LoadScope = Pick<ServerScope, 'cookie'> & Partial<Pick<ServerScope, 'param'>>
+
+let loadScope: (() => LoadScope | undefined) | undefined
+
+export function setLoadScope(scope: () => LoadScope | undefined): void {
+  loadScope = scope
+}
+
+// The scope a persisted signal reads its cookie through: the render's, or the load's before the render's is made.
+export function currentRequestScope(): LoadScope | undefined {
+  return serverScope?.() ?? loadScope?.()
+}
+
 // Any write while a request renders, a page's script or an island's, stays with that request; the browser installs no scope.
 function scopedValues(node: { shared: boolean }): WeakMap<object, unknown> | undefined {
   return node.shared ? interceptor?.values?.() : undefined

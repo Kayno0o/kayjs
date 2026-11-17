@@ -1,10 +1,10 @@
 import type { Duration } from './duration'
-import type { ServerScope } from './reactive'
+import type { LoadScope } from './reactive'
 import { TRAILING_SLASH, withBase } from './base'
 import { durationSeconds } from './duration'
 import { KayError } from './kay-error'
 import { kayLog } from './log'
-import { createSignal, currentServerScope, isHydrating, untrack, whenHydrated } from './reactive'
+import { createSignal, currentRequestScope, isHydrating, untrack, whenHydrated } from './reactive'
 import { sendValue } from './send'
 import { decodeValue } from './wire'
 
@@ -28,7 +28,7 @@ export type Stored<T> = { found: true, value: T } | { found: false }
 
 // Where a kept signal's value lives: what the request being rendered holds, which the server renders with, none for a store only the browser sees; what the browser holds, and how it keeps a new value.
 export interface Store<T> {
-  request?: ((scope: ServerScope) => Stored<T>) | undefined
+  request?: ((scope: LoadScope) => Stored<T>) | undefined
   stored: () => Stored<T>
   save: (value: T) => void
   // A store the server never sees: an island claiming its markup reads the value it rendered with, the kept one applying once it has hydrated.
@@ -176,12 +176,12 @@ function inBrowser<T>(store: Store<T>, read: () => T, write: (value: T) => void)
 
 // The server reads the request being rendered once per request, until a render of it writes the signal.
 function serverSide<T>(request: Store<T>['request'], read: () => T): Persisted<T> {
-  const fromRequest = new WeakMap<ServerScope, Stored<T>>()
-  const written = new WeakSet<ServerScope>()
+  const fromRequest = new WeakMap<LoadScope, Stored<T>>()
+  const written = new WeakSet<LoadScope>()
 
   return {
     read: () => {
-      const scope = currentServerScope()
+      const scope = currentRequestScope()
 
       if (!scope || !request || written.has(scope))
         return read()
@@ -196,7 +196,7 @@ function serverSide<T>(request: Store<T>['request'], read: () => T): Persisted<T
       return stored.found ? stored.value : read()
     },
     save: () => {
-      const scope = currentServerScope()
+      const scope = currentRequestScope()
 
       if (scope)
         written.add(scope)

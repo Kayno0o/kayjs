@@ -293,7 +293,7 @@ describe('a queue\'s hook context', () => {
     const request = new Request('http://x/first-visitor?q=1')
 
     try {
-      await answeringRequest(request, async () => inServerScope(request, () => undefined, async () => runInLocale({ locale: 'fr' } as never, async () => inLoad(new URL(request.url), async () => inPreview(async () => inLiveReads(async () => {
+      await answeringRequest(request, async () => inServerScope(request, () => undefined, async () => runInLocale({ locale: 'fr' } as never, async () => inLoad(new URL(request.url), request, async () => inPreview(async () => inLiveReads(async () => {
         await cached('wakes-the-queue', '1m', () => 1, { live: true })
 
         return jobs.enqueue(1)

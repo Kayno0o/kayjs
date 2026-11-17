@@ -15,6 +15,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's `RelationGraph` draws an item and its neighbours on a ring, joined by lines, each neighbour a link, a button or a muted gap, in the keyboard order of `items`, which can be a list, a promise or a function; `@neighbour` and `@middle` replace the text ([RelationGraph](/ui/relation-graph)).
 - kayjs-ui's `Sparkline` takes `variant="line"` or `"area"`: a line through the values, with a tint under it for an area, in `tone` or any `color`, a `null` splitting it into runs; `hints`, `onSelect`, `href` and the keyboard work as on bars, and `plot`, `line`, `area` and `point` are its new parts ([Sparkline](/ui/sparkline#a-line-or-an-area)).
 - `defineConfig` takes `{ env }` and `{ file }` where an option takes a secret (`mcp.token`, `metrics.token`), which 1.105.0 refused as an unknown option, and still refuses a mistyped key inside them ([MCP](mcp.md)).
+- A page's `--- server` fence reads a `persisted.cookie()` signal by calling it: the value is the request's, decoded and checked against `values` as the render does, so an app no longer reads `ctx.cookies` and decodes kay's format itself ([shared and persisted state](islands-state-to-ids.md)).
 
 ## 1.105.0
 

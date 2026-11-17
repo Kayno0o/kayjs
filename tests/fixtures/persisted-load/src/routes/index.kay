@@ -1,0 +1,8 @@
+--- server
+import { open } from '../lib/open'
+
+// The fence reads the request's cookie through the signal, before the page renders.
+const folder = open()
+---
+main
+  p.folder {folder}

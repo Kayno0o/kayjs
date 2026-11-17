@@ -106,7 +106,7 @@ export function keepParam<T>(name: string, read: () => T, write: (value: T) => v
   }
 
   return keep<T>({
-    request: scope => found(scope.param(name), values, fallback),
+    request: scope => found(scope.param?.(name), values, fallback),
     stored,
     save: value => saveParam(name, value, fallback, push),
   }, read, write)

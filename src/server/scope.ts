@@ -1,11 +1,11 @@
 import type { Outcome } from '../runtime/action'
 import type { QueryRules } from '../runtime/query-param'
-import type { ServerScope } from '../runtime/reactive'
+import type { LoadScope, ServerScope } from '../runtime/reactive'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { setRequestOutcome } from '../runtime/action'
 import { setEndedEntryNote } from '../runtime/ended-entry'
 import { readParam } from '../runtime/query-param'
-import { setServerScope } from '../runtime/reactive'
+import { setLoadScope, setServerScope } from '../runtime/reactive'
 import { setCurrentUrl } from '../runtime/with-query'
 import { requestCookies } from './cookies'
 import { requestUrl } from './request-url'
@@ -17,30 +17,36 @@ const store = new AsyncLocalStorage<ServerScope>()
 
 setServerScope(() => store.getStore())
 
-// The page a load answers, which runs before the render's scope is made.
-const loadUrls = new AsyncLocalStorage<URL>()
+// The page a load answers and the cookies it reads, which runs before the render's scope is made.
+const loads = new AsyncLocalStorage<{ url: URL, scope: LoadScope }>()
 
-setCurrentUrl(() => loadUrls.getStore() ?? (store.getStore()?.request === undefined ? undefined : requestUrl(store.getStore()!.request!)))
+setCurrentUrl(() => loads.getStore()?.url ?? (store.getStore()?.request === undefined ? undefined : requestUrl(store.getStore()!.request!)))
+setLoadScope(() => loads.getStore()?.scope)
 
-// Runs a page's or a layout's load, which reads the page it answers through `withQuery`.
-export function inLoad<T>(url: URL, run: () => T): T {
-  return loadUrls.run(url, run)
+// Runs a page's or a layout's load, which reads the page it answers through `withQuery`, and a persisted cookie signal through the request's cookies, as the render reads them.
+export function inLoad<T>(url: URL, request: Request, run: () => T): T {
+  return loads.run({ url, scope: { cookie: cookieReader(request) } }, run)
+}
+
+// Reads the request's cookies on the first call, which makes the page depend on them, then `first` runs.
+function cookieReader(request: Request, first?: () => void): (name: string) => string | undefined {
+  let cookies: ReturnType<typeof requestCookies> | undefined
+
+  return (name) => {
+    if (!cookies) {
+      cookies = requestCookies(request)
+      personal.add(request)
+      first?.()
+    }
+
+    return cookies.get(name) ?? undefined
+  }
 }
 
 // Renders for `request`: a module's signals keep what this render writes to itself, persisted signals read its cookies and query, `queryParam` its query by the page's `rules`, and a `try` block reports what it caught.
 // `cookieRead` runs once a persisted signal read a cookie, the page then depending on it.
 export function inServerScope<T>(request: Request, report: (error: unknown) => void, run: () => T, cookieRead?: () => void, rules?: QueryRules): T {
-  let cookies: ReturnType<typeof requestCookies> | undefined
-
-  const cookie = (name: string) => {
-    if (!cookies) {
-      cookies = requestCookies(request)
-      personal.add(request)
-      cookieRead?.()
-    }
-
-    return cookies.get(name) ?? undefined
-  }
+  const cookie = cookieReader(request, () => cookieRead?.())
 
   const url = requestUrl(request)
 

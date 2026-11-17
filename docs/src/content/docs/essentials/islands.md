@@ -183,6 +183,8 @@ export const theme = persisted.cookie('theme', 'light')
 
 `persisted.cookie()` keeps its value across pages and visits in a cookie. The server reads the cookie too, so the first paint is right. The cookie lasts a year; pass `{ maxAge: '30d' }` for another time.
 
+A page's `--- server` fence reads the signal by calling it. `const open = openFolders()` there is the visitor's value, so the page can load the rows it shows from the first render, with no `ctx.cookies` and no decoding by hand. A missing cookie, or one the signal's `values` refuse, reads as the default.
+
 A cookie can hold a value your app never offers, after an old release or an edit by hand. Name the values the signal may hold, and anything else reads as the default, on the server and in the browser: `persisted.cookie('theme', 'light', { values: ['light', 'dark'] })`. The signal is then typed `'light' | 'dark'`, and a default outside them is a type error.
 
 A param kept in the URL takes `values` too: `queryParam('tab', { default: 'site', values: ['site', 'logs'] })`; a number or a boolean in `values` is compared with what the page's `query` schema reads, or, with no schema naming the param, with its text, so `?page=2` reads as `2` for `values: [1, 2, 3]`.
