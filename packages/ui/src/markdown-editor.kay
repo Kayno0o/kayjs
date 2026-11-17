@@ -437,4 +437,4 @@ div(part="wrap")
         div(part="preview" role="region" aria-label={wording('ui.markdownEditor.preview', 'Preview')} aria-busy="false")
           div(part="previewBody" class={previewClass} innerHTML={previewHtml})
       for View of previewView() key={View}
-        View(text={text()} render={preview} trusted={previewTrusted} initial={previewHtml} initialFor={startText} class={previewParts()})
+        View(text={text()} render={preview} trusted={previewTrusted} initial={previewHtml} initialFor={startText} parts={previewParts()})
