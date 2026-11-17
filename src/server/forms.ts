@@ -2,8 +2,8 @@ import type { TSchema } from 'elysia'
 import type { Action, ServerAction } from '../runtime/action'
 import type { FieldRules, FormRules } from '../runtime/validate'
 import { isAction } from '../runtime/action'
+import { errorText } from '../runtime/field-errors'
 import { localeState } from '../runtime/locale-state'
-import { errorText } from './field-errors'
 
 // The keywords the browser checks a field against, with the `error` message the server shows for it.
 const CHECKED = new Set(['type', 'format', 'pattern', 'minLength', 'maxLength', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'minItems', 'maxItems', 'const', 'items', 'anyOf', 'error'])

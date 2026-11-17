@@ -3,8 +3,8 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
+import { fieldMessage } from '../src/runtime/field-errors'
 import { servePages } from '../src/server/app'
-import { fieldMessage } from '../src/server/field-errors'
 import { testSite } from '../src/test'
 
 type Rules = Record<string, { properties: Record<string, { error?: string }> }>

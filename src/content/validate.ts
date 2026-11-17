@@ -1,7 +1,7 @@
 import type { TSchema } from 'elysia'
 import type { RawEntry } from './load'
 import type { ComponentSegment, Segment } from './markdown'
-import { errorText } from '../server/field-errors'
+import { errorText } from '../runtime/field-errors'
 import { compiledCheck, dottedPath, fieldOf, refusals, unescaped } from '../server/schema-check'
 import { entryRefusal, kayWord } from '../server/words'
 import { humanize } from './humanize'

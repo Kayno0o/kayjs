@@ -1,6 +1,6 @@
 import type { Issue, Refusal, Source, Validated, ValidateOptions } from '../server/validate'
 import type { FieldRules } from './field-refusal'
-import { errorText, ruleOf } from '../server/field-errors'
+import { errorText, ruleOf } from './field-errors'
 import { issueOf } from './field-refusal'
 import { formInput } from './form'
 import { schemaOf } from './schema-record'

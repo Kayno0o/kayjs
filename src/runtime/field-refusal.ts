@@ -1,6 +1,6 @@
 import type { InvalidWord } from '../server/words'
-import { errorText, ruleOf } from '../server/field-errors'
 import { isEmail } from './email'
+import { errorText, ruleOf } from './field-errors'
 import { NUMERIC_FORMATS } from './form'
 import { wording } from './words.client'
 

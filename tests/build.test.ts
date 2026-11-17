@@ -855,9 +855,12 @@ describe('kay build', () => {
       expect(await Bun.file(`${entryFile}.br`).exists()).toBe(true)
 
       // The runtime and the entry's own code are one chunk, which every island and the page swap import: a page loads it, then one chunk per island, and for the islands compiling to a `for`, `await`, `try` or spread, the chunk of that block's module they share.
+      // An `await` block's chunk adds the reader of the page's words, which the browser's `validate` shares with it.
       const swap = (await readdir(dirname(entryFile))).find(file => file.startsWith('page-swap-') && file.endsWith('.js'))!
+      const wordsOnly = async (chunk: string | undefined) => chunk === undefined || (await Bun.file(join(dirname(entryFile), chunk.slice('/_kay/'.length))).text()).includes('data-kay-i18n')
 
-      expect(Object.values(manifest.islands).filter(chunks => chunks[1] !== manifest.entry || chunks.length > 3)).toEqual([])
+      expect(Object.values(manifest.islands).filter(chunks => chunks[1] !== manifest.entry || chunks.length > 4)).toEqual([])
+      expect(await Promise.all(Object.values(manifest.islands).map(async chunks => wordsOnly(chunks[3])))).not.toContain(false)
       expect(Object.entries(manifest.islands).filter(([, chunks]) => chunks.length === 2).map(([island]) => island).sort()).toEqual(['counter.kay', 'joined.kay', 'mounted.kay', 'picker.kay', 'rich.kay', 'typed.kay', 'vouched.kay'])
       // Beside it, only the live-region announcer it shares with the pending blocks, which the page itself never loads.
       const imported = [...(await Bun.file(join(dirname(entryFile), swap)).text()).matchAll(/from\s*"\.\/([^"]+)"/g)].map(match => match[1]!)
