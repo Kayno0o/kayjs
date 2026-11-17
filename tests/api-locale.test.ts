@@ -219,6 +219,12 @@ describe('input an API route refuses, merged schemas and cookies', () => {
     expect(await (await post('/api/refused-schemas/merged-guard-only', {}, { 'accept-language': 'fr' })).json()).toEqual({ status: 422, errors: { guarded: 'Refusé' } })
   })
 
+  it('accepts a body that satisfies a guard\'s schema and the route\'s together', async () => {
+    const response = await post('/api/refused-schemas/merged', { guarded: 'a', own: 'b' }, {})
+
+    expect(response.status).toBe(200)
+  })
+
   it('answers a refused cookie as { errors, status } with the schema\'s own error', async () => {
     const response = await sites.plain.fetch('/api/refused-schemas/cookie', { headers: { 'accept-language': 'fr' } })
 

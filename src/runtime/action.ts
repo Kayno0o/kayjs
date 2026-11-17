@@ -94,7 +94,14 @@ function isOptions(first: unknown): boolean {
   if ('input' in first) {
     const { input } = first
 
-    return typeof input === 'object' && input !== null && (isStandardSchema(input) || !isSchema(input) || (input as { type?: unknown }).type === 'object')
+    // An `input` that is a schema or a record is options; so is one left undefined. A legacy record holding a field called `input` has a schema beside it, which options never do.
+    if (input === undefined)
+      return true
+
+    if (typeof input !== 'object' || input === null)
+      return false
+
+    return !entries.some(([name, value]) => name !== 'input' && (isSchema(value) || isStandardSchema(value)))
   }
 
   return !entries.some(([, value]) => isSchema(value) || isStandardSchema(value))

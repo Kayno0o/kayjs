@@ -141,7 +141,7 @@ An action and an API route import `choice`. An island writes `import type { Choi
 
 An action takes its options first, with its input among them: `action({ input: { title: s.string() }, maxSize: '1mb' }, handler)`. The older `action(schema, handler, options)` still works and `kay upgrade` rewrites it.
 
-Every input an app reads, an action's, an API route's, a socket's, `defineEnv`'s and a collection's, goes through one check. Text from a form, a query string, a path or the environment is read as the numbers, booleans and lists it spells, and a JSON body never is, so `'3'` sent for an int is refused. A key the schema does not name is refused too, and a refusal is worded in the visitor's language.
+Every input an app reads, an action's, an API route's, a socket's and `defineEnv`'s, goes through one check. Text from a form, a query string, a path or the environment is read as the numbers, booleans and lists it spells, and a JSON body never is, so `'3'` sent for an int is refused. A key the schema does not name is refused too, and a refusal is worded in the visitor's language.
 
 Any validator that follows Standard Schema, such as Zod or ArkType, can be the `input` of an action or the `body` of an API route. kay asks it to validate, and reads its JSON Schema, when it has one, for the form's constraints, the OpenAPI document and MCP tools.
 

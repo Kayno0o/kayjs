@@ -38,7 +38,7 @@ describe('validate', () => {
     expect(await validate(schema, { name: 'ab', age: 3, agree: false, when }, { source: 'json' })).toEqual({ value: { name: 'ab', age: 3, agree: false, when } })
   })
 
-  it('refuses numeric text with spaces, exponents and non-decimal forms from a form', async () => {
+  it('reads an exponent and refuses spaces and non-decimal forms in numeric text from a form', async () => {
     expect(await refusedPaths({ name: 'ab', age: '1e2' }, 'form')).toEqual([])
     expect(await refusedPaths({ name: 'ab', age: '0x10' }, 'form')).toEqual(['age'])
     expect(await refusedPaths({ name: 'ab', age: 'Infinity' }, 'form')).toEqual(['age'])

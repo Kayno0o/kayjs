@@ -9,7 +9,7 @@ const INPUTS = ['body', 'query', 'params', 'headers', 'cookie'] as const
 
 type Input = typeof INPUTS[number]
 
-type Hooks = Partial<Record<Input, unknown>> & { transform?: unknown, [DECLARED]?: Partial<Record<Input, object>> }
+type Hooks = Partial<Record<Input, unknown>> & { transform?: unknown, standaloneValidator?: Partial<Record<Input, unknown>>[], [DECLARED]?: Partial<Record<Input, object>> }
 
 // Input a route's schema refused. It carries Elysia's `VALIDATION` code and the shape of its error, so an `onError` hook that answers refused input still reads it as it did.
 export class InputRefused extends Error {
@@ -73,41 +73,69 @@ function cookieValues(jar: unknown): unknown {
 export function validatingInputs(hooks: unknown, inLocale: <T>(request: Request, run: () => T) => T): void {
   const route = hooks as Hooks | undefined
   const declared: Partial<Record<Input, object>> = {}
+  // Every schema an input has: the route's own, and one for each guard around it, which Elysia keeps apart and checks one by one.
+  const all: Partial<Record<Input, object[]>> = {}
 
   if (route === undefined)
     return
 
   for (const input of INPUTS) {
-    const schema = route[input]
+    for (const holder of [route, ...route.standaloneValidator ?? []]) {
+      const schema = holder[input]
 
-    if (typeof schema === 'object' && schema !== null) {
-      declared[input] = schema
-      route[input] = undefined
+      if (typeof schema === 'object' && schema !== null) {
+        (all[input] ??= []).push(schema)
+        declared[input] ??= schema
+        holder[input] = undefined
+      }
     }
   }
 
   if (Object.keys(declared).length === 0)
     return
 
-  const checked: Partial<Record<Input, object>> = Object.fromEntries(Object.entries(declared).map(([input, schema]) => [input, input === 'body' || input === 'params' ? schema : lenient(schema)]))
+  const checked: Partial<Record<Input, object[]>> = Object.fromEntries(Object.entries(all).map(([input, schemas]) => [input, input === 'body' || input === 'params' ? schemas : schemas.map(lenient)]))
 
   route[DECLARED] = declared
-  route.transform = [...[route.transform ?? []].flat() as unknown[], async (context: InputContext) => {
-    const given = { body: context.body, query: context.query, params: context.params, headers: context.headers, cookie: cookieValues(context.cookie) }
 
-    for (const input of INPUTS) {
-      const schema = checked[input]
+  // One hook per input, each reading its own property by name: Elysia parses what a hook's source reads, so a route declaring only a `query` leaves its body to the handler.
+  const check = (input: Input, read: (context: InputContext) => unknown, write: (context: InputContext, value: unknown) => void) => async (context: InputContext) => {
+    const schemas = checked[input]
 
-      if (schema === undefined)
+    if (schemas === undefined)
+      return
+
+    let value = read(context)
+    const refused = new Map<string, Issue>()
+
+    for (const schema of schemas) {
+      const result = await inLocale(context.request, async () => validate(schema, value, { source: sourceOf(input, context.request) }))
+
+      if (!isRefusal(result)) {
+        value = result.value
+
         continue
+      }
 
-      const result = await inLocale(context.request, async () => validate(schema, given[input], { source: sourceOf(input, context.request) }))
-
-      if (isRefusal(result))
-        throw new InputRefused(input, result.errors)
-
-      if (input !== 'cookie')
-        (context as unknown as Record<string, unknown>)[input] = result.value
+      for (const issue of result.errors) {
+        if (!refused.has(issue.path))
+          refused.set(issue.path, issue)
+      }
     }
-  }]
+
+    if (refused.size > 0)
+      throw new InputRefused(input, [...refused.values()])
+
+    write(context, value)
+  }
+
+  const readers: Record<Input, (context: InputContext) => Promise<void>> = {
+    body: check('body', context => context.body, (context, value) => void (context.body = value)),
+    query: check('query', context => context.query, (context, value) => void (context.query = value)),
+    params: check('params', context => context.params, (context, value) => void (context.params = value)),
+    headers: check('headers', context => context.headers, (context, value) => void (context.headers = value)),
+    cookie: check('cookie', context => cookieValues(context.cookie), () => undefined),
+  }
+
+  route.transform = [...[route.transform ?? []].flat() as unknown[], ...INPUTS.filter(input => declared[input] !== undefined).map(input => readers[input])]
 }
