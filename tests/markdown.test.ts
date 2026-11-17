@@ -214,8 +214,19 @@ describe('markdownHtml autolinks', () => {
       expect(islandMarkdown(markdown)).toBe(markdownHtml(markdown))
   })
 
+  it('links what Bun.markdown links, and reads a hostile text in bounded time', () => {
+    expect<string>(islandMarkdown('[[https://x.y/?a=1&b=2]]')).toContain('<a href="https://x.y/?a=1&amp;b=2"')
+    expect<string>(islandMarkdown('a@b.co')).toContain('<a href="mailto:a@b.co"')
+    expect<string>(islandMarkdown('xhttps://x.y')).not.toContain('<a')
+
+    const started = performance.now()
+
+    islandMarkdown('*www.a/x*'.repeat(11_000))
+    expect(performance.now() - started).toBeLessThan(1500)
+  })
+
   it('cuts a URL beside any one character as Bun.markdown does', () => {
-    const bases = ['https://x.y', 'https://x.y/a', 'https://x.y/?q=1', 'https://x.y#f', 'www.x.y/a', 'see https://x.y/a', '(https://x.y/a', '[https://x.y/a', 'a@b.co']
+    const bases = ['https://x.y', 'https://x.y/a', 'https://x.y/?q=1', 'https://x.y#f', 'www.x.y/a', 'see https://x.y/a', '(https://x.y/a', '[https://x.y/a', 'a@b.co', 'foo.a@b.co', 'x-a@b.co', '1a@b.co']
 
     for (const base of bases) {
       for (const char of '.,!?;:_-~=&%+$#/()[]*\'"@<>{}|^\\` ') {

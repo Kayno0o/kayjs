@@ -4,7 +4,7 @@ import type { MarkdownOptions } from './markdown'
 import { Marked, Tokenizer } from 'marked'
 import { escapeMarkdownText as escape } from './escape'
 import { sanitizedMarkdown, withInline } from './markdown'
-import { autolinkLength, endsAutolink, opensAutolink, startsAutolink } from './markdown-autolink'
+import { autolinkLength, endsAutolink, gluedLength, opensAutolink, startsAutolink } from './markdown-autolink'
 import { vouch } from './safe-html'
 
 const TEXT_ESCAPED = /&(?![a-z][a-z\d]{1,31};)|[<>"]/gi
@@ -13,7 +13,6 @@ const REFERENCE = /&(?:#(\d{1,7})|#x([\da-f]{1,6})|(amp|lt|gt|quot|apos|nbsp));/
 const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: '\u00A0' }
 const FIRST_WORD = /^\S*/
 const PROTOCOL = /^(?:mailto|xmpp):/i
-const LABEL = /^(?:https?|ftp):\/\/[\w.-]*|^www\.[\w.-]*/i
 const BARE_TASK = /^\[([ x])\]$/i
 const TRAILING_LINES = /\n+$/
 const LINE_INDENT = /^[ \t]+/gm
@@ -164,7 +163,7 @@ const tokenizer: TokenizerObject = {
       return token
 
     const rest = src.slice(token.raw.length)
-    const glued = startsAutolink(rest) ? LABEL.exec(rest)![0] : emailToken(this, rest)?.raw
+    const glued = startsAutolink(rest) ? rest.slice(0, gluedLength(rest)) : emailToken(this, rest)?.raw
 
     return glued === undefined ? token : { ...token, raw: token.raw + glued, text: token.text + glued }
   },

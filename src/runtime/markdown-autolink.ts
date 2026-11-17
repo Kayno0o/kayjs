@@ -3,6 +3,9 @@ const SCHEME = /(?:https?|ftp):\/\/|www\./iy
 const HOST = /[a-z\d](?:[\w-]|\.(?=[\w-]))*/iy
 const ALNUM_END = /[a-z\d]$/i
 const NEXT = /[\s.,!?;&)\]<}]|$/y
+const LABEL = /(?:https?|ftp):\/\/[\w.-]*|www\.[\w.-]*/iy
+// How far a URL is read: a scan that fails runs to the end of its path, which hostile text repeats.
+const REACH = 2000
 const OPENERS = /[\s([{]$/
 // Each part, what it may end with and the closers its last character may be followed by instead.
 const PARTS: [RegExp, RegExp, RegExp][] = [
@@ -18,7 +21,8 @@ function match(pattern: RegExp, text: string, at: number): string | undefined {
 }
 
 /** The length of the bare URL `text` starts with, 0 when it is not one. */
-export function autolinkLength(text: string): number {
+export function autolinkLength(whole: string): number {
+  const text = whole.slice(0, REACH)
   const scheme = match(SCHEME, text, 0)
   const host = scheme === undefined ? undefined : match(HOST, text, scheme.length)
 
@@ -40,6 +44,11 @@ export function autolinkLength(text: string): number {
   }
 
   return endsAutolink(text, end) ? end : 0
+}
+
+/** The start of a URL that `text` starts with: the part marked leaves as text when a word is stuck to it. */
+export function gluedLength(text: string): number {
+  return match(LABEL, text, 0)?.length ?? 0
 }
 
 /** Whether `text` starts like a bare URL, which may still not be one. */
