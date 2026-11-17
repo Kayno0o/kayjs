@@ -601,7 +601,7 @@ describe('the naming conventions', () => {
 describe('the llms topic files', () => {
   // The release logs are written by `just patch` and `just minor`, not as a topic.
   const INDEX_BYTES = 6000
-  const logs = /^llms\/(?:whats-new|upgrading)(?:-archive)?\.md$/
+  const logs = /^llms\/(?:whats-new|upgrading)(?:-archive|-\d+-\d+-[a-z]+)?\.md$/
   const topics = async () => [...await Array.fromAsync(new Glob('llms/*.md').scan()), ...await Array.fromAsync(new Glob('packages/*/llms/*.md').scan())].sort().filter(file => !logs.test(file))
 
   it('open with Common tasks and hold a Reference section', async () => {

@@ -5,7 +5,7 @@
 ## Rules that are easy to get wrong
 
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
-- A signal or memo is read by calling it, `count()`, in the template and the script; a bare name in the template is the error `uncalled-signal`, fixed by `kay check --fix`. Assigning writes it: `count = 0`, `count += step`, `count++`. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>` and assigns it, the parent passing `bind:open={open}`.
+- A signal or memo is read by calling it, `count()`, in the template and the script; a bare name in the template is the error `uncalled-signal`. Assigning writes it: `count = 0`, `count += step`, `count++`. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>` and assigns it, the parent passing `bind:open={open}`.
 - A `for` matches its rows across renders by `item.id`, else by the item itself; `for post of posts key={post.slug}` names another key.
 - An `await` block streams any promise: `await comments`, `await data.comments`, a prop or one a component makes.
 - Shared values are exported from a `--- module` fence.
@@ -14,7 +14,7 @@
 - Every duration is a string with its unit, `'250ms'`, `'5m'` or `'30d'`; a bare number is a type error; `durationMs` gives milliseconds.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - `kay dev` writes the server errors to `.kay/dev/errors.json`: read it.
-- Pug features that do not exist, each reported with a replacement: `- code`, `#{}`, `!{}`, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`.
+- Pug features kay lacks, each reported with a replacement: `- code`, `#{}`, `!{}`, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`.
 
 ## Libraries
 
@@ -22,15 +22,15 @@ Each library ships its `llms.txt` and `llms/`: open the one a task needs.
 
 - [kayjs-auth](packages/auth/llms.txt): sign-in with OAuth, passwords, magic links, two-factor and passkeys
 - [kayjs-ui](packages/ui/llms.txt): components styled by one theme: dialogs, toasts, tables, forms, charts
-- [kayjs-mail](packages/mail/llms.txt): mails written as `.kay` components, SMTP from the environment, queued sending
-- [kayjs-cms](packages/cms/llms.txt): content edited on the page it renders, collections, history, uploads
-- [kayjs-ai](packages/ai/llms.txt): `ask()` over Anthropic or an OpenAI-compatible server, streamed replies, tools, limits
+- [kayjs-mail](packages/mail/llms.txt): mails as `.kay` components, SMTP from the env, queued sending
+- [kayjs-cms](packages/cms/llms.txt): content edited on its own page, collections, history, uploads
+- [kayjs-ai](packages/ai/llms.txt): `ask()` over Anthropic or OpenAI-compatible servers, streaming, tools, limits
 
 ## Docs
 
 To build a site, read [Build a site](llms/site.md) first, then the topics below; `kay docs <words>` prints the matching section.
 
-- [Build a site](llms/site.md): config, layout, a Markdown collection, the 404 page, islands, a form
+- [Build a site](llms/site.md): config, layout, Markdown collection, 404 page, islands, a form
 - [Recipes](llms/recipes.md): a database CRUD, a dashboard behind sign-in, a blog
 - [Components](llms/components.md): fences, props, signals, memos, generics, `import.meta.glob`
 - [Effects](llms/effects.md): `effect`, `watch`, `every`, `listen`
@@ -116,7 +116,8 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Hooks](llms/hooks.md): `onX`, `beforeX`, `refuse()`
 - [Queues](llms/queues.md): jobs and workflows that survive a restart
 - [Proxies and security headers](llms/proxy-and-security.md): headers, CSP, compression
-- [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
+- [Upgrading](llms/upgrading.md): what each recent minor breaks, what an app changes
+- [Upgrading to 1.105, config](llms/upgrading-1-105-config.md): config and hooks
 - [Upgrading, older](llms/upgrading-archive.md): the minors before 1.105
 - [What's new](llms/whats-new.md): what each recent release adds
 - [What's new, older](llms/whats-new-archive.md): the releases before 1.104.3

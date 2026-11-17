@@ -8,42 +8,6 @@ What each minor release before 1.105 broke, and what an app changed to move to i
 
 `island({ render, hydrate, persist, interactive })` first in a component's script replaces the `--- island`, `--- client` and `--- static` fence lines and `export const island = { ... }` in a `--- module` fence: `--- client` is `island({ render: 'client' })`, `--- island` is `island()`, `--- static` is `island({ render: 'static' })`, and the export's `persist`, `hydrate` and `interactive` move into the call. On a use, `hydrate="client"` is `render="client"` and `server="defer"` is `server defer`. `kay upgrade` rewrites them (`deprecated-island-fence`, `deprecated-island-attributes`), and they work until 1.108. kayjs-ui's `table.kay`, `site-nav.kay` and `app-header.kay` and kayjs-ai's `chat-launcher.kay` no longer export `island`: they declare it with the call, and an app reading that export reads the component's `interactive` props from its docs instead.
 
-### Feature keys of kay.config.ts are `false`, `true` or options
-
-`robots`, `sitemap`, `favicon`, `security`, `security.cookies`, `security.csp`, `health`, `preview`, `offline`, `proxy`, `images.avif`, `images.placeholder`, `images.rateLimit`, `live.rateLimit`, `mcp.rateLimit` and `env` take `false` for off, `true` for the defaults, which is the same as leaving the key out except for `preview` and `offline`, off until set, and an object of options. `deprecated-config-switch` (`kay check --fix`) rewrites `proxy: 2` as `proxy: { hops: 2 }` and `proxy: 1` as `proxy: true`; the number works until 1.108.
-
-- `defineConfig` refuses a key it does not know in every option bag, however deep (`images: { widht: 1 }`, `security: { cookies: { httpOnlee: true } }`), where it checked 11 of them and let a typo in the others through.
-
-### `images` is grouped, and lists may come from a function
-
-`images: { remote: { hosts, maxSize, timeout }, formats: { quality, webp, avif }, limits: { variants, queue } }` replaces the flat `remoteMaxSize`, `remoteTimeout`, `quality`, `webp`, `avif`, `maxVariants` and `queue`; `remote: [...]` stays for hosts alone. `deprecated-images-keys` (`kay check --fix`) moves them; the flat keys work until 1.108.
-
-### `ttl` is how long data lives
-
-`signed.sign(use, value, { ttl })`, `files.url(key, { ttl })`, `workChallenge(scope, { ttl })`, kayjs-auth's `proofOfWork({ ttl })`, the `ttl` of an action's `protect.minTime` and `protect.proofOfWork`, and the `ttl: { link, code }` a kayjs-auth mail's data carries to a template replace `maxAge`, which stays for an HTTP header or a cookie. `deprecated-ttl-names` (`kay check --fix`) renames it; `maxAge` works there until 1.108 (a mail template destructuring `{ maxAge }` is changed by hand, as the lint finds `data.maxAge.link` and `data.maxAge.code` only). `window` of a rate limit and `failedTtl` of a queue keep their names: a window is a span counted in, not how long data lives, and `failedTtl` already is a `ttl`.
-
-A store receives its lengths as a `Duration`: `RateStore.hit(key, window)`, `KvStore`'s `set(key, value, ttl)` and `once(key, ttl)`, `SessionStore.set(id, data, maxAge)` and `LiveStore.endAll(id, ttl)`. A store you wrote before 1.105 keeps working with no edit: kay hands milliseconds as a number to every store without `durations: true`, until 1.108. To move one over, add `durations: true` and read the length with `lengthMs(value)` from `kay`, which takes a `Duration` or a number; `kv(ns).set(key, value, 60_000)` written with milliseconds still works and `deprecated-store-ms` rewrites it as `'60000ms'`. kay's own stores take both forms. The types of a store's parameters accept both, so no store fails to type check, and no lint finds a store of your own, as its methods cannot be told from any other object's.
-
-### Hooks are flat keys named by the moment they run
-
-`onListen` replaces the config's `onStart` (a job's, queue's and workflow's `onStart` keep theirs), `onError` is a key of the config beside `observe`, and every hook event carries one `context`: an action's `beforeRun`, `onSuccess` and `onError` read `context` where they read `ctx`, which holds the action's own context besides `ip`, `userAgent` and `userId`. `observe.log` is `false`, `true` or `{ format: 'json', requests, sink }`, replacing `'json'` and a function. `deprecated-app-hooks` and `deprecated-hook-context` (`kay check --fix`) rewrite them; the old forms work until 1.108.
-
-- The resolved `KayConfig` (what the server reads) no longer has `onStart` or `observe.onError`: read `onListen` and `onError`.
-
-### `pages()` and `testSite()` take `{ config }`
-
-The config keys written beside `root` in the options (`pages({ root, client: { navigation: false } })`) go under `config`: `pages({ root, config: { client: { navigation: false } } })`; `root`, `dev`, `prebuilt` and a test site's own options (`browser`, `headers`, `outgoing`, `mcpKey` and the rest) stay. `deprecated-pages-options` (`kay check --fix`) moves them; the old form works until 1.108.
-
-### Library stores and tables share one naming
-
-Each library takes its data store as `store`, and each `/pg` and `/sqlite` entry names its helpers the same way. The old names work until 1.108, and `kay check` reports them as `deprecated-store-names`, with a fix for the imports, `ai({ conversations })` and a lone `listStore` or `suppressionStore` of `mailer()`:
-
-- kayjs-ai: `ai({ store })` for `conversations`; `pgAi(db)`, `sqliteAi(path)`, `createAiTables(db)` and `aiTables` for `pgConversations`, `sqliteConversations`, `createConversationTable` and `conversationTable`.
-- kayjs-mail: `mailer({ store: { lists, suppressions } })` for `listStore` and `suppressionStore`, `pgMail(db)` and `sqliteMail(path)` for both at once, and `mail.list(name, { store: sqliteMail(path) })` for `mail.list(name, { file })`, which the lint does not find; `sqliteLists`, `createMailTables` and `mailTables` for `openLists`, `createMailListTables` and `mailListTableNames`.
-- kayjs-auth: `sqliteAuth(path)` from `@kayjs/auth/sqlite` is `store: { url: 'sqlite://path' }`; `pgAuth` and `authTables` stay.
-- kayjs-cms: `pgCms` and `sqliteCms` for `pgLoader` and `sqliteLoader`, and `cmsTables` from `@kayjs/cms/pg` for an app's own `ignoreTables`. `cms({ files })` keeps its name: it is where edits are committed, not a data store.
-
-An app with no `store` now keeps sessions, jobs and every library in one SQLite file, `data/app.sqlite`, in place of `data/sessions.sqlite`, `data/jobs.sqlite`, `data/auth.sqlite`, `data/ai-conversations.sqlite`, `data/mail-list.sqlite` and `data/content.sqlite`. A file of the old name that exists is still read, so nothing is lost on upgrade and nothing needs moving; delete it and copy its tables into `data/app.sqlite` to leave it. `kay add postgres` names `data/app.sqlite` among the files holding users to move.
 ### `formatDuration` takes a duration with its unit
 
 `formatDuration(7_500_000)` is `formatDuration('125m')` (or `'7500s'`, `'2.5h'`): a length is written with its unit everywhere in kay, as `formatBytes` already took bytes or `'1.5kb'`. A number of milliseconds still works until 1.108 and `kay upgrade` rewrites a literal one, as `'7500000ms'` (`deprecated-format-duration`); a number held in a variable is changed by hand, and the editor strikes the call through.
@@ -68,14 +32,6 @@ An app with no `store` now keeps sessions, jobs and every library in one SQLite 
 - kayjs-ai: `onStep` and `onToolCall` are `afterStep` and `afterToolCall`, and `onSuccess` is `afterRequest`, beside `beforeRequest`, in `ai()` and in the options of `ask`, `speak`, `embed`, `transcribe` and `describeImage` (sources `ai.afterStep`, `ai.afterToolCall`, `ai.afterRequest`).
 - A test or a log reading a hook's `source` from `observe.onError` reads the new name.
 
-### Every guard option is `guards`, and a feature with none is closed
-
-`deprecated-guard-option` (`kay check --fix`) renames `guard` to `guards` in `vitals()` and in the `jobs` and `images` of kay.config.ts, and writes `requireGuards` as `guards: { default }`; the old forms work until 1.108.
-
-- `vitals({ guard })`, `jobs: { guard }` and `images: { guard }` are `guards`, taking a guard, a list, `{ load }` or `false`, as a page's and an API module's `guards` do. `cms()` keeps `access`, which also takes a role.
-- `jobs` with no `guards` mounts the page and answers 403 instead of stopping the boot, and `jobs: { guards: false }` opens it.
-- `images.resolve` with no `images.guards` answers 403 for every image it resolves, where it was open: write `guards: false` to resize them for everyone.
-- `requireGuards: true` is `guards: { default: 'closed' }` and `requireGuards: false` is `guards: { default: 'open' }`; left out, a site that guards some route of its own still closes the rest.
 
 ### Every job takes `(input, ctx)`, and `src/jobs` mounts them
 
@@ -137,10 +93,32 @@ Toggle, Checkbox, Slider, ColorInput, Combobox and DateInput put the attributes 
 
 ### SidePanel is a Dialog with a side `placement`
 
-`SidePanel` draws a `Dialog` with `placement="right"`, so the head, title, body and footer are the Dialog's. Nothing changes in its props, and its `class` still takes `head`, `title`, `body` and `footer`, handed to the Dialog. A `src/ui.ts` entry for `'@kayjs/ui/side-panel.kay'` with `head`, `title`, `body` or `footer` moves to `'@kayjs/ui/dialog.kay'` (which then restyles centred dialogs too: a part restyled for one placement only is `class` on the call); `kay check` reports the entry left behind, as a part the component no longer has.
+`SidePanel` draws a `Dialog` with `placement="right"`, so the head, title, body and footer are the Dialog's. Nothing changes in its props, and its `parts` still take `head`, `title`, `body` and `footer`, handed to the Dialog. A `src/ui.ts` entry for `'@kayjs/ui/side-panel.kay'` with `head`, `title`, `body` or `footer` moves to `'@kayjs/ui/dialog.kay'` (which then restyles centred dialogs too: a part restyled for one placement only is `class` on the call); `kay check` reports the entry left behind, as a part the component no longer has.
 
 ### A page is never an island
 
 A page without a `--- server` fence that has an `on*`, `bind:` or `ref`, a browser value of `kay` such as `signal`, or a live or persisted import used to become an island. It still does through 1.107, and `kay check` warns with `deprecated-page-island` at that line; 1.108 refuses it. Move what needs the browser into a component of its own and render it from the page: the component is the island. No `kay upgrade` fix exists, as the fix moves code into a new file.
 
 Releases before 1.105 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+
+### Island sources read and report the same way
+
+every source (`resource`, `stream`, `socket`, `local`, a `track()` handle) has `data()`, `status()`, `pending()`, `error()` and `retry()`, and `onData({ value })` and `onError`. `value()`, `last()`, `rows()`, `unsynced()`, `syncStatus()`, `onSuccess`, `onSync` and an action's `succeeded()` work through 1.107, and `kay check` warns with `deprecated-source-readers` and `kay upgrade` rewrites them.
+
+An action has `data()` and `status()` too, and `succeeded()` is `data()` (what the last call returned, `status() === 'ready'` for whether there was one); an action has no `retry()`, `onData` or `onError` of its own, its `track()` handle does.
+
+Not rewritten, so by hand: `pending()` and `status()` of a `local()` collection keep their names and change meaning, so no check can tell an old read from a new one: they read a boolean and `idle|loading|ready|failed`, not the count and the sync states, and `{todos.pending()}` renders `true` or `false` now. Write `sync.queued()` and `sync.status()` for the old reads, and `ReturnType<LocalSync['status']>` where the type `LocalStatus` was used (it is gone). `rows()` of an `infiniteList()` and `last()` of the stream an action's island call returns are `data()`, with no lint, as `kay check` does not follow an import of kayjs-ui nor the receiver of an awaited call. A custom list given to `LoadMore` or `Table` takes `data()` beside `rows()` (a list with only `rows()` still works through 1.107), and a fake stream in a test needs `data`. `succeeded()` read as a whole (passed on, or `succeeded()?.data?.id`) becomes `data()` with `status() === 'ready'` where it tested for a result. An event's `data` and `rows` in a handler passed by name are `value` now.
+### Live values and presence write alike
+
+`set` of a live value takes the next value first and where it goes in its options: `room.set(next, { key: id })` of a value per key, `unread.set(next, { user: id })` of a value per user, and `visitors.set(next)` as before. `presence({ room, member })` takes one object, in place of `presence(room, member)`. The old forms work until 1.108, `kay check` warns with `deprecated-live-api` and `kay upgrade` rewrites them, on a value declared in the file with `live()` or imported under a name every declaration of the project agrees on; a value reached through a namespace import is not found. A `set(key, next)` whose `next` is an object holding only `key` (or `user`) reads as the new form, so write it in the new order.
+
+### One Action type crosses into components
+
+`Action` with no parameters takes any action as a prop, in place of `Action<never, unknown>`: the old spelling works until 1.108 and `deprecated-action-type` rewrites it. A `.with()` action now crosses into an island, its fields sent over the input of each call, where it failed the render; `NoInputAction` stays.
+
+### Component callbacks take one event object
+
+Every transition callback of a kayjs-ui, kayjs-ai or kayjs-cms component takes one object holding what it reports, never positional arguments or a bare value: `onOpenChange(true)` is `onOpenChange({ open })`, `onChange(value, option)` is `onChange({ value, option })`. A handler written by hand destructures the event, `onChange={({ value }) => kind = value}` in place of `onChange={kind.set}`; `kay check` types it, so a handler reading the old arguments fails the check. The fields are in [the conventions](component-library-conventions.md) and each component's page: `open`, `value`, `checked` (Checkbox, Toggle, Menu), `rows`, `files`, `item` (`onSelect`), `page`, `size`, `sort`, `row`, `index`, `text`, `data` (`onSave`, `onSend`), `audio`, `crop`, `from` and `to`. A source reports `onLoad({ options, query })`, `{ rows }` on Table and `{ items }` on VirtualList. `onSelectedChange` is `{ keys, rows }` on Table, `{ id, node }` on TreeView and `{ key, entry }` on Timeline, so `bind:selected` no longer applies to them. `onError`, the callbacks with no argument and Chat's `onSend({ messages })` are unchanged.
+
+Four callbacks are renamed to say what they report, and the old names keep working with their positional arguments until 1.108: `onChange` of Accordion, Tabs and ThemeToggle is `onValueChange`, ZoomPane's is `onPlateChange({ plate })`, Table's `onSort` is `onSortChange({ sort })` and a chart's `onActive` is `onActiveChange({ index })`. `kay check` reports them as `deprecated-ui-callbacks` and `kay upgrade` rewrites an inline arrow function, any other value getting the new name only.
+

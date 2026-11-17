@@ -28,6 +28,7 @@ export const LLMS_GUIDES = [
   { slug: 'guides/whats-new-archive', topic: 'whats-new-archive', order: 10.6, listed: false, description: 'What the older releases added, with a link to where each feature is documented.' },
   { slug: 'guides/upgrading', topic: 'upgrading', order: 11, description: 'What each minor release breaks, and what to change in your app.' },
   { slug: 'guides/upgrading-archive', topic: 'upgrading-archive', order: 11.1, listed: false, description: 'What the older minor releases broke, and what to change in your app.' },
+  { slug: 'guides/upgrading-1-105-config', topic: 'upgrading-1-105-config', order: 11.2, listed: false, description: 'What 1.105 changed in kay.config.ts, the hooks, the stores and the guards of features.' },
 ] as const
 
 // The guides left out of the sidebar and the pagers, served and linked from the page they continue.
