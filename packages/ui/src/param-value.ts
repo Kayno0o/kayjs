@@ -23,7 +23,6 @@ export function paramTexts(name: string | undefined): string[] | undefined {
   }
 }
 
-// The option a control holding `param` shows: the one the address names, else the one `paramDefault` names, else none, which the control reads as its first or its empty option.
 // The options a control holding several values in `param` shows, in the order of `options`: the ones the address names, else the ones `paramDefault` names, else undefined, which the control reads as none.
 export function paramPicks<Choice extends string | number>(options: readonly { value: Choice }[], param: string | undefined, paramDefault: readonly Choice[] | undefined): Choice[] | undefined {
   if (param === undefined)
@@ -37,6 +36,7 @@ export function paramPicks<Choice extends string | number>(options: readonly { v
   return options.map(option => option.value).filter(value => named.includes(String(value)))
 }
 
+// The option a control holding `param` shows: the one the address names, else the one `paramDefault` names, else none, which the control reads as its first or its empty option.
 export function paramPick<Choice extends string | number | null>(options: readonly { value: Choice }[], param: string | undefined, paramDefault: string | number | undefined): Choice | undefined {
   if (param === undefined)
     return undefined
