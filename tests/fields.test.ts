@@ -238,10 +238,10 @@ describe('nativeConstraints', () => {
     expect(of(t.String())).toEqual({})
     expect(of(t.String({ minLength: 1 }))).toEqual({ required: '', minlength: '1' })
     expect(of(t.String({ minLength: 1 }), false)).toEqual({ minlength: '1' })
-    expect(of(t.Integer())).toEqual({ required: '' })
-    expect(of(t.Boolean())).toEqual({})
+    expect(of(t.Integer())).toEqual({ required: '', type: 'number' })
+    expect(of(t.Boolean())).toEqual({ type: 'checkbox' })
     expect(of(t.Array(t.String()))).toEqual({})
-    expect(of(t.File())).toEqual({ required: '' })
+    expect(of(t.File())).toEqual({ required: '', type: 'file' })
     expect(of(t.Union([t.Literal('a'), t.Literal('b')]))).toEqual({ required: '' })
     expect(of(t.Union([t.Literal(''), t.Literal('b')]))).toEqual({})
   })
@@ -253,8 +253,24 @@ describe('nativeConstraints', () => {
   })
 
   it('bounds a number, s.Numeric included, and types an email field', () => {
-    expect(of(t.Numeric({ minimum: 1, maximum: 9 }), false)).toEqual({ min: '1', max: '9' })
+    expect(of(t.Numeric({ minimum: 1, maximum: 9 }), false)).toEqual({ min: '1', max: '9', type: 'number', step: 'any' })
+    expect(of(t.Integer({ minimum: 1 }), false)).toEqual({ min: '1', type: 'number' })
     expect(of(t.String({ format: 'email', maxLength: 80 }))).toEqual({ required: '', maxlength: '80', type: 'email' })
+  })
+
+  it('types a url, a date, a boolean and a file, and takes the autocomplete of a format, a name or the schema', () => {
+    const named = (field: unknown, name: string) => Object.fromEntries(nativeConstraints(field as FieldSchema, false, name))
+
+    expect(of(t.String({ format: 'url' }), false)).toEqual({ type: 'url' })
+    expect(of(t.Date(), false)).toEqual({ type: 'date' })
+    expect(of(t.Boolean(), false)).toEqual({ type: 'checkbox' })
+    expect(of(t.File({ type: ['image/png', 'image/jpeg'] }), false)).toEqual({ type: 'file', accept: 'image/png,image/jpeg' })
+    expect(of(t.Files({ type: 'image/*' }), false)).toEqual({ type: 'file', accept: 'image/*', multiple: '' })
+    expect(named(t.String({ format: 'email' }), 'contact')).toEqual({ type: 'email', autocomplete: 'email' })
+    expect(named(t.String(), 'first_name')).toEqual({ autocomplete: 'given-name' })
+    expect(named(t.String({ autocomplete: 'off' }), 'firstName')).toEqual({ autocomplete: 'off' })
+    expect(named(t.String(), 'name')).toEqual({})
+    expect(named(t.File(), 'email')).toEqual({ type: 'file' })
   })
 })
 

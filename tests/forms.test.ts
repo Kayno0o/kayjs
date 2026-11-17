@@ -400,7 +400,7 @@ describe('a form naming its fields with field and showing their messages with er
     const page = await site.visit('/')
 
     expect(page.html).toContain('<input name="title" required minlength="3" maxlength="40">')
-    expect(page.html).toContain('<input name="email" required maxlength="200" type="email">')
+    expect(page.html).toContain('<input name="email" required maxlength="200" type="email" autocomplete="email">')
     expect(page.html).toContain('<input name="age" type="number" min="1" max="120">')
     expect(page.html).toContain('<input name="agree" type="checkbox">')
     expect(page.html).not.toContain('enrol-title-error')

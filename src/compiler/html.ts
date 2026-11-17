@@ -9,7 +9,8 @@ import { actionOf, failedBlockOf, marksServerIsland, sectionOf, serverIslandOf }
 import { decodeEntities } from './expression'
 import { addFieldDescribed, addInvalidAttribute } from './field-described'
 import { valuesOf } from './form-info'
-import { addFilled, addInitial } from './html-initial'
+import { addClassAttribute, addFieldFill, addSchemaOptions, listsFromSchema } from './html-fields'
+import { addInitial } from './html-initial'
 import { Markup } from './html-parts'
 import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, fixedSource, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
 import { END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
@@ -492,32 +493,7 @@ export class HtmlTemplate extends TemplateWriter {
     if (unit !== undefined)
       markup.text(` data-kay-u="${unit.id}"`)
 
-    if (plan.classes?.parts) {
-      const classes = plan.classes
-
-      markup.dynamic(() => {
-        b.add(`${helperName('nonEmptyAttribute')}("class", ${helperName('className')}(`)
-        this.classList(classes)
-        b.add('))')
-      })
-    }
-    else if (plan.classes?.expression) {
-      const { text, expression } = plan.classes
-
-      markup.text(' class="')
-      markup.dynamic(() => b.add(`${helperName('className')}([${JSON.stringify(text)}, (`).addSource(expression).add(')])'))
-      markup.text('"')
-    }
-    else if (plan.classes?.pieces) {
-      const { pieces } = plan.classes
-
-      markup.text(' class="')
-      markup.dynamic(() => b.add(`${helperName('className')}(${JSON.stringify(pieces)})`))
-      markup.text('"')
-    }
-    else if (plan.classes) {
-      markup.text(` class="${escapeStaticAttribute(plan.classes.text)}"`)
-    }
+    addClassAttribute(b, markup, plan.classes, classes => this.classList(classes))
 
     for (const attribute of plan.attributes) {
       if (attribute.kind === 'binding') {
@@ -667,7 +643,7 @@ export class HtmlTemplate extends TemplateWriter {
       }
 
       if (filled)
-        markup.dynamic(() => addFilled(b, this.src, element, { filled, fieldArguments, own: ownFill, box: checkboxValue, values, name: field.name }))
+        addFieldFill(b, this.src, element, markup, { filled, fieldArguments, own: ownFill, box: checkboxValue, values, name: field.name }, field, name === 'input' && !this.named(element, 'type'))
 
       if (field.invalid) {
         refusing = fieldArguments
@@ -751,12 +727,18 @@ export class HtmlTemplate extends TemplateWriter {
       // A refused post's text takes the place of the textarea's static value.
       const staticContent = field?.fill === 'content' && plan.valueText !== undefined ? undefined : plan.staticContent
 
-      if (children.length > 0 && field?.fill === 'selected' && target) {
+      const fromSchema = listsFromSchema(children, field)
+
+      if ((children.length > 0 || fromSchema) && field?.fill === 'selected' && target) {
         const own = selected
 
         markup.dynamic(() => {
           b.add(`${helperName('refillOptions')}(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}), `)
-          this.markup(children, true)
+
+          if (fromSchema)
+            addSchemaOptions(b, target, field.name)
+          else
+            this.markup(children, true)
 
           if (own) {
             b.add(', () => ')

@@ -523,6 +523,9 @@ function formConstraints(target: unknown, name: string, written: readonly string
 [./html] formKey
 function formKey(kept?: boolean): string
 
+[./html] formOptions
+function formOptions(target: unknown, name: string): string
+
 [./html] head
 function head(tags: HeadTag[]): void
 
@@ -607,6 +610,9 @@ function refillOptions(posted: string | undefined, markup: string, value?: (() =
 
 [./html] reportRenderFailure
 function reportRenderFailure(error: unknown): void
+
+[./html] schemaFill
+function schemaFill(target: unknown, name: string, value: () => string, checked: () => string): string
 
 [./html] selectOptions
 function selectOptions(value: unknown, markup: string, only?: boolean): string

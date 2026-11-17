@@ -1,4 +1,5 @@
 import type { TSchema } from 'elysia'
+import { autocompleteOf, typeAttributes } from './form-types'
 
 // What a top-level field's JSON schema says about the text a form posts for it.
 export interface FieldSchema {
@@ -100,7 +101,7 @@ function fromText(field: FieldSchema | undefined, value: unknown): unknown {
 }
 
 // A boolean, or the text of one as `s.boolean()` reads it.
-function isBoolean(field: FieldSchema): boolean {
+export function isBoolean(field: FieldSchema): boolean {
   return field.type === 'boolean' || (field.anyOf?.some(member => member.type === 'boolean') ?? false)
 }
 
@@ -110,13 +111,13 @@ function isNumeric(field: FieldSchema): boolean {
 }
 
 // The attributes a browser checks a field against without JavaScript, where a keyword of its schema has one; `required` only where the server would refuse the field left blank, as it never does an unticked checkbox.
-export function nativeConstraints(field: FieldSchema, required: boolean): [name: string, value: string][] {
+export function nativeConstraints(field: FieldSchema, required: boolean, name?: string): [name: string, value: string][] {
   const found: [string, string][] = []
 
   if (required && refusesBlank(field))
     found.push(['required', ''])
 
-  if (field.type === 'string') {
+  if (field.type === 'string' && field.format !== 'binary') {
     if (typeof field.minLength === 'number' && field.minLength > 0)
       found.push(['minlength', String(field.minLength)])
 
@@ -127,9 +128,6 @@ export function nativeConstraints(field: FieldSchema, required: boolean): [name:
 
     if (pattern !== undefined)
       found.push(['pattern', pattern])
-
-    if (field.format === 'email')
-      found.push(['type', 'email'])
   }
 
   if (isNumeric(field)) {
@@ -139,6 +137,13 @@ export function nativeConstraints(field: FieldSchema, required: boolean): [name:
     if (typeof field.maximum === 'number')
       found.push(['max', String(field.maximum)])
   }
+
+  found.push(...typeAttributes(field, isNumeric(field), isBoolean(field)))
+
+  const autocomplete = name === undefined ? undefined : autocompleteOf(field, name)
+
+  if (autocomplete !== undefined)
+    found.push(['autocomplete', autocomplete])
 
   return found
 }

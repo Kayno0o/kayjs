@@ -211,3 +211,41 @@ describe('a button given an action, alone', () => {
     expect(messages('button(action={save}) Go\n')).not.toContain('A button with `action` is a form of its own, so it sits outside one')
   })
 })
+
+describe('a field typed by its schema', () => {
+  it('takes the type, the accept and the autocomplete of what the schema says', async () => {
+    const { html } = await site.visit('/typed')
+
+    expect(html).toContain('<input name="email" required maxlength="254" type="email" autocomplete="email">')
+    expect(html).toContain('<input name="age" required min="18" type="number">')
+    expect(html).toContain('<input name="price" required type="number" step="any">')
+    expect(html).toContain('<input name="born" required type="date">')
+    expect(html).toContain('<input name="agree" type="checkbox">')
+    expect(html).toContain('<input name="cv" required type="file" accept="application/pdf">')
+    expect(html).toContain('<input name="photos" required type="file" accept="image/png,image/jpeg" multiple>')
+  })
+
+  it('leaves what the template writes alone, and the autocomplete the schema or the name gives', async () => {
+    const { html } = await site.visit('/typed')
+
+    expect(html).toContain('<input name="site" type="text" maxlength="2048" autocomplete="url">')
+    expect(html).toContain('<input name="firstName" maxlength="10000" autocomplete="given-name">')
+    expect(html).toContain('<input name="code" autocomplete="off" maxlength="10000">')
+    expect(html).toContain('<textarea name="firstName" maxlength="10000" autocomplete="given-name"></textarea>')
+  })
+
+  it('renders the options of an enum record with their texts, a blank one first for an optional field', async () => {
+    const { html } = await site.visit('/typed')
+
+    expect(html).toContain('<option value="sales">Sales</option><option value="support">Support &amp; help</option>')
+    expect(html).toContain('<option value=""></option><option value="free">free</option><option value="pro">pro</option>')
+  })
+
+  it('ticks a boolean back and selects the option a refused post chose', async () => {
+    const { typed } = await import(join(import.meta.dir, 'fixtures/form-fields/src/routes/typed.kay')) as { typed: Action<Record<string, string | boolean>, unknown> }
+    const refused = await site.submit(typed, { email: 'a@b.co', agree: 'on', topic: 'support', age: '20', price: '1', born: '2020-01-01' }, { from: '/typed' })
+
+    expect(refused.html).toContain('<input name="agree" type="checkbox" checked>')
+    expect(refused.html).toContain('<option value="support" selected>Support &amp; help</option>')
+  })
+})

@@ -1,0 +1,35 @@
+--- server
+import { action, s } from 'kay'
+
+export const TOPICS = { sales: 'Sales', support: 'Support & help' }
+
+export const typed = action(s.object({
+  email: s.email(),
+  site: s.url({ optional: true }),
+  age: s.int({ min: 18 }),
+  price: s.number(),
+  born: s.date(),
+  agree: s.boolean(),
+  cv: s.file({ type: 'application/pdf' }),
+  photos: s.files({ type: ['image/png', 'image/jpeg'] }),
+  topic: s.enum(TOPICS),
+  tier: s.enum(['free', 'pro'], { optional: true }),
+  firstName: s.string({ optional: true }),
+  code: s.string({ optional: true, autocomplete: 'one-time-code' }),
+}), (_input, ctx) => ctx.fail(409, 'Taken'))
+---
+form(action={typed})
+  input(field="email")
+  input(field="site" type="text")
+  input(field="age")
+  input(field="price")
+  input(field="born")
+  input(field="agree")
+  input(field="cv")
+  input(field="photos")
+  select(field="topic")
+  select(field="tier")
+  input(field="firstName")
+  input(field="code" autocomplete="off")
+  textarea(field="firstName")
+  button Send

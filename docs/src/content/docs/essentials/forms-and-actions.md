@@ -28,6 +28,8 @@ form(action={add})
 
 `field` also writes what the schema asks of `title` as attributes the browser checks. Here that is `required`, `minlength` and `maxlength`.
 
+It writes the control's `type` too when you leave it out: `input(field="email")` on an `s.email()` is a `type="email"` input with `autocomplete="email"`, and a number, a date, a boolean (a checkbox) and a file (with `accept`) get theirs the same way. `select(field="topic")` on an `s.enum({ sales: 'Sales', support: 'Support' })` lists the options itself. Anything you write on the control yourself wins.
+
 With kay's script the form posts without a reload. It is checked against the schema first, so the browser shows the schema's `error` message.
 
 A field's `error` is a text, or a function such as `error: () => t('titles.required')`. kay calls the function in the request's locale, so a visitor reads their own language with or without JavaScript. A function that throws or returns no string leaves the field its default wording.

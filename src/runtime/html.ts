@@ -9,7 +9,8 @@ import { NON_ROOT_TRAILING_SLASH } from './base'
 import { fieldDescription, fieldInvalid, fieldRequired } from './described'
 import { escape, escapeAttribute } from './escape'
 import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
-import { nativeConstraints } from './form'
+import { isBoolean, nativeConstraints } from './form'
+import { optionsOf } from './form-types'
 import { DATA_SCRIPT, headCheckpoint, LEADING_NEWLINE, restoreHead } from './head'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
@@ -639,18 +640,41 @@ export function refillOptions(posted: string | undefined, markup: string, value?
   return initial === undefined ? markup : selectOptions(initial, markup, true)
 }
 
-// The constraints a `field` checks in the browser without JavaScript, read off the schema of the action its form posts to; those the template writes itself are left to it.
+interface ActionSchema { properties?: Record<string, FieldSchema>, required?: string[] }
+
+function schemaOf(target: unknown): ActionSchema | undefined {
+  return isAction(target) ? (target as { schema?: ActionSchema }).schema : undefined
+}
+
+// The attributes that only mean something with the `type` the schema gave, so a template writing its own leaves them out.
+const TYPED = new Set(['accept', 'multiple', 'step'])
+
+// The constraints and the `type` and `autocomplete` a `field` takes in the browser without JavaScript, read off the schema of the action its form posts to; those the template writes itself are left to it.
 export function formConstraints(target: unknown, name: string, written: readonly string[]): string {
-  const schema = isAction(target) ? (target as { schema?: { properties?: Record<string, FieldSchema>, required?: string[] } }).schema : undefined
+  const schema = schemaOf(target)
   const field = schema?.properties?.[name]
 
   if (!field)
     return ''
 
-  return nativeConstraints(field, schema.required?.includes(name) === true)
-    .filter(([attribute]) => !written.includes(attribute))
+  return nativeConstraints(field, schema.required?.includes(name) === true, name)
+    .filter(([attribute]) => !written.includes(attribute) && !(TYPED.has(attribute) && written.includes('type')))
     .map(([attribute, value]) => value === '' ? ` ${attribute}` : ` ${attribute}="${escapeAttribute(value)}"`)
     .join('')
+}
+
+// The options of a `select(field=...)` written with none, from the enum of the field in the schema of the action its form posts to.
+export function formOptions(target: unknown, name: string): string {
+  const schema = schemaOf(target)
+
+  return optionsOf(schema?.properties?.[name], schema?.required?.includes(name) === true)
+}
+
+// Which of two fills an `input(field=...)` with no `type` takes: a ticked box for a boolean of the schema, else a value.
+export function schemaFill(target: unknown, name: string, value: () => string, checked: () => string): string {
+  const field = schemaOf(target)?.properties?.[name]
+
+  return field && isBoolean(field) ? checked() : value()
 }
 
 // The `p` an `error` line shows a refused form's message in, nothing while there is none.

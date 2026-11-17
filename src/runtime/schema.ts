@@ -191,7 +191,11 @@ function enumeration(source: EnumValues | object, options?: FieldOptions): Schem
   if (values.length === 0)
     throw new KayError('argument-invalid', 'kay: s.enum() takes at least one value, or a record with at least one key')
 
-  return wrapped(UnionEnum(values as unknown as EnumValues, { ...rest(options, FIELD_KEYS), ...keywords(options ?? {}) }), options)
+  // The texts of a record word the options of a `select(field=...)`.
+  const texts = Array.isArray(source) ? [] : Object.entries(source).filter(([, text]) => typeof text === 'string')
+  const labels = texts.length === 0 ? {} : { 'x-labels': Object.fromEntries(texts) }
+
+  return wrapped(UnionEnum(values as unknown as EnumValues, { ...rest(options, FIELD_KEYS), ...keywords(options ?? {}), ...labels }), options)
 }
 
 function literal<const Value extends string | number | boolean, const Options extends FieldOptions<Value>>(value: Value, options?: Options): Built<ReturnType<typeof schema.Literal<Value>>, Options> {
