@@ -14,6 +14,6 @@ const signIn = api({ guards: false })
     const back = localPath(query.redirect, settings().prefix)
 
     return new Response(null, { status: 302, headers: { location: localPath(`${base}${screenPath(settings().prefix, '/sign-in')}?redirect=${encodeURIComponent(back)}`, '/') } })
-  }, { query: s.object({ redirect: s.string({ optional: true, max: 2000 }) }, { extra: 'strip' }) })
+  }, { query: s.object({ redirect: s.string({ optional: true, max: 2000 }) }) })
 
 export default signIn

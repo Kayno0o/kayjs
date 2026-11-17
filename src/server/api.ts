@@ -67,6 +67,18 @@ const TIMEOUT = Symbol.for('kay.timeout')
 const INPUTS = ['body', 'query', 'params', 'headers', 'cookie']
 const BODY_PREFIX = /^body\./
 
+// Elysia reads the whole jar of a request against the `cookie` schema, where the query and the headers it strips, so a strict one would refuse every cookie a third party sets.
+function inputSchema(input: string, schema: TSchema): TSchema {
+  if (input !== 'cookie' || !('additionalProperties' in schema) || schema.additionalProperties !== false)
+    return schema
+
+  const copy = { ...schema } as Record<PropertyKey, unknown>
+
+  delete copy.additionalProperties
+
+  return copy as unknown as TSchema
+}
+
 // The requests the guards of their module let through, whose later errors are no refused input.
 const admitted = new WeakSet<Request>()
 
@@ -152,7 +164,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         const schema = (hooks as Record<string, unknown> | undefined)?.[input]
 
         if (route.method !== 'WS' && typeof schema === 'object' && schema !== null && !('~standard' in schema))
-          (hooks as Record<string, unknown>)[input] = validated(schema as TSchema)
+          (hooks as Record<string, unknown>)[input] = validated(inputSchema(input, schema as TSchema))
       }
 
       // Whichever way the module chains its `.ws()` (in a group, a guard or a used plugin), every websocket route is held to its limits.

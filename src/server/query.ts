@@ -97,13 +97,20 @@ function layoutDeclares(modules: object[]): boolean {
   return false
 }
 
+// A search parameter the schema does not name is no one's to refuse: a link carries `utm_source`, a proxy adds its own. The schema reads the ones it declares, whatever its `extra`.
+function declaredOnly(schema: TSchema, input: Record<string, unknown>): Record<string, unknown> {
+  const { properties } = schema as ObjectSchema
+
+  return properties === undefined ? input : Object.fromEntries(Object.entries(input).filter(([name]) => Object.hasOwn(properties, name)))
+}
+
 // `ctx.query`: the search params read against the page's `query` schema, a refusal answering 400, except for a field marked `lenient`, which a value it refuses leaves to its default.
 // Without a schema, each parameter's text, a repeated one as a list.
 export function readQuery(schema: unknown, url: URL): Readonly<Record<string, unknown>> {
-  const input = searchInput(url)
-
   if (!isSchema(schema))
-    return input
+    return searchInput(url)
+
+  const input = declaredOnly(schema, searchInput(url))
 
   let read = readFields(schema, input)
 
@@ -124,10 +131,10 @@ export function readQuery(schema: unknown, url: URL): Readonly<Record<string, un
 
 // `ctx.query` for a page that answers a failure, where a layout's load runs although the route's own query was refused, or never read: a field the schema refuses reads as its default, or is left out, so a layout still gets what its types promise.
 export function readQueryLeniently(schema: unknown, url: URL): Readonly<Record<string, unknown>> {
-  const input = searchInput(url)
-
   if (!isSchema(schema))
-    return input
+    return searchInput(url)
+
+  const input = declaredOnly(schema, searchInput(url))
 
   const read = readFields(schema, input)
 

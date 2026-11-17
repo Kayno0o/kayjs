@@ -37,7 +37,7 @@ async function problemWith(file: File, maxSize: number, collection: string): Pro
 export default api({ maxSize: uploadMaxSize })
   .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
   // What the pickers offer and the size an upload may have, so a file the server would refuse is not offered.
-  .get('/rules', ({ query }) => uploadRules(query.collection), { query: s.object({ collection: s.string({ optional: true }) }, { extra: 'strip' }) })
+  .get('/rules', ({ query }) => uploadRules(query.collection), { query: s.object({ collection: s.string({ optional: true }) }) })
   // The shared uploads and those an older release kept in the collection's folder, for a field to pick one again; `images` leaves out the others.
   .get('/:collection', async ({ params, query }) => {
     const collection = await collectionNamed(params.collection)
@@ -47,7 +47,7 @@ export default api({ maxSize: uploadMaxSize })
     const wanted = stored.filter(file => !moved.has(file.key) && (query.images !== 'true' || typeOfName(file.key).startsWith('image/')))
 
     return wanted.toSorted((a, b) => (b.modifiedAt?.getTime() ?? 0) - (a.modifiedAt?.getTime() ?? 0)).slice(0, PICKABLE).map(file => ({ path: files.url(file.key), name: index[file.key]?.name ?? file.key.split('/').at(-1) ?? file.key }))
-  }, { query: s.object({ images: s.string({ optional: true }) }, { extra: 'strip' }) })
+  }, { query: s.object({ images: s.string({ optional: true }) }) })
   .post('/:collection', async ({ params, body, status, request }) => {
     await collectionNamed(params.collection)
 

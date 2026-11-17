@@ -82,6 +82,7 @@ describe('a lenient query field of a page and its layout', () => {
     await Promise.all([
       Bun.write(join(dir, 'routes/traffic/_layout.kay'), '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ period: s.UnionEnum([\'24h\', \'7d\'], { default: \'24h\', lenient: true }) }) }\nconst { period } = ctx.query\n---\nsection(data-period={period})\n  slot\n'),
       Bun.write(join(dir, 'routes/traffic/index.kay'), '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ rows: s.Integer({ default: 10 }) }) }\nconst { period, rows } = ctx.query\n---\np.read {period} {rows}\n'),
+      Bun.write(join(dir, 'routes/strict.kay'), '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.object({ q: s.string({ optional: true }) }) }\nconst keys = Object.keys(ctx.query).join(\',\')\nconst q = ctx.query.q ?? \'\'\n---\np.read {keys}|{q}\n'),
       Bun.write(join(dir, 'routes/_error.kay'), '--- server\nconst { status } = ctx.error\n---\nh1 Error {status}\n'),
     ])
     plain = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false })
@@ -99,6 +100,16 @@ describe('a lenient query field of a page and its layout', () => {
     expect(stale.html).toContain('data-period="24h"')
     expect(read((await get(plain, '/traffic?period=7d')).html)).toBe('7d 10')
     expect((await get(plain, '/traffic?period=1y&rows=x')).status).toBe(400)
+  })
+
+  it('drops a key the strict query schema of a page lacks, as a campaign link carries one', async () => {
+    const tagged = await get(plain, '/strict?utm_source=x&q=a')
+
+    expect(tagged.status).toBe(200)
+    expect(read(tagged.html)).toBe('q|a')
+    expect(read((await get(plain, '/strict?utm_source=x')).html)).toBe('|')
+    expect(read((await get(mounted, '/strict/?utm_source=x&q=a')).html)).toBe('q|a')
+    expect(read((await get(localized, '/fr/strict?utm_source=x&q=a')).html)).toBe('q|a')
   })
 
   it('holds under a base with trailing slashes and a locale prefix', async () => {

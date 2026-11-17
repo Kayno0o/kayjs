@@ -21,7 +21,7 @@ export default api()
 
     return refusal === undefined ? { added: true } : status(400, refusal)
   }, { body: s.object({ from: s.string({ max: 512 }), to: s.string({ max: 512 }), status: STATUS, permanent: s.boolean({ optional: true }) }) })
-  .get('/paths', ({ query }) => sitePathsLike(query.q ?? ''), { query: s.object({ q: s.string({ optional: true, max: 512 }) }, { extra: 'strip' }) })
+  .get('/paths', ({ query }) => sitePathsLike(query.q ?? ''), { query: s.object({ q: s.string({ optional: true, max: 512 }) }) })
   .post('/remove', async ({ body, status }) => {
     return !settings().guard ? status(403, needsGuard()) : { removed: await removeRedirects([...body.froms ?? [], ...body.from === undefined ? [] : [body.from]]) }
   }, { body: s.object({ froms: paths({ optional: true }), from: s.string({ optional: true, max: 512 }) }) })

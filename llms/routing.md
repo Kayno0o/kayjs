@@ -25,7 +25,7 @@ The `query` key of `page` is the schema `ctx.query` is read against, so `ctx.que
 --- server
 import { s } from 'kay'
 
-export const page = { query: s.object({ q: s.string(), page: s.int({ optional: true }) }, { extra: 'strip' }) }
+export const page = { query: s.object({ q: s.string(), page: s.int({ optional: true }) }) }
 
 const { q, page: current } = ctx.query
 ---
@@ -62,7 +62,7 @@ a(href={route('/blog/:page?', { page: 2 }, { query: { q: 'kay' }, hash: 'top' })
 --- server
 import { localPath, s } from 'kay'
 
-export const page = { query: s.object({ next: s.string({ optional: true }) }, { extra: 'strip' }) }
+export const page = { query: s.object({ next: s.string({ optional: true }) }) }
 
 if (ctx.params.id === 'latest') ctx.redirect(localPath(ctx.query.next, '/todos/42'))
 if (ctx.params.id === 'secret') ctx.deny(403, { message: 'Members only' })
@@ -257,7 +257,7 @@ export default (value: string) =>
 The fence's `ctx`:
 
 - `ctx.params`, typed from the file name, `ctx.url`, `ctx.request`
-- `ctx.query`, the search params, read against the schema the page sets as the `query` key of `page`: `export const page = { query: s.object({ q: s.string(), page: s.int({ optional: true }) }, { extra: 'strip' }) }` types `ctx.query.page` as a `number | undefined`.
+- `ctx.query`, the search params, read against the schema the page sets as the `query` key of `page`: `export const page = { query: s.object({ q: s.string(), page: s.int({ optional: true }) }) }` types `ctx.query.page` as a `number | undefined`.
   - Each is read as a form field is (a number from decimal text, a list from a repeated name, `true` from `on`), one left out takes its `default`, and a query the schema refuses renders `_error.kay` with status 400, once the guards let the request through.
   - A field with `lenient: true` in its options (`period: s.enum(['24h', '7d'], { default: '24h', lenient: true })`) reads a value its schema refuses, a stale link's, as its default, or leaves it out when it has none, and `ctx.query` is typed by the real schema (`'24h' | '7d'`); a field without it, or a refused one with no default and required, still answers 400, and an island's `queryParam` already reads a refused value as its default.
   - A layout declares the params it reads the same way, in its own `page`, and the pages under it do not repeat the schema: `ctx.query` is read once against every `query` of the route's layouts and its page merged, so a layout and its page see the same typed values.

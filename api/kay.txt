@@ -1331,9 +1331,9 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
     public: true;
   };
   string: <const Options extends StringOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
-  email: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
-  url: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
-  slug: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
+  email: <const Options extends FormatOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
+  url: <const Options extends FormatOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
+  slug: <const Options extends FormatOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
   int: <const Options extends NumberOptions>(options?: Options | undefined) => Wrapped<TInteger, Options>;
   number: <const Options extends NumberOptions>(options?: Options | undefined) => Wrapped<TNumber, Options>;
   boolean: <const Options extends FieldOptions<boolean>>(options?: Options | undefined) => Wrapped<TBoolean, Options>;
@@ -3862,9 +3862,9 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
     public: true;
   };
   string: <const Options extends StringOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
-  email: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
-  url: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
-  slug: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
+  email: <const Options extends FormatOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
+  url: <const Options extends FormatOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
+  slug: <const Options extends FormatOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
   int: <const Options extends NumberOptions>(options?: Options | undefined) => Wrapped<TInteger, Options>;
   number: <const Options extends NumberOptions>(options?: Options | undefined) => Wrapped<TNumber, Options>;
   boolean: <const Options extends FieldOptions<boolean>>(options?: Options | undefined) => Wrapped<TBoolean, Options>;

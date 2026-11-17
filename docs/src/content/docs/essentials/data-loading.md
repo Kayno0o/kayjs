@@ -51,7 +51,7 @@ export const page = {
   query: s.object({
     q: s.string({ default: '' }),
     page: s.int({ optional: true }),
-  }, { extra: 'strip' }),
+  }),
 }
 
 const { q, page: number = 1 } = ctx.query
@@ -65,7 +65,7 @@ A layout declares the params its pages share the same way, in its own `page`. It
 --- server
 import { s } from 'kay'
 
-export const page = { query: s.object({ period: s.string({ max: 4, default: '24h' }) }, { extra: 'strip' }) }
+export const page = { query: s.object({ period: s.string({ max: 4, default: '24h' }) }) }
 
 const { period } = ctx.query
 ---
@@ -76,7 +76,7 @@ slot
 A value the schema refuses answers 400. A link from a bookmark or an old email may carry one the page no longer takes, so give the field `lenient: true` and it reads as its default instead, or is left out when it has none. The field keeps its real type:
 
 ```ts
-export const page = { query: s.object({ period: s.enum(['24h', '7d', '30d'], { default: '24h', lenient: true }) }, { extra: 'strip' }) }
+export const page = { query: s.object({ period: s.enum(['24h', '7d', '30d'], { default: '24h', lenient: true }) }) }
 ```
 
 Two files of one route can declare the same name when their schemas are the same. `kay check` reports a name declared with different schemas, on the later file.

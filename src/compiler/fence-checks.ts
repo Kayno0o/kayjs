@@ -98,14 +98,14 @@ function lineEnd(source: string, end: number): number {
 const SUGGESTED_MAX_LENGTH = 200
 
 // Where and what to insert to bound a string field: a new options object, the first property of an empty one, or a property before the others.
-function maxLengthEdit(call: NodeOfType<'CallExpression'>, options: NodeOfType<'CallExpression'>['arguments'][number] | undefined): { at: number, text: string } {
+function maxLengthEdit(call: NodeOfType<'CallExpression'>, options: NodeOfType<'CallExpression'>['arguments'][number] | undefined, key: string): { at: number, text: string } {
   if (options === undefined)
-    return { at: call.end - 1, text: `{ maxLength: ${SUGGESTED_MAX_LENGTH} }` }
+    return { at: call.end - 1, text: `{ ${key}: ${SUGGESTED_MAX_LENGTH} }` }
 
   if (options.type === 'ObjectExpression' && options.properties.length === 0)
-    return { at: options.start + 1, text: ` maxLength: ${SUGGESTED_MAX_LENGTH} ` }
+    return { at: options.start + 1, text: ` ${key}: ${SUGGESTED_MAX_LENGTH} ` }
 
-  return { at: (options as NodeOfType<'ObjectExpression'>).properties[0]!.start, text: `maxLength: ${SUGGESTED_MAX_LENGTH}, ` }
+  return { at: (options as NodeOfType<'ObjectExpression'>).properties[0]!.start, text: `${key}: ${SUGGESTED_MAX_LENGTH}, ` }
 }
 
 const UNBOUNDED_QUANTIFIER = /^\{\d+,\}/
@@ -169,7 +169,7 @@ function isShortField(field: string): boolean {
 export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[] {
   const fence = server?.fence
 
-  if (!fence?.code.includes('String'))
+  if (!fence?.code.includes('String') && !fence?.code.includes('string'))
     return []
 
   const diagnostics: Diagnostic[] = []
@@ -184,19 +184,20 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
       const options = call.arguments[0]
       const known = options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type !== 'SpreadElement'))
 
-      if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && (propertyKey(property) === 'maxLength' || isBoundedByValue(property)))) || field === undefined || isSecret(field) || !isShortField(field))
+      if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && (propertyKey(property) === 'maxLength' || propertyKey(property) === 'max' || isBoundedByValue(property)))) || field === undefined || isSecret(field) || !isShortField(field))
         return
 
-      const edit = maxLengthEdit(call, options)
+      const lowercase = call.callee.type === 'MemberExpression' && call.callee.property.type === 'Identifier' && call.callee.property.name === 'string'
+      const edit = maxLengthEdit(call, options, lowercase ? 'max' : 'maxLength')
       const at = fence.offset + edit.at
 
       diagnostics.push({
         ...fence.shift(call.callee),
         code: 'unbounded-string',
-        message: `The string field ${field} has no maxLength of its own`,
+        message: `The string field ${field} has no ${lowercase ? 'max' : 'maxLength'} of its own`,
         note: 'it takes the default bound of 10,000 characters, which is a lot for a value of its kind',
         help: 'give it a tighter one',
-        fixes: [{ title: `Give it a maxLength of ${SUGGESTED_MAX_LENGTH}`, edits: [{ start: at, end: at, text: edit.text }] }],
+        fixes: [{ title: `Give it a ${lowercase ? 'max' : 'maxLength'} of ${SUGGESTED_MAX_LENGTH}`, edits: [{ start: at, end: at, text: edit.text }] }],
         checkOnly: true,
       })
     })
@@ -336,14 +337,14 @@ export function cssImportsWithoutText(fence: ParsedFence): Diagnostic[] {
   })
 }
 
-// Every `s.String(...)` call in a schema, with the name of the field it types, the nearest property holding it.
+// Every `s.string(...)` (or old `s.String(...)`) call in a schema, with the name of the field it types, the nearest property holding it.
 function schemaStrings(node: Node | null | undefined, field: string | undefined, found: (call: NodeOfType<'CallExpression'>, field: string | undefined) => void): void {
   const optional = optionalParts()
 
   eachNode(node, (inner, parent) => {
     if (isPlainProperty(inner))
       schemaStrings(inner.value, propertyKey(inner) ?? field, found)
-    else if (!optional(inner, parent) && inner.type === 'CallExpression' && inner.callee.type === 'MemberExpression' && inner.callee.property.type === 'Identifier' && inner.callee.property.name === 'String')
+    else if (!optional(inner, parent) && inner.type === 'CallExpression' && inner.callee.type === 'MemberExpression' && inner.callee.property.type === 'Identifier' && (inner.callee.property.name === 'String' || inner.callee.property.name === 'string'))
       found(inner, field)
 
     // A property's value is walked above, under the property's own name.

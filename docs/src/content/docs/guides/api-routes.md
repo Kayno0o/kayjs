@@ -15,7 +15,7 @@ export default api()
   .get(
     '/',
     ({ query }) => listNotes(query.prefix ?? ''),
-    { query: s.object({ prefix: s.string({ optional: true }) }, { extra: 'strip' }) },
+    { query: s.object({ prefix: s.string({ optional: true }) }) },
   )
   .post(
     '/',

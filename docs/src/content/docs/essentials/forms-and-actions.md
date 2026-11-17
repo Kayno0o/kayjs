@@ -34,6 +34,12 @@ A field's `error` is a text, or a function such as `error: () => t('titles.requi
 
 Text reaches the schema trimmed, and an optional field left blank counts as left out.
 
+A schema is strict. A string stops at 10,000 characters and a list at 1,000 items unless the field says otherwise, and `s.object` is closed, so a key it does not name is not part of the value.
+
+What happens to such a key depends on who reads the schema. In an action the handler never sees it and the request still succeeds. Kay refuses it where kay reads the schema itself, as in `defineEnv` and the frontmatter of a collection.
+
+The search params of a page or an API route, the request's headers and its cookies are never refused, since a visitor's link carries `utm_source` and a browser sends cookies the app did not set. Kay drops what the schema does not name. Write `s.object(shape, { extra: 'strip' })` to leave a shape open.
+
 ## A choice among a record's keys
 
 A `select` often takes its options from a record that maps each value to a label. `s.enum(record)` is the schema for the value the visitor picks: only the record's keys pass, and the handler gets them typed as the union of the keys, with no cast.

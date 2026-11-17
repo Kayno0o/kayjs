@@ -31,16 +31,17 @@ export const DEFAULT_MAX_ITEMS = 1000
 const SLUG = '^[a-z0-9]+(?:-[a-z0-9]+)*$'
 
 // What every builder takes beside its own options: the field is `optional`, takes a `default` when the value is left out, words its refusal with `error` (a text or a function called in the request's locale), and carries a `label`, a `description` and an `example` for the form, OpenAPI and MCP.
-export interface FieldOptions<Value = unknown> {
+export interface FieldBase<Value = unknown> {
   optional?: boolean | undefined
   default?: Value | undefined
   error?: string | (() => string) | undefined
   label?: string | undefined
   description?: string | undefined
   example?: Value | undefined
-  // Any other JSON Schema keyword, `format` or `x-privacy`, goes through to the schema as it is.
-  [keyword: string]: unknown
 }
+
+// Any other JSON Schema keyword, `format` or `x-privacy`, goes through to the schema as it is.
+export type FieldOptions<Value = unknown> = FieldBase<Value> & Record<string, unknown>
 
 interface Flagged { optional?: boolean | undefined }
 
@@ -73,6 +74,12 @@ function rest<Options extends object>(options: Options | undefined, own: readonl
 
 const FIELD_KEYS = ['optional', 'default', 'error', 'label', 'description', 'example'] as const
 
+// What `s.email()`, `s.url()` and `s.slug()` take: their own format is theirs, so no pattern, no format and no other keyword.
+export interface FormatOptions extends FieldBase<string> {
+  min?: number | undefined
+  max?: number | undefined
+}
+
 export interface StringOptions extends FieldOptions<string> {
   min?: number | undefined
   max?: number | undefined
@@ -102,17 +109,17 @@ function string<const Options extends StringOptions>(options?: Options): Built<R
 }
 
 // An address `isEmail` accepts, the check the browser, auth and mail share, at most 254 characters long.
-function email<const Options extends Omit<StringOptions, 'pattern' | 'format'>>(options?: Options): Built<ReturnType<Builder['String']>, Options> {
+function email<const Options extends FormatOptions>(options?: Options): Built<ReturnType<Builder['String']>, Options> {
   return wrapped(stringOf({ max: 254, ...options }, { format: 'email' }), options)
 }
 
 // An `http:` or `https:` address.
-function url<const Options extends Omit<StringOptions, 'pattern' | 'format'>>(options?: Options): Built<ReturnType<Builder['String']>, Options> {
+function url<const Options extends FormatOptions>(options?: Options): Built<ReturnType<Builder['String']>, Options> {
   return wrapped(stringOf({ max: 2048, ...options }, { format: 'url' }), options)
 }
 
 // Lowercase words and digits joined by single hyphens.
-function slug<const Options extends Omit<StringOptions, 'pattern' | 'format'>>(options?: Options): Built<ReturnType<Builder['String']>, Options> {
+function slug<const Options extends FormatOptions>(options?: Options): Built<ReturnType<Builder['String']>, Options> {
   return wrapped(stringOf({ max: 200, ...options, pattern: SLUG }), options)
 }
 

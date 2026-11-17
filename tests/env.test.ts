@@ -920,6 +920,13 @@ describe('kay check --fix on raw environment reads', () => {
     expect(Bun.file(join(root, 'src/env.ts')).size).toBe(0)
   })
 
+  it('imports s into an existing record schema that has none, once, in sorted order', async () => {
+    const root = await project({ ...config, 'src/config.ts': 'import { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv({\n})\n', 'src/lib.ts': 'export const a = process.env.FOO ?? \'bar\'\n' })
+
+    await kay(['check', '--fix'], root)
+    expect(await read(root, 'src/config.ts')).toBe('import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv({\n  FOO: s.string({ default: \'bar\' }),\n})\n')
+  })
+
   it('leaves the shapes it cannot rewrite safely, with their warning', async () => {
     const root = await project({
       ...config,

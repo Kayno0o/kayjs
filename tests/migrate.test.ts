@@ -246,11 +246,11 @@ export const collections = { blog, authors: defineCollection({ schema: z.object(
 import { collection } from 'kay/content'
 
 export const blog = collection('data/blog', {
-  schema: s.Object({ title: s.String({ maxLength: 80 }), date: s.Date(), tags: s.Array(s.String(), { default: [] }), draft: s.Optional(s.Boolean()), kind: s.Union([s.Literal('note'), s.Literal('post')]), cover: s.String(), views: s.Integer({ minimum: 0 }), slug: /* kay migrate: .transform() has no \`s\` counterpart kay migrate knows */ z.string().transform(value => value.toLowerCase()) }),
+  schema: s.object({ title: s.string({ max: 80 }), date: s.date(), tags: s.list(s.string(), { default: [] }), draft: s.boolean({ optional: true }), kind: s.enum(['note', 'post']), cover: s.string(), views: s.int({ min: 0 }), slug: /* kay migrate: .transform() has no \`s\` counterpart kay migrate knows */ z.string().transform(value => value.toLowerCase()) }),
 })
 
 export const authors = collection('content/authors', {
-  schema: s.Object({ name: s.String() }),
+  schema: s.object({ name: s.string() }),
 })
 `)
     expect(notes.map(note => note.line)).toEqual([14])

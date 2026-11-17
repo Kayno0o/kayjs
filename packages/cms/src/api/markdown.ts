@@ -61,6 +61,6 @@ const markdown = api({ maxSize: MAX_MARKDOWN })
       return new Response(null, { status: 304, headers })
 
     return new Response(file, { headers })
-  }, { query: s.object({ collection: s.string(), slug: s.string(), path: s.string(), locale: s.string({ optional: true }) }, { extra: 'strip' }) })
+  }, { query: s.object({ collection: s.string(), slug: s.string(), path: s.string(), locale: s.string({ optional: true }) }) })
 
 export default markdown

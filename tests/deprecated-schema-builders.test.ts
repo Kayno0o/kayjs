@@ -37,10 +37,18 @@ describe('deprecated-schema-builders', () => {
     expect(text).toBe(`${head}export const a = {\n  one: s.string({ optional: true }),\n  two: s.string({ optional: true, max: 4 }),\n  three: s.list(s.string(), { optional: true }),\n  four: s.literal('a', { optional: true }),\n  five: s.object({ x: s.int() }, { optional: true }),\n  six: s.object({}, { optional: true }),\n}\n`)
   })
 
-  it('keeps the unknown keys of a query, params, headers or cookie schema by, as s.Object let them', async () => {
-    const { text } = await fixed(`${head}export const page = { query: s.Object({ q: s.String() }), headers: s.Object({}) }\nexport const body = s.Object({ q: s.String() })\n`)
+  it('drops the import of s once the record leaves it unread, and keeps it while something reads it', async () => {
+    const some = await fixed('import { action, s } from \'kay\'\n\nexport const add = action(s.Object({}), () => 1)\n')
 
-    expect(text).toBe(`${head}export const page = { query: s.object({ q: s.string() }, { extra: 'strip' }), headers: s.object({}, { extra: 'strip' }) }\nexport const body = s.object({ q: s.string() })\n`)
+    expect(some.text).toBe('import { action } from \'kay\'\n\nexport const add = action({}, () => 1)\n')
+
+    const sole = await fixed('import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({}))\n')
+
+    expect(sole.text).toBe('import { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv({})\n')
+
+    const read = await fixed(`${head}export const add = action(s.Object({ n: s.String() }), () => 1)\n`)
+
+    expect(read.text).toBe(`${head}export const add = action({ n: s.string() }, () => 1)\n`)
   })
 
   it('leaves an s.Optional around anything but a builder of s, which has no optional option to write', async () => {

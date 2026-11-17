@@ -9,5 +9,5 @@ const MOST = 100
 export default api()
   // The markup travels as plain text, which the editor vouches for itself: this route's answer carries no mark of it.
   .get('/', ({ query }) => findIcons(query.set, query.query, Math.min(query.limit, MOST), query.offset).map(({ name, icon }) => ({ name, icon: { ...icon, innerHTML: String(icon.innerHTML) } })), {
-    query: s.object({ set: s.string({ max: 100 }), query: s.string({ max: 200 }), limit: s.int({ min: 1 }), offset: s.int({ min: 0 }) }, { extra: 'strip' }),
+    query: s.object({ set: s.string({ max: 100 }), query: s.string({ max: 200 }), limit: s.int({ min: 1 }), offset: s.int({ min: 0 }) }),
   })

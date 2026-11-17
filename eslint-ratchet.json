@@ -139,9 +139,6 @@
   "src/migrate/astro.ts": {
     "complexity": 43
   },
-  "src/migrate/content.ts": {
-    "complexity": 42
-  },
   "src/migrate/markup.ts": {
     "complexity": 42
   },

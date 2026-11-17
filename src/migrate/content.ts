@@ -5,11 +5,11 @@ import { parseProgram, positionOf } from '../compiler/estree'
 // An Astro content config, `defineCollection` with a zod schema, as kay's: `collection(folder, { schema })` with the schema in `s`.
 
 // zod's types and the `s` builder each becomes, for those that take their arguments the same way.
-const SAME: Record<string, string> = { string: 'String', number: 'Number', boolean: 'Boolean', date: 'Date', array: 'Array', object: 'Object', literal: 'Literal', any: 'Any', unknown: 'Unknown', null: 'Null' }
-// zod's string checks and the `s.String` option each becomes.
-const STRING_CHECKS: Record<string, string> = { min: 'minLength', max: 'maxLength', email: 'format', url: 'format', regex: 'pattern' }
+const SAME: Record<string, string> = { string: 'string', number: 'number', boolean: 'boolean', date: 'date', literal: 'literal' }
+// zod's string checks and the `s.string` option each becomes.
+const STRING_CHECKS: Record<string, string> = { min: 'min', max: 'max', email: 'format', url: 'format', regex: 'pattern' }
 const LEADING_DOT_SLASH = /^\.\//
-const NUMBER_CHECKS: Record<string, string> = { min: 'minimum', max: 'maximum', gte: 'minimum', lte: 'maximum' }
+const NUMBER_CHECKS: Record<string, string> = { min: 'min', max: 'max', gte: 'min', lte: 'max' }
 const CHECKS_BY_KIND = new Map([['string', STRING_CHECKS], ['number', NUMBER_CHECKS]])
 
 class SchemaTranslator {
@@ -39,7 +39,7 @@ class SchemaTranslator {
 
     // The schema helper Astro passes, `schema: ({ image }) => z.object(...)`.
     if (current.type === 'CallExpression' && current.callee.type === 'Identifier' && current.callee.name === 'image')
-      return chain.length === 0 ? 's.String()' : this.modifiers('s.String()', chain, node)
+      return this.image(chain, node)
 
     const base = chain.shift()
 
@@ -48,72 +48,78 @@ class SchemaTranslator {
 
     const kind = base.callee.property.name
     const args = base.arguments
-    let built: string
-    let integer = false
-    const options: string[] = []
-    const checks = CHECKS_BY_KIND.get(kind)
-    const rest: CallExpression[] = []
+    const { options, integer, rest } = this.chain(kind, chain)
 
-    for (const call of chain) {
-      const name = call.callee.type === 'MemberExpression' && call.callee.property.type === 'Identifier' ? call.callee.property.name : ''
-      const option = checks?.[name]
-
-      if (option === 'format')
-        options.push(`format: '${name === 'url' ? 'uri' : 'email'}'`)
-      else if (option === 'pattern' && call.arguments[0]?.type === 'Literal' && 'regex' in call.arguments[0])
-        options.push(`pattern: ${JSON.stringify((call.arguments[0] as { regex: { pattern: string } }).regex.pattern)}`)
-      else if (option !== undefined && call.arguments[0])
-        options.push(`${option}: ${this.text(call.arguments[0])}`)
-      else if (kind === 'number' && name === 'int')
-        integer = true
-      else
-        rest.push(call)
-    }
+    if (rest[0])
+      return this.untranslated(node, `.${methodName(rest[0])}() has no \`s\` counterpart kay migrate knows`)
 
     if (kind === 'object' && args[0]?.type === 'ObjectExpression') {
       const fields = args[0].properties.map(property => isPlain(property) ? `${this.text(property.key)}: ${this.schema(property.value)}` : this.untranslated(property, 'a spread in an object schema'))
 
-      built = `s.Object({ ${fields.join(', ')} })`
+      return this.call('s.object', [`{ ${fields.join(', ')} }`], options)
     }
-    else if (kind === 'array' && args[0]) {
-      built = `s.Array(${this.schema(args[0])}${options.length > 0 ? `, { ${options.join(', ')} }` : ''})`
-    }
-    else if (kind === 'enum' && args[0]?.type === 'ArrayExpression') {
-      built = `s.Union([${args[0].elements.map(element => element ? `s.Literal(${this.text(element)})` : '').join(', ')}])`
-    }
-    else if (kind === 'union' && args[0]?.type === 'ArrayExpression') {
-      built = `s.Union([${args[0].elements.map(element => element ? this.schema(element) : '').join(', ')}])`
-    }
-    else if (kind === 'coerce' || !(kind in SAME)) {
+
+    if (kind === 'array' && args[0])
+      return this.call('s.list', [this.schema(args[0])], options)
+
+    if (kind === 'enum' && args[0]?.type === 'ArrayExpression')
+      return this.call('s.enum', [this.text(args[0])], options)
+
+    if (kind === 'union' && args[0]?.type === 'ArrayExpression')
+      return this.call('s.union', [`[${args[0].elements.map(element => element ? this.schema(element) : '').join(', ')}]`], options)
+
+    if (kind === 'coerce' || !(kind in SAME))
       return this.untranslated(node, `z.${kind} has no \`s\` counterpart kay migrate knows`)
-    }
-    else {
-      const builder = integer ? 's.Integer' : `s.${SAME[kind]}`
 
-      built = `${builder}(${[...args.map(arg => this.text(arg)), ...options.length > 0 ? [`{ ${options.join(', ')} }`] : []].join(', ')})`
-    }
-
-    return this.modifiers(built, rest, node)
+    return this.call(integer ? 's.int' : `s.${SAME[kind]}`, args.map(arg => this.text(arg)), options)
   }
 
-  private modifiers(built: string, calls: CallExpression[], node: Node): string {
-    let result = built
+  // The `image()` helper: a string, whatever follows it in the chain.
+  private image(chain: CallExpression[], node: Node): string {
+    const { options, rest } = this.chain('image', chain)
 
-    for (const call of calls) {
-      const name = call.callee.type === 'MemberExpression' && call.callee.property.type === 'Identifier' ? call.callee.property.name : ''
+    return rest[0] ? this.untranslated(node, `.${methodName(rest[0])}() has no \`s\` counterpart kay migrate knows`) : this.call('s.string', [], options)
+  }
 
-      if (name === 'optional' || name === 'nullish')
-        result = `s.Optional(${result})`
-      else if (name === 'nullable')
-        result = `s.Nullable(${result})`
-      else if (name === 'default' && call.arguments[0])
-        result = result.endsWith(')') && !result.startsWith('s.Optional(') ? `${result.slice(0, -1)}${result.endsWith('()') ? '' : ', '}{ default: ${this.text(call.arguments[0])} })` : this.untranslated(node, '`.default` on a schema already given options')
+  // `s.string({ min: 1 })`: the builder, its arguments, then the options when there are any.
+  private call(builder: string, args: string[], options: string[]): string {
+    return `${builder}(${[...args, ...options.length > 0 ? [`{ ${options.join(', ')} }`] : []].join(', ')})`
+  }
+
+  // The calls after a zod type: the checks that are options of the builder, `.optional()` and `.default()`, and what has no counterpart.
+  private chain(kind: string, chain: CallExpression[]): { options: string[], integer: boolean, rest: CallExpression[] } {
+    const checks = CHECKS_BY_KIND.get(kind)
+    const options: string[] = []
+    const rest: CallExpression[] = []
+    let integer = false
+
+    for (const call of chain) {
+      const name = methodName(call)
+      const option = checks?.[name]
+      const first = call.arguments[0]
+
+      if (option === 'format')
+        options.push(`format: '${name === 'url' ? 'uri' : 'email'}'`)
+      else if (option === 'pattern' && first?.type === 'Literal' && 'regex' in first)
+        options.push(`pattern: ${JSON.stringify((first as { regex: { pattern: string } }).regex.pattern)}`)
+      else if (option !== undefined && first)
+        options.push(`${option}: ${this.text(first)}`)
+      else if (kind === 'number' && name === 'int')
+        integer = true
+      else if (name === 'optional' || name === 'nullish')
+        options.push('optional: true')
+      else if (name === 'default' && first)
+        options.push(`default: ${this.text(first)}`)
       else
-        return this.untranslated(node, `.${name}() has no \`s\` counterpart kay migrate knows`)
+        rest.push(call)
     }
 
-    return result
+    return { options, integer, rest }
   }
+}
+
+function methodName(call: CallExpression): string {
+  return call.callee.type === 'MemberExpression' && call.callee.property.type === 'Identifier' ? call.callee.property.name : ''
 }
 
 function literalKey(key: Node): string | undefined {
@@ -235,7 +241,7 @@ function collectionsOf(object: ObjectExpression, declared: Map<string, CallExpre
     if (folder === undefined)
       notes.push({ line: positionOf(source, call.start).line, message: `the collection ${name} uses a loader other than \`glob({ base })\`: kay reads a folder of files, so give it the folder` })
 
-    result.push(`export const ${name} = collection('${folder ?? `content/${name}`}', {\n  schema: ${schema ? translator.schema(schema) : 's.Object({})'},\n})`)
+    result.push(`export const ${name} = collection('${folder ?? `content/${name}`}', {\n  schema: ${schema ? translator.schema(schema) : 's.object({})'},\n})`)
   }
 
   return result

@@ -23,6 +23,7 @@ const ASSIGNED = /^\s*(?:\?\?|\|\||&&|\*\*|<<|>>>|>>|[-+*/%&|^])?=(?![=>])/
 const DELETED = /\bdelete\s+$/
 const ENV_NAME = /(?<![.\w$])env(?![\w$])/
 const RAW_START = /^(?:process\.env|Bun\.env)/
+const S_IMPORT = /import\s*\{[^}]*\bs\b[^}]*\}\s*from\s*['"]kay['"]/
 const SCHEMA_PATH = /\.[mc]?ts$/
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 const EXTENSION = /\.[mc]?[jt]s$/
@@ -169,6 +170,11 @@ function field(prefix: string, name: string, fallback: string | undefined): stri
   return `${name}: ${fallback === undefined ? 's.string({ optional: true })' : `s.string({ default: '${fallback}' })`}`
 }
 
+// A record of fields needs no `s` of its own until a variable is declared with it.
+function withS(text: string, prefix: string): string {
+  return prefix !== 's' || S_IMPORT.test(text) ? text : insertImport(text, 'import { s } from \'kay\'')
+}
+
 // Declares the variables `process.env.X` is read for with no schema, in the schema file of the project, and rewrites their reads to `env.X`, a `?? 'default'` becoming the variable's default. `files` are the only files it may change: a variable with a read outside them is left alone, as is one whose read is assigned or deleted, destructured, in a `.kay` file or a file with an `env` of its own, inside a string, a template or a comment, or in the schema file itself. Answers the variables declared and the reads rewritten.
 export async function declareRawEnv(root: string, undeclared: ReadonlySet<string>, files: ReadonlySet<string>): Promise<{ names: Set<string>, reads: number }> {
   const reads = (await rawReads(root)).filter(({ name }) => undeclared.has(name) && !IGNORED_READS.has(name))
@@ -246,7 +252,9 @@ export async function declareRawEnv(root: string, undeclared: ReadonlySet<string
     const eol = text.includes('\r\n') ? '\r\n' : '\n'
     const indent = INDENT.exec(text.slice(at))?.[1] ?? '  '
 
-    await writeFile(schema.file, `${text.slice(0, at)}${fields.map(line => `${eol}${indent}${line},`).join('')}${text[at] === '}' ? eol : ''}${text.slice(at)}`)
+    const added = `${text.slice(0, at)}${fields.map(line => `${eol}${indent}${line},`).join('')}${text[at] === '}' ? eol : ''}${text.slice(at)}`
+
+    await writeFile(schema.file, withS(added, schema.existing.prefix))
   }
 
   for (const [file, list] of edits) {

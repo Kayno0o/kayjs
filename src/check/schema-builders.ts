@@ -29,8 +29,6 @@ const BUILDERS: Record<string, { name: string, options: number, keys?: Record<st
 const FILES = new Set(['File', 'Files', 'file', 'files'])
 const OLD_SIZE = /^\d+(?:\.\d+)?[kmg]$/i
 const KAY = /^kay(?:\/|$)/
-// The route options whose schema reads what a visitor or a proxy sends along with it, and so lets keys it does not name by, as `s.Object` did.
-const LENIENT_KEYS = new Set(['query', 'params', 'headers', 'cookie'])
 const NEEDLE = /\.(?:String|Secret|Number|Numeric|Integer|Boolean|BooleanString|Date|File|Files|Literal|Union|Array|Object|UnionEnum|UnionKeys|Public|Optional)\(|\.(?:file|files)\(/
 
 interface Call {
@@ -60,7 +58,7 @@ function renamedOption(name: string, keys: Record<string, string> | undefined): 
 }
 
 // The edits renaming a builder and the options it was given under old names: `s.String({ minLength: 3 })` is `s.string({ min: 3 })`.
-function renames(call: Call, base: number, lenient = false): Edit[] {
+function renames(call: Call, base: number): Edit[] {
   const builder = BUILDERS[call.name]!
   const { property } = call.node.callee as { property: Node }
   const edits: Edit[] = [{ start: base + property.start, end: base + property.end, text: builder.name }]
@@ -76,15 +74,6 @@ function renames(call: Call, base: number, lenient = false): Edit[] {
 
       edits.push({ start: base + entry.key.start, end: base + entry.key.end, text: entry.shorthand ? `${renamed}: ${name}` : renamed })
     }
-  }
-
-  if (lenient) {
-    const close = base + call.node.end - 1
-
-    if (options === undefined)
-      edits.push({ start: close, end: close, text: call.node.arguments.length === 0 ? '{}, { extra: \'strip\' }' : ', { extra: \'strip\' }' })
-    else if (options.type === 'ObjectExpression')
-      edits.push({ start: base + options.start + 1, end: base + options.start + 1, text: options.properties.length === 0 ? ' extra: \'strip\' ' : ' extra: \'strip\',' })
   }
 
   return edits
@@ -112,6 +101,51 @@ function optionalEdit(call: Call, base: number): Edit | undefined {
   return { start: open, end: open + 1, text: options.properties.length === 0 ? '{ optional: true ' : '{ optional: true,' }
 }
 
+type Program = Parameters<typeof importsOf>[0]
+type Report = (start: number, end: number, message: string, help: string, edits: Edit[] | null) => void
+
+// The `s` an app imported and no longer reads once a fix has taken `dropped` of its uses away: its import goes too, or the file would fail its own unused-name check.
+function dropUnreadImport(ast: Program, receivers: Set<string>, dropped: number, span: { base: number, text: string }, report: Report): void {
+  for (const statement of ast.body) {
+    if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || !KAY.test(statement.source.value))
+      continue
+
+    const index = statement.specifiers.findIndex(specifier => specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type' && (specifier.imported as { name?: string }).name === 's' && receivers.has(specifier.local.name))
+
+    if (index < 0)
+      continue
+
+    const specifier = statement.specifiers[index]!
+    let references = 0
+
+    walk(ast, (node) => {
+      if (node.type === 'Identifier' && receivers.has(node.name) && (node.start < specifier.start || node.end > specifier.end))
+        references++
+    })
+
+    if (references > dropped)
+      return
+
+    const only = statement.specifiers.length === 1
+    const next = statement.specifiers[index + 1]
+    const previous = statement.specifiers[index - 1]
+    const lineEnd = span.text[statement.end] === '\n' ? statement.end + 1 : statement.end
+    // The whole line when it is the only name, else the name and the comma beside it.
+    let [from, to] = [previous?.end ?? specifier.start, specifier.end]
+
+    if (only)
+      [from, to] = [statement.start, lineEnd]
+    else if (next)
+      [from, to] = [specifier.start, next.start]
+
+    const edit = { start: span.base + from, end: span.base + to, text: '' }
+
+    report(span.base + specifier.start, span.base + specifier.end, '`s` is no longer read once its builders are written as a record, so its import goes', 'drop the import of `s`', [edit])
+
+    return
+  }
+}
+
 // The PascalCase builders of `s`, which kay 1.106 replaces with its own lowercase ones, and the `'2m'` sizes of a file field, which are `'2mb'` as every size is.
 // Found on the `s` a file imports from `kay`, in the TypeScript files and the fences of `.kay` files. `s.Optional(x)` of one of these builders is `optional: true` in its options; an `s.Object({ ... })` that is the schema of an `action` or a `defineEnv` is the record alone.
 export async function schemaBuilders(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
@@ -119,7 +153,7 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
     return []
 
   return scan(root, options, 'deprecated-schema-builders', NEEDLE, ({ parsed, report }) => {
-    for (const { ast, base } of parsed) {
+    for (const { ast, base, text } of parsed) {
       const receivers = importsOf(ast, source => KAY.test(source), 's').locals
       const records = new Set([...importsOf(ast, source => KAY.test(source), 'action').locals, ...importsOf(ast, source => KAY.test(source), 'defineEnv').locals])
 
@@ -128,12 +162,10 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
 
       // What an `s.Optional(...)` or a record has taken over, so the call inside is not reported on its own.
       const taken = new Set<Node>()
-      const lenient = new Set<Node>()
+      // The uses of `s` a fix takes away: an `s.Optional(` and the `s.Object(` of a record.
+      let dropped = 0
 
       walk(ast, (node) => {
-        if (node.type === 'Property' && !node.computed && LENIENT_KEYS.has(keyName(node) ?? ''))
-          lenient.add(node.value)
-
         const call = builderCall(node, receivers)
 
         if (call === undefined) {
@@ -146,6 +178,7 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
               const shape = inner.node.arguments[0]
 
               taken.add(schema)
+              dropped++
               report(base + schema.start, base + schema.end, 'a plain record of fields is the object schema of an action or a defineEnv since 1.106, `s.Object` being the PascalCase builder it replaces; the old form works until 2.0', 'write the record of fields', [{ start: base + schema.start, end: base + shape.start, text: '' }, { start: base + shape.end, end: base + schema.end, text: '' }])
             }
           }
@@ -170,6 +203,7 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
           }
 
           taken.add(inner!)
+          dropped++
           report(base + node.start, base + node.end, '`s.Optional(field)` is `optional: true` in the options of the field since 1.106, the same option on every builder; the old form works until 2.0', 'write `optional: true` in the field\'s options', [
             { start: base + node.start, end: base + inner!.start, text: '' },
             ...renames(wrapped, base),
@@ -183,12 +217,12 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
         const builder = BUILDERS[call.name]
 
         if (builder && !taken.has(node)) {
-          const object = call.name === 'Object' ? 'unknown keys are refused as a 422 by `s.object`, where `s.Object` let them by; write `extra: \'strip\'` to keep the old way' : ''
+          const object = call.name === 'Object' ? 'unknown keys are refused by `s.object` where kay reads the schema itself, where `s.Object` let them by; write `extra: \'strip\'` to keep the old way' : ''
           const message = call.name === 'UnionKeys' || call.name === 'UnionEnum'
             ? '`s.enum()` takes the values, or a record whose keys are the values, since 1.106, in place of `s.UnionEnum` and `s.UnionKeys`; the old forms work until 2.0'
             : `\`s.${call.name}\` is \`s.${builder.name}\` since 1.106, kay's own lowercase builders with short options (\`min\`, \`max\`, \`optional\`) replacing the PascalCase ones of TypeBox${object ? `; ${object}` : ''}; the old form works until 2.0`
 
-          report(base + node.start, base + node.end, message, `write \`s.${builder.name}\``, renames(call, base, call.name === 'Object' && lenient.has(node)))
+          report(base + node.start, base + node.end, message, `write \`s.${builder.name}\``, renames(call, base))
         }
       })
 
@@ -214,6 +248,9 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
           report(base + entry.value.start, base + entry.value.end, `a size is written \`'${entry.value.value}b'\`, with its unit, as every size of kay is`, 'write the size with its `b`', [{ start: end, end, text: 'b' }])
         }
       })
+
+      if (dropped > 0)
+        dropUnreadImport(ast, receivers, dropped, { base, text }, report)
     }
   })
 }

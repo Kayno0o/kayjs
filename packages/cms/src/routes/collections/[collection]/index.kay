@@ -10,7 +10,7 @@ import EntryTable from '../../../components/entry-table.kay'
 import { adminTitle, collectionTitle, newEntryPath, statusParam, trashPath, viewHref } from '../../../listing'
 import { listScreen, openPath } from '../../../screens'
 
-export const page = { query: s.object({ q: s.string({ optional: true }), page: s.int({ optional: true }), status: s.string({ optional: true }), sort: s.string({ optional: true }), dir: s.string({ optional: true }) }, { extra: 'strip' }) }
+export const page = { query: s.object({ q: s.string({ optional: true }), page: s.int({ optional: true }), status: s.string({ optional: true }), sort: s.string({ optional: true }), dir: s.string({ optional: true }) }) }
 
 const search = ctx.query.q ?? ''
 const status = statusParam(ctx.query.status)
