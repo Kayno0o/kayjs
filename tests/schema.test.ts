@@ -65,12 +65,12 @@ describe('s from kay', () => {
     expect(read()).toBe('ok')
   })
 
-  it('throws saying why when an island reads or validates with a schema it built', async () => {
+  it('leaves a schema an island built with the deprecated builders open, neither thenable nor serialized', async () => {
     const bundle = await browserBundle('import { s } from \'kay\'\n\nconst SHAPE = s.Object({ name: s.String() })\n\nexport const inert = () => [typeof (SHAPE as unknown as { then?: unknown }).then, JSON.stringify(SHAPE)]\nexport const read = () => (SHAPE as unknown as { properties: unknown }).properties\n')
     const { inert, read } = await import(`data:text/javascript;base64,${Buffer.from(bundle).toString('base64')}`) as { inert: () => unknown[], read: () => unknown }
 
     expect(inert()).toEqual(['undefined', '{}'])
-    expect(read).toThrow('a schema is inert in the browser')
+    expect(read()).toBeUndefined()
   })
 
   it('builds an enum over a record\'s keys, typed as their union', () => {
