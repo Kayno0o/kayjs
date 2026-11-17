@@ -9,7 +9,7 @@ const PREVIEW_DELAY = 250
 const look = recipe({ parts: { root: 'kui-markdown-preview', failed: 'kui-markdown-preview-failed', body: 'kui-markdown-preview-body' } })
 
 // What rendered Markdown keeps besides formatted text, as the site's own Markdown does; scripts, handlers and unsafe URLs never survive.
-const KEPT = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'title'], th: ['align'], td: ['align'] } }
+const KEPT = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'title'], th: ['align'], td: ['align'], code: ['class'] } }
 
 const { text, render, trusted = false, initial, initialFor } = props<{
   text: string

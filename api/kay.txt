@@ -2674,10 +2674,19 @@ function shareImage(src: string): string
 function isHeldMarkdown(_html: string): boolean
 
 [./markdown] markdownHtml
-function markdownHtml(markdown: string): SafeHtml
+function markdownHtml(markdown: string, options?: MarkdownOptions | undefined): SafeHtml
+
+[./markdown] MarkdownInline
+interface MarkdownInline
+  pattern: RegExp
+  render: (match: string[]) => string | undefined | { text: string; href: string; }
 
 [./markdown] markdownLoaded
 function markdownLoaded(): boolean
+
+[./markdown] MarkdownOptions
+interface MarkdownOptions
+  inline?: readonly MarkdownInline[] | undefined
 
 [./markdown] markdownReady
 function markdownReady(): Promise<void>

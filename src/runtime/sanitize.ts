@@ -37,6 +37,8 @@ const TRAILING_COMMAS = /,+$/
 const DESCRIPTOR_TEXT = /^[\d.\sxwh]*$/i
 const ATTRIBUTE = /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
 const LINK_ATTRIBUTES = ['href']
+// The only class a `code` keeps, whatever attributes the options allow: the language of a fence, so a user's text cannot pick a utility class that covers the page.
+const LANGUAGE_CLASS = /^language-[\w+#.-]+$/
 
 // How the URLs of one call are rewritten: `base` is a URL to resolve against, `null` for a `base` that is none, which keeps only the absolute URLs, and `undefined` for no `base`. `leaves` tells a link opening in a new tab, `undefined` for markup that is not opened apart.
 interface Rewrite {
@@ -176,7 +178,7 @@ function openingTag(tag: string, attributes: string | undefined, allowedNames: r
       const attribute = name!.toLowerCase()
       const value = double ?? single ?? bare ?? ''
 
-      const fit = allowedNames.includes(attribute) && !written.has(attribute) ? keptValue(attribute, value, rewrite) : undefined
+      const fit = allowedNames.includes(attribute) && !written.has(attribute) && (tag !== 'code' || attribute !== 'class' || LANGUAGE_CLASS.test(value)) ? keptValue(attribute, value, rewrite) : undefined
 
       if (fit !== undefined)
         written.set(attribute, text(fit).replaceAll('"', '&quot;'))

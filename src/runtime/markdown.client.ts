@@ -1,4 +1,5 @@
 import type { SafeHtml } from './checks'
+import type { MarkdownOptions } from './markdown'
 import { claiming, keepServerMarkup } from './dom'
 import { escapeMarkdownText } from './escape'
 import { ownSignal, whenHydrated } from './reactive'
@@ -6,7 +7,9 @@ import { vouch } from './safe-html'
 
 type Marked = Element & { _$m?: string | undefined }
 
-const loaded = ownSignal<((markdown: string) => SafeHtml) | undefined>(undefined)
+export type { MarkdownInline, MarkdownOptions } from './markdown'
+
+const loaded = ownSignal<((markdown: string, options?: MarkdownOptions) => SafeHtml) | undefined>(undefined)
 let loading: Promise<void> | undefined
 
 // The stand-ins an island hydrating gave for Markdown the server drew formatted, until the islands are in: `property` leaves the server's markup in place instead of writing one of them to a claimed element. Tied to the value rather than a flag, so no other write consumes or skips it.
@@ -59,11 +62,11 @@ function hold(standIn: string): void {
 }
 
 // Markdown rendered as `renderMarkdown` renders it, headings without anchors, then sanitized for `innerHTML`: formatted text, tables, images and task lists, a link leaving the site opening in a new tab, sync so it renders again on each chunk of a stream. Until the renderer has loaded it gives the text as written, and a template or effect that called it runs again once it has.
-export function markdownHtml(markdown: string): SafeHtml {
+export function markdownHtml(markdown: string, options?: MarkdownOptions): SafeHtml {
   const render = loaded[0]()
 
   if (render)
-    return render(markdown)
+    return render(markdown, options)
 
   const standIn = asWritten(markdown)
 

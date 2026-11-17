@@ -284,3 +284,77 @@ describe('the runtime renderer\'s headings', () => {
     expect(islandMarkdown(source)).not.toContain('id=')
   })
 })
+
+describe('markdownHtml fence language', () => {
+  it('keeps language-* on code, in an island as on the server', () => {
+    for (const render of [markdownHtml, islandMarkdown]) {
+      expect<string>(render('```ts\nconst a = 1\n```')).toBe('<pre><code class="language-ts">const a = 1\n</code></pre>\n')
+      expect<string>(render('```c++\nx\n```')).toContain('<code class="language-c++">')
+      expect<string>(render('```\nx\n```')).toBe('<pre><code>x\n</code></pre>\n')
+    }
+  })
+
+  it('drops any other class a user writes on code', () => {
+    for (const render of [markdownHtml, islandMarkdown]) {
+      expect<string>(render('<code class="fixed inset-0">x</code>')).not.toContain('class')
+      expect<string>(render('<code class="language-js fixed">x</code>')).not.toContain('class')
+      expect<string>(render('<code class="language-x&quot; onmouseover=&quot;y">x</code>')).not.toContain('onmouseover')
+      expect<string>(render('<code class="language-js">x</code>')).toContain('class="language-js"')
+    }
+  })
+})
+
+describe('markdownHtml inline extensions', () => {
+  const wiki = { pattern: /\[\[([^\]]+)\]\]/, render: ([, name]: string[]) => ({ text: name!, href: `#note:${encodeURIComponent(name!)}` }) }
+
+  it('draws a match as a link, the same on the server and in an island', () => {
+    for (const render of [markdownHtml, islandMarkdown]) {
+      expect<string>(render('See [[My note]] and [[b]].', { inline: [wiki] })).toBe('<p>See <a href="#note:My%20note" rel="nofollow ugc">My note</a> and <a href="#note:b" rel="nofollow ugc">b</a>.</p>\n')
+      expect<string>(render('See [[b]]')).toBe('<p>See [[b]]</p>\n')
+    }
+
+    for (const markdown of ['a [[x]] *b [[y]]* | c', '- [[x]]\n- [ ] [[y]]\n\n> [[z]]'])
+      expect(islandMarkdown(markdown, { inline: [wiki] })).toBe(markdownHtml(markdown, { inline: [wiki] }))
+  })
+
+  it('leaves code, fences and links alone', () => {
+    for (const render of [markdownHtml, islandMarkdown]) {
+      const html = render('`[[a]]`\n\n```\n[[b]]\n```\n\n[[[c]](/x)](/y) <a href="/z">[[d]]</a>', { inline: [wiki] })
+
+      expect(html).toContain('<code>[[a]]</code>')
+      expect(html).toContain('[[b]]\n</code>')
+      expect(html).not.toContain('#note:a')
+      expect(html).not.toContain('#note:b')
+      expect(html).not.toContain('#note:d')
+    }
+  })
+
+  it('escapes what the hook returns as text and gives its groups as plain text', () => {
+    const inline = [{ pattern: /\{\{(.+?)\}\}/, render: ([, name]: string[]) => `<img src=x onerror=alert(1)> ${name}` }]
+
+    for (const render of [markdownHtml, islandMarkdown]) {
+      expect<string>(render('{{a & b}}', { inline })).toBe('<p>&lt;img src=x onerror=alert(1)&gt; a &amp; b</p>\n')
+      expect<string>(render('{{&lt;b&gt;}}', { inline })).toBe('<p>&lt;img src=x onerror=alert(1)&gt; &lt;b&gt;</p>\n')
+    }
+  })
+
+  it('sanitizes a link the hook builds from the text', () => {
+    const inline = [{ pattern: /\[\[(.+?)\]\]/, render: ([, target]: string[]) => ({ text: '"><script>x</script>', href: target! }) }]
+
+    for (const render of [markdownHtml, islandMarkdown]) {
+      const html = render('[[javascript:alert(1)]] [[/ok" onclick="x]] [[/p?q=1&r=2]]', { inline })
+
+      expect(html).not.toContain('javascript:')
+      expect(html).not.toContain('onclick')
+      expect(html).not.toContain('<script')
+      expect(html).toContain('href="/p?q=1&amp;r=2"')
+    }
+  })
+
+  it('tries the extensions in order and leaves what its hook declines', () => {
+    const inline = [{ pattern: /@(\w+)/, render: ([, name]: string[]) => name === 'no' ? undefined : `<${name}>` }, { pattern: /#(\w+)/, render: ([, tag]: string[]) => ({ text: `#${tag}`, href: `/tags/${tag}` }) }]
+
+    expect<string>(markdownHtml('@no @yes #t', { inline })).toBe('<p>@no &lt;yes&gt; <a href="/tags/t" rel="nofollow ugc">#t</a></p>\n')
+    expect<string>(markdownHtml('@no @yes #t', { inline: [{ pattern: /x*/, render: () => 'z' }] })).toBe('<p>@no @yes #t</p>\n')
+  })
+})

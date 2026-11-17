@@ -1,8 +1,9 @@
 import type { RendererObject, Token, TokenizerObject, Tokens } from 'marked'
 import type { SafeHtml } from './checks'
+import type { MarkdownOptions } from './markdown'
 import { Marked, Tokenizer } from 'marked'
 import { escapeMarkdownText as escape } from './escape'
-import { sanitizedMarkdown } from './markdown'
+import { sanitizedMarkdown, withInline } from './markdown'
 import { vouch } from './safe-html'
 
 const TEXT_ESCAPED = /&(?![a-z][a-z\d]{1,31};)|[<>"]/gi
@@ -149,12 +150,12 @@ const marked = new Marked({ gfm: true, async: false, renderer, tokenizer })
 const asWritten = (markdown: string) => vouch(`<p>${escape(markdown)}</p>\n`)
 
 // Markdown rendered as `renderMarkdown` renders it, headings without anchors, then sanitized for `innerHTML`: formatted text, tables, images and task lists, a link leaving the site opening in a new tab, sync so it renders again on each chunk of a stream.
-export function markdownHtml(markdown: string): SafeHtml {
+export function markdownHtml(markdown: string, options?: MarkdownOptions): SafeHtml {
   if (markdown.length > MAX_LENGTH)
     return asWritten(markdown)
 
   try {
-    return sanitizedMarkdown(marked.parse(markdown) as string)
+    return withInline(sanitizedMarkdown(marked.parse(markdown) as string), options?.inline)
   }
   // Thousands of nested quotes overflow marked's stack.
   catch {

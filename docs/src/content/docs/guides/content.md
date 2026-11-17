@@ -529,6 +529,22 @@ Text set through `innerHTML`, from `markdownHtml`, `renderMarkdown` or `sanitize
 
 A link leaving your site opens in a new tab with `rel="nofollow ugc noopener"`, the server and the island alike, unless you set `client: { links: { outside: 'same-tab' } }`.
 
+A fenced block keeps its language as `class="language-ts"` on its `code`, so a page can name the language over the block; `code` keeps no other class.
+
+`markdownHtml(text, { inline })` draws your own inline syntax, such as `[[note]]` links, the same on the server and in an island. Each entry has a `pattern` and a `render` that gets the match with its groups as plain text and returns text, a link `{ text, href }`, or `undefined` to leave the match as written. Text is escaped and a link goes through `sanitizeHtml`, so a hook never opens a way to run script whatever the text holds.
+
+Code, fences and links are left alone, and the pattern reads the rendered text, where `&`, `<`, `>` and `"` stand as their entities.
+
+```kay
+---
+import { markdownHtml } from 'kay/markdown'
+
+const { body } = props<{ body: string }>()
+const wiki = { pattern: /\[\[([^\]]+)\]\]/, render: ([, name]: string[]) => ({ text: name!, href: `/notes/${encodeURIComponent(name!)}` }) }
+---
+div(innerHTML={markdownHtml(body, { inline: [wiki] })})
+```
+
 The server renders it with Bun.markdown and the island with marked, and both write the same HTML. Only the islands importing it load marked, about 15 KB gzipped, and only when they first render Markdown the server did not draw: until it arrives the island shows the text as written, then the formatted one. Call it in a template or an effect, which runs again once marked has loaded; in a click handler, `await markdownReady()` from `kay/markdown` first.
 
 An island about to stream Markdown starts the load early with `void markdownReady()`, as kayjs-ai's Chat does when the visitor sends.
