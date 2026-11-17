@@ -1432,6 +1432,7 @@ interface ChartMark
 interface ChartSeries
   color?: string
   name: string
+  notes?: (null | string | undefined)[]
   values: (null | number)[]
 
 [./lib/index] Column
@@ -2757,6 +2758,7 @@ interface BarSeries extends ChartSeries
 interface ChartSeries
   color?: string
   name: string
+  notes?: (null | string | undefined)[]
   values: (null | number)[]
 
 [./lib/plot] dashSample

@@ -70,4 +70,8 @@ With an `href` the rule is a link, so a middle click or a new tab works, and a t
 
 `href` answers the address a point goes to, from `{ index, label, values }`, or `undefined` for none. A click without a drag on it, or Enter, follows it, in a new tab when it leaves the site; `onSelect`, when given, hears the press in its place, as on the other charts.
 
-`onSelect` hears the point a click without a drag lands on, or Enter when no span is being picked, as `{ index, label, values }`. `onActiveChange({ index })` hears the index of the point the pointer or keyboard is on, `null` when it leaves, and `active` draws the cursor and dots at a point of the app's choice. LineChart takes no tooltip block yet.
+`onSelect` hears the point a click without a drag lands on, or Enter when no span is being picked, as `{ index, label, values }`. `onActiveChange({ index })` hears the index of the point the pointer or keyboard is on, `null` when it leaves, and `active` draws the cursor and dots at a point of the app's choice.
+
+## The tooltip
+
+A series takes `notes`, one message per label, which joins that point's tooltip and what screen readers read, as BarChart's do (`tooltipNote` part). A `@tooltip(mark)` block replaces the tooltip's body, a heading, one row per series and the notes, with the app's own content for `{ index, label, values }`; the chart still places the tooltip, and the block is not read by screen readers, the slider's reading still names the point.

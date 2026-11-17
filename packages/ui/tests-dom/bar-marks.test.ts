@@ -165,4 +165,33 @@ describe('BarChart marks', () => {
       opened.mockRestore()
     }
   })
+
+  test('LineChart adds the notes a series carries to the point\'s tooltip and announcement', async () => {
+    const { root } = await marks()
+    const overlay = root.querySelector<HTMLElement>('#noted [data-part="overlay"]')!
+    const notes = () => [...root.querySelectorAll('[data-part="tooltipNote"]')].map(note => note.textContent)
+
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }))
+    await settle()
+    expect(notes()).toEqual(['first'])
+    expect(overlay.getAttribute('aria-valuetext')).toBe('a: Runs 1, Fails 0; first')
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }))
+    await settle()
+    expect(notes()).toEqual(['last', 'rolled back'])
+    expect(overlay.getAttribute('aria-valuetext')).toBe('c: Runs 2, Fails 0; last; rolled back')
+  })
+
+  test('LineChart draws the tooltip block in place of its rows, for the point the keyboard is on and the one the pointer is on', async () => {
+    const { root } = await marks()
+    const overlay = root.querySelector<HTMLElement>('#lit [data-part="overlay"]')!
+
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }))
+    await settle()
+    expect(root.querySelector('[data-part="tooltip"] .own')?.textContent).toBe('a: 1')
+    expect(root.querySelector('[data-part="tooltipLabel"]')).toBeNull()
+    expect(root.querySelector('[data-part="tooltipRow"]')).toBeNull()
+    overlay.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }))
+    await settle()
+    expect(root.querySelector('[data-part="tooltip"]')).toBeNull()
+  })
 })

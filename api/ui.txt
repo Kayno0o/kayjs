@@ -76,6 +76,7 @@ interface ChartMark
 interface ChartSeries
   color?: string
   name: string
+  notes?: (null | string | undefined)[]
   values: (null | number)[]
 
 [.] Column
@@ -2160,6 +2161,7 @@ component default
   swatch?: string | undefined;
   tooltipName?: string | undefined;
   tooltipValue?: string | undefined;
+  tooltipNote?: string | undefined;
   tooltipEvent?: string | undefined;
   tooltipGoal?: string | undefined;
   data?: string | undefined;
@@ -2172,6 +2174,7 @@ component default
   rangeHint?: string | undefined
   series: ChartSeries[]
   stacked?: boolean | undefined
+  tooltip?: ((mark: ChartMark) => Element) | undefined
   totalLabel?: string | undefined
   xLabels?: boolean | undefined
 

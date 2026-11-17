@@ -88,6 +88,8 @@ export interface ChartSeries {
   values: (number | null)[]
   // Any CSS colour; a series without one takes the next `--color-chart-*` token.
   color?: string
+  // One message per label, added to that point's tooltip and announcement (a LineChart) or that bar's (a BarChart).
+  notes?: (string | null | undefined)[]
 }
 
 // The dash each series of a LineChart draws with, by its place in the list, so lines stay apart without their colours: solid, then patterns in px of a 2px stroke, no dash shorter than the stroke is wide.
@@ -146,8 +148,6 @@ export const PALETTE = ['var(--color-chart-1)', 'var(--color-chart-2)', 'var(--c
 export interface BarSeries extends ChartSeries {
   // One colour per label, any CSS colour, taking over the series' own where set: an up run green, a failed one red.
   colors?: (string | null | undefined)[]
-  // One message per label, added to that bar's tooltip and announcement.
-  notes?: (string | null | undefined)[]
 }
 
 // The smallest 1, 2, 4, 6, 8 or 10 times a power of ten that holds `value`, so the middle tick of a plot spanning it is a round number too.

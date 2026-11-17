@@ -48,6 +48,7 @@ const look = recipe({
     goal: GOAL_LOOK.goal,
     goalLabel: GOAL_LOOK.goalLabel,
     tooltipGoal: 'text-foreground',
+    tooltipNote: 'text-foreground',
     // What screen readers read in place of the drawing: every value, and how to pick a span from the keyboard.
     data: 'sr-only',
     hint: 'sr-only',
@@ -58,7 +59,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, marks, goals, onMark, eventsLabel = wording('ui.lineChart.events', 'Events'), onSelect, href, newTab, onActiveChange, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), emptyLabel = wording('ui.lineChart.empty', 'No data yet.'), empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, marks, goals, onMark, eventsLabel = wording('ui.lineChart.events', 'Events'), onSelect, href, newTab, onActiveChange, onActive, active, tooltip, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), emptyLabel = wording('ui.lineChart.empty', 'No data yet.'), empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -101,6 +102,8 @@ const { labels, series, formatValue = (value: number) => formatNumber(value), fo
   onActive?: ((index: number | null) => unknown) | undefined
   // The point whose cursor and dots are drawn, `null` for none; the app controls them when it gives it, the tooltip following the pointer and keyboard alone.
   active?: number | null | undefined
+  // Replaces the tooltip's body with the app's own content for the point under the pointer or focus, the chart still placing it: a `@tooltip(mark)` block.
+  tooltip?: Snippet<[mark: ChartMark]> | undefined
   // Tells screen readers how to pick a span from the keyboard, once the chart takes `onRange`.
   rangeHint?: string | undefined
   // Names the chart for screen readers, which read its values from a table they alone see.
@@ -240,6 +243,8 @@ const lit = () => active === undefined ? hovered() : active === null || labels.l
 // The events that fall on a label of the chart, with where each stands among those on its label.
 // The features a chart's call sites leave out (marks, onMark, onSelect, href) are left out of its island (`uses`).
 const placed = memo(() => uses('marks') ? placeEvents(marks, labels) : [])
+// The notes the series carry for a point, in series order.
+const notesAt = (index: number) => series.map(item => item.notes?.[index]).filter((note): note is string => Boolean(note))
 const titlesAt = (index: number) => placed().filter(item => item.index === index).map(item => item.event.title)
 
 // Where an event's rule stands across the plot, side by side with the ones on its label.
@@ -370,7 +375,7 @@ const announced = () => {
   const picked = span && span.from !== span.to ? `; ${heading(Math.min(span.from, span.to))} - ${heading(Math.max(span.from, span.to))}` : ''
 
   const to = linkAt(index)
-  const events = [...titlesAt(index), ...namedGoals().map(goal => goalText(goal, formatValue))].map(title => `; ${title}`).join('')
+  const events = [...notesAt(index), ...titlesAt(index), ...namedGoals().map(goal => goalText(goal, formatValue))].map(title => `; ${title}`).join('')
 
   return `${heading(index)}: ${readings}${events}${picked}${to ? `; ${to}` : ''}`
 }
@@ -728,22 +733,27 @@ div(part="root" {...rest} role="figure" aria-label={label})
         | {emptyLabel}
   if hovered()
     div(part="tooltip" ref={watchTip} style={tipPlace()} aria-hidden="true")
-      div(part="tooltipLabel") {heading(hovered()!.index)}
-      for item, index of series key={item.name}
-        div(part="tooltipRow")
-          span(part="swatch" style={`background-color: ${colors()[index]}`})
-          span(part="tooltipName") {item.name}
-          span(part="tooltipValue") {reading(index)}
-      if stacked
-        div(part="tooltipRow" data-total)
-          span(part="tooltipName") {totalLabel}
-          span(part="tooltipValue") {totalText(hovered()!.index)}
-      if uses('marks')
-        for title, at of titlesAt(hovered()!.index) key={at}
-          div(part="tooltipEvent") {title}
-      if uses('goals')
-        for goal, at of namedGoals() key={at}
-          div(part="tooltipGoal") {goalText(goal, formatValue)}
+      if uses('tooltip') && tooltip
+        {tooltip(mark(hovered()!.index))}
+      else
+        div(part="tooltipLabel") {heading(hovered()!.index)}
+        for item, index of series key={item.name}
+          div(part="tooltipRow")
+            span(part="swatch" style={`background-color: ${colors()[index]}`})
+            span(part="tooltipName") {item.name}
+            span(part="tooltipValue") {reading(index)}
+        if stacked
+          div(part="tooltipRow" data-total)
+            span(part="tooltipName") {totalLabel}
+            span(part="tooltipValue") {totalText(hovered()!.index)}
+        for note, at of notesAt(hovered()!.index) key={at}
+          div(part="tooltipNote") {note}
+        if uses('marks')
+          for title, at of titlesAt(hovered()!.index) key={at}
+            div(part="tooltipEvent") {title}
+        if uses('goals')
+          for goal, at of namedGoals() key={at}
+            div(part="tooltipGoal") {goalText(goal, formatValue)}
   // A table box ignores the 1px size and clip of sr-only and would scroll the page by its full height, so the table sits in a block that carries them.
   div(part="data")
     table
