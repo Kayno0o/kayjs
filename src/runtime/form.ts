@@ -99,12 +99,12 @@ function fromText(field: FieldSchema | undefined, value: unknown): unknown {
   return value.includes('\r') ? value.replaceAll(CRLF, '\n') : value
 }
 
-// `s.Number()`, or `s.Integer()` and `s.Numeric()`, which Elysia writes as a number or a numeric string; `s.Date()` takes a number too, but not only.
 // A boolean, or the text of one as `s.boolean()` reads it.
 function isBoolean(field: FieldSchema): boolean {
   return field.type === 'boolean' || (field.anyOf?.some(member => member.type === 'boolean') ?? false)
 }
 
+// `s.Number()`, or `s.Integer()` and `s.Numeric()`, which Elysia writes as a number or a numeric string; `s.Date()` takes a number too, but not only.
 function isNumeric(field: FieldSchema): boolean {
   return field.type === 'number' || field.type === 'integer' || (field.anyOf?.every(member => isNumeric(member) || NUMERIC_FORMATS.has(member.format)) ?? false)
 }

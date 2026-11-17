@@ -23,7 +23,7 @@ const ASSIGNED = /^\s*(?:\?\?|\|\||&&|\*\*|<<|>>>|>>|[-+*/%&|^])?=(?![=>])/
 const DELETED = /\bdelete\s+$/
 const ENV_NAME = /(?<![.\w$])env(?![\w$])/
 const RAW_START = /^(?:process\.env|Bun\.env)/
-const S_IMPORT = /import\s*\{[^}]*\bs\b[^}]*\}\s*from\s*['"]kay['"]/
+const S_IMPORT = /import\s*\{[^}]*\bs\b[^}]*\}\s*from\s*['"]kay(?:\/server)?['"]/
 const SCHEMA_PATH = /\.[mc]?ts$/
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 const EXTENSION = /\.[mc]?[jt]s$/
