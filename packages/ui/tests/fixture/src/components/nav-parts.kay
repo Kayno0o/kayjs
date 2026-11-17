@@ -32,3 +32,4 @@ Breadcrumb#crumbs(items={[{ label: 'Home', href: 'https://example.com/', icon: '
 Breadcrumb#block-crumbs(items={[{ label: 'Home', href: 'https://example.com/' }, { label: 'Planets' }]} label="Trail")
   @item(crumb)
     em {crumb.label}!
+TabNav#segmented-nav(links={links} current="https://example.com/a" variant="segmented" label="Sections")

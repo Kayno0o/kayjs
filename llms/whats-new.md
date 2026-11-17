@@ -25,6 +25,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The installed app's icon badge shows the unread count: kayjs-ui's `Bell` sets it (`appBadge={false}` opts out) and a push from `notify()` carries the count for the worker to set (`notify(..., { badge: false })` opts out, `sendPush` takes `badge`) ([notifications](notifications.md)).
 - `assets.manifest.shareTarget` lists the installed app in a device's share sheet, posting the shared title, text, link and files to an action ([web manifest](sitemap-search-fonts.md#favicon-and-web-manifest)).
 - kayjs-ui's `Badge` takes `dot`, a small dot in its colour before the label ([Badge](/ui/badge#a-dot)).
+- kayjs-ui's `TabNav` takes `variant="segmented"`, its links drawn as Segmented's tray of keys, still links with `aria-current` ([TabNav](/ui/tab-nav#segmented)).
 
 ## 1.105.0
 

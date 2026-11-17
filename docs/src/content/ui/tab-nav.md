@@ -45,3 +45,9 @@ Tabs over one set of filters, such as a period or a site, keep them from tab to 
 ```kay
 TabNav(links={TABS} current={url} keep={['period', 'site']} label="Traffic")
 ```
+
+## Segmented
+
+`variant="segmented"` draws the tabs as a tray of keys with the current one filled, as [Segmented](/ui/segmented) does, but each key is still a link to a page of its own, marked `aria-current`. A `badge` count sits after each label. The default is `underline`.
+
+<Demo name="tab-nav/segmented" />

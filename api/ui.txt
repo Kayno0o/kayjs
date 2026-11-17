@@ -979,10 +979,11 @@ component default
   kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
   color?: string | undefined
+  dot?: boolean | undefined
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   label?: number | string | undefined
-  parts?: undefined | { root?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }
+  parts?: undefined | { root?: string | undefined; dot?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }
   style?: string | undefined
   tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
   variant?: "outline" | "solid" | "stamp" | undefined
@@ -3444,7 +3445,7 @@ component default
   };
   badge?: string | undefined;
   link?: string | undefined;
-}; tab?: ((tab: TabEntry) => Element) | undefined; tabs?: undefined }
+}; tab?: ((tab: TabEntry) => Element) | undefined; tabs?: undefined; variant?: "segmented" | "underline" | undefined }
   | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }; current?: undefined; keep?: undefined; label: string; links?: undefined; orientation?: "horizontal" | "vertical" | undefined; param: string; paramDefault?: number | string | undefined; parts?: undefined | {
@@ -3454,7 +3455,7 @@ component default
   };
   badge?: string | undefined;
   link?: string | undefined;
-}; tab?: ((tab: TabEntry) => Element) | undefined; tabs: readonly ({ value: number | string; } & NavItem)[] }
+}; tab?: ((tab: TabEntry) => Element) | undefined; tabs: readonly ({ value: number | string; } & NavItem)[]; variant?: "segmented" | "underline" | undefined }
 
 [./table.kay] default
 component default

@@ -57,3 +57,18 @@ test('a Breadcrumb item takes an icon and an item block, the last staying a curr
   expect([...page.querySelectorAll('#block-crumbs li [data-part]')].filter(part => part.tagName !== 'EM').map(part => part.textContent)).toEqual(['Home!', 'Planets!'])
   expect(page.querySelector('#block-crumbs [data-part="link"] em')?.textContent).toBe('Home!')
 })
+
+test('a segmented TabNav keeps its links, current mark and badge, and draws them as a tray rather than underlined', async () => {
+  const page = await root()
+  const links = [...page.querySelectorAll('#segmented-nav [data-part="link"]')]
+  const underlined = page.querySelector('#plain-nav [data-part="link"]')!
+
+  expect(links[0]?.tagName).toBe('A')
+  expect(links[0]?.getAttribute('aria-current')).toBe('page')
+  expect(links[1]?.querySelector('[data-part="badge"]')?.textContent).toBe('3')
+  expect(links[0]?.className).toContain('aria-[current=page]:bg-accent')
+  expect(links[0]?.className).not.toContain('border-b-2')
+  expect(page.querySelector('#segmented-nav')?.className).toContain('bg-surface')
+  expect(underlined.className).toContain('border-b-2')
+  expect(page.querySelector('#plain-nav')?.className).not.toContain('bg-surface')
+})

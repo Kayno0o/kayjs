@@ -1,0 +1,10 @@
+---
+import TabNav from '@kayjs/ui/tab-nav.kay'
+
+const links = [
+  { href: '/ui/tab-nav', label: 'Overview', badge: 3 },
+  { href: '/ui/tabs', label: 'Findings' },
+  { href: '/ui/segmented', label: 'Hosts', badge: 12 },
+]
+---
+TabNav(links={links} current="/ui/tab-nav" variant="segmented" label="Sections")
