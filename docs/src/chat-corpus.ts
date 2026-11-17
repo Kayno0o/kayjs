@@ -31,7 +31,7 @@ const FENCE = /^```/
 const MAX_HITS = 6
 const SNIPPET = 220
 // Release history is not a place to learn how to do something.
-const ARCHIVES = new Set(['whats-new-archive', 'upgrading-archive'])
+const ARCHIVES = new Set(['whats-new-archive', 'upgrading-archive', 'upgrading-1-105-config'])
 const guideHref = new Map<string, string>(LLMS_GUIDES.map(guide => [guide.topic, `/${guide.slug}`]))
 
 async function load(): Promise<ChatPage[]> {
