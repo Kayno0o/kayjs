@@ -56,6 +56,30 @@ describe('deprecated-package-names', () => {
     })
   })
 
+  it('reports a specifier, a config key or a manifest entry, not a string or a comment that mentions an old name', async () => {
+    await withFiles({
+      'src/a.ts': [
+        '// moved from @kaynooo/kayjs-ui to @kayjs/ui',
+        '/* @kaynooo/kayjs-cms',
+        '   @kaynooo/kayjs-mail */',
+        'const note = \'use @kaynooo/kayjs-ui instead\'',
+        'const url = \'https://example.com/@kaynooo/kayjs-ui\' // @kaynooo/kayjs-ai',
+        'import \'@kaynooo/kayjs-auth\'',
+        '',
+      ].join('\n'),
+      'src/app.css': '/* @kaynooo/kayjs-ui */\n@source \'../node_modules/@kaynooo/kayjs-ui/src\';\n',
+      'package.json': '{ "name": "@kaynooo/kayjs-ui", "description": "a fork of @kaynooo/kayjs-cms", "dependencies": { "@kaynooo/kayjs-ai": "~1.103.0" } }\n',
+    }, async (root) => {
+      const found = await renamedPackages(root, undefined)
+
+      expect(found.map(d => [d.file.slice(root.length + 1), d.line, d.message.slice(0, 22)])).toEqual([
+        ['package.json', 1, '`@kaynooo/kayjs-ai` is'],
+        ['src/a.ts', 6, '`@kaynooo/kayjs-auth` '],
+        ['src/app.css', 2, '`@kaynooo/kayjs-ui` is'],
+      ])
+    })
+  })
+
   it('writes the new names with the safe fixes, and the project then holds no old name', async () => {
     await withFiles({
       'package.json': '{ "dependencies": { "@kaynooo/kayjs-ui": "~1.103.0", "@kaynooo/pg-orm": "^8.1.4" }, "devDependencies": { "kay": "npm:@kaynooo/kayjs@~1.103.0" } }\n',

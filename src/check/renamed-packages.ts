@@ -29,6 +29,32 @@ function raisedRange(source: string, from: number): { start: number, end: number
   return { start, end: start + found[1]!.length, text: RENAMED_IN }
 }
 
+const BLOCK_COMMENT = /\/\*[\s\S]*?(?:\*\/|$)/g
+
+// What a name may follow inside its string: nothing, an alias, or a path through node_modules, as a stylesheet's `@source`.
+const BEFORE_NAME_IN_STRING = /^(?:npm:|[\w./-]*node_modules\/)?$/
+
+const LINE_COMMENT = /(?:^|[^:])\/\//
+const KEY_END = /^"\s*:/
+
+// Whether the name at `index` is what the project depends on, not a word of a comment or a sentence: it opens a quoted string (or follows `npm:` or a node_modules path in one), and in a manifest is a key or an alias.
+function namesAPackage(source: string, index: number, end: number, manifest: boolean, comments: [number, number][]): boolean {
+  if (comments.some(([from, to]) => index >= from && index < to))
+    return false
+
+  const lineStart = source.lastIndexOf('\n', index - 1) + 1
+  const before = source.slice(lineStart, index)
+  const quote = Math.max(before.lastIndexOf('\''), before.lastIndexOf('"'), before.lastIndexOf('`'))
+
+  if (quote === -1 || !BEFORE_NAME_IN_STRING.test(before.slice(quote + 1)))
+    return false
+
+  if (LINE_COMMENT.test(before.slice(0, quote)))
+    return false
+
+  return !manifest || before.endsWith('npm:') || KEY_END.test(source.slice(end))
+}
+
 // Every file of the project that names a package, but its manifest, written with the new names: what `kay upgrade` does before it runs the kay it installed, which loads the project's config and so cannot meet an old name.
 export async function renameProjectFiles(root: string): Promise<void> {
   for (const file of await findProjectFiles(root, NAMING_FILE, { project: true, ownKayOnly: true })) {
@@ -57,8 +83,14 @@ export async function renamedPackages(root: string, levels: LintLevels | undefin
     const source = await Bun.file(file).text()
     const manifest = basename(file) === 'package.json'
 
+    const comments = manifest ? [] : [...source.matchAll(BLOCK_COMMENT)].map((c): [number, number] => [c.index, c.index + c[0].length])
+
     for (const match of source.matchAll(OLD_PACKAGE_NAME)) {
       const name = match[0]
+
+      if (!namesAPackage(source, match.index, match.index + name.length, manifest, comments))
+        continue
+
       const next = RENAMED_PACKAGES[name]!
       const before = source.slice(0, match.index).split('\n')
       const raised = manifest ? raisedRange(source, match.index + name.length) : undefined
