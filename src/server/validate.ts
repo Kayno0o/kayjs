@@ -2,6 +2,7 @@ import type { TSchema } from 'elysia'
 import type { LocaleState } from '../runtime/locale-state'
 import type { InvalidWord } from './words'
 import { fileType } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { formInput, NUMERIC_FORMATS } from '../runtime/form'
 import { runInLocale } from '../runtime/locale-state'
 import { isStandardSchema, jsonSchemaOf } from '../runtime/standard-schema'
@@ -112,6 +113,8 @@ function strict(node: unknown): unknown {
   return copy
 }
 
+const isFileField = (field: Node): boolean => field.format === 'binary' || (isNode(field.items) && field.items.format === 'binary')
+
 // A missing field takes its schema's `default`, a nested object's too; a default is a whole value, filled as it is.
 function withDefaults(schema: unknown, value: unknown): unknown {
   if (!isNode(schema) || !isPlain(value) || !isNode(schema.properties))
@@ -123,7 +126,8 @@ function withDefaults(schema: unknown, value: unknown): unknown {
     if (!isNode(field))
       continue
 
-    if (fields[name] === undefined && field.default !== undefined)
+    // Elysia's `File` and `Files` carry their own name as a `default`, which no post is filled with.
+    if (fields[name] === undefined && field.default !== undefined && !isFileField(field))
       fields[name] = structuredClone(field.default)
     else if (fields[name] !== undefined)
       fields[name] = withDefaults(field, fields[name])
@@ -297,7 +301,7 @@ export async function validate<Value = unknown>(schema: object, value: unknown, 
 // `validate` for a caller that cannot await, such as the boot reading the environment; a Standard Schema validator answering with a promise is refused.
 export function validateNow<Value = unknown>(schema: object, value: unknown, { source, locale }: ValidateOptions): Validated<Value> {
   if (isStandardSchema(schema))
-    throw new TypeError('kay: validateNow reads a TypeBox schema, as a Standard Schema validator may answer with a promise: use validate')
+    throw new KayError('config-invalid', 'kay: validateNow reads a TypeBox schema, as a Standard Schema validator may answer with a promise: use validate')
 
   return (locale === undefined ? checked(schema as TSchema, source, value) : runInLocale(locale, () => checked(schema as TSchema, source, value))) as Validated<Value>
 }

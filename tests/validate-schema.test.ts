@@ -96,6 +96,48 @@ describe('validate', () => {
   })
 })
 
+describe('each kay.invalid kind', () => {
+  const kinds = s.object({
+    a: s.string({ min: 3 }),
+    b: s.string({ max: 2 }),
+    c: s.string({ pattern: '^a$' }),
+    d: s.email(),
+    e: s.list(s.string(), { min: 2 }),
+    f: s.list(s.string(), { max: 1 }),
+    g: s.int({ min: 5 }),
+    h: s.int({ max: 5 }),
+    i: s.boolean(),
+  })
+
+  it('names its key and the limit it words, in a JSON body', async () => {
+    const result = await validate(kinds, { a: 'x', b: 'xxx', c: 'z', d: 'no', e: ['a'], f: ['a', 'b'], g: 1, h: 9, i: 'yes' }, { source: 'json' })
+    const found = isRefusal(result) ? Object.fromEntries(result.errors.map(issue => [issue.path, [issue.key, issue.params]])) : {}
+
+    expect(found).toEqual({
+      a: ['kay.invalid.tooShort', { min: 3 }],
+      b: ['kay.invalid.tooLong', { max: 2 }],
+      c: ['kay.invalid.pattern', {}],
+      d: ['kay.invalid.format', { format: 'email' }],
+      e: ['kay.invalid.tooFewItems', { min: 2 }],
+      f: ['kay.invalid.tooManyItems', { max: 1 }],
+      g: ['kay.invalid.tooSmall', { min: 5 }],
+      h: ['kay.invalid.tooBig', { max: 5 }],
+      i: ['kay.invalid.type', {}],
+    })
+  })
+})
+
+describe('a form with files', () => {
+  const upload = s.object({ title: s.string(), photo: s.file({ optional: true }), more: s.files({ optional: true }) })
+
+  it('reads text beside a file, and refuses a file where text is expected', async () => {
+    const photo = new File(['x'], 'a.png', { type: 'image/png' })
+
+    expect(await validate(upload, { title: 'a', photo }, { source: 'form' })).toEqual({ value: { title: 'a', photo } })
+    expect(isRefusal(await validate(upload, { title: photo }, { source: 'form' }))).toBe(true)
+  })
+})
+
 describe('validate with a Standard Schema validator', () => {
   const standard = (jsonSchema?: object) => ({
     '~standard': {

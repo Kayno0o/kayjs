@@ -7,6 +7,7 @@ import type { ServedPaths } from './served-paths'
 import { posix } from 'node:path'
 import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
+import { jsonSchemaOf } from '../runtime/standard-schema'
 import { inLocale, passGuards } from './actions'
 import { declaredInputs } from './api-input'
 import { API_PREFIX, KAY_PREFIX, openApiPaths, referenced } from './api-modules'
@@ -209,7 +210,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
   for (const module of modules) {
     for (const route of module.instance.routes) {
       const method = route.method.toUpperCase()
-      const hooks = { ...route.hooks as object, ...declaredInputs(route.hooks) } as Record<string, unknown> & { detail?: { summary?: string, description?: string, tags?: string[], deprecated?: boolean, hide?: boolean, operationId?: string, tool?: boolean | string | ActionTool } }
+      const hooks = { ...route.hooks as object, ...Object.fromEntries(Object.entries(declaredInputs(route.hooks)).map(([input, schema]) => [input, described(schema)])) } as Record<string, unknown> & { detail?: { summary?: string, description?: string, tags?: string[], deprecated?: boolean, hide?: boolean, operationId?: string, tool?: boolean | string | ActionTool } }
 
       if ((!METHODS.has(method) && method !== 'ALL') || hooks.detail?.hide === true)
         continue
@@ -362,7 +363,7 @@ function withRefusal(answers: Record<string, Schema>, hooks: Record<string, unkn
 
 // A schema under the type it goes as: raw bytes as such, text as text, anything else as `fallback`.
 function content(schema: unknown, fallback: string): Record<string, { schema: unknown }> {
-  const plain = schemaOf(schema) as Schema
+  const plain = schemaOf(described(schema)) as Schema
   let type = fallback
 
   if (plain.format === 'binary')
@@ -373,7 +374,14 @@ function content(schema: unknown, fallback: string): Record<string, { schema: un
   return { [type]: { schema: plain } }
 }
 
-function holdsFile(schema: unknown): boolean {
+// What a schema describes as JSON Schema: itself, or what a Standard Schema validator says of its input, none for one that cannot.
+function described(schema: unknown): unknown {
+  return typeof schema === 'object' && schema !== null ? jsonSchemaOf(schema) ?? {} : schema
+}
+
+function holdsFile(given: unknown): boolean {
+  const schema = described(given)
+
   if (typeof schema !== 'object' || schema === null)
     return false
 

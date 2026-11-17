@@ -602,4 +602,5 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.104' },
   { since: '1.105' },
   { since: '1.106' },
+  { since: '1.107' },
 ]

@@ -97,7 +97,7 @@ export { verifyWork, workChallenge } from './work-scope'
 export type { StartOptions, WaitResult, Workflow, WorkflowContext, WorkflowOptions, WorkflowStatus, WorkflowStep } from './workflow'
 export { workflow } from './workflow'
 export type { Issue, Refusal, Source, Validated, ValidateOptions } from './validate'
-export { isRefusal, validate } from './validate'
+export { validate } from './validate'
 export { forgetLocalMirrors } from './writes'
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.

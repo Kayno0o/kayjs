@@ -1,5 +1,6 @@
 import type { TSchema } from 'elysia'
 import { byteSize } from '../runtime/byte-size'
+import { jsonSchemaOf } from '../runtime/standard-schema'
 
 const ELYSIA_SIZE = /^(\d+(?:\.\d+)?)([km])$/
 
@@ -56,7 +57,12 @@ function weigh(node: Node | undefined): number {
 
 // The body an action taking sized files needs at least, so a `maxSize` written on the field raises the action's limit when the action sets none; undefined when its files have no size.
 export function fileBodyLimit(schema: TSchema): number | undefined {
-  const files = weigh(schema as Node)
+  const described = jsonSchemaOf(schema)
+
+  if (described === undefined)
+    return undefined
+
+  const files = weigh(described)
 
   return files > 0 ? Math.ceil(files) + FRAMING : undefined
 }

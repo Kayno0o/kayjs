@@ -1,0 +1,9 @@
+--- server
+import { action } from 'kay'
+import { described, plain } from '../validators'
+
+export const add = action({ input: described }, ({ age }) => ({ age }))
+
+export const bare = action({ input: plain }, ({ age }) => ({ age }))
+---
+p Standard schemas

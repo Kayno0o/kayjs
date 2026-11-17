@@ -1,5 +1,6 @@
 import type { TSchema, Static as TypeBoxStatic } from 'elysia'
 import type { ByteSize } from './byte-size'
+import type { StandardOutput, StandardSchema } from './standard-schema'
 import { t as schema } from 'elysia'
 import { FormatRegistry } from 'elysia/type-system'
 import { byteSize } from './byte-size'
@@ -14,6 +15,9 @@ export interface Schema extends TSchema {}
 
 // The value a schema describes. Kept as `Static`, the name an app already reads it by, since a second name would only duplicate it.
 export type Static<Type extends Schema, Params extends unknown[] = []> = TypeBoxStatic<Type, Params>
+
+// A Standard Schema validator (Zod, ArkType, Valibot) typed as a schema whose value is the validator's output, which is what `Static` reads of one.
+export type StandardAs<Validator extends StandardSchema> = Schema & { static: StandardOutput<Validator> }
 
 // The `email` format is kay's own check, the one the browser, auth and mail share, in place of Elysia's.
 FormatRegistry.Set('email', isEmail)
@@ -42,7 +46,7 @@ export const DEFAULT_MAX_ITEMS = 1000
 const SLUG = '^[a-z0-9]+(?:-[a-z0-9]+)*$'
 
 // The words of a refusal: a text, a function called in the request's locale, or a record by the rule that failed (`min`, `max`, `pattern`, `format`, `required`, `type`), with a `default` for the others.
-export type ErrorText = string | (() => string) | { [rule: string]: string | (() => string) | undefined }
+export type ErrorText = string | (() => string) | Record<string, string | (() => string) | undefined>
 
 // What every builder takes beside its own options: the field is `optional`, takes a `default` when the value is left out, words its refusal with `error` (a text or a function called in the request's locale), and carries a `label`, a `description` and an `example` for the form, OpenAPI and MCP.
 export interface FieldBase<Value = unknown> {

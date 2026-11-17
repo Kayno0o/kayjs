@@ -1,4 +1,48 @@
 [.] action
+function action<const Honeypot extends string = never, Output = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & {
+  input?: undefined;
+}, handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>): NoInputAction<Settled<Output>, Honeypot>
+function action<Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & {
+  input: Spec;
+}, handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof Static<Spec>, string>, object>) => Output | Promise<Output>): ServerAction<Spec, Settled<Output>, Honeypot>
+function action<Validator extends StandardSchema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & {
+  input: Validator;
+}, handler: (input: StandardOutput<Validator>, ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof StandardOutput<Validator>, string>, object>) => Output | Promise<Output>): ServerAction<StandardAs<Validator>, Settled<Output>, Honeypot>
+function action<const Fields extends SchemaShape, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(options: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> & {
+  input: Fields;
+}, handler: (input: Evaluate<Readonly<Partial<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, ReadonlyOptionalPropertyKeys<Fields>>>> & Readonly<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, ReadonlyPropertyKeys<Fields>>> & Partial<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, OptionalPropertyKeys<Fields>>> & Required<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, Exclude<keyof Fields, OptionalPropertyKeys<Fields> | ReadonlyOptionalPropertyKeys<Fields> | ReadonlyPropertyKeys<Fields>>>>>, ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof Evaluate<Readonly<Partial<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, ReadonlyOptionalPropertyKeys<Fields>>>> & Readonly<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, ReadonlyPropertyKeys<Fields>>> & Partial<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, OptionalPropertyKeys<Fields>>> & Required<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, Exclude<keyof Fields, OptionalPropertyKeys<Fields> | ReadonlyOptionalPropertyKeys<Fields> | ReadonlyPropertyKeys<Fields>>>>>, string>, object>) => Output | Promise<Output>): ServerAction<TObject<Fields>, Settled<Output>, Honeypot>
 function action<Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> | undefined): NoInputAction<Settled<Output>, Honeypot>
 function action<Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Spec, handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof Static<Spec>, string>, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> | undefined): ServerAction<Spec, Settled<Output>, Honeypot>
 function action<const Fields extends SchemaShape, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(fields: Fields, handler: (input: Evaluate<Readonly<Partial<Pick<{
@@ -3135,6 +3179,13 @@ interface Inbox
 [./server] inlineScriptHashes
 function inlineScriptHashes(options?: ScriptHashOptions): string[]
 
+[./server] Issue
+interface Issue
+  key: InvalidWord
+  message: string
+  params: Record<string, number | string>
+  path: string
+
 [./server] JobContext
 interface JobContext<Progress = unknown>
   job: JobRef<Progress>
@@ -3712,6 +3763,11 @@ interface RateLimiter extends RateLimit
 /** @deprecated Import `RateLimitRefusal` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
 type RateLimitRefusal = RateLimitRefusalIn
 
+[./server] Refusal
+interface Refusal
+  errors: Issue[]
+  status: 422
+
 [./server] RenderedPage
 interface RenderedPage
   file: (url: string) => Promise<string | undefined>
@@ -4066,6 +4122,9 @@ interface SignOptions
 [./server] SNIFFED_BYTES
 const SNIFFED_BYTES: 4096
 
+[./server] Source
+type Source = 'form' | 'query' | 'params' | 'env' | 'json'
+
 [./server] sqliteCache
 /** @deprecated Import `sqliteCache` from `kay/cache`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
 function sqliteCache(path: string): SyncCacheStore
@@ -4174,6 +4233,17 @@ function typeOfName(name: string): string
 interface UrlOptions
   /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+
+[./server] validate
+function validate<Value = unknown>(schema: object, value: unknown, { source, locale }: ValidateOptions): Promise<Validated<Value>>
+
+[./server] Validated
+type Validated<Value = unknown> = { value: Value } | Refusal
+
+[./server] ValidateOptions
+interface ValidateOptions
+  locale?: LocaleState | undefined
+  source: Source
 
 [./server] verifyWork
 function verifyWork(solution: null | string | undefined, scope: string, options?: VerifyWorkOptions): Promise<ProofOfWorkRefusal | undefined>
