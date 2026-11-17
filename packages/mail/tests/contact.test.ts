@@ -24,6 +24,8 @@ const held: Action<{ name: string, email: string, message: string, phone?: strin
 const dropped: Action<{ nope: number }, unknown, 'website'> = typed
 
 const fields: Answers = { name: 'Ada Lovelace', email: 'ada@example.com', phone: '06 12 34 56 78', topic: 'quote', message: 'Hello,\nI would like a quote.' }
+// What a form with no extra field takes: a call is refused a key its schema does not name.
+const basic = { name: fields.name, email: fields.email, message: fields.message }
 
 void [held, dropped]
 
@@ -71,7 +73,7 @@ describe('contactForm', () => {
 
   it('answers 503 with the way else to reach the site when the mail has no recipient', async () => {
     const { refusal } = await site()
-    const refused = await refusal(noRecipient, fields)
+    const refused = await refusal(noRecipient, basic as Answers)
 
     expect(refused.status).toBe(503)
     expect(refused.errors['']).toBe('The form cannot send messages yet: write to hello@fixture.test.')
@@ -80,14 +82,14 @@ describe('contactForm', () => {
   it('answers success while the mail server is down, the mail waiting in the queue to be retried', async () => {
     const { call } = await site()
 
-    expect(await call(serverDown, fields)).toBeUndefined()
+    expect(await call(serverDown, basic as Answers)).toBeUndefined()
   })
 
   it('does not wait on the transport, which a slow relay holds up', async () => {
     const { call } = await site()
 
     delivery.sent = false
-    await call(slowRelay, fields)
+    await call(slowRelay, basic as Answers)
     expect(delivery.sent).toBe(false)
   })
 
@@ -164,7 +166,7 @@ describe('contactForm', () => {
     global[SINK] = (...args: unknown[]) => calls.push(args)
 
     try {
-      expect((await refusal(unrendered, fields)).status).toBe(502)
+      expect((await refusal(unrendered, basic as Answers)).status).toBe(502)
     }
     finally {
       global[SINK] = sink
@@ -229,7 +231,7 @@ describe('contactForm', () => {
   it('lets a person fill a website field once the honeypot has another name', async () => {
     const running = await site()
 
-    await running.call(consented, { ...fields, consent: true, website: 'https://ada.test' })
+    await running.call(consented, { ...basic, consent: true, website: 'https://ada.test' })
 
     expect((await outbox.waitFor('team@fixture.test', { site: running })).text).toContain('Website: https://ada.test')
   })
@@ -238,19 +240,19 @@ describe('contactForm', () => {
     const { refusal } = await site()
 
     for (const consent of [false, undefined]) {
-      const refused = await refusal(consented, { ...fields, consent } as never)
+      const refused = await refusal(consented, { ...basic, consent } as never)
 
       expect(refused.errors.consent).toBe('Please tick the box to send your message.')
     }
 
-    expect((await refusal(consented, { ...fields, consent: false }, { from: '/fr/consent' })).errors.consent).toBe('Merci de cocher la case pour envoyer votre message.')
+    expect((await refusal(consented, { ...basic, consent: false }, { from: '/fr/consent' })).errors.consent).toBe('Merci de cocher la case pour envoyer votre message.')
     expect(outbox.last()).toBeUndefined()
   })
 
   it('leaves the consent out of the mail', async () => {
     const running = await site()
 
-    await running.call(consented, { ...fields, consent: true })
+    await running.call(consented, { ...basic, consent: true })
 
     const sent = await outbox.waitFor('team@fixture.test', { site: running })
 
@@ -260,7 +262,7 @@ describe('contactForm', () => {
 
   it('still refuses a header injected through the name or the email beside consent', async () => {
     const { refusal } = await site()
-    const refused = await refusal(consented, { ...fields, consent: true, name: 'Ada\r\nBcc: x@y.test', email: 'ada@example.com\r\nBcc: x@y.test' })
+    const refused = await refusal(consented, { ...basic, consent: true, name: 'Ada\r\nBcc: x@y.test', email: 'ada@example.com\r\nBcc: x@y.test' })
 
     expect(refused.errors.name).toBeDefined()
     expect(refused.errors.email).toBeDefined()
