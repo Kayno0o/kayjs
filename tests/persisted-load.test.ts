@@ -13,6 +13,14 @@ it('reads a persisted cookie signal in the page\'s server fence', async () => {
   expect(await folder(persistedCookie('open', 'b'))).toBe('b')
 })
 
+it('reads it in a layout\'s server fence too, valid, refused and missing', async () => {
+  const layout = async (cookie?: string) => (await (cookie === undefined ? site : site.as(cookie)).visit('/')).find('p.layout')[0]?.text
+
+  expect(await layout(persistedCookie('open', 'b'))).toBe('b')
+  expect(await layout(persistedCookie('open', 'zzz'))).toBe('none')
+  expect(await layout()).toBe('none')
+})
+
 it('reads a value its values refuse as the default', async () => {
   expect(await folder(persistedCookie('open', 'zzz'))).toBe('none')
   expect(await folder(persistedCookie('open', 7))).toBe('none')

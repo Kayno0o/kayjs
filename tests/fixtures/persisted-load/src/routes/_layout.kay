@@ -1,0 +1,8 @@
+--- server
+import { open } from '../lib/open'
+
+const shown = open()
+---
+header
+  p.layout {shown}
+slot
