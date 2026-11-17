@@ -144,7 +144,13 @@ function sameValue(a: unknown, b: unknown): boolean {
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null)
     return false
 
-  if (Array.isArray(a) !== Array.isArray(b))
+  if (a instanceof Date && b instanceof Date)
+    return a.getTime() === b.getTime()
+
+  // A Map, a Set or a class instance holds its data out of reach of `entries`, so only the same object is the same value.
+  const plain = (value: object) => Array.isArray(value) || [Object.prototype, null].includes(Object.getPrototypeOf(value) as object | null)
+
+  if (Array.isArray(a) !== Array.isArray(b) || !plain(a) || !plain(b))
     return false
 
   const [left, right] = [Object.entries(a), Object.entries(b)]

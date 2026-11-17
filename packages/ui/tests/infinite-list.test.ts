@@ -431,6 +431,31 @@ describe('infiniteList following its island', () => {
     expect(calls).toEqual([{ repo: 'b', offset: 0, limit: 3 }])
   })
 
+  test('an input returning a Date restarts when the date changes, not when it is rebuilt equal', async () => {
+    const since = signal(new Date(1000))
+    const calls: object[] = []
+    const action = (async (input: object) => {
+      calls.push(input)
+
+      return bans(4, 3)
+    }) as never
+    const list = infiniteList(bans(1, 3), { limit: 3, action, failure: 'no', input: (() => ({ since: since() })) as never })
+
+    flush()
+    since.set(new Date(1000))
+    flush()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(calls).toEqual([])
+
+    since.set(new Date(2000))
+    flush()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(calls).toHaveLength(1)
+    expect(list.data()).toHaveLength(3)
+  })
+
   test('rows changed before the effect first ran still replace the first ones', () => {
     const given = signal(bans(1, 3))
     const list = infiniteList(() => given(), { limit: 3, load: source().load })
