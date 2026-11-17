@@ -84,7 +84,7 @@ describe('the output schemas derived for tool actions', () => {
 
     expect(((await derive(dir))!['src/routes/index.kay#summary'] as { properties: { count: unknown } }).properties.count).toEqual({ type: 'string' })
 
-    await Bun.write(file, (await Bun.file(file).text()).replace(', note: undefined as string | undefined }), { tool: true })', ' }), {})'))
+    await Bun.write(file, (await Bun.file(file).text()).replace('action({ input: t.Object({}), tool: true }, () => ({ count', 'action({ input: t.Object({}) }, () => ({ count'))
 
     expect(Object.keys((await derive(dir))!)).toEqual(['src/routes/index.kay#worded'])
   })

@@ -5,11 +5,11 @@ type Who = { locals: { user?: string } }
 
 const user = (ctx: Who) => ctx.locals.user
 
-export const perUser = action(() => 'ok', { protect: { rateLimit: { max: 1, window: '1m', key: user } } })
+export const perUser = action({ protect: { rateLimit: { max: 1, window: '1m', key: user } } }, () => 'ok')
 
-export const empty = action(() => 'ok', { protect: { rateLimit: { max: 1, window: '1m', key: () => '' } } })
+export const empty = action({ protect: { rateLimit: { max: 1, window: '1m', key: () => '' } } }, () => 'ok')
 
-export const throws = action(() => 'ok', {
+export const throws = action({
   protect: {
     rateLimit: {
       max: 1,
@@ -19,20 +19,20 @@ export const throws = action(() => 'ok', {
       },
     },
   },
-})
+}, () => 'ok')
 
-export const rejects = action(() => 'ok', { protect: { rateLimit: { max: 1, window: '1m', key: async () => Promise.reject(new Error('no user')) } } })
+export const rejects = action({ protect: { rateLimit: { max: 1, window: '1m', key: async () => Promise.reject(new Error('no user')) } } }, () => 'ok')
 
-export const notText = action(() => 'ok', { protect: { rateLimit: { max: 1, window: '1m', key: (() => 42) as never } } })
+export const notText = action({ protect: { rateLimit: { max: 1, window: '1m', key: (() => 42) as never } } }, () => 'ok')
 
-export const long = action(() => 'ok', { protect: { rateLimit: { max: 1, window: '1m', key: ctx => ctx.request.headers.get('x-key') ?? '' } } })
+export const long = action({ protect: { rateLimit: { max: 1, window: '1m', key: ctx => ctx.request.headers.get('x-key') ?? '' } } }, () => 'ok')
 
-export const counted = action((ctx) => {
+export const counted = action({ protect: { rateLimit: { max: 1, window: '1m', count: 'succeeded', key: user } } }, (ctx) => {
   (ctx.locals as { user?: string }).user = 'someone else'
 
   return 'ok'
-}, { protect: { rateLimit: { max: 1, window: '1m', count: 'succeeded', key: user } } })
+})
 
-export const inLocale = action(() => 'ok', { protect: { rateLimit: { max: 1, window: '1m', key: ctx => `locale:${ctx.locale}` } } })
+export const inLocale = action({ protect: { rateLimit: { max: 1, window: '1m', key: ctx => `locale:${ctx.locale}` } } }, () => 'ok')
 ---
 h1 Rate keys

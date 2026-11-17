@@ -272,11 +272,14 @@ const BOT_PROTECTIONS = new Set(['honeypot', 'minTime', 'proofOfWork'])
 
 // What an `action(...)` call's options say, when one of its arguments is an object literal setting `tool`. Options it cannot read, a variable or an object spreading the `tool`, may make a tool: `output` is then false, so the type of its handler is probed, and `botProtected` false.
 function toolOptions(args: NodeOfType<'CallExpression'>['arguments']): { botProtected: boolean, output: boolean } | undefined {
-  // The options follow the handler, which is the first argument of an action with no schema.
-  const options = args[0]?.type === 'ArrowFunctionExpression' || args[0]?.type === 'FunctionExpression' ? args[1] : args[2]
+  const isHandler = (arg: Node | undefined): boolean => arg?.type === 'ArrowFunctionExpression' || arg?.type === 'FunctionExpression'
+  // The options come first when a handler follows them (`action({ input, ...options }, handler)`), else follow the handler, which is the first argument of an action with no schema.
+  const optionsFirst = args[0]?.type === 'ObjectExpression' && isHandler(args[1])
+  const afterHandler = isHandler(args[0]) ? args[1] : args[2]
+  const options = optionsFirst ? args[0] : afterHandler
   let unreadable = options !== undefined && options.type !== 'ObjectExpression'
 
-  for (const arg of args.slice(1)) {
+  for (const arg of args.slice(options === args[0] ? 0 : 1)) {
     if (arg.type !== 'ObjectExpression')
       continue
 

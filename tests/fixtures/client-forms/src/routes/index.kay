@@ -2,17 +2,17 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const guarded = action(t.Object({ note: t.String({ maxLength: 40 }), website: t.Optional(t.String({ maxLength: 40 })) }), ({ note }) => note.length, { protect: { honeypot: 'website', minTime: '2s' } })
+export const guarded = action({ input: t.Object({ note: t.String({ maxLength: 40 }), website: t.Optional(t.String({ maxLength: 40 })) }), protect: { honeypot: 'website', minTime: '2s' } }, ({ note }) => note.length)
 
-export const trapped = action(t.Object({ website: t.Optional(t.String({ maxLength: 40 })) }), () => 1, { protect: { honeypot: 'website' } })
+export const trapped = action({ input: t.Object({ website: t.Optional(t.String({ maxLength: 40 })) }), protect: { honeypot: 'website' } }, () => 1)
 
 export const open = action(t.Object({}), () => 1)
 
-export const limited = action(t.Object({}), () => 1, { protect: { rateLimit: { max: 1000, window: '1m' } } })
+export const limited = action({ input: t.Object({}), protect: { rateLimit: { max: 1000, window: '1m' } } }, () => 1)
 
-export const plainOnly = action(t.Object({}), () => 1, { protect: { minTime: { after: '2s', plain: true } } })
+export const plainOnly = action({ input: t.Object({}), protect: { minTime: { after: '2s', plain: true } } }, () => 1)
 
-export const quiet = action(t.Object({}), () => 1, { protect: { minTime: { after: '2s', pretend: true } } })
+export const quiet = action({ input: t.Object({}), protect: { minTime: { after: '2s', pretend: true } } }, () => 1)
 --- script
 import Opener from '../components/opener.kay'
 ---

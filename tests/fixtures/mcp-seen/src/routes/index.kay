@@ -1,6 +1,6 @@
 --- server
 import { action } from 'kay'
 
-export const ping = action(() => 'pong', { tool: true })
+export const ping = action({ tool: true }, () => 'pong')
 ---
 h1 Seen

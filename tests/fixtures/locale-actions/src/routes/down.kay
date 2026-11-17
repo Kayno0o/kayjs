@@ -2,19 +2,19 @@
 import { s, action } from 'kay'
 
 // The wording is async and reads the error and the page's locale, as one loading an address kept in a collection would.
-export const loud = action(s.Object({}), () => {
+export const loud = action({ input: s.Object({}), messages: { serverError: async (error, ctx) => `${ctx.locale}: ${(error as Error).message}` } }, () => {
   throw new Error('mail down')
-}, { messages: { serverError: async (error, ctx) => `${ctx.locale}: ${(error as Error).message}` } })
+})
 
-export const mute = action(s.Object({}), () => {
-  throw new Error('mail down')
-}, { messages: { serverError: () => {
+export const mute = action({ input: s.Object({}), messages: { serverError: () => {
   throw new Error('words down')
-} } })
-
-export const blank = action(s.Object({}), () => {
+} } }, () => {
   throw new Error('mail down')
-}, { messages: { serverError: () => '  ' } })
+})
+
+export const blank = action({ input: s.Object({}), messages: { serverError: () => '  ' } }, () => {
+  throw new Error('mail down')
+})
 ---
 form(action={loud})
   button Send

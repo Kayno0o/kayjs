@@ -2,7 +2,7 @@
 import { action, s } from 'kay'
 
 export const upload = action(s.Object({ file: s.File({ maxSize: '2mb' }) }), ({ file }) => file.size)
-export const own = action(s.Object({ file: s.File({ maxSize: '2mb' }) }), ({ file }) => file.size, { maxSize: '1mb' })
+export const own = action({ input: s.Object({ file: s.File({ maxSize: '2mb' }) }), maxSize: '1mb' }, ({ file }) => file.size)
 export const many = action(s.Object({ files: s.Files({ maxSize: '1mb', maxItems: 3 }) }), ({ files }) => files.length)
 
 export const unbounded = action(s.Object({ files: s.Files({ maxSize: '1mb' }) }), ({ files }) => files.length)

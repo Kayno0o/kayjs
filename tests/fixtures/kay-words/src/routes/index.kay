@@ -20,13 +20,13 @@ export const listed = action(t.Object({
   after: t.String({ pattern: '^[a-z]+$', format: 'email' }),
 }), () => undefined)
 
-export const guarded = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { protect: { honeypot: 'website', rateLimit: { max: 1, window: '1m' } }, maxSize: 200 })
+export const guarded = action({ input: t.Object({ website: t.Optional(t.String()) }), protect: { honeypot: 'website', rateLimit: { max: 1, window: '1m' } }, maxSize: 200 }, () => undefined)
 
-export const owned = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { protect: { honeypot: 'website' }, messages: { honeypot: 'Own words' } })
+export const owned = action({ input: t.Object({ website: t.Optional(t.String()) }), protect: { honeypot: 'website' }, messages: { honeypot: 'Own words' } }, () => undefined)
 
-export const slow = action(t.Object({}), async () => {
+export const slow = action({ input: t.Object({}), timeout: '20ms' }, async () => {
   await Bun.sleep(300)
-}, { timeout: '20ms' })
+})
 
 export const boom = action(t.Object({}), () => {
   throw new Error('down')

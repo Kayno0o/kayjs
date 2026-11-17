@@ -2,35 +2,33 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const addNote = action(t.Object({
+export const addNote = action({ input: t.Object({
   title: t.String({ minLength: 3, error: 'Too short' }),
   pinned: t.Optional(t.Boolean()),
-}), ({ title }) => ({ id: 1, title, at: new Date(0) }), { tool: 'Create a note' })
+}), tool: 'Create a note' }, ({ title }) => ({ id: 1, title, at: new Date(0) }))
 
 export const hidden = action(t.Object({}), () => 'not a tool')
 
-export const named = action(() => 'named', { tool: { name: 'Say-Hello', description: 'Says hello' } })
+export const named = action({ tool: { name: 'Say-Hello', description: 'Says hello' } }, () => 'named')
 
-export const bare = action(() => 'bare', { tool: true })
+export const bare = action({ tool: true }, () => 'bare')
 
-export const refuses = action(t.Object({}), (_input, ctx) => ctx.fail(409, { reason: 'full' }), { tool: true })
+export const refuses = action({ input: t.Object({}), tool: true }, (_input, ctx) => ctx.fail(409, { reason: 'full' }))
 
-export const sendsAway = action(t.Object({}), (_input, ctx) => ctx.redirect('/done'), { tool: true })
+export const sendsAway = action({ input: t.Object({}), tool: true }, (_input, ctx) => ctx.redirect('/done'))
 
-export const breaks = action(t.Object({}), () => {
+export const breaks = action({ input: t.Object({}), tool: true }, () => {
   throw new Error('boom')
-}, { tool: true })
-
-export const language = action(t.Object({}), (_input, ctx) => ({ locale: ctx.locale }), { tool: true })
-
-export const upload = action(t.Object({ photo: t.File() }), () => 'stored', { tool: true })
-
-export const signup = action(t.Object({ email: t.String(), website: t.Optional(t.String()) }), ({ email }) => ({ email }), {
-  tool: 'Sign up',
-  protect: { honeypot: 'website', minTime: '1h', rateLimit: { max: 2, window: '1m' } },
 })
 
-export const listing = action(t.Object({
+export const language = action({ input: t.Object({}), tool: true }, (_input, ctx) => ({ locale: ctx.locale }))
+
+export const upload = action({ input: t.Object({ photo: t.File() }), tool: true }, () => 'stored')
+
+export const signup = action({ input: t.Object({ email: t.String(), website: t.Optional(t.String()) }), tool: 'Sign up',
+  protect: { honeypot: 'website', minTime: '1h', rateLimit: { max: 2, window: '1m' } } }, ({ email }) => ({ email }))
+
+export const listing = action({ input: t.Object({
   limit: t.Integer({ minimum: 1, maximum: 100, default: 20 }),
   ratio: t.Numeric({ default: 0.5 }),
   page: t.Optional(t.Integer()),
@@ -41,29 +39,29 @@ export const listing = action(t.Object({
   paging: t.Object({ size: t.Integer({ default: 10 }), after: t.Integer() }),
   kind: t.Union([t.Literal('a'), t.Literal('b')], { default: 'a' }),
   either: t.Union([t.Integer(), t.String()]),
-}), input => input, { tool: 'List things' })
+}), tool: 'List things' }, input => input)
 
-export const solve = action(t.Object({}), () => 'solved', { tool: true, protect: { proofOfWork: true } })
+export const solve = action({ input: t.Object({}), tool: true, protect: { proofOfWork: true } }, () => 'solved')
 
-export const digest = action(t.Object({}), () => ({ notes: [{ title: 'a' }, { title: 'b' }], at: new Date(0) }), { tool: { text: ({ notes }) => notes.map(note => note.title).join('\n') } })
+export const digest = action({ input: t.Object({}), tool: { text: ({ notes }) => notes.map(note => note.title).join('\n') } }, () => ({ notes: [{ title: 'a' }, { title: 'b' }], at: new Date(0) }))
 
-export const report = action(t.Object({}), () => ({ count: 2, at: new Date(0) }), { tool: { readOnly: true, output: t.Object({ count: t.Number(), at: t.String() }) } })
+export const report = action({ input: t.Object({}), tool: { readOnly: true, output: t.Object({ count: t.Number(), at: t.String() }) } }, () => ({ count: 2, at: new Date(0) }))
 
-export const reportWorded = action(t.Object({}), () => ({ count: 2, at: new Date(0) }), { tool: { output: t.Object({ count: t.Number(), at: t.String() }), text: ({ count }) => `${count} things` } })
+export const reportWorded = action({ input: t.Object({}), tool: { output: t.Object({ count: t.Number(), at: t.String() }), text: ({ count }) => `${count} things` } }, () => ({ count: 2, at: new Date(0) }))
 
-export const lies = action(t.Object({}), () => ({ count: 'two' as unknown as number }), { tool: { output: t.Object({ count: t.Number() }) } })
+export const lies = action({ input: t.Object({}), tool: { output: t.Object({ count: t.Number() }) } }, () => ({ count: 'two' as unknown as number }))
 
-export const mapped = action(t.Object({}), () => new Map([['a', 1]]), { tool: { output: t.Record(t.String(), t.Number()) } })
+export const mapped = action({ input: t.Object({}), tool: { output: t.Record(t.String(), t.Number()) } }, () => new Map([['a', 1]]))
 
-export const strict = action(t.Object({ n: t.Number() }), ({ n }) => ({ n }), { tool: { output: t.Object({ n: t.Number() }) } })
+export const strict = action({ input: t.Object({ n: t.Number() }), tool: { output: t.Object({ n: t.Number() }) } }, ({ n }) => ({ n }))
 
 // An action answering nothing under an output only a library's `Output = never` lets through.
-export const silent = action(t.Object({}), () => undefined as never, { tool: { output: t.Object({ n: t.Number() }) } })
+export const silent = action({ input: t.Object({}), tool: { output: t.Object({ n: t.Number() }) } }, () => undefined as never)
 
-export const mute = action(t.Object({}), () => ({ notes: [] }), { tool: { text: () => { throw new Error('no words') } } })
+export const mute = action({ input: t.Object({}), tool: { text: () => { throw new Error('no words') } } }, () => ({ notes: [] }))
 
-export const peek = action(t.Object({}), () => 'peeked', { tool: { readOnly: true } })
+export const peek = action({ input: t.Object({}), tool: { readOnly: true } }, () => 'peeked')
 
-export const long = action(t.Object({}), () => 'long', { tool: { name: 'a'.repeat(100) } })
+export const long = action({ input: t.Object({}), tool: { name: 'a'.repeat(100) } }, () => 'long')
 ---
 h1 Notes

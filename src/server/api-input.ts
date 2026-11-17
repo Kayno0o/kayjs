@@ -70,6 +70,17 @@ function cookieValues(jar: unknown): unknown {
 }
 
 // Takes the route's input schemas out of Elysia's validation, which would call their `error` functions outside the request's locale, and checks them in a hook of its own, the value read being the one the handler gets. Reading each by its property tells Elysia the route needs it parsed.
+// A key the query repeats is a list of its values: Elysia reads it so only for a schema it holds itself, which it is left none of.
+function withRepeats(request: Request, parsed: unknown): unknown {
+  if (typeof parsed !== 'object' || parsed === null)
+    return parsed
+
+  const { searchParams } = new URL(request.url)
+  const repeated = Object.fromEntries([...new Set(searchParams.keys())].map(key => [key, searchParams.getAll(key)] as const).filter(([, values]) => values.length > 1))
+
+  return Object.keys(repeated).length === 0 ? parsed : { ...parsed, ...repeated }
+}
+
 export function validatingInputs(hooks: unknown, inLocale: <T>(request: Request, run: () => T) => T): void {
   const route = hooks as Hooks | undefined
   const declared: Partial<Record<Input, object>> = {}
@@ -138,7 +149,7 @@ export function validatingInputs(hooks: unknown, inLocale: <T>(request: Request,
       context.body = await settle('body', context.request, context.body)
     },
     query: async (context) => {
-      context.query = await settle('query', context.request, context.query)
+      context.query = await settle('query', context.request, withRepeats(context.request, context.query))
     },
     params: async (context) => {
       context.params = await settle('params', context.request, context.params)

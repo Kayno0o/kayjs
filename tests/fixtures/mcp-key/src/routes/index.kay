@@ -2,6 +2,6 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const greet = action(t.Object({ name: t.String() }), ({ name }) => `hi ${name}`, { tool: true })
+export const greet = action({ input: t.Object({ name: t.String() }), tool: true }, ({ name }) => `hi ${name}`)
 ---
 h1 Key

@@ -2,7 +2,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const add = action(t.Object({ title: t.String({ minLength: 1 }) }), ({ title }) => title, { tool: true })
+export const add = action({ input: t.Object({ title: t.String({ minLength: 1 }) }), tool: true }, ({ title }) => title)
 --- script
 import Counter from '../components/counter.kay'
 ---

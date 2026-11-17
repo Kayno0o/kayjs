@@ -2309,7 +2309,7 @@ describe('action input', () => {
         // Posted as a plain form: the payload reaches the handler typed by the schema, with nothing else posted.
         expect(got(await post(`${url}${query}`))).toEqual([303, JSON.stringify({ id: 3, to: 2, tags: ['a', 'b'], done: false })])
         // The payload is the form's to fix: a field of the same name does not change it, one of another name goes along.
-        expect(got(await post(`${url}${query}`, new URLSearchParams('id=9&tags=c')))).toEqual([303, JSON.stringify({ id: 3, to: 2, tags: ['a', 'b'], done: false })])
+        expect(got(await post(`${url}${query}`, new URLSearchParams('id=9&tags=c')))).toEqual([303, JSON.stringify({ id: 3, tags: ['a', 'b'], to: 2, done: false })])
         // A crafted payload is a form's fields read the same way: the schema refuses what it cannot take, and the prototype is left alone.
         expect(got(await post(`${url}?kay_with=id%3Dx%26to%3D1`))[0]).toBe(422)
         expect(got(await post(`${url}?kay_with=__proto__%3Dx%26id%3D1%26to%3D1`))).toEqual([303, JSON.stringify({ id: 1, to: 1 })])

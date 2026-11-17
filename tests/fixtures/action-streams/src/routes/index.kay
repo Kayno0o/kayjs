@@ -5,10 +5,10 @@ import { invalidate } from 'kay/cache'
 import { t as translate } from 'kay/i18n'
 import { seen } from '../seen'
 
-export const count = action(t.Object({ to: t.Number({ minimum: 0, maximum: 5, error: 'Too many' }) }), async function* ({ to }) {
+export const count = action({ input: t.Object({ to: t.Number({ minimum: 0, maximum: 5, error: 'Too many' }) }), tool: true }, async function* ({ to }) {
   for (let at = 1; at <= to; at++)
     yield at
-}, { tool: true })
+})
 
 export const dated = action(async function* () {
   yield { at: new Date(0), tags: new Map([['a', 1]]) }
@@ -56,9 +56,9 @@ export const endless = action(async function* () {
   }
 })
 
-export const limited = action(async function* () {
+export const limited = action({ protect: { rateLimit: { max: 1, window: '1m' } } }, async function* () {
   yield 'ok'
-}, { protect: { rateLimit: { max: 1, window: '1m' } } })
+})
 
 export const baked = action(async function* (ctx) {
   ctx.cookies.set('baked', 'yes', { path: '/' })
@@ -98,20 +98,20 @@ export const slow = action(async function* () {
   }
 })
 
-export const counted = action(t.Object({ fail: t.Boolean() }), async function* ({ fail }) {
+export const counted = action({ input: t.Object({ fail: t.Boolean() }), protect: { rateLimit: { max: 1, window: '1m', count: 'succeeded' } } }, async function* ({ fail }) {
   if (fail)
     throw new Error('before the first value')
 
   yield 'ok'
-}, { protect: { rateLimit: { max: 1, window: '1m', count: 'succeeded' } } })
+})
 
-export const trapped = action({ name: s.string() }, async function* ({ name }) {
+export const trapped = action({ input: { name: s.string() }, protect: { honeypot: 'website' } }, async function* ({ name }) {
   yield name
-}, { protect: { honeypot: 'website' } })
+})
 
-export const pretending = action({ name: s.string() }, async function* ({ name }) {
+export const pretending = action({ input: { name: s.string() }, protect: { honeypot: { field: 'website', pretend: true } } }, async function* ({ name }) {
   yield name
-}, { protect: { honeypot: { field: 'website', pretend: true } } })
+})
 
 export const sendsAway = action(async function* (ctx) {
   ctx.redirect('/done')
@@ -128,17 +128,17 @@ export const libraryBroken = action(t.Object({ refusal: t.Any() }), ({ refusal }
   throw Object.assign(new Error('odd'), { [Symbol.for('kay.refused')]: refusal })
 })())
 
-export const libraryForbidden = action(() => (async function* () {
+export const libraryForbidden = action({ messages: { rateLimit: 'Slow down' } }, () => (async function* () {
   throw Object.assign(new Error('no'), { [Symbol.for('kay.refused')]: { status: 403, retryAfter: 7, message: 'Not you' } })
-})(), { messages: { rateLimit: 'Slow down' } })
+})())
 
 export const libraryLimited = action(() => (async function* () {
   throw libraryLimit()
 })())
 
-export const libraryWorded = action(() => (async function* () {
+export const libraryWorded = action({ messages: { rateLimit: wait => `Back in ${wait} s` } }, () => (async function* () {
   throw libraryLimit()
-})(), { messages: { rateLimit: wait => `Back in ${wait} s` } })
+})())
 
 export const refuses = action(t.Object({ full: t.Boolean() }), async ({ full }, ctx) => {
   if (full)

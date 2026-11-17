@@ -2,6 +2,6 @@
 import { action } from 'kay'
 import { visits } from '../limits'
 
-export const post = action(() => 'ok', { protect: { rateLimit: visits } })
+export const post = action({ protect: { rateLimit: visits } }, () => 'ok')
 ---
 h1 Home

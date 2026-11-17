@@ -3,9 +3,9 @@ import { t } from 'elysia'
 import { action } from 'kay'
 
 // Each post costs the browser a challenge; `gated` lets a form posted without JavaScript through on its stamp, `faked` answers a wrong solution as sent.
-export const solve = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { protect: { proofOfWork: 500 } })
-export const gated = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { protect: { proofOfWork: 500, minTime: '1s' } })
-export const faked = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }) => message.length, { protect: { proofOfWork: { difficulty: 500, ttl: '1h', pretend: true } }, messages: { proofOfWork: reason => `${reason}!` } })
+export const solve = action({ input: t.Object({ message: t.String({ maxLength: 200 }) }), protect: { proofOfWork: 500 } }, ({ message }) => message.length)
+export const gated = action({ input: t.Object({ message: t.String({ maxLength: 200 }) }), protect: { proofOfWork: 500, minTime: '1s' } }, ({ message }) => message.length)
+export const faked = action({ input: t.Object({ message: t.String({ maxLength: 200 }) }), protect: { proofOfWork: { difficulty: 500, ttl: '1h', pretend: true } }, messages: { proofOfWork: reason => `${reason}!` } }, ({ message }) => message.length)
 
 const failure = solve.form.failed() ?? gated.form.failed() ?? faked.form.failed()
 const solved = solve.status() === 'ready'

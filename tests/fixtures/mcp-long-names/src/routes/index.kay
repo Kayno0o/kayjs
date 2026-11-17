@@ -1,6 +1,6 @@
 --- server
 import { action } from 'kay'
 
-export const xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = action(() => 'action', { tool: true })
+export const xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = action({ tool: true }, () => 'action')
 ---
 h1 Long names

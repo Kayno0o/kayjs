@@ -10,7 +10,7 @@ const schema = t.Object({
   'foo[]': t.Optional(t.String({ maxLength: 40 })),
 })
 
-export const first = action(schema, () => undefined, { protect: { honeypot: 'nectar' } })
+export const first = action({ input: schema, protect: { honeypot: 'nectar' } }, () => undefined)
 export const second = action(schema, () => undefined)
 --- script
 import Echo from '../components/echo.kay'

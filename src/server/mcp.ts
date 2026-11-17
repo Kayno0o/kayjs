@@ -176,7 +176,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
       const init: RequestInit = { method: method.toUpperCase(), headers: { accept: 'application/json' } }
 
       if (action) {
-        init.headers = { 'accept': 'application/json', 'content-type': 'application/json', 'x-kay-action': '1' }
+        init.headers = { 'accept': 'application/json', 'content-type': 'application/json', 'x-kay-action': '1', 'x-kay-tool': '1' }
         init.body = encodeValue(args)
       }
       else if (!NO_BODY.has(method) && operation.requestBody) {

@@ -9,16 +9,16 @@ export const slow = action(async (ctx) => {
   return 'late'
 })
 
-export const patient = action(async () => {
+export const patient = action({ timeout: false }, async () => {
   await Bun.sleep(250)
 
   return 'done'
-}, { timeout: false })
+})
 
-export const strict = action(async () => {
+export const strict = action({ timeout: '30ms' }, async () => {
   await Bun.sleep(400)
 
   return 'late'
-}, { timeout: '30ms' })
+})
 ---
 p actions

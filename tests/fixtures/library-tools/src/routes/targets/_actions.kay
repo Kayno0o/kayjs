@@ -6,11 +6,11 @@ export const addNote = action(s.Object({
   pinned: s.Optional(s.Boolean()),
 }), ({ title }) => ({ id: 1, title, at: new Date(0) }))
 
-export const worded = action(s.Object({}), () => ({ items: ['a', 'b'] }), { tool: { text: ({ items }) => items.join(' ') } })
+export const worded = action({ input: s.Object({}), tool: { text: ({ items }) => items.join(' ') } }, () => ({ items: ['a', 'b'] }))
 
-export const described = action(s.Object({}), () => 'described', { tool: 'Says it was described' })
+export const described = action({ input: s.Object({}), tool: 'Says it was described' }, () => 'described')
 
-export const named = action(() => 'named', { tool: { name: 'Say-Hello', description: 'Says hello' } })
+export const named = action({ tool: { name: 'Say-Hello', description: 'Says hello' } }, () => 'named')
 
 export const refuses = action(s.Object({}), (_input, ctx) => ctx.fail(409, { reason: 'full' }))
 
@@ -24,22 +24,20 @@ export const language = action(s.Object({}), (_input, ctx) => ({ locale: ctx.loc
 
 export const upload = action(s.Object({ photo: s.File() }), () => 'stored')
 
-export const signup = action(s.Object({ email: s.String(), website: s.Optional(s.String()) }), ({ email }) => ({ email }), {
-  protect: { honeypot: 'website', minTime: '1h', rateLimit: { max: 2, window: '1m' } },
-})
+export const signup = action({ input: s.Object({ email: s.String(), website: s.Optional(s.String()) }), protect: { honeypot: 'website', minTime: '1h', rateLimit: { max: 2, window: '1m' } } }, ({ email }) => ({ email }))
 
-export const vetoed = action(s.Object({}), () => 'vetoed', { tool: false })
+export const vetoed = action({ input: s.Object({}), tool: false }, () => 'vetoed')
 
-export const limited = action(s.Object({}), () => 'counted', { protect: { rateLimit: { max: 2, window: '1m' } } })
+export const limited = action({ input: s.Object({}), protect: { rateLimit: { max: 2, window: '1m' } } }, () => 'counted')
 
-export const solve = action(s.Object({}), () => 'solved', { protect: { proofOfWork: true } })
+export const solve = action({ input: s.Object({}), protect: { proofOfWork: true } }, () => 'solved')
 
 // Actions with an `output`, for the dev check of a library's tool: one lying, one fitting, one answering nothing, one whose output is no object schema.
-export const lies = action(s.Object({}), () => ({ count: 'two' as unknown as number }), { tool: { output: s.Object({ count: s.Number() }) } })
+export const lies = action({ input: s.Object({}), tool: { output: s.Object({ count: s.Number() }) } }, () => ({ count: 'two' as unknown as number }))
 
-export const honest = action(s.Object({}), () => ({ count: 2 }), { tool: { output: s.Object({ count: s.Number() }) } })
+export const honest = action({ input: s.Object({}), tool: { output: s.Object({ count: s.Number() }) } }, () => ({ count: 2 }))
 
-export const silent = action(s.Object({}), () => undefined as never, { tool: { output: s.Object({ n: s.Number() }) } })
+export const silent = action({ input: s.Object({}), tool: { output: s.Object({ n: s.Number() }) } }, () => undefined as never)
 
-export const unlisted = action(s.Object({}), () => ({ count: 2 }), { tool: { output: s.Array(s.Number()) as never } })
+export const unlisted = action({ input: s.Object({}), tool: { output: s.Array(s.Number()) as never } }, () => ({ count: 2 }))
 ---

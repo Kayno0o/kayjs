@@ -2305,11 +2305,11 @@ describe.concurrent('kay check, edge cases', () => {
       'import { t } from \'elysia\'',
       'import { action } from \'kay\'',
       '',
-      'export const signIn = action(t.Object({ code: t.String({ maxLength: 200 }) }), async ({ code }, ctx) => {',
+      'export const signIn = action({ input: t.Object({ code: t.String({ maxLength: 200 }) }), protect: { honeypot: \'website\' } }, async ({ code }, ctx) => {',
       '  if (code === \'x\')',
       '    return ctx.deny(400, { data: { error: \'bad\' } })',
       '  ctx.redirect(\'/\')',
-      '}, { protect: { honeypot: \'website\' } })',
+      '})',
       'export const save = action(t.Object({ code: t.String({ maxLength: 200 }) }), async ({ code }, ctx) => {',
       '  if (code === \'x\')',
       '    return ctx.deny(400, { data: { error: \'bad\' } })',
@@ -2344,11 +2344,11 @@ describe.concurrent('kay check, edge cases', () => {
       'import { t } from \'elysia\'',
       'import { action } from \'kay\'',
       '',
-      'export const save = action(t.Object({ code: t.String({ maxLength: 200 }) }), async ({ code }, ctx) => {',
+      'export const save = action({ input: t.Object({ code: t.String({ maxLength: 200 }) }), protect: { honeypot: \'website\' } }, async ({ code }, ctx) => {',
       '  if (code === \'x\')',
       '    return ctx.deny(400, { data: { error: \'bad\' } })',
       '  return 1',
-      '}, { protect: { honeypot: \'website\' } })',
+      '})',
       '---',
       'p {save.form.error(\'code\')} {save.form.error(\'website\')} {save.form.error()} {save.form.failed()?.data?.error} {save.data()}',
       'p {save.form.error(\'cod\')}',
@@ -3261,7 +3261,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
       '  return { id, org, slug, typo }',
       '})',
       'export const rename = action(s.Object({ name: s.String({ maxLength: 20 }) }), async ({ name }, ctx) => ({ name, id: ctx.params.id satisfies number }))',
-      'export const mixed = action(async ({ params }) => params.id.toFixed(0), { protect: { minTime: \'1s\' } })',
+      'export const mixed = action({ protect: { minTime: \'1s\' } }, async ({ params }) => params.id.toFixed(0))',
       '---',
       'p hi',
       '',
@@ -4408,7 +4408,7 @@ describe.concurrent('kay check, unused code', () => {
 
   it('reports the flat checks of an action as a type error, now that they are gone', async () => {
     const root = await scratchProject({
-      'src/actions.ts': 'import { action } from \'kay\'\n\nexport const a = action(async () => 1, { rateLimit: { max: 5, window: \'1m\' } })\nexport const b = action(async () => 1, { protect: { rateLimit: { max: 5, window: \'1m\' } } })\n',
+      'src/actions.ts': 'import { action } from \'kay\'\n\nexport const a = action({ rateLimit: { max: 5, window: \'1m\' } }, async () => 1)\nexport const b = action({ protect: { rateLimit: { max: 5, window: \'1m\' } } }, async () => 1)\n',
     })
 
     try {

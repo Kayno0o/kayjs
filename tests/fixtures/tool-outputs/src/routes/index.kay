@@ -2,20 +2,20 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const summary = action(t.Object({}), () => ({ count: 2, at: new Date(0), tags: ['a'] as string[], note: undefined as string | undefined }), { tool: true })
+export const summary = action({ input: t.Object({}), tool: true }, () => ({ count: 2, at: new Date(0), tags: ['a'] as string[], note: undefined as string | undefined }))
 
-export const declared = action(t.Object({}), () => ({ count: 2, extra: 'x' }), { tool: { output: t.Object({ count: t.Number() }) } })
+export const declared = action({ input: t.Object({}), tool: { output: t.Object({ count: t.Number() }) } }, () => ({ count: 2, extra: 'x' }))
 
-export const worded = action(t.Object({}), () => ({ count: 2 }), { tool: { text: ({ count }) => `${count} things` } })
+export const worded = action({ input: t.Object({}), tool: { text: ({ count }) => `${count} things` } }, () => ({ count: 2 }))
 
-export const plain = action(() => 'plain', { tool: true })
+export const plain = action({ tool: true }, () => 'plain')
 
-export const refuses = action(t.Object({}), (_input, ctx) => ctx.fail(409, { reason: 'full' }), { tool: true })
+export const refuses = action({ input: t.Object({}), tool: true }, (_input, ctx) => ctx.fail(409, { reason: 'full' }))
 
 export const hidden = action(t.Object({}), () => ({ secret: true }))
 
-export const stream = action(async function* () {
+export const stream = action({ tool: true }, async function* () {
   yield { n: 1 }
-}, { tool: true })
+})
 ---
 h1 Tools

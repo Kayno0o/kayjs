@@ -18,6 +18,7 @@ import type { I18n } from './i18n'
 import type { DocumentedAction } from './openapi'
 import type { Unmatched } from './page-routes'
 import type { ToolOutputs } from './tool-outputs'
+import type { Source } from './validate'
 import { relative } from 'node:path'
 import { KayError } from '../compiler/errors'
 import { decodeCall, failure, FORM_CALL, FORM_FIELD, honeypotField, isAction, isFailure, protectionFields, STAMP_FIELD } from '../runtime/action'
@@ -238,8 +239,9 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
                 return refusal
             }
 
-            const posted = context.body
-            const result = await validate(value.schema, isCall(request) && !isFormCall(request) ? posted : withoutKayFields(posted, value), { source: isCall(request) && !isFormCall(request) ? 'json' : 'form' })
+            // A call with no input posts no body, which an object schema reads as no fields.
+            const posted = context.body === undefined && (value.schema as { type?: string }).type === 'object' ? {} : context.body
+            const result = await validate(value.schema, isCall(request) && !isFormCall(request) ? posted : withoutKayFields(posted, value), { source: sourceOfCall(request) })
 
             if (isRefusal(result))
               return failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: isCall(request) ? {} : submittedValues(posted), errors: messagesOf(result.errors) }, context.server, back)
@@ -869,4 +871,12 @@ function visitHeaders(request: Request): Headers {
 // `fetch` and XMLHttpRequest would follow a `location` and hand the script the next page's HTML; a call, or a form the page swap posts, reads where to go instead.
 function redirectHeader(request: Request): string {
   return isCall(request) || request.headers.get(NAVIGATE_HEADER) === '1' ? REDIRECT_HEADER : 'location'
+}
+
+// A call's JSON keeps its types, except one from an MCP client, whose arguments may be the text of a number or a boolean as a form's are.
+function sourceOfCall(request: Request): Source {
+  if (!isCall(request) || isFormCall(request))
+    return 'form'
+
+  return request.headers.get('x-kay-tool') === '1' ? 'query' : 'json'
 }

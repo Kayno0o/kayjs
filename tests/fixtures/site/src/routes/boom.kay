@@ -19,9 +19,9 @@ if (ctx.url.searchParams.has('bare')) {
 
 const later = defer(ctx.url.searchParams.has('later') ? Promise.reject(new Error('Kaboom later')) : Promise.resolve('Fine'))
 
-export const send = action(t.Object({ message: t.String({ maxLength: 1000 }) }), () => {
+export const send = action({ input: t.Object({ message: t.String({ maxLength: 1000 }) }), messages: { serverError: 'Not sent; write to hello@example.com instead' } }, () => {
   throw new Error('Mail server down')
-}, { messages: { serverError: 'Not sent; write to hello@example.com instead' } })
+})
 
 export const forget = action(async () => 'Forgotten')
 ---
