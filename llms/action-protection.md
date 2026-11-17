@@ -88,7 +88,7 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 - `minTime` is given `early` for a post sent too soon or `expired` for a stamp missing, forged or past `ttl`, as a page from before a restart sends.
 - `proofOfWork` is given `missing`, `expired` or `wrong` as below.
 - `maxSize` is given the most bytes a post may send, as a number whatever size `maxSize` was written as.
-- Each is a string or a function; `serverError` is given the error and the action's `ctx` (see [Refused posts](actions.md#refused-posts)). A function runs in the request's locale, so it may word the refusal with `t()`; `serverError` may be async.
+- Each is a string or a function; `serverError` is given the error and the action's `ctx` (see [Refused posts](actions-refused-fields.md#refused-posts)). A function runs in the request's locale, so it may word the refusal with `t()`; `serverError` may be async.
 
 #### Proof of work
 

@@ -228,28 +228,6 @@ form(action={add})
 - `label(field="name")` writes the label's `for` and the `id` of the one control of that field in the form, `<action>-<field>` (`save-name`), so `label(for="name")` and `input#name(field="name")` become two `field`. It is `form-misuse` when the form has no control of that field or several (a group of radios or boxes: write `for` and `id` yourself), when the label also writes `for`, or when the control writes its own `id`. Forms posting to one action, such as one per row, repeat the id: write `for` and `id` there.
 - `button(action={move.with({ id })})` outside a form posts that action: kay wraps it in a `form(action={...})` that has no box of its own (`display: contents`, set by a hashed `style` rule in the head, so a strict CSP holds), so a static page posts and an island calls it, with the `.with()` arguments; the button is then the only child of its form for `:first-child` and `first:` styles. In a `p` it is `invalid-nesting`. Inside a form it is `form-misuse`: the form's own button posts the form.
 
-### Refused posts
-
-- `ctx.deny(status, { message, errors, data })` is the one refusal of a guard, a page, an action and an endpoint, `refuse(status, { ... })` throws it from anywhere; `return` it so `form.failed()` types `data`. `ctx.fail` is its old spelling until 1.108 (`unreturned-fail`).
-- A post the schema refuses, or whose handler denies with `ctx.deny(status, { data })`, is answered with the page it came from, rendered with the failure's status, rather than with a redirect.
-- There `add.form.failed()` returns `{ status, message, values, errors, data }`, typed from the action, or `undefined`.
-- `values` is what the form posted (fields named like a password left out).
-- `errors` is a message per refused field, the schema's `error` option when set.
-- `data` is what `ctx.deny` received.
-- `return ctx.deny(409, { errors: { email: 'Already taken' } })` puts a message on a field, typed from the schema's keys, with `''` for the form's own, so `error email`, `aria-invalid`, `add.form.error('email')`, the value re-fill and an island's `ActionError.errors` (and a kayjs-ui `FormField` named `email`) follow it with and without JavaScript.
-- A rate limit's refusal sits under `errors['']`, read by `add.form.error()`, and a text `data` is that message: `return ctx.deny(502, { data: 'Not sent; try again later' })`.
-- The page renders as a visit of it would, through the app's plugins and the page's guards, and nothing the visitor typed is lost however long it is.
-- Reloading it posts again, as after any form a server answers in place.
-- The page is the one the post was sent from, as `ctx.params` reads it below, the home page when it names none or another site.
-- Without the page swap the browser shows the action's URL, so the page carries a `base` naming its own URL, and its relative links lead where they did.
-- Each form on it posting to an action names that page in a `kay_back` query parameter, so a post refused again renders the same page, however many times in a row, and one that goes through goes back to it.
-- A handler that throws, a mail server down say, is logged as any server error, `onError` included, and answered as a refusal with status 500.
-- A plain form post then renders its page with the message under the form and what was typed kept, read by `add.form.error()`, and a call answers `{ ok: false }` with it in `errors['']`.
-- The message is `Something went wrong on our side; try again later` unless the site words it as `kay.action.serverError` ([Locales](locales-texts.md)) or the action words its own, `action(schema, handler, { messages: { serverError: 'Not sent; write to hello@example.com instead' } })`, so a handler needs no `try`/`catch` of its own to tell the visitor.
-- `serverError` may be a function given the error and `ctx`, sync or async, to word it from what is loaded per request or the page's `ctx.locale`: `serverError: async () => 'Write to ' + (await settings.one()).email`. Its text is answered with the same status 500; one that throws, or answers a blank text, leaves kay's message (a throw logged beside the handler's error), and a redirect or denial thrown from it is no answer either.
-- An action past its `timeout` (`serve.timeout` or the action's own) answers 504 the same way, worded `kay.action.timeout` (`This took too long; try again later`) and reported as a server error.
-- A redirect or a guard's denial thrown is no error.
-
 ### Params of the posting page
 
 - `ctx.params` holds the params of the page the action was posted from, matched against the route of the page exporting it, as its guards read them. In an action declared in a page, `kay check` types it from that page's route, a matcher's value as it gives it and an optional param `| undefined`, so `ctx.params.id` is a `number` under `[id=integer]` and a misspelled one is an error; a layout's or an `_actions.kay` action, and a guard, cover several routes and read `unknown`.
