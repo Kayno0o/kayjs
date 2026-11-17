@@ -115,6 +115,9 @@ describe('propsWritten', () => {
   })
 })
 
+// What follows `?uses=` in a variant's address.
+const usesOf = (address: string) => address.slice(address.indexOf('?uses=') + '?uses='.length)
+
 describe('a feature on when the prop is left out', () => {
   const head = 'import Table from \'./table.kay\'\n---\n'
 
@@ -150,10 +153,36 @@ describe('a feature on when the prop is left out', () => {
       return new VariantIndex(paths).entry(table)
     }
 
-    expect(await entry(call('sortable={false}'))).not.toContain('sortable')
-    expect(await entry(call('sortable={false}'), call(''))).toContain('sortable')
-    expect(await entry(call('sortable={false}'), call('sortable={flag}'))).toContain('sortable')
-    expect(await entry(call('sortable={false} {...rest}'))).toContain('sortable')
+    const features = (query: string) => usesOf(query).slice(0, usesOf(query).indexOf('~')).split('-')
+
+    expect(features(await entry(call('sortable={false}')))).not.toContain('sortable')
+    expect(features(await entry(call('sortable={false}'), call('')))).toContain('sortable')
+    expect(features(await entry(call('sortable={false}'), call('sortable={flag}')))).toContain('sortable')
+    expect(features(await entry(call('sortable={false} {...rest}')))).toContain('sortable')
     await rm(dir, { recursive: true, force: true })
+  })
+})
+
+describe('the props a variant knows its call sites write', () => {
+  const table = join(import.meta.dir, '../packages/ui/src/table.kay')
+  const query = async (...calls: string[]) => {
+    const dir = await scratchDir('variants-')
+    const paths = await Promise.all(calls.map(async (call, at) => {
+      const path = join(dir, `${at}.kay`)
+
+      await Bun.write(path, `---\nimport Table from '${table}'\n---\nTable(${call})\n`)
+
+      return path
+    }))
+    const entry = await new VariantIndex(paths).entry(table)
+
+    await rm(dir, { recursive: true, force: true })
+
+    return entry
+  }
+
+  it('names every prop written at any call site after a tilde, none when a call spreads', async () => {
+    expect(usesOf(await query('rows={r} columns={c}', 'rowKey="id" selectable'))).toBe('selectable-sortable~columns-rowKey-rows-selectable')
+    expect(usesOf(await query('rows={r}', '{...rest}'))).not.toContain('~')
   })
 })

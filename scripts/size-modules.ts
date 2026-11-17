@@ -9,7 +9,7 @@ const FILE = process.env.KAY_SIZE_MODULES
 const PACKAGE = /(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)\//
 const LIBRARY = /^packages\/([^/]+)\//
 const VARIANT_PREFIX = /^kay-variant:/
-const VARIANT_QUERY = /\?uses=[\w.]*$/
+const VARIANT_QUERY = /\?uses=[\w.~-]*$/
 
 export type ChunkModules = Record<string, Record<string, number>>
 

@@ -61,6 +61,8 @@ export interface TransformOptions {
   classTable?: ClassTable | undefined
   // The features of a component its importer's call sites use, as `variants.ts` reads them: part of the cache key, as the source it was specialized from is the same file's.
   variant?: string | undefined
+  // The props the call sites of a variant write, when it knows them all: the component leaves the others out of the rest it forwards.
+  writtenProps?: ReadonlySet<string> | undefined
   // The server's build of an app with Tailwind, which merges a shorthand beside a static `class` while rendering; set by `transformKayCached` from the app's stylesheets.
   classMerge?: boolean | undefined
 }
@@ -254,7 +256,7 @@ function compile(source: string, filename: string, options: TransformOptions, si
   const root = options.root ?? process.cwd()
   // A page of the routes directory, whose root `@failed` fills a layout outlet rather than being a component's own block.
   const page = isPageFile(file, options.pages ?? [projectPaths(root).routes]) ? true : undefined
-  const { tsx, map, diagnostics } = compileKay(source, throughLinks(root, file), { root: options.root, page, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, awaitAlert: awaitAlertOf(root, file), importedSignals: signals, namedRefresh: server && namedRefresh(file, root), ui: uiEntryOf(options.root ?? process.cwd(), file) })
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(root, file), { root: options.root, page, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, awaitAlert: awaitAlertOf(root, file), importedSignals: signals, namedRefresh: server && namedRefresh(file, root), ui: uiEntryOf(options.root ?? process.cwd(), file), writtenProps: options.writtenProps })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))

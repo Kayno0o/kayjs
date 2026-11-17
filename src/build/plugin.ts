@@ -85,13 +85,13 @@ const WORKER_BUNDLE = join(import.meta.dir, 'worker-bundle.ts')
 const bundledWorkers = new Map<string, { result: WorkerResult, stamp: string }>()
 
 // Serves a component as the variant its `?uses=` names: resolved from the importer, loaded specialized to its features.
-function variantHooks(build: Bun.PluginBuilder, load: (file: string, twin: boolean, features: ReadonlySet<string>) => Promise<Bun.OnLoadResult>): void {
+function variantHooks(build: Bun.PluginBuilder, load: (file: string, twin: boolean, features: ReadonlySet<string>, written?: ReadonlySet<string>) => Promise<Bun.OnLoadResult>): void {
   build.onResolve({ filter: USES_QUERY }, ({ path, importer }) => {
-    const features = USES_QUERY.exec(path)![1]!
-    const base = path.slice(0, path.length - features.length - '?uses='.length)
+    const query = USES_SUFFIX.exec(path)![0]
+    const base = path.slice(0, path.length - query.length)
 
     try {
-      return { path: `${Bun.resolveSync(base, dirname(withoutTwin(importer.replace(USES_SUFFIX, ''))))}?uses=${features}`, namespace: VARIANT_NAMESPACE }
+      return { path: `${Bun.resolveSync(base, dirname(withoutTwin(importer.replace(USES_SUFFIX, ''))))}${query}`, namespace: VARIANT_NAMESPACE }
     }
     catch {
       // The normal resolver names what is wrong with the specifier.
@@ -99,9 +99,10 @@ function variantHooks(build: Bun.PluginBuilder, load: (file: string, twin: boole
     }
   })
   build.onLoad({ filter: USES_QUERY, namespace: VARIANT_NAMESPACE }, async ({ path }) => {
-    const features = USES_QUERY.exec(path)![1]!
+    const [, features, written] = USES_QUERY.exec(path)!
+    const query = USES_SUFFIX.exec(path)![0]
 
-    return load(path.slice(0, path.length - features.length - '?uses='.length), false, new Set(features.split('-').filter(Boolean)))
+    return load(path.slice(0, path.length - query.length), false, new Set(features!.split('-').filter(Boolean)), written === undefined ? undefined : new Set(written.split('-').filter(Boolean)))
   })
 }
 
@@ -256,11 +257,11 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       const pointed = async (contents: string, loader: Bun.JavaScriptLoader = 'ts') => options.direct === true ? directImports(contents, loader) : contents
 
       // A twin's frames show its namespace and the whole path, where a file's show its path from where the build ran.
-      const load = async (file: string, twin = false, features?: ReadonlySet<string>) => {
+      const load = async (file: string, twin = false, features?: ReadonlySet<string>, written?: ReadonlySet<string>) => {
         const original = await Bun.file(withoutTwin(file)).text()
         const source = features === undefined ? original : specializedSource(original, features, withoutTwin(file))
 
-        const compiled = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, pages: options.pages, cacheDir: options.cacheDir, inspect: options.inspect, classTable: options.classTable, variant: features === undefined ? undefined : [...features].sort().join('.') })
+        const compiled = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, pages: options.pages, cacheDir: options.cacheDir, inspect: options.inspect, classTable: options.classTable, variant: features === undefined ? undefined : `${[...features].sort().join('.')}${written === undefined ? '' : `~${[...written].sort().join('.')}`}`, writtenProps: written })
         const code = target === 'dom' ? await variantIndex.variantImports(compiled, withoutTwin(file), original) : compiled
         const contents = await pointed(await shippingFiles(expandGlobs(code, withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
 

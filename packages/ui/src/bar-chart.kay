@@ -107,23 +107,27 @@ const reading = (item: BarSeries, at: number) => {
 const placed = memo(() => uses('marks') ? placeEvents(events, labels) : [])
 
 // Side by side with the events on the same column, each a pointer's width further along.
-const eventStyle = (event: ChartEvent, slot: number) => `margin-left: ${slot * 0.5}rem${event.color ? `; --event-color: ${event.color}` : ''}`
+const eventStyle = uses('marks') ? (event: ChartEvent, slot: number) => `margin-left: ${slot * 0.5}rem${event.color ? `; --event-color: ${event.color}` : ''}` : undefined
 
 // The link of a mark that has an address, with the tab it opens in.
-const markLink = (item: PlacedEvent) => ({ href: item.event.href ?? '', ...tabOf(item.event.href, newTab) })
+const markLink = uses('marks') ? (item: PlacedEvent) => ({ href: item.event.href ?? '', ...tabOf(item.event.href, newTab) }) : undefined
 
-function markPressedAt(item: PlacedEvent) {
-  void (uses('onMark') ? onMark : undefined)?.({ mark: item.event, index: item.source })
-}
+const markPressedAt = uses('onMark')
+  ? (item: PlacedEvent) => {
+    void onMark?.({ mark: item.event, index: item.source })
+  }
+  : undefined
 
 // A plain click on a mark link goes to `onMark` when the app gave one; a modified or middle click is left to the browser.
-function markPressed(event: MouseEvent, item: PlacedEvent) {
-  if (!uses('onMark') || !onMark || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
-    return
+const markPressed = uses('onMark')
+  ? (event: MouseEvent, item: PlacedEvent) => {
+    if (!onMark || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return
 
-  event.preventDefault()
-  void onMark({ mark: item.event, index: item.source })
-}
+    event.preventDefault()
+    void onMark({ mark: item.event, index: item.source })
+  }
+  : undefined
 
 // What a bar column reads on hover and focus, and to screen readers: the label, each series' reading, the notes the series carry for it and the events marked on it.
 const summaries = memo(() => labels.map((_, at) => {
@@ -156,30 +160,34 @@ function keyDown(event: KeyboardEvent) {
 }
 
 const mark = (at: number): ChartMark => ({ index: at, label: labels[at]!, values: series.map(item => item.values[at] ?? null) })
-const marks = activeMarks({ active: () => active, onActiveChange: () => onActiveChange, onActive: () => onActive })
+const marks = activeMarks({ active: () => uses('active') ? active : undefined, onActiveChange: () => uses('onActiveChange') ? onActiveChange : undefined, onActive: () => uses('onActive') ? onActive : undefined })
 const tip = uses('tooltip') ? chartTooltip() : undefined
 
-function link(at: number) {
-  const to = uses('href') ? href?.(mark(at)) : undefined
+const link = uses('href')
+  ? (at: number) => {
+    const to = href?.(mark(at))
 
-  return to === undefined || to === '' ? undefined : { href: to, ...tabOf(to, newTab) }
-}
+    return to === undefined || to === '' ? undefined : { href: to, ...tabOf(to, newTab) }
+  }
+  : undefined
 
 // A plain click on a link goes to `onSelect` when the app gave one; a modified or middle click is left to the browser.
-function pressed(event: MouseEvent, at: number) {
-  if (!uses('onSelect') || !onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
-    return
+const pressed = uses('onSelect')
+  ? (event: MouseEvent, at: number) => {
+    if (!onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return
 
-  event.preventDefault()
-  void onSelect({ item: mark(at) })
-}
+    event.preventDefault()
+    void onSelect({ item: mark(at) })
+  }
+  : undefined
 
 function focused(event: FocusEvent, at: number) {
   stop = at
   marks.enter(at, event.currentTarget as Element)
 }
 
-const nothing = () => emptyLabel ?? wording('ui.barChart.empty', 'No data yet.')
+const nothing = () => (uses('emptyLabel') ? emptyLabel : undefined) ?? wording('ui.barChart.empty', 'No data yet.')
 ---
 snippet bars(at: number)
   for item, index of series key={item.name}
@@ -189,7 +197,7 @@ snippet bars(at: number)
       span(part="bar" data-stub data-stacked={uses('stacked') && stacked ? '' : undefined} style={fill(item, index, at)})
 if labels.length === 0
   // The app's id and class stay on whichever element shows.
-  if empty
+  if uses('empty') && empty
     div.kui-bar-chart-empty(part="root" id={rest.id})
       | {empty}
   else
@@ -202,8 +210,8 @@ else
           span(part="tick") {formatValue(tick.ratio * ratios().top)}
       div(part="columns" style={gaps()})
         for _, at of labels key={at}
-          if uses('href') && markKind(link(at)?.href, onSelect !== undefined) === 'link'
-            a(part="column" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={uses('stacked') && stacked ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+          if uses('href') && markKind(link!(at)?.href, onSelect !== undefined) === 'link'
+            a(part="column" {...link!(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={uses('stacked') && stacked ? '' : undefined} onClick={event => pressed!(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
           else if uses('onSelect') && onSelect
             button(part="column" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={uses('stacked') && stacked ? '' : undefined} onClick={() => void onSelect?.({ item: mark(at) })} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
@@ -217,13 +225,13 @@ else
             span(part="eventCell")
               for item of placed().filter(entry => entry.index === at) key={item.slot}
                 if markKind(item.event.href, onMark !== undefined) === 'link'
-                  a(part="event" {...markLink(item)} data-kind="link" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle(item.event, item.slot)} onClick={event => markPressed(event, item)})
+                  a(part="event" {...markLink!(item)} data-kind="link" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle!(item.event, item.slot)} onClick={event => markPressed!(event, item)})
                     span(part="eventRule")
                 else if uses('onMark') && onMark
-                  button(part="event" type="button" data-kind="button" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle(item.event, item.slot)} onClick={() => markPressedAt(item)})
+                  button(part="event" type="button" data-kind="button" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle!(item.event, item.slot)} onClick={() => markPressedAt!(item)})
                     span(part="eventRule")
                 else
-                  span(part="event" aria-hidden="true" style={eventStyle(item.event, item.slot)})
+                  span(part="event" aria-hidden="true" style={eventStyle!(item.event, item.slot)})
                     span(part="eventRule")
     if uses('tooltip') && tooltip && marks.current() !== null && marks.anchor()
       div(part="tooltip" ref={tip!.watch} style={tip!.place(marks.anchor()!)} aria-hidden="true")

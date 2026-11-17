@@ -19,8 +19,9 @@ const IDENTIFIER_CHAR = /[\w$.]/
 const BACKSLASH = /\\/g
 
 // The suffix an import of a variant carries: the features, joined by dashes (a dot would end the stem of the file name the bundler gives an entry), the call sites of the project use.
-export const USES_QUERY = /\.kay\?uses=([\w-]*)$/
-const VARIANT_INPUT = /^kay-variant:|\?uses=[\w-]*$/g
+// `~` and the props the call sites write follow when the project reads them all: the props a spread may carry are not known.
+export const USES_QUERY = /\.kay\?uses=([\w-]*)(?:~([\w-]*))?$/
+const VARIANT_INPUT = /^kay-variant:|\?uses=[\w~-]*$/g
 
 // A path the bundler names for a variant, as the file it is made from.
 export function variantFile(input: string): string {
@@ -295,6 +296,30 @@ function splitTop(text: string, operator: '&&' | '||'): string[] | undefined {
   return parts
 }
 
+// A destructured default that only an absent feature reads, `label = uses('x') ? wording('a', 'A') : ''` once the call is false: the closure it would make is left out.
+const ABSENT_DEFAULT = / = false(?: \|\| false)* \? wording\([^()]*\) : ''/g
+const DEAD_SPREAD = /^(\s*)\.\.\.\(false(?: \|\| false)*\)\s*$/
+
+// A recipe part group `...(uses('x')) ? { ... } : {}` whose condition is false, written on lines like that, is blanked.
+function blankDeadSpreads(lines: string[], from: number): void {
+  for (let at = 0; at < from; at++) {
+    const hit = DEAD_SPREAD.exec(lines[at]!)
+
+    if (hit === null)
+      continue
+
+    const end = lines.findIndex((line, index) => index > at && line === `${hit[1]}  : {},`)
+
+    if (end === -1)
+      continue
+
+    for (let blank = at; blank <= end; blank++)
+      lines[blank] = ''
+
+    at = end
+  }
+}
+
 // The source with each `uses('x')` of its script and of its template lines as `true` when `x` is among `present`, `false` otherwise, and a template `if` that cannot hold with them reduced to `if false` with its lines blanked: the block keeps its markers for the server markup the island hydrates, and the lines keep their numbers for the source map. An `else` after a blanked block still follows it. A `file` that does not import the marker is returned as it is.
 export function specializedSource(source: string, present: ReadonlySet<string>, file = ''): string {
   if (file !== '' && !importsMarker(source, file))
@@ -306,7 +331,8 @@ export function specializedSource(source: string, present: ReadonlySet<string>, 
   const template = lines.findLastIndex(line => FENCE.test(line)) + 1
 
   // The script as one text, so a comment or a template literal over several lines is read as one; the answers hold no newline, so the lines keep their numbers.
-  lines.splice(0, template, ...replaced(lines.slice(0, template).join('\n')).split('\n'))
+  lines.splice(0, template, ...replaced(lines.slice(0, template).join('\n')).replace(ABSENT_DEFAULT, '').split('\n'))
+  blankDeadSpreads(lines, template)
 
   for (let at = template; at < lines.length; at++) {
     const hit = USES_IF.exec(lines[at]!)
@@ -350,6 +376,7 @@ export const ANY = Symbol('any')
 
 // What stands for a call that leaves a feature on by default (`uses('x', true)`) on: the prop left out or written with anything but a literal `false`.
 const ON_PREFIX = '+'
+const PROP_NAME = /^\w+$/
 
 // The props the call sites of each `.kay` component a file imports write, by the name the file gives it; `defaults` names, by local, the features on when the prop is left out, which a call keeps on by adding `+name`.
 export function propsWritten(source: string, locals: readonly string[], defaults: ReadonlyMap<string, ReadonlySet<string>> = new Map()): Map<string, Set<string> | typeof ANY> {
@@ -492,10 +519,14 @@ export class VariantIndex {
     }
   }
 
-  private usedOf(path: string, features: string[], defaults: ReadonlySet<string>): string[] {
+  // The query of a variant: its features, then the props written.
+  private usedOf(path: string, features: string[], defaults: ReadonlySet<string>): string {
     const props = this.union.get(path) ?? new Set<string>()
 
-    return (props === ANY ? features : features.filter(feature => props.has(defaults.has(feature) ? ON_PREFIX + feature : feature))).sort()
+    if (props === ANY)
+      return features.sort().join('-')
+
+    return `${features.filter(feature => props.has(defaults.has(feature) ? ON_PREFIX + feature : feature)).sort().join('-')}~${[...props].filter(name => PROP_NAME.test(name)).sort().join('-')}`
   }
 
   // An island entry that is a component with features, as the variant the project's call sites need; any other file as it is.
@@ -507,7 +538,7 @@ export class VariantIndex {
 
     await this.scanned()
 
-    return `${path}?uses=${this.usedOf(path, names, defaults).join('-')}`
+    return `${path}?uses=${this.usedOf(path, names, defaults)}`
   }
 
   // The imports of the compiled `code` of `file` that name a component with features, pointed at the one variant the project's call sites need: `import Table from './table.kay'` as `./table.kay?uses=pageSize`. `source` is the file's own, for one the scan did not meet.
@@ -525,7 +556,7 @@ export class VariantIndex {
     for (const { specifier, path, features, defaults } of candidates) {
       const used = this.usedOf(path, features, defaults)
 
-      result = result.replace(new RegExp(`^(import\\s+\\w+\\s+from\\s+)(["'])${RegExp.escape(specifier)}\\2`, 'm'), (_import, head: string, quote: string) => `${head}${quote}${specifier}?uses=${used.join('-')}${quote}`)
+      result = result.replace(new RegExp(`^(import\\s+\\w+\\s+from\\s+)(["'])${RegExp.escape(specifier)}\\2`, 'm'), (_import, head: string, quote: string) => `${head}${quote}${specifier}?uses=${used}${quote}`)
     }
 
     return result

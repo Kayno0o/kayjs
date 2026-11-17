@@ -103,6 +103,7 @@ export interface GenerateOptions {
   ui?: UiEntry | undefined
   // Type checking's counterpart of `ui`: the variants and values `src/ui.ts` adds to the component's props.
   uiAdded?: UiEntry | undefined
+  writtenProps?: ReadonlySet<string> | undefined
   // Final pass: rewrites from the analysis pass are applied and the props destructuring disappears.
   rewrites?: ReadonlyMap<number, Rewrite & { end: number }> | undefined
   // Type checking's final pass: the value of each signal the template reads, declared under `VALUES`.
@@ -886,9 +887,8 @@ class ModuleShell {
 
     if (props.rest) {
       const owned = this.facts.parts?.merges === true
-      const keys = [...props.bindings.map(binding => JSON.stringify(binding.key)), ...owned ? ['"class"', '"parts"'] : [], ...owned && this.facts.recipe !== undefined ? [`...${this.facts.recipe}.variants`] : [], ...owned ? Object.keys(this.facts.ui?.variants ?? {}).map(name => JSON.stringify(name)) : []]
 
-      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${keys.join(', ')});\n`)
+      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${[...props.bindings.filter(binding => this.options.writtenProps?.has(binding.key) ?? true).map(binding => JSON.stringify(binding.key)), ...owned ? ['"class"', '"parts"'] : [], ...owned && this.facts.recipe !== undefined ? [`...${this.facts.recipe}.variants`] : [], ...owned ? Object.keys(this.facts.ui?.variants ?? {}).map(name => JSON.stringify(name)) : []].join(', ')});\n`)
     }
 
     // The analysis pass declares the destructured names so scope analysis can find every read of them; the final pass rewrites those reads instead.

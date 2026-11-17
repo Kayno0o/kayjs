@@ -1944,6 +1944,7 @@ interface CompileOptions
   twinBuild?: boolean | undefined
   typesOnly?: boolean | undefined
   ui?: UiEntry | undefined
+  writtenProps?: ReadonlySet<string> | undefined
 
 [./compiler] CompileResult
 interface CompileResult
