@@ -3,20 +3,22 @@ import { withQuery } from 'kay'
 // The text of the page's query param `name`, read from the address the page is at: the request's on the server, the browser's after, in an island following each navigation, swap and Back or Forward step.
 // A page rendered once at build time has no query to read, so it reads as left out.
 export function paramText(name: string | undefined): string | undefined {
-  return paramTexts(name)?.[0]
+  return (name === undefined ? undefined : query()?.get(name)) ?? undefined
 }
 
 // Every text of the param `name`, `?tag=a&tag=b` giving two, or undefined when the address has none.
 export function paramTexts(name: string | undefined): string[] | undefined {
-  if (name === undefined)
-    return undefined
+  const found = name === undefined ? undefined : query()?.getAll(name)
 
+  return found === undefined || found.length === 0 ? undefined : found
+}
+
+function query(): URLSearchParams | undefined {
   try {
     const href = withQuery({})
     const at = href.indexOf('?')
-    const found = at === -1 ? [] : new URLSearchParams(href.slice(at + 1)).getAll(name)
 
-    return found.length === 0 ? undefined : found
+    return at === -1 ? undefined : new URLSearchParams(href.slice(at + 1))
   }
   catch {
     return undefined

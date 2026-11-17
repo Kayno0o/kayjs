@@ -23,13 +23,10 @@ export type QueryChanges = Readonly<Record<string, string | number | readonly (s
 // Sets each param of `changes` on `params`, a null, undefined or empty one dropped and the others kept: the rule of `navigate.query` and of `withQuery`.
 export function mergeQuery(params: URLSearchParams, changes: QueryChanges): void {
   for (const [name, value] of Object.entries(changes)) {
-    if (value == null || value === '' || (typeof value === 'object' && value.length === 0)) {
-      params.delete(name)
-    }
-    else if (typeof value === 'object') {
+    if (value == null || value === '' || typeof value === 'object') {
       params.delete(name)
 
-      for (const item of value)
+      for (const item of value ?? [])
         params.append(name, String(item))
     }
     else {
