@@ -1,7 +1,7 @@
 import type { CallResult } from 'kay'
 import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test'
 import { ActionError, ActionRedirectError, ApiError, signal } from 'kay'
-import { callAction } from '../src/forms'
+import { callAction } from '../src/forms-send'
 import { attempt, dismissToast, holdToasts, messageOf, toast, toasts } from '../src/toast'
 
 function shown() {

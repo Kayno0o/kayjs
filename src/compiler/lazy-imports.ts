@@ -27,6 +27,8 @@ export interface LazyImport {
 // The smallest source a component loads lazily: below it the request and the stub cost more than the code saves.
 export const LAZY_FLOOR = 2000
 const CHILDREN = 'children'
+const LINE_COMMENT = /^[ \t]*\/\/.*$/gm
+const PLAIN_STRING = /'[^'\\\n$`]*'|"[^"\\\n$`]*"/g
 // An import of a component's default export on a line of its own, the one form a lazy import can replace.
 const PLAIN_IMPORT = /^import\s+[\w$]+\s+from\s*(['"])[^'"]+\1\s*;?$/
 
@@ -177,7 +179,12 @@ function codeOf(file: KayFile): string {
   for (const { start, end } of blanks)
     code = `${code.slice(0, start)}${' '.repeat(end - start)}${code.slice(end)}`
 
-  return code
+  return blankLiterals(code)
+}
+
+// The whole-line comments and the one-line strings that hold no `${` or backtick, blanked: a word in them, as the `Select all` of a label, is text no code reads, so it is no reference to a component of that name.
+function blankLiterals(script: string): string {
+  return script.replace(LINE_COMMENT, blank => ' '.repeat(blank.length)).replace(PLAIN_STRING, blank => ' '.repeat(blank.length))
 }
 
 // The text before a file's template, which is all of its script.

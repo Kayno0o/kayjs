@@ -4,9 +4,10 @@ import { carrySchema, effect, recipe, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import type { Discard } from './confirm'
-import type { FormValidation } from './forms'
+import type { FormValidation } from './form-context'
 
-import { callAction, checkSchema, checkSent, formIssues, leftField, showIssues } from './forms'
+import { formIssues, leftField } from './form-context'
+import { callAction, checkSchema, checkSent, showIssues } from './form-calls'
 import type { OverlaySize } from './overlay'
 import { wording } from 'kay/words'
 

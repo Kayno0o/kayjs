@@ -182,6 +182,10 @@ What the server did not draw is fetched when the visitor reaches for the island,
 
 Until the code arrives the branch shows nothing, then the component. A chunk that fails to load is tried again twice, then reported in the console and to your error reporter, not to `@failed`, and the next opening tries again.
 
+A word of a label or a comment that happens to be a component's name, as the `Select all` of a checkbox's text, does not keep that component in the island. Only code that names it does.
+
+The code that a `Form`, `FormDialog` or `SaveForm` uses to send and report a form is not in the first load either: it loads with the first send or blur check, and a failed fetch is tried once more.
+
 The code that sends an action call is not in the island's first load either. It loads when the browser is idle, or with the first call when that comes first, and a failed fetch is tried again after one second and after three before the call fails as any call that could not be sent.
 
 A component also drawn outside such a branch, a `snippet` used as a value and a dynamic tag keep their import eager.

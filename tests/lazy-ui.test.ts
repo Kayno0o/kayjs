@@ -432,6 +432,15 @@ describe('which islands load components lazily', () => {
     expect(compileKay(source, file('eager'), { root, output: 'dom', components: importedComponents(file('eager'), source, root) }).tsx).toContain('KayLazy(')
   })
 
+  it('keeps a component lazy that a string or a comment of the file only names, as a label `Heavy all` does', () => {
+    const named = '---\nimport Heavy from \'./heavy.kay\'\n// A Heavy one, named in a comment.\nconst label = \'Heavy all\'\nconst { on } = props<{ on: boolean }>()\n---\nif on\n  Heavy(label={label} aria-label={wording(\'heavy.row\', \'Heavy {row}\')})\n'
+    const read = '---\nimport Heavy from \'./heavy.kay\'\nconst keep = Heavy\nconst { on } = props<{ on: boolean }>()\n---\nif on\n  Heavy(label="x")\n'
+    const out = (source: string) => compileKay(source, file('eager'), { root, output: 'dom', components: importedComponents(file('eager'), source, root) }).tsx
+
+    expect(out(named)).toContain('KayLazy(')
+    expect(out(read)).not.toContain('KayLazy(')
+  })
+
   it('keeps a small component eager', () => {
     const source = '---\nimport Shell from \'./shell.kay\'\n---\nmain\n  if true\n    Shell(open=true)\n'
     const facts = importedComponents(join(fixtures, 'eager.kay'), source, root)
