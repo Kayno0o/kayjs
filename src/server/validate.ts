@@ -136,8 +136,8 @@ function withDefaults(schema: unknown, value: unknown): unknown {
   return fields
 }
 
-// The keys an object that opted into `extra: 'strip'` is sent with that its shape lacks, dropped.
-function stripped(schema: unknown, value: unknown): unknown {
+// The keys an object that opted into `extra: 'strip'` is sent with that its shape lacks, dropped; `dropUnknown` does it for the top level whatever the object says.
+function stripped(schema: unknown, value: unknown, dropUnknown = false): unknown {
   if (!isNode(schema))
     return value
 
@@ -148,7 +148,7 @@ function stripped(schema: unknown, value: unknown): unknown {
     return value
 
   const shape = schema.properties
-  const keep = schema['x-kay-extra'] !== 'strip'
+  const keep = schema['x-kay-extra'] !== 'strip' && !dropUnknown
 
   return Object.fromEntries(Object.entries(value).filter(([name]) => keep || name in shape).map(([name, field]) => [name, name in shape ? stripped(shape[name], field) : field]))
 }
@@ -173,7 +173,8 @@ function readText(schema: unknown, value: unknown, form: boolean): unknown {
 function prepare(schema: unknown, value: unknown, source: Source): unknown {
   const read = source === 'json' ? withDefaults(schema, value) : readText(schema, value, source !== 'env' && source !== 'params')
 
-  return stripped(schema, read)
+  // A browser posts controls the app does not own, a named submit button or a widget: a form's unknown fields are dropped, where JSON and a query are strict.
+  return stripped(schema, read, source === 'form')
 }
 
 // Every place the value fails a schema, once each, the first reason for it.

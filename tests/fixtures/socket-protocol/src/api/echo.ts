@@ -44,6 +44,12 @@ export default api()
       return undefined
     },
   })
+  .ws('/shaped', {
+    body: s.object({ a: s.string() }),
+    message(ws, input) {
+      ws.send(input.a)
+    },
+  })
   .ws('/room', {
     response: room.response,
     open(ws) {

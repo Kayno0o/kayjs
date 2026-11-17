@@ -151,7 +151,7 @@ describe('input an API route refuses', () => {
 
     const french = await post(sites.plain, '/api/refused', { tags: ['a', 'b'] }, { 'accept-language': 'fr' })
 
-    expect(await french.json()).toEqual({ status: 422, errors: { title: 'Requis', tags: expect.any(String) } })
+    expect(await french.json()).toEqual({ status: 422, errors: { title: 'Requis', tags: 'Expected array length to be less or equal to 1' } })
     expect((await (await post(sites.plain, '/api/refused', { title: 'ab' }, { 'accept-language': 'fr' })).json() as { errors: unknown }).errors).toEqual({ title: 'Au moins 3 caractères' })
   })
 

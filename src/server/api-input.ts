@@ -98,18 +98,18 @@ export function validatingInputs(hooks: unknown, inLocale: <T>(request: Request,
 
   route[DECLARED] = declared
 
-  // One hook per input, each reading its own property by name: Elysia parses what a hook's source reads, so a route declaring only a `query` leaves its body to the handler.
-  const check = (input: Input, read: (context: InputContext) => unknown, write: (context: InputContext, value: unknown) => void) => async (context: InputContext) => {
+  // What an input reads as, or the refusal thrown: the schemas it has, the route's own and its guards', checked one after the other.
+  const settle = async (input: Input, request: Request, given: unknown): Promise<unknown> => {
     const schemas = checked[input]
 
     if (schemas === undefined)
-      return
+      return given
 
-    let value = read(context)
+    let value = given
     const refused = new Map<string, Issue>()
 
     for (const schema of schemas) {
-      const result = await inLocale(context.request, async () => validate(schema, value, { source: sourceOf(input, context.request) }))
+      const result = await inLocale(request, async () => validate(schema, value, { source: sourceOf(input, request) }))
 
       if (!isRefusal(result)) {
         value = result.value
@@ -126,15 +126,26 @@ export function validatingInputs(hooks: unknown, inLocale: <T>(request: Request,
     if (refused.size > 0)
       throw new InputRefused(input, [...refused.values()])
 
-    write(context, value)
+    return value
   }
 
+  // One hook per input, each naming its own property and never passing the context on: Elysia reads a hook's source to know what to parse, so a route declaring only a `query` leaves its body to the handler.
   const readers: Record<Input, (context: InputContext) => Promise<void>> = {
-    body: check('body', context => context.body, (context, value) => void (context.body = value)),
-    query: check('query', context => context.query, (context, value) => void (context.query = value)),
-    params: check('params', context => context.params, (context, value) => void (context.params = value)),
-    headers: check('headers', context => context.headers, (context, value) => void (context.headers = value)),
-    cookie: check('cookie', context => cookieValues(context.cookie), () => undefined),
+    body: async (context) => {
+      context.body = await settle('body', context.request, context.body)
+    },
+    query: async (context) => {
+      context.query = await settle('query', context.request, context.query)
+    },
+    params: async (context) => {
+      context.params = await settle('params', context.request, context.params)
+    },
+    headers: async (context) => {
+      context.headers = await settle('headers', context.request, context.headers)
+    },
+    cookie: async (context) => {
+      await settle('cookie', context.request, cookieValues(context.cookie))
+    },
   }
 
   route.transform = [...[route.transform ?? []].flat() as unknown[], ...INPUTS.filter(input => declared[input] !== undefined).map(input => readers[input])]

@@ -50,9 +50,10 @@ describe('validate', () => {
     expect(await refusedPaths({ name: 'ab', age: Number.NaN })).toEqual(['age'])
   })
 
-  it('refuses an unknown key in JSON and in a form, and strips one of an object that opts out', async () => {
+  it('refuses an unknown key in JSON and a query, drops one a form posts, and strips one of an object that opts out', async () => {
     expect(await refusedPaths({ name: 'ab', extra: 1 })).toEqual(['extra'])
-    expect(await refusedPaths({ name: 'ab', extra: 'x' }, 'form')).toEqual(['extra'])
+    expect(await refusedPaths({ name: 'ab', extra: 'x' }, 'query')).toEqual(['extra'])
+    expect(await validate(schema, { name: 'ab', extra: 'x', go: 'Save' }, { source: 'form' })).toEqual({ value: { name: 'ab' } })
     expect(await validate(s.object({ a: s.string() }, { extra: 'strip' }), { a: 'x', b: 1 }, { source: 'json' })).toEqual({ value: { a: 'x' } })
   })
 

@@ -6,6 +6,7 @@ import { actionStub } from '../src/runtime/action-call'
 import { validateForm } from '../src/runtime/validate'
 import { resetWords } from '../src/runtime/words.client'
 import { formsScript } from '../src/server/forms'
+import { isRefusal, messagesOf, validate } from '../src/server/validate'
 
 interface Reads { form: { validate: (form: HTMLFormElement, field?: string) => Promise<boolean>, error: (field?: string) => string | undefined, failed: () => { status: number, errors: Record<string, string> } | undefined } }
 
@@ -44,6 +45,20 @@ describe('action.validate in the browser', () => {
     expect([add.form.error('title'), add.form.error('slug'), add.form.error('count'), add.form.error('photo')]).toEqual(['Three letters at least', 'Expected string to match \'^[a-z]+$\'', 'Expected number to be greater or equal to 1', undefined])
     expect(add.form.failed()?.status).toBe(422)
     expect([...form.querySelectorAll('input')].map(input => input.validationMessage)).toEqual(['', '', ''])
+  })
+
+  it('refuses the same value with the same words as the server does', async () => {
+    const posted = { title: 'ab', slug: 'A1', count: '0' }
+    const form = page(posted)
+    const add = actionStub('/act') as unknown as Reads
+
+    await add.form.validate(form)
+
+    const result = await validate(schema, posted, { source: 'form' })
+    const server = messagesOf(isRefusal(result) ? result.errors : [])
+
+    for (const field of ['title', 'slug', 'count'])
+      expect(add.form.error(field)).toBe(server[field])
   })
 
   it('checks one field alone, replacing its message and keeping the others', async () => {

@@ -106,6 +106,18 @@ describe('the frames of a websocket route', () => {
     expect(third).toEqual('hi' as never)
   })
 
+  it('refuse a key a message\'s object lacks, and hand the handler what it names', async () => {
+    const { socket, frames } = await raw('/shaped')
+
+    socket.send('{"a":"x","extra":1}')
+    socket.send('{"a":"ok"}')
+    await until(() => frames.length === 2)
+    socket.close()
+
+    expect(JSON.parse(frames[0]!)).toMatchObject({ error: { key: 'kay.socket.invalid', fields: { extra: expect.any(String) } } })
+    expect(JSON.parse(frames[1]!)).toBe('ok')
+  })
+
   it('refuse a message of the wrong kind with its fields and nothing of the schema', async () => {
     const { socket, frames } = await raw('/replies')
 
