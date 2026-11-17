@@ -2,6 +2,6 @@
 import Badge from '@kayjs/ui/badge.kay'
 ---
 .flex.flex-wrap.items-center.gap-2
-  Badge(label="Private" color="#8fb8f4")
-  Badge(label="Links" color="oklch(0.75 0.15 150)")
-  Badge(label="Public" color="#e8a24a" variant="solid")
+  Badge(label="Private" color="light-dark(#2a5f9e, #8fb8f4)")
+  Badge(label="Links" color="light-dark(oklch(0.48 0.13 150), oklch(0.75 0.15 150))")
+  Badge(label="Public" color="light-dark(#9c560b, #e8a24a)" variant="solid")

@@ -12,7 +12,7 @@ description: A small label for a status, a tag or a count.
 
 ## Any colour
 
-`color` takes any CSS colour, such as `#8fb8f4`, in place of the tone's, for a hue per kind that the tones do not cover. It colours the outline and the text, and fills a `solid` badge. A value that is no colour, such as one holding a `;`, is ignored.
+`color` takes any CSS colour, such as `#8fb8f4`, in place of the tone's, for a hue per kind that the tones do not cover; `light-dark(#2a5f9e, #8fb8f4)` gives each theme a shade that reads on its surface. It colours the outline and the text, and fills a `solid` badge. A value that is no colour, such as one holding a `;`, is ignored.
 
 <Demo name="badge/color" />
 
