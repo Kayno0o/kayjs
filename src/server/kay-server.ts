@@ -177,11 +177,12 @@ function patched(this: Installable, options: Parameters<Reload>[0]): void {
   if (typeof (options as { stop?: unknown }).stop === 'function')
     return lifted(this, options)
 
-  const { kay } = this[INSTALLED]!
+  const { kay: current } = this[INSTALLED]!
   const { fetch: elysia } = options as { fetch?: ((request: Request, server: ReceiveServer) => Response | Promise<Response>) | undefined }
 
-  kay.fallback = elysia && (async request => elysia(request, this))
-  lifted(this, { ...options, fetch: async (request: Request, bun: ReceiveServer) => kay.fetch(request, bun ?? this), routes: withTable(options.routes, kay.routes) as never })
+  current.fallback = elysia && (async request => elysia(request, this))
+  // The table is read from the server at each request, so a reload of an earlier run, which a later run's own reload takes over from, never leaves a request to a table that has no fallback.
+  lifted(this, { ...options, fetch: async (request: Request, bun: ReceiveServer) => this[INSTALLED]!.kay.fetch(request, bun ?? this), routes: withTable(options.routes, current.routes) as never })
 }
 
 // Puts kay's server in front of the Elysia app once it listens: Bun is handed `kay.fetch`, with the app's own `fetch` as its fallback, and the routes the table compiled to, beside the ones Elysia hands it.

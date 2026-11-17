@@ -130,8 +130,8 @@ export class Pipeline {
 
   // Runs `respond` and `after` over an answer made before any record was reached: a refusal of `receive`, or the fallback app's.
   async settle(request: Request, response: Response): Promise<Response> {
-    // The fallback app's answer, as it is, when no step is left to run over it.
-    if (this.phases.respond.length === 0 && this.phases.after.length === 0 && request.method !== 'HEAD')
+    // The fallback app's answer, as it is, when no step is left to run over it: Bun leaves a HEAD answer's body out itself, with the length the body gave. An upgraded socket has no answer to run them over.
+    if ((this.phases.respond.length === 0 && this.phases.after.length === 0) || response === undefined)
       return response
 
     const context = new RequestContext(request, undefined, {})

@@ -475,6 +475,25 @@ describe('the receive phase', () => {
 })
 
 describe('kay in front of the Elysia app', () => {
+  it('answers a request through the app a later reload hands the server, with no gap for a table without one', async () => {
+    const kay = kayServer([])
+    const first = new Elysia().get('/who', () => 'first') as unknown as Elysia
+
+    serveThrough(first, kay)
+    first.listen({ port: 0, hostname: '127.0.0.1' })
+    stopped.push(() => void first.stop(true))
+    await Bun.sleep(10)
+
+    const server = first.server!
+    const second = new Elysia().get('/who', () => 'second') as unknown as Elysia
+
+    await second.modules
+    server.reload({ fetch: second.fetch, routes: {} })
+
+    expect(await (await fetch(`${server.url.origin}/who`)).text()).toBe('second')
+    expect(await (await fetch(`${server.url.origin}/who`, { method: 'HEAD' })).headers.get('content-length')).toBe('6')
+  })
+
   it('serves a record from the table and everything else through the app, both through the phases', async () => {
     const kay = kayServer([record('/kay', () => 'from kay', { kind: 'kay' })])
     const app = new Elysia().get('/elysia', () => 'from elysia') as unknown as Elysia
