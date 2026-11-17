@@ -13,6 +13,7 @@ const shapes: Record<string, (s: Builders) => object> = {
   record: s => ({ email: s.email(), topic: s.enum(['a', 'b']), message: s.string({ min: 3, max: 10, error: { min: 'Say more' } }), age: s.int({ min: 18, optional: true }), tags: s.list(s.string(), { max: 2 }), site: s.url({ optional: true }) }),
   nested: s => s.object({ user: s.object({ name: s.string({ min: 1 }), role: s.enum({ admin: 'Admin', member: 'Member' }) }), flags: s.record(s.boolean()) }),
   union: s => ({ pick: s.union([s.literal('x'), s.int({ min: 1 })]) }),
+  objects: s => ({ u: s.union([s.object({ a: s.string() }), s.object({ b: s.int() })]), l: s.list(s.string(), { maxItems: 1, optional: true }), r: s.record(s.int(), { optional: true }), d: s.date({ optional: true }), f: s.file({ optional: true }) }),
 }
 
 const values: Record<string, unknown[]> = {
@@ -27,6 +28,7 @@ const values: Record<string, unknown[]> = {
     { user: { name: '', role: 'boss' }, flags: { a: 'yes' } },
     { user: { role: 'admin' } },
   ],
+  objects: [{ u: { a: 'x' } }, { u: { zzz: 1 } }, { u: { b: 1 }, l: ['a', 'b'] }, { u: { b: 1 }, r: { ['k'.repeat(201)]: 1 } }, { u: { b: 1 }, d: '2024-05-01' }, { u: { b: 1 }, d: 'nope' }, JSON.parse('{"u":{"a":"x"},"__proto__":1}')],
   union: [{ pick: 'x' }, { pick: 5 }, { pick: 0 }, { pick: 'y' }, {}],
 }
 

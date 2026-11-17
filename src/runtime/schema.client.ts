@@ -93,7 +93,7 @@ const builders: Record<string, (...args: never[]) => Node> = {
   union: (members: Node[], options?: Options) => node('Union', { anyOf: [...members] }, options),
   object: objectOf,
   record: (value: Node, options?: Options) => node('Record', { type: 'object', additionalProperties: value }, options),
-  list: (item: Node, options?: Options) => node('Array', { type: 'array', items: item, ...options?.min !== undefined && { minItems: options.min }, ...options?.max !== undefined ? { maxItems: options.max } : item.format !== 'binary' && { maxItems: DEFAULT_MAX_ITEMS } }, options),
+  list: (item: Node, options?: Options) => node('Array', { type: 'array', items: item, ...options?.min !== undefined && { minItems: options.min }, ...(options?.max ?? options?.maxItems) !== undefined ? { maxItems: options?.max ?? options?.maxItems } : item.format !== 'binary' && { maxItems: DEFAULT_MAX_ITEMS } }, options),
   file: (options?: Options) => node('File', filesOf(options, false), options),
   files: (options?: Options) => node('Files', filesOf(options, true), options),
   public: (field: Node) => ({ ...field, public: true }),
@@ -106,6 +106,9 @@ const opaque = (): Node => ({ [KIND]: 'Any' })
 // The browser's `s`: it builds the plain JSON Schema `validate` reads, and carries no Elysia, which would weigh about 190 KB in every island. Unused, a bundler drops it.
 export const s = /* @__PURE__ */ new Proxy({}, {
   get: (_, name) => {
-    return typeof name === 'symbol' || name === 'then' ? undefined : builders[name] ?? opaque
+    if (typeof name === 'symbol' || name === 'then')
+      return undefined
+
+    return Object.hasOwn(builders, name) ? builders[name] : opaque
   },
 }) as typeof server

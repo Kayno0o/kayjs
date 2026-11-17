@@ -37,7 +37,7 @@ const FORMATS: Record<string, Format> = {
   'email': isEmail,
   'uuid': /^(?:urn:uuid:)?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i,
   'url': isUrl,
-  'date-time': /^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d+)?)?(?:Z|[+-]\d\d:\d\d)$/i,
+  'date-time': /^\d{4}-\d\d-\d\d(?:T\d\d:\d\d(?::\d\d(?:\.\d+)?)?(?:Z|[+-]\d\d:\d\d)?)?$/i,
   'date': /^\d{4}-\d\d-\d\d$/,
 }
 

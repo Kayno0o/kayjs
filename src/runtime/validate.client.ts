@@ -58,6 +58,25 @@ function walk(field: Node, value: unknown, path: string, source: Source, issues:
     return
   }
 
+  // A file is read by its bytes on the server alone.
+  if (field.format === 'binary' || field.items?.format === 'binary')
+    return
+
+  if (field.anyOf?.some(member => member.type === 'object' || member.type === 'array')) {
+    const tries = field.anyOf.map((member) => {
+      const found: Issue[] = []
+
+      walk(member as Node, value, path, source, found)
+
+      return found
+    })
+
+    if (!tries.some(found => found.length === 0))
+      issues.push(issue(path, 'kay.invalid.type', 'Expected union value', field))
+
+    return
+  }
+
   if (field.type === 'object' && field.anyOf === undefined) {
     if (!isNode(value)) {
       issues.push(issue(path, 'kay.invalid.type', 'Expected object', field))
@@ -75,7 +94,7 @@ function walk(field: Node, value: unknown, path: string, source: Source, issues:
     }
 
     for (const [name, member] of Object.entries(value)) {
-      if (name in shape)
+      if (Object.hasOwn(shape, name))
         continue
 
       if (isNode(field.additionalProperties))
@@ -103,13 +122,16 @@ function walk(field: Node, value: unknown, path: string, source: Source, issues:
 
 // What an object keeps of a value: a form's unknown top-level fields are dropped, as a browser posts controls the app does not own, and an object that opted into `extra: 'strip'` loses its unknown keys.
 function stripped(schema: Node, value: unknown, dropUnknown = false): unknown {
+  if (Array.isArray(value))
+    return schema.items === undefined ? value : value.map(item => stripped(schema.items!, item))
+
   if (!isNode(value) || schema.properties === undefined)
     return value
 
   const shape = schema.properties
   const keep = schema['x-kay-extra'] !== 'strip' && !dropUnknown
 
-  return Object.fromEntries(Object.entries(value).filter(([name]) => keep || name in shape).map(([name, member]) => [name, name in shape ? stripped(shape[name]!, member) : member]))
+  return Object.fromEntries(Object.entries(value).filter(([name]) => keep || Object.hasOwn(shape, name)).map(([name, member]) => [name, Object.hasOwn(shape, name) ? stripped(shape[name]!, member) : member]))
 }
 
 const refused = (errors: Issue[]): Refusal => ({ errors, status: 422 })
