@@ -102,7 +102,7 @@ describe('an app with no src/ui.ts', () => {
   it('renders the recipe and the caller\'s class alone', async () => {
     const server = await bundle('bun', 'out-none')
 
-    expect(html(server.Card!, { title: 't', class: { head: 'p-8' } })).toContain('<header class="p-8" data-part="head">t</header>')
+    expect(html(server.Card!, { title: 't', parts: { head: 'p-8' } })).toContain('<header class="p-8" data-part="head">t</header>')
   })
 })
 
@@ -116,7 +116,7 @@ describe('src/ui.ts on the server', () => {
 
   it('puts its parts after the recipe\'s and before the caller\'s class', () => {
     expect(html(server.Card!, { title: 't' })).toContain('<section class="card p-4 rounded-xl"><header class="p-6 font-bold bg-white" data-part="head">t</header>')
-    expect(html(server.Card!, { title: 't', class: { head: 'p-8' } })).toContain('<header class="font-bold bg-white p-8" data-part="head">t</header>')
+    expect(html(server.Card!, { title: 't', parts: { head: 'p-8' } })).toContain('<header class="font-bold bg-white p-8" data-part="head">t</header>')
   })
 
   it('puts the variants after the recipe\'s, and reads the recipe\'s defaults', () => {
