@@ -901,14 +901,7 @@ component default
   block?: ((call: AiToolCall) => Element) | undefined
   calls: AiToolCall[]
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  root?: string | undefined;
-  list?: string | undefined;
-  call?: string | undefined;
-  summary?: string | undefined;
-  name?: string | undefined;
-  status?: string | undefined;
-  title?: string | undefined;
-  code?: string | undefined;
+  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
   details: boolean
   doneLabel: string
@@ -1064,16 +1057,7 @@ component default
 component default
   children?: Element
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  root?: string | undefined;
-  new?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  expand?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  close?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
+  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
   closeIcon: Element
   collapseIcon: Element
@@ -1102,11 +1086,7 @@ component default
 component default
   block?: ((source: Source, n: number) => Element) | undefined
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  root?: string | undefined;
-  label?: string | undefined;
-  list?: string | undefined;
-  item?: string | undefined;
-  link?: string | undefined;
+  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
   here?: boolean | undefined
   label: string
@@ -1122,81 +1102,7 @@ component default
   attach?: boolean | undefined
   call?: ((call: AiToolCall) => Element) | undefined
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  root?: string | undefined;
-  conversations?: string | undefined;
-  newConversation?: string | undefined;
-  conversationList?: string | undefined;
-  conversation?: string | undefined;
-  renameField?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-    field?: string | undefined;
-    icon?: readonly unknown[] | string | undefined | {
-      root?: string | undefined;
-    };
-  };
-  deleteConfirm?: string | undefined;
-  confirm?: string | undefined;
-  cancel?: string | undefined;
-  conversationLink?: string | undefined;
-  rename?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  delete?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  empty?: string | undefined;
-  greeting?: string | undefined;
-  suggestions?: string | undefined;
-  suggestion?: string | undefined;
-  log?: string | undefined;
-  turn?: string | undefined;
-  editField?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  files?: string | undefined;
-  file?: string | undefined;
-  actions?: string | undefined;
-  save?: string | undefined;
-  approval?: string | undefined;
-  approvalText?: string | undefined;
-  allow?: string | undefined;
-  deny?: string | undefined;
-  text?: string | undefined;
-  reasoning?: string | undefined;
-  reasoningText?: string | undefined;
-  note?: string | undefined;
-  edit?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  regenerate?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  thinking?: string | undefined;
-  status?: string | undefined;
-  retry?: string | undefined;
-  disclosure?: string | undefined;
-  remove?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  form?: string | undefined;
-  new?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  attach?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  field?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  record?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  recordSpinner?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  send?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
+  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
   conversationIn?: "address" | "browser" | undefined
   conversations?: boolean | undefined

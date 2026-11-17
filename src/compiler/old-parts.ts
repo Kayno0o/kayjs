@@ -7,6 +7,9 @@ type ExpressionAttribute = Extract<NamedAttribute, { kind: 'expression' }>
 
 const WORD = /^\w+$/
 
+// What was found of each element, so its `class` is parsed once however many times a compiler pass asks.
+const found = new WeakMap<ElementNode, ExpressionAttribute | undefined>()
+
 // Whether an expression is written as the class of a part and of nothing a `{ class: condition }` object holds: a string, a template, an array of those, a choice between them, or a parts object of its own for a part that is a component.
 function isPartEntry(node: Node): boolean {
   if (node.type === 'Literal')
@@ -39,9 +42,16 @@ export function oldPartsClass(element: ElementNode, source: string): ExpressionA
   if (!element.component)
     return undefined
 
+  if (!found.has(element))
+    found.set(element, find(element, source))
+
+  return found.get(element)
+}
+
+function find(element: ElementNode, source: string): ExpressionAttribute | undefined {
   const attribute = element.attributes.find((one): one is ExpressionAttribute => one.kind === 'expression' && one.shorthand === undefined && source.slice(one.name.start, one.name.end) === 'class')
 
-  if (attribute === undefined)
+  if (attribute === undefined || !source.slice(attribute.expression.start, attribute.expression.end).trimStart().startsWith('{'))
     return undefined
 
   let value: Expression

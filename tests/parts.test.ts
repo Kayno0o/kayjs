@@ -34,7 +34,8 @@ const files: Record<string, string> = {
   '_layout.kay': 'main.p-2(part="page") page\n',
   'client.kay': '--- client\nlet count = 0\n---\nsection.card\n  header(part="head") {count}\n',
   'node_modules/uilib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n',
-  'calls-rule.kay': '---\nimport Card from \'./card.kay\'\nconst user = { name: \'Ada\' } as { name: string } | undefined\nconst own = \'p-3\'\n---\nCard(title="a" class={{ active: user && user.name }})\nCard(title="b" class={{ active: true, head: \'p-4\' }})\nCard(title="c" class={{ head: \'p-6\' }})\nCard(title="d" class={{ root: \'mt-4\', body: \'p-8\' }})\nCard(title="e" parts={{ head: own }} class={{ head: \'p-6\' }})\n',
+  'calls-rule.kay': '---\nimport Card from \'./card.kay\'\nconst user = { name: \'Ada\' } as { name: string } | undefined\nconst own = \'p-3\'\nconst size = \'p-5\'\nconst on = true\n---\nCard(title="a" class={{ active: user && user.name }})\nCard(title="b" class={{ active: true, head: \'p-4\' }})\nCard(title="c" class={{ head: \'p-6\' }})\nCard(title="d" class={{ root: \'mt-4\', body: \'p-8\' }})\nCard(title="e" parts={{ head: own }} class={{ head: \'p-6\' }})\nCard(title="f" class={{ head: size }})\nCard(title="g" class={{ head: on ? \'p-6\' : \'p-7\' }})\n',
+  'old-call.kay': '---\nimport Card from \'./card.kay\'\nconst on = true\nconst size = \'p-5\'\nconst rest = { id: \'x\' }\n---\nCard.mt-2(title="a" class={{ head: on ? \'p-6\' : \'p-7\' }}) a\nCard({...rest} title="b" class={{ head: \'p-8\' }}) b\nCard(title="c" parts={{ head: \'p-1\' }} class={{ head: \'p-9\' }}) c\nCard(title="d" class={{ head: size }}) d\n',
   'calls-conditions.kay': '---\nimport Card from \'./card.kay\'\nconst on = true\n---\nCard(title="array" class={[\'mt-2\', on && \'mt-3\']} parts={{ root: \'mt-6\', head: \'p-6\' }}) a\nCard(title="conditions" class={{ \'mt-2\': on, hidden: !on }} parts={{ root: \'mt-6\', head: \'p-6\' }}) b\n',
   'calls-parts.kay': '---\nimport Card from \'./card.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Hands from \'./hands.kay\'\nimport PanelOwn from \'./panel-own.kay\'\n---\nPanelOwn(parts={{ card: { head: \'p-9\' } }})\nCard.mt-4(title="short" parts={{ head: \'p-6\' }}) a\nCard(title="root" class="mt-2" parts={{ root: \'mt-6\', body: \'p-8\' }}) b\nSpread(title="s" parts={{ root: \'p-9\' }} id="s")\nPanel(parts={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nHands(parts={{ root: \'p-6\', spinner: \'size-5\' }})\nHands(class={{ spinner: \'size-5\' }} parts={{ spinner: \'size-7\' }})\n',
   'calls.kay': '---\nimport Card from \'./card.kay\'\nimport Rows from \'./rows.kay\'\nimport Spread from \'./spread.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Rooted from \'./rooted.kay\'\nimport Wrapper from \'./wrapper.kay\'\nimport Hands from \'./hands.kay\'\nimport Library from \'uilib/card.kay\'\nconst built = [\'p-\', \'8\'].join(\'\')\n---\nCard(title="string" class="mt-4") a\nCard(title="parts" class={{ root: \'mt-6\', head: \'p-6\' }} parts={{ body: built }}) b\nCard(title="plain")\nRows(rows={[\'x\', \'y\']} open class={{ item: \'p-8\', open: \'text-lg\' }})\nRows(rows={[]} open={false} class="gap-2")\nSpread(title="s" class={{ root: \'p-9\' }} id="s")\nPanel(class={{ card: { head: \'p-9\', root: \'m-1\' }, root: \'m-2\' }})\nPlain(class="given")\nRooted(class={{ top: \'t\', root: \'r\' }})\nWrapper(class="outer")\nHands(class={{ root: \'p-6\', spinner: \'size-5\' }})\nHands(class={{ root: { spinner: \'size-7\' }, spinner: \'size-5\' }})\nHands(class="p-8")\nLibrary(title="lib" class={{ head: \'p-6\' }})\n',
@@ -134,6 +135,8 @@ describe('a component with parts, on the server', () => {
     expect(html).toContain('<section class="card p-4"><header class="p-6" data-part="head">c</header>')
     expect(html).toContain('<section class="card p-4 mt-4"><header class="p-2" data-part="head">d</header><div class="p-8" data-part="body"></div></section>')
     expect(html).toContain('<header class="p-6" data-part="head">e</header>')
+    expect(html).toContain('<section class="card p-4 head"><header class="p-2" data-part="head">f</header>')
+    expect(html).toContain('<header class="p-6" data-part="head">g</header>')
   })
 
   it('leaves a component without parts alone, class prop and all', async () => {
@@ -180,24 +183,26 @@ describe('a component with parts, as an island', () => {
   let hands!: (props: object) => unknown
   let handsShort!: (props: object) => unknown
   let link!: (props: object) => unknown
+  let oldCall!: (props: object) => unknown
   let linkClass!: (props: object) => unknown
 
   beforeAll(async () => {
     GlobalRegistrator.register()
-    await Bun.write(join(scratch, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Client from \'./client.kay\'\nimport Hands from \'./hands.kay\'\nimport HandsShort from \'./hands-short.kay\'\nimport Island from \'./island.kay\'\nimport Link from \'./link.kay\'\nimport LinkClass from \'./link-class.kay\'\n\nexport { Client, Hands, HandsShort, Island, Link, LinkClass, render }\n')
+    await Bun.write(join(scratch, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Client from \'./client.kay\'\nimport Hands from \'./hands.kay\'\nimport HandsShort from \'./hands-short.kay\'\nimport Island from \'./island.kay\'\nimport OldCall from \'./old-call.kay\'\nimport Link from \'./link.kay\'\nimport LinkClass from \'./link-class.kay\'\n\nexport { Client, Hands, HandsShort, Island, Link, OldCall, LinkClass, render }\n')
 
     const build = await Bun.build({ entrypoints: [join(scratch, 'entry.ts')], outdir: join(scratch, 'out'), target: 'browser', plugins: [kay()] })
 
     if (!build.success)
       throw new AggregateError(build.logs, 'client build failed')
 
-    const module = await import(build.outputs[0]!.path) as { Client: typeof client, Hands: typeof hands, HandsShort: typeof handsShort, Island: typeof island, Link: typeof link, LinkClass: typeof linkClass, render: typeof render }
+    const module = await import(build.outputs[0]!.path) as { Client: typeof client, Hands: typeof hands, HandsShort: typeof handsShort, Island: typeof island, Link: typeof link, OldCall: typeof oldCall, LinkClass: typeof linkClass, render: typeof render }
 
     client = module.Client
     hands = module.Hands
     handsShort = module.HandsShort
     island = module.Island
     link = module.Link
+    oldCall = module.OldCall
     linkClass = module.LinkClass
     render = module.render
   }, 60_000)
@@ -244,6 +249,19 @@ describe('a component with parts, as an island', () => {
     expect(summary(mounted.root)[1]).toEqual(['header', 'p-6', 'head'])
     expect(summary(holder)).toEqual(summary(mounted.root))
     mounted.stop()
+  })
+
+  it('hands a literal parts object in class on as parts beside a shorthand, a spread and a parts attribute, and any other object as conditions, as the server does', async () => {
+    const server = await import(join(scratch, 'old-call.kay')) as { default: (props: object) => unknown }
+    const holder = document.createElement('div')
+
+    holder.innerHTML = child(server.default({})).replace(MARKERS, '')
+
+    const { root, stop } = mount(oldCall, {})
+
+    expect(summary(root)).toEqual([['section', 'card p-4 mt-2', null], ['header', 'p-6', 'head'], ['section', 'card p-4', null], ['header', 'p-8', 'head'], ['section', 'card p-4', null], ['header', 'p-9', 'head'], ['section', 'card p-4 head', null], ['header', 'p-2', 'head']])
+    expect(summary(holder)).toEqual(summary(root))
+    stop()
   })
 
   it('hands the called component the parts a call names beside its own, as the server does', async () => {
@@ -393,8 +411,10 @@ describe('kay check on parts', () => {
     const several = compileKay('header(part="top") a\nfooter(part="bottom") b\n', 'src/two.kay', { check: true }).tsx
     const nested = compileKay('---\nimport Card from \'./card.kay\'\n---\nsection\n  Card(part="card") a\n', 'src/panel.kay', { check: true }).tsx
 
-    expect(one).toContain('class?: string | readonly unknown[] | Record<string, boolean | null | undefined> | { "root"?: string | undefined; "head"?: string | undefined } | undefined')
-    expect(several).toContain('class?: { "top"?: string | undefined; "bottom"?: string | undefined } | { kayError:')
+    expect(one).toContain('class?: string | readonly unknown[] | Record<string, boolean | null | undefined> | { kayError:')
+    expect(one).toContain('parts?: { "root"?: string | undefined; "head"?: string | undefined } | undefined')
+    expect(several).toContain('class?: { kayError:')
+    expect(several).toContain('parts?: { "top"?: string | undefined; "bottom"?: string | undefined } | undefined')
     expect(nested).toContain('"card"?: KayPartOf<typeof Card> | undefined')
   })
 })

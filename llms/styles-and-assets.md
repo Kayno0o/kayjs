@@ -50,14 +50,14 @@ section.rounded.border
 `Card(title="Hi" class="mt-4")` styles the root, `Card(title="Hi" parts={{ root: 'mt-4', head: 'p-6' }})` the root and the head, and both can be written at once.
 
 - A part renders `data-part="head"`, for selectors and `data-[part=head]:` utilities; one name may sit on several elements, every row of a `for`, and inside an `if` or a slot.
-- A part that is a component, `Button(part="action")`, hands its entry to that component, a string or an object of its parts: `parts={{ action: { icon: 'size-5' } }}`. `data-part` reaches its root through the spread there. Names after the first, `Busy(part="root spinner")`, hand the entries of those parts of this component on as well, under the same names, for a part that sits inside the called component. `kay check` reports a handed part the called component does not name, types its entry as the called component's part takes it, and a page or a layout, which has no class to hand from, refuses one.
-- `parts` sits beside a shorthand, a spread and a `class` on the call, `Card.mt-4(parts={{ head: 'p-6' }})`. The `class` object literal of before 1.105 (strings by part name) works until 1.108; `deprecated-parts-class` writes `parts`.
-- `kay check` reports a part named by an expression, an unknown part at a call, a string `class` for a template with several top elements and no `part="root"`, and a component with parts that also destructures `class` or `parts`, as the compiler owns those props. `...rest` leaves them out.
+- A part that is a component, `Button(part="action")`, hands its entry to it, a string or an object of its parts: `parts={{ action: { icon: 'size-5' } }}`. `data-part` reaches its root through the spread. Names after the first, `Busy(part="root spinner")`, hand those parts of this component on too, under the same names, for a part inside the called component. `kay check` reports a handed part the called component does not name, types its entry as that part takes it, and refuses one in a page or a layout, which has no class to hand from.
+- `parts` sits beside a shorthand, a spread and a `class` on the call, `Card.mt-4(parts={{ head: 'p-6' }})`. Until 1.108 a `class` literal of before 1.105 is handed on as `parts`: word keys, each value a string, template, conditional or array of those, or a nested literal (`deprecated-parts-class` writes `parts`). Any other `class` object is conditions; a held one is a type error naming `parts`.
+- `kay check` reports a part named by an expression, an unknown part at a call, a string `class` on a template with several top elements and no `part="root"`, and a component that also destructures `class` or `parts`, which the compiler owns. `...rest` leaves them out.
 - A page or a layout has no `class` prop: its parts render `data-part` only.
 
 ### Give a component variants
 
-`recipe({ parts, variants, defaults })` from `kay`, declared as `const card = recipe(...)` in the script, holds the component's classes. `parts` is the base, a string for the root or one string per part, and each variant value is a string for the root or one string per part. The variants become props of the component, typed from the recipe, with nothing declared beside it:
+`recipe({ parts, variants, defaults })` from `kay`, declared as `const card = recipe(...)` in the script, holds the component's classes. `parts` is the base and each variant value a string for the root or one string per part. The variants become props of the component, typed from the recipe, with nothing declared beside it:
 
 ```kay
 ---

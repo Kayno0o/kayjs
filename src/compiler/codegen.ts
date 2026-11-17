@@ -482,7 +482,7 @@ class ModuleShell {
     })
     const object = `{ ${entries.join('; ')} }`
 
-    const type = `{ class?: ${parts.root === 'none' ? `${object} | { kayError: 'A template with several top elements takes an object of its parts: mark one with part="root" to take a string' }` : `string | readonly unknown[] | Record<string, boolean | null | undefined> | ${object}`} | undefined; parts?: ${object} | undefined }`
+    const type = `{ class?: ${parts.root === 'none' ? `{ kayError: 'A template with several top elements takes its classes as parts={{ head: "p-6" }}: mark one with part="root" to take a string' }` : `string | readonly unknown[] | Record<string, boolean | null | undefined> | { kayError: 'A parts object is the parts attribute: write parts={{ head: "p-6" }}' }`} | undefined; parts?: ${object} | undefined }`
     const recipe = this.facts.recipe
 
     // The variants of the recipe, typed off it, so the component declares them once.
@@ -537,22 +537,21 @@ class ModuleShell {
     const visible = rooted.filter(node => node.kind !== 'slot')
     const located = this.options.inspect === true ? sourceLocator(this.options.inspectSource?.text ?? src, this.options.moduleId, this.options.inspectSource?.real) : undefined
 
-    let after = ''
-
     if (mode === 'html') {
       new HtmlTemplate(b, src, this.facts, this.ownMarkup, { classMerge: this.options.classMerge, awaitAlert: awaitAlertTail(this.options.awaitAlert, 'html'), hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { groups: this.loadPlan.groups } }).value(visible)
+      b.add('\n}\n')
     }
     else if (mode === 'dom') {
       const dom = new DomTemplate(b, src, this.facts, this.ownMarkup, errors, located, this.options.classTable, awaitAlertTail(this.options.awaitAlert, 'dom'))
 
       dom.block(visible)
-      after = dom.declarations(this.navigates())
+      b.add('\n}\n')
+      b.add(dom.declarations(this.navigates()))
     }
     else {
       this.jsx.emitRoot(rooted)
+      b.add('\n}\n')
     }
-
-    b.add(`\n}\n${after}`)
   }
 
   // Whether the script has `navigate` from `kay`, by import under any name or as a member of a namespace import.

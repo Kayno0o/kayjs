@@ -20,7 +20,7 @@ const COMPONENTS = {
   'src/hands.kay': '---\nimport Busy from \'./busy.kay\'\n---\nBusy(part="root spinner")\n',
   'src/panel.kay': '---\nimport Card from \'./card.kay\'\n---\nsection.panel\n  Card(part="card") body\n',
 }
-const IMPORTS = '---\nimport Card from \'../card.kay\'\nimport Pair from \'../pair.kay\'\nimport Panel from \'../panel.kay\'\nimport Plain from \'../plain.kay\'\nconst rest = { id: \'x\' }\nconst mine = { head: \'p-6\' }\n---\n'
+const IMPORTS = '---\nimport Card from \'../card.kay\'\nimport Pair from \'../pair.kay\'\nimport Panel from \'../panel.kay\'\nimport Plain from \'../plain.kay\'\nconst rest = { id: \'x\' }\nconst mine = { head: \'p-6\' }\nconst size = \'p-4\'\n---\n'
 
 async function problems(page: string, route = 'src/routes/index.kay', config = tsconfig): Promise<string[]> {
   const root = await scratchDir('parts-check-')
@@ -89,7 +89,7 @@ describe('kay check on a component with parts', () => {
   })
 
   it('takes a part class that may be undefined under exactOptionalPropertyTypes', async () => {
-    expect(await problems(`${IMPORTS}Card(class={{ head: rest.id === 'x' ? 'p-6' : undefined }}) a\n`, undefined, exact)).toEqual([])
+    expect(await problems(`${IMPORTS}Card(parts={{ head: rest.id === 'x' ? 'p-6' : undefined }}) a\n`, undefined, exact)).toEqual([])
   })
 
   it('reports a part the component does not have, at the call', async () => {
@@ -106,6 +106,13 @@ describe('kay check on a component with parts', () => {
     expect(await problems(`${IMPORTS}Card({...rest} class={{ head: 'p-6' }}) a\n`)).toEqual([])
     expect(await problems(`${IMPORTS}Card.mt-4(class={mine}) a\n`)).toEqual([expect.stringContaining('cannot be merged')])
     expect(await problems(`${IMPORTS}Plain.mt-4(class={{ on: true }})\nPlain({...rest} class={{ on: true }})\n`)).toEqual([])
+  })
+
+  it('refuses a parts object the compiler cannot see as one, naming the parts attribute, and takes one it can', async () => {
+    for (const call of ['Card(class={mine}) a', 'Card(class={{ head: size }}) a'])
+      expect(await problems(`${IMPORTS}${call}\n`)).toEqual([expect.stringContaining('parts')])
+
+    expect(await problems(`${IMPORTS}Card(class={{ head: rest.id === 'x' ? 'a' : 'b' }}) a\nCard(class={{ head: \`p-\${size}\` }}) b\n`)).toEqual([])
   })
 
   describe('a merged class on a component typing its class prop, under exactOptionalPropertyTypes', () => {

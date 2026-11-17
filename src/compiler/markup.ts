@@ -337,9 +337,7 @@ export abstract class TemplateWriter {
     return plan
   }
 
-  // An image loads lazily and decodes off the main thread unless the template says otherwise: a hero above the fold sets `loading="eager"` or `fetchpriority="high"`.
-
-  // The image defaults as a props object leading an element's sources, so a spread carrying its own wins.
+  // The image defaults, which an image loads lazily and decodes off the main thread unless the template says otherwise (a hero above the fold sets `loading="eager"` or `fetchpriority="high"`), as a props object leading an element's sources, so a spread carrying its own wins.
   protected leadingImageDefaults(element: ElementNode): void {
     const defaults = imageDefaultsOf(element, name => this.named(element, name))
 

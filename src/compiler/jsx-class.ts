@@ -88,11 +88,21 @@ export function addMergedClass(b: CodeBuilder, element: ElementNode, { attribute
 export function addOldParts(b: CodeBuilder, element: ElementNode, src: string, attribute: Attribute): boolean {
   const old = oldPartsClass(element, src)
 
-  if (attribute !== old || old === undefined)
+  if (old === undefined)
     return false
 
-  if (!element.attributes.some(one => one.kind !== 'spread' && src.slice(one.name.start, one.name.end) === 'parts'))
-    b.add(' ').wrap(old.name, () => b.add('parts')).add('={').addSource(old.expression).add('}')
+  const hand = element.attributes.find((one): one is Extract<NamedAttribute, { kind: 'expression' }> => one.kind === 'expression' && src.slice(one.name.start, one.name.end) === 'parts')
 
-  return true
+  if (attribute === old) {
+    b.add(' ').wrap(old.name, () => b.add('parts')).add('={')
+
+    if (hand === undefined)
+      b.addSource(old.expression)
+    else
+      b.add('{ ...(').addSource(hand.expression).add('), ...(').addSource(old.expression).add(') }')
+
+    b.add('}')
+  }
+
+  return attribute === old || attribute === hand
 }

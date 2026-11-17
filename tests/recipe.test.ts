@@ -249,7 +249,8 @@ describe('compiling a recipe', () => {
     const { tsx } = compileKay(CARD, 'src/card.kay', { check: true })
 
     expect(tsx).toContain('KayRecipeProps<typeof card>')
-    expect(tsx).toContain('class?: string | readonly unknown[] | Record<string, boolean | null | undefined> | { "root"?: string | undefined; "head"?: string | undefined; "body"?: string | undefined } | undefined')
+    expect(tsx).toContain('class?: string | readonly unknown[] | Record<string, boolean | null | undefined> | { kayError:')
+    expect(tsx).toContain('parts?: { "root"?: string | undefined; "head"?: string | undefined; "body"?: string | undefined } | undefined')
   })
 
   it('reads a recipe of a component with no props declaration', () => {
