@@ -67,12 +67,12 @@ function find(element: ElementNode, source: string): ExpressionAttribute | undef
   return isPartsObject(value) ? attribute : undefined
 }
 
-// The `parts` a component call writes and the `class` of before 1.105 that is one, which a call handing parts on lays under the parts it hands.
-export function writtenParts(element: ElementNode, source: string): ExpressionAttribute[] {
+// The `parts` a component call writes and the `class` of before 1.105 that is one, which a call handing parts on lays under the parts it hands, and the `parts` of its spreads under both, which the called component would otherwise lose to the hand-off.
+export function writtenParts(element: ElementNode, source: string): Attribute[] {
   const old = oldPartsClass(element, source)
   const hand = element.attributes.find((one): one is ExpressionAttribute => one.kind === 'expression' && source.slice(one.name.start, one.name.end) === 'parts')
 
-  return [hand, old].filter(attribute => attribute !== undefined)
+  return [...element.attributes.filter(one => one.kind === 'spread'), hand, old].filter(attribute => attribute !== undefined)
 }
 
 // What opens the list of classes of an element: an array, or on a component call the helper merging it, which is `handParts` for the `parts` of a call handing parts on.
@@ -86,12 +86,28 @@ export function openClassList(b: CodeBuilder, component: boolean, parts: boolean
 export function closeHandParts(b: CodeBuilder, component: boolean, written: readonly Attribute[] | undefined): void {
   b.add(component && !written ? '])' : ']')
 
-  const given = written?.filter(attribute => attribute.kind === 'expression') ?? []
+  const given = written?.filter(attribute => attribute.kind === 'expression' || attribute.kind === 'spread') ?? []
+  const emit = (attribute: (typeof given)[number]) => {
+    if (attribute.kind === 'spread')
+      b.add('((').addSource(attribute.expression).add(') as unknown as { parts?: unknown }).parts')
+    else if (attribute.kind === 'expression')
+      b.add('(').addSource(attribute.expression).add(')')
+  }
 
-  if (given.length === 1)
-    b.add(', (').addSource(given[0]!.expression).add(')')
-  else if (given.length === 2)
-    b.add(', { ...(').addSource(given[0]!.expression).add('), ...(').addSource(given[1]!.expression).add(') }')
+  if (given.length === 1) {
+    b.add(', ')
+    emit(given[0]!)
+  }
+  else if (given.length > 1) {
+    b.add(', { ')
+
+    for (const [index, attribute] of given.entries()) {
+      b.add(index === 0 ? '...' : ', ...')
+      emit(attribute)
+    }
+
+    b.add(' }')
+  }
 
   if (written)
     b.add(')')
@@ -101,7 +117,7 @@ export function closeHandParts(b: CodeBuilder, component: boolean, written: read
 export function oldPartsEntry(element: ElementNode, source: string, attribute: NamedAttribute, b: CodeBuilder, entry: (name: string, value: () => void, live: boolean) => void, hands = false): boolean {
   // A call that hands parts on writes them itself, with these.
   if (hands)
-    return writtenParts(element, source).includes(attribute as Extract<NamedAttribute, { kind: 'expression' }>)
+    return writtenParts(element, source).includes(attribute)
 
   const old = oldPartsClass(element, source)
 

@@ -23,6 +23,7 @@ const files: Record<string, string> = {
   'panel.kay': '---\nimport Card from \'./card.kay\'\n---\nsection.panel\n  Card(part="card" title="t") body\n',
   'busy.kay': '---\n---\nbutton.btn(part="root")\n  span.spin(part="spinner") wait\n',
   'hands.kay': '---\nimport Busy from \'./busy.kay\'\n---\nBusy(part="root spinner")\n',
+  'hands-spread.kay': '---\nimport Busy from \'./busy.kay\'\nconst { ...rest } = props<{ [key: string]: unknown }>()\n---\nBusy({...rest} part="root spinner" parts={{ spinner: \'size-9\' }})\n',
   'hands-short.kay': '---\nimport Busy from \'./busy.kay\'\n---\nBusy.mt-4(part="root spinner")\n',
   'plain.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv.base(class={className}) plain\n',
   'rooted.kay': 'header.p-2(part="top") a\nfooter.p-2(part="root") b\n',
@@ -413,6 +414,21 @@ describe('kay check on parts', () => {
     expect(handParts(['mt-4', handed])).toEqual({ root: ['mt-4', undefined], spinner: 'size-5' })
     expect(handParts([handed], { head: 'p-6' })).toEqual({ head: 'p-6', spinner: 'size-5' })
     expect(handParts(['mt-4'], { head: 'p-6' })).toEqual({ head: 'p-6' })
+  })
+
+  it('keeps what a written part and a handed one give the same nested part', () => {
+    const handed = partHanded('spinner', ['size-5', partClass({ parts: { spinner: { root: 'r1', icon: 'i1' } } }, 'spinner')])
+
+    expect(partClass({ parts: handParts(['mt-4', handed], { spinner: { icon: 'z', extra: 'e' } }) }, 'spinner')).toEqual({ root: ['size-5', 'r1'], icon: ['z', 'i1'], extra: 'e' })
+    expect(handParts(['mt-4'], ['x'])).toBeUndefined()
+  })
+
+  it('lays the parts of a spread under the ones a call hands on', async () => {
+    const html = await render('hands-spread.kay', { parts: { root: 'p-6', spinner: 'size-3' }, id: 'a' })
+
+    expect(html).toContain('p-6')
+    expect(html).toContain('size-9')
+    expect(html).toContain('size-3')
   })
 
   it('lets a page or layout with parts and a class prop through', () => {

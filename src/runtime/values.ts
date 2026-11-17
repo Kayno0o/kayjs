@@ -204,11 +204,18 @@ export function partsClass(list: readonly unknown[]): string | undefined {
 
 // The `parts` of a call that hands parts on: the parts its list holds, with the rest of its classes at their root, laid over the `written` parts object of the call; none when there are neither.
 export function handParts(list: readonly unknown[], written?: unknown): unknown {
-  const own = typeof written === 'object' && written !== null ? [taggedParts(written as Record<string, unknown>)] : []
+  const own = typeof written === 'object' && written !== null && !Array.isArray(written) ? [writtenAsParts(written as Record<string, unknown>)] : []
   const handed = partsIn(list)
   const all = handed === undefined ? own : [...own, handed]
 
   return all.length < 2 ? all[0] : mergeParts(all)
+}
+
+// The parts a call writes, the entry of a part that is a component its own parts, as `partClass` reads them from a prop.
+function writtenAsParts(written: Record<string, unknown>): Parts {
+  const entries = Object.entries(written).map(([name, entry]) => [name, typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry])
+
+  return taggedParts(Object.fromEntries(entries) as Record<string, unknown>)
 }
 
 // A part of this component handed to the called one under its name, `{ spinner: ... }`, which joins the entries the call hands it: its value is what the part's classes and the caller's entry make.
@@ -221,7 +228,14 @@ function joinable(value: unknown): boolean {
   return typeof value === 'string' || Array.isArray(value) || (typeof value === 'object' && value !== null && !isParts(value))
 }
 
-// Several objects of parts as one, a part two of them give joined in order when both are classes, the later one replacing it when either is the parts of a component.
+function mergedEntry(earlier: unknown, entry: unknown): unknown {
+  if (joinable(earlier) && joinable(entry))
+    return [earlier, entry]
+
+  return isParts(earlier) && isParts(entry) ? mergeParts([earlier, entry]) : entry ?? earlier
+}
+
+// Several objects of parts as one, a part two of them give joined in order when both are classes, merged the same way when both are the parts of a component, the later one replacing it otherwise.
 function mergeParts(found: readonly Parts[]): Parts {
   const merged: Record<string, unknown> = {}
 
@@ -229,7 +243,7 @@ function mergeParts(found: readonly Parts[]): Parts {
     for (const [name, entry] of Object.entries(parts)) {
       const earlier = Object.hasOwn(merged, name) ? merged[name] : undefined
 
-      merged[name] = joinable(earlier) && joinable(entry) ? [earlier, entry] : entry ?? earlier
+      merged[name] = mergedEntry(earlier, entry)
     }
   }
 
