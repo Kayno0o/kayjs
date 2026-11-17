@@ -82,6 +82,7 @@ import { retiredLintLevels } from './retired-lints'
 import { routeKeys } from './route-keys'
 import { routeShadow, routeShadowPath } from './route-shadow'
 import { schemaBuilders } from './schema-builders'
+import { schemaJson } from './schema-json'
 import { schemaType } from './schema-type'
 import { secretKeys } from './secret-keys'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
@@ -211,6 +212,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
 
   async ({ root, options }) => schemaType(root, options),
   async ({ root, options }) => schemaBuilders(root, options),
+  async ({ root, options }) => schemaJson(root, options),
   async ({ root, options }) => actionOptions(root, options),
   async ({ root, options }) => aiLanguage(root, options),
   async ({ root, options }) => hookNames(root, options),

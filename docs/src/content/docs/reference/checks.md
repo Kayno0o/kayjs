@@ -59,6 +59,7 @@ Each lint has a level. `deny` is an error (the eight that ship a broken page, su
 | `duplicate-id` | deny | a11y | An id two elements share, or one written out in a `for` or a `snippet` called more than once |
 | `invalid-autocomplete` | deny | forms | An `autocomplete` value HTML does not define |
 | `unbounded-string` | warn | forms | A string field of an action named like a short value (`name`, `email`, `title`...) with no `maxLength` of its own, which takes the default bound of 10,000 characters, unless an `enum`, `const` or anchored bounded `pattern` bounds it |
+| `schema-without-json-schema` | warn | forms | A Standard Schema validator with no `~standard.jsonSchema` (a hand-written one, or valibot's) where an action's `input` or an API route's `body`, `query`, `params`, `headers` or `cookie` takes a schema: a form shows no constraints, and OpenAPI and MCP show an open schema |
 | `invalid-nesting` | warn | islands | Markup HTML forbids or the parser rewrites, so the server and an island may disagree: a block in a `p`, a `form` in a `form`, a `tr` straight in a `table`, a cell outside a row, a heading in a heading, an `option` outside a `select`, an `li` outside a list, a non-`li` straight in one |
 | `positional-key` | deny | islands | A `for` keyed by position whose rows read `item.id` |
 | `unkeyed-rows` | deny | islands | A `for` of a component with no `key` over rows of an object type with no `id` |

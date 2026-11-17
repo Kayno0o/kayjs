@@ -143,7 +143,7 @@ An action takes its options first, with its input among them: `action({ input: {
 
 Every input an app reads, an action's, an API route's, a socket's and `defineEnv`'s, goes through one check. Text from a form, a query string, a path or the environment is read as the numbers, booleans and lists it spells, and a JSON body never is, so `'3'` sent for an int is refused. A key the schema does not name is refused in JSON and dropped from a form post, and a refusal is worded in the visitor's language.
 
-Any validator that follows Standard Schema, such as Zod or ArkType, can be the `input` of an action or the `body` of an API route. kay asks it to validate, and reads its JSON Schema, when it has one, for the form's constraints, the OpenAPI document and MCP tools.
+Any validator that follows Standard Schema, such as Zod or ArkType, can be the `input` of an action or the `body` of an API route. kay asks it to validate, and reads its JSON Schema, when it has one, for the form's constraints, the OpenAPI document and MCP tools. A validator without one still validates, and `kay check` warns of it (`schema-without-json-schema`): its form shows no constraints.
 
 ## Filling a form from a record
 
