@@ -782,7 +782,10 @@ type CaseVariant<Key, Known> = { [Name in keyof Known & string]: Lowercase<Name>
 type Misspelled<Key, Known> = [CaseVariant<Key, Known>] extends [never] ? 'unknown option' : `unknown option, did you mean \`${CaseVariant<Key, Known> & string}\`?`
 
 // A symbol key is no option a config names, and an object a library returns may carry one, as `pgData()`'s `Symbol.asyncDispose` does.
-type UnknownKeys<Given, Known> = Given extends object ? { [Key in Exclude<keyof Given, keyof Known | symbol>]: Misspelled<Key, Known> } : unknown
+type UnknownKeys<Given, Known> = Given extends object ? { [Key in Exclude<keyof Given, AllKeys<Known> | symbol>]: Misspelled<Key, Known> } : unknown
+
+// The keys of every member of a union of object shapes (`{ env } | { file }`), where `keyof` keeps only the keys they share, none for that one.
+type AllKeys<Known> = Known extends unknown ? keyof Known : never
 
 type Method = (...args: never[]) => unknown
 

@@ -59,6 +59,19 @@ describe('the unknown keys defineConfig refuses by type', () => {
     expect(defineConfig({ store: { sesions: undefined } })).toBeDefined()
   })
 
+  it('takes every shape of an option typed by a union of objects, and still refuses a typo in a plain bag', () => {
+    expect(defineConfig({ mcp: { token: { env: 'MCP_KEY' } } })).toBeDefined()
+    expect(defineConfig({ mcp: { token: { file: 'data/mcp-key' } } })).toBeDefined()
+    expect(defineConfig({ mcp: { token: 'secret' } })).toBeDefined()
+    expect(defineConfig({ metrics: { token: { file: 'data/metrics-key' } } })).toBeDefined()
+    expect(defineConfig({ cors: { origins: '*', credentials: false } })).toBeDefined()
+    expect(defineConfig({ cors: { origins: ['https://a.fr'], credentials: true } })).toBeDefined()
+    // @ts-expect-error a mistyped key inside a member of the union
+    expect(defineConfig({ mcp: { token: { flie: 'data/mcp-key' } } })).toBeDefined()
+    // @ts-expect-error a mistyped key of a plain bag beside them
+    expect(defineConfig({ mcp: { tokn: 'secret' } })).toBeDefined()
+  })
+
   it('leaves an object a library hands over alone, as a store carrying a symbol key', () => {
     const store = { sql: undefined, ping: async () => true, [Symbol.asyncDispose]: async () => undefined }
 
