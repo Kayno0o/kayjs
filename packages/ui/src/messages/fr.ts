@@ -159,6 +159,7 @@ export default defineMessages({
       taken: 'Le micro est utilisé par une autre application.',
       unsupported: 'Ce navigateur ne peut pas enregistrer de son.',
     },
+    relationGraph: { empty: 'Aucun élément lié.', failure: 'Impossible de charger les éléments liés', loading: 'Chargement…', retry: 'Réessayer' },
     rowsField: { add: 'Ajouter une ligne', added: 'Ligne {n} ajoutée', remove: 'Supprimer la ligne {n}', removed: 'Ligne {n} supprimée' },
     saveForm: {
       cancel: 'Annuler',

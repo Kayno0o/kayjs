@@ -1,0 +1,22 @@
+---
+import { signal } from 'kay'
+import type { RelationNeighbour } from '@kayjs/ui'
+import RelationGraph from '@kayjs/ui/relation-graph.kay'
+
+const { onSelect, items } = props<{ onSelect: (key: string | number) => void, items?: (() => Promise<RelationNeighbour[]>) | undefined }>()
+
+const picked = signal<string | number | undefined>(undefined)
+const moons: RelationNeighbour[] = [{ key: 'phobos', label: 'Phobos', href: '/phobos' }, { key: 'deimos', label: 'Deimos', missing: true }, { key: 'io', label: 'Io' }]
+
+function pick(item: RelationNeighbour) {
+  picked = item.key
+  onSelect(item.key)
+}
+---
+RelationGraph#bound(centre={{ label: 'Mars' }} items={moons} label="Around Mars" selected={picked()} onSelect={({ item }) => pick(item)})
+RelationGraph#late(centre={{ label: 'Venus' }} items={items ?? moons} label="Around Venus")
+RelationGraph#blocks(centre={{ label: 'Earth' }} items={moons} label="Around Earth")
+  @neighbour(item, index)
+    | {index + 1}. {item.label}
+  @middle(centre)
+    | <{centre.label}>

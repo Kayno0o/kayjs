@@ -37,6 +37,7 @@ export type { AxisScale, AxisTick, BarListRow, BarSeries, ChartSeries, ScatterAx
 export type * from './popover'
 export type { RangeValue } from './range'
 export { rangeFrom } from './range'
+export type { RelationNeighbour, RelationNode } from './relation-graph'
 export type { SideNavGroup } from './side-nav'
 export type { Size } from './size'
 export type { RowsSource } from './source'

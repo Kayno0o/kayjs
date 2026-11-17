@@ -1,0 +1,109 @@
+---
+import type { JSX, Snippet } from 'kay'
+import type { RelationNeighbour, RelationNode } from './relation-graph'
+import { recipe } from 'kay'
+import { wording } from 'kay/words'
+import { colorStyle } from './color'
+import { loadOptions } from './options-source'
+import type { OptionsSource } from './options-source'
+import { tabOf } from './outside'
+import { NODE_TONES, ringAt } from './relation-graph'
+
+// 'kui-relation-graph' stays as the component's name for an app's CSS. A tone or a `color` sets one variable, `--node-color`, that an item, its line and its label read; a missing item is muted and its line dashed.
+
+const look = recipe({
+  parts: {
+    root: 'kui-relation-graph block',
+    graph: 'relative mx-auto aspect-square w-full max-w-72',
+    lines: 'absolute inset-0 size-full',
+    line: `${NODE_TONES} [stroke:var(--node-color)] [stroke-opacity:0.45] [stroke-width:1.5px] data-missing:[stroke-dasharray:3_3]`,
+    list: 'm-0 list-none p-0',
+    item: 'absolute max-w-24 -translate-1/2',
+    centre: `${NODE_TONES} absolute top-1/2 left-1/2 max-w-28 -translate-1/2 truncate rounded-md bg-[color-mix(in_oklab,var(--node-color)_15%,transparent)] px-2 py-1 text-sm [font-weight:var(--font-weight-semibold)] [color:var(--node-color)] no-underline`,
+    node: `${NODE_TONES} block truncate rounded-md bg-surface px-1.5 py-0.5 text-xs [color:var(--node-color)] no-underline [&:is(a,button)]:cursor-pointer [&:is(a,button)]:hover:bg-surface-strong aria-current:bg-surface-strong aria-current:[font-weight:var(--font-weight-semibold)]`,
+    label: 'truncate',
+    status: 'm-0 pt-2 text-center text-xs text-muted',
+    retry: 'cursor-pointer text-xs text-accent underline',
+  },
+})
+
+const { items, centre, max = 10, selected, label, emptyLabel, empty, loadingLabel = wording('ui.relationGraph.loading', 'Loading…'), failureLabel = wording('ui.relationGraph.failure', 'Could not load the neighbours'), retryLabel = wording('ui.relationGraph.retry', 'Try again'), onSelect, onLoad, onError, neighbour: drawNeighbour, middle: drawMiddle, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect' | 'onLoad' | 'onError'> & {
+  // The item at the middle.
+  centre: RelationNode
+  // The items around it, in the order a keyboard and a screen reader reach them, which is the order of the ring too: a list, a promise of one, or a function answering it, such as an action, asked in the browser, the graph busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
+  items: OptionsSource<RelationNeighbour>
+  // How many are drawn at most, the first ones of `items`.
+  max?: number | undefined
+  // The key of the marked neighbour (`aria-current`), the app's to move.
+  selected?: string | number | undefined
+  // Names the graph for screen readers.
+  label: string
+  // What the component reads with no neighbour; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
+  emptyLabel?: string | undefined
+  empty?: Snippet | undefined
+  loadingLabel?: string | undefined
+  failureLabel?: string | undefined
+  retryLabel?: string | undefined
+  // Makes every neighbour without an `href`, and not missing, a button handing back the item pressed.
+  onSelect?: ((event: { item: RelationNeighbour }) => unknown) | undefined
+  // Called with each answer of a function or promise `items`, and with what it rejected with.
+  onLoad?: ((event: { options: readonly RelationNeighbour[], query: string }) => unknown) | undefined
+  onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
+  // Draws a neighbour in place of its `label`: `@neighbour(item, index)`; its link or button and its colour stay.
+  neighbour?: Snippet<[item: RelationNeighbour, index: number]> | undefined
+  // Draws the centre in place of its `label`: `@middle(centre)`.
+  middle?: Snippet<[centre: RelationNode]> | undefined
+}>()
+
+const source = loadOptions<RelationNeighbour>(() => items, { onLoad, onError, label: 'RelationGraph' })
+const shown = () => source.options().slice(0, Math.max(0, max))
+// The centre is `accent` and a neighbour `neutral` unless one says otherwise.
+const toneOf = (item: RelationNode, fallback: 'accent' | 'neutral') => item.tone ?? fallback
+const spot = (index: number) => ringAt(index, shown().length)
+const place = (index: number) => `left: ${spot(index).x}%; top: ${spot(index).y}%`
+---
+snippet middle(node: RelationNode)
+  if drawMiddle
+    | {drawMiddle(node)}
+  else
+    | {node.label}
+snippet name(item: RelationNeighbour, index: number)
+  if drawNeighbour
+    span(part="label") {drawNeighbour(item, index)}
+  else
+    span(part="label") {item.label}
+div(part="root" {...rest} role="group" aria-label={label} aria-busy={source.loading() ? 'true' : undefined})
+  div(part="graph")
+    svg(part="lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true")
+      for item, index of shown() key={item.key}
+        line(part="line" x1="50" y1="50" x2={spot(index).x} y2={spot(index).y} vector-effect="non-scaling-stroke" data-tone={toneOf(item, 'neutral')} data-missing={item.missing === true ? '' : undefined} style={colorStyle('--node-color', item.color)})
+    if centre.href !== undefined
+      a(part="centre" href={centre.href} {...tabOf(centre.href, centre.newTab)} data-tone={toneOf(centre, 'accent')} style={colorStyle('--node-color', centre.color)})
+        {middle(centre)}
+    else
+      span(part="centre" data-tone={toneOf(centre, 'accent')} style={colorStyle('--node-color', centre.color)})
+        {middle(centre)}
+    ol(part="list")
+      for item, index of shown() key={item.key}
+        li(part="item" style={place(index)})
+          if item.missing !== true && item.href !== undefined
+            a(part="node" href={item.href} {...tabOf(item.href, item.newTab)} data-tone={toneOf(item, 'neutral')} style={colorStyle('--node-color', item.color)} aria-current={selected === item.key ? 'true' : undefined})
+              {name(item, index)}
+          else if item.missing !== true && onSelect
+            button(part="node" type="button" data-tone={toneOf(item, 'neutral')} style={colorStyle('--node-color', item.color)} aria-current={selected === item.key ? 'true' : undefined} onClick={() => void onSelect?.({ item })})
+              {name(item, index)}
+          else
+            span(part="node" data-tone={toneOf(item, 'neutral')} data-missing={item.missing === true ? '' : undefined} style={colorStyle('--node-color', item.color)} aria-current={selected === item.key ? 'true' : undefined})
+              {name(item, index)}
+  if source.loading()
+    p(part="status" role="status") {loadingLabel}
+  else if source.failed()
+    p(part="status" role="alert") {failureLabel}
+    if source.retryable()
+      button(part="retry" type="button" onClick={source.retry}) {retryLabel}
+  else if shown().length === 0
+    if empty
+      div(part="status" role="status")
+        | {empty}
+    else if emptyLabel !== ''
+      p(part="status" role="status") {emptyLabel ?? wording('ui.relationGraph.empty', 'No related items.')}

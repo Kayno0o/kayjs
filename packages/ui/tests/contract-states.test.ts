@@ -10,7 +10,7 @@ const read = (file: string) => readFileSync(join(SRC, `${file}.kay`), 'utf8')
 const declares = (source: string, name: string) => new RegExp(`^\\s+${name}\\??: `, 'm').test(source)
 
 // Components showing a list, a series or a tree of data: each says what it reads with nothing to show (`emptyLabel`), and lets the app draw that state itself (an `@empty` block).
-const DATA = ['bar-chart', 'bar-list', 'scatter-chart', 'line-chart', 'contribution-graph', 'sparkline', 'status-strip', 'media-gallery', 'carousel', 'timeline', 'tree-view', 'description-list', 'virtual-list', 'table', 'combobox', 'multi-select', 'icon-picker', 'command-palette']
+const DATA = ['bar-chart', 'bar-list', 'scatter-chart', 'line-chart', 'contribution-graph', 'sparkline', 'status-strip', 'media-gallery', 'carousel', 'timeline', 'relation-graph', 'tree-view', 'description-list', 'virtual-list', 'table', 'combobox', 'multi-select', 'icon-picker', 'command-palette']
 
 // A component whose data arrives late words that state `loadingLabel`, its failure `failureLabel` and the way out `retryLabel`; these have no word for a part, for the reason given.
 const FAILURE_EXEMPT: Record<string, readonly string[]> = {

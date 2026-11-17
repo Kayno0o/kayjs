@@ -425,6 +425,24 @@ function rangeFrom(low: string, high: string): RangeValue
 [.] RangeValue
 type RangeValue = [number | null, number | null]
 
+[.] RelationNeighbour
+interface RelationNeighbour extends RelationNode
+  color?: string | undefined
+  href?: string | undefined
+  key: number | string
+  label: string
+  missing?: boolean | undefined
+  newTab?: NewTab | undefined
+  tone?: Tone | undefined
+
+[.] RelationNode
+interface RelationNode
+  color?: string | undefined
+  href?: string | undefined
+  label: string
+  newTab?: NewTab | undefined
+  tone?: Tone | undefined
+
 [.] RowChange
 type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
 
@@ -2735,6 +2753,40 @@ component default
   size?: "lg" | "md" | "sm" | "xs" | undefined
   tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
   variant?: "ghost" | "inline" | "solid" | undefined
+
+[./relation-graph.kay] default
+component default
+  centre: RelationNode
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
+  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
+}
+  empty?: Element
+  emptyLabel?: string | undefined
+  failureLabel?: string | undefined
+  items: OptionsSource<RelationNeighbour>
+  label: string
+  loadingLabel?: string | undefined
+  max?: number | undefined
+  middle?: ((centre: RelationNode) => Element) | undefined
+  neighbour?: ((item: RelationNeighbour, index: number) => Element) | undefined
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
+  onLoad?: ((event: { options: readonly RelationNeighbour[]; query: string; }) => unknown) | undefined
+  onSelect?: ((event: { item: RelationNeighbour; }) => unknown) | undefined
+  parts?: undefined | {
+  root?: string | undefined;
+  label?: string | undefined;
+  graph?: string | undefined;
+  lines?: string | undefined;
+  line?: string | undefined;
+  centre?: string | undefined;
+  list?: string | undefined;
+  item?: string | undefined;
+  node?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
+}
+  retryLabel?: string | undefined
+  selected?: number | string | undefined
 
 [./relative-time.kay] default
 component default

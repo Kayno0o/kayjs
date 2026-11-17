@@ -62,6 +62,7 @@ import RadioGroup from '@kayjs/ui/radio-group.kay'
 import RangeInput from '@kayjs/ui/range-input.kay'
 import Rating from '@kayjs/ui/rating.kay'
 import RecordButton from '@kayjs/ui/record-button.kay'
+import RelationGraph from '@kayjs/ui/relation-graph.kay'
 import RowsField from '@kayjs/ui/rows-field.kay'
 import SaveForm from '@kayjs/ui/save-form.kay'
 import ScatterChart from '@kayjs/ui/scatter-chart.kay'
@@ -181,6 +182,7 @@ export const COMPONENTS = {
   'range-input': RangeInput,
   'rating': Rating,
   'record-button': RecordButton,
+  'relation-graph': RelationGraph,
   'rows-field': RowsField,
   'save-form': SaveForm,
   'scatter-chart': ScatterChart,
@@ -283,6 +285,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'range-input': { label: 'Hours', min: 0, max: 24 },
   'rating': { value: 4.5, label: 'Rated 4.5 out of 5' },
   'record-button': { onRecord: noop },
+  'relation-graph': { centre: { label: 'Mars' }, items: [{ key: 'phobos', label: 'Phobos', href: '/phobos' }, { key: 'deimos', label: 'Deimos', missing: true }], label: 'Around Mars' },
   'rows-field': { label: 'Headers', columns: [{ key: 'name', label: 'Header' }], rows: [{ name: 'A' }] },
   'save-form': { action, failure: 'Failed' },
   'scatter-chart': { points: [{ key: 'a', label: 'Hades', x: 1, y: 2 }], label: 'Games' },

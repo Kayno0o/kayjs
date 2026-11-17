@@ -1741,6 +1741,24 @@ function rangeFrom(low: string, high: string): RangeValue
 [./lib/index] RangeValue
 type RangeValue = [number | null, number | null]
 
+[./lib/index] RelationNeighbour
+interface RelationNeighbour extends RelationNode
+  color?: string | undefined
+  href?: string | undefined
+  key: number | string
+  label: string
+  missing?: boolean | undefined
+  newTab?: NewTab | undefined
+  tone?: Tone | undefined
+
+[./lib/index] RelationNode
+interface RelationNode
+  color?: string | undefined
+  href?: string | undefined
+  label: string
+  newTab?: NewTab | undefined
+  tone?: Tone | undefined
+
 [./lib/index] RowChange
 type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
 
@@ -2816,6 +2834,30 @@ function startRecording(options: RecordOptions): Promise<RecordProblem | Recordi
 
 [./lib/refill] sentOption
 function sentOption<Choice extends string | null | number, Held>(sent: string | undefined, options: readonly { value: Choice; }[], fallback: Held): Choice | Held
+
+[./lib/relation-graph] NODE_TONES
+const NODE_TONES: "data-[tone=neutral]:[--node-color:var(--color-muted)] data-[tone=accent]:[--node-color:var(--color-accent)] data-[tone=success]:[--node-color:var(--color-success)] data-[tone=warning]:[--node-color:var(--color-warning)] data-[tone=danger]:[--node-color:var(--color-danger)] data-[tone=info]:[--node-color:var(--color-info)] data-missing:[--node-color:var(--color-muted)]"
+
+[./lib/relation-graph] RelationNeighbour
+interface RelationNeighbour extends RelationNode
+  color?: string | undefined
+  href?: string | undefined
+  key: number | string
+  label: string
+  missing?: boolean | undefined
+  newTab?: NewTab | undefined
+  tone?: Tone | undefined
+
+[./lib/relation-graph] RelationNode
+interface RelationNode
+  color?: string | undefined
+  href?: string | undefined
+  label: string
+  newTab?: NewTab | undefined
+  tone?: Tone | undefined
+
+[./lib/relation-graph] ringAt
+function ringAt(index: number, count: number, radius?: number): { x: number; y: number; }
 
 [./lib/safely] safely
 function safely(call: () => unknown, label: string): void

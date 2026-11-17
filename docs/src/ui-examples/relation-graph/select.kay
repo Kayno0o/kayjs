@@ -1,0 +1,15 @@
+---
+import { signal } from 'kay'
+import type { RelationNeighbour } from '@kayjs/ui'
+import RelationGraph from '@kayjs/ui/relation-graph.kay'
+
+const picked = signal<string | number | undefined>(undefined)
+const notes: RelationNeighbour[] = [
+  { key: 'ring', label: 'Ring buffers', tone: 'info' },
+  { key: 'queue', label: 'Queues', tone: 'info' },
+  { key: 'cache', label: 'Cache eviction', color: 'oklch(0.7 0.12 150)' },
+]
+---
+.max-w-sm
+  RelationGraph(centre={{ label: 'Linked lists' }} items={notes} label="Notes around Linked lists" selected={picked()} onSelect={({ item }) => picked = item.key})
+  p.text-sm Picked: {picked() ?? 'nothing'}.

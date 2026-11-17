@@ -173,6 +173,19 @@ test('Sparkline scales its bars against the largest and tones them, and StatusSt
   expect(strip.map(cell => [attr(cell, 'data-tone'), attr(cell, 'aria-hidden'), attr(cell, 'data-hint')])).toEqual([['success', 'true', 'ok'], ['danger', 'true', null], [null, 'true', null], ['warning', 'true', null]])
 })
 
+test('RelationGraph draws the neighbours in list order up to max, each a link or plain text, with its line', async () => {
+  const nodes = await find('/relation-graph', '#graph [data-part=node]')
+  const lines = await find('/relation-graph', '#graph [data-part=line]')
+
+  expect(nodes.map(node => [node.tag, node.text, attr(node, 'href'), attr(node, 'data-tone')])).toEqual([['a', 'Phobos', '/phobos', 'info'], ['span', 'Deimos', null, 'neutral'], ['a', 'Io', 'https://example.com/io', 'neutral']])
+  expect(attr(nodes[2]!, 'target')).toBe('_blank')
+  expect(attr(nodes[2]!, 'style')).toBe('--node-color: #2a5f9e')
+  expect(lines.map(line => attr(line, 'data-missing'))).toEqual([null, '', null])
+  expect([attr(await one('/relation-graph', '#graph'), 'role'), attr(await one('/relation-graph', '#graph'), 'aria-label')]).toEqual(['group', 'Around Mars'])
+  expect((await one('/relation-graph', '#graph [data-part=centre]')).tag).toBe('a')
+  expect((await one('/relation-graph', '#alone [data-part=status]')).text).toBe('No related items.')
+})
+
 test('Tooltip is a tab stop carrying its text for TooltipHost', async () => {
   const found = await one('/buttons', '#tip')
 

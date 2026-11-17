@@ -1,0 +1,7 @@
+---
+import RelationGraph from '@kayjs/ui/relation-graph.kay'
+import '../app.css'
+---
+main
+  RelationGraph#graph(centre={{ label: 'Mars', href: '/mars' }} items={[{ key: 'phobos', label: 'Phobos', href: '/phobos', tone: 'info' }, { key: 'deimos', label: 'Deimos', missing: true }, { key: 'io', label: 'Io', href: 'https://example.com/io', color: '#2a5f9e' }, { key: 'ceres', label: 'Ceres' }]} max={3} label="Around Mars")
+  RelationGraph#alone(centre={{ label: 'Venus' }} items={[]} label="Around Venus")

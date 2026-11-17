@@ -1,0 +1,13 @@
+---
+import type { RelationNeighbour } from '@kayjs/ui'
+import RelationGraph from '@kayjs/ui/relation-graph.kay'
+
+const notes: RelationNeighbour[] = [
+  { key: 'ring', label: 'Ring buffers', href: '/notes/ring', tone: 'info' },
+  { key: 'queue', label: 'Queues', href: '/notes/queue', tone: 'info' },
+  { key: 'cache', label: 'Cache eviction', href: '/notes/cache', tone: 'accent' },
+  { key: 'lru', label: 'LRU', missing: true },
+]
+---
+.max-w-sm
+  RelationGraph(centre={{ label: 'Linked lists' }} items={notes} label="Notes around Linked lists")
