@@ -58,7 +58,7 @@ const look = recipe({
     failure: 'flex flex-wrap items-center justify-center gap-3 px-3 py-4 text-sm',
     message: 'm-0',
     // The retry is a plain button wearing the Button's look, so a Table with no other Button keeps the Button and its busy state out of the island.
-    retry: 'kui-btn inline-flex cursor-pointer items-center justify-center gap-[calc(var(--spacing)*1.25*var(--density))] rounded-md border-0 [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] whitespace-nowrap [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+    retry: 'kui-btn inline-flex enabled:not-aria-busy:cursor-pointer items-center justify-center gap-[calc(var(--spacing)*1.25*var(--density))] rounded-md border-0 [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] whitespace-nowrap [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     emptyCell: 'px-3 py-8 text-center text-xs text-muted @max-[30rem]/table:block',
     ...(uses('filter') || uses('filterParam') || uses('fields'))
       ? {
