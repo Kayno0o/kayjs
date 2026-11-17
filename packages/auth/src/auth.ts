@@ -2,19 +2,20 @@ import type { DefinitionBase, EphemeralType, MetadataBase, RouteBase, SingletonB
 import type { Duration, Guard, Schema } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { Access } from './access'
-import type { IssueTokenResult, TokenOptions } from './bearer'
+import type { TokenOptions, TokenProblem } from './bearer'
 import type { CaptchaOptions } from './captcha'
 import type { AuthSessionData, BareUser, OAuthApp, Profile, User } from './core'
 import type { AccountOptions } from './deletion'
 import type { EmailOptions } from './email'
 import type { AuthEventInfo, AuthHookContext } from './events'
+import type { Result } from './failure'
 import type { ForwardAuthOptions, ForwardDomains } from './forwardAuth'
 import type { ScopeRequirement } from './gate'
 import type { RouteGuardOptions } from './guards'
 import type { LimitsOption } from './limits'
 import type { OrganizationsOptions } from './organizations'
 import type { AuthPagesConfig } from './pages'
-import type { CreateUserInput, CreateUserResult } from './password'
+import type { CreateUserInput, RegisterErrors } from './password'
 import type { AuthRequirement } from './request'
 import type { CredentialRules } from './rules'
 import type { AuthStore } from './store'
@@ -186,13 +187,13 @@ export function authCore<Data extends AuthSessionData, Role extends string = str
 
     admin: {
       // A user made by the app, as a script or an admin page makes one: checked as registering is, open with `signUp: false` too, signing no one in and mailing no one.
-      async createUser(input: Omit<CreateUserInput, 'roles'> & { roles?: Role[] | undefined }): Promise<CreateUserResult> {
+      async createUser(input: Omit<CreateUserInput, 'roles'> & { roles?: Role[] | undefined }): Promise<Result<{ user: BareUser }, never, RegisterErrors>> {
         return (await load.password()).createUser(core, input)
       },
     },
 
     // A bearer token for `userId` taking no proof and sending no mail, for a flow the app gates itself, such as pairing a device, or a script. `token` adopts one the app handed out before, so its devices keep working through a migration.
-    async issueToken(userId: string, label: string, tokenOptions: TokenOptions<Scope> & { token?: string | undefined } = {}): Promise<IssueTokenResult> {
+    async issueToken(userId: string, label: string, tokenOptions: TokenOptions<Scope> & { token?: string | undefined } = {}): Promise<Result<{ token: string, id: string }, TokenProblem | 'token' | 'not-found' | 'banned'>> {
       return (await load.bearer()).issueToken(core, userId, label, tokenOptions)
     },
 

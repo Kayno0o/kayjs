@@ -1,10 +1,10 @@
-import type { ChangeUsernameResult, DeleteAccountResult, UpdateLocaleResult } from '../account'
-import type { CancelDeletionResult } from '../deletion'
+import type { BareUser } from '../core'
 import type { DeletionImpact } from '../erase'
-import type { ExportResult } from '../export'
-import type { ProfileFieldView } from '../pages'
-import type { SaveProfileResult } from '../profile'
-import type { Proof } from '../proof'
+import type { DataExport } from '../export'
+import type { Result } from '../failure'
+import type { ProfileFieldView, ProfileProblem } from '../pages'
+import type { Proof, ProofFailure } from '../proof'
+import type { UsernameProblem } from '../rules'
 import type { RequestState } from '../state'
 import { KayError } from 'kay/library'
 import { publicUser } from '../core'
@@ -16,22 +16,22 @@ export class AccountMethods {
   constructor(private readonly state: RequestState) {}
 
   // Names the signed-in user, or renames them, under the rules register checks; no proof, a name being no credential.
-  async changeUsername(username: string): Promise<ChangeUsernameResult> {
+  async changeUsername(username: string): Promise<Result<{ user: BareUser }, 'signed-out', { username: UsernameProblem | 'taken' | 'unchanged' }>> {
     return (await load.account()).changeUsername(this.state, username)
   }
 
   // Sets the language the signed-in user's mails are written in, a BCP 47 tag such as `fr`; refused with `signed-out`, or `invalid-locale` for anything else than a tag.
-  async updateLocale(locale: string): Promise<UpdateLocaleResult> {
+  async updateLocale(locale: string): Promise<Result<object, 'signed-out' | 'invalid-locale'>> {
     return (await load.account()).updateLocale(this.state, locale)
   }
 
   // Deletes the signed-in user, calling `beforeDelete` for the app's own records, and signs this session out, or with `account.deleteAfter` only marks the account pending (`{ ok: true, deleteAt }`) and stays signed in, the prune deleting it once the period ends; the last admin and the only owner of an organization with other members are refused, an organization they are alone in is deleted with them.
-  async delete(proof: Proof): Promise<DeleteAccountResult> {
+  async delete(proof: Proof): Promise<Result<{ deleteAt?: Date }, ProofFailure | 'last-admin' | 'last-owner' | 'refused'>> {
     return (await load.account()).deleteAccount(this.state, proof, this.state.signOut)
   }
 
   // With `account.deleteAfter`, takes the pending deletion off the signed-in user's account and tells them; refused with `signed-out`, or `not-pending` when the account is not pending deletion.
-  async cancelDeletion(): Promise<CancelDeletionResult> {
+  async cancelDeletion(): Promise<Result<object, 'signed-out' | 'not-pending'>> {
     return (await load.deletion()).cancelDeletion(this.state)
   }
 
@@ -59,7 +59,7 @@ export class AccountMethods {
   }
 
   // Stores the values posted from that form through `pages.profile.save`, once trimmed and checked against each field's `required` and `maxLength`: names that are no field are dropped, and nothing is stored while any field is refused.
-  async saveProfile(values: Record<string, unknown>): Promise<SaveProfileResult> {
+  async saveProfile(values: Record<string, unknown>): Promise<Result<object, 'signed-out', Record<string, ProfileProblem>>> {
     const profile = this.state.core.pages?.profile
 
     if (!profile)
@@ -75,7 +75,7 @@ export class AccountMethods {
   }
 
   // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `exportData`: for a download of their data.
-  async export(): Promise<ExportResult> {
+  async export(): Promise<Result<{ data: DataExport }, 'signed-out' | 'limited' | 'impersonating' | 'stale'>> {
     return (await load.exports()).exportData(this.state)
   }
 }

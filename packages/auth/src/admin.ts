@@ -1,6 +1,6 @@
 import type { BareUser, SignedIn } from './core'
 import type { AuditCursorInput, AuditEntry } from './events'
-import type { AuthFailed } from './failure'
+import type { AuthFailed, Result } from './failure'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
@@ -30,14 +30,6 @@ export type AdminFailure = 'forbidden' | 'not-found' | 'two-factor-required'
 
 // `stale` when the admin's session neither signed in nor re-proved in the last ten minutes.
 export type AdminChangeFailure = AdminFailure | 'stale'
-
-export type RoleResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChangeFailure | 'unknown-role' | 'self' | 'last-admin'>
-
-export type BanResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChangeFailure | 'self' | 'admin' | 'until'>
-
-export type UnbanResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChangeFailure>
-
-export type DeleteResult = { ok: true } | AuthFailed<AdminChangeFailure | 'self' | 'admin' | 'refused'>
 
 export function managedUser(record: UserRecord): ManagedUser {
   return {
@@ -130,10 +122,8 @@ async function anotherAdmin(state: RequestState, exceptId: string): Promise<bool
   }
 }
 
-export type ListUsersResult = { ok: true, users: ManagedUser[], total: number } | AuthFailed<'forbidden' | 'two-factor-required'>
-
 // Newest first, a page of `limit` (50 by default) from `offset`.
-export async function listUsers(state: RequestState, query: { search?: string | undefined, offset?: number | undefined, limit?: number | undefined }): Promise<ListUsersResult> {
+export async function listUsers(state: RequestState, query: { search?: string | undefined, offset?: number | undefined, limit?: number | undefined }): Promise<Result<{ users: ManagedUser[], total: number }, 'forbidden' | 'two-factor-required'>> {
   const acting = await askingAdmin(state)
 
   if (!acting.ok)
@@ -149,9 +139,7 @@ export async function listUsers(state: RequestState, query: { search?: string | 
   return { ok: true, users: found.users.map(managedUser), total: found.total }
 }
 
-export type GetUserResult = { ok: true, user: ManagedUser, admin: boolean } | AuthFailed<AdminFailure>
-
-export async function getUser(state: RequestState, userId: string): Promise<GetUserResult> {
+export async function getUser(state: RequestState, userId: string): Promise<Result<{ user: ManagedUser, admin: boolean }, AdminFailure>> {
   const acting = await askingAdmin(state)
 
   if (!acting.ok)
@@ -163,7 +151,7 @@ export async function getUser(state: RequestState, userId: string): Promise<GetU
 }
 
 // Takes effect on the user's next request, roles being read with the user each time.
-export async function changeRole(state: RequestState, userId: string, role: string, granted: boolean): Promise<RoleResult> {
+export async function changeRole(state: RequestState, userId: string, role: string, granted: boolean): Promise<Result<{ user: ManagedUser }, AdminChangeFailure | 'unknown-role' | 'self' | 'last-admin'>> {
   const acting = await changingAdmin(state)
 
   if (!acting.ok)
@@ -202,7 +190,7 @@ export async function changeRole(state: RequestState, userId: string, role: stri
 }
 
 // Bars the user from signing in, for good or `until` then, and signs them out everywhere, devices included. Another admin is refused: revoke their role first.
-export async function banUser(state: RequestState, userId: string, options: { reason?: string | undefined, until?: Date | undefined }): Promise<BanResult> {
+export async function banUser(state: RequestState, userId: string, options: { reason?: string | undefined, until?: Date | undefined }): Promise<Result<{ user: ManagedUser }, AdminChangeFailure | 'self' | 'admin' | 'until'>> {
   const acting = await changingAdmin(state)
 
   if (!acting.ok)
@@ -235,7 +223,7 @@ export async function banUser(state: RequestState, userId: string, options: { re
   return { ok: true, user: managedUser(updated) }
 }
 
-export async function unbanUser(state: RequestState, userId: string): Promise<UnbanResult> {
+export async function unbanUser(state: RequestState, userId: string): Promise<Result<{ user: ManagedUser }, AdminChangeFailure>> {
   const acting = await changingAdmin(state)
 
   if (!acting.ok)
@@ -260,7 +248,7 @@ export async function unbanUser(state: RequestState, userId: string): Promise<Un
 }
 
 // Deletes the user with everything kayjs-auth keeps for them, asks `beforeDelete`, calls `onDelete` and mails them the account-deleted notice. Another admin is refused: revoke their role first. An organization the user solely owns with other members passes to its longest-standing member, its new owner told, so an abandoned account is never a dead end.
-export async function deleteUser(state: RequestState, userId: string): Promise<DeleteResult> {
+export async function deleteUser(state: RequestState, userId: string): Promise<Result<object, AdminChangeFailure | 'self' | 'admin' | 'refused'>> {
   const acting = await changingAdmin(state)
 
   if (!acting.ok)
@@ -279,19 +267,15 @@ export async function deleteUser(state: RequestState, userId: string): Promise<D
   return await isAdmin(state, record) ? failed('admin') : eraseLeavingUser(state, record, { actor, handOver: true })
 }
 
-export type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | AuthFailed<'forbidden' | 'two-factor-required'>
-
 // Everyone's audit log, or one user's, newest first.
-export async function adminAuditLog(state: RequestState, query: { userId?: string | undefined, before?: AuditCursorInput | undefined, limit?: number | undefined }): Promise<AdminAuditLogResult> {
+export async function adminAuditLog(state: RequestState, query: { userId?: string | undefined, before?: AuditCursorInput | undefined, limit?: number | undefined }): Promise<Result<{ entries: AuditEntry[] }, 'forbidden' | 'two-factor-required'>> {
   const acting = await askingAdmin(state)
 
   return !acting.ok ? acting : { ok: true, entries: await auditEntries(state.core, query) }
 }
 
-export type ImpersonateResult = { ok: true } | AuthFailed<AdminFailure | 'stale' | 'self' | 'admin' | 'banned'>
-
 // Signs this browser in as `userId`, the admin's own sign-in kept for `admin.stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, nothing is written to the user's organizations, another admin cannot be impersonated, it ends after 30 minutes, and the user is mailed.
-export async function impersonate(state: RequestState, userId: string): Promise<ImpersonateResult> {
+export async function impersonate(state: RequestState, userId: string): Promise<Result<object, AdminFailure | 'stale' | 'self' | 'admin' | 'banned'>> {
   const acting = await changingAdmin(state)
   const own = await state.session.get('auth')
 

@@ -5,7 +5,7 @@ import { KayError } from 'kay/library'
 import { notifications, personalData } from 'kay/server'
 import { linkedUser } from './core'
 import { reportFrom } from './events'
-import { failed } from './failure'
+import { failed, failedAs } from './failure'
 import { log } from './log'
 import { mailNotice, securityNotice } from './securityNotice'
 
@@ -127,7 +127,7 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, acto
   const refusal = await core.beforeDelete?.(await linkedUser(core, record), actor ? await linkedUser(core, actor) : null)
 
   if (refusal)
-    return { ok: false, error: refusal }
+    return failedAs(refusal)
 
   if (stillDue && !await stillDue())
     return failed('refused')

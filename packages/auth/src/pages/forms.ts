@@ -2,7 +2,7 @@ import type { MinTimeRefusal } from 'kay'
 import type { Auth } from '../auth'
 import type { CaptchaAction } from '../captcha'
 import type { Proof } from '../proof'
-import type { AuthFeatures, ProfileProblem } from './index'
+import type { AuthFeatures } from './index'
 import { t } from 'elysia'
 import { wording } from 'kay/words'
 import { passkeyAssertion, passkeyAttestation } from '../payloads'
@@ -171,8 +171,8 @@ export function issue(...[field, problem, rules]: [field: 'email', problem: Prob
 }
 
 // What a page shows under a profile field the app asked for, `max` being the field's own limit when it set one.
-export function profileIssue(problem: ProfileProblem, max?: number): string {
-  return typeof problem === 'object' ? problem.message : wording(`auth.fields.profile.${problem}`, FIELD_ERRORS.profile[problem], { max: max ?? PROFILE_MAX_LENGTH })
+export function profileIssue(problem: string, max?: number): string {
+  return problem === 'required' || problem === 'too-long' ? wording(`auth.fields.profile.${problem}`, FIELD_ERRORS.profile[problem], { max: max ?? PROFILE_MAX_LENGTH }) : problem
 }
 
 // The message for the `?error=` a failed provider sign-in comes back with; undefined for none, or one kayjs-auth never sends.

@@ -1,6 +1,6 @@
 import type { Duration } from 'kay'
 import type { Core } from './core'
-import type { AuthFailed, AuthRejected } from './failure'
+import type { AuthFailed, Result } from './failure'
 import type { AuthMailer, MailData, Templates } from './mail'
 import type { Proof, ProofFailure } from './proof'
 import type { EmailProblem, PasswordProblem } from './rules'
@@ -68,23 +68,10 @@ export interface PendingCode {
   expires: number
 }
 
-export type CodeResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'expired' | 'limited' | 'banned'>
-
 // Sent whether or not an account has that address, so the answer tells nothing of which ones exist.
-export type MailRequestResult = { ok: true } | AuthFailed<'limited' | 'captcha' | 'unavailable'>
-
-export type LinkResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'limited' | 'banned'>
-
-export type VerifyEmailResult = LinkResult | AuthFailed<'confirm'>
-
-export type ResetPasswordResult = LinkResult | AuthRejected<{ password: PasswordProblem | 'breached' }>
-
-export type ChangeEmailResult = { ok: true } | AuthFailed<ProofFailure | 'unavailable'> | AuthRejected<{ email: EmailProblem | 'taken' | 'unchanged' }>
-
-export type SendVerificationResult = MailRequestResult | AuthFailed<'signed-out' | 'verified'>
 
 // Mails a new verification link to the signed-in user or, with nobody signed in, off the response's path to the account this browser registered or proved the password of.
-export async function sendVerification(state: RequestState): Promise<SendVerificationResult> {
+export async function sendVerification(state: RequestState): Promise<Result<object, 'limited' | 'captcha' | 'unavailable' | 'signed-out' | 'verified'>> {
   const current = await state.current()
   const registered = current ? undefined : await state.session.get('authRegistered')
   const record = current ?? (registered === undefined ? undefined : await state.core.store.users.get(registered))
@@ -120,7 +107,7 @@ export async function sendVerification(state: RequestState): Promise<SendVerific
 
 // Verifies the address for the browser signed in as the account, the one that registered it or the one that proved its password; any other must give the account's password, since whoever opens the mail may be confirming an account a stranger registered with their address, which verified would stay the stranger's.
 // Never signs in. Refused, the link stays usable where it can be confirmed.
-export async function verifyEmail(state: RequestState, token: string, password?: string): Promise<VerifyEmailResult> {
+export async function verifyEmail(state: RequestState, token: string, password?: string): Promise<Result<{ redirect: string }, 'invalid' | 'limited' | 'banned' | 'confirm'>> {
   const spent = await spendLink(state, token, 'verify-email')
 
   if (!spent.ok)
@@ -179,12 +166,12 @@ async function holdsPassword(state: RequestState, record: UserRecord, password: 
   return true
 }
 
-export async function requestPasswordReset(state: RequestState, email: string, captcha?: string, redirect?: string): Promise<MailRequestResult> {
+export async function requestPasswordReset(state: RequestState, email: string, captcha?: string, redirect?: string): Promise<Result<object, 'limited' | 'captcha' | 'unavailable'>> {
   return mailByAddress(state, email, 'reset-password', backOf(state.core, redirect), captcha)
 }
 
 // Sets the password the link was sent for and ends every other session the user held.
-export async function resetPassword(state: RequestState, token: string, password: string): Promise<ResetPasswordResult> {
+export async function resetPassword(state: RequestState, token: string, password: string): Promise<Result<{ redirect: string }, 'invalid' | 'limited' | 'banned', { password: PasswordProblem | 'breached' }>> {
   // Counted before the breached-password service is asked, so forged links cannot make the server call it without end.
   if (await spend(state.core.rates, `link:${state.client}`, state.core.limits.link))
     return failed('limited')
@@ -221,11 +208,11 @@ export async function resetPassword(state: RequestState, token: string, password
   return state.complete(record, spent.token.redirect ?? homeOf(state.core), 'reset-password')
 }
 
-export async function requestMagicLink(state: RequestState, email: string, redirect?: string, captcha?: string): Promise<MailRequestResult> {
+export async function requestMagicLink(state: RequestState, email: string, redirect?: string, captcha?: string): Promise<Result<object, 'limited' | 'captcha' | 'unavailable'>> {
   return mailByAddress(state, email, 'magic-link', localPath(redirect, homeOf(state.core)), captcha)
 }
 
-export async function signInWithMagicLink(state: RequestState, token: string): Promise<LinkResult> {
+export async function signInWithMagicLink(state: RequestState, token: string): Promise<Result<{ redirect: string }, 'invalid' | 'limited' | 'banned'>> {
   const spent = await spendLink(state, token, 'magic-link')
 
   if (!spent.ok)
@@ -245,7 +232,7 @@ export async function signInWithMagicLink(state: RequestState, token: string): P
 }
 
 // Mails the new address a link confirming it; the account keeps the old one until then.
-export async function changeEmail(state: RequestState, proof: Proof, email: string): Promise<ChangeEmailResult> {
+export async function changeEmail(state: RequestState, proof: Proof, email: string): Promise<Result<object, ProofFailure | 'unavailable', { email: EmailProblem | 'taken' | 'unchanged' }>> {
   const proved = await reprove(state, proof, { secondFactor: true })
 
   if (!proved.ok)
@@ -274,7 +261,7 @@ export async function changeEmail(state: RequestState, proof: Proof, email: stri
 }
 
 // Moves the account to the address the link was sent to, and ends the user's other sessions.
-export async function confirmEmailChange(state: RequestState, token: string): Promise<LinkResult> {
+export async function confirmEmailChange(state: RequestState, token: string): Promise<Result<{ redirect: string }, 'invalid' | 'limited' | 'banned'>> {
   const spent = await spendLink(state, token, 'change-email')
 
   if (!spent.ok)
@@ -337,7 +324,7 @@ export async function warnHolder(state: RequestState, holder: UserRecord): Promi
 }
 
 // Signs in with the code a magic link mail carried, in the session that asked for it.
-export async function signInWithEmailCode(state: RequestState, code: string): Promise<CodeResult> {
+export async function signInWithEmailCode(state: RequestState, code: string): Promise<Result<{ redirect: string }, 'invalid' | 'expired' | 'limited' | 'banned'>> {
   const spent = await spendCode(state, 'sign-in-code', code)
 
   if (!spent.ok)
@@ -351,7 +338,7 @@ export async function signInWithEmailCode(state: RequestState, code: string): Pr
 }
 
 // Verifies the address with the code its verification mail carried, in the session that asked for it, which registered the account or is signed in as it.
-export async function verifyEmailCode(state: RequestState, code: string): Promise<CodeResult> {
+export async function verifyEmailCode(state: RequestState, code: string): Promise<Result<{ redirect: string }, 'invalid' | 'expired' | 'limited' | 'banned'>> {
   const spent = await spendCode(state, 'verify-code', code)
 
   if (!spent.ok)
@@ -424,7 +411,7 @@ function codeDigest(core: Core, nonce: string, code: string): string {
 }
 
 // Counted by address whether or not an account has it, and mailed off the response's path, so neither the answer nor its time tells which addresses exist.
-async function mailByAddress(state: RequestState, email: string, type: 'reset-password' | 'magic-link', redirect: string | null, captcha: string | undefined): Promise<MailRequestResult> {
+async function mailByAddress(state: RequestState, email: string, type: 'reset-password' | 'magic-link', redirect: string | null, captcha: string | undefined): Promise<Result<object, 'limited' | 'captcha' | 'unavailable'>> {
   const { core } = state
 
   if (!core.email)

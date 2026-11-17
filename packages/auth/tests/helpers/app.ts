@@ -1,3 +1,4 @@
+import type { FAILURE } from 'kay/library'
 import type { Auth, AuthOptions, AuthSessionData } from '../../src/auth'
 import type { SignInOptions } from '../../src/signInOptions'
 import type { AuthStore, UserRecord } from '../../src/store'
@@ -119,7 +120,7 @@ type Method<A, P extends string> = At<A, P> extends (...args: infer Args) => inf
 // What an answer is once it went through JSON: dates are strings, and a method answering nothing answers null.
 type Wire<T> = T extends undefined ? null : Shape<T>
 
-type Shape<T> = T extends Date ? string : T extends ArrayBufferLike | ArrayBufferView ? T : T extends readonly (infer Item)[] ? Shape<Item>[] : T extends object ? { [Key in keyof T]: Shape<T[Key]> } : T
+type Shape<T> = T extends Date ? string : T extends ArrayBufferLike | ArrayBufferView ? T : T extends readonly (infer Item)[] ? Shape<Item>[] : T extends { readonly [FAILURE]: true } ? { [Key in keyof T as Key extends symbol | 'status' | 'data' ? never : Key]: Shape<T[Key]> } : T extends object ? { [Key in keyof T]: Shape<T[Key]> } : T
 
 export function browser<A = Record<string, never>>(app: { handle: (request: Request) => Promise<Response> }) {
   const jar = cookieJar()

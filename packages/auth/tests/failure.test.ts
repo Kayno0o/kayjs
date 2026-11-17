@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { FAILURE } from 'kay/library'
 import { authFailure, failed, rejected } from '../src/failure'
 import { testApp } from './helpers/app'
 
@@ -7,7 +8,7 @@ describe('an auth failure', () => {
     const { browser } = testApp({ signUp: false })
     const result = await browser().call('password.register', { email: 'ada@example.com', password: 'correct horse battery' })
 
-    expect(result).toEqual({ ok: false, error: { code: 'off', status: 404, message: 'Off', errors: {}, data: undefined } })
+    expect(result).toEqual({ ok: false, error: { code: 'off', status: 404, message: 'Off', errors: {}, data: undefined } } as never)
   })
 
   test('gives a kind a status and a sentence', () => {
@@ -18,12 +19,18 @@ describe('an auth failure', () => {
     expect(authFailure('something-new').status).toBe(400)
   })
 
+  test('is a kay Failure, so an action returns it as it is', () => {
+    expect(failed('limited')).toMatchObject({ [FAILURE]: true, status: 429, data: { code: 'limited', message: 'Limited' } })
+    expect(rejected({ email: 'taken' })).toMatchObject({ [FAILURE]: true, status: 422, data: { code: 'invalid' } })
+    expect(Object.keys(failed('limited'))).toEqual(['ok', 'error'])
+  })
+
   test('puts the fields a call refused on errors and on error.errors, with the first as the message', () => {
     expect(rejected({ email: 'taken', password: undefined, username: { message: 'Too long' } })).toEqual({
       ok: false,
       error: { code: 'invalid', status: 422, message: 'Email taken', errors: { email: 'taken', username: 'Too long' }, data: undefined },
-      errors: { email: 'taken', password: undefined, username: { message: 'Too long' } },
-    })
+      errors: { email: 'taken', username: 'Too long' },
+    } as never)
   })
 
   test('a registration refused for its fields carries both', async () => {

@@ -1,6 +1,6 @@
 import type { Duration } from 'kay'
 import type { Core } from './core'
-import type { AuthFailed } from './failure'
+import type { Result } from './failure'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { report } from './events'
@@ -15,8 +15,6 @@ export interface AccountOptions {
   // The page the mailed link to cancel opens, which cancels through `account.cancelDeletion()`: the prebuilt account data page by default.
   cancelPage?: string | undefined
 }
-
-export type CancelDeletionResult = { ok: true } | AuthFailed<'signed-out' | 'not-pending'>
 
 // Where the mailed link leads: the app's own page, else the prebuilt account data page.
 function cancelPageOf(core: Core): string {
@@ -62,7 +60,7 @@ function mailCancelLink(state: RequestState, record: UserRecord, deleteAt: Date)
 }
 
 // Takes the pending mark off the signed-in user, and tells them.
-export async function cancelDeletion(state: RequestState): Promise<CancelDeletionResult> {
+export async function cancelDeletion(state: RequestState): Promise<Result<object, 'signed-out' | 'not-pending'>> {
   const record = await state.current()
 
   if (!record)

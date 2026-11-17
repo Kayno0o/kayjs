@@ -1,5 +1,6 @@
 import type { Off } from '../core'
-import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult, RenamePasskeyResult, RevokePasskeyResult } from '../passkeys'
+import type { Result } from '../failure'
+import type { Passkey } from '../passkeys'
 import type { Proof, ProofFailure } from '../proof'
 import type { SignInOptions } from '../signInOptions'
 import type { RequestState } from '../state'
@@ -14,12 +15,12 @@ export class PasskeyMethods {
   constructor(private readonly state: RequestState) {}
 
   // The options for `makePasskey` of `@kayjs/auth/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
-  async registrationOptions(proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure | 'off'>> {
+  async registrationOptions(proof: Proof): Promise<Result<{ options: PublicKeyCredentialCreationOptionsJSON }, ProofFailure | 'off'>> {
     return !this.state.core.switches.passkeys ? OFF : (await load.passkeys()).passkeyRegistrationOptions(this.state, proof)
   }
 
   // Keeps the passkey `makePasskey` made, under `name` or the browser and system it was made on.
-  async register(response: RegistrationResponseJSON, name?: string): Promise<RegisterPasskeyResult | Off> {
+  async register(response: RegistrationResponseJSON, name?: string): Promise<Result<{ passkey: Passkey }, 'signed-out' | 'expired' | 'invalid'> | Off> {
     return !this.state.core.switches.passkeys ? OFF : (await load.passkeys()).registerPasskey(this.state, response, name)
   }
 
@@ -28,11 +29,11 @@ export class PasskeyMethods {
   }
 
   // Renames one of the signed-in user's passkeys; refused with `not-found` for one that is not theirs and `invalid-name` for a blank name.
-  async rename(id: string, name: string): Promise<RenamePasskeyResult> {
+  async rename(id: string, name: string): Promise<Result<object, 'signed-out' | 'not-found' | 'invalid-name'>> {
     return (await load.passkeys()).renamePasskey(this.state, id, name)
   }
 
-  async revoke(id: string, proof: Proof): Promise<RevokePasskeyResult> {
+  async revoke(id: string, proof: Proof): Promise<Result<object, ProofFailure | 'not-found' | 'last-way-in'>> {
     return (await load.passkeys()).removePasskey(this.state, id, proof)
   }
 
@@ -45,7 +46,7 @@ export class PasskeyMethods {
   }
 
   // Signs in with the passkey that answered `signInOptions`, with no second factor after it.
-  async signIn(response: AuthenticationResponseJSON, options: Pick<SignInOptions, 'redirect' | 'remember'> = {}): Promise<PasskeySignInResult | Off> {
+  async signIn(response: AuthenticationResponseJSON, options: Pick<SignInOptions, 'redirect' | 'remember'> = {}): Promise<Result<{ redirect: string }, 'expired' | 'invalid' | 'limited' | 'banned'> | Off> {
     if (!this.state.core.switches.passkeys)
       return OFF
 
@@ -55,7 +56,7 @@ export class PasskeyMethods {
   }
 
   // The options for re-proving with a passkey, its answer then passed as `{ passkey }` wherever a proof is asked.
-  async proofOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
+  async proofOptions(): Promise<Result<{ options: PublicKeyCredentialRequestOptionsJSON }, 'signed-out' | 'none' | 'expired' | 'off'>> {
     return !this.state.core.switches.passkeys ? OFF : (await load.passkeys()).passkeyProofOptions(this.state)
   }
 }

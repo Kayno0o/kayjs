@@ -1,4 +1,5 @@
-import type { AcceptResult, CreateOrganizationResult, DeleteOrganizationResult, Invitation, InviteResult, ListInvitationsResult, ListMembersResult, MemberResult, Membership, RejectInvitationResult, RevokeInvitationResult, UpdateOrganizationResult } from '../organizations'
+import type { Result } from '../failure'
+import type { AuthMember, Invitation, Membership, Organization, OrganizationFailure, OrganizationWriteFailure } from '../organizations'
 import type { RequestState } from '../state'
 import { failed } from '../failure'
 import { load } from '../load'
@@ -8,8 +9,8 @@ export class OrganizationMethods<OrgRole extends string = string> {
   constructor(private readonly state: RequestState) {}
 
   // A new organization, the signed-in user its owner. `slug`, lowercase letters, digits and dashes, names it in URLs.
-  async create(input: { name: string, slug?: string | null | undefined }): Promise<CreateOrganizationResult<OrgRole>> {
-    return (await load.organizations()).createOrganization(this.state, input) as Promise<CreateOrganizationResult<OrgRole>>
+  async create(input: { name: string, slug?: string | null | undefined }): Promise<Result<{ membership: Membership<OrgRole> }, 'signed-out' | 'impersonating' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited'>> {
+    return (await load.organizations()).createOrganization(this.state, input) as Promise<Result<{ membership: Membership<OrgRole> }, 'signed-out' | 'impersonating' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited'>>
   }
 
   // The organizations the signed-in user belongs to, with their roles in each.
@@ -30,47 +31,47 @@ export class OrganizationMethods<OrgRole extends string = string> {
   }
 
   // Renames it, or changes or clears its slug: for members holding `manage`.
-  async update(ref: string, patch: { name?: string | undefined, slug?: string | null | undefined }): Promise<UpdateOrganizationResult> {
+  async update(ref: string, patch: { name?: string | undefined, slug?: string | null | undefined }): Promise<Result<{ organization: Organization }, OrganizationWriteFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken'>> {
     return (await load.organizations()).updateOrganization(this.state, ref, patch)
   }
 
   // For members holding `owner`.
-  async delete(ref: string): Promise<DeleteOrganizationResult> {
+  async delete(ref: string): Promise<Result<object, OrganizationWriteFailure>> {
     return (await load.organizations()).deleteOrganization(this.state, ref)
   }
 
   // Every member, oldest first, for any member to see.
-  async members(ref: string): Promise<ListMembersResult<OrgRole>> {
-    return (await load.organizations()).listMembers(this.state, ref) as Promise<ListMembersResult<OrgRole>>
+  async members(ref: string): Promise<Result<{ members: AuthMember<OrgRole>[] }, OrganizationFailure>> {
+    return (await load.organizations()).listMembers(this.state, ref) as Promise<Result<{ members: AuthMember<OrgRole>[] }, OrganizationFailure>>
   }
 
   // Replaces a member's roles: for members holding `manage`, giving only roles they hold, to a member holding none above theirs.
-  async setMemberRoles(ref: string, userId: string, roles: OrgRole[]): Promise<MemberResult> {
+  async setMemberRoles(ref: string, userId: string, roles: OrgRole[]): Promise<Result<object, OrganizationWriteFailure | 'unknown-role' | 'last-owner'>> {
     return (await load.organizations()).setMemberRoles(this.state, ref, userId, roles)
   }
 
   // For members holding `manage`, of a member holding no role above theirs.
-  async removeMember(ref: string, userId: string): Promise<MemberResult> {
+  async removeMember(ref: string, userId: string): Promise<Result<object, OrganizationWriteFailure | 'unknown-role' | 'last-owner'>> {
     return (await load.organizations()).removeMember(this.state, ref, userId)
   }
 
-  async leave(ref: string): Promise<MemberResult> {
+  async leave(ref: string): Promise<Result<object, OrganizationWriteFailure | 'unknown-role' | 'last-owner'>> {
     const record = await this.state.current()
 
     return record ? (await load.organizations()).removeMember(this.state, ref, record.id) : failed('signed-out')
   }
 
   // Mails `email` a link to the `invitationPage`, else the prebuilt pages' invitation page, giving `roles` (`defaultRoles` when none) once accepted: for members holding `manage` and every role it gives.
-  async invite(ref: string, email: string, roles?: OrgRole[]): Promise<InviteResult<OrgRole>> {
-    return (await load.organizations()).invite(this.state, ref, email, roles) as Promise<InviteResult<OrgRole>>
+  async invite(ref: string, email: string, roles?: OrgRole[]): Promise<Result<{ invitation: Invitation<OrgRole> }, OrganizationWriteFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable'>> {
+    return (await load.organizations()).invite(this.state, ref, email, roles) as Promise<Result<{ invitation: Invitation<OrgRole> }, OrganizationWriteFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable'>>
   }
 
   // The organization's open invitations, for members holding `manage`.
-  async invitations(ref: string): Promise<ListInvitationsResult<OrgRole>> {
-    return (await load.organizations()).listInvitations(this.state, ref) as Promise<ListInvitationsResult<OrgRole>>
+  async invitations(ref: string): Promise<Result<{ invitations: Invitation<OrgRole>[] }, OrganizationFailure>> {
+    return (await load.organizations()).listInvitations(this.state, ref) as Promise<Result<{ invitations: Invitation<OrgRole>[] }, OrganizationFailure>>
   }
 
-  async revokeInvitation(ref: string, invitationId: string): Promise<RevokeInvitationResult> {
+  async revokeInvitation(ref: string, invitationId: string): Promise<Result<object, OrganizationWriteFailure>> {
     return (await load.organizations()).revokeInvitation(this.state, ref, invitationId)
   }
 
@@ -85,12 +86,12 @@ export class OrganizationMethods<OrgRole extends string = string> {
   }
 
   // For an account verified at the invited address only.
-  async acceptInvitation(invitationId: string): Promise<AcceptResult<OrgRole>> {
-    return (await load.organizations()).acceptInvitation(this.state, invitationId) as Promise<AcceptResult<OrgRole>>
+  async acceptInvitation(invitationId: string): Promise<Result<{ membership: Membership<OrgRole> }, 'signed-out' | 'impersonating' | 'not-found' | 'wrong-account' | 'unverified' | 'member'>> {
+    return (await load.organizations()).acceptInvitation(this.state, invitationId) as Promise<Result<{ membership: Membership<OrgRole> }, 'signed-out' | 'impersonating' | 'not-found' | 'wrong-account' | 'unverified' | 'member'>>
   }
 
   // Turns down an invitation open to the user; `not-found` for any other.
-  async rejectInvitation(invitationId: string): Promise<RejectInvitationResult> {
+  async rejectInvitation(invitationId: string): Promise<Result<object, 'signed-out' | 'impersonating' | 'not-found'>> {
     return (await load.organizations()).declineInvitation(this.state, invitationId)
   }
 }

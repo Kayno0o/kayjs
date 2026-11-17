@@ -1024,6 +1024,9 @@ function escapeHtml(text: string): string
 [./library] eventStream
 function eventStream<T>(source: Source<T>, options?: EventStreamOptions<T>): EventStream<T>
 
+[./library] FAILURE
+const FAILURE: typeof FAILURE
+
 [./library] FallbackMemory
 interface FallbackMemory
   hit: (key: string, windowMs: number, weight?: number | undefined) => RateWindow

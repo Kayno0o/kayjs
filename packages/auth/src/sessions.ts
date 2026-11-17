@@ -1,7 +1,7 @@
 import type { SessionSettings } from 'kay/server'
-import type { BareUser, Core } from './core'
+import type { Core } from './core'
 import type { Device } from './device'
-import type { AuthFailed } from './failure'
+import type { Result } from './failure'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
 import { durationSeconds } from 'kay/library'
@@ -11,10 +11,6 @@ import { failed } from './failure'
 import { log } from './log'
 
 const USER_AGENT_MAX_LENGTH = 512
-
-export type RevokeSessionResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
-
-export type GuestSignInResult = { ok: true, user: BareUser } | AuthFailed<'limited' | 'captcha' | 'signed-in' | 'off'>
 
 // Where the user is signed in, as the app lists it.
 export interface UserSession {
@@ -55,7 +51,7 @@ export async function liveSession(state: RequestState, found: SessionRecord | un
 }
 
 // Ends one of the signed-in user's sessions, effective on its next request; ending this one signs out through `signOut`.
-export async function revokeSession(state: RequestState, id: string, signOut: () => Promise<void>): Promise<RevokeSessionResult> {
+export async function revokeSession(state: RequestState, id: string, signOut: () => Promise<void>): Promise<Result<object, 'signed-out' | 'not-found'>> {
   const record = await state.current()
   const signedIn = await state.session.get('auth')
 

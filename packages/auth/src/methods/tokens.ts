@@ -1,5 +1,6 @@
-import type { BearerToken, CreateTokenResult, RevokeTokenResult, TokenOptions } from '../bearer'
-import type { Proof } from '../proof'
+import type { BearerToken, TokenOptions, TokenProblem } from '../bearer'
+import type { Result } from '../failure'
+import type { Proof, ProofFailure } from '../proof'
 import type { RequestState } from '../state'
 import { load } from '../load'
 
@@ -8,7 +9,7 @@ export class TokenMethods<Scope extends string = string> {
   constructor(private readonly state: RequestState) {}
 
   // A bearer token for a device or an API client of the signed-in user, shown this once; minted from a session only, never from another token.
-  async create(proof: Proof, label: string, options: TokenOptions<Scope> = {}): Promise<CreateTokenResult> {
+  async create(proof: Proof, label: string, options: TokenOptions<Scope> = {}): Promise<Result<{ token: string, id: string }, ProofFailure | TokenProblem>> {
     return (await load.bearer()).createToken(this.state, proof, label, options)
   }
 
@@ -18,7 +19,7 @@ export class TokenMethods<Scope extends string = string> {
   }
 
   // Revokes one of the signed-in user's bearer tokens, from a browser session only: `signed-out` through a token, `not-found` for one that is not theirs.
-  async revoke(id: string): Promise<RevokeTokenResult> {
+  async revoke(id: string): Promise<Result<object, 'signed-out' | 'not-found'>> {
     return (await load.bearer()).revokeToken(this.state, id)
   }
 }

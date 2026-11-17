@@ -1,5 +1,5 @@
 import type { BareUser, Core } from './core'
-import type { AuthFailed, AuthRejected } from './failure'
+import type { Result } from './failure'
 import type { EmailProblem, PasswordProblem, UsernameProblem } from './rules'
 import type { SignInOptions } from './signInOptions'
 import type { RequestState } from './state'
@@ -33,7 +33,6 @@ export interface RegisterErrors {
 }
 
 // `signedIn` is false, with no user, when the app wants the address verified first: the same answer whether the address was free or held, its holder mailed instead. `off` with `signUp: false`.
-export type RegisterResult = { ok: true, user: BareUser, signedIn: true } | { ok: true, signedIn: false } | AuthRejected<RegisterErrors> | AuthFailed<'limited' | 'captcha' | 'off'>
 
 export interface CreateUserInput {
   // At least one of the two, the user signing in with either.
@@ -48,8 +47,6 @@ export interface CreateUserInput {
   locale?: string | undefined
 }
 
-export type CreateUserResult = { ok: true, user: BareUser } | AuthRejected<RegisterErrors>
-
 export interface PasswordSignInInput {
   // An email, or a username when it holds no `@`.
   identifier: string
@@ -58,10 +55,9 @@ export interface PasswordSignInInput {
 
 // `invalid` whether no account matches or the password is wrong, so the answer tells nothing of which accounts exist.
 // `unverified` once the password is right, when the app wants the address verified first.
-export type PasswordSignInResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned'>
 
 // A new user with a password, signed in on this session; a guest signed in becomes it, keeping their id.
-export async function register(state: RequestState, input: RegisterInput, options: Pick<SignInOptions, 'redirect' | 'captcha'> = {}): Promise<RegisterResult> {
+export async function register(state: RequestState, input: RegisterInput, options: Pick<SignInOptions, 'redirect' | 'captcha'> = {}): Promise<Result<{ user: BareUser, signedIn: true } | { signedIn: false }, 'limited' | 'captcha' | 'off', RegisterErrors>> {
   const { store } = state.core
 
   if (!state.core.signUp)
@@ -189,7 +185,7 @@ export async function userProblems(core: Core, input: CreateUserInput): Promise<
 }
 
 // A user made by the app, checked as registering is but signing no one in and mailing no one, open with `signUp: false` too.
-export async function createUser(core: Core, input: CreateUserInput): Promise<CreateUserResult> {
+export async function createUser(core: Core, input: CreateUserInput): Promise<Result<{ user: BareUser }, never, RegisterErrors>> {
   const errors = await userProblems(core, input)
 
   if (Object.keys(errors).length > 0)
@@ -242,7 +238,7 @@ async function replaceUnclaimed(state: RequestState, holder: UserRecord): Promis
 }
 
 // Spends the time hashing a new password takes, so a held address answers no faster than a free one, and leaves this session as a new account's, which `email.sendVerification` answers alike, mailing no one.
-async function answerHeld(state: RequestState, holder: UserRecord, password: string | null): Promise<RegisterResult> {
+async function answerHeld(state: RequestState, holder: UserRecord, password: string | null): Promise<Result<{ user: BareUser, signedIn: true } | { signedIn: false }, 'limited' | 'captcha' | 'off', RegisterErrors>> {
   if (password !== null)
     await hashPassword(password)
 
@@ -265,7 +261,7 @@ async function keepBack(state: RequestState, redirect: string | undefined): Prom
     await state.session.set('authBack', back)
 }
 
-export async function signInWithPassword(state: RequestState, input: PasswordSignInInput, options: Pick<SignInOptions, 'redirect' | 'captcha'>): Promise<PasswordSignInResult> {
+export async function signInWithPassword(state: RequestState, input: PasswordSignInInput, options: Pick<SignInOptions, 'redirect' | 'captcha'>): Promise<Result<{ redirect: string }, 'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned'>> {
   const { store } = state.core
   // Registration reads the address NFKC-normalised, so a fullwidth at sign names an email here too.
   const byEmail = input.identifier.normalize('NFKC').includes('@')

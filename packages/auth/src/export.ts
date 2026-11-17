@@ -3,7 +3,7 @@ import type { ApprovedClient } from './authorize/grants'
 import type { BearerToken } from './bearer'
 import type { User } from './core'
 import type { AuditEntry } from './events'
-import type { AuthFailed } from './failure'
+import type { Result } from './failure'
 import type { MailingSubscription } from './mail'
 import type { Invitation, Membership } from './organizations'
 import type { Passkey } from './passkeys'
@@ -53,11 +53,9 @@ export interface DataExport {
   app: unknown
 }
 
-export type ExportResult = { ok: true, data: DataExport } | AuthFailed<'signed-out' | 'limited' | 'impersonating' | 'stale'>
-
 // Not for an admin acting as the user: they see what the user sees, not a copy of everything kept about them.
 // Only within ten minutes of signing in or re-proving, so a session left open or stolen does not download everything the account holds.
-export async function exportData(state: RequestState): Promise<ExportResult> {
+export async function exportData(state: RequestState): Promise<Result<{ data: DataExport }, 'signed-out' | 'limited' | 'impersonating' | 'stale'>> {
   const { core } = state
   const record = await state.current()
 

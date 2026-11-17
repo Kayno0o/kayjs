@@ -2,9 +2,10 @@ import type { ExtensionApp, KayExtension, PluginInput } from 'kay/server'
 import type { CaptchaWidget } from '../captcha'
 import type { BareUser, Core } from '../core'
 import type { CodedLink, CodeMode } from '../email'
+import type { Result } from '../failure'
 import type { OrganizationsCore } from '../organizationsCore'
 import type { OwnOptions, OwnPlugin } from '../own'
-import type { CreateUserInput, CreateUserResult } from '../password'
+import type { CreateUserInput, RegisterErrors } from '../password'
 import type { LinkType } from '../store'
 import { resolve } from 'node:path'
 import { appModules, checkOptionKeys, configError, KayError } from 'kay/library'
@@ -205,7 +206,7 @@ export const CHECK_USER = Symbol('kayjs-auth.checkUser')
 export interface UserMaker {
   // What `createUser` would refuse the login for, asked before the password is.
   [CHECK_USER]: (input: Omit<CreateUserInput, 'roles'> & { roles?: string[] | undefined }) => Promise<Partial<Record<'email' | 'username' | 'password', string>>>
-  admin: { createUser: (input: Omit<CreateUserInput, 'roles'> & { roles?: string[] | undefined }) => Promise<CreateUserResult> }
+  admin: { createUser: (input: Omit<CreateUserInput, 'roles'> & { roles?: string[] | undefined }) => Promise<Result<{ user: BareUser }, never, RegisterErrors>> }
 }
 
 // The commands both extensions add.

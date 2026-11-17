@@ -1,4 +1,5 @@
-import type { RevokeSessionResult, UserSession } from '../sessions'
+import type { Result } from '../failure'
+import type { UserSession } from '../sessions'
 import type { RequestState } from '../state'
 import { listSessions, revokeSession } from '../sessions'
 
@@ -12,7 +13,7 @@ export class SessionMethods {
   }
 
   // Ends one of the signed-in user's sessions, effective on its next request; ending this one signs out. Refused with `not-found` when they have none with that id, and `signed-out` through a bearer token.
-  async revoke(id: string): Promise<RevokeSessionResult> {
+  async revoke(id: string): Promise<Result<object, 'signed-out' | 'not-found'>> {
     return revokeSession(this.state, id, this.state.signOut)
   }
 }

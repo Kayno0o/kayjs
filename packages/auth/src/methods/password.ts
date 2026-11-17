@@ -1,8 +1,8 @@
-import type { ChangePasswordResult } from '../account'
-import type { Off } from '../core'
-import type { MailRequestResult, ResetPasswordResult } from '../email'
-import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from '../password'
-import type { Proof } from '../proof'
+import type { BareUser, Off } from '../core'
+import type { Result } from '../failure'
+import type { PasswordSignInInput, RegisterErrors, RegisterInput } from '../password'
+import type { Proof, ProofFailure } from '../proof'
+import type { PasswordProblem } from '../rules'
 import type { SignInOptions } from '../signInOptions'
 import type { RequestState } from '../state'
 import { OFF } from '../core'
@@ -14,7 +14,7 @@ export class PasswordMethods {
   constructor(private readonly state: RequestState) {}
 
   // A new user with an email and a password, signed in on this session; field errors come back as codes. With `redirect`, the mail verifying the address leads on to that page.
-  async register(input: RegisterInput, options?: Pick<SignInOptions, 'remember' | 'captcha' | 'redirect'>): Promise<RegisterResult | Off> {
+  async register(input: RegisterInput, options?: Pick<SignInOptions, 'remember' | 'captcha' | 'redirect'>): Promise<Result<{ user: BareUser, signedIn: true } | { signedIn: false }, 'limited' | 'captcha' | 'off', RegisterErrors> | Off> {
     if (!this.state.core.switches.password)
       return OFF
 
@@ -24,7 +24,7 @@ export class PasswordMethods {
   }
 
   // Signs in with an email or a username and a password; a wrong password and an unknown account answer alike.
-  async signIn(input: PasswordSignInInput, options?: SignInOptions): Promise<PasswordSignInResult | Off> {
+  async signIn(input: PasswordSignInInput, options?: SignInOptions): Promise<Result<{ redirect: string }, 'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned'> | Off> {
     if (!this.state.core.switches.password)
       return OFF
 
@@ -34,7 +34,7 @@ export class PasswordMethods {
   }
 
   // Mails a reset link to that address when an account has it; answers alike when none does. The reset signs in to `redirect` when given.
-  async requestReset(email: string, options: Pick<SignInOptions, 'captcha' | 'redirect'> = {}): Promise<MailRequestResult | Off> {
+  async requestReset(email: string, options: Pick<SignInOptions, 'captcha' | 'redirect'> = {}): Promise<Result<object, 'limited' | 'captcha' | 'unavailable'> | Off> {
     if (!this.state.core.switches.password)
       return OFF
 
@@ -42,12 +42,12 @@ export class PasswordMethods {
   }
 
   // Spends a reset link's token on a new password, signing the user out everywhere else and in here.
-  async reset(token: string, password: string): Promise<ResetPasswordResult | Off> {
+  async reset(token: string, password: string): Promise<Result<{ redirect: string }, 'invalid' | 'limited' | 'banned', { password: PasswordProblem | 'breached' }> | Off> {
     return !this.state.core.switches.password ? OFF : (await load.email()).resetPassword(this.state, token, password)
   }
 
   // Sets the signed-in user's password, or a first one, and ends their other sessions.
-  async change(proof: Proof, password: string): Promise<ChangePasswordResult | Off> {
+  async change(proof: Proof, password: string): Promise<Result<object, ProofFailure, { password: PasswordProblem | 'breached' }> | Off> {
     return !this.state.core.switches.password ? OFF : (await load.account()).changePassword(this.state, proof, password)
   }
 }

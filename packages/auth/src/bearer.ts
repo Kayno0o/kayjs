@@ -1,6 +1,6 @@
 import type { Duration } from 'kay'
 import type { Core } from './core'
-import type { AuthFailed } from './failure'
+import type { Result } from './failure'
 import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { BearerTokenRecord, UserRecord } from './store'
@@ -53,11 +53,7 @@ function expirySeconds(maxAge: Duration): number | undefined {
   }
 }
 
-type TokenProblem = 'label' | 'scope' | 'expiry'
-
-export type CreateTokenResult = { ok: true, token: string, id: string } | AuthFailed<ProofFailure | TokenProblem>
-
-export type IssueTokenResult = { ok: true, token: string, id: string } | AuthFailed<TokenProblem | 'token' | 'not-found' | 'banned'>
+export type TokenProblem = 'label' | 'scope' | 'expiry'
 
 function tokenProblem(core: Core, name: string, options: TokenOptions): TokenProblem | undefined {
   if (name.length === 0 || name.length > LABEL_MAX_LENGTH)
@@ -98,7 +94,7 @@ async function storeToken(core: Core, userId: string, name: string, options: Tok
 }
 
 // A token for a device or an API client of the signed-in user, minted from a session only, never from another token.
-export async function createToken(state: RequestState, proof: Proof, label: string, options: TokenOptions = {}): Promise<CreateTokenResult> {
+export async function createToken(state: RequestState, proof: Proof, label: string, options: TokenOptions = {}): Promise<Result<{ token: string, id: string }, ProofFailure | TokenProblem>> {
   const name = plainName(label)
   const problem = tokenProblem(state.core, name, options)
 
@@ -122,7 +118,7 @@ export async function createToken(state: RequestState, proof: Proof, label: stri
 }
 
 // A token for `userId` with no proof, for the app to gate; `token` adopts one it handed out before, 32 to 4096 characters without whitespace, as a bearer header carries.
-export async function issueToken(core: Core, userId: string, label: string, options: TokenOptions & { token?: string | undefined } = {}): Promise<IssueTokenResult> {
+export async function issueToken(core: Core, userId: string, label: string, options: TokenOptions & { token?: string | undefined } = {}): Promise<Result<{ token: string, id: string }, TokenProblem | 'token' | 'not-found' | 'banned'>> {
   const name = plainName(label)
   const problem = tokenProblem(core, name, options)
 
@@ -151,9 +147,7 @@ export async function listTokens(state: RequestState): Promise<BearerToken[]> {
   return record && state.via() === 'session' ? (await state.core.store.bearerTokens.listByUser(record.id)).filter(token => !token.oauth).map(publicToken) : []
 }
 
-export type RevokeTokenResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
-
-export async function revokeToken(state: RequestState, id: string): Promise<RevokeTokenResult> {
+export async function revokeToken(state: RequestState, id: string): Promise<Result<object, 'signed-out' | 'not-found'>> {
   const record = await state.current()
 
   if (!record || state.via() !== 'session')

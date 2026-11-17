@@ -1,5 +1,5 @@
 import type { BareUser } from './core'
-import type { AuthFailed, AuthRejected } from './failure'
+import type { Result } from './failure'
 import type { Proof, ProofFailure } from './proof'
 import type { PasswordProblem, UsernameProblem } from './rules'
 import type { RequestState } from './state'
@@ -21,10 +21,8 @@ const NO_ASIDE = { restore: async () => {
   await Promise.resolve()
 } }
 
-export type ChangePasswordResult = { ok: true } | AuthFailed<ProofFailure> | AuthRejected<{ password: PasswordProblem | 'breached' }>
-
 // Sets the signed-in user's password, or a first one, and ends their other sessions.
-export async function changePassword(state: RequestState, proof: Proof, password: string): Promise<ChangePasswordResult> {
+export async function changePassword(state: RequestState, proof: Proof, password: string): Promise<Result<object, ProofFailure, { password: PasswordProblem | 'breached' }>> {
   const problem = await newPasswordProblem(state.core, password)
 
   if (problem !== undefined)
@@ -46,10 +44,8 @@ export async function changePassword(state: RequestState, proof: Proof, password
   return { ok: true }
 }
 
-export type UpdateLocaleResult = { ok: true } | AuthFailed<'signed-out' | 'invalid-locale'>
-
 // Sets the language the signed-in user's mails are written in, a BCP 47 tag such as `fr`.
-export async function updateLocale(state: RequestState, locale: string): Promise<UpdateLocaleResult> {
+export async function updateLocale(state: RequestState, locale: string): Promise<Result<object, 'signed-out' | 'invalid-locale'>> {
   const record = await state.current()
 
   if (!record)
@@ -63,10 +59,8 @@ export async function updateLocale(state: RequestState, locale: string): Promise
   return { ok: true }
 }
 
-export type ChangeUsernameResult = { ok: true, user: BareUser } | AuthFailed<'signed-out'> | AuthRejected<{ username: UsernameProblem | 'taken' | 'unchanged' }>
-
 // Names the signed-in user, or renames them, under the rules register checks. A name is no credential, so it takes no proof and sends no mail; a session is needed all the same, so a device's token cannot rename the account it was given for.
-export async function changeUsername(state: RequestState, username: string): Promise<ChangeUsernameResult> {
+export async function changeUsername(state: RequestState, username: string): Promise<Result<{ user: BareUser }, 'signed-out', { username: UsernameProblem | 'taken' | 'unchanged' }>> {
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
@@ -110,10 +104,8 @@ export async function changeUsername(state: RequestState, username: string): Pro
   return { ok: true, user: publicUser(updated) }
 }
 
-export type UnlinkResult = { ok: true } | AuthFailed<ProofFailure | 'not-linked' | 'last-way-in'>
-
 // Unlinks a provider from the signed-in user, unless it is their last way in, and ends their other sessions.
-export async function unlink(state: RequestState, provider: string, proof: Proof): Promise<UnlinkResult> {
+export async function unlink(state: RequestState, provider: string, proof: Proof): Promise<Result<object, ProofFailure | 'not-linked' | 'last-way-in'>> {
   const proved = await reprove(state, proof)
 
   if (!proved.ok)
@@ -146,10 +138,9 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
 }
 
 // `deleteAt` is set with `account.deleteAfter`: the account is pending until then and the session stays signed in, so the user can cancel.
-export type DeleteAccountResult = { ok: true, deleteAt?: Date } | AuthFailed<ProofFailure | 'last-admin' | 'last-owner' | 'refused'>
 
 // Deletes the signed-in user and everything kayjs-auth keeps for them, then signs this session out. The last admin, and the only owner of an organization with other members, are refused before the proof is spent; an organization the user is alone in is deleted with them. With `account.deleteAfter` it only marks the account pending: the prune deletes it, `beforeDelete` and the notices included, once the period ends.
-export async function deleteAccount(state: RequestState, proof: Proof, signOut: () => Promise<void>): Promise<DeleteAccountResult> {
+export async function deleteAccount(state: RequestState, proof: Proof, signOut: () => Promise<void>): Promise<Result<{ deleteAt?: Date }, ProofFailure | 'last-admin' | 'last-owner' | 'refused'>> {
   const current = await state.current()
   // Without the `admin` option nobody is an admin: no last one to keep and no roles to set aside.
   const admins = state.core.admin ? await import('./admin') : undefined

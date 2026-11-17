@@ -1,5 +1,6 @@
-import type { ApprovedClient, RevokeGrantResult } from '../authorize/grants'
-import type { AuthorizeOutcome, AuthorizeParams, DecideResult } from '../authorize/request'
+import type { ApprovedClient } from '../authorize/grants'
+import type { AuthorizeOutcome, AuthorizeParams } from '../authorize/request'
+import type { Result } from '../failure'
 import type { RequestState } from '../state'
 import { siteRoot } from '../authorize/metadata'
 import { failed } from '../failure'
@@ -15,7 +16,7 @@ export class OAuthServerMethods {
   }
 
   // The user's answer on the consent page, checked again as the request is: where the browser goes next.
-  async decide(fields: AuthorizeParams, allow: boolean): Promise<DecideResult> {
+  async decide(fields: AuthorizeParams, allow: boolean): Promise<Result<{ redirect: string }, 'client' | 'redirect_uri' | 'signed-out'>> {
     return this.state.core.oauthServer ? (await load.request()).decide(this.state, fields, allow, siteRoot(this.state.core, this.request)) : failed('client')
   }
 
@@ -25,7 +26,7 @@ export class OAuthServerMethods {
   }
 
   // Takes an app's approval back with every token it was given; refused with `not-found` when there was none, and `signed-out` outside the user's own session.
-  async revokeGrant(clientId: string): Promise<RevokeGrantResult> {
+  async revokeGrant(clientId: string): Promise<Result<object, 'signed-out' | 'not-found'>> {
     return (await load.grants()).revokeClient(this.state, clientId)
   }
 }

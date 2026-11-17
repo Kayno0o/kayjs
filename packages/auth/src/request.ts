@@ -2,10 +2,10 @@ import type { Duration, GuardContext } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { CaptchaAction } from './captcha'
 import type { AuthSessionData, BareUser, Core, SignedIn, User } from './core'
+import type { Result } from './failure'
 import type { ScopeRequirement } from './gate'
 import type { AuthFeatures } from './pages'
-import type { Proof, ReproveResult } from './proof'
-import type { GuestSignInResult } from './sessions'
+import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
 import type { Requirement } from './types'
@@ -453,7 +453,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Signs this browser in as a new guest, a user with no email and no password whom registering or an OAuth sign-in later makes a real account, keeping their id; the guest signed in already answers as is. Counted as registering is, and CAPTCHA-checked as `guest`.
-  async signInAsGuest(options: { captcha?: string | undefined } = {}): Promise<GuestSignInResult> {
+  async signInAsGuest(options: { captcha?: string | undefined } = {}): Promise<Result<{ user: BareUser }, 'limited' | 'captcha' | 'signed-in' | 'off'>> {
     const current = await this.record()
 
     if (current)
@@ -517,7 +517,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Re-proves the signed-in user, as before an app's own sensitive change: a proof counts for ten minutes, as a sign-in does.
-  async reprove(proof: Proof): Promise<ReproveResult> {
+  async reprove(proof: Proof): Promise<Result<object, ProofFailure>> {
     const proved = await reprove(this[STATE], proof)
 
     return proved.ok ? { ok: true } : proved

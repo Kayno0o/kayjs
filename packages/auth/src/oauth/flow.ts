@@ -1,5 +1,5 @@
 import type { Core, Profile } from '../core'
-import type { AuthFailed } from '../failure'
+import type { Result } from '../failure'
 import type { Proof, ProofFailure } from '../proof'
 import type { RequestState } from '../state'
 import type { IdentityRecord, UserRecord } from '../store'
@@ -36,8 +36,6 @@ export interface OAuthFlow {
   expires: number
 }
 
-export type LinkProviderResult = { ok: true, url: string } | AuthFailed<ProofFailure | 'not-found' | 'unavailable'>
-
 // The provider's authorize URL for a sign-in, the flow parked in the session; undefined for a provider the app has not configured.
 export async function startOAuth(state: RequestState, provider: string, options: { redirect?: string | undefined, remember?: boolean | undefined }): Promise<string | { error: OAuthFailure } | undefined> {
   if (!state.core.oauth.has(provider))
@@ -61,7 +59,7 @@ export async function startOAuth(state: RequestState, provider: string, options:
 
 // The provider's authorize URL for linking it to the signed-in user, once `proof` re-proves them.
 // A linked provider is a way in that outlives every sign-out, so a stolen session alone may not add one, and the second factor proves it when it is on.
-export async function startLink(state: RequestState, provider: string, proof: Proof, redirect: string | undefined): Promise<LinkProviderResult> {
+export async function startLink(state: RequestState, provider: string, proof: Proof, redirect: string | undefined): Promise<Result<{ url: string }, ProofFailure | 'not-found' | 'unavailable'>> {
   if (!state.core.oauth.has(provider))
     return failed('not-found')
 

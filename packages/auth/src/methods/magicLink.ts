@@ -1,5 +1,5 @@
 import type { Off } from '../core'
-import type { CodeResult, LinkResult, MailRequestResult } from '../email'
+import type { Result } from '../failure'
 import type { SignInOptions } from '../signInOptions'
 import type { RequestState } from '../state'
 import { OFF } from '../core'
@@ -11,7 +11,7 @@ export class MagicLinkMethods {
   constructor(private readonly state: RequestState) {}
 
   // Mails a sign-in link to that address when an account has it; answers alike when none does. `remember` holds for the link opened in this browser, or the code typed in it.
-  async request(email: string, options: SignInOptions = {}): Promise<MailRequestResult | Off> {
+  async request(email: string, options: SignInOptions = {}): Promise<Result<object, 'limited' | 'captcha' | 'unavailable'> | Off> {
     if (!this.state.core.switches.magicLink)
       return OFF
 
@@ -21,12 +21,12 @@ export class MagicLinkMethods {
   }
 
   // Spends a magic link's token, signing its user in.
-  async signIn(token: string): Promise<LinkResult | Off> {
+  async signIn(token: string): Promise<Result<{ redirect: string }, 'invalid' | 'limited' | 'banned'> | Off> {
     return !this.state.core.switches.magicLink ? OFF : (await load.email()).signInWithMagicLink(this.state, token)
   }
 
   // Signs in with the code a magic link mail carried, typed in the browser that asked for it.
-  async signInWithCode(code: string): Promise<CodeResult | Off> {
+  async signInWithCode(code: string): Promise<Result<{ redirect: string }, 'invalid' | 'expired' | 'limited' | 'banned'> | Off> {
     return !this.state.core.switches.magicLink ? OFF : (await load.email()).signInWithEmailCode(this.state, code)
   }
 }

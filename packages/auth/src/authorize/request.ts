@@ -1,5 +1,5 @@
 import type { Core } from '../core'
-import type { AuthFailed } from '../failure'
+import type { Result } from '../failure'
 import type { RequestState } from '../state'
 import type { OAuthGrantRecord, UserRecord } from '../store'
 import type { OAuthClient } from './clients'
@@ -232,10 +232,8 @@ export async function authorize(state: RequestState, params: AuthorizeParams, ro
   }
 }
 
-export type DecideResult = { ok: true, redirect: string } | AuthFailed<'client' | 'redirect_uri' | 'signed-out'>
-
 // The user's answer on the consent page, checked again as the request is: where the browser goes back to the client.
-export async function decide(state: RequestState, fields: AuthorizeParams, allow: boolean, root: string): Promise<DecideResult> {
+export async function decide(state: RequestState, fields: AuthorizeParams, allow: boolean, root: string): Promise<Result<{ redirect: string }, 'client' | 'redirect_uri' | 'signed-out'>> {
   const checked = await check(state, { ...fields, response_type: 'code', code_challenge_method: 'S256' }, root)
 
   if (isOutcome(checked))

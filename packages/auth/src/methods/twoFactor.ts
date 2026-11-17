@@ -1,8 +1,8 @@
 import type { Off } from '../core'
-import type { PasskeyOptionsResult } from '../passkeys'
-import type { Proof } from '../proof'
+import type { Result } from '../failure'
+import type { Proof, ProofFailure } from '../proof'
 import type { RequestState } from '../state'
-import type { DisableTwoFactorResult, EnableTwoFactorResult, RecoveryCodesResult, SetUpTwoFactorResult, TwoFactorResult } from '../twoFactor'
+import type { TwoFactorSetup } from '../twoFactor'
 import type { AuthenticationResponseJSON, PublicKeyCredentialRequestOptionsJSON } from '../webauthn'
 import { OFF } from '../core'
 import { load } from '../load'
@@ -18,26 +18,26 @@ export class TwoFactorMethods {
   }
 
   // Finishes a sign-in waiting for its second factor with an authenticator code or a recovery code.
-  async verify(code: string): Promise<TwoFactorResult> {
+  async verify(code: string): Promise<Result<{ redirect: string }, 'invalid' | 'expired' | 'limited'>> {
     return (await load.twoFactor()).verifyTwoFactor(this.state, code, this.state.establish)
   }
 
   // A secret for the signed-in user's authenticator, as text and as a QR code; the second factor turns on once `enable` gets a code from it.
-  async setUp(proof: Proof): Promise<SetUpTwoFactorResult | Off> {
+  async setUp(proof: Proof): Promise<Result<{ setup: TwoFactorSetup }, ProofFailure | 'enabled'> | Off> {
     return !this.state.core.switches.twoFactor ? OFF : (await load.twoFactor()).setUpTwoFactor(this.state, proof)
   }
 
   // Turns the second factor on with a code from the authenticator just set up; answers the recovery codes, to show this once.
-  async enable(code: string): Promise<EnableTwoFactorResult | Off> {
+  async enable(code: string): Promise<Result<{ recoveryCodes: string[] }, 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited'> | Off> {
     return !this.state.core.switches.twoFactor ? OFF : (await load.twoFactor()).enableTwoFactor(this.state, code)
   }
 
-  async disable(proof: Proof): Promise<DisableTwoFactorResult> {
+  async disable(proof: Proof): Promise<Result<object, ProofFailure>> {
     return (await load.twoFactor()).disableTwoFactor(this.state, proof)
   }
 
   // A new set of recovery codes, the old ones void.
-  async regenerateRecoveryCodes(proof: Proof): Promise<RecoveryCodesResult> {
+  async regenerateRecoveryCodes(proof: Proof): Promise<Result<{ recoveryCodes: string[] }, ProofFailure | 'not-enabled'>> {
     return (await load.twoFactor()).regenerateRecoveryCodes(this.state, proof)
   }
 
@@ -49,11 +49,11 @@ export class TwoFactorMethods {
   }
 
   // The options for answering a pending sign-in's second factor with a passkey; `none` when the user has none.
-  async passkeyOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
+  async passkeyOptions(): Promise<Result<{ options: PublicKeyCredentialRequestOptionsJSON }, 'signed-out' | 'none' | 'expired' | 'off'>> {
     return !this.state.core.switches.passkeys ? OFF : (await load.passkeys()).twoFactorPasskeyOptions(this.state)
   }
 
-  async verifyPasskey(response: AuthenticationResponseJSON): Promise<TwoFactorResult | Off> {
+  async verifyPasskey(response: AuthenticationResponseJSON): Promise<Result<{ redirect: string }, 'invalid' | 'expired' | 'limited'> | Off> {
     if (!this.state.core.switches.passkeys)
       return OFF
 

@@ -1,11 +1,9 @@
 import type { BareUser } from './core'
-import type { AuthFailed, AuthRejected } from './failure'
+import type { AuthRejected } from './failure'
 import type { ProfileFieldView, ProfileOptions, ProfileProblem } from './pages'
 import { rejected } from './failure'
 import { profileLabel, profileValue } from './pages'
 import { PROFILE_MAX_LENGTH } from './rules'
-
-export type SaveProfileResult = { ok: true } | AuthFailed<'signed-out'> | AuthRejected<Record<string, ProfileProblem>>
 
 // The fields of the profile form with what `user` holds in each.
 export async function profileFields(profile: ProfileOptions, user: BareUser, locale: string | undefined): Promise<ProfileFieldView[]> {
