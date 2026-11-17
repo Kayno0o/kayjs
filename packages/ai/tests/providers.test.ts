@@ -280,8 +280,8 @@ describe('timeouts', () => {
         async start(controller) {
           for (const line of lines) {
             controller.enqueue(encoder.encode(line))
-            // A server sending a chunk every 40 ms, under the 150 ms idle timeout.
-            await Bun.sleep(40)
+            // A chunk every 120 ms: six of them outlast the 500 ms idle timeout, which only holds if each chunk resets it.
+            await Bun.sleep(120)
           }
 
           controller.close()
@@ -291,7 +291,7 @@ describe('timeouts', () => {
       return new Response(body, { headers: { 'content-type': 'text/event-stream' } })
     })
 
-    expect(await ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { idle: '150ms' } })).toBe('abc')
+    expect(await ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { idle: '500ms' } })).toBe('abc')
   })
 
   it('ends without an error when stopped while connecting', async () => {
