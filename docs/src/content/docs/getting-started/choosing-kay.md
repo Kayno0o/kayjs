@@ -39,7 +39,7 @@ kay has [page swaps](/essentials/islands#page-navigation) of its own. It adds wh
 - **A young ecosystem.** Few integrations exist beyond kay's libraries: [kayjs-ui](/libraries/kayjs-ui), [kayjs-auth](/libraries/kayjs-auth), [kayjs-mail](/libraries/kayjs-mail), [kayjs-cms](/libraries/kayjs-cms) and [kayjs-ai](/libraries/kayjs-ai). Answers are in these docs, not across the web. Coding agents learn kay from [llms.txt](/llms.txt), not from their training.
 - **No JSX components to reuse.** React, Vue and Svelte components do not run in `.kay`, and their component libraries have no kay version. A plain browser library, such as a map or a chart, runs inside an island.
 - **Its own file format.** Editors read `.kay` through `kay lsp`, in VS Code or any LSP editor. Tools that only know HTML, JSX or Svelte files do not.
-- **It moves fast.** A minor version can carry a breaking change. [Upgrading](/guides/upgrading) lists each with what to change. A major is kept for a rewrite.
+- **It moves fast.** Until 2.0.0, a minor version can carry a breaking change, and an app pins kay with `~` to take patches only. From 2.0.0, kay follows semver: a breaking change is a major version, and a new app pins kay with `^`. [Upgrading](/guides/upgrading) lists what each release changes.
 
 ## When to pick something else
 

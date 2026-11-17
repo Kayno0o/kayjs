@@ -17,7 +17,7 @@ bun install
 bun run dev   # http://localhost:3000, reloads on every change
 ```
 
-The project depends on it as `"kay": "npm:@kayjs/kay@~<version>"`, a tilde since a minor may break, so imports read `kay`, `kay/server` and so on. `bun src/cli.ts new ../my-app` from a checkout of this repository depends on a packed copy of it instead.
+The project depends on it as `"kay": "npm:@kayjs/kay@~<version>"`, so imports read `kay`, `kay/server` and so on. `bun src/cli.ts new ../my-app` from a checkout of this repository depends on a packed copy of it instead.
 
 ## A page and an island
 
@@ -92,7 +92,7 @@ Every command takes an optional project directory and prints its usage for `--he
 
 ## Upgrading
 
-[What's new](llms/whats-new.md) lists what each release adds, and a minor release may break an app: [Upgrading](llms/upgrading.md) lists what each one breaks and what to change.
+[What's new](llms/whats-new.md) lists what each release adds, and [Upgrading](llms/upgrading.md) lists what each one breaks and what to change. kay follows semver from 2.0.0: a breaking change is a major version, a minor adds features and a patch fixes bugs. Until then a 1.x minor may break an app, each break behind a `deprecated` lint that `kay upgrade` fixes, and `kay new` pins kay with `~`, which takes patches only.
 
 ## Contributing
 

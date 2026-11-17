@@ -2,7 +2,9 @@
 
 ## Supported versions
 
-Security fixes go into the latest minor release of kay and its libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms, kayjs-ai), as a patch. They all share one version, so upgrading to the latest one picks up every fix.
+Security fixes go into the latest release of kay and its libraries (`@kayjs/auth`, `@kayjs/ui`, `@kayjs/mail`, `@kayjs/cms`, `@kayjs/ai`), as a patch. They all share one version, so upgrading to the latest one picks up every fix.
+
+Through 1.x, only the latest minor is supported. From 2.0.0, kay follows semver, and the latest major is supported. A fix for the previous major is made only for a serious vulnerability, for six months after the new major is released.
 
 ## Reporting a vulnerability
 
