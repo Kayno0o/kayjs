@@ -9,13 +9,16 @@ const TOOL_LIMIT = { max: 20, window: '1m' } as const
 const log = logFrom('docs-chat')
 
 export const searchDocs = action(
-  { query: s.string({ min: 2, max: 200 }) },
+  { input: { query: s.string({ min: 2, max: 200 }) }, tool: 'Searches the documentation and returns the best matching sections, each with the path of its page', protect: { rateLimit: TOOL_LIMIT } },
   async ({ query }) => ({ hits: await searchPages(query) }),
-  { tool: 'Searches the documentation and returns the best matching sections, each with the path of its page', protect: { rateLimit: TOOL_LIMIT } },
 )
 
 export const readDocsPage = action(
-  { path: s.string({ min: 1, max: 200 }), part: s.int({ optional: true, min: 1, max: 50 }) },
+  {
+    input: { path: s.string({ min: 1, max: 200 }), part: s.int({ optional: true, min: 1, max: 50 }) },
+    tool: { name: 'read_page', description: 'Reads one documentation page in full, given its path such as /essentials/islands or /llms/actions. A long page comes in parts: the result says how many there are, and part picks the next one', readOnly: true },
+    protect: { rateLimit: TOOL_LIMIT },
+  },
   async ({ path, part }, ctx) => {
     const found = await readPage(path)
 
@@ -29,7 +32,6 @@ export const readDocsPage = action(
 
     return { path: found.href, title: found.title, part: part ?? 1, parts, text }
   },
-  { tool: { name: 'read_page', description: 'Reads one documentation page in full, given its path such as /essentials/islands or /llms/actions. A long page comes in parts: the result says how many there are, and part picks the next one', readOnly: true }, protect: { rateLimit: TOOL_LIMIT } },
 )
 
 const Messages = s.object({
@@ -37,7 +39,7 @@ const Messages = s.object({
 })
 
 export const reply = action(
-  Messages,
+  { input: Messages, protect: { rateLimit: { max: 8, window: '1m' } } },
   async ({ messages }, ctx) => {
     try {
       return ask(messages, { system: await systemPrompt(), tools: [searchDocs, readDocsPage], maxSteps: 4, maxTokens: 1500, temperature: 0.2 }).progress()
@@ -49,6 +51,5 @@ export const reply = action(
       return ctx.deny(400, { data: 'The chat is not available on this site right now. Search the docs with Ctrl K instead.' })
     }
   },
-  { protect: { rateLimit: { max: 8, window: '1m' } } },
 )
 ---

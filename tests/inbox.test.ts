@@ -104,7 +104,7 @@ describe('the inbox route', () => {
     expect((await inbox(ADA)).unread).toBe(1)
   })
 
-  it('reads the user from the request, not from anything the request says about itself', async () => {
+  it('reads the user from the request, and refuses a body naming another', async () => {
     await notify('grace', { title: 'for Grace' })
 
     const forged = await get('/_kay/ui/inbox?user=grace', ADA)
@@ -114,7 +114,7 @@ describe('the inbox route', () => {
     const [note] = await notifications.list('grace')
     const marked = await post({ id: note!.id, user: 'grace' }, ADA)
 
-    expect(marked.status).toBe(200)
+    expect(marked.status).toBe(422)
     expect(await notifications.unread('grace')).toBe(1)
   })
 
