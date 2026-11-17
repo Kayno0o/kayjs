@@ -65,6 +65,6 @@ async function loadHappyDom(): Promise<typeof import('happy-dom')> {
     if ((error as { code?: string }).code !== 'ERR_MODULE_NOT_FOUND' && !String(error).includes('Cannot find'))
       throw error
 
-    throw new MissingPeerError(`happy-dom is not installed, and \`page.a11y()\` of a visited page needs it: run \`bun add -d @happy-dom/global-registrator\``)
+    throw new MissingPeerError(`happy-dom is not installed, and \`page.a11y()\` of a visited page needs it: run \`bun add -d happy-dom\``)
   }
 }
