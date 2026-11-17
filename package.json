@@ -300,7 +300,7 @@
     "@kayjs/cms": "workspace:*",
     "@kayjs/mail": "workspace:*",
     "@kayjs/ui": "workspace:*",
-    "@kaynooo/eslint": "^7.1.6",
+    "@kaynooo/eslint": "^8.0.3",
     "@kaynooo/pg-orm": "^8.1.4",
     "@oxc-parser/binding-wasm32-wasip1": "0.155.0",
     "@types/babel__traverse": "^7.28.0",

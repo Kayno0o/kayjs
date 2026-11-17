@@ -80,7 +80,7 @@
     "@happy-dom/global-registrator": "^21.0.4",
     "@kayjs/mail": "workspace:~",
     "@kayjs/ui": "workspace:~",
-    "@kaynooo/eslint": "^7.1.6",
+    "@kaynooo/eslint": "^8.0.3",
     "@types/bun": "^1.4.4",
     "bun-plugin-tailwind": "^0.1.2",
     "tailwindcss": "^4.3.3",

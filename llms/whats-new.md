@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - In an island, an `error` or `pending` line in a snippet declared outside the form, or inside an `await` or an `if` shown later, follows the form the snippet is called in, as it does on a static page ([snippets](templates-elements-slots-snippets.md#snippets)).
 - A kayjs-ui Table island whose call sites all write `sortable={false}` leaves its sorting code out, and one that writes no `header`, `cell` or `noMatch` block leaves those out too (a plain Table drops about 4 KB minified); a BarChart leaves out `stacked`, `xLabels`, `empty`, `emptyLabel`, `active`, `onActive` and `onActiveChange` that no call site writes ([Table](../packages/ui/llms/table.md)).
 - `s` is kay's own schema builder: lowercase builders with short options (`s.string({ min, max })`, `s.email()`, `s.int()`, `s.enum(values | record)`, `s.list()`, `s.object()`, `s.file({ maxSize: '5mb' })`), the same field options on every one (`optional`, `default`, `error`, `label`, `description`, `example`), strings and lists bounded by default, and a plain record of fields taken as the object schema by `action` and `defineEnv`; the PascalCase builders and `s.Optional` are deprecated (`deprecated-schema-builders`), `s.typebox` is gone ([Schemas](schemas.md#schemas)).
+- kay and the apps `kay new` writes lint with `@kaynooo/eslint` 8, which installs about 30 MB less as it no longer pulls in the formatters ([upgrading](upgrading.md)).
 
 ## 1.105.0
 

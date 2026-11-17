@@ -7,6 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `s` is kay's own builder, in lowercase
 
 `s.string({ min, max })`, `s.int()`, `s.enum()`, `s.object()` and the rest replace the PascalCase builders of Elysia, each taking the same field options (`optional: true`, `default`, `error`, `label`, `description`, `example`); `s.Optional(field)` is `optional: true` in the field's options, `s.UnionEnum` and `s.UnionKeys` are `s.enum`, `s.Numeric` is `s.number`, and `s.typebox` is gone: `s` builds a schema of its own, over TypeBox, and a schema built with Elysia's `t` is still taken. The old names work until 2.0, and `kay upgrade` rewrites them (`deprecated-schema-builders`, [schemas](schemas.md#schemas)). A file size of a file field is `'2mb'`, never `'2m'`. Two things differ in the new builders, which the fix does not hide: `s.object` refuses a key its shape lacks, where `s.Object` let it by (`{ extra: 'strip' }` keeps the old way; see [schemas](schemas.md#schemas) for where it refuses), and `s.list` is at most 1,000 items unless `max` says more. An unknown key of a query, the headers or the cookies is dropped, whatever the schema says, as a link or a proxy adds some; `s.Object` of a collection's frontmatter now refuses a key its shape lacks, so an entry with an extra key fails the build until the schema says `{ extra: 'strip' }`. An `action` or a `defineEnv` takes the record of fields where it took `s.Object({ ... })`, and the fix writes it.
+### `@kaynooo/eslint` 8
+
+kay and `kay new` use `@kaynooo/eslint` 8, which has no formatters (Prettier, oxfmt and dprint, about 30 MB, are no longer installed): run `bun add -d @kaynooo/eslint@^8`, and drop a `formatters` option from `eslint.config.ts` if it sets one. `kay fmt` formats as before.
 
 ## 1.105.0
 
