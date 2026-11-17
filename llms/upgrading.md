@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.107.0
 
+### `--- script` opening a file is an error
+
+A file opens its script with `---`; `--- script` is only for a script that follows a `--- server`, `--- module` or `--- style` fence. The `deprecated-script-fence` lint is gone, and `--- script` first in a file is a `fence-invalid` error whose safe fix `kay check --fix` applies.
+
 ### `action({ input, ...options }, handler)`
 
 An action takes its options first, with its input in them, as an API route does: `action({ input: { title: s.string() }, maxSize: '1mb' }, handler)`. `action(schema, handler, options)` and `action(handler, options)` work until 2.0; `kay upgrade` rewrites them (`deprecated-action-options`).

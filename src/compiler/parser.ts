@@ -2,7 +2,7 @@ import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic,
 import { scanClassName } from './class-name'
 import { strayElse } from './else-problem'
 import { ifAlias } from './if-alias'
-import { rolesOf } from './island-declaration'
+import { rolesOf, spelledOutFirstFence } from './island-declaration'
 import { Scanner } from './scanner'
 
 // `--- server`, `--- client`, `--- island`, `--- static`, `--- script`, `--- module`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
@@ -170,7 +170,7 @@ export function parseKay(source: string): KayFile {
   if (bareClosing)
     explainSecondFence(source, bareClosing, diagnostics)
 
-  return { source, script: fences.script, server: fences.server, serverFence, module: fences.module, style: fences.style, typeParameters, client, pin, island, scriptLine, templateStart, template, diagnostics, unclosedServer }
+  return { source, script: fences.script, server: fences.server, serverFence, module: fences.module, style: fences.style, typeParameters, client, pin, island, scriptLine, templateStart, template, diagnostics: [...diagnostics, ...spelledOutFirstFence(source, scriptLine, fenceWord)], unclosedServer }
 }
 
 // A bare `---` in the template after a named fence closed by a bare `---`: the first bare line closed that fence, so the author meant the second fence as the script, which takes `--- script` once a named fence is there.

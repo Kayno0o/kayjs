@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `--- script` as a file's first fence is a compile error naming `---`, and the `deprecated-script-fence` lint is gone ([components](components.md)).
 - A component an island draws only where it may not render at first paint (inside an `if`, a `match` case, `@failed`, or the body of a closed `Dialog` or `FormDialog`) loads when that branch first draws, with nothing to declare: the page preloads what the server drew, a visitor reaching for the island loads the rest ahead, and a failed chunk is retried and reported; the code that posts an action call loads with its first call, retried after 1 s and 3 s when the load fails ([islands](islands.md#components-that-load-when-they-first-draw)).
 - An island whose closed forms and dialogs hold words that are also component names loads less: a name in a string or a comment no longer keeps a component eager, and `Form`, `FormDialog` and `SaveForm` load their sending code on the first send. An island with a table, a closed form dialog and a select in it sheds 4.6 KB gzip of eager JS ([islands](islands.md))
 - `action({ input, ...options }, handler)`: an action takes its options first with its input in them, as an API route does; the old argument order works until 2.0 and `kay upgrade` rewrites it ([actions](actions.md))

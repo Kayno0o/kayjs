@@ -115,6 +115,16 @@ describe('fence', () => {
     expect(outline(unclosed)).toEqual([{ tag: 'p', children: [['x']] }])
   })
 
+  it('refuses `--- script` opening a file, naming `---`, and leaves it after a named fence', () => {
+    const first = parse('\n--- script <T>\nconst a = 1\n---\np {a}\n').diagnostics
+
+    expect(first.map(d => [d.code, d.message])).toEqual([['fence-invalid', '`--- script` cannot open a file: the script is written `---`']])
+    expect(first[0]?.help).toContain('`--- server`')
+    expect(first[0]?.fixes?.[0]?.edits).toEqual([{ start: 4, end: 11, text: '' }])
+    expect(parse('--- server\nconst a = 1\n--- script\nconst b = 2\n---\np {a}\n').diagnostics).toEqual([])
+    expect(parse('---\nconst a = 1\n---\npre\n  | --- script\n').diagnostics).toEqual([])
+  })
+
   it('closes a fence on the labeled line opening the next one, `--- script` naming the component script', () => {
     const merged = parse('--- server\nconst a = 1\n--- script\nconst b = 2\n---\np {a}\n')
     const literal = parse('---\nconst b = 2\n--- server\nconst md = `\n--- client\n`\n---\np {b}\n')
@@ -128,7 +138,7 @@ describe('fence', () => {
 
   it('reports an unclosed fence', () => {
     expect(parse('---\nconst a = 1\n').diagnostics[0]?.message).toContain('never closed')
-    expect(parse('--- script\nconst a = 1\n').diagnostics[0]?.message).toContain('never closed')
+    expect(parse('---\nconst a = 1\n').diagnostics[0]?.message).toContain('never closed')
   })
 
   it('leaves a server fence running to the end of the file to its file, as an _actions.kay holds no template', () => {

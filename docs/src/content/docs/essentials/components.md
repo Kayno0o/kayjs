@@ -40,7 +40,7 @@ li(class={size})
 
 A `@keyframes` name is scoped to the component with the `animation` values that use it, and `@keyframes :global(spin)` keeps it as written. `kay check` warns of a rule no element of the template can match (`unused-selector`), and reports a rule ending on `:root`, `html` or `body` (`unreachable-selector`), since those elements carry no `data-k-` attribute: write `:global(body)`, and `kay check --fix` does.
 
-A fence ends on a `---` line, or on the line opening the next one. A script that follows another fence opens with `--- script`, since a bare `---` there would close the fence before it. A script that comes first is written `---`.
+A fence ends on a `---` line, or on the line opening the next one. A script that follows another fence opens with `--- script`, since a bare `---` there would close the fence before it. A script that comes first is written `---`, and `--- script` there is an error.
 
 ```kay
 --- server

@@ -1,4 +1,4 @@
---- script
+---
 import Tracker from '../components/tracker.kay'
 import { move } from './fixed.kay'
 ---

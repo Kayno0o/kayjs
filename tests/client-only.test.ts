@@ -289,7 +289,7 @@ describe('client-only islands through the cache', () => {
 describe('browser-only globals read while rendering', () => {
   // Each fix as the source it leaves, its edits applied from the last.
   const fixed = (source: string, edits: { start: number, end: number, text: string }[]) => edits.toSorted((a, b) => b.start - a.start).reduce((text, change) => text.slice(0, change.start) + change.text + text.slice(change.end), source)
-  const reads = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true, lints: { 'constant-signal': 'allow', 'deprecated-script-fence': 'allow' } }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message, fixes: diagnostic.fixes?.map(fix => fixed(source, fix.edits)) }))
+  const reads = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true, lints: { 'constant-signal': 'allow' } }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message, fixes: diagnostic.fixes?.map(fix => fixed(source, fix.edits)) }))
   const client = (source: string) => source.replace('---\n', '---\nisland({ render: \'client\' })\n')
 
   it('reports one read by the script, a function the template calls, a memo or the template itself, each with its fixes', () => {
@@ -335,10 +335,10 @@ describe('browser-only globals read while rendering', () => {
     expect(reads(source).map(read => read.text)).toEqual(['document'])
   })
 
-  it('turns a `--- script` fence into `--- client`', () => {
-    const source = '--- script\nconst title = document.title\n---\np {title}\n'
+  it('adds the island declaration to the script fence', () => {
+    const source = '---\nconst title = document.title\n---\np {title}\n'
 
-    expect(reads(source)).toEqual([{ text: 'document', message: '`document` exists only in the browser', fixes: [source.replace('--- script', '--- script\nisland({ render: \'client\' })')] }])
+    expect(reads(source)).toEqual([{ text: 'document', message: '`document` exists only in the browser', fixes: [source.replace('---', '---\nisland({ render: \'client\' })')] }])
   })
 
   it('leaves handlers, refs, effects and other callbacks alone, as globals Bun has, shadowed names and types', () => {

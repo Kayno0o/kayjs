@@ -1,4 +1,4 @@
---- script
+---
 import FormCaller from '../components/form-caller.kay'
 import { move } from './fixed.kay'
 ---

@@ -152,7 +152,7 @@ describe('every deprecated lint has a safe fix', () => {
   it('lists each lint\'s check, so a new one cannot go without', () => {
     const compiled = names.filter(name => !(name in SITE))
 
-    expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-ai-links', 'deprecated-auth-signed', 'deprecated-children-prop', 'deprecated-image-options', 'deprecated-island-attributes', 'deprecated-island-fence', 'deprecated-link-flags', 'deprecated-mail-send', 'deprecated-page-cache', 'deprecated-page-island', 'deprecated-page-seo', 'deprecated-parts-class', 'deprecated-script-fence', 'deprecated-ui-callbacks', 'deprecated-ui-input', 'deprecated-ui-items', 'deprecated-ui-props', 'deprecated-uncaught-await'])
+    expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-ai-links', 'deprecated-auth-signed', 'deprecated-children-prop', 'deprecated-image-options', 'deprecated-island-attributes', 'deprecated-island-fence', 'deprecated-link-flags', 'deprecated-mail-send', 'deprecated-page-cache', 'deprecated-page-island', 'deprecated-page-seo', 'deprecated-parts-class', 'deprecated-ui-callbacks', 'deprecated-ui-input', 'deprecated-ui-items', 'deprecated-ui-props', 'deprecated-uncaught-await'])
     expect(Object.keys(NO_SAFE_FIX).filter(name => !names.includes(name as Name))).toEqual([])
   })
 

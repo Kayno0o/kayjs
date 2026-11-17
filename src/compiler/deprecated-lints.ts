@@ -34,14 +34,6 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Card from \'./card.kay\'\n---\nCard(class={{ head: \'p-6\' }})',
     right: '---\nimport Card from \'./card.kay\'\n---\nCard(parts={{ head: \'p-6\' }})',
   },
-  'deprecated-script-fence': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.102',
-    summary: '`--- script` as the first fence of a file, `---` since 1.102: the bare line opens the component script wherever no named fence comes before it, so one fence had two spellings. `--- script` stays for a script that follows a `--- server`, `--- module` or `--- style` fence, where a bare `---` would close that fence instead, and `--- client` still replaces `---` rather than modifying it. The old form still works. The fix drops the word, keeping the type parameters of `--- script <T>` as `--- <T>`.',
-    wrong: '--- script\nconst { title } = props<{ title: string }>()\n---\nh1 {title}',
-    right: '---\nconst { title } = props<{ title: string }>()\n---\nh1 {title}',
-  },
   'deprecated-schema-type': {
     level: 'warn',
     group: 'deprecated',
@@ -563,7 +555,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.99', removedIn: '1.103' },
   { since: '1.100', removedIn: '1.104' },
   { since: '1.101', removedIn: '1.105' },
-  { since: '1.102' },
+  { since: '1.102', removedIn: '1.107' },
   { since: '1.103' },
   { since: '1.104' },
   { since: '1.105' },

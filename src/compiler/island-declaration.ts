@@ -179,3 +179,17 @@ export function rolesOf(source: string, script: Span | undefined, fence: Span & 
 
   return island.render === 'client' ? { island, client: island.span, pin: undefined } : { island, client: undefined, pin: { kind: island.render, ...island.span } }
 }
+
+// `--- script` opening a file: the bare `---` is the same fence, and only a script that follows a named fence needs the word, as there a bare line would close that one.
+export function spelledOutFirstFence(source: string, line: Span | undefined, word: { start: number, end: number, word: string } | undefined): Diagnostic[] {
+  if (!line || word?.word !== 'script' || source.slice(0, line.start).trim() !== '')
+    return []
+
+  return [{
+    ...line,
+    code: 'fence-invalid',
+    message: '`--- script` cannot open a file: the script is written `---`',
+    help: '`--- script` is only for a script that follows a `--- server`, `--- module` or `--- style` fence',
+    fixes: [{ title: 'Write `---`', safe: true, edits: [{ start: line.start + 3, end: word.end, text: '' }] }],
+  }]
+}

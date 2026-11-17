@@ -134,7 +134,7 @@ ul
 | Fence | What it is | Allowed on |
 | --- | --- | --- |
 | `---` | The component script, run wherever the component renders | Every `.kay` file; written `--- <T>` for a generic component |
-| `--- script` | The same fence, for a script that follows a `--- server`, `--- module` or `--- style` fence, where a bare `---` would close that one; as a file's first fence it is the `deprecated-script-fence` lint | After another fence |
+| `--- script` | The same fence, for a script that follows a `--- server`, `--- module` or `--- style` fence, where a bare `---` would close that one; as a file's first fence it is a `fence-invalid` error, write `---` | After another fence |
 | `--- server` | Code run on the server for each request, never sent to the browser | Pages, layouts and the other `_` route files; `fence-invalid` on a component |
 | `--- module` | Module-level code, run once per bundle, whose exports other files import | Every file; no props, and not on a browser-only component |
 | `--- style` | CSS scoped to the component | Every file |
