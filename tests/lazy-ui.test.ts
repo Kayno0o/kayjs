@@ -66,6 +66,15 @@ describe('lazy components', () => {
     expect(compiled('page', 'dom')).not.toMatch(/await\s+\w*[rR]eady\(/)
   })
 
+  it('keeps a component eager that draws itself in a branch, as its module is the one loading', async () => {
+    expect(compiled('tree', 'dom')).not.toContain('import("./tree.kay")')
+    expect(compiled('tree', 'html')).not.toMatch(/import \w+_Tree from/)
+
+    const { default: Tree } = await import(join(fixtures, 'tree.kay')) as { default: (props: object) => unknown }
+
+    expect(String(child(Tree({ depth: 1 })))).toContain('Level')
+  })
+
   it('keeps a component eager that a branch inside a loop body draws, as the rows of a page mostly draw every branch', () => {
     expect(compiled('rows', 'dom')).toMatch(/^import Heavy from/m)
     expect(compiled('rows', 'dom')).not.toContain('KayLazy(')
