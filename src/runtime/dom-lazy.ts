@@ -212,9 +212,14 @@ async function track(drawing: Promise<void>): Promise<void> {
   }
 }
 
-;(globalThis as { $kayLazyIdle?: () => Promise<void> }).$kayLazyIdle = async () => {
+// Answers whether it waited for any, so a settle with nothing loading takes no extra turn.
+;(globalThis as { $kayLazyIdle?: () => Promise<boolean> }).$kayLazyIdle = async () => {
+  const waited = inflight.size > 0
+
   while (inflight.size > 0)
     await Promise.allSettled(inflight)
+
+  return waited
 }
 
 // Loads the component, trying again after a failure, then draws it; a render error is no load failure and goes where any render error of the branch goes. The one that failed to load for good is reported, and a deploy that dropped the chunk reloads the page.

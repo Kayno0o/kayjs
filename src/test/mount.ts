@@ -46,8 +46,10 @@ const bundles = new Map<string, Promise<string>>()
 // Lets queued effects and timers due now land, as after a click, before the DOM is read, and the components that load when they first draw arrive.
 export async function settle(): Promise<void> {
   await sleep(0)
-  await (globalThis as { $kayLazyIdle?: () => Promise<void> }).$kayLazyIdle?.()
-  await sleep(0)
+
+  // A second turn only after a component loaded, so a transition's first frame stays readable after a plain settle.
+  if (await (globalThis as { $kayLazyIdle?: () => Promise<boolean> }).$kayLazyIdle?.() === true)
+    await sleep(0)
 }
 
 // Keeps a value in localStorage as `persisted.local(key, initial)` does, or in sessionStorage as `persisted.session(key, initial)` does with `'session'`, encoded as island props are rather than as JSON, for a component mounted after to read.
