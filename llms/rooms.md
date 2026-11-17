@@ -14,7 +14,7 @@ const chats = rooms<{ from: string, text: string }, string>()
 
 export default api()
   .ws('/:room', {
-    body: s.Object({ text: s.String() }),
+    body: s.object({ text: s.string() }),
     response: chats.response,
     open(ws) {
       chats.join(ws, ws.data.params.room, ws.data.user.name)
@@ -70,9 +70,9 @@ const sendBoard = games.coalesce(async room => ({
 
 export default api()
   .ws('/:room', {
-    body: s.Union([
-      s.Object({ type: s.Literal('say'), text: s.String() }),
-      s.Object({ type: s.Literal('play'), cell: s.Integer() }),
+    body: s.union([
+      s.object({ type: s.literal('say'), text: s.string() }),
+      s.object({ type: s.literal('play'), cell: s.int() }),
     ]),
     response: games.response,
     open(ws) {

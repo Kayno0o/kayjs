@@ -55,7 +55,7 @@ export const news = collection({
     })),
   ttl: '15m',
 }, {
-  schema: s.Object({ title: s.String(), published: s.Boolean() }),
+  schema: s.object({ title: s.string(), published: s.boolean() }),
   draft: post => !post.data.published,
 })
 ```

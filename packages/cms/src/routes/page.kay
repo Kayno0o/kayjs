@@ -17,7 +17,7 @@ function enter(ctx: { cookies: Bun.CookieMap, request: Request, redirect: (to: s
 }
 
 // The button of a page another site linked to: entering edit mode is a write, so it takes a post from this site.
-export const enterEditing = action(s.Object({ path: s.Optional(s.String({ maxLength: 2000 })) }), async ({ path }, ctx) => {
+export const enterEditing = action({ path: s.string({ optional: true, max: 2000 }) }, async ({ path }, ctx) => {
   enter(ctx, path)
 })
 

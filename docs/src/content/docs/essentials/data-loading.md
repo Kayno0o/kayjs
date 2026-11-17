@@ -48,10 +48,10 @@ A page sets a `query` schema in its `page` object to read the search params type
 import { s } from 'kay'
 
 export const page = {
-  query: s.Object({
-    q: s.String({ default: '' }),
-    page: s.Optional(s.Integer()),
-  }),
+  query: s.object({
+    q: s.string({ default: '' }),
+    page: s.int({ optional: true }),
+  }, { extra: 'strip' }),
 }
 
 const { q, page: number = 1 } = ctx.query
@@ -65,7 +65,7 @@ A layout declares the params its pages share the same way, in its own `page`. It
 --- server
 import { s } from 'kay'
 
-export const page = { query: s.Object({ period: s.String({ maxLength: 4, default: '24h' }) }) }
+export const page = { query: s.object({ period: s.string({ max: 4, default: '24h' }) }, { extra: 'strip' }) }
 
 const { period } = ctx.query
 ---
@@ -76,7 +76,7 @@ slot
 A value the schema refuses answers 400. A link from a bookmark or an old email may carry one the page no longer takes, so give the field `lenient: true` and it reads as its default instead, or is left out when it has none. The field keeps its real type:
 
 ```ts
-export const page = { query: s.Object({ period: s.UnionEnum(['24h', '7d', '30d'], { default: '24h', lenient: true }) }) }
+export const page = { query: s.object({ period: s.enum(['24h', '7d', '30d'], { default: '24h', lenient: true }) }, { extra: 'strip' }) }
 ```
 
 Two files of one route can declare the same name when their schemas are the same. `kay check` reports a name declared with different schemas, on the later file.
@@ -151,10 +151,10 @@ Caching a load with `cached()` is covered in [Caching and streaming](/guides/cac
 import { s } from 'kay'
 import { defineEnv } from 'kay/server'
 
-export const env = defineEnv(s.Object({
-  DATABASE_URL: s.String(),
-  PORT: s.Integer({ default: 3000 }),
-}))
+export const env = defineEnv({
+  DATABASE_URL: s.string(),
+  PORT: s.int({ default: 3000 }),
+})
 ```
 
 Import `env` from server code. An island never sees it.
@@ -165,27 +165,27 @@ To read other values in a test, use `overrideEnv` from `kay/test` ([Testing](/gu
 
 Give a variable that development and tests can do without, and production must have, `requiredInProduction: true`.
 
-Under `NODE_ENV=production` a missing value stops the boot, whatever the default. Anywhere else the default applies, the variable is left out when its field is `s.Optional`, or it is an empty string.
+Under `NODE_ENV=production` a missing value stops the boot, whatever the default. Anywhere else the default applies, the variable is left out when its field is `optional: true`, or it is an empty string.
 
 `NODE_ENV=production kay build` counts as production too. A prerendered page reading such a variable needs it set for the build.
 
-A field with no default keeps its type `string`: in development it is an empty string. Add `s.Optional` when your code handles a missing value, and the type becomes `string | undefined`.
+A field with no default keeps its type `string`: in development it is an empty string. Add `optional: true` when your code handles a missing value, and the type becomes `string | undefined`.
 
 ```ts
-export const env = defineEnv(s.Object({
-  DISCORD_CLIENT_ID: s.String({ requiredInProduction: true }),
-  STRIPE_KEY: s.Optional(s.String({ requiredInProduction: true })),
-}))
+export const env = defineEnv({
+  DISCORD_CLIENT_ID: s.string({ requiredInProduction: true }),
+  STRIPE_KEY: s.string({ optional: true, requiredInProduction: true }),
+})
 ```
 
-For a secret, use `s.Secret()`. It is a string of at least 32 characters that production must set. Under `kay dev` and `bun test` kay derives a value from the project path and a random seed kept in the git-ignored `.kay` folder, so sessions survive a restart and no placeholder is committed. Under any other `NODE_ENV`, or none, a missing secret stops the boot, as production does. If `kay dev` cannot write `.kay`, kay says so and asks you to set the variable.
+For a secret, use `s.secret()`. It is a string of at least 32 characters that production must set. Under `kay dev` and `bun test` kay derives a value from the project path and a random seed kept in the git-ignored `.kay` folder, so sessions survive a restart and no placeholder is committed. Under any other `NODE_ENV`, or none, a missing secret stops the boot, as production does. If `kay dev` cannot write `.kay`, kay says so and asks you to set the variable.
 
 Under `bun test` the seed is only read, and kay uses one of the process when there is none, so a test run writes nothing to `.kay` for it and needs no variable. The seed goes into `KAY_DEV_SEED` in the environment, so a subprocess a test spawns with the environment it was given derives the same secret and reads its parent's cookies; one spawned with an environment of its own derives another.
 
 ```ts
-export const env = defineEnv(s.Object({
-  DOWNLOAD_KEY: s.Secret(),
-}))
+export const env = defineEnv({
+  DOWNLOAD_KEY: s.secret(),
+})
 ```
 
 ### List the variables

@@ -10,7 +10,7 @@ import { adminTitle } from '../listing'
 import { screenPath } from '../paths'
 import { activityScreen } from '../screens'
 
-export const page = { query: s.Object({ page: s.Optional(s.Integer()) }) }
+export const page = { query: s.object({ page: s.int({ optional: true }) }, { extra: 'strip' }) }
 
 // The log names every editor and what each did, the people the `delete` role may erase from the history.
 if (!await may(ctx, 'delete'))

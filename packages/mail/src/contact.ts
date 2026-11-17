@@ -96,12 +96,12 @@ export function contactForm<const Extra extends Record<string, Schema>, const Ho
 
   const words = { reach: reach ?? '' }
 
-  const schema = s.Object({
-    name: s.String({ pattern: ONE_LINE, maxLength: 100, ...refusal('name') }),
-    email: s.String({ format: 'email', maxLength: 254, ...refusal('email') }),
+  const schema = s.object({
+    name: s.string({ pattern: ONE_LINE, max: 100, ...refusal('name') }),
+    email: s.string({ format: 'email', max: 254, ...refusal('email') }),
     ...fields,
-    ...consent ? { consent: s.Literal(true, { ...refusal('consent'), 'x-kay-consent': true }) } : {},
-    message: s.String({ pattern: '\\S', maxLength, ...refusal('message') }),
+    ...consent ? { consent: s.literal(true, { ...refusal('consent'), 'x-kay-consent': true }) } : {},
+    message: s.string({ pattern: '\\S', max: maxLength, ...refusal('message') }),
   }) as unknown as ContactSchema<Extra, Consent>
 
   const handler = async (input: ContactInput<Extra, Consent>, ctx: ActionContext): Promise<Failure<string> | undefined> => {

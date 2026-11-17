@@ -37,7 +37,7 @@ import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({ title: s.String(), date: s.Date() }),
+  schema: s.object({ title: s.string(), date: s.date() }),
 })
 ```
 
@@ -120,7 +120,7 @@ A page's server fence exports an action, and `form(action={comment})` posts to i
 import { s, action } from 'kay'
 
 export const comment = action(
-  s.Object({ text: s.String({ minLength: 10, maxLength: 2000 }) }),
+  { text: s.string({ min: 10, max: 2000 }) },
   async ({ text }) => text.trim(),
 )
 ---
@@ -195,10 +195,10 @@ import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({
-    title: s.String(),
-    date: s.Date(),
-    tags: s.Array(s.String(), { default: [] }),
+  schema: s.object({
+    title: s.string(),
+    date: s.date(),
+    tags: s.list(s.string(), { default: [] }),
   }),
 })
 ```
@@ -329,9 +329,9 @@ import { s, action } from 'kay'
 import { checkComment } from '../comment'
 import CommentForm from '../components/comment-form.kay'
 
-const newComment = s.Object({
-  name: s.String({ maxLength: 100 }),
-  text: s.String({ maxLength: 2000 }),
+const newComment = s.object({
+  name: s.string({ max: 100 }),
+  text: s.string({ max: 2000 }),
 })
 
 export const comment = action(newComment, (input, ctx) => {

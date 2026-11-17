@@ -18,7 +18,7 @@ const LIBRARY = 'kayjs-ai'
 const PROMPT_VERSION = '1'
 const MAX_ALT_CHARS = 200
 
-const ALT = s.Object({ alt: s.String({ maxLength: MAX_ALT_CHARS }) })
+const ALT = s.object({ alt: s.string({ max: MAX_ALT_CHARS }) })
 
 interface Draft {
   alt: string

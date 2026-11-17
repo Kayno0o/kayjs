@@ -1,8 +1,8 @@
 --- server
 import { ask, chatMessages } from '@kayjs/ai'
-import { action, s } from 'kay'
+import { action } from 'kay'
 
 // A chat that takes files: a message holds the images the visitor attached.
-export const reply = action(s.Object({ messages: chatMessages({ maxItems: 50, attachments: { type: 'image/png' } }) }), ({ messages }) => ask(messages), { maxSize: '2mb' })
+export const reply = action({ messages: chatMessages({ maxItems: 50, attachments: { type: 'image/png' } }) }, ({ messages }) => ask(messages), { maxSize: '2mb' })
 ---
 p Chat

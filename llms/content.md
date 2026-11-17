@@ -11,11 +11,11 @@ import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({
-    title: s.String(),
-    date: s.Date(),
-    tags: s.Array(s.String(), { default: [] }),
-    draft: s.Optional(s.Boolean()),
+  schema: s.object({
+    title: s.string(),
+    date: s.date(),
+    tags: s.list(s.string(), { default: [] }),
+    draft: s.boolean({ optional: true }),
   }),
   route: '/blog/:slug',
   draft: post => post.data.draft === true,
@@ -66,7 +66,7 @@ A page at the route that reads the request (`ctx.cookies`, `ctx.query`, a sessio
 
 ```ts
 export const posts = collection('content/posts', {
-  schema: s.Object({ title: s.String(), date: s.Date() }),
+  schema: s.object({ title: s.string(), date: s.date() }),
   route: '/blog/:slug',
   feed: { path: '/blog/rss.xml', title: 'Blog' },
 })
@@ -75,7 +75,7 @@ export const posts = collection('content/posts', {
 - `a(href={post.url}) ...` links it; `url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link.
 - A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is the page of its translation, on a page that read the entry with `get()`, `alternate('fr')` gives it too. A dotted slug, `v1.2`, is a page, not a file; so is an entry's `release.html` (re-read on `invalidate()`); links ending in `.png` are files. A slug the route cannot write (`..`) leaves its entry out, logged. The CMS reads the route before `url`.
 - A feed item with no `path` links the entry's `url`, absolute on the site, in the locale's feed under its prefix, as `trailingSlash` writes a page's address. A `url` function next to a `route` is overridden by the route, and a feed item's `path` is still read.
-- The page whose pattern is the route prerenders and lists its entries in the sitemap by itself, with the entry's head (title, description, dates, the feed's `link rel="alternate"`) and, with `modified: 'updatedAt'` naming an `s.Date()` field, a `lastmod` per URL and `article:modified_time` (`modified: 'mtime'` takes each file's time, `modified: 'git'` its last commit's date from one `git log` for the folder, kept while HEAD stays (a load then costs one `git rev-parse`), a file edited since taking its time, the file's time for a file git does not know or outside a repository; the date is also `entry.modified`, a folder's entry only, and a schema field named `mtime` or `git` is read as a field; a shallow clone dates every file at its one commit, so a `git` build wants the history); its own `prerender`, `sitemap` and `lastmod` win. `kay check` reports two collections with one route, as the page cannot tell which it lists. An optional-param page (`blog/[[page]].kay`) is never taken for it.
+- The page whose pattern is the route prerenders and lists its entries in the sitemap by itself, with the entry's head (title, description, dates, the feed's `link rel="alternate"`) and, with `modified: 'updatedAt'` naming an `s.date()` field, a `lastmod` per URL and `article:modified_time` (`modified: 'mtime'` takes each file's time, `modified: 'git'` its last commit's date from one `git log` for the folder, kept while HEAD stays (a load then costs one `git rev-parse`), a file edited since taking its time, the file's time for a file git does not know or outside a repository; the date is also `entry.modified`, a folder's entry only, and a schema field named `mtime` or `git` is read as a field; a shallow clone dates every file at its one commit, so a `git` build wants the history); its own `prerender`, `sitemap` and `lastmod` win. `kay check` reports two collections with one route, as the page cannot tell which it lists. An optional-param page (`blog/[[page]].kay`) is never taken for it.
 - The route has one param, the slug: `:slug`, or `*slug` for slugs with folders, and `collection()` refuses any other.
 - `kay check` reports a route no page's pattern matches (`src/routes/blog/[slug].kay`, whatever its param is named); a page listing the entries in `prerender: posts` while another page serves the route is reported too.
 - A collection with no `route` has no `url`.
@@ -113,7 +113,7 @@ import { collection } from 'kay/content'
 import Callout from './components/callout.kay'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({ title: s.String() }),
+  schema: s.object({ title: s.string() }),
   components: { Callout },
 })
 ```
@@ -127,7 +127,7 @@ import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({ title: s.String(), date: s.Date() }),
+  schema: s.object({ title: s.string(), date: s.date() }),
   feed: {
     path: '/blog/rss.xml',
     title: 'Blog',
@@ -149,14 +149,14 @@ import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({ title: s.String() }),
+  schema: s.object({ title: s.string() }),
   localized: true,
 })
 ```
 
 ### Point at another collection's entry
 
-`reference('authors')` from `kay/content` is a field holding the slug of an entry of the collection exported as `authors`, also in a list (`s.Array(reference('authors'))`), an object or a `blocks()` item. `kay check` and `kay build` fail on a slug that collection has no entry for (any locale's, in a localized one), or on a collection the content config does not export, naming the file and the line of the field; a write through `saveEntry` and `showDraft` refuses it as an issue at the field's path. A collection with a loader is not read by the check, so a reference to it is checked only when written. The check accepts a reference to a draft, as an editor may point at one before publishing it, and `resolve` returns undefined for it until the entry is published.
+`reference('authors')` from `kay/content` is a field holding the slug of an entry of the collection exported as `authors`, also in a list (`s.list(reference('authors'))`), an object or a `blocks()` item. `kay check` and `kay build` fail on a slug that collection has no entry for (any locale's, in a localized one), or on a collection the content config does not export, naming the file and the line of the field; a write through `saveEntry` and `showDraft` refuses it as an issue at the field's path. A collection with a loader is not read by the check, so a reference to it is checked only when written. The check accepts a reference to a draft, as an editor may point at one before publishing it, and `resolve` returns undefined for it until the entry is published.
 
 `resolve(slug, collection)` from `kay/content` gives the entry, or undefined for a null, undefined or hidden one (a draft in production), and an array of slugs gives the entries found, in order. In a localized collection it reads as `get` does, the request's locale with the default locale's as fallback:
 
@@ -200,11 +200,11 @@ import { collection } from 'kay/content'
 import Callout from './components/callout.kay'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({
-    title: s.String(),
-    date: s.Date(),
-    tags: s.Array(s.String(), { default: [] }),
-    draft: s.Optional(s.Boolean()),
+  schema: s.object({
+    title: s.string(),
+    date: s.date(),
+    tags: s.list(s.string(), { default: [] }),
+    draft: s.boolean({ optional: true }),
   }),
   components: { Callout },
   draft: post => post.data.draft === true,
@@ -221,7 +221,7 @@ export const posts = collection('content/posts', {
 })
 
 export const authors = collection('content/authors', {
-  schema: s.Object({ name: s.String() }),
+  schema: s.object({ name: s.string() }),
 })
 ```
 
@@ -263,9 +263,9 @@ article
 - An entry `draft` returns true for shows in development (`kay dev`, or the server's `dev` option, which wins over `NODE_ENV`) and to a visitor in preview mode only.
 - Everywhere else a draft is left out of `all()`, `get()`, prerendering, the sitemap and the feed.
 - `draft: 'draft'`, a boolean field's name, holds back the entries where it is true, which a CMS then reads and publishes by writing false.
-- `publishAt: 'publishAt'`, an `s.Date()` field's name, holds an entry back until that time, as a draft is, and shows it by itself then, in `all()`, `get()`, `translation()`, the pages prerendered from it, the sitemap and the feed; `kay dev` and preview mode show it at once. An entry with no date, or a date in the past, is published: a server down at that time shows it from its next boot, and one whose loader fails then logs once and reads the dates again every minute, its start waiting for the first read one second at most. A draft stays one whatever its date, so `draft: 'draft'` and `publishAt` together hold an entry until it is neither.
-- `unpublishAt: 'endsAt'`, another `s.Date()` field's name, takes an entry down from that time on, as a draft is, in the same places and by itself: the pages that read the collection render again, the page of an ended entry answers 410 Gone when its code calls `ctx.notFound()` after `get()` finds nothing (a draft or an entry not yet published stays 404), or what its code does otherwise (`ctx.redirect(...)`), and a redirect from the path, in `redirects` or added while the site runs, wins over the 410 (any `ctx.notFound()` of the same render answers 410 once `get()` found an ended entry, and an app's own 410 can be redirected the same way), the visit being listed on the missing pages screen, and a server down then catches up as it starts. No date never ends; `kay dev` and preview mode keep showing it; with `publishAt` an entry has a window.
-- The date is read as `s.Date()` reads it, never in the server's time zone: `2026-10-20` is 00:00 UTC, and `2026-10-20T08:00:00+02:00` is that instant; write the offset for an hour in your own zone, as an hour with neither `Z` nor an offset is refused. A field that is not an `s.Date()` is a type error in `kay check` and fails the boot.
+- `publishAt: 'publishAt'`, an `s.date()` field's name, holds an entry back until that time, as a draft is, and shows it by itself then, in `all()`, `get()`, `translation()`, the pages prerendered from it, the sitemap and the feed; `kay dev` and preview mode show it at once. An entry with no date, or a date in the past, is published: a server down at that time shows it from its next boot, and one whose loader fails then logs once and reads the dates again every minute, its start waiting for the first read one second at most. A draft stays one whatever its date, so `draft: 'draft'` and `publishAt` together hold an entry until it is neither.
+- `unpublishAt: 'endsAt'`, another `s.date()` field's name, takes an entry down from that time on, as a draft is, in the same places and by itself: the pages that read the collection render again, the page of an ended entry answers 410 Gone when its code calls `ctx.notFound()` after `get()` finds nothing (a draft or an entry not yet published stays 404), or what its code does otherwise (`ctx.redirect(...)`), and a redirect from the path, in `redirects` or added while the site runs, wins over the 410 (any `ctx.notFound()` of the same render answers 410 once `get()` found an ended entry, and an app's own 410 can be redirected the same way), the visit being listed on the missing pages screen, and a server down then catches up as it starts. No date never ends; `kay dev` and preview mode keep showing it; with `publishAt` an entry has a window.
+- The date is read as `s.date()` reads it, never in the server's time zone: `2026-10-20` is 00:00 UTC, and `2026-10-20T08:00:00+02:00` is that instant; write the offset for an hour in your own zone, as an hour with neither `Z` nor an offset is refused. A field that is not an `s.date()` is a type error in `kay check` and fails the boot.
 - A server refreshes the prerendered pages that read the collection when a date passes, in each process on its own clock, so replicas sharing a store each do it and the app writes no cron, job or webhook; `live: true` pages follow too, and the sitemap is built afresh. The entry's own page, which the build did not list, renders per request until the next build. A static export (`kay build --static`) cannot change by itself: it leaves the entry out until the next build, so rebuild on a schedule in CI.
 - `order: 'position'`, a number field's name, orders the entries by it, ascending, those without a number last, unless `sort` says otherwise; kayjs-cms then lists them so and moves an entry up or down by writing the field, so the editor never types the numbers.
 - `live: true` has every open page that read the collection (`all()`, `get()`, `translation()`) in its server fence or a layout's show it afresh in each tab once `posts.invalidate()` drops it, so a kayjs-cms save or removal shows in the other open tabs; it is the collection's side of `cached(..., { live: true })` ([Following cached values](live-values.md#following-cached-values)), with the same cost, and read it directly: a read inside a `cached` load follows only when that `cached` has `live: true`; a page reading it is rendered per request and a static export of it fails with `export-server-render`.

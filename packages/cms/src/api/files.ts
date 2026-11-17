@@ -37,7 +37,7 @@ async function problemWith(file: File, maxSize: number, collection: string): Pro
 export default api({ maxSize: uploadMaxSize })
   .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
   // What the pickers offer and the size an upload may have, so a file the server would refuse is not offered.
-  .get('/rules', ({ query }) => uploadRules(query.collection), { query: s.Object({ collection: s.Optional(s.String()) }) })
+  .get('/rules', ({ query }) => uploadRules(query.collection), { query: s.object({ collection: s.string({ optional: true }) }, { extra: 'strip' }) })
   // The shared uploads and those an older release kept in the collection's folder, for a field to pick one again; `images` leaves out the others.
   .get('/:collection', async ({ params, query }) => {
     const collection = await collectionNamed(params.collection)
@@ -47,7 +47,7 @@ export default api({ maxSize: uploadMaxSize })
     const wanted = stored.filter(file => !moved.has(file.key) && (query.images !== 'true' || typeOfName(file.key).startsWith('image/')))
 
     return wanted.toSorted((a, b) => (b.modifiedAt?.getTime() ?? 0) - (a.modifiedAt?.getTime() ?? 0)).slice(0, PICKABLE).map(file => ({ path: files.url(file.key), name: index[file.key]?.name ?? file.key.split('/').at(-1) ?? file.key }))
-  }, { query: s.Object({ images: s.Optional(s.String()) }) })
+  }, { query: s.object({ images: s.string({ optional: true }) }, { extra: 'strip' }) })
   .post('/:collection', async ({ params, body, status, request }) => {
     await collectionNamed(params.collection)
 
@@ -80,7 +80,7 @@ export default api({ maxSize: uploadMaxSize })
     await dispatch('cms.afterUpload', hooksOf('afterUpload', params.collection), { collection: params.collection, key, path, name: file.name, type: file.type, size: file.size, ...author !== undefined && { author } })
 
     return { path, ...sizeOfPath(path) }
-  }, { body: s.Object({ file: s.File() }) })
+  }, { body: s.object({ file: s.file() }) })
   // Changes the name the library shows for an upload; the key, and so every reference to it, stays.
   .post('/media/rename', async ({ body, status }) => {
     const name = body.name.trim()
@@ -94,7 +94,7 @@ export default api({ maxSize: uploadMaxSize })
       return status(400, wording('cms.media.nameEmpty', 'The name is empty'))
 
     return await renameUpload(body.key, name) ? { name } : status(404, wording('cms.media.notFound', '{key} is not an upload', { key: body.key }))
-  }, { body: s.Object({ key: s.String({ maxLength: 300 }), name: s.String({ maxLength: 200 }) }) })
+  }, { body: s.object({ key: s.string({ max: 300 }), name: s.string({ max: 200 }) }) })
   // Only whom the app's guard admits may delete, since an edit cookie is tied to no user; a file referenced since the screen was drawn is kept.
   .post('/unused/delete', async ({ body, status }) => {
     if (!settings().guard)
@@ -103,4 +103,4 @@ export default api({ maxSize: uploadMaxSize })
     const result = await deleteUnusedUploads(body.keys)
 
     return 'blocked' in result ? status(409, wording('cms.uploads.nothingDeleted', 'Nothing was deleted: {reasons}', { reasons: result.blocked.join('; ') })) : result
-  }, { body: s.Object({ keys: s.Array(s.String({ maxLength: 300 }), { maxItems: 100 }) }) })
+  }, { body: s.object({ keys: s.list(s.string({ max: 300 }), { max: 100 }) }) })

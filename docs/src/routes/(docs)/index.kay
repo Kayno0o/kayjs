@@ -19,7 +19,7 @@ import { s } from 'kay'
 import { addTodo, listTodos } from '../todos'
 
 export const add = action(
-  s.Object({ title: s.String({ minLength: 1 }) }),
+  { title: s.string({ min: 1 }) },
   ({ title }) => addTodo(title),
 )
 
@@ -36,10 +36,10 @@ form(action={add})
 const AUTH = `--- server
 import { s } from 'kay'
 
-const Credentials = s.Object({
-  identifier: s.String({ maxLength: 254 }),
-  password: s.String({ maxLength: 128 }),
-})
+const Credentials = {
+  identifier: s.string({ max: 254 }),
+  password: s.string({ max: 128 }),
+}
 
 export const signIn = action(Credentials, async (input, ctx) => {
   const result = await ctx.locals.auth.password.signIn(input)

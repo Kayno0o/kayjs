@@ -19,7 +19,7 @@ export const posts = collection(sqliteCms({
   database: 'data/content.sqlite',
   seed: [{ slug: 'hello', data: { title: 'Hello', order: 1 }, body: 'First post.' }],
 }), {
-  schema: s.Object({ title: s.String(), order: s.Number() }),
+  schema: s.object({ title: s.string(), order: s.number() }),
   order: 'order',
 })
 ```
@@ -32,7 +32,7 @@ export const posts = collection(sqliteCms({
 import { pgCms } from '@kayjs/cms/pg'
 
 export const posts = collection(pgCms({ name: 'posts', source: process.env.DATABASE_URL! }), {
-  schema: s.Object({ title: s.String() }),
+  schema: s.object({ title: s.string() }),
 })
 ```
 

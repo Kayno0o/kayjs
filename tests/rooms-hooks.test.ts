@@ -185,7 +185,7 @@ describe('the reply of rooms', () => {
   it('binds to a route whose response is a status map', () => {
     const tally = rooms<{ n: number }>({ reply: t.Ref('mapped') as never })
 
-    api().model({ mapped: s.Object({ n: s.Number() }) }).ws('/', { response: { 200: tally.response } as never, message: () => undefined })
+    api().model({ mapped: s.object({ n: s.number() }) }).ws('/', { response: { 200: tally.response } as never, message: () => undefined })
     expect(() => tally.publish('only', { n: 1 })).not.toThrow()
     expect(() => tally.publish('only', { n: 'x' } as never)).toThrow('reply')
   })
@@ -195,8 +195,8 @@ describe('the reply of rooms', () => {
     const first = rooms<{ n: number }>({ reply })
     const second = rooms<{ n: number }>({ reply })
 
-    api().model({ shared: s.Object({ n: s.Number() }) }).ws('/', { response: first.response, message: () => undefined })
-    api().model({ shared: s.Object({ n: s.String() }) }).ws('/', { response: second.response, message: () => undefined })
+    api().model({ shared: s.object({ n: s.number() }) }).ws('/', { response: first.response, message: () => undefined })
+    api().model({ shared: s.object({ n: s.string() }) }).ws('/', { response: second.response, message: () => undefined })
     expect(() => first.publish('only', { n: 1 })).not.toThrow()
     expect(() => first.publish('only', { n: 'x' } as never)).toThrow('reply')
     expect(() => second.publish('only', { n: 'x' } as never)).not.toThrow()

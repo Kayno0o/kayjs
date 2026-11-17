@@ -15,7 +15,7 @@ async function* say(text: string, mode: string | undefined) {
 
 let failed = false
 
-export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }), attachments: s.Optional(s.Array(s.File({ type: 'image/png' }), { maxItems: 4 })) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => {
+export const reply = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }), attachments: s.list(s.file({ type: 'image/png' }), { optional: true, max: 4 }) }), { min: 1, max: 50 }) }, ({ messages }) => {
   const replacing = replaces()
   const last = messages.at(-1)!
 

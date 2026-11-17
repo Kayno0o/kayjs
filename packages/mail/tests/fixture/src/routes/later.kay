@@ -4,7 +4,7 @@ import { mail } from '../mail'
 import Welcome from '../mails/welcome.kay'
 
 // Answers first and mails after, unawaited: the app declares nothing for a test to wait on.
-export const signUpLater = action(s.Object({ name: s.String({ minLength: 1, maxLength: 100 }), email: s.String({ format: 'email', maxLength: 254 }) }), ({ name, email }) => {
+export const signUpLater = action({ name: s.string({ min: 1, max: 100 }), email: s.string({ format: 'email', max: 254 }) }, ({ name, email }) => {
   void mail.enqueue({ to: email, subject: `Welcome, ${name}`, view: Welcome, props: { name, url: 'https://fixture.test/confirm?token=abc' } })
 })
 ---

@@ -1,6 +1,6 @@
 --- server
 import { ask, chatMessages } from '@kayjs/ai'
-import { action, s } from 'kay'
+import { action } from 'kay'
 
 // Says one word and keeps working until the visitor stops it, for a message that asks to be held.
 async function* held() {
@@ -8,6 +8,6 @@ async function* held() {
   await Bun.sleep(30_000)
 }
 
-export const reply = action(s.Object({ messages: chatMessages({ maxItems: 50 }) }), ({ messages }) => messages.at(-1)?.content === 'Hold' ? held() : ask(messages))
+export const reply = action({ messages: chatMessages({ maxItems: 50 }) }, ({ messages }) => messages.at(-1)?.content === 'Hold' ? held() : ask(messages))
 ---
 p Chat

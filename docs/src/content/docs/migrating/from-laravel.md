@@ -84,8 +84,8 @@ A form request class becomes the schema of an action. kay checks the input again
 import { s, action } from 'kay'
 import { createPost } from '../posts'
 
-const newPost = s.Object({
-  title: s.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
+const newPost = s.object({
+  title: s.string({ min: 1, max: 200, error: 'Write a title' }),
 })
 
 export const create = action(newPost, async ({ title }) => {

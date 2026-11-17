@@ -6,10 +6,10 @@ import { Notice } from '../db/notice'
 import { announcements } from '../jobs/announcements'
 import { latestNotices } from '../notices'
 
-export const post = action(s.Object({
-  title: s.String({ pattern: '\\S', maxLength: 120, error: 'Write a title' }),
-  body: s.String({ pattern: '\\S', maxLength: 4000, error: 'Write the notice' }),
-}), async ({ title, body }, ctx) => {
+export const post = action({
+  title: s.string({ pattern: '\\S', max: 120, error: 'Write a title' }),
+  body: s.string({ pattern: '\\S', max: 4000, error: 'Write the notice' }),
+}, async ({ title, body }, ctx) => {
   const user = await ctx.locals.auth.user()
 
   if (!user)

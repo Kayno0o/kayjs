@@ -9,11 +9,11 @@ How a `fileField()` and an `imageField()` upload, what the editor shows, and the
 `imageField({ alt, width, height })` names fields beside it; the editor asks for the alt text under the image and stores its pixels, so the page gives `image` its size.
 
 ```ts
-s.Object({
+s.object({
   photo: imageField({ alt: 'photoAlt', width: 'photoWidth', height: 'photoHeight' }),
-  photoAlt: s.Optional(s.String()),
-  photoWidth: s.Optional(s.Integer()),
-  photoHeight: s.Optional(s.Integer()),
+  photoAlt: s.string({ optional: true }),
+  photoWidth: s.int({ optional: true }),
+  photoHeight: s.int({ optional: true }),
 })
 ```
 
@@ -22,7 +22,7 @@ s.Object({
 `imageField({ accept, maxSize, minWidth, minHeight })` and `fileField({ accept, maxSize })` narrow the types, weight and pixels for one field, checked in the editor before the file is sent.
 
 ```ts
-s.Object({
+s.object({
   cover: imageField({ accept: ['image/png', 'image/jpeg'], maxSize: '2mb', minWidth: 1200 }),
   brochure: fileField({ accept: ['application/pdf'] }),
 })
@@ -33,7 +33,7 @@ s.Object({
 A list of them has a zone of its own taking several files at once, one item appended per file.
 
 ```ts
-s.Object({ gallery: s.Array(imageField()) })
+s.object({ gallery: s.list(imageField()) })
 ```
 
 ### Show an uploaded image on a page
@@ -54,7 +54,7 @@ await fetch('/_kay/cms/files/unused/delete', { method: 'POST', body: JSON.string
 
 ## Reference
 
-- A file dropped or picked on an image or file field goes to `POST /_kay/cms/files/:collection`, `uploads.maxSize` at most (20 MB by default), an empty file refused 400, a bigger one 413, which stores it public through kay's `files.put` in one folder every collection shares, `cms-media`, named by the hash of its bytes (the same file sent twice is stored once and answers the same path; kay strips the EXIF a camera writes in it), and records its name, size, who sent it and when in a private index beside the files, and the field keeps `files.url(key)`, `/_kay/files/<key>`; a list of them, `s.Array(imageField())`, also has a zone of its own taking several files at once, which uploads them one after the other and appends one item per file in order, a refused one told by the field while the others still land; a typed path works as well, in the field's `Path` control, which an upload the CMS stored does not show, so a page renders either with `img(src={entry.data.photo})`.
+- A file dropped or picked on an image or file field goes to `POST /_kay/cms/files/:collection`, `uploads.maxSize` at most (20 MB by default), an empty file refused 400, a bigger one 413, which stores it public through kay's `files.put` in one folder every collection shares, `cms-media`, named by the hash of its bytes (the same file sent twice is stored once and answers the same path; kay strips the EXIF a camera writes in it), and records its name, size, who sent it and when in a private index beside the files, and the field keeps `files.url(key)`, `/_kay/files/<key>`; a list of them, `s.list(imageField())`, also has a zone of its own taking several files at once, which uploads them one after the other and appends one item per file in order, a refused one told by the field while the others still land; a typed path works as well, in the field's `Path` control, which an upload the CMS stored does not show, so a page renders either with `img(src={entry.data.photo})`.
 - An image pasted or dropped into a Markdown body, the entry's or a `markdown` field's, goes to the same endpoint and is embedded as `![](path)` where the cursor is; the pickers offer only the types `uploads` takes (images for an image field) and `GET /_kay/cms/files/rules` tells the editor them with the size limit, so a dropped file they miss, or one over the size, is told by the field with its type or size, and a refused upload in a Markdown body is toasted and leaves the text as it was.
 - Replacing or removing a file leaves the old upload stored: the unused-uploads screen at `<prefix>/uploads` lists the uploads of the shared folder, and those an older release stored in a collection's folder, that no entry mentions, in any collection, locale, draft or loaded collection, each with the image variants it would take with it, and deletes only the ones you confirm, and only with a `guard`.
 - Uploads under a day old, or that the storage dates not at all, are held back: a save the site has not rebuilt from, another server's save or an unsaved form may use them. Sending the same bytes again renews that day.

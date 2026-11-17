@@ -45,7 +45,8 @@ describe('mocked', () => {
     const spec = offered.find(item => item.name === 'add_note')!
 
     expect(spec.description).toBe(real.description)
-    expect(spec.inputSchema).toEqual(real.inputSchema)
+    // An action's tool leaves out `additionalProperties`, which the schema a tool of its own carries.
+    expect(spec.inputSchema).toEqual({ ...real.inputSchema, additionalProperties: false })
     expect(offered.find(item => item.name === 'home_state')!.description).toBe('Reads the home')
   })
 

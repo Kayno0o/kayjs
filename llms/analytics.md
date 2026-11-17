@@ -38,7 +38,7 @@ export default defineConfig({
 ```ts
 import { track } from 'kay/analytics'
 
-export const signup = action(s.Object({ plan: s.String() }), async ({ plan }, ctx) => {
+export const signup = action({ plan: s.string() }, async ({ plan }, ctx) => {
   await track(ctx, 'signup', { plan })
 })
 ```

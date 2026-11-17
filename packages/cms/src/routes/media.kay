@@ -12,7 +12,7 @@ import { libraryUploads } from '../orphans'
 import { screenPath } from '../paths'
 import { settings } from '../settings'
 
-export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()) }) }
+export const page = { query: s.object({ q: s.string({ optional: true }), page: s.int({ optional: true }) }, { extra: 'strip' }) }
 
 const { prefix } = settings()
 const url = ctx.url

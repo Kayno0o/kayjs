@@ -154,9 +154,9 @@ import { s, action } from 'kay'
 import { mail } from '../mail'
 import Welcome from '../mails/welcome.kay'
 
-const newUser = s.Object({
-  name: s.String({ maxLength: 100 }),
-  email: s.String({ format: 'email', maxLength: 254 }),
+const newUser = s.object({
+  name: s.string({ max: 100 }),
+  email: s.string({ format: 'email', max: 254 }),
 })
 
 export const signUp = action(newUser, async ({ name, email }) => {
@@ -307,7 +307,7 @@ import { contactForm } from '@kayjs/mail'
 import { s, action } from 'kay'
 
 export const contact = action(...contactForm({
-  fields: { phone: s.Optional(s.String({ maxLength: 30 })) },
+  fields: { phone: s.string({ optional: true, max: 30 }) },
   reach: 'hello@example.com',
 }))
 ---

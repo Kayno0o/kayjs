@@ -124,10 +124,10 @@ import { addBook, listBooks } from '../books'
 
 const books = await listBooks()
 
-export const add = action(s.Object({
-  title: s.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
-  author: s.String({ minLength: 1, maxLength: 100, error: 'Write the author' }),
-}), async ({ title, author }, ctx) => {
+export const add = action({
+  title: s.string({ min: 1, max: 200, error: 'Write a title' }),
+  author: s.string({ min: 1, max: 100, error: 'Write the author' }),
+}, async ({ title, author }, ctx) => {
   if ((await listBooks()).some(book => book.title === title))
     return ctx.deny(409, { data: { message: 'Already on the list' } })
 

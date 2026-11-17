@@ -4,7 +4,7 @@ import { action, s } from 'kay'
 
 const down = mailer({ from: 'Fixture <hello@fixture.test>' })
 
-export const consented = action(...contactForm(down, { to: 'team@fixture.test', honeypot: 'nectar', consent: true, fields: { website: s.Optional(s.String({ maxLength: 100 })) } }))
+export const consented = action(...contactForm(down, { to: 'team@fixture.test', honeypot: 'nectar', consent: true, fields: { website: s.string({ optional: true, max: 100 }) } }))
 ---
 form(action={consented} novalidate)
   input(field="name" aria-label="Name")

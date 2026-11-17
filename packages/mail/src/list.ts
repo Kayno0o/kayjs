@@ -394,7 +394,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     const list: MailingList = {
       name,
       form() {
-        const schema = s.Object({ email: s.String({ format: 'email', maxLength: 254, error: emailError }), wording: s.Optional(s.String({ maxLength: 64 })) }, options.privacy === undefined ? undefined : { 'x-privacy': options.privacy }) as unknown as SubscribeSchema
+        const schema = s.object({ email: s.string({ format: 'email', max: 254, error: emailError }), wording: s.string({ optional: true, max: 64 }) }, options.privacy === undefined ? undefined : { 'x-privacy': options.privacy }) as unknown as SubscribeSchema
 
         const handler = async (input: { email: string, wording?: string | undefined }, ctx: ActionContext): Promise<Failure<string> | undefined> => {
           if (!host.configured())

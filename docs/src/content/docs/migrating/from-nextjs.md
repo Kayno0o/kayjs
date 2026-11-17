@@ -66,8 +66,8 @@ In kay it is one file.
 import { s, action } from 'kay'
 import { addTodo, listTodos } from '../data'
 
-const newTodo = s.Object({
-  title: s.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
+const newTodo = s.object({
+  title: s.string({ min: 1, max: 200, error: 'Write a title' }),
 })
 
 export const add = action(newTodo, async ({ title }) => {
@@ -162,7 +162,7 @@ export const theme = persisted.cookie('theme', 'light')
 | `next/font` | `assets.fonts` in `kay.config.ts`, which self-hosts font files, see [Styling and assets](/essentials/styling-and-assets#fonts) |
 | `next/link` | A plain `a(href="/about")`, which `kay check` verifies |
 | `useRouter().push('/todos')` | `navigate('/todos')` from `kay` |
-| `.env` and `NEXT_PUBLIC_` | `defineEnv` for the server, `s.Public` fields of it for the browser |
+| `.env` and `NEXT_PUBLIC_` | `defineEnv` for the server, `s.public` fields of it for the browser |
 | Streaming with `Suspense` | An `await` block, see [Data loading](/essentials/data-loading) |
 
 `kay build` prerenders a page by itself when it can show that the page reads nothing from its request or the clock. It reports what it decided for each route. See [Routing](/essentials/routing#prerendering).

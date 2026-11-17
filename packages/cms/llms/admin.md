@@ -11,7 +11,7 @@ The screens fit a 375 px phone: no sideways scroll, lists stacked as cards, cont
 A collection declaring `order: '<number field>'` lists its entries in that order with Up and Down on each.
 
 ```ts
-collection(loader, { schema: s.Object({ title: s.String(), order: s.Number() }), order: 'order' })
+collection(loader, { schema: s.object({ title: s.string(), order: s.number() }), order: 'order' })
 ```
 
 ### Schedule an entry
@@ -19,7 +19,7 @@ collection(loader, { schema: s.Object({ title: s.String(), order: s.Number() }),
 A collection declaring `publishAt: '<date field>'` shows a Status column and a Scheduled badge; the cms only edits the field, kay publishes the entry at that time.
 
 ```ts
-collection(loader, { schema: s.Object({ title: s.String(), publishAt: s.Date() }), publishAt: 'publishAt' })
+collection(loader, { schema: s.object({ title: s.string(), publishAt: s.date() }), publishAt: 'publishAt' })
 ```
 
 ### Make a collection a single page
@@ -27,7 +27,7 @@ collection(loader, { schema: s.Object({ title: s.String(), publishAt: s.Date() }
 `single: true` makes the collection one entry (slug `index`), opened straight from the content list; `seed` fills its first form.
 
 ```ts
-collection(loader, { schema: s.Object({ title: s.String() }), single: true, seed: { title: 'Home' } })
+collection(loader, { schema: s.object({ title: s.string() }), single: true, seed: { title: 'Home' } })
 ```
 
 ### Redirect a page visitors did not find

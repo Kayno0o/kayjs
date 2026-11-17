@@ -5,21 +5,21 @@ import { action, s } from 'kay'
 import { done, heard, hooks, testing } from '../testing'
 import { wipe } from './locked/_actions.kay'
 
-export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100, error: 'Too short' }) }), ({ title }) => {
+export const addNote = action({ title: s.string({ min: 3, max: 100, error: 'Too short' }) }, ({ title }) => {
   done.push(`addNote:${title}`)
 
   return { id: 1, title }
 })
 
-export const refuses = action(s.Object({}), (_input, ctx) => ctx.deny(409, { data: { reason: 'full' } }))
+export const refuses = action({}, (_input, ctx) => ctx.deny(409, { data: { reason: 'full' } }))
 
-export const sendsAway = action(s.Object({}), (_input, ctx) => ctx.redirect('/'))
+export const sendsAway = action({}, (_input, ctx) => ctx.redirect('/'))
 
-export const breaks = action(s.Object({}), () => {
+export const breaks = action({}, () => {
   throw new Error('boom secret')
 })
 
-export const slow = action(s.Object({}), async () => {
+export const slow = action({}, async () => {
   hooks.slowStarted?.()
   await Bun.sleep(150)
   done.push('slow')
@@ -27,30 +27,30 @@ export const slow = action(s.Object({}), async () => {
   return 'slow done'
 })
 
-export const limited = action(s.Object({}), () => 'counted', { protect: { rateLimit: { max: 1, window: '1m' } } })
+export const limited = action({}, () => 'counted', { protect: { rateLimit: { max: 1, window: '1m' } } })
 
-export const vetoed = action(s.Object({}), () => 'vetoed', { tool: false })
+export const vetoed = action({}, () => 'vetoed', { tool: false })
 
-export const upload = action(s.Object({ photo: s.File() }), () => 'stored')
+export const upload = action({ photo: s.file() }, () => 'stored')
 
 // A read that names its calls for a chat.
-export const homeState = action(s.Object({}), () => 'lit', { tool: { description: 'Reads the home', label: 'Read the home', readOnly: true } })
+export const homeState = action({}, () => 'lit', { tool: { description: 'Reads the home', label: 'Read the home', readOnly: true } })
 
 const tools = [addNote, refuses, sendsAway, breaks, slow, limited, wipe, homeState]
 
-export const converse = action(s.Object({ prompt: s.String({ maxLength: 200 }), maxSteps: s.Optional(s.Integer({ minimum: 1, maximum: 10 })), offer: s.Optional(s.Array(s.String({ maxLength: 40 }), { maxItems: 10 })) }), async ({ prompt, maxSteps, offer }) => {
+export const converse = action({ prompt: s.string({ max: 200 }), maxSteps: s.int({ optional: true, min: 1, max: 10 }), offer: s.list(s.string({ max: 40 }), { optional: true, max: 10 }) }, async ({ prompt, maxSteps, offer }) => {
   const reply = ask(prompt, { tools: offer === undefined ? tools : tools.filter(tool => offer.includes(tool.url.slice(tool.url.lastIndexOf('/') + 1))), maxSteps, approval: false, provider: testing.provider })
 
   return { text: await reply, calls: await reply.calls, finish: await reply.finish, usage: await reply.usage }
 })
 
 // A posted file shown to a model that calls tools, as an app's scan reader would.
-export const looks = action(s.Object({ photo: s.File({ type: 'image/png' }) }), async ({ photo }) => await ask([{ role: 'user', content: 'look', attachments: [photo] }], { tools: [addNote], approval: false, provider: testing.provider }), { maxSize: '1mb' })
+export const looks = action({ photo: s.file({ type: 'image/png' }) }, async ({ photo }) => await ask([{ role: 'user', content: 'look', attachments: [photo] }], { tools: [addNote], approval: false, provider: testing.provider }), { maxSize: '1mb' })
 
-export const watch = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote, slow], approval: false, provider: testing.provider }).progress())
+export const watch = action({ prompt: s.string({ max: 200 }) }, ({ prompt }) => ask(prompt, { tools: [addNote, slow], approval: false, provider: testing.provider }).progress())
 
 // A tool loop an app reads itself, as it would to speak the reply aloud, which `outlive` lets go on once the visitor left.
-export const staying = action(s.Object({ prompt: s.String({ maxLength: 200 }), outlive: s.Boolean() }), ({ prompt, outlive }) => {
+export const staying = action({ prompt: s.string({ max: 200 }), outlive: s.boolean() }, ({ prompt, outlive }) => {
   const reply = ask(prompt, { tools: [addNote, slow], approval: false, outlive, provider: testing.provider })
 
   void (async () => {
@@ -65,35 +65,35 @@ export const staying = action(s.Object({ prompt: s.String({ maxLength: 200 }), o
   return reply.progress()
 })
 
-const stamp = tool({ name: 'stamp', description: 'Stamps something', input: s.Object({}), run: () => {
+const stamp = tool({ name: 'stamp', description: 'Stamps something', input: s.object({}), run: () => {
   done.push('stamp')
 
   return 'stamped'
 } })
-const addNoteTwin = tool({ name: 'add_note', description: 'A function tool named as an action', input: s.Object({}), run: () => 'twin' })
+const addNoteTwin = tool({ name: 'add_note', description: 'A function tool named as an action', input: s.object({}), run: () => 'twin' })
 
 // An action and a function tool in one ask, whose approval refuses every action.
-export const mixed = action(s.Object({ prompt: s.String({ maxLength: 200 }), twin: s.Optional(s.Boolean()) }), ({ prompt, twin }) => ask(prompt, { tools: twin === true ? [addNoteTwin, addNote] : [addNote, stamp], approval: () => false, provider: testing.provider }).progress())
+export const mixed = action({ prompt: s.string({ max: 200 }), twin: s.boolean({ optional: true }) }, ({ prompt, twin }) => ask(prompt, { tools: twin === true ? [addNoteTwin, addNote] : [addNote, stamp], approval: () => false, provider: testing.provider }).progress())
 
 // A tool loop whose every call the visitor has not confirmed.
-export const unconfirmed = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], approval: () => false, provider: testing.provider }).progress())
+export const unconfirmed = action({ prompt: s.string({ max: 200 }) }, ({ prompt }) => ask(prompt, { tools: [addNote], approval: () => false, provider: testing.provider }).progress())
 
-export const lookup = action(s.Object({}), () => 'found', { tool: { description: 'Looks something up', readOnly: true } })
+export const lookup = action({}, () => 'found', { tool: { description: 'Looks something up', readOnly: true } })
 
 // A chat whose tools are asked about by default: the write waits for the visitor's Allow, the read does not.
-export const approving = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [addNote, lookup], provider: testing.provider }).progress())
+export const approving = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }) }), { min: 1, max: 50 }) }, ({ messages }) => ask(messages, { tools: [addNote, lookup], provider: testing.provider }).progress())
 
 // The chat's action when the model has tools: the stream carries the calls too.
-export const helper = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [addNote, breaks], approval: false, provider: testing.provider }).progress())
+export const helper = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }) }), { min: 1, max: 50 }) }, ({ messages }) => ask(messages, { tools: [addNote, breaks], approval: false, provider: testing.provider }).progress())
 
-export const labelled = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [homeState], provider: testing.provider }).progress())
+export const labelled = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }) }), { min: 1, max: 50 }) }, ({ messages }) => ask(messages, { tools: [homeState], provider: testing.provider }).progress())
 
-export const sourced = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { sources: [{ n: 1, title: 'Tides', href: 'https://example.com/tides?a=1&b=2' }, { n: 2, title: 'Moon', href: '/moon' }, { n: 3, title: 'Never cited', href: 'https://example.com/3' }, { n: 4, title: 'Hostile', href: 'javascript:alert(1)' }] }).progress())
+export const sourced = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }) }), { min: 1, max: 50 }) }, ({ messages }) => ask(messages, { sources: [{ n: 1, title: 'Tides', href: 'https://example.com/tides?a=1&b=2' }, { n: 2, title: 'Moon', href: '/moon' }, { n: 3, title: 'Never cited', href: 'https://example.com/3' }, { n: 4, title: 'Hostile', href: 'javascript:alert(1)' }] }).progress())
 
 // A chat with a tool and sources, for the blocks that replace how each is drawn.
-export const blocked = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [homeState], sources: [{ n: 1, title: 'Tides', href: 'https://example.com/tides' }, { n: 2, title: 'Moon', href: '/moon' }] }).progress())
+export const blocked = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }) }), { min: 1, max: 50 }) }, ({ messages }) => ask(messages, { tools: [homeState], sources: [{ n: 1, title: 'Tides', href: 'https://example.com/tides' }, { n: 2, title: 'Moon', href: '/moon' }] }).progress())
 
-export const refusedTools = action(s.Object({ which: s.UnionEnum(['vetoed', 'upload']) }), ({ which }) => {
+export const refusedTools = action({ which: s.enum(['vetoed', 'upload']) }, ({ which }) => {
   ask('x', { tools: [which === 'vetoed' ? vetoed : upload] })
 
   return 'unreachable'

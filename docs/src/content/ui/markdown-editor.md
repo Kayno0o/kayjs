@@ -41,7 +41,7 @@ import { s } from 'kay'
 import { renderMarkdown } from 'kay/content'
 import { api } from 'kay/server'
 
-export default api().post('/', async ({ body }) => (await renderMarkdown(body.markdown)).html, { body: s.Object({ markdown: s.String() }) })
+export default api().post('/', async ({ body }) => (await renderMarkdown(body.markdown)).html, { body: s.object({ markdown: s.string() }) })
 ```
 
 In the page, `preview={async markdown => call(preview, '/', { method: 'post', body: { markdown } }).orThrow()}`.

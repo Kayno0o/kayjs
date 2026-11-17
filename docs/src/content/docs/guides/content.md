@@ -11,11 +11,11 @@ import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({
-    title: s.String(),
-    date: s.Date(),
-    tags: s.Array(s.String(), { default: [] }),
-    draft: s.Optional(s.Boolean()),
+  schema: s.object({
+    title: s.string(),
+    date: s.date(),
+    tags: s.list(s.string(), { default: [] }),
+    draft: s.boolean({ optional: true }),
   }),
   draft: post => post.data.draft === true,
   sort: (a, b) => b.data.date.getTime() - a.data.date.getTime(),
@@ -80,7 +80,7 @@ Name a date field with `publishAt` in the collection, beside `draft`:
 
 ```ts
 export const posts = collection('src/content/posts', {
-  schema: s.Object({ title: s.String(), publishAt: s.Optional(s.Date()) }),
+  schema: s.object({ title: s.string(), publishAt: s.date({ optional: true }) }),
   publishAt: 'publishAt',
 })
 ```
@@ -97,7 +97,7 @@ The page of the new entry itself was not listed when the site was built, so it i
 
 A [static export](/guides/static-export) has no server, so it cannot change by itself. Build it again on a schedule, for example from CI, and the entry appears in the next build.
 
-A name that is not an `s.Date()` field is a type error in `kay check`, and the server refuses to start.
+A name that is not an `s.date()` field is a type error in `kay check`, and the server refuses to start.
 
 ## Ending an entry
 
@@ -105,7 +105,7 @@ Name a second date field with `unpublishAt` and the entry takes itself down at t
 
 ```ts
 export const offers = collection('src/content/offers', {
-  schema: s.Object({ title: s.String(), endsAt: s.Optional(s.Date()) }),
+  schema: s.object({ title: s.string(), endsAt: s.date({ optional: true }) }),
   unpublishAt: 'endsAt',
 })
 ```
@@ -116,7 +116,7 @@ The server builds again the pages that read the collection when the date passes,
 
 A redirect from the path, in `redirects` or added from the Missing pages screen, wins over the 410, and a visit to an ended entry is listed on that screen so an editor can add one. A `ctx.notFound()` that comes after the page read an ended entry answers 410 too, even for something unrelated, and a 410 your own code answers can be redirected the same way.
 
-A name that is not an `s.Date()` field is a type error in `kay check`, and the server refuses to start. kayjs-cms shows `Ends` or `Ended` beside the entry's date field and can clear the date.
+A name that is not an `s.date()` field is a type error in `kay check`, and the server refuses to start. kayjs-cms shows `Ends` or `Ended` beside the entry's date field and can clear the date.
 
 ## A page per entry
 
@@ -432,7 +432,7 @@ export const news = collection({
   })),
   ttl: '15m',
 }, {
-  schema: s.Object({ title: s.String() }),
+  schema: s.object({ title: s.string() }),
 })
 ```
 
@@ -457,7 +457,7 @@ Entries a database holds keep the shape they had when they were saved. When you 
 import { collection, convertField, renameField, setField } from 'kay/content'
 
 export const packs = collection(loader, {
-  schema: s.Object({ title: s.String(), price: s.Integer(), visible: s.Boolean() }),
+  schema: s.object({ title: s.string(), price: s.int(), visible: s.boolean() }),
   migrations: [
     renameField('name', 'title'),
     convertField('price', value => typeof value === 'string' ? Number.parseInt(value, 10) : value),

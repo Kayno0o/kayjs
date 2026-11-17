@@ -4,9 +4,9 @@ import { rooms } from 'kay/server'
 export const BOARD = 'board'
 
 // What every open board page hears: a notice as it is posted, and who is reading.
-export const boardMessage = s.Union([
-  s.Object({ type: s.Literal('posted'), notice: s.Object({ id: s.Number(), title: s.String(), author: s.String() }) }),
-  s.Object({ type: s.Literal('present'), names: s.Array(s.String()), guests: s.Number() }),
+export const boardMessage = s.union([
+  s.object({ type: s.literal('posted'), notice: s.object({ id: s.number(), title: s.string(), author: s.string() }) }),
+  s.object({ type: s.literal('present'), names: s.list(s.string()), guests: s.number() }),
 ])
 
 export type BoardMessage = typeof boardMessage.static

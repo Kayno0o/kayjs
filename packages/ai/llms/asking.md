@@ -30,11 +30,11 @@ ask([{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello' }, {
 import { ask } from '@kayjs/ai'
 import { s } from 'kay'
 
-const review = s.Object({ title: s.String(), score: s.Integer({ minimum: 1, maximum: 5 }), tags: s.Array(s.String()) })
+const review = s.object({ title: s.string(), score: s.int({ min: 1, max: 5 }), tags: s.list(s.string()) })
 const verdict = await ask('Review the film Alien', { schema: review })
 ```
 
-`ask(messages, { schema })` takes an object schema (`s.Object`; anything else throws a `config-invalid` `KayError`, an `s.Record` or `s.Intersect` field too, as a model cannot be held to free keys: name the fields) and returns a `StructuredReply` instead of a `AiReply`: `await` is the value the schema describes, `Static<typeof review>`, with no cast, and `for await` gives the object so far, a `DeepPartial` of it. Nothing is sent until it is first read, and readers share one request, as with text.
+`ask(messages, { schema })` takes an object schema (`s.object`; anything else throws a `config-invalid` `KayError`, an `s.Record` or `s.Intersect` field too, as a model cannot be held to free keys: name the fields) and returns a `StructuredReply` instead of a `AiReply`: `await` is the value the schema describes, `Static<typeof review>`, with no cast, and `for await` gives the object so far, a `DeepPartial` of it. Nothing is sent until it is first read, and readers share one request, as with text.
 
 ### In a page
 
@@ -63,7 +63,7 @@ An action returning the reply streams it to the island calling it, with the acti
 import { s, action } from 'kay'
 import { ask, chatMessages } from '@kayjs/ai'
 
-export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages, { system: 'You answer for the shop' }))
+export const reply = action({ messages: chatMessages() }, ({ messages }) => ask(messages, { system: 'You answer for the shop' }))
 ---
 p Chat
 ```

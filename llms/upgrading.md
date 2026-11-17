@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.106.0
+
+### `s` is kay's own builder, in lowercase
+
+`s.string({ min, max })`, `s.int()`, `s.enum()`, `s.object()` and the rest replace the PascalCase builders of Elysia, each taking the same field options (`optional: true`, `default`, `error`, `label`, `description`, `example`); `s.Optional(field)` is `optional: true` in the field's options, `s.UnionEnum` and `s.UnionKeys` are `s.enum`, `s.Numeric` is `s.number`, and `s.typebox` is gone: `s` builds a schema of its own, over TypeBox, and a schema built with Elysia's `t` is still taken. The old names work until 2.0, and `kay upgrade` rewrites them (`deprecated-schema-builders`, [schemas](schemas.md#schemas)). A file size of a file field is `'2mb'`, never `'2m'`. Two things differ in the new builders, which the fix does not hide: `s.object` refuses a key its shape lacks with an error, where `s.Object` let it by (`{ extra: 'strip' }` keeps the old way), and `s.list` is at most 1,000 items unless `max` says more. The `query`, `params`, `headers` and `cookie` of a route keep `{ extra: 'strip' }`, as a visitor sends keys a schema does not name. An `action` or a `defineEnv` takes the record of fields where it took `s.Object({ ... })`, and the fix writes it.
+
 ## 1.105.0
 
 The changes to kay.config.ts, the hooks, the stores and the guards of features are in [Upgrading to 1.105: kay.config.ts and library options](upgrading-1-105-config.md).

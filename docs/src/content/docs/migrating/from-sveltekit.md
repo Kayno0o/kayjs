@@ -83,8 +83,8 @@ A SvelteKit action reads `FormData` by hand, returns `fail(400, ...)` for a refu
 import { s, action } from 'kay'
 import { addTodo, listTodos } from '../data'
 
-const newTodo = s.Object({
-  title: s.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
+const newTodo = s.object({
+  title: s.string({ min: 1, max: 200, error: 'Write a title' }),
 })
 
 export const add = action(newTodo, async ({ title }) => {
@@ -153,7 +153,7 @@ Runes become the signals of kay. A signal is read by calling it and written by a
 | A snippet passed as a prop | An `@name` block, which can take parameters, rendered with `slot name`, or a snippet or function passed as `row={x}` |
 | `<svelte:head>` | A `head` block, see [Head and SEO](/essentials/head-and-seo) |
 | `setContext`, `getContext` | `createContext`, see the [islands reference](/llms/islands) |
-| `$env/static/public` | `s.Public` fields of `defineEnv`, read as `publicEnv` from `kay` |
+| `$env/static/public` | `s.public` fields of `defineEnv`, read as `publicEnv` from `kay` |
 | `$env/static/private` | `defineEnv` in `src/env.ts`, imported from server code |
 | `goto('/todos')` | `navigate('/todos')` from `kay` |
 | `page.url.searchParams` in a component | `queryParam('page')` from `kay`, or `ctx.query` on the server |

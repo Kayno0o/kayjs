@@ -8,7 +8,7 @@ import { denials } from '../../access'
 import { adminTitle, collectionTitle } from '../../listing'
 import { collectionScreen, openPath, translationStart, writtenSlug } from '../../screens'
 
-export const page = { query: s.Object({ locale: s.Optional(s.String()), from: s.Optional(s.String()), fromLocale: s.Optional(s.String()) }) }
+export const page = { query: s.object({ locale: s.string({ optional: true }), from: s.string({ optional: true }), fromLocale: s.string({ optional: true }) }, { extra: 'strip' }) }
 
 const { prefix, collection } = await collectionScreen(ctx.params.collection) ?? ctx.notFound()
 const denied = await denials(ctx, { collection: collection.name })

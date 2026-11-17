@@ -115,12 +115,13 @@ describe('ask with a schema', () => {
     expect(fakeAi.last()!.schema).toEqual({
       type: 'object',
       properties: {
-        title: { type: 'string' },
+        title: { type: 'string', maxLength: 10_000 },
         score: { type: 'number' },
-        tags: { type: 'array', items: { type: 'string' } },
-        author: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+        tags: { type: 'array', items: { type: 'string', maxLength: 10_000 }, maxItems: 1000 },
+        author: { type: 'object', properties: { name: { type: 'string', maxLength: 10_000 } }, required: ['name'], additionalProperties: false },
       },
       required: ['title', 'score', 'tags', 'author'],
+      additionalProperties: false,
     })
     expect(fakeAi.last()!.tools).toBeUndefined()
   })
@@ -182,7 +183,7 @@ describe('an answer the schema refuses', () => {
   })
 
   it('names a field of the wrong type by its path, nested ones and array items included', async () => {
-    fakeAi.reply({ data: { title: 'x', score: '4', tags: ['a', 2], author: { name: 7 } } })
+    fakeAi.reply({ data: { title: 'x', score: 'four', tags: ['a', 2], author: { name: 7 } } })
 
     const error = await failure(ask('x', { schema: verdict }))
 
@@ -266,9 +267,12 @@ describe('an answer the schema refuses', () => {
     expect([...(error as AiError).fields!].sort()).toEqual(['author', 'score', 'tags'])
   })
 
-  it('reads nothing a model made up beyond the schema into the value\'s type: extra fields neither fail nor change a valid one', async () => {
+  it('reads nothing a model made up beyond the schema into the value\'s type: extra fields fail a strict schema and pass one that strips them', async () => {
     fakeAi.reply({ data: { ...answer, extra: 1 } })
-    expect(await ask('x', { schema: verdict })).toMatchObject(answer)
+    expect((await failure(ask('x', { schema: verdict }))).kind).toBe('schema')
+
+    fakeAi.reply({ data: { ...answer, extra: 1 } })
+    expect(await ask('x', { schema: s.object({ title: s.string(), score: s.number(), tags: s.list(s.string()), author: s.object({ name: s.string() }) }, { extra: 'strip' }) })).toMatchObject(answer)
   })
 })
 

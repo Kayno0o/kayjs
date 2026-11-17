@@ -1,6 +1,6 @@
 --- server
 import { t } from 'elysia'
-import { action } from 'kay'
+import { action, s } from 'kay'
 import { invalidate } from 'kay/cache'
 import { t as translate } from 'kay/i18n'
 import { seen } from '../seen'
@@ -105,11 +105,11 @@ export const counted = action(t.Object({ fail: t.Boolean() }), async function* (
   yield 'ok'
 }, { protect: { rateLimit: { max: 1, window: '1m', count: 'succeeded' } } })
 
-export const trapped = action(t.Object({ name: t.String() }), async function* ({ name }) {
+export const trapped = action({ name: s.string() }, async function* ({ name }) {
   yield name
 }, { protect: { honeypot: 'website' } })
 
-export const pretending = action(t.Object({ name: t.String() }), async function* ({ name }) {
+export const pretending = action({ name: s.string() }, async function* ({ name }) {
   yield name
 }, { protect: { honeypot: { field: 'website', pretend: true } } })
 

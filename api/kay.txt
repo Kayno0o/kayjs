@@ -1,6 +1,39 @@
 [.] action
 function action<Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> | undefined): NoInputAction<Settled<Output>, Honeypot>
 function action<Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Spec, handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof Static<Spec>, string>, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> | undefined): ServerAction<Spec, Settled<Output>, Honeypot>
+function action<const Fields extends SchemaShape, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(fields: Fields, handler: (input: Evaluate<Readonly<Partial<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, ReadonlyOptionalPropertyKeys<Fields>>>> & Readonly<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, ReadonlyPropertyKeys<Fields>>> & Partial<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, OptionalPropertyKeys<Fields>>> & Required<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, Exclude<keyof Fields, OptionalPropertyKeys<Fields> | ReadonlyOptionalPropertyKeys<Fields> | ReadonlyPropertyKeys<Fields>>>>>, ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof Evaluate<Readonly<Partial<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, ReadonlyOptionalPropertyKeys<Fields>>>> & Readonly<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, ReadonlyPropertyKeys<Fields>>> & Partial<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, OptionalPropertyKeys<Fields>>> & Required<Pick<{
+  [K in keyof Fields]: (Fields[K] & {
+    params: unknown[] & [];
+  })["static"];
+}, Exclude<keyof Fields, OptionalPropertyKeys<Fields> | ReadonlyOptionalPropertyKeys<Fields> | ReadonlyPropertyKeys<Fields>>>>>, string>, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> | undefined): ServerAction<TObject<Fields>, Settled<Output>, Honeypot>
 
 [.] Action
 interface Action<Input = never, Output = unknown, Honeypot extends string = never>
@@ -1288,38 +1321,37 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
   Uint8Array: (options: Uint8ArrayOptions) => TUnsafe<Uint8Array<ArrayBufferLike>>;
 } & {
   Transform<Type extends TSchema>(type: Type): ElysiaTransformDecodeBuilder<Type>;
-}, "File" | "Files"> & {
-  File: (options?: FileOptions | undefined) => TUnsafe<File>;
-  Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
+}, "File" | "Files" | "Secret" | "UnionEnum"> & {
+  UnionEnum: <Readonly<NonEmptyArray<TEnumValue>> | const T extends NonEmptyArray<TEnumValue>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
+  UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;
+  File: (options?: OldFileOptions | undefined) => TUnsafe<File>;
+  Files: (options?: OldFilesOptions | undefined) => TUnsafe<File[]>;
   Secret: (options?: ElysiaStringOptions | undefined) => TString;
   Public: <Field extends Schema>(field: Field) => Field & {
     public: true;
   };
-  UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;
-  readonly typebox: Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
-    String: (property?: ElysiaStringOptions | undefined) => TString;
-    Numeric: (property?: NumberOptions | undefined) => TNumber;
-    NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>;
-    Integer: (property?: IntegerOptions | undefined) => TInteger;
-    Date: (property?: DateOptions | undefined) => TDate;
-    BooleanString: (property?: SchemaOptions | undefined) => TBoolean;
-    ObjectString: <T extends TProperties>(properties: T, options?: ObjectOptions | undefined) => TObject<T>;
-    ArrayString: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
-    ArrayQuery: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
-    File: TFile;
-    Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
-    Nullable: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull]>;
-    MaybeEmpty: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull, TUndefined]>;
-    Cookie: <T extends TProperties>(properties: T, {
-      domain, expires, httpOnly, maxAge, path, priority, sameSite, secure, secrets, sign, ...options
-    }?: CookieValidatorOptions<T> | undefined) => TObject<T>;
-    UnionEnum: <Readonly<NonEmptyArray<TEnumValue>> | const T extends NonEmptyArray<TEnumValue>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
-    NoValidate: <T extends TAnySchema>(v: T, enabled?: boolean | undefined) => T;
-    Form: <T extends TProperties>(v: T, options?: ObjectOptions | undefined) => TForm<T>;
-    ArrayBuffer(options?: TArrayBuffer | undefined): TUnsafe<ArrayBuffer>;
-    Uint8Array: (options: Uint8ArrayOptions) => TUnsafe<Uint8Array<ArrayBufferLike>>;
-  } & {
-    Transform<Type extends TSchema>(type: Type): ElysiaTransformDecodeBuilder<Type>;
+  string: <const Options extends StringOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
+  email: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
+  url: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
+  slug: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
+  int: <const Options extends NumberOptions>(options?: Options | undefined) => Wrapped<TInteger, Options>;
+  number: <const Options extends NumberOptions>(options?: Options | undefined) => Wrapped<TNumber, Options>;
+  boolean: <const Options extends FieldOptions<boolean>>(options?: Options | undefined) => Wrapped<TBoolean, Options>;
+  date: <const Options extends FieldOptions<Date>>(options?: Options | undefined) => Wrapped<TDate, Options>;
+  enum: {
+    <const Values extends EnumValues, const Options extends FieldOptions<Values[number]> = FieldOptions<Values[number]>>(values: Values, options?: Options | undefined): Wrapped<TUnionEnum<Values>, Options>;
+    <const Keyed extends object, const Options extends FieldOptions<keyof Keyed & string> = FieldOptions<keyof Keyed & string>>(record: Keyed, options?: Options | undefined): Wrapped<TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>, Options>;
+  };
+  literal: <boolean | const Value extends string | number, const Options extends FieldOptions<Value>>(value: Value, options?: Options | undefined) => Wrapped<TLiteral<Value>, Options>;
+  union: <const Members extends readonly [Schema, Schema, ...Schema[]], const Options extends FieldOptions>(members: Members, options?: Options | undefined) => Wrapped<Union<[...Members]>, Options>;
+  object: <Shape extends Record<string, Schema>, const Options extends ObjectOptions>(shape: Shape, options?: Options | undefined) => Wrapped<TObject<Shape>, Options>;
+  record: <Value extends Schema, const Options extends FieldOptions>(value: Value, options?: Options | undefined) => Wrapped<TRecord<TString, Value>, Options>;
+  list: <Item extends Schema, const Options extends ListOptions>(item: Item, options?: Options | undefined) => Wrapped<TArray<Item>, Options>;
+  file: <const Options extends FileOptions>(options?: Options | undefined) => Wrapped<TUnsafe<File>, Options>;
+  files: <const Options extends FilesOptions>(options?: Options | undefined) => Wrapped<TUnsafe<File[]>, Options>;
+  secret: <const Options extends StringOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
+  public: <Field extends Schema>(field: Field) => Field & {
+    public: true;
   };
 }
 
@@ -2954,7 +2986,8 @@ function defineContext<Loaders extends Record<string, (request: Request) => unkn
 }>
 
 [./server] defineEnv
-function defineEnv<Spec extends EnvSchema>(declared: Spec, source?: Record<string, string | undefined>): Static<Spec> & (keyof PublicFieldsOf<Spec> extends never ? unknown : WithPublicFields<Spec>)
+function defineEnv<Spec extends EnvSchema>(declared: Spec, source?: Record<string, string | undefined> | undefined): EnvValues<Spec>
+function defineEnv<const Shape extends SchemaShape>(declared: Shape, source?: Record<string, string | undefined> | undefined): EnvValues<TObject<Shape>>
 
 [./server] DeletableSessionStore
 type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => MaybePromise<number> }
@@ -3819,38 +3852,37 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
   Uint8Array: (options: Uint8ArrayOptions) => TUnsafe<Uint8Array<ArrayBufferLike>>;
 } & {
   Transform<Type extends TSchema>(type: Type): ElysiaTransformDecodeBuilder<Type>;
-}, "File" | "Files"> & {
-  File: (options?: FileOptions | undefined) => TUnsafe<File>;
-  Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
+}, "File" | "Files" | "Secret" | "UnionEnum"> & {
+  UnionEnum: <Readonly<NonEmptyArray<TEnumValue>> | const T extends NonEmptyArray<TEnumValue>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
+  UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;
+  File: (options?: OldFileOptions | undefined) => TUnsafe<File>;
+  Files: (options?: OldFilesOptions | undefined) => TUnsafe<File[]>;
   Secret: (options?: ElysiaStringOptions | undefined) => TString;
   Public: <Field extends Schema>(field: Field) => Field & {
     public: true;
   };
-  UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;
-  readonly typebox: Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
-    String: (property?: ElysiaStringOptions | undefined) => TString;
-    Numeric: (property?: NumberOptions | undefined) => TNumber;
-    NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>;
-    Integer: (property?: IntegerOptions | undefined) => TInteger;
-    Date: (property?: DateOptions | undefined) => TDate;
-    BooleanString: (property?: SchemaOptions | undefined) => TBoolean;
-    ObjectString: <T extends TProperties>(properties: T, options?: ObjectOptions | undefined) => TObject<T>;
-    ArrayString: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
-    ArrayQuery: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
-    File: TFile;
-    Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
-    Nullable: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull]>;
-    MaybeEmpty: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull, TUndefined]>;
-    Cookie: <T extends TProperties>(properties: T, {
-      domain, expires, httpOnly, maxAge, path, priority, sameSite, secure, secrets, sign, ...options
-    }?: CookieValidatorOptions<T> | undefined) => TObject<T>;
-    UnionEnum: <Readonly<NonEmptyArray<TEnumValue>> | const T extends NonEmptyArray<TEnumValue>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
-    NoValidate: <T extends TAnySchema>(v: T, enabled?: boolean | undefined) => T;
-    Form: <T extends TProperties>(v: T, options?: ObjectOptions | undefined) => TForm<T>;
-    ArrayBuffer(options?: TArrayBuffer | undefined): TUnsafe<ArrayBuffer>;
-    Uint8Array: (options: Uint8ArrayOptions) => TUnsafe<Uint8Array<ArrayBufferLike>>;
-  } & {
-    Transform<Type extends TSchema>(type: Type): ElysiaTransformDecodeBuilder<Type>;
+  string: <const Options extends StringOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
+  email: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
+  url: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
+  slug: <const Options extends Omit<StringOptions, "format" | "pattern">>(options?: Options | undefined) => Wrapped<TString, Options>;
+  int: <const Options extends NumberOptions>(options?: Options | undefined) => Wrapped<TInteger, Options>;
+  number: <const Options extends NumberOptions>(options?: Options | undefined) => Wrapped<TNumber, Options>;
+  boolean: <const Options extends FieldOptions<boolean>>(options?: Options | undefined) => Wrapped<TBoolean, Options>;
+  date: <const Options extends FieldOptions<Date>>(options?: Options | undefined) => Wrapped<TDate, Options>;
+  enum: {
+    <const Values extends EnumValues, const Options extends FieldOptions<Values[number]> = FieldOptions<Values[number]>>(values: Values, options?: Options | undefined): Wrapped<TUnionEnum<Values>, Options>;
+    <const Keyed extends object, const Options extends FieldOptions<keyof Keyed & string> = FieldOptions<keyof Keyed & string>>(record: Keyed, options?: Options | undefined): Wrapped<TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>, Options>;
+  };
+  literal: <boolean | const Value extends string | number, const Options extends FieldOptions<Value>>(value: Value, options?: Options | undefined) => Wrapped<TLiteral<Value>, Options>;
+  union: <const Members extends readonly [Schema, Schema, ...Schema[]], const Options extends FieldOptions>(members: Members, options?: Options | undefined) => Wrapped<Union<[...Members]>, Options>;
+  object: <Shape extends Record<string, Schema>, const Options extends ObjectOptions>(shape: Shape, options?: Options | undefined) => Wrapped<TObject<Shape>, Options>;
+  record: <Value extends Schema, const Options extends FieldOptions>(value: Value, options?: Options | undefined) => Wrapped<TRecord<TString, Value>, Options>;
+  list: <Item extends Schema, const Options extends ListOptions>(item: Item, options?: Options | undefined) => Wrapped<TArray<Item>, Options>;
+  file: <const Options extends FileOptions>(options?: Options | undefined) => Wrapped<TUnsafe<File>, Options>;
+  files: <const Options extends FilesOptions>(options?: Options | undefined) => Wrapped<TUnsafe<File[]>, Options>;
+  secret: <const Options extends StringOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
+  public: <Field extends Schema>(field: Field) => Field & {
+    public: true;
   };
 }
 

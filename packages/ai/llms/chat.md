@@ -9,7 +9,7 @@
 import { ask, chatMessages } from '@kayjs/ai'
 import { s, action } from 'kay'
 
-export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages, { system: 'Be brief' }))
+export const reply = action({ messages: chatMessages() }, ({ messages }) => ask(messages, { system: 'Be brief' }))
 ---
 ```
 
@@ -32,7 +32,7 @@ Chat(action={reply} label="Assistant")
 import { ask, chatMessages } from '@kayjs/ai'
 import { s, action } from 'kay'
 
-export const reply = action(s.Object({ messages: chatMessages({ attachments: { type: 'image/png' } }) }), ({ messages }) => ask(messages), { maxSize: '20mb' })
+export const reply = action({ messages: chatMessages({ attachments: { type: 'image/png' } }) }, ({ messages }) => ask(messages), { maxSize: '20mb' })
 ---
 ```
 
@@ -51,7 +51,7 @@ The attach button, the upload's checks (`accept`, `maxFiles`, `maxSize`), their 
 import { s, action } from 'kay'
 import { transcribe } from '@kayjs/ai'
 
-export const dictate = action(s.Object({ audio: s.File() }), async ({ audio }) => ({ text: await transcribe(audio) }), { maxSize: '10mb', protect: { rateLimit: { max: 10, window: '1m' } } })
+export const dictate = action({ audio: s.file() }, async ({ audio }) => ({ text: await transcribe(audio) }), { maxSize: '10mb', protect: { rateLimit: { max: 10, window: '1m' } } })
 ---
 Chat(action={reply} transcribe={dictate})
 ```

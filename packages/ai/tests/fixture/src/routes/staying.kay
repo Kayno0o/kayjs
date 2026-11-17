@@ -4,6 +4,6 @@ import { action, s } from 'kay'
 import { testing } from '../testing'
 
 // A chat whose reply goes on after the visitor left, asked of the provider a test sets.
-export const staying = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { outlive: true, provider: testing.provider }).progress())
+export const staying = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }) }), { min: 1, max: 50 }) }, ({ messages }) => ask(messages, { outlive: true, provider: testing.provider }).progress())
 ---
 p Staying

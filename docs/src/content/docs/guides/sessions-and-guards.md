@@ -189,9 +189,9 @@ Call `start(data)` to sign in, which moves the session to a new id, and `destroy
 --- server
 import { s, action } from 'kay'
 
-const credentials = s.Object({
-  email: s.String({ maxLength: 254 }),
-  password: s.String(),
+const credentials = s.object({
+  email: s.string({ max: 254 }),
+  password: s.string(),
 })
 
 export const signIn = action(credentials, async (input, ctx) => {
@@ -303,21 +303,21 @@ The OpenAPI document is refused too, unless a guard covers every module not sett
 
 `defineEnv` reads `process.env` once against a schema at boot. It stops the server with an error naming each missing variable.
 
-For variables an island may read, such as a map key, mark the field `s.Public` in `defineEnv` and import `publicEnv` from `kay`.
+For variables an island may read, such as a map key, mark the field `s.public` in `defineEnv` and import `publicEnv` from `kay`.
 
 ```ts
 import { s } from 'kay'
 import { defineEnv } from 'kay/server'
 
-export const env = defineEnv(s.Object({
-  DATABASE_URL: s.String(),
-  MAP_KEY: s.Public(s.String()),
-}))
+export const env = defineEnv({
+  DATABASE_URL: s.string(),
+  MAP_KEY: s.public(s.string()),
+})
 ```
 
 Declare the field in a module under `src`: kay does not read one outside it, so an island would type it as a string, and `kay check` reports it.
 
-Nothing else of the environment reaches the browser. The server refuses to boot when an `s.Public` field names a variable that looks secret, such as `DATABASE_URL`, `API_KEY`, `SIGNING_KEY` or `SENTRY_DSN`, or one with `SECRET`, `PASSWORD`, `PRIVATE`, `TOKEN`, `JWT` or `CREDENTIAL` in its name. Every visitor reads those, so keep them in `defineEnv` without `s.Public`.
+Nothing else of the environment reaches the browser. The server refuses to boot when an `s.public` field names a variable that looks secret, such as `DATABASE_URL`, `API_KEY`, `SIGNING_KEY` or `SENTRY_DSN`, or one with `SECRET`, `PASSWORD`, `PRIVATE`, `TOKEN`, `JWT` or `CREDENTIAL` in its name. Every visitor reads those, so keep them in `defineEnv` without `s.public`.
 
 A value that is an address with a username and password in it is refused too. A key meant for the browser, such as `MAP_KEY` or `STRIPE_PUBLISHABLE_KEY`, passes.
 

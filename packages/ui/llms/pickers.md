@@ -16,7 +16,7 @@
 - `FileDrop(accept="image/*" multiple paste onFiles={upload})` with a `@content(zone)` block:
   - Files dropped on the zone, picked through `zone.open()` or, with `paste`, pasted anywhere on the page outside a text field, reach `onFiles({ files })`: those `accept` allows, one unless `multiple`, never an empty list. A file the browser gives no type, such as a `.csv` on Windows, passes a type in `accept`, for its receiver to judge by its name. `onReject({ files })` gets the dropped or picked files left out (not pasted ones), those `accept` refuses and, without `multiple`, the matching ones beyond the first, to say why they were ignored.
   - `onReject({ files, reason })` is called once per reason: `type` (misses `accept`), `size` (past `maxSize`, bytes or `'2mb'`) and `count` (beyond `maxFiles`, or the first without `multiple`).
-  - `name` makes it a form control: the zone keeps what it takes on its input, so a plain `form(method="post" enctype="multipart/form-data")` posts them to an `s.File()` or `s.Files()` of an action, and `onFiles` is optional. A zone with a `name` or `list` keeps its files: `multiple` adds to them (a file already kept is skipped, `maxFiles` counts them), a single zone replaces them, a form reset empties it, and `onChange({ value })` hears each change.
+  - `name` makes it a form control: the zone keeps what it takes on its input, so a plain `form(method="post" enctype="multipart/form-data")` posts them to an `s.file()` or `s.files()` of an action, and `onFiles` is optional. A zone with a `name` or `list` keeps its files: `multiple` adds to them (a file already kept is skipped, `maxFiles` counts them), a single zone replaces them, a form reset empties it, and `onChange({ value })` hears each change.
   - `list` shows the kept files under the zone, each with its size and a remove button (`removeLabel={file => ...}`, words `ui.fileDrop.remove`). `issue` and, inside a FormDialog, the message its call was refused with for `name` show under the zone as Checkbox's do, and mark it `invalid`; a FormField of the same `name` shows them itself.
   - Left out, `@content` is a button opening the picker (`chooseLabel`) and a line about dropping (`dropLabel`), reachable by keyboard.
   - `zone.dragging()` reads whether files hover the zone, which also carries `data-dragging`.
@@ -45,7 +45,7 @@
     import { s } from 'kay'
     import { iconNames, iconProps } from 'kay/icons'
 
-    export const findIcons = action(s.Object({ query: s.String({ maxLength: 200 }), limit: s.Integer(), offset: s.Integer() }), async ({ query, limit, offset }) =>
+    export const findIcons = action(s.object({ query: s.string({ maxLength: 200 }), limit: s.int(), offset: s.int() }), async ({ query, limit, offset }) =>
       iconNames(tabler).filter(name => name.includes(query)).slice(offset, offset + limit).map(name => ({ name: `tabler:${name}`, icon: iconProps(tabler, name)! })))
     ```
 

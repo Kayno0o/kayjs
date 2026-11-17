@@ -144,7 +144,7 @@ describe('kay/library', () => {
   })
 
   describe('an answer checked against a schema', () => {
-    const shape = s.Object({ 'title': s.String({ minLength: 2 }), 'tags': s.Array(s.Object({ name: s.String() })), 'a/b': s.Optional(s.Number()), 'when': s.Optional(s.Date()) })
+    const shape = s.object({ 'title': s.string({ min: 2 }), 'tags': s.list(s.object({ name: s.string() })), 'a/b': s.number({ optional: true }), 'when': s.date({ optional: true }) })
 
     it('gives the value of one that fits, decoded as the schema types it', () => {
       expect(checkAnswer(shape, { title: 'ok', tags: [{ name: 'x' }] })).toEqual({ value: { title: 'ok', tags: [{ name: 'x' }] } })
@@ -165,14 +165,14 @@ describe('kay/library', () => {
     })
 
     it('reports at most twenty paths of a hostile answer', () => {
-      const wide = s.Object(Object.fromEntries(Array.from({ length: 50 }, (_, index) => [`f${index}`, s.String()])))
+      const wide = s.object(Object.fromEntries(Array.from({ length: 50 }, (_, index) => [`f${index}`, s.string()])))
       const checked = checkAnswer(wide, {})
 
       expect('issues' in checked && checked.issues).toHaveLength(20)
     })
 
     it('describes a schema as plain JSON Schema', () => {
-      expect(jsonSchemaOf(s.Object({ title: s.String({ minLength: 2, error: 'Short' }), n: s.Optional(s.Integer({ minimum: 1 })) }))).toMatchObject({
+      expect(jsonSchemaOf(s.object({ title: s.string({ min: 2, error: 'Short' }), n: s.int({ optional: true, min: 1 }) }))).toMatchObject({
         type: 'object',
         properties: { title: { type: 'string', minLength: 2 }, n: { type: 'integer', minimum: 1 } },
         required: ['title'],

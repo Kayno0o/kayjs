@@ -9,13 +9,13 @@ const TOOL_LIMIT = { max: 20, window: '1m' } as const
 const log = logFrom('docs-chat')
 
 export const searchDocs = action(
-  s.Object({ query: s.String({ minLength: 2, maxLength: 200 }) }),
+  { query: s.string({ min: 2, max: 200 }) },
   async ({ query }) => ({ hits: await searchPages(query) }),
   { tool: 'Searches the documentation and returns the best matching sections, each with the path of its page', protect: { rateLimit: TOOL_LIMIT } },
 )
 
 export const readDocsPage = action(
-  s.Object({ path: s.String({ minLength: 1, maxLength: 200 }), part: s.Optional(s.Integer({ minimum: 1, maximum: 50 })) }),
+  { path: s.string({ min: 1, max: 200 }), part: s.int({ optional: true, min: 1, max: 50 }) },
   async ({ path, part }, ctx) => {
     const found = await readPage(path)
 
@@ -32,8 +32,8 @@ export const readDocsPage = action(
   { tool: { name: 'read_page', description: 'Reads one documentation page in full, given its path such as /essentials/islands or /llms/actions. A long page comes in parts: the result says how many there are, and part picks the next one', readOnly: true }, protect: { rateLimit: TOOL_LIMIT } },
 )
 
-const Messages = s.Object({
-  messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 2000 }) }), { minItems: 1, maxItems: 20 }),
+const Messages = s.object({
+  messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 2000 }) }), { min: 1, max: 20 }),
 })
 
 export const reply = action(

@@ -1,8 +1,10 @@
 import type { Lint } from './lints'
 import { AUTH_LINTS } from './deprecated-auth-lints'
+import { SCHEMA_BUILDERS } from './deprecated-lints-1-106'
 
 // The lints of the `deprecated` group, with the other lints in `LINTS`; each stays three minors from its `since`.
 export const DEPRECATED_LINTS = {
+  ...SCHEMA_BUILDERS,
   'deprecated-source-readers': {
     level: 'warn',
     group: 'deprecated',
@@ -595,4 +597,5 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.103' },
   { since: '1.104' },
   { since: '1.105' },
+  { since: '1.106' },
 ]

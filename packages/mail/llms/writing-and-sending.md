@@ -142,7 +142,7 @@ import { s, action } from 'kay'
 import { mail } from '../mail'
 import Welcome from '../mails/welcome.kay'
 
-export const signUp = action(s.Object({ name: s.String({ maxLength: 100 }), email: s.String({ format: 'email', maxLength: 254 }) }), async ({ name, email }) => {
+export const signUp = action({ name: s.string({ max: 100 }), email: s.string({ format: 'email', max: 254 }) }, async ({ name, email }) => {
   await mail.enqueue({ to: email, subject: `Welcome, ${name}`, view: Welcome, props: { name, url: 'https://example.com/confirm' } })
 })
 ---

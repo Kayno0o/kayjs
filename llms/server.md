@@ -53,9 +53,9 @@ Mount it from `src/plugins/session.ts` (`export default sessions`, see above), o
 --- server
 import { s, action } from 'kay'
 
-const credentials = s.Object({
-  email: s.String({ maxLength: 254 }),
-  password: s.String(),
+const credentials = s.object({
+  email: s.string({ max: 254 }),
+  password: s.string(),
 })
 
 export const signIn = action(credentials, async (input, ctx) => {
@@ -95,10 +95,10 @@ export const signOut = action(async ctx => {
 --- server
 import { s, action } from 'kay'
 
-const credentials = s.Object({
-  email: s.String({ maxLength: 254 }),
-  password: s.String(),
-  remember: s.Optional(s.Boolean()),
+const credentials = s.object({
+  email: s.string({ max: 254 }),
+  password: s.string(),
+  remember: s.boolean({ optional: true }),
 })
 
 export const signIn = action(credentials, async (input, ctx) => {

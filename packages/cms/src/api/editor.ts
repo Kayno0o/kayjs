@@ -25,7 +25,7 @@ export default api()
     set.headers['cache-control'] = 'no-store'
 
     return { denied: await denialsOf(request, query.collection === undefined ? undefined : { collection: query.collection }), prefix: settings().prefix }
-  }, { query: s.Object({ collection: s.Optional(s.String()) }) })
+  }, { query: s.object({ collection: s.string({ optional: true }) }, { extra: 'strip' }) })
   // What an editor's browser runs on each page, the same bytes for everyone and no secret in them; the guard leaves it open so a stale hint is found and cleared.
   .get('/module.js', ({ set }) => {
     set.headers['content-type'] = 'text/javascript; charset=utf-8'

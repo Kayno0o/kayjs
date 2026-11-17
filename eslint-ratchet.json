@@ -40,7 +40,7 @@
     "max-lines-per-function": 151
   },
   "packages/cms/src/fields.ts": {
-    "complexity": 51
+    "complexity": 50
   },
   "packages/cms/src/form.ts": {
     "max-lines-per-function": 197

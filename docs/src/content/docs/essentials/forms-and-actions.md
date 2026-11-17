@@ -11,8 +11,8 @@ An action is a schema and a handler exported from a page's server fence. It beco
 import { s, action } from 'kay'
 import { addTodo } from '../data'
 
-const newTodo = s.Object({
-  title: s.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
+const newTodo = s.object({
+  title: s.string({ min: 1, max: 200, error: 'Write a title' }),
 })
 
 export const add = action(newTodo, async ({ title }) => {
@@ -36,9 +36,9 @@ Text reaches the schema trimmed, and an optional field left blank counts as left
 
 ## A choice among a record's keys
 
-A `select` often takes its options from a record that maps each value to a label. `s.UnionKeys(record)` is the schema for the value the visitor picks: only the record's keys pass, and the handler gets them typed as the union of the keys, with no cast.
+A `select` often takes its options from a record that maps each value to a label. `s.enum(record)` is the schema for the value the visitor picks: only the record's keys pass, and the handler gets them typed as the union of the keys, with no cast.
 
-Like `s.UnionEnum(values)`, it has no default: leave the field out and an optional one reads `undefined`, a required one is refused. Pass `{ default: 'a' }` to fill one in.
+Like `s.enum(values)`, it has no default: leave the field out and an optional one reads `undefined`, a required one is refused. Pass `{ default: 'a' }` to fill one in.
 
 ```kay
 --- server
@@ -48,7 +48,7 @@ import { sendMessage } from '../mail'
 const TOPICS = { billing: 'Billing', support: 'Support' }
 const choices = Object.entries(TOPICS).map(([value, label]) => ({ value, label }))
 
-export const contact = action(s.Object({ topic: s.UnionKeys(TOPICS) }), async ({ topic }) => {
+export const contact = action({ topic: s.enum(TOPICS) }, async ({ topic }) => {
   await sendMessage(topic)
 })
 ---
@@ -94,7 +94,7 @@ An action that a page and a component both use lives in a file called `_actions.
 --- server
 import { s, action } from 'kay'
 
-export const deleteTissue = action(s.Object({ id: s.Integer() }), async ({ id }) => {
+export const deleteTissue = action({ id: s.int() }, async ({ id }) => {
   await removeTissue(id)
 })
 ```
@@ -119,7 +119,7 @@ A schema is built with `s`, and validates on the server. An island may import th
 import type { Static } from 'kay'
 import { s } from 'kay'
 
-export const choice = s.Union([s.Literal('smash'), s.Literal('pass')])
+export const choice = s.union([s.literal('smash'), s.literal('pass')])
 export type Choice = Static<typeof choice>
 ```
 
@@ -291,7 +291,7 @@ An action reads the params of the page it was posted from in `ctx.params`. This 
 import { action, s } from 'kay'
 import { projects } from '../../../db'
 
-export const remove = action(s.Object({ id: s.String({ maxLength: 36 }) }), async ({ id }, ctx) => {
+export const remove = action({ id: s.string({ max: 36 }) }, async ({ id }, ctx) => {
   await projects.remove({ org: ctx.params.org, id })
 })
 ---
@@ -395,7 +395,7 @@ Each returns a function that removes it, and ends with the island. A plain scrip
 --- server
 import { s, action } from 'kay'
 
-export const add = action(s.Object({ title: s.String({ minLength: 1 }) }), async ({ title }) => title)
+export const add = action({ title: s.string({ min: 1 }) }, async ({ title }) => title)
 --- script
 import { listen, optimistic } from 'kay'
 
@@ -478,7 +478,7 @@ A handler can send its answer in parts, such as a model's reply as it is written
 import { s, action } from 'kay'
 import { complete } from '../data'
 
-export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }), async function* ({ prompt }) {
+export const reply = action({ prompt: s.string({ max: 2000 }) }, async function* ({ prompt }) {
   let text = ''
 
   for await (const piece of complete(prompt))
@@ -582,17 +582,17 @@ A success gives `{ ok: true, data }`. A failure with no answer from the server, 
 
 ## File uploads
 
-Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form. The handler receives a `File`, which `files.put` stores.
+Use `s.file()` in the schema and `input(type="file" name="avatar")` in the form. The handler receives a `File`, which `files.put` stores.
 
-`s.Files()` takes several files from one field. The action takes the size of ten files for a field without `maxItems`, and `maxItems` sets another count.
+`s.files()` takes several files from one field. The action takes the size of ten files for a field without `maxItems`, and `maxItems` sets another count.
 
-A form that posts to an action is sent as `multipart/form-data` unless it sets its own `enctype`. An empty file input counts as no file, so `s.Optional(s.File())` works.
+A form that posts to an action is sent as `multipart/form-data` unless it sets its own `enctype`. An empty file input counts as no file, so `s.file({ optional: true })` works.
 
 An island passes a `File` or `Blob` anywhere in its input: `await upload({ avatar: input.files[0] })`. A `Blob` fills a file field too, such as a `MediaRecorder` recording, and the handler still gets a `File`.
 
-`s.File({ type: 'image/png' })` checks the file's bytes, not its name or the type the browser declared. That holds for a top-level field only. A nested file is checked against the type it declares.
+`s.file({ type: 'image/png' })` checks the file's bytes, not its name or the type the browser declared. That holds for a top-level field only. A nested file is checked against the type it declares.
 
-A post carries 1 MB at most. Give the field a size, `s.File({ maxSize: '2mb' })`, and the action takes that much, plus a little for the other fields. A `maxSize` in the third argument of `action` wins over it. See [File storage](/guides/file-storage).
+A post carries 1 MB at most. Give the field a size, `s.file({ maxSize: '2mb' })`, and the action takes that much, plus a little for the other fields. A `maxSize` in the third argument of `action` wins over it. See [File storage](/guides/file-storage).
 
 ## A post from another site
 

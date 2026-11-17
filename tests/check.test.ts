@@ -35,7 +35,8 @@ const turn = limiter(2)
 setDefaultTimeout(90_000)
 
 async function check(root: string, options?: CheckOptions): ReturnType<typeof checkProject> {
-  return turn(async () => checkProject(root, options))
+  // The projects of these tests write `s.Object` and the other PascalCase builders as the apps they stand for do, which a lint of its own reports.
+  return turn(async () => checkProject(root, { ...options, lints: { 'deprecated-schema-builders': 'allow', ...options?.lints } }))
 }
 
 // Runs the kay CLI as a user would, in its turn, answering its exit code, what it did on stdout and the problems it found on stderr.

@@ -14,7 +14,7 @@ import { s, action } from 'kay'
 import { files } from 'kay/server'
 import { photos } from '../photos'
 
-export const upload = action(s.Object({ photo: s.File({ type: 'image/jpeg' }) }), async ({ photo }) => {
+export const upload = action({ photo: s.file({ type: 'image/jpeg' }) }, async ({ photo }) => {
   photos.push(await files.put(photo, { folder: 'photos' }))
 }, { maxSize: '20mb' })
 ---

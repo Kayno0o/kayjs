@@ -17,7 +17,7 @@ export default api()
   .post(
     '/',
     ({ body }) => addNote(body.text),
-    { body: s.Object({ text: s.String() }) },
+    { body: s.object({ text: s.string() }) },
   )
 ```
 

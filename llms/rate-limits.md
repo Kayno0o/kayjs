@@ -13,7 +13,7 @@ How many times a client may do something in a window, on actions, in guards and 
 import { s, action } from 'kay'
 
 export const subscribe = action(
-  s.Object({ email: s.String({ format: 'email' }) }),
+  { email: s.string({ format: 'email' }) },
   async ({ email }) => email.length,
   { protect: { rateLimit: { max: 5, window: '1m' } } },
 )

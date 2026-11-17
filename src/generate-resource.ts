@@ -33,14 +33,14 @@ interface TypeDescription {
 }
 
 // The range of a 4-byte column, which a bare integer schema would let a post exceed.
-const INT4 = '{ minimum: -2147483648, maximum: 2147483647 }'
+const INT4 = '{ min: -2147483648, max: 2147483647 }'
 
 const TYPES: Record<FieldType, TypeDescription> = {
-  string: { column: 'f.varchar(200)', schema: 's.String({ minLength: 1, maxLength: 200 })', sample: '\'First\'', posted: '\'First\'', shown: 'First' },
-  text: { column: 'f.text()', schema: 's.String({ minLength: 1, maxLength: 10_000 })', sample: '\'Some text\'', posted: '\'Some text\'', shown: 'Some text' },
-  int: { column: 'f.integer()', schema: `s.Integer(${INT4})`, sample: '42', posted: '\'42\'', shown: '42' },
-  float: { column: 'f.doublePrecision()', schema: 's.Number()', sample: '4.25', posted: '\'4.25\'', shown: '4.25' },
-  boolean: { column: 'f.boolean().default(false)', schema: 's.Boolean()', sample: 'true', posted: '\'on\'', shown: 'true' },
+  string: { column: 'f.varchar(200)', schema: 's.string({ min: 1, max: 200 })', sample: '\'First\'', posted: '\'First\'', shown: 'First' },
+  text: { column: 'f.text()', schema: 's.string({ min: 1, max: 10_000 })', sample: '\'Some text\'', posted: '\'Some text\'', shown: 'Some text' },
+  int: { column: 'f.integer()', schema: `s.int(${INT4})`, sample: '42', posted: '\'42\'', shown: '42' },
+  float: { column: 'f.doublePrecision()', schema: 's.number()', sample: '4.25', posted: '\'4.25\'', shown: '4.25' },
+  boolean: { column: 'f.boolean().default(false)', schema: 's.boolean()', sample: 'true', posted: '\'on\'', shown: 'true' },
 }
 
 const ALIASES: Record<string, FieldType> = { string: 'string', text: 'text', int: 'int', integer: 'int', float: 'float', number: 'float', boolean: 'boolean', bool: 'boolean' }
@@ -170,19 +170,19 @@ const fields = {
 ${schemas}
 }
 
-export const create = action(s.Object(fields), async (input, ctx) => {
+export const create = action(fields, async (input, ctx) => {
   await db.repo(${names.pascal}).write.insertOne(input)
 
   return ctx.redirect('${list}')
 })
 
-export const update = action(s.Object({ id: s.Integer(${INT4}), ...fields }), async ({ id, ...values }, ctx) => {
+export const update = action({ id: s.int(${INT4}), ...fields }, async ({ id, ...values }, ctx) => {
   await db.repo(${names.pascal}).write.updateOne(values, { id })
 
   return ctx.redirect('${list}')
 })
 
-export const remove = action(s.Object({ id: s.Integer(${INT4}) }), async ({ id }, ctx) => {
+export const remove = action({ id: s.int(${INT4}) }, async ({ id }, ctx) => {
   await db.repo(${names.pascal}).write.deleteOne({ id })
 
   return ctx.redirect('${list}')

@@ -90,7 +90,7 @@ An island cannot call `ask`, because the key must stay on the server. Importing 
 import { s, action } from 'kay'
 import { ask, chatMessages } from '@kayjs/ai'
 
-export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages))
+export const reply = action({ messages: chatMessages() }, ({ messages }) => ask(messages))
 ---
 p Chat
 ```
@@ -349,14 +349,14 @@ if (!answer.resumed)
 
 ## Ask for an object
 
-When you want data and not prose, pass a `schema`. It is a kay schema made with `s.Object`. `await` then gives the value the schema describes, checked, and TypeScript knows its fields with no cast.
+When you want data and not prose, pass a `schema`. It is a kay schema made with `s.object`. `await` then gives the value the schema describes, checked, and TypeScript knows its fields with no cast.
 
 ```kay
 --- server
 import { s } from 'kay'
 import { ask } from '@kayjs/ai'
 
-const review = s.Object({ title: s.String(), score: s.Integer({ minimum: 1, maximum: 5 }), tags: s.Array(s.String()) })
+const review = s.object({ title: s.string(), score: s.int({ min: 1, max: 5 }), tags: s.list(s.string()) })
 const verdict = ask('Review the film Alien', { schema: review })
 ---
 await verdict
@@ -387,16 +387,16 @@ In a test, `fakeAi.reply({ data: { title: 'Alien', score: 5, tags: [] } })` answ
 
 ## Show the model an image or a PDF
 
-A user message can hold `attachments` beside its text. An attachment is a `File` or `Blob` (an `s.File()` field gives you one), bytes, or a file kay stored, as `storedFile(key)`.
+A user message can hold `attachments` beside its text. An attachment is a `File` or `Blob` (an `s.file()` field gives you one), bytes, or a file kay stored, as `storedFile(key)`.
 
 ```kay
 --- server
 import { ask } from '@kayjs/ai'
 import { s, action } from 'kay'
 
-const bill = s.Object({ supplier: s.String(), total: s.Number() })
+const bill = s.object({ supplier: s.string(), total: s.number() })
 
-export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) }), async ({ scan }) => {
+export const read = action({ scan: s.file({ type: 'application/pdf' }) }, async ({ scan }) => {
   return await ask([{ role: 'user', content: 'Read this bill', attachments: [scan] }], { schema: bill })
 }, { maxSize: '6mb' })
 ---
@@ -446,9 +446,9 @@ Give `ask` some of your actions as tools, and the model can use them. Passing an
 import { s, action } from 'kay'
 import { ask, chatMessages } from '@kayjs/ai'
 
-export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100 }) }), ({ title }) => saveNote(title), { tool: 'Adds a note to the visitor\'s list' })
+export const addNote = action({ title: s.string({ min: 3, max: 100 }) }, ({ title }) => saveNote(title), { tool: 'Adds a note to the visitor\'s list' })
 
-export const assistant = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages, { tools: [addNote], maxSteps: 4 }).progress())
+export const assistant = action({ messages: chatMessages() }, ({ messages }) => ask(messages, { tools: [addNote], maxSteps: 4 }).progress())
 ---
 p Assistant
 ```
@@ -486,7 +486,7 @@ import { ask, tool } from '@kayjs/ai'
 const findArticle = tool({
   name: 'find_article',
   description: 'Finds an article by its title',
-  input: s.Object({ title: s.String() }),
+  input: s.object({ title: s.string() }),
   run: ({ title }) => articles.find(title),
 })
 

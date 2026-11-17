@@ -21,7 +21,7 @@ const WORD_BREAK = /[-_]+/g
 // Words an action cannot be exported as, or that its own file already names: the `action` and `s` it calls, `title` its handler reads.
 const RESERVED = new Set(['action', 's', 'title', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new', 'null', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield', 'implements', 'interface', 'package', 'private', 'protected', 'public', 'eval', 'arguments'])
 // The action added to an `_actions.kay`, or printed for the author to add when the file holds more than a server fence.
-const ACTION_BODY = (name: string) => `export const ${name} = action(\n  s.Object({ title: s.String({ minLength: 1, maxLength: 200 }) }),\n  ({ title }) => title,\n)\n`
+const ACTION_BODY = (name: string) => `export const ${name} = action(\n  { title: s.string({ min: 1, max: 200 }) },\n  ({ title }) => title,\n)\n`
 const LINE_BREAK = /\r?\n/
 const LINE_BREAKS = /\r?\n/g
 const TABLES_FILE = 'src/db/tables.ts'

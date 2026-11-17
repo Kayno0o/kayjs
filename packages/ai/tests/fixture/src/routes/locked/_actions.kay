@@ -2,7 +2,7 @@
 import { action, s } from 'kay'
 import { done } from '../../testing'
 
-export const wipe = action(s.Object({ confirm: s.Boolean() }), () => {
+export const wipe = action({ confirm: s.boolean() }, () => {
   done.push('wipe')
 
   return { wiped: true }

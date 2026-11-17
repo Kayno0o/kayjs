@@ -1,12 +1,14 @@
 import type { Elysia } from 'elysia'
 import type { PublicFieldsOf, WithPublicFields } from '../runtime/env'
 import type { Schema, Static } from '../runtime/schema'
+import type { ObjectOf, SchemaShape } from '../runtime/schema-record'
 import type { EnvSchemaRecord } from './env-state'
 import { readFileSync } from 'node:fs'
 import process from 'node:process'
 import { t } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { PUBLIC_ENV } from '../runtime/env'
+import { schemaOf } from '../runtime/schema-record'
 import { bundled } from './bundle'
 import { fixedReply } from './compress'
 import { devSecret } from './dev-secret'
@@ -44,6 +46,8 @@ function loadSamples(length: number, pattern: unknown): string[] {
 // A `s.Object` of the variables, each read on its own.
 export type EnvSchema = Schema & { properties: Record<string, Schema> }
 
+type EnvValues<Spec extends EnvSchema> = Static<Spec> & (keyof PublicFieldsOf<Spec> extends never ? unknown : WithPublicFields<Spec>)
+
 // The text of the file `<NAME>_FILE` names, trimmed and read once, as the server boots; a file that cannot be read or holds nothing is an error naming the variable and the path, never the content.
 function readSecretFile(name: string, file: string, path: string): string {
   try {
@@ -64,7 +68,11 @@ function readSecretFile(name: string, file: string, path: string): string {
 // A field marked `s.Public` reaches islands as `publicEnv` from `kay`, with no config key; a name such as `STRIPE_SECRET` or `DATABASE_URL` is refused.
 // A string field, `s.Public` ones apart, also reads `<NAME>_FILE`, the path of a file holding the value, trimmed and read once, as a compose secret hands it; both set, or a file that cannot be read or is empty, stops the boot naming them, unless the field is `s.Optional`, which is left unset with one warning naming the file.
 // A field with `requiredInProduction: true` is required in production with its default dropped, and outside production takes its default, stays `undefined` under `s.Optional`, or is `''` when it has neither; `s.Secret()` is one that development and tests give a value derived from the project path; `kay env` lists each as required in production.
-export function defineEnv<Spec extends EnvSchema>(declared: Spec, source: Record<string, string | undefined> = process.env): Static<Spec> & (keyof PublicFieldsOf<Spec> extends never ? unknown : WithPublicFields<Spec>) {
+export function defineEnv<Spec extends EnvSchema>(declared: Spec, source?: Record<string, string | undefined>): EnvValues<Spec>
+export function defineEnv<const Shape extends SchemaShape>(declared: Shape, source?: Record<string, string | undefined>): EnvValues<ObjectOf<Shape>>
+export function defineEnv(given: EnvSchema | SchemaShape, source: Record<string, string | undefined> = process.env): unknown {
+  const declared = schemaOf(given) as EnvSchema
+
   recordEnv(declared, defineEnv)
 
   const production = source.NODE_ENV === 'production'
@@ -114,7 +122,7 @@ export function defineEnv<Spec extends EnvSchema>(declared: Spec, source: Record
 
     registerPublic(declared, values)
 
-    return values as ReturnType<typeof defineEnv<Spec>>
+    return values
   }
 
   if (!building())
@@ -144,7 +152,7 @@ export function defineEnv<Spec extends EnvSchema>(declared: Spec, source: Record
 
   registerPublic(declared, env)
 
-  return env as ReturnType<typeof defineEnv<Spec>>
+  return env
 }
 
 // What `--load` gives a variable the build lacks or refuses: a fixed string of 32 characters or its `minLength`, which a session secret's own check accepts and writes nothing to disk; `undefined` for a field of another type.

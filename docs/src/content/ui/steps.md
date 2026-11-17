@@ -18,8 +18,8 @@ import { currentStep, stepDraft, stepHref } from '@kayjs/ui'
 import { TypeCompiler } from 'elysia/type-system'
 
 const KEYS = ['account', 'profile', 'review'] as const
-const account = s.Object({ email: s.String({ format: 'email', maxLength: 200, error: 'Enter an email' }) }, { additionalProperties: false })
-const profile = s.Object({ name: s.String({ minLength: 2, maxLength: 80, error: 'Two letters at least' }) }, { additionalProperties: false })
+const account = s.object({ email: s.string({ format: 'email', max: 200, error: 'Enter an email' }) }, { additionalProperties: false })
+const profile = s.object({ name: s.string({ min: 2, max: 80, error: 'Two letters at least' }) }, { additionalProperties: false })
 const checks: Record<string, ReturnType<typeof TypeCompiler.Compile>> = { account: TypeCompiler.Compile(account), profile: TypeCompiler.Compile(profile) }
 
 // The cookie is the visitor's to edit, so a step counts as done only while its values still pass its schema.

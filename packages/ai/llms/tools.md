@@ -11,9 +11,9 @@ Pass actions in `tools` and the model can call them:
 import { s, action } from 'kay'
 import { ask, chatMessages } from '@kayjs/ai'
 
-export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100 }) }), ({ title }) => saveNote(title), { tool: 'Adds a note to the visitor\'s list' })
+export const addNote = action({ title: s.string({ min: 3, max: 100 }) }, ({ title }) => saveNote(title), { tool: 'Adds a note to the visitor\'s list' })
 
-export const assistant = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages, { tools: [addNote], maxSteps: 4 }).progress())
+export const assistant = action({ messages: chatMessages() }, ({ messages }) => ask(messages, { tools: [addNote], maxSteps: 4 }).progress())
 ---
 p Assistant
 ```
@@ -94,12 +94,12 @@ Run it as `bun --preload kay/test/preload bench.ts`, which lets the script impor
 A scheduled job or a queue worker has no visitor to run an action as. `tool({ name, description, input, run })` (from `@kayjs/ai`) makes a tool of a plain function, which `tools` takes beside actions and which works with or without a request:
 
 ```ts
-const findArticle = tool({ name: 'find_article', description: 'Finds an article by its title', input: s.Object({ title: s.String() }), run: ({ title }) => articles.find(title) })
+const findArticle = tool({ name: 'find_article', description: 'Finds an article by its title', input: s.object({ title: s.string() }), run: ({ title }) => articles.find(title) })
 
 await ask('Write the episode', { tools: [findArticle], key: 'podcast' })
 ```
 
-- `name` is letters, digits, `_` and `-` up to 64 characters and unique among the tools of an ask (a clash or a bad one throws a `config-invalid` `KayError`); `input` is an `s.Object` and `run(input, { signal })` gets it checked and typed.
+- `name` is letters, digits, `_` and `-` up to 64 characters and unique among the tools of an ask (a clash or a bad one throws a `config-invalid` `KayError`); `input` is an `s.object` and `run(input, { signal })` gets it checked and typed.
 - It runs as nobody: the app's own rights, no cookies, no guards, no rate limit of an action. Passing it is the opt-in, so it is never held for approval and `approval` is not called for it (`approval` still governs the actions of the same ask), even in a visitor's chat, where the model picks its arguments from text a visitor or a fetched page wrote: it must be safe for any input, or check inside `run`.
 - The result is the returned string, or the JSON of any other value, cut at 20,000 characters. An input the schema refuses is answered `The arguments do not fit the tool: title (...)` and `run` is not called; a throw is `The tool could not run`, the error going to the logger `kayjs-ai`. `signal` aborts with the reply.
 - `maxSteps`, `outlive` and `reply.progress()` work as for actions. With no request, `ai({ budget, rateLimit })` count the ask's `key` and `total` counts always ([limits](limits.md)).

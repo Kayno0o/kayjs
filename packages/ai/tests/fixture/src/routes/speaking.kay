@@ -8,10 +8,10 @@ async function* held() {
   await Bun.sleep(30_000)
 }
 
-export const reply = action(s.Object({ messages: chatMessages({ maxItems: 50, attachments: { type: 'image/png' } }) }), ({ messages }) => messages.at(-1)?.content === 'Hold' ? held() : ask(messages), { maxSize: '2mb' })
+export const reply = action({ messages: chatMessages({ maxItems: 50, attachments: { type: 'image/png' } }) }, ({ messages }) => messages.at(-1)?.content === 'Hold' ? held() : ask(messages), { maxSize: '2mb' })
 
 // The fake recorder's bytes are their own transcript, so a test says what was heard: `refuse` is refused as a provider's error would be, and `slow ...` takes a second.
-export const transcribe = action(s.Object({ audio: s.File() }), async ({ audio }, ctx) => {
+export const transcribe = action({ audio: s.file() }, async ({ audio }, ctx) => {
   const text = await audio.text()
 
   if (text.startsWith('slow '))

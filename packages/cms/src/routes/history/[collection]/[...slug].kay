@@ -9,7 +9,7 @@ import { memberOf } from '../../../access'
 import { adminTitle, entryPath, entryTitle } from '../../../listing'
 import { historyScreen } from '../../../screens'
 
-export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
+export const page = { query: s.object({ locale: s.string({ optional: true }) }, { extra: 'strip' }) }
 
 const ref = { collection: ctx.params.collection, slug: ctx.params.slug, locale: ctx.query.locale }
 const { prefix, collection, entry, rows, review } = await historyScreen(ref, await memberOf(ctx)) ?? ctx.notFound()

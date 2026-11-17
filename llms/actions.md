@@ -15,7 +15,7 @@ An action is an Elysia schema and a handler a page's server fence exports, and `
 import { s, action } from 'kay'
 
 export const subscribe = action(
-  s.Object({ email: s.String({ minLength: 3, maxLength: 200 }) }),
+  { email: s.string({ min: 3, max: 200 }) },
   async ({ email }) => email.toLowerCase(),
 )
 ---
@@ -33,7 +33,7 @@ An `error` line inside the form shows the message of the field, the schema's `er
 import { s, action } from 'kay'
 
 export const rename = action(
-  s.Object({ name: s.String({ minLength: 1, maxLength: 80, error: 'Write a name' }) }),
+  { name: s.string({ min: 1, max: 80, error: 'Write a name' }) },
   async ({ name }, ctx) => {
     if (name === 'admin')
       return ctx.deny(409, { message: 'That name is taken' })
@@ -73,7 +73,7 @@ The handler's result comes back on the next render of the page, once, through `c
 --- server
 import { s, action } from 'kay'
 
-export const createToken = action(s.Object({ label: s.String({ maxLength: 80 }) }), async () => crypto.randomUUID())
+export const createToken = action({ label: s.string({ max: 80 }) }, async () => crypto.randomUUID())
 
 const done = createToken.data()
 ---
@@ -92,7 +92,7 @@ form(action={createToken})
 --- server
 import { s, action } from 'kay'
 
-export const create = action(s.Object({ title: s.String({ maxLength: 200 }) }), async ({ title }, ctx) => {
+export const create = action({ title: s.string({ max: 200 }) }, async ({ title }, ctx) => {
   const id = crypto.randomUUID()
   return ctx.redirect(`/posts/${id}`)
 })
@@ -104,14 +104,14 @@ form(action={create})
 
 ### Accept a file
 
-`s.File()` in the schema, `input(type="file" name="avatar")` in the form, and the handler gets a `File`:
+`s.file()` in the schema, `input(type="file" name="avatar")` in the form, and the handler gets a `File`:
 
 ```kay
 --- server
 import { s, action } from 'kay'
 
 export const upload = action(
-  s.Object({ avatar: s.File({ type: 'image/png' }) }),
+  { avatar: s.file({ type: 'image/png' }) },
   async ({ avatar }) => avatar.size,
   { maxSize: '10mb' },
 )
@@ -133,8 +133,8 @@ A page's or a layout's server fence exports actions: an Elysia schema and a hand
 import { s, action } from 'kay'
 import { addTodo, listTodos } from '../data'
 
-const newTodo = s.Object({
-  title: s.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
+const newTodo = s.object({
+  title: s.string({ min: 1, max: 200, error: 'Write a title' }),
 })
 
 export const add = action(newTodo, async ({ title }, ctx) => {
@@ -161,8 +161,8 @@ form(action={add})
 - An action with no input leaves the schema out: `action(async (ctx) => { ... }, protection?)`, validated as an empty object, its handler getting the context alone, called as `signOut()`, `signOut(undefined, { refresh: false })` or `site.call(signOut)`, and posted by `form(action={signOut})`.
 - An action several pages and components share lives in an `_actions.kay` of a routes directory, a `--- server` fence alone, no closing `---` needed: it is served like a layout's actions, behind the guards of its directory and above, reading the params of every page below it, and `page = { guards: false }` opens it as a layout's.
 - A page or a component imports it by its path, `import { removeTissue } from '../routes/admin/_actions.kay'`, in the server fence of a page or an island alike; no route file is imported, and `kay build`, `kay check` and `kay routes` see it as they see a layout's actions.
-- `s.String({ format: 'email' })` accepts one plain address, the same check in the browser, on the server, in kayjs-auth and in kayjs-mail: letters and digits of any script, `+tag`, an internationalised domain; a local part up to 64 characters, labels up to 63, no quotes, comments, IP domain, name with angle brackets, list, line break or space around it, 254 characters at most, a host typed as is (no soft hyphen, zero-width space, fullwidth letter or ideographic full stop). Non-ASCII local parts and IDN domains pass for every app field; kayjs-auth alone also refuses a Latin, Cyrillic or Greek mix. `isEmail(value)` from `kay` is that check, `normalizeAddress(value)` from `kay/library` the form to store (trimmed, lower case, punycode domain).
-- A string field with no `maxLength` of its own is refused past 10,000 characters, with the error of a declared `maxLength`, and carries that bound to the form's `maxlength` and to the tool's schema; whatever builder wrote it, `t.Record` values, tuples and a string in an API route's `body` included. A field with an `enum`, a `const`, or a secret name such as `password` keeps none. Declare a tighter one for a name, an email or a title, which `kay check` warns of (`unbounded-string`), and a longer one for a field that takes more.
+- `s.email()` accepts one plain address, the same check in the browser, on the server, in kayjs-auth and in kayjs-mail: letters and digits of any script, `+tag`, an internationalised domain; a local part up to 64 characters, labels up to 63, no quotes, comments, IP domain, name with angle brackets, list, line break or space around it, 254 characters at most, a host typed as is (no soft hyphen, zero-width space, fullwidth letter or ideographic full stop). Non-ASCII local parts and IDN domains pass for every app field; kayjs-auth alone also refuses a Latin, Cyrillic or Greek mix. `isEmail(value)` from `kay` is that check, `normalizeAddress(value)` from `kay/library` the form to store (trimmed, lower case, punycode domain).
+- A string field with no `max` (`maxLength`) of its own is refused past 10,000 characters, with the error of a declared `maxLength`, and carries that bound to the form's `maxlength` and to the tool's schema; whatever builder wrote it, `t.Record` values, tuples and a string in an API route's `body` included. A field with an `enum`, a `const`, or a secret name such as `password` keeps none. Declare a tighter one for a name, an email or a title, which `kay check` warns of (`unbounded-string`), and a longer one for a field that takes more.
 - `s` from `kay` builds the schema. A schema shared by API modules, server fences and islands, and the types an island reads off it, are in [Schemas](schemas.md).
 - The handler's second argument is the request context every route shares (see routing, "The request context"), `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`, with `status(code)`.
 - `ctx.redirect`, `ctx.notFound()` and `ctx.deny()` throw, as in a page, and a handler writes `return ctx.redirect(...)`, as a guard does; a call or a form post is answered with the redirect or a 404 as plain text, `redirect` with 303 unless given. `ctx.deny(status, { message, errors, data })` fails the post as in the next lines when it holds `data` or `errors` (400 to 599); `deny(status, { message })` alone, and `deny(status, 'text')` until 1.108, stop with plain text.
@@ -174,8 +174,8 @@ form(action={add})
 
 - `form(action={add})` posts without JavaScript.
 - Inside it, `input(field="title")`, on an `input`, `textarea` or `select`, renders `name="title"` plus the constraints the browser checks without JavaScript that the schema gives `title`: `required` where the server would refuse the field left blank (never for a boolean, so a checkbox stays optional, nor a list), `minlength`, `maxlength`, `pattern` (matched anywhere, as the schema matches it, and left out when the browser could not read it), `min`, `max` and `type="email"`, each unless the template writes it.
-- `s.UnionEnum(values)` has no `default` unless the options give one: an optional enum field left out reads `undefined` and a required one is refused with a 422, where Elysia's own fills the first value in.
-- `s.UnionKeys(TOPICS)` is a `UnionEnum` of a record's keys, typed as their union with no cast, for a `select(field="topic")` whose options come from `Object.entries(TOPICS)`.
+- `s.enum(values)` has no `default` unless the options give one: an optional enum field left out reads `undefined` and a required one is refused with a 422, where Elysia's own fills the first value in.
+- `s.enum(TOPICS)` of a record is an enum of its keys, typed as their union with no cast, for a `select(field="topic")` whose options come from `Object.entries(TOPICS)`.
 - `field` takes written text, never both `field` and `name`, and only inside such a form.
 - `kay check` verifies every `field` and `name` against the schema.
 - Once kay's script runs it sets `novalidate` on every form posting to an action and checks the form against the schema itself, so the schema's `error` messages show rather than the browser's, then the constraints the template wrote itself. `validate` (or `validate="blur"`) on the `form` shows them as text instead, in the `data-field="<name>"` elements outside islands (a FormField's); `blur` checks each field as it loses focus too.
@@ -193,12 +193,12 @@ form(action={add})
 ### Form values
 
 - A plain form posts text, read against the schema before it validates.
-- An `s.Number()`, `s.Integer()` or `s.Boolean()` field becomes one, a number only from decimal text such as `-1.5` or `2e3`, never `0x10`.
+- An `s.number()`, `s.int()` or `s.boolean()` field becomes one, a number only from decimal text such as `-1.5` or `2e3`, never `0x10`.
 - A ticked checkbox posts `on`, read as `true`, and an unticked one nothing, read as `false` when the field is required.
-- An `s.Array()` field takes a single value or none as a list.
+- An `s.list()` field takes a single value or none as a list.
 - The spaces around each text are dropped, so `minLength: 10` counts what was typed and ten spaces fill nothing.
-- An optional field left blank counts as left out, `undefined` for `s.Optional(s.String())`.
-- A field named like a password or a secret keeps its spaces, as does one whose schema says so, `s.String({ trim: false })` for a code block.
+- An optional field left blank counts as left out, `undefined` for `s.string({ optional: true })`.
+- A field named like a password or a secret keeps its spaces, as does one whose schema says so, `s.string({ trim: false })` for a code block.
 - A call from an island with its input, not a form's fields, reaches the schema as sent.
 - An island holding a form may call the action with its fields instead, `await add(new FormData(form))`: the server reads them as it reads a plain form post, numbers, booleans and arrays coerced from their text, spaces around text dropped and a blank optional field left out, files and the honeypot included, and answers as a call, so the island shows the field errors of the `ActionError` and goes on once it resolves.
 - To check a form in the browser with rules of its own, showing their messages as text rather than the browser's bubbles, an island holding the form gives it `onSubmit` and `novalidate`.
@@ -260,4 +260,4 @@ form(action={add})
 
 ### Files
 
-- What an action takes of a file, `s.File()`, `s.Files()`, the form encoding and the body limit, is in [Stored files](files.md#files-posted-to-an-action).
+- What an action takes of a file, `s.file()`, `s.files()`, the form encoding and the body limit, is in [Stored files](files.md#files-posted-to-an-action).

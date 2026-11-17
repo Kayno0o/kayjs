@@ -10,7 +10,7 @@ An action signs a visitor in with `password.signIn` and redirects to where they 
 --- server
 import { s, action } from 'kay'
 
-export const signIn = action(s.Object({ identifier: s.String({ maxLength: 254 }), password: s.String() }), async (input, ctx) => {
+export const signIn = action({ identifier: s.string({ max: 254 }), password: s.string() }, async (input, ctx) => {
   const result = await ctx.locals.auth.password.signIn(input, { redirect: ctx.url.searchParams.get('redirect') ?? '/' })
 
   if (!result.ok)
@@ -47,9 +47,9 @@ The page a mailed link opens shows a button posting the token to an action, so o
 --- server
 import { s, action } from 'kay'
 
-export const query = s.Object({ token: s.Optional(s.String()) })
+export const query = s.object({ token: s.string({ optional: true }) })
 
-export const spend = action(s.Object({ token: s.String() }), async ({ token }, ctx) => {
+export const spend = action({ token: s.string() }, async ({ token }, ctx) => {
   const result = await ctx.locals.auth.magicLink.signIn(token)
 
   if (!result.ok)

@@ -1,10 +1,10 @@
 --- server
 import { ask, chatMessages } from '@kayjs/ai'
-import { action, s } from 'kay'
+import { action } from 'kay'
 import { testing } from '../testing'
 
 // Keeps the conversation on the server, its reply going on once the visitor left, asked of the provider a test sets.
-export const keepingStaying = action(s.Object({ messages: chatMessages({ maxItems: 50 }) }), ({ messages }) => ask(messages, { key: 'visitor', outlive: true, provider: testing.provider }).progress())
+export const keepingStaying = action({ messages: chatMessages({ maxItems: 50 }) }, ({ messages }) => ask(messages, { key: 'visitor', outlive: true, provider: testing.provider }).progress())
 --- script
 import Chat from '@kayjs/ai/chat.kay'
 ---

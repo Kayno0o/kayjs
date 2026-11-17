@@ -17,7 +17,7 @@ interface Candidate {
 }
 
 const DEFINE_ENV = /\bdefineEnv\s*\(/
-const SCHEMA = /export const env = defineEnv\(\s*(s|t)\.Object\(\{(?=\r?\n|\})/
+const SCHEMA = /export const env = defineEnv\(\s*(?:(s|t)\.Object\()?\{(?=\r?\n|\})/
 const FALLBACK = /^\s*\?\?\s*(?:'([^'\\\n]*)'|"([^"'\\\n]*)")(?=\s*(?:[;,)\]}]|\/\/|$))/
 const ASSIGNED = /^\s*(?:\?\?|\|\||&&|\*\*|<<|>>>|>>|[-+*/%&|^])?=(?![=>])/
 const DELETED = /\bdelete\s+$/
@@ -140,7 +140,7 @@ function regexLiteralEnd(text: string, start: number): number | undefined {
   return undefined
 }
 
-// The schema file a variable is added to: the project's `export const env = defineEnv(s.Object({` when it has one, `src/env.ts` when it has no `defineEnv` at all, nothing when it declares them in another shape.
+// The schema file a variable is added to: the project's `export const env = defineEnv({` (or `defineEnv(s.Object({`) when it has one, `src/env.ts` when it has no `defineEnv` at all, nothing when it declares them in another shape.
 async function schemaFile(root: string): Promise<{ file: string, existing: { prefix: string, at: number } | undefined } | undefined> {
   const files = [...new Bun.Glob('src/**/*.{ts,tsx,js,mjs,mts,kay}').scanSync({ cwd: root })].sort().filter(file => !TEST_FILE.test(file))
   const holders: { file: string, text: string }[] = []
@@ -158,11 +158,15 @@ async function schemaFile(root: string): Promise<{ file: string, existing: { pre
   const [only, ...others] = holders
   const found = others.length === 0 ? SCHEMA.exec(only!.text) : null
 
-  return found === null || !SCHEMA_PATH.test(only!.file) ? undefined : { file: only!.file, existing: { prefix: found[1]!, at: found.index + found[0].length } }
+  return found === null || !SCHEMA_PATH.test(only!.file) ? undefined : { file: only!.file, existing: { prefix: found[1] ?? 's', at: found.index + found[0].length } }
 }
 
 function field(prefix: string, name: string, fallback: string | undefined): string {
-  return `${name}: ${fallback === undefined ? `${prefix}.Optional(${prefix}.String())` : `${prefix}.String({ default: '${fallback}' })`}`
+  // `t` is Elysia's, which the project's schema was written with; `s` is kay's.
+  if (prefix === 't')
+    return `${name}: ${fallback === undefined ? 't.Optional(t.String())' : `t.String({ default: '${fallback}' })`}`
+
+  return `${name}: ${fallback === undefined ? 's.string({ optional: true })' : `s.string({ default: '${fallback}' })`}`
 }
 
 // Declares the variables `process.env.X` is read for with no schema, in the schema file of the project, and rewrites their reads to `env.X`, a `?? 'default'` becoming the variable's default. `files` are the only files it may change: a variable with a read outside them is left alone, as is one whose read is assigned or deleted, destructured, in a `.kay` file or a file with an `env` of its own, inside a string, a template or a comment, or in the schema file itself. Answers the variables declared and the reads rewritten.
@@ -234,7 +238,7 @@ export async function declareRawEnv(root: string, undeclared: ReadonlySet<string
 
   // The schema goes first, so a failed write leaves no file importing what is not there.
   if (schema.existing === undefined) {
-    await writeFile(schema.file, `import { s } from 'kay'\nimport { defineEnv } from 'kay/server'\n\nexport const env = defineEnv(s.Object({\n${fields.map(line => `  ${line},\n`).join('')}}))\n`)
+    await writeFile(schema.file, `import { s } from 'kay'\nimport { defineEnv } from 'kay/server'\n\nexport const env = defineEnv({\n${fields.map(line => `  ${line},\n`).join('')}})\n`)
   }
   else {
     const text = await readFile(schema.file, 'utf8')

@@ -154,7 +154,7 @@ Give `authCore` a `user` schema to keep your own fields on the user, such as a p
 ```ts
 authCore({
   // ...
-  user: s.Object({ avatar: s.Optional(s.String()) }),
+  user: s.object({ avatar: s.string({ optional: true }) }),
   profileFields: ({ user, profile }) => ({ avatar: profile.avatar ?? undefined }),
 })
 ```
@@ -294,10 +294,10 @@ Methods that can fail answer `{ ok: true, ... }` or `{ ok: false, error }`. `err
 --- server
 import { s, action } from 'kay'
 
-export const signIn = action(s.Object({
-  identifier: s.String({ maxLength: 254 }),
-  password: s.String({ maxLength: 128 }),
-}), async (input, ctx) => {
+export const signIn = action({
+  identifier: s.string({ max: 254 }),
+  password: s.string({ max: 128 }),
+}, async (input, ctx) => {
   const result = await ctx.locals.auth.password.signIn(input)
 
   if (!result.ok)
@@ -390,7 +390,7 @@ Two-factor asks for a code from an authenticator app after the password. It take
 --- server
 import { s, action } from 'kay'
 
-export const enable = action(s.Object({ code: s.String({ maxLength: 20 }) }), async ({ code }, ctx) => {
+export const enable = action({ code: s.string({ max: 20 }) }, async ({ code }, ctx) => {
   const result = await ctx.locals.auth.twoFactor.enable(code)
 
   if (!result.ok)
@@ -500,11 +500,11 @@ The prebuilt pages carry it. Your own form carries `captcha.challenge` in a `dat
 --- server
 import { s, action } from 'kay'
 
-export const register = action(s.Object({
-  email: s.String({ maxLength: 254 }),
-  password: s.String({ maxLength: 128 }),
-  captcha: s.Optional(s.String({ maxLength: 512 })),
-}), async ({ captcha, ...input }, ctx) => {
+export const register = action({
+  email: s.string({ max: 254 }),
+  password: s.string({ max: 128 }),
+  captcha: s.string({ optional: true, max: 512 }),
+}, async ({ captcha, ...input }, ctx) => {
   const result = await ctx.locals.auth.password.register(input, { captcha })
 
   if (!result.ok)

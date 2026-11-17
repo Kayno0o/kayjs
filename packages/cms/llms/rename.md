@@ -17,7 +17,7 @@ await fetch(`/_kay/cms/entries/posts/hello/rename?version=${version}`, { method:
 A localized entry paired with its translations by its slug gets `translationKey: <old slug>` when its schema has a `translationKey` field, so set the field before renaming one locale's slug.
 
 ```ts
-s.Object({ title: s.String(), translationKey: s.Optional(s.String()) })
+s.object({ title: s.string(), translationKey: s.string({ optional: true }) })
 ```
 
 ### Let your own saver rename

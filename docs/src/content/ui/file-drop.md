@@ -19,7 +19,7 @@ FileDrop takes functions, so it renders inside an island: a component with an `o
 
 ## In a form
 
-`name` makes the zone a form control. It keeps the files on its input, so a plain form posts them to an action's `s.File()` or `s.Files()`, and `onFiles` becomes optional. `maxSize` takes bytes or a string such as `'2mb'`, and `maxFiles` the most files kept. `list` shows the kept files under the zone, each with a button to remove it, and `onChange` hears the list change. A form reset empties it.
+`name` makes the zone a form control. It keeps the files on its input, so a plain form posts them to an action's `s.file()` or `s.files()`, and `onFiles` becomes optional. `maxSize` takes bytes or a string such as `'2mb'`, and `maxFiles` the most files kept. `list` shows the kept files under the zone, each with a button to remove it, and `onChange` hears the list change. A form reset empties it.
 
 The zone picks files once the page is interactive, as its input is hidden and the content opens it. A form that must work without JavaScript uses a plain `input(type="file" name="photos")` instead.
 

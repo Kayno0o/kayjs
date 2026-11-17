@@ -317,8 +317,12 @@ interface ChatMessage
   role: "assistant" | "user"
 
 [.] chatMessages
-function chatMessages(options?: WithoutFiles | undefined): TArray<TObject<{ role: TUnionEnum<["user", "assistant"]>; content: TString; }>>
-function chatMessages(options: ChatMessagesOptions): TArray<TObject<{ attachments: TOptional<TArray<TUnsafe<File>>>; role: TUnionEnum<["user", "assistant"]>; content: TString; }>>
+function chatMessages(options?: WithoutFiles | undefined): TArray<TObject<{ role: TUnionEnum<readonly ["user", "assistant"]>; content: TString; }>>
+function chatMessages(options: ChatMessagesOptions): TArray<TObject<{
+  attachments: TOptional<TArray<TUnsafe<File>>>;
+  role: TUnionEnum<readonly ["user", "assistant"]>;
+  content: TString;
+}>>
 
 [.] ChatMessagesOptions
 interface ChatMessagesOptions

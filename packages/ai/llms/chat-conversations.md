@@ -11,7 +11,7 @@
 import { ask, chatMessages } from '@kayjs/ai'
 import { s, action } from 'kay'
 
-export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages))
+export const reply = action({ messages: chatMessages() }, ({ messages }) => ask(messages))
 --- script
 import Chat from '@kayjs/ai/chat.kay'
 ---

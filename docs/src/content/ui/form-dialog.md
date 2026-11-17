@@ -8,11 +8,11 @@ FormDialog needs an action exported by a page, so it is shown here as code. `src
 --- server
 import { s } from 'kay'
 
-const renaming = s.Object({
-  id: s.String({ maxLength: 64 }),
-  title: s.String({
-    minLength: 2,
-    maxLength: 200,
+const renaming = s.object({
+  id: s.string({ max: 64 }),
+  title: s.string({
+    min: 2,
+    max: 200,
     error: 'Two letters at least',
   }),
 })

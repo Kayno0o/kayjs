@@ -905,7 +905,7 @@ describe('kay check --fix on raw environment reads', () => {
     expect(code).toBe(0)
     expect(stderr).not.toContain('is read with no schema')
     expect((await kay(['check'], root)).stderr).not.toContain('is read with no schema')
-    expect(await read(root, 'src/env.ts')).toBe('import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({\n  BAZ: s.Optional(s.String()),\n  DIR: s.String({ default: \'.\' }),\n  FOO: s.String({ default: \'bar\' }),\n}))\n')
+    expect(await read(root, 'src/env.ts')).toBe('import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv({\n  BAZ: s.string({ optional: true }),\n  DIR: s.string({ default: \'.\' }),\n  FOO: s.string({ default: \'bar\' }),\n})\n')
     expect(await read(root, 'src/lib.ts')).toBe('import { join } from \'node:path\'\nimport { env } from \'./env\'\nimport { x } from \'./x\'\n\nexport const a = env.FOO\nexport const b = env.BAZ\nexport const c = env.FOO\nexport const d = join(env.DIR, \'x\')\n')
     expect((await names(root)).map(({ name, default: fallback }) => [name, fallback])).toEqual([['BAZ', undefined], ['DIR', '.'], ['FOO', 'bar']])
   })
@@ -914,7 +914,7 @@ describe('kay check --fix on raw environment reads', () => {
     const root = await project({ ...config, 'src/config.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({\n  OLD: s.Optional(s.String()),\n}))\n', 'src/deep/lib.ts': 'export const a = process.env.FOO ?? \'bar\'\n' })
 
     await kay(['check', '--fix'], root)
-    expect(await read(root, 'src/config.ts')).toContain('{\n  FOO: s.String({ default: \'bar\' }),\n  OLD: s.Optional(s.String()),\n}))')
+    expect(await read(root, 'src/config.ts')).toContain('{\n  FOO: s.string({ default: \'bar\' }),\n  OLD: s.string({ optional: true }),\n})')
     expect(await read(root, 'src/deep/lib.ts')).toBe('import { env } from \'../config\'\n\nexport const a = env.FOO\n')
     expect(Bun.file(join(root, 'src/env.ts')).size).toBe(0)
   })
@@ -943,7 +943,7 @@ describe('kay check --fix on raw environment reads', () => {
     expect(await read(root, 'src/shadow.ts')).toContain('process.env.SHADOWED')
     // Two different defaults declare the variable with none, and the reads keep theirs.
     expect(await read(root, 'src/conflict.ts')).toBe('import { env } from \'./env\'\n\nexport const c = env.TWO ?? \'a\'\nexport const d = env.TWO ?? \'b\'\n')
-    expect(await read(root, 'src/env.ts')).toContain('TWO: s.Optional(s.String()),')
+    expect(await read(root, 'src/env.ts')).toContain('TWO: s.string({ optional: true }),')
   })
 
   it('leaves a standalone entry and what it imports, a config-time module and a file marked raw, with no warning', async () => {

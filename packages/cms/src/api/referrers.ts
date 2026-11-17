@@ -13,7 +13,7 @@ export default api()
     const member = await memberOfRequest(request)
 
     return Object.fromEntries(await referrersOf(collection.name, slugs, async ({ collection: other, entry }) => permits(member, 'read', { collection: other.name, entry: { data: entry.data } })))
-  }, { query: s.Object({ slugs: s.String() }) })
+  }, { query: s.object({ slugs: s.string() }, { extra: 'strip' }) })
 
 function parseSlugs(text: string): string[] {
   try {

@@ -289,7 +289,7 @@ import { api, eventStream } from 'kay/server'
 export default api().post(
   '/answer',
   ({ body }) => eventStream(complete(body.prompt)),
-  { body: s.Object({ prompt: s.String() }) },
+  { body: s.object({ prompt: s.string() }) },
 )
 ```
 
@@ -382,8 +382,8 @@ A valid message arrives decoded as an HTTP body is, so `'1'` reaches `message()`
 
 ```ts
 export default api().ws('/:room', {
-  body: s.Object({ text: s.String() }),
-  response: s.Object({ from: s.String(), text: s.String() }),
+  body: s.object({ text: s.string() }),
+  response: s.object({ from: s.string(), text: s.string() }),
   message(ws, { text }) {
     ws.send({ from: ws.data.user?.name ?? 'guest', text })
   },
@@ -494,7 +494,7 @@ const chats = rooms<{ from: string, text: string }, string>()
 
 export default api()
   .ws('/:room', {
-    body: s.Object({ text: s.String() }),
+    body: s.object({ text: s.string() }),
     response: chats.response,
     open(ws) {
       chats.join(ws, ws.data.params.room, ws.data.user.name)

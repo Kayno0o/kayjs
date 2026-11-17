@@ -91,11 +91,11 @@ function isPreset(app: true | PresetApp | OAuthApp): app is true | PresetApp {
 export function ownEnv(options: Pick<OwnOptions, 'oauth' | 'store'>) {
   const names = Object.entries(options.oauth ?? {}).filter(([, app]) => isPreset(app) && (app === true || app.clientId === undefined || app.clientSecret === undefined)).map(([name]) => name)
 
-  return s.Object({
-    ...options.store === undefined && { AUTH_DATABASE_URL: s.Optional(s.String({ description: 'the database kayjs-auth keeps its users in, a Postgres or SQLite url; the one of the app\'s store, else data/auth.sqlite (SQLite; data/auth.db where it exists), when unset' })) },
+  return s.object({
+    ...options.store === undefined && { AUTH_DATABASE_URL: s.string({ optional: true, description: 'the database kayjs-auth keeps its users in, a Postgres or SQLite url; the one of the app\'s store, else data/auth.sqlite (SQLite; data/auth.db where it exists), when unset' }) },
     ...Object.fromEntries(names.flatMap(name => [
-      [`${name.toUpperCase()}_CLIENT_ID`, s.String({ description: `the ${name} OAuth app's client id`, requiredInProduction: true })],
-      [`${name.toUpperCase()}_CLIENT_SECRET`, s.String({ description: `the ${name} OAuth app's client secret`, requiredInProduction: true })],
+      [`${name.toUpperCase()}_CLIENT_ID`, s.string({ description: `the ${name} OAuth app's client id`, requiredInProduction: true })],
+      [`${name.toUpperCase()}_CLIENT_SECRET`, s.string({ description: `the ${name} OAuth app's client secret`, requiredInProduction: true })],
     ])),
   })
 }

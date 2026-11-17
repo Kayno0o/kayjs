@@ -10,7 +10,7 @@ let online = 0
 
 // Served at /api/online: every open connection hears how many there are.${has('auth') ? ' Open to everyone: the root guard would otherwise close it.' : ''}
 export default api(${has('auth') ? '{ guards: false }' : ''}).ws('/', {
-  response: s.Object({ online: s.Number() }),
+  response: s.object({ online: s.number() }),
   open(ws) {
     online++
     ws.subscribe('online')

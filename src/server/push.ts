@@ -73,9 +73,9 @@ const DEFAULT_TTL = '1d'
 const URGENCIES = new Set(['very-low', 'low', 'normal', 'high'])
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]'])
 
-const PUSH_ENV = s.Object({
-  VAPID_PUBLIC_KEY: s.String({ requiredInProduction: true, description: 'the VAPID public key push services check a push against, a base64url P-256 point; `kay push keys` prints a pair' }),
-  VAPID_PRIVATE_KEY: s.Secret({ minLength: 43, description: 'the VAPID private key signing pushes, base64url; `kay push keys` prints a pair' }),
+const PUSH_ENV = s.object({
+  VAPID_PUBLIC_KEY: s.string({ requiredInProduction: true, description: 'the VAPID public key push services check a push against, a base64url P-256 point; `kay push keys` prints a pair' }),
+  VAPID_PRIVATE_KEY: s.secret({ min: 43, description: 'the VAPID private key signing pushes, base64url; `kay push keys` prints a pair' }),
 })
 
 // Lets the site push to the devices of the people who opted in: `sendPush` sends, an island's `webPush.subscribe()` opts in, `notify()` pushes beside the inbox, and kay's service worker shows the notification and opens its link on a click.

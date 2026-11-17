@@ -1,12 +1,12 @@
 --- server
 import { action, s } from 'kay'
 
-export const contact = action(s.Object({
-  name: s.String({ minLength: 2, maxLength: 100, error: 'Tell us your name' }),
-  email: s.String({ format: 'email', maxLength: 254, error: 'Not an email address' }),
-  topic: s.UnionEnum(['quote', 'other']),
-  message: s.String({ minLength: 5, maxLength: 2000, error: 'A few words at least' }),
-}), async ({ message }, ctx) => message === 'Please fail' ? ctx.deny(502, { data: 'Could not send it' }) : undefined, { protect: { honeypot: 'website', minTime: '3s' } })
+export const contact = action({
+  name: s.string({ min: 2, max: 100, error: 'Tell us your name' }),
+  email: s.string({ format: 'email', max: 254, error: 'Not an email address' }),
+  topic: s.enum(['quote', 'other']),
+  message: s.string({ min: 5, max: 2000, error: 'A few words at least' }),
+}, async ({ message }, ctx) => message === 'Please fail' ? ctx.deny(502, { data: 'Could not send it' }) : undefined, { protect: { honeypot: 'website', minTime: '3s' } })
 ---
 ---
 import ContactForm from '@kayjs/ui/contact-form.kay'

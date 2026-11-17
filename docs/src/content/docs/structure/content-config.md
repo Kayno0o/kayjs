@@ -12,10 +12,10 @@ import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({
-    title: s.String(),
-    date: s.Date(),
-    draft: s.Optional(s.Boolean()),
+  schema: s.object({
+    title: s.string(),
+    date: s.date(),
+    draft: s.boolean({ optional: true }),
   }),
   draft: post => post.data.draft === true,
   sort: (a, b) => b.data.date.getTime() - a.data.date.getTime(),

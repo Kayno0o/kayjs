@@ -34,6 +34,7 @@ import { rateEnforce } from '../src/check/rate-enforce'
 import { refusalCalls } from '../src/check/refusal-calls'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { routeKeys } from '../src/check/route-keys'
+import { schemaBuilders } from '../src/check/schema-builders'
 import { schemaType } from '../src/check/schema-type'
 import { secretKeys } from '../src/check/secret-keys'
 import { socketFrames } from '../src/check/socket-frames'
@@ -76,6 +77,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-listen-target': listenTarget,
   'deprecated-import-path': movedImports,
   'deprecated-schema-type': schemaType,
+  'deprecated-schema-builders': schemaBuilders,
   'deprecated-test-helpers': testHelpers,
   'deprecated-cms-options': cmsOptions,
   'deprecated-hook-names': hookNames,

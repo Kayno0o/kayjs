@@ -13,12 +13,12 @@ Declare the actions as for any call, one that stores a row and one that removes 
 import { action, s } from 'kay'
 import { removeTodo, saveTodo } from '../data'
 
-export const save = action(s.Object({ id: s.String({ maxLength: 40 }), title: s.String({ minLength: 1, maxLength: 200 }), rev: s.Number() }), async (todo, ctx) => {
+export const save = action({ id: s.string({ max: 40 }), title: s.string({ min: 1, max: 200 }), rev: s.number() }, async (todo, ctx) => {
   const held = await saveTodo(todo)
 
   return held.conflict ? ctx.deny(409, { data: held.row }) : held.row
 })
-export const remove = action(s.Object({ id: s.String({ maxLength: 40 }) }), async ({ id }) => removeTodo(id))
+export const remove = action({ id: s.string({ max: 40 }) }, async ({ id }) => removeTodo(id))
 ---
 Todos
 ```

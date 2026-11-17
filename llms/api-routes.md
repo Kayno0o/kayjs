@@ -16,7 +16,7 @@ export default api()
   .post(
     '/',
     ({ body }) => addNote(body.title),
-    { body: s.Object({ title: s.String() }) },
+    { body: s.object({ title: s.string() }) },
   )
 ```
 
@@ -94,7 +94,7 @@ export default defineConfig({ mcp: true })
 import { s, action } from 'kay'
 
 export const addNote = action(
-  s.Object({ title: s.String({ minLength: 3, maxLength: 80 }) }),
+  { title: s.string({ min: 3, max: 80 }) },
   async ({ title }) => ({ title }),
   { tool: 'Create a note' },
 )
@@ -129,8 +129,8 @@ import { complete, listRooms } from '../data'
 export default api()
   .get('/rooms', () => listRooms())
   .ws('/:room', {
-    body: s.Object({ text: s.String() }),
-    response: s.Object({ from: s.String(), text: s.String() }),
+    body: s.object({ text: s.string() }),
+    response: s.object({ from: s.string(), text: s.string() }),
     message(ws, { text }) {
       ws.send({ from: ws.data.user?.name ?? 'guest', text })
     },
@@ -138,7 +138,7 @@ export default api()
   .post(
     '/answer',
     ({ body }) => eventStream(complete(body.prompt)),
-    { body: s.Object({ prompt: s.String() }) },
+    { body: s.object({ prompt: s.string() }) },
   )
 ```
 
@@ -201,7 +201,7 @@ export default api()
 ### OpenAPI
 
 - `openapi: true` in kay.config.ts serves an OpenAPI 3.1 document of every module's routes at `/api/openapi.json`, read from the schemas they declare.
-- Path params are written in braces; `params`, `query` and `headers` are parameters; `body` is JSON, or multipart when it holds an `s.File()`; `response` is one schema or one per status.
+- Path params are written in braces; `params`, `query` and `headers` are parameters; `body` is JSON, or multipart when it holds an `s.file()`; `response` is one schema or one per status.
 - A route's `detail` gives its `summary`, `description`, `tags`, the module's path by default, and `deprecated`.
 - `detail: { hide: true }` leaves a route out; websockets are left out.
 - A route behind guards is marked `x-kay-guarded: true`, with no guard file named. A document no `_guard.ts` of the API directory protects leaves the guarded routes out, as it is open to anyone; behind a guard it lists all.

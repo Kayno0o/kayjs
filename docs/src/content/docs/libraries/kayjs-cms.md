@@ -305,7 +305,7 @@ Some content is one entry, such as the texts of a home page. Declare the collect
 
 ```ts
 export const home = collection('src/content/home', {
-  schema: s.Object({ headline: s.String(), intro: s.String() }),
+  schema: s.object({ headline: s.string(), intro: s.string() }),
   title: 'Home page',
   single: true,
   seed: { headline: 'Welcome', intro: '' },
@@ -349,7 +349,7 @@ A page that refers to a translated entry follows the rename in its own language,
 A collection listed in a hand-picked order names a number field with `order`:
 
 ```ts
-export const produits = collection('src/content/produits', { schema: s.Object({ name: s.String(), position: s.Optional(s.Number()) }), order: 'position' })
+export const produits = collection('src/content/produits', { schema: s.object({ name: s.string(), position: s.number({ optional: true }) }), order: 'position' })
 ```
 
 `all()` then lists the entries by that field, those without a number last, and the entry list shows Up and Down on each entry. A move saves the field of the two entries that swap places, so the editor never types a number. If several entries hold the same number, or none, a move numbers the entries from 1. A search hides the buttons, as the rows no longer follow the order.
@@ -359,10 +359,10 @@ export const produits = collection('src/content/produits', { schema: s.Object({ 
 A union of literals or an enum is picked from a list. A literal's `title` is what the list shows, and the value stays what is saved:
 
 ```ts
-status: s.Union([
-  s.Literal('available', { title: 'Disponible' }),
-  s.Literal('new', { title: 'Nouveau' }),
-  s.Literal('sold', { title: 'Vendu' }),
+status: s.union([
+  s.literal('available', { label: 'Disponible' }),
+  s.literal('new', { label: 'Nouveau' }),
+  s.literal('sold', { label: 'Vendu' }),
 ])
 ```
 
@@ -389,12 +389,12 @@ For what a schema cannot say, wrap the field in `fieldInput()` from `kay/content
 ```ts
 import { fieldInput } from 'kay/content'
 
-s.Object({
-  price: fieldInput(s.Number({ minimum: 0 }), { suffix: '€', placeholder: '600' }),
-  bio: fieldInput(s.String(), { rows: 6 }),
-  status: fieldInput(s.Union([s.Literal('draft'), s.Literal('live')]), { labels: { draft: 'Brouillon', live: 'En ligne' } }),
-  tags: fieldInput(s.Array(s.String()), { lines: true }),
-  linkLabel: fieldInput(s.Optional(s.String()), { when: 'link' }),
+s.object({
+  price: fieldInput(s.number({ min: 0 }), { suffix: '€', placeholder: '600' }),
+  bio: fieldInput(s.string(), { rows: 6 }),
+  status: fieldInput(s.union([s.literal('draft'), s.literal('live')]), { labels: { draft: 'Brouillon', live: 'En ligne' } }),
+  tags: fieldInput(s.list(s.string()), { lines: true }),
+  linkLabel: fieldInput(s.string({ optional: true }), { when: 'link' }),
 })
 ```
 
@@ -410,7 +410,7 @@ Fields a site rebuilds each time come with the editor's control. Name the kind i
 import tabler from '@iconify-json/tabler/icons.json'
 import { colorField, geoField, iconField, linkField, moneyField, tagsField } from 'kay/content'
 
-s.Object({
+s.object({
   accent: colorField(),
   price: moneyField({ currency: 'EUR' }),
   labels: tagsField(),
@@ -429,10 +429,10 @@ A page made of different sections is a list whose items are of several types. De
 ```ts
 import { blocks, imageField, markdownField } from 'kay/content'
 
-s.Object({
+s.object({
   sections: blocks({
-    hero: s.Object({ heading: s.String({ minLength: 1 }), image: s.Optional(imageField()) }, { title: 'Hero banner' }),
-    text: s.Object({ body: markdownField() }),
+    hero: s.object({ heading: s.string({ min: 1 }), image: s.Optional(imageField()) }, { label: 'Hero banner' }),
+    text: s.object({ body: markdownField() }),
   }),
 })
 ```
@@ -448,7 +448,7 @@ A field the admin should edit another way, such as a colour or a rating, is decl
 ```ts
 import { customField } from 'kay/content'
 
-s.Object({ accent: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-f]{6}$' }))) })
+s.object({ accent: s.Optional(customField('color', s.string({ pattern: '^#[0-9a-f]{6}$' }))) })
 ```
 
 ```kay
@@ -480,9 +480,9 @@ An image field can ask more of its files, and pair itself with the fields next t
 
 ```ts
 photo: s.Optional(imageField({ accept: ['image/png', 'image/jpeg'], maxSize: '2mb', minWidth: 800, alt: 'photoAlt', width: 'photoWidth', height: 'photoHeight' })),
-photoAlt: s.Optional(s.String()),
-photoWidth: s.Optional(s.Integer()),
-photoHeight: s.Optional(s.Integer()),
+photoAlt: s.string({ optional: true }),
+photoWidth: s.int({ optional: true }),
+photoHeight: s.int({ optional: true }),
 ```
 
 `accept`, `maxSize`, `minWidth` and `minHeight` narrow what `uploads` takes for that field alone; the editor checks them before it sends the file. `fileField` takes `accept` and `maxSize`.
@@ -491,7 +491,7 @@ The fields named by `alt`, `width` and `height` leave the form. The editor asks 
 
 These pairs work for a field of an object, not for the items of a list. An object field is drawn as one block with a rule down its left side.
 
-A list of them, such as `s.Array(imageField())`, has a zone of its own that takes several files at once: each is uploaded in turn and added as a new item, in the order given, and a file the server refuses is reported under the zone while the others still land.
+A list of them, such as `s.list(imageField())`, has a zone of its own that takes several files at once: each is uploaded in turn and added as a new item, in the order given, and a file the server refuses is reported under the zone while the others still land.
 
 An image pasted or dropped into a Markdown body is uploaded the same way and embedded where the cursor is. A refused upload shows a message and leaves the text as it was.
 
@@ -597,7 +597,7 @@ export const news = collection({
   },
   remove: async ({ slug }) => deletePost(slug),
 }, {
-  schema: s.Object({ title: s.String() }),
+  schema: s.object({ title: s.string() }),
 })
 ```
 
@@ -621,7 +621,7 @@ export const posts = collection(sqliteCms({
 
   seed: [{ slug: 'hello', data: { title: 'Hello', order: 1 }, body: 'First post.' }],
 }), {
-  schema: s.Object({ title: s.String(), order: s.Number() }),
+  schema: s.object({ title: s.string(), order: s.number() }),
   order: 'order',
 })
 ```

@@ -24,7 +24,7 @@ export const Todo = defineTable('todo', f => ({
 import { s } from 'kay'
 import { defineEnv } from 'kay/server'
 
-export const env = defineEnv(s.Object({ DATABASE_URL: s.String() }))
+export const env = defineEnv({ DATABASE_URL: s.string() })
 ```
 
 ```ts
@@ -53,13 +53,13 @@ import { s, action } from 'kay'
 import { db } from '../db'
 import { Todo } from '../db/todo'
 
-export const create = action(s.Object({
-  title: s.String({ pattern: '\\S', maxLength: 120, error: 'Write a title' }),
-}), async ({ title }) => {
+export const create = action({
+  title: s.string({ pattern: '\\S', max: 120, error: 'Write a title' }),
+}, async ({ title }) => {
   await db.repo(Todo).write.insertOne({ title: title.trim() })
 })
 
-export const remove = action(s.Object({ id: s.Integer() }), async ({ id }) => {
+export const remove = action({ id: s.int() }, async ({ id }) => {
   await db.repo(Todo).write.deleteOne({ id })
 })
 
@@ -88,11 +88,11 @@ import { s, action } from 'kay'
 import { db } from '../../db'
 import { Todo } from '../../db/todo'
 
-export const save = action(s.Object({
-  id: s.Integer(),
-  title: s.String({ pattern: '\\S', maxLength: 120, error: 'Write a title' }),
-  done: s.Boolean(),
-}), async ({ id, title, done }, ctx) => {
+export const save = action({
+  id: s.int(),
+  title: s.string({ pattern: '\\S', max: 120, error: 'Write a title' }),
+  done: s.boolean(),
+}, async ({ id, title, done }, ctx) => {
   await db.repo(Todo).write.updateOne({ title: title.trim(), done }, { id })
 
   return ctx.redirect('/todos')
@@ -201,7 +201,7 @@ An action is covered by the guards of its folder; one that lives elsewhere check
 // src/routes/dashboard/users/index.kay, in its server fence
 import { auth } from '../../../auth'
 
-export const ban = action(s.Object({ id: s.String() }), async ({ id }, ctx) => {
+export const ban = action({ id: s.string() }, async ({ id }, ctx) => {
   const user = await ctx.locals.auth.requireUser()
 
   if (!auth.isGranted('admin', user))
@@ -243,11 +243,11 @@ import { s } from 'kay'
 import { collection } from 'kay/content'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({
-    title: s.String(),
-    date: s.Date(),
-    tags: s.Array(s.String(), { default: [] }),
-    draft: s.Optional(s.Boolean()),
+  schema: s.object({
+    title: s.string(),
+    date: s.date(),
+    tags: s.list(s.string(), { default: [] }),
+    draft: s.boolean({ optional: true }),
   }),
   route: '/blog/:slug',
   draft: post => post.data.draft === true,

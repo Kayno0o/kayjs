@@ -12,9 +12,9 @@ import { approveEntry, sendBackEntry, submitEntry } from '../reviewing'
 import { revokeShares } from '../share-revoke'
 import { deleteEntry, duplicateEntry, entryScreen, moveEntry, publishEntry, referenceChoices, renameEntry, saveEntry, shareLink, UnknownCollectionError, unpublishEntry } from '../store'
 
-const locale = s.Object({ locale: s.Optional(s.String()) })
+const locale = s.object({ locale: s.string({ optional: true }) })
 const nobody = { name: '', reviewers: [] }
-const versioned = s.Object({ locale: s.Optional(s.String()), version: s.Optional(s.String()) })
+const versioned = s.object({ locale: s.string({ optional: true }), version: s.string({ optional: true }) })
 
 export default api()
   .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
@@ -41,20 +41,20 @@ export default api()
     return screen.entry ? { collection: screen.collection, entry: screen.entry, review: review && viewOf(review, await memberOfRequest(request), params.collection) } : status(404, wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: params.slug, collection: params.collection }))
   }, { query: locale })
   .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: stamped(request, await withHold(request, params.collection, body.data)), body: body.body }, { create: body.create, version: body.version, required: true, author: authors.get(request) }), {
-    body: s.Object({
-      locale: s.Optional(s.String()),
-      data: s.Record(s.String(), s.Unknown()),
+    body: s.object({
+      locale: s.string({ optional: true }),
+      data: s.Record(s.string(), s.Unknown()),
       // An entry's text is long: past the default bound of a string, under any request limit an app raises.
-      body: s.Optional(s.String({ maxLength: 5_000_000 })),
-      create: s.Optional(s.Boolean()),
-      version: s.Optional(s.String()),
+      body: s.string({ optional: true, max: 5_000_000 }),
+      create: s.boolean({ optional: true }),
+      version: s.string({ optional: true }),
     }),
   })
   .post('/:collection/:slug/publish', async ({ params, query, request }) => publishEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
   .post('/:collection/:slug/unpublish', async ({ params, query, request }) => unpublishEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
   .post('/:collection/:slug/submit', async ({ params, query, request }) => submitEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, actors.get(request) ?? nobody, authors.get(request)), { query: locale })
-  .post('/:collection/:slug/approve', async ({ params, query, body, request }) => approveEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, actors.get(request) ?? nobody, authors.get(request), body.version), { query: locale, body: s.Object({ version: s.Optional(s.String()) }) })
-  .post('/:collection/:slug/send-back', async ({ params, query, body, request }) => sendBackEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, body.note, actors.get(request) ?? nobody, authors.get(request)), { query: locale, body: s.Object({ note: s.String() }) })
+  .post('/:collection/:slug/approve', async ({ params, query, body, request }) => approveEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, actors.get(request) ?? nobody, authors.get(request), body.version), { query: locale, body: s.object({ version: s.string({ optional: true }) }) })
+  .post('/:collection/:slug/send-back', async ({ params, query, body, request }) => sendBackEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, body.note, actors.get(request) ?? nobody, authors.get(request)), { query: locale, body: s.object({ note: s.string() }) })
   .post('/:collection/:slug/share', async ({ params, query, request }) => {
     const shared = await shareLink({ collection: params.collection, slug: params.slug, locale: query.locale })
 
@@ -78,6 +78,6 @@ export default api()
     return { ok: true as const }
   }, { query: locale })
   .post('/:collection/:slug/duplicate', async ({ params, query, request }) => duplicateEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
-  .post('/:collection/:slug/rename', async ({ params, query, body, request }) => renameEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, body.slug, { author: authors.get(request), version: query.version, required: true }), { query: versioned, body: s.Object({ slug: s.String() }) })
-  .post('/:collection/:slug/move', async ({ params, query, request }) => moveEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, query.direction, authors.get(request)), { query: s.Object({ locale: s.Optional(s.String()), direction: s.Union([s.Literal('up'), s.Literal('down')]) }) })
+  .post('/:collection/:slug/rename', async ({ params, query, body, request }) => renameEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, body.slug, { author: authors.get(request), version: query.version, required: true }), { query: versioned, body: s.object({ slug: s.string() }) })
+  .post('/:collection/:slug/move', async ({ params, query, request }) => moveEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, query.direction, authors.get(request)), { query: s.object({ locale: s.string({ optional: true }), direction: s.union([s.literal('up'), s.literal('down')]) }, { extra: 'strip' }) })
   .delete('/:collection/:slug', async ({ params, query, request }) => deleteEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request), { version: query.version, required: true }), { query: versioned })

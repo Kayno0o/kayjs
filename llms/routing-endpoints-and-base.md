@@ -31,7 +31,7 @@ export function GET({ params }: EndpointContext) {
 import type { EndpointContext } from 'kay'
 import { s } from 'kay'
 
-export const page = { rateLimit: { max: 60, window: '1m' }, maxSize: '1mb', query: s.Object({ test: s.Optional(s.Boolean()) }) }
+export const page = { rateLimit: { max: 60, window: '1m' }, maxSize: '1mb', query: s.object({ test: s.boolean({ optional: true }) }, { extra: 'strip' }) }
 
 export async function POST({ request, query }: EndpointContext) {
   await handleEvent(await request.json(), query.test === true)

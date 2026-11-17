@@ -15,7 +15,7 @@ A third argument limits attempts and traps bots, its `protect` group holding `ra
 import { s, action } from 'kay'
 
 export const contact = action(
-  s.Object({ message: s.String({ maxLength: 2000 }) }),
+  { message: s.string({ max: 2000 }) },
   async ({ message }) => message.length,
   { protect: { rateLimit: { max: 5, window: '1m' }, honeypot: 'website', minTime: '3s' } },
 )

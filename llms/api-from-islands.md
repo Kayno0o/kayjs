@@ -51,7 +51,7 @@ export default api()
   .post(
     '/answer',
     ({ body }) => eventStream(complete(body.prompt)),
-    { body: s.Object({ prompt: s.String() }) },
+    { body: s.object({ prompt: s.string() }) },
   )
 ```
 

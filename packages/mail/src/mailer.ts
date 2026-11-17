@@ -350,21 +350,21 @@ function delivering(): 'outbox' | 'smtp' {
 function smtpEnv({ optional = false, listed = false }: { optional?: boolean, listed?: boolean } = {}) {
   const hostOptional = listed || optional
 
-  return s.Object({
-    MAIL_URL: hostOptional ? s.Optional(s.String(listed ? { description: 'smtp://user:pass@mail.example.com:465, the login and the port optional; or a provider\'s API: resend://KEY, postmark://TOKEN, sendgrid://KEY, mailgun://KEY@mg.example.com, ses://ACCESSKEY:SECRET@eu-west-1', requiredInProduction: true } : {})) : s.String(),
-    MAIL_INSECURE: s.Optional(s.Boolean()),
-    MAIL_RATE_LIMIT: s.Optional(s.String({ pattern: '^\\d+(?:/\\S+)?$', description: 'mails per window, such as 5/1s' })),
-    MAIL_DKIM_SELECTOR: s.Optional(s.String()),
-    MAIL_DKIM_PRIVATE_KEY: s.Optional(s.String()),
-    MAIL_DKIM_DOMAIN: s.Optional(s.String()),
-    MAIL_FROM: s.Optional(s.String({ pattern: SENDER, ...listed ? { description: 'defaults to noreply@ the site\'s host' } : {} })),
-    MAIL_TO: s.Optional(s.String({ pattern: RECIPIENTS })),
-    MAIL_EVENTS_POSTMARK: s.Optional(s.String({ pattern: '^[^:\\s]+:\\S+$', description: 'user:password, the Basic credentials of the Postmark webhook URL for bounces and complaints' })),
-    MAIL_EVENTS_MAILGUN: s.Optional(s.String({ description: 'the Mailgun webhook signing key, for bounces and complaints' })),
-    MAIL_EVENTS_SENDGRID: s.Optional(s.String({ description: 'the base64 public key of the SendGrid Event Webhook, for bounces and complaints' })),
-    MAIL_EVENTS_RESEND: s.Optional(s.String({ description: 'the whsec_ signing secret of the Resend webhook, for bounces and complaints' })),
-    MAIL_EVENTS_SES: s.Optional(s.String({ pattern: '^arn:aws:sns:[^\\s,]+(?:\\s*,\\s*arn:aws:sns:[^\\s,]+)*$', description: 'the ARN of the SNS topic SES publishes bounces and complaints to (several, comma separated)' })),
-    MAIL_EVENTS_INBOUND: s.Optional(s.String({ description: 'the bearer secret of /_kay/mail/inbound, where a mail server posts delivery reports and replies' })),
+  return s.object({
+    MAIL_URL: hostOptional ? s.string({ optional: true, ...listed && { description: 'smtp://user:pass@mail.example.com:465, the login and the port optional; or a provider\'s API: resend://KEY, postmark://TOKEN, sendgrid://KEY, mailgun://KEY@mg.example.com, ses://ACCESSKEY:SECRET@eu-west-1', requiredInProduction: true } }) : s.string(),
+    MAIL_INSECURE: s.boolean({ optional: true }),
+    MAIL_RATE_LIMIT: s.string({ optional: true, pattern: '^\\d+(?:/\\S+)?$', description: 'mails per window, such as 5/1s' }),
+    MAIL_DKIM_SELECTOR: s.string({ optional: true }),
+    MAIL_DKIM_PRIVATE_KEY: s.string({ optional: true }),
+    MAIL_DKIM_DOMAIN: s.string({ optional: true }),
+    MAIL_FROM: s.string({ optional: true, pattern: SENDER, ...listed ? { description: 'defaults to noreply@ the site\'s host' } : {} }),
+    MAIL_TO: s.string({ optional: true, pattern: RECIPIENTS }),
+    MAIL_EVENTS_POSTMARK: s.string({ optional: true, pattern: '^[^:\\s]+:\\S+$', description: 'user:password, the Basic credentials of the Postmark webhook URL for bounces and complaints' }),
+    MAIL_EVENTS_MAILGUN: s.string({ optional: true, description: 'the Mailgun webhook signing key, for bounces and complaints' }),
+    MAIL_EVENTS_SENDGRID: s.string({ optional: true, description: 'the base64 public key of the SendGrid Event Webhook, for bounces and complaints' }),
+    MAIL_EVENTS_RESEND: s.string({ optional: true, description: 'the whsec_ signing secret of the Resend webhook, for bounces and complaints' }),
+    MAIL_EVENTS_SES: s.string({ optional: true, pattern: '^arn:aws:sns:[^\\s,]+(?:\\s*,\\s*arn:aws:sns:[^\\s,]+)*$', description: 'the ARN of the SNS topic SES publishes bounces and complaints to (several, comma separated)' }),
+    MAIL_EVENTS_INBOUND: s.string({ optional: true, description: 'the bearer secret of /_kay/mail/inbound, where a mail server posts delivery reports and replies' }),
   })
 }
 

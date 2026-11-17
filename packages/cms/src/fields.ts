@@ -80,6 +80,13 @@ type Hinted = Exclude<Field['kind'], 'select' | 'reference' | 'list' | 'group' |
 const HINTED = new Set<string>(['text', 'textarea', 'markdown', 'number', 'integer', 'boolean', 'date', 'datetime', 'json'] satisfies Hinted[])
 // A plain string longer than a line or two is edited in a textarea rather than a one-line box.
 const LONG_TEXT = 120
+// The bound `s.string()` puts on a string with none of its own (DEFAULT_MAX_LENGTH of kay): no editor's limit, so neither a textarea nor an attribute.
+const DEFAULT_BOUND = 10_000
+
+function isLong(maxLength: unknown): boolean {
+  return typeof maxLength === 'number' && maxLength !== DEFAULT_BOUND && maxLength > LONG_TEXT
+}
+
 // The formats of a string that are a single line by nature, entered in an input of the type they name.
 const LINE_FORMATS: Record<string, FieldBase['inputType']> = { email: 'email', uri: 'url', url: 'url', hostname: 'text', uuid: 'text' }
 const MIN_ROWS = 2
@@ -224,7 +231,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
       if (entering.options.rows !== undefined && entering.options.rows >= MIN_ROWS)
         return { ...base, kind: 'textarea', rows: entering.options.rows }
 
-      return { ...base, kind: base.inputType === undefined && typeof inner.maxLength === 'number' && inner.maxLength > LONG_TEXT ? 'textarea' : 'text' }
+      return { ...base, kind: base.inputType === undefined && isLong(inner.maxLength) ? 'textarea' : 'text' }
     case 'Date':
       return { ...base, kind: 'date' }
     case 'number':
@@ -275,7 +282,7 @@ function limitsOf(schema: JsonSchema): Limits | undefined {
   for (const key of LIMIT_KEYS) {
     const value = schema[key]
 
-    if (typeof value === 'number')
+    if (typeof value === 'number' && !(key === 'maxLength' && value === DEFAULT_BOUND))
       limits[key] = value
   }
 

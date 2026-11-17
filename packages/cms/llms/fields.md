@@ -11,14 +11,14 @@ How the editor enters a field comes from the schema's own keywords first, then f
 ```ts
 import { fieldInput } from 'kay/content'
 
-s.Object({
-  price: fieldInput(s.Number({ minimum: 0 }), { suffix: '€', placeholder: '600' }),
-  phone: fieldInput(s.String(), { type: 'tel' }),
-  bio: fieldInput(s.String(), { rows: 6 }),
-  status: fieldInput(s.Union([s.Literal('draft'), s.Literal('live')]), { labels: { draft: 'Brouillon', live: 'En ligne' } }),
-  tags: fieldInput(s.Array(s.String()), { lines: true }),
-  people: fieldInput(s.Array(s.Object({ name: s.String(), role: s.String() })), { titleField: 'role' }),
-  linkLabel: fieldInput(s.Optional(s.String()), { when: 'link' }),
+s.object({
+  price: fieldInput(s.number({ min: 0 }), { suffix: '€', placeholder: '600' }),
+  phone: fieldInput(s.string(), { type: 'tel' }),
+  bio: fieldInput(s.string(), { rows: 6 }),
+  status: fieldInput(s.union([s.literal('draft'), s.literal('live')]), { labels: { draft: 'Brouillon', live: 'En ligne' } }),
+  tags: fieldInput(s.list(s.string()), { lines: true }),
+  people: fieldInput(s.list(s.object({ name: s.string(), role: s.string() })), { titleField: 'role' }),
+  linkLabel: fieldInput(s.string({ optional: true }), { when: 'link' }),
 })
 ```
 
@@ -30,7 +30,7 @@ Fields a site rebuilds each time, from `kay/content`; a schema names the kind, t
 import tabler from '@iconify-json/tabler/icons.json'
 import { colorField, geoField, iconField, linkField, moneyField, tagsField } from 'kay/content'
 
-s.Object({
+s.object({
   accent: colorField(),
   price: moneyField({ currency: 'EUR' }),
   labels: tagsField({ maxItems: 8 }),
@@ -47,11 +47,11 @@ A page made of mixed sections is a list of items of several declared types, `blo
 ```ts
 import { blocks } from 'kay/content'
 
-s.Object({
+s.object({
   sections: blocks({
-    hero: s.Object({ heading: s.String({ minLength: 1 }), image: s.Optional(imageField()) }, { title: 'Hero banner' }),
-    text: s.Object({ body: markdownField() }),
-    gallery: s.Object({ images: s.Array(imageField()) }),
+    hero: s.object({ heading: s.string({ min: 1 }), image: s.Optional(imageField()) }, { label: 'Hero banner' }),
+    text: s.object({ body: markdownField() }),
+    gallery: s.object({ images: s.list(imageField()) }),
   }),
 })
 ```
@@ -63,7 +63,7 @@ A field the admin should edit another way, a colour, a map point, a rating, is d
 ```ts
 import { customField } from 'kay/content'
 
-s.Object({ accent: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-f]{6}$' }))) })
+s.object({ accent: s.Optional(customField('color', s.string({ pattern: '^#[0-9a-f]{6}$' }))) })
 ```
 
 ```kay
@@ -98,7 +98,7 @@ A hand-written `x-kay` string (`{ 'x-kay': 'text' }`, as apps wrote before `fiel
 - `prefix`, `suffix`: a word before or after a text or number box, a currency or a unit; `600 €` is a number with `suffix: '€'`, stored as `600`.
 - `rows`: a string entered in a textarea of that many rows (2 or more), growing with its text.
 - `type`: `'text' | 'email' | 'url' | 'tel' | 'search'` for a one-line string.
-- `labels`: the label of each `enum` value or union literal by value, which wins over a literal's own `title` (`s.Literal('new', { title: 'Nouveau' })`); the stored value stays the raw one.
+- `labels`: the label of each `enum` value or union literal by value, which wins over a literal's own `title` (`s.literal('new', { title: 'Nouveau' })`); the stored value stays the raw one.
 - `lines`: a list of strings entered in one box, a line each, blank lines dropped; emptied on an optional field it unsets the key.
 - `titleField`: the field of a list's object items whose text heads an item, before the first filled text field.
 - A list has Add at the top, a jump menu from 8 items, an issue count on a folded item's head, and the entry's Reset asks to confirm (`cms.list.*`, `cms.entry.resetMessage`).
@@ -117,13 +117,13 @@ A collection's `description` (`collection({ description })`) is shown to the edi
 
 A long list of options (more than 12) picked with a union of literals or an `enum` opens on a search box; the native list has no icons, so a pick among icons is an `iconField`. A date has Today and Clear, a date and time Now and Clear; Clear is hidden on a required field.
 
-How other schema types show: a `s.Date()` is a date input (use `format: 'date-time'` text for a time), a `t.Transform` is entered as the type it decodes from, and a `t.BigInt()` has no control, so it is edited as JSON: prefer `s.Integer()`.
+How other schema types show: a `s.date()` is a date input (use `format: 'date-time'` text for a time), a `t.Transform` is entered as the type it decodes from, and a `t.BigInt()` has no control, so it is edited as JSON: prefer `s.int()`.
 
 ### How blocks behave
 
 - Each key is a block type and its object the fields of an item of it. An item is stored as an object with a `type` key naming its type, `{ type: 'hero', heading: 'Welcome' }`, so a Markdown or JSON file holds a plain array.
 - The typed read is the union of the blocks discriminated on `type`: `section.type === 'hero'` narrows to `section.heading`. A block may not declare a `type` field of its own, and `blocks()` throws saying so; it also throws for no block, an empty type name or a block that is not an object.
-- A block's `title` is its label in the editor, else its key humanized (`hero` gives `Hero`). `blocks(types, { minItems, maxItems })` takes a list's own options, and `s.Optional(blocks(...))` makes the list optional.
+- A block's `title` is its label in the editor, else its key humanized (`hero` gives `Hero`). `blocks(types, { minItems, maxItems })` takes a list's own options, and `s.Optional(blocks(...))` (the field helpers have no `optional` option yet) makes the list optional.
 - The editor adds a block by its type: an `Add <type>` button for each at the end of the list and a menu of the types to add at the top. Each item shows the fields of its own type, headed by its label then its first filled text (`Hero banner: Welcome`), and folds, moves (across types), duplicates and removes with Undo as any list item does. `fieldsOf` gives a `list` field with `blocks`, each `{ type, label, fields }`, and `itemAt(list, index, value)` the group of one item.
 - An item saved with an unknown `type` shows as `Unknown block` with no field, left to be removed, and the save refuses it.
 - A block failing its schema is refused at its own field (`sections.1.heading`), the issue worded with that field's label. `withDefaults` fills the defaults of a block by its type, and a reference inside a block is checked like any other.

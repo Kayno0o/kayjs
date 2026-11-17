@@ -19,23 +19,23 @@ export const byPosition = (a: { slug: string, data: { order: number } }, b: { sl
 
 // Written for people: one folder per section, read in the sidebar's order. A Structure page's `path` is the file or folder it is about.
 export const docs = collection('content/docs', {
-  schema: s.Object({ title: s.String(), order: s.Number(), description: s.String(), path: s.Optional(s.String()) }),
+  schema: s.object({ title: s.string(), order: s.number(), description: s.string(), path: s.string({ optional: true }) }),
   components: { Callout, FileTree, HtmlConverter, Playground, ReadMore, RequestFlow, ThemeTokens },
   sort: byPosition,
 })
 
 // Written for agents, every option and edge case: llms.txt and the docs it lists, then each library's llms.txt and the topic files it lists, as published.
 export const reference = collection({ name: 'reference', load: async () => [...await loadReference(), ...await loadLibraries()] }, {
-  schema: s.Object({ title: s.String(), order: s.Number(), version: s.Optional(s.String()), library: s.Optional(s.String()), source: s.Optional(s.String()) }),
+  schema: s.object({ title: s.string(), order: s.number(), version: s.string({ optional: true }), library: s.string({ optional: true }), source: s.string({ optional: true }) }),
   sort: byOrder,
 })
 
-const part = s.Object({ name: s.String(), on: s.Array(s.Object({ name: s.String(), component: s.Boolean() })), handedTo: s.Array(s.String()) })
-const prop = s.Object({ name: s.String(), type: s.String(), optional: s.Boolean(), default: s.Optional(s.String()), comment: s.Optional(s.String()) })
+const part = s.object({ name: s.string(), on: s.list(s.object({ name: s.string(), component: s.boolean() })), handedTo: s.list(s.string()) })
+const prop = s.object({ name: s.string(), type: s.string(), optional: s.boolean(), default: s.string({ optional: true }), comment: s.string({ optional: true }) })
 
 // One page per kayjs-ui component: its usage from src/content/ui, its props and parts read from its source.
 export const components = collection({ name: 'components', load: () => loadComponents() }, {
-  schema: s.Object({ title: s.String(), order: s.Number(), description: s.String(), props: s.Array(prop), parts: s.Array(part) }),
+  schema: s.object({ title: s.string(), order: s.number(), description: s.string(), props: s.list(prop), parts: s.list(part) }),
   components: { Callout, Demo, ReadMore },
   sort: byOrder,
 })

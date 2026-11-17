@@ -46,13 +46,13 @@ async function setupWarnings(): Promise<string[]> {
 }
 
 // What a production server with no `cms({ files })` commits through, listed for `kay env`.
-const CMS_ENV = s.Object({
-  CMS_URL: s.Optional(s.String({ description: 'the repository a production cms commits edits to, token included, when cms({ files }) is not set: forgejo://TOKEN@git.example.com/owner/repo, github://TOKEN@owner/repo or gitlab://TOKEN@group/project, with ?branch= for the branch (the repository\'s default when unset) and ?baseUrl= for the address of a GitHub Enterprise Server\'s API or a self-managed GitLab, or a Forgejo that is not https' })),
-  CMS_HOST: s.Optional(s.Union([s.Literal('forgejo'), s.Literal('github'), s.Literal('gitlab')], { description: 'the older form of CMS_URL: the kind of git host a production cms commits edits to, forgejo by default, when cms({ files }) is not set' })),
-  CMS_BASE_URL: s.Optional(s.String({ description: 'the address of that host: the Forgejo, such as https://git.example.com, or for github the API of a GitHub Enterprise Server (https://api.github.com when unset), or for gitlab a self-managed GitLab (https://gitlab.com when unset)' })),
-  CMS_REPO: s.Optional(s.String({ description: 'the repository the cms commits to, as owner/name' })),
-  CMS_TOKEN: s.Optional(s.String({ description: 'a token of that host allowed to write that repository\'s contents' })),
-  CMS_BRANCH: s.Optional(s.String({ description: 'the branch the cms commits to, the repository\'s default when unset' })),
+const CMS_ENV = s.object({
+  CMS_URL: s.string({ optional: true, description: 'the repository a production cms commits edits to, token included, when cms({ files }) is not set: forgejo://TOKEN@git.example.com/owner/repo, github://TOKEN@owner/repo or gitlab://TOKEN@group/project, with ?branch= for the branch (the repository\'s default when unset) and ?baseUrl= for the address of a GitHub Enterprise Server\'s API or a self-managed GitLab, or a Forgejo that is not https' }),
+  CMS_HOST: s.union([s.literal('forgejo'), s.literal('github'), s.literal('gitlab')], { optional: true, description: 'the older form of CMS_URL: the kind of git host a production cms commits edits to, forgejo by default, when cms({ files }) is not set' }),
+  CMS_BASE_URL: s.string({ optional: true, description: 'the address of that host: the Forgejo, such as https://git.example.com, or for github the API of a GitHub Enterprise Server (https://api.github.com when unset), or for gitlab a self-managed GitLab (https://gitlab.com when unset)' }),
+  CMS_REPO: s.string({ optional: true, description: 'the repository the cms commits to, as owner/name' }),
+  CMS_TOKEN: s.string({ optional: true, description: 'a token of that host allowed to write that repository\'s contents' }),
+  CMS_BRANCH: s.string({ optional: true, description: 'the branch the cms commits to, the repository\'s default when unset' }),
 })
 
 const NO_SAVER = 'a production server saves no edit to the working tree, which the next deploy replaces: set CMS_URL, as forgejo://TOKEN@git.example.com/owner/repo, github://TOKEN@owner/repo or gitlab://TOKEN@group/project, or cms({ files: forgejo(...) }), cms({ files: github(...) }) or cms({ files: gitlab(...) }), or cms({ files: workingTree() }) where the files outlive a deploy'

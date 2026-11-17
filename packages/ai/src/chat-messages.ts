@@ -12,12 +12,12 @@ export interface ChatMessagesOptions {
 
 const DEFAULT_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'application/pdf']
 
-const message = (maxLength: number) => ({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength }) })
+const message = (maxLength: number) => ({ role: s.enum(['user', 'assistant']), content: s.string({ max: maxLength }) })
 
-const withFiles = (maxLength: number, { type = DEFAULT_TYPES, maxFiles = 4 }: { type?: string | string[] | undefined, maxFiles?: number | undefined }) => s.Object({ ...message(maxLength), attachments: s.Optional(s.Array(s.File({ type }), { maxItems: maxFiles })) })
+const withFiles = (maxLength: number, { type = DEFAULT_TYPES, maxFiles = 4 }: { type?: string | string[] | undefined, maxFiles?: number | undefined }) => s.object({ ...message(maxLength), attachments: s.list(s.file({ type }), { optional: true, max: maxFiles }) })
 
-const plain = (maxLength: number, maxItems: number) => s.Array(s.Object(message(maxLength)), { minItems: 1, maxItems })
-const filed = (maxLength: number, maxItems: number, files: { type?: string | string[] | undefined, maxFiles?: number | undefined }) => s.Array(withFiles(maxLength, files), { minItems: 1, maxItems })
+const plain = (maxLength: number, maxItems: number) => s.list(s.object(message(maxLength)), { min: 1, max: maxItems })
+const filed = (maxLength: number, maxItems: number, files: { type?: string | string[] | undefined, maxFiles?: number | undefined }) => s.list(withFiles(maxLength, files), { min: 1, max: maxItems })
 
 type WithoutFiles = ChatMessagesOptions & { attachments?: false | undefined }
 

@@ -4,7 +4,7 @@ import { sqliteCms } from '../../../src/loaders/sqlite'
 import { sections as blocks, footerDown, partners as friends, ledgerRows, outage, shop as shelf, products as stock } from './products'
 
 export const posts = collection('content/posts', {
-  schema: s.Object({ title: s.String({ maxLength: 40 }), draft: s.Optional(s.Boolean()), tags: s.Array(s.String(), { default: [] }) }),
+  schema: s.object({ title: s.string({ max: 40 }), draft: s.boolean({ optional: true }), tags: s.list(s.string(), { default: [] }) }),
   draft: 'draft',
 })
 
@@ -24,7 +24,7 @@ export const products = collection({
     stock.splice(0, stock.length, ...stock.filter(product => product.slug !== entry.slug))
   },
 }, {
-  schema: s.Object({ name: s.String({ minLength: 1 }), photo: s.Optional(imageField()), color: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-f]{6}$' }))), mood: s.Optional(customField('mood', s.String())), gallery: s.Optional(s.Array(imageField())) }),
+  schema: s.object({ name: s.string({ min: 1 }), photo: s.Optional(imageField()), color: s.Optional(customField('color', s.string({ pattern: '^#[0-9a-f]{6}$' }))), mood: s.Optional(customField('mood', s.string())), gallery: s.list(imageField(), { optional: true }) }),
   title: 'Our products',
 })
 
@@ -39,13 +39,13 @@ export const shop = collection({
     shelf.splice(0, shelf.length, ...shelf.filter(item => item.slug !== entry.slug))
   },
 }, {
-  schema: s.Object({ name: s.String({ minLength: 1 }), price: s.Optional(s.Number()), stock: s.Optional(s.Integer()), live: s.Optional(s.Boolean()), photo: s.Optional(imageField()), sku: s.String({ minLength: 1 }), position: s.Optional(s.Integer()) }),
+  schema: s.object({ name: s.string({ min: 1 }), price: s.number({ optional: true }), stock: s.int({ optional: true }), live: s.boolean({ optional: true }), photo: s.Optional(imageField()), sku: s.string({ min: 1 }), position: s.int({ optional: true }) }),
   order: 'position',
 })
 
 // A collection of one entry, written already.
 export const welcome = collection('content/welcome', {
-  schema: s.Object({ headline: s.String({ pattern: '^[A-Za-z ]+$' }) }),
+  schema: s.object({ headline: s.string({ pattern: '^[A-Za-z ]+$' }) }),
   title: 'Welcome page',
   single: true,
 })
@@ -57,7 +57,7 @@ export const footer = collection({ name: 'footer', load: () => {
 
   return []
 } }, {
-  schema: s.Object({ legal: s.String() }),
+  schema: s.object({ legal: s.string() }),
   title: 'Footer',
   single: true,
   seed: { legal: 'All rights reserved' },
@@ -68,7 +68,7 @@ export const partners = collection({
   name: 'partners',
   load: () => friends.map(({ slug, data }) => ({ slug, data })),
 }, {
-  schema: s.Object({ name: s.String({ minLength: 1 }) }),
+  schema: s.object({ name: s.string({ min: 1 }) }),
 })
 
 // Single entries: `about` reads `hero`, no page reads `unused`.
@@ -76,7 +76,7 @@ export const sections = collection({
   name: 'sections',
   load: () => blocks.map(({ slug, data }) => ({ slug, data })),
 }, {
-  schema: s.Object({ heading: s.String({ minLength: 1 }) }),
+  schema: s.object({ heading: s.string({ min: 1 }) }),
 })
 
 // A loaded collection whose schema says how its fields are entered, which reaches the form through `collectionInfo`.
@@ -84,9 +84,9 @@ export const profiles = collection({
   name: 'profiles',
   load: () => [],
 }, {
-  schema: s.Object({
-    name: s.String({ minLength: 1 }),
-    nickname: s.Optional(fieldInput(s.String(), { placeholder: 'Jo', when: 'name' })),
+  schema: s.object({
+    name: s.string({ min: 1 }),
+    nickname: s.Optional(fieldInput(s.string(), { placeholder: 'Jo', when: 'name' })),
   }),
   description: 'Who edits the site',
 })
@@ -99,29 +99,29 @@ export const ledger = collection({
     ledgerRows.splice(0, ledgerRows.length, ...ledgerRows.filter(row => row.slug !== entry.slug), { slug: entry.slug, data: entry.data as { name: string, note: string | null } })
   },
 }, {
-  schema: s.Object({ name: s.String({ minLength: 1 }), note: s.Nullable(s.String()) }),
+  schema: s.object({ name: s.string({ min: 1 }), note: s.Nullable(s.string()) }),
 })
 
 // A loaded collection in SQLite, which keeps the history of its entries.
 export const journal = collection(sqliteCms({ name: 'journal', database: ':memory:' }), {
-  schema: s.Object({ title: s.String({ minLength: 1 }) }),
+  schema: s.object({ title: s.string({ min: 1 }) }),
 })
 
 // A localized collection of lists: plain, block and nested ones, and an empty one, which the page shows for the editor to reorder, add to and remove from.
 export const guides = collection('content/guides', {
-  schema: s.Object({
-    title: s.String({ minLength: 1 }),
-    steps: s.Array(s.String(), { default: [] }),
-    sections: blockList({ hero: s.Object({ heading: s.String() }), text: s.Object({ body: s.String() }), quote: s.Object({ author: s.String() }) }),
-    columns: s.Array(s.Object({ title: s.String(), cells: s.Array(s.String(), { default: [] }) }), { default: [] }),
-    empty: s.Array(s.String(), { default: [] }),
-    limited: s.Array(s.String(), { default: [], minItems: 1, maxItems: 2 }),
-    named: s.Array(s.String({ minLength: 1 }), { default: [] }),
+  schema: s.object({
+    title: s.string({ min: 1 }),
+    steps: s.list(s.string(), { default: [] }),
+    sections: blockList({ hero: s.object({ heading: s.string() }), text: s.object({ body: s.string() }), quote: s.object({ author: s.string() }) }),
+    columns: s.list(s.object({ title: s.string(), cells: s.list(s.string(), { default: [] }) }), { default: [] }),
+    empty: s.list(s.string(), { default: [] }),
+    limited: s.list(s.string(), { default: [], min: 1, max: 2 }),
+    named: s.list(s.string({ min: 1 }), { default: [] }),
   }),
   localized: true,
 })
 
 // A loaded collection in SQLite that opts out of the history, the trash and the activity log.
 export const scratch = collection(sqliteCms({ name: 'scratch', database: ':memory:' }), {
-  schema: s.Object({ title: s.String({ minLength: 1 }) }),
+  schema: s.object({ title: s.string({ min: 1 }) }),
 })

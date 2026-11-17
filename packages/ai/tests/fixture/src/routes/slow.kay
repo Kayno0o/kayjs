@@ -5,7 +5,7 @@ const PACE_MS = 50
 const STEPS = 200
 
 // A reply that says one word and then keeps working until the visitor stops it.
-export const slow = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), async function* () {
+export const slow = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }) }), { min: 1, max: 50 }) }, async function* () {
   yield 'Working'
 
   for (let step = 0; step < STEPS; step++)

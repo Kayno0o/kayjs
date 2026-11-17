@@ -15,12 +15,12 @@ export default api()
   .get(
     '/',
     ({ query }) => listNotes(query.prefix ?? ''),
-    { query: s.Object({ prefix: s.Optional(s.String()) }) },
+    { query: s.object({ prefix: s.string({ optional: true }) }, { extra: 'strip' }) },
   )
   .post(
     '/',
     ({ body }) => addNote(body.text),
-    { body: s.Object({ text: s.String() }) },
+    { body: s.object({ text: s.string() }) },
   )
 ```
 
@@ -143,7 +143,7 @@ export default api({ rateLimit: { max: 60, window: '1m' } })
 
 A route sets its own limit and its own `maxSize` in its `detail`. The module's limit applies to it as well.
 
-A string in a route's `body` is refused past 10,000 characters, with a 422, unless its schema sets a `maxLength`, an `enum` or a `const`, or it is a date. A field that takes more text sets its own: `s.String({ maxLength: 100_000 })`. The request body limit still applies on top, so raise `maxSize` too when a body can be larger than the module's.
+A string in a route's `body` is refused past 10,000 characters, with a 422, unless its schema sets a `maxLength`, an `enum` or a `const`, or it is a date. A field that takes more text sets its own: `s.string({ maxLength: 100_000 })`. The request body limit still applies on top, so raise `maxSize` too when a body can be larger than the module's.
 
 `key` counts a person instead of an address, as it does for an action. The limit counts after the guards, so a caller they refuse costs no allowance. Stores and the other options are in [Rate limits](/guides/security#rate-limits).
 
@@ -223,7 +223,7 @@ An action is a tool only when you say so, with `tool` in its third argument. Set
 import { s, action } from 'kay'
 
 export const addNote = action(
-  s.Object({ title: s.String({ minLength: 3, maxLength: 80 }) }),
+  { title: s.string({ min: 3, max: 80 }) },
   async ({ title }) => ({ title }),
   { tool: 'Create a note' },
 )
@@ -242,7 +242,7 @@ An agent reads an action's answer as JSON, and as `structuredContent` too when i
 import { s, action } from 'kay'
 
 export const search = action(
-  s.Object({ query: s.String() }),
+  { query: s.string() },
   async ({ query }) => [{ id: 1, title: query }],
   { tool: { readOnly: true, text: notes => notes.map(note => `${note.id} ${note.title}`).join('\n') } },
 )
@@ -252,7 +252,7 @@ h1 Notes
 
 The agent gets that text alone, with no JSON and no `structuredContent`, while the page and any other caller still get the notes. An error thrown by `text` is the agent's refusal. A route's `detail.tool` takes `text` the same way, from its parsed JSON answer.
 
-To tell a client what a tool answers before it calls, give the action an `output` object schema (`s.Object` or `s.Record`; the types refuse a union, an array or a primitive): `tool: { output: s.Object({ id: s.Integer(), title: s.String() }) }`. `/_kay/mcp` lists it as the tool's `outputSchema`, and `kay check` refuses one the handler's return value does not fit. The schema describes the JSON the agent receives, so a `Date` is a string, a bigint a string, a `Map` an object and a `Set` an array.
+To tell a client what a tool answers before it calls, give the action an `output` object schema (`s.object` or `s.Record`; the types refuse a union, an array or a primitive): `tool: { output: s.object({ id: s.int(), title: s.string() }) }`. `/_kay/mcp` lists it as the tool's `outputSchema`, and `kay check` refuses one the handler's return value does not fit. The schema describes the JSON the agent receives, so a `Date` is a string, a bigint a string, a `Map` an object and a `Set` an array.
 
 An action that declares no `output` is listed with the schema of what its handler returns, read from its TypeScript return type when you run `kay build` (and in the background under `kay dev`), so there is nothing to declare.
 

@@ -14,7 +14,7 @@ class Refused extends Error {
   }
 }
 
-const locale = s.Object({ locale: s.Optional(s.String()) })
+const locale = s.object({ locale: s.string({ optional: true }) })
 
 // The entry versions sent or being sent in this process, so a double click or a second editor cannot mail a list twice by accident. A folder entry outside a repository has no version, so its content stands for it.
 const sent = new Map<string, string>()

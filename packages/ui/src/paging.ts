@@ -3,8 +3,8 @@ import { s } from 'kay'
 // The input fields of an action that lists by offset, which `infiniteList({ action })` fills in for each page: `s.Object({ ...pageFields(), q: s.Optional(s.String()) })`. `max` is the most rows one call may ask for.
 export function pageFields(max = 500) {
   return {
-    offset: s.Optional(s.Integer({ minimum: 0 })),
-    limit: s.Optional(s.Integer({ minimum: 1, maximum: max })),
+    offset: s.int({ optional: true, min: 0 }),
+    limit: s.int({ optional: true, min: 1, max }),
   }
 }
 

@@ -4,7 +4,7 @@
 
 ### Show the model an image or a PDF
 
-A user message holds `attachments` beside its text: a `File` or `Blob` (an `s.File()` field gives a `File`), bytes, or a file of kay's store:
+A user message holds `attachments` beside its text: a `File` or `Blob` (an `s.file()` field gives a `File`), bytes, or a file of kay's store:
 
 ```ts
 import { ask, storedFile } from '@kayjs/ai'
@@ -22,9 +22,9 @@ The scan goes with a `schema`, and `await` gives the checked object:
 import { ask, storedFile } from '@kayjs/ai'
 import { s, action } from 'kay'
 
-const bill = s.Object({ supplier: s.String(), total: s.Number(), due: s.Optional(s.String()) })
+const bill = s.object({ supplier: s.string(), total: s.number(), due: s.string({ optional: true }) })
 
-export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) }), async ({ scan }) => {
+export const read = action({ scan: s.file({ type: 'application/pdf' }) }, async ({ scan }) => {
   return await ask([{ role: 'user', content: 'Read this bill', attachments: [scan] }], { schema: bill, maxSize: '5mb' })
 }, { maxSize: '6mb' })
 ---
@@ -36,7 +36,7 @@ export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) 
 
 - A button beside the field (its `attach` part, a plus, named `labels.attach`), dropping on it and pasting a file anywhere on the page outside a text field attach files, which show as chips with a remove button above the field and then in the visitor's turn. A message may hold files alone, posted with `content: ''`, so the schema's `content` takes an empty string (no `minLength`).
 - `accept` (images and PDFs; an `accept` token matches as an `accept` attribute does, `image/*` and `.png` included, and a file the browser cannot type is taken and left to the action's 415), `maxFiles` (4 a message) and `maxSize` (5 MB each, bytes or a size such as `'2mb'`) are the upload's checks, made before anything is sent; a file left out says why in a notice: `attachRefusedLabel`, `attachTooBigLabel` or `attachFullLabel`. Words: `ai.chat.attach`, `remove`, `attachRefused`, `attachTooBig` and `attachFull`; `@attachIcon` replaces the plus.
-- The action still checks: `s.File({ type })` reads the bytes of a top-level field only, so for a file nested in `messages` `ask` reads them again and answers 415 for a file that is no image or PDF (`unsupported`), 413 past its `maxSize`. Set the action's `maxSize` for `maxFiles` files of the chat's `maxSize` each.
+- The action still checks: `s.file({ type })` reads the bytes of a top-level field only, so for a file nested in `messages` `ask` reads them again and answers 415 for a file that is no image or PDF (`unsupported`), 413 past its `maxSize`. Set the action's `maxSize` for `maxFiles` files of the chat's `maxSize` each.
 - The files ride on the history: each send posts those of the `history` latest messages again, so the model sees them in a follow-up, up to 8 MB for the messages before the last, the newest first (a message whose files do not fit leaves them all out, and goes itself, with the assistant reply that answered it, when it held nothing else; the last message keeps its files whatever they weigh), and a 413 shrinks the history counting each file as `ask` prices an image. The files live in the page: `remember` keeps the text of a turn, so after a reload the model no longer sees them.
 - Stop's call to the server posts the last message without its files.
 
@@ -70,7 +70,7 @@ export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) 
 
 - `maxInputChars` counts an attachment as a price in characters, since a provider bills a file in tokens: an image 4,000 characters (about a thousand tokens, whatever its size), a PDF 4,000 for each 250 KB it holds. Before the files are read the estimate is from their size, a stored file counting as an image; once read, the exact price is checked again, so a PDF stored by key still fails `too-long` when it is over.
 - The same price counts toward the budget's hold and a provider reporting no usage, so a visitor cannot spend unseen on files ([limits](limits.md)). The default 50,000 holds about twelve images, so an app reading scans raises `maxInputChars` with `maxSize`.
-- Size the action too: a post sends 1 MB at most unless the action raises `maxSize` (kay's action protection), and a bound `s.Array(s.File(), { maxItems })` keeps a visitor from posting twenty.
+- Size the action too: a post sends 1 MB at most unless the action raises `maxSize` (kay's action protection), and a bound `s.list(s.file(), { maxItems })` keeps a visitor from posting twenty.
 
 ### In tests
 

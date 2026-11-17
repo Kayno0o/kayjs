@@ -10,21 +10,21 @@ import { OPENAI_URL, openaiAt } from './openai'
 
 // The variables, shared by what `ai()` lists for `kay env` and what `ask` reads: `listed` marks the model as the one production needs.
 export function aiEnv(listed = false) {
-  return s.Object({
-    ANTHROPIC_API_KEY: s.Optional(s.String({ description: 'the key of Anthropic\'s Messages API' })),
-    OPENAI_API_KEY: s.Optional(s.String({ description: 'the key of OpenAI, or of an OpenAI-compatible server that wants one' })),
-    AI_BASE_URL: s.Optional(s.String({ description: 'an OpenAI-compatible server\'s API root, such as http://localhost:11434/v1 for Ollama' })),
-    AI_MODEL: s.Optional(s.String(listed ? { description: 'the model asked unless `ask` names one', requiredInProduction: true } : {})),
-    AI_INSECURE: s.Optional(s.Boolean({ description: 'lets a key go over plain http to a host that is not loopback, for a network you trust such as a compose network' })),
-    AI_PROVIDER: s.Optional(s.String({ pattern: '^(?:anthropic|openai)$', description: 'anthropic or openai: only needed when both keys are set' })),
-    AI_AUDIO_URL: s.Optional(s.String({ description: 'the API root of an OpenAI-compatible server for transcribe() and speak(), when it is not the one ask() uses' })),
-    AI_AUDIO_KEY: s.Optional(s.String({ description: 'the key of the AI_AUDIO_URL server, when it wants one other than OPENAI_API_KEY' })),
-    AI_TRANSCRIBE_MODEL: s.Optional(s.String({ description: 'the model transcribe() writes a recording down with, such as whisper-1' })),
-    AI_SPEECH_MODEL: s.Optional(s.String({ description: 'the model speak() reads a text aloud with, such as gpt-4o-mini-tts' })),
-    AI_VOICE: s.Optional(s.String({ description: 'the voice speak() reads in unless it names one' })),
-    AI_EMBED_URL: s.Optional(s.String({ description: 'the API root of an OpenAI-compatible server for embed(), when it is not the one ask() uses' })),
-    AI_EMBED_KEY: s.Optional(s.String({ description: 'the key of the AI_EMBED_URL server, when it wants one other than OPENAI_API_KEY' })),
-    AI_EMBED_MODEL: s.Optional(s.String({ description: 'the model embed() turns texts into vectors with, such as nomic-embed-text' })),
+  return s.object({
+    ANTHROPIC_API_KEY: s.string({ optional: true, description: 'the key of Anthropic\'s Messages API' }),
+    OPENAI_API_KEY: s.string({ optional: true, description: 'the key of OpenAI, or of an OpenAI-compatible server that wants one' }),
+    AI_BASE_URL: s.string({ optional: true, description: 'an OpenAI-compatible server\'s API root, such as http://localhost:11434/v1 for Ollama' }),
+    AI_MODEL: s.string({ optional: true, ...listed && { description: 'the model asked unless `ask` names one', requiredInProduction: true } }),
+    AI_INSECURE: s.boolean({ optional: true, description: 'lets a key go over plain http to a host that is not loopback, for a network you trust such as a compose network' }),
+    AI_PROVIDER: s.string({ optional: true, pattern: '^(?:anthropic|openai)$', description: 'anthropic or openai: only needed when both keys are set' }),
+    AI_AUDIO_URL: s.string({ optional: true, description: 'the API root of an OpenAI-compatible server for transcribe() and speak(), when it is not the one ask() uses' }),
+    AI_AUDIO_KEY: s.string({ optional: true, description: 'the key of the AI_AUDIO_URL server, when it wants one other than OPENAI_API_KEY' }),
+    AI_TRANSCRIBE_MODEL: s.string({ optional: true, description: 'the model transcribe() writes a recording down with, such as whisper-1' }),
+    AI_SPEECH_MODEL: s.string({ optional: true, description: 'the model speak() reads a text aloud with, such as gpt-4o-mini-tts' }),
+    AI_VOICE: s.string({ optional: true, description: 'the voice speak() reads in unless it names one' }),
+    AI_EMBED_URL: s.string({ optional: true, description: 'the API root of an OpenAI-compatible server for embed(), when it is not the one ask() uses' }),
+    AI_EMBED_KEY: s.string({ optional: true, description: 'the key of the AI_EMBED_URL server, when it wants one other than OPENAI_API_KEY' }),
+    AI_EMBED_MODEL: s.string({ optional: true, description: 'the model embed() turns texts into vectors with, such as nomic-embed-text' }),
   })
 }
 

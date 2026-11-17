@@ -10,7 +10,7 @@ import { transcribe } from '@kayjs/ai'
 const text = await transcribe(recording, { locale: 'fr' })
 ```
 
-`transcribe(audio, options?)` takes a `Blob` or a `File` (an action's `s.File()`, a `Chat`'s recording) and returns the text, trimmed. `locale` is a BCP 47 tag such as `fr` or `pt-BR`, sent to the provider as the ISO 639-1 code it takes (`fr`, `pt`; the old `language` works until 1.108: `deprecated-ai-language`); left out, the model tells, which a few words may get wrong. `maxSize` caps the recording (10 MB by default). A `Chat` takes it through its `transcribe` action: [Speaking a message](chat.md#speaking-a-message).
+`transcribe(audio, options?)` takes a `Blob` or a `File` (an action's `s.file()`, a `Chat`'s recording) and returns the text, trimmed. `locale` is a BCP 47 tag such as `fr` or `pt-BR`, sent to the provider as the ISO 639-1 code it takes (`fr`, `pt`; the old `language` works until 1.108: `deprecated-ai-language`); left out, the model tells, which a few words may get wrong. `maxSize` caps the recording (10 MB by default). A `Chat` takes it through its `transcribe` action: [Speaking a message](chat.md#speaking-a-message).
 
 ### Read a text aloud
 
@@ -82,7 +82,7 @@ import { ask, chatMessages, embed, ground, lastChatMessage } from '@kayjs/ai'
 import { db } from '../db'
 import { Passage } from '../db/passage'
 
-export const reply = action(s.Object({ messages: chatMessages() }), async ({ messages }) => {
+export const reply = action({ messages: chatMessages() }, async ({ messages }) => {
   const question = lastChatMessage(messages).content
   const found = await db.repo(Passage).read.nearest(await embed(question, { dimensions: 768 }), { k: 4, maxDistance: 0.6 })
 

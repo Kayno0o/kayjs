@@ -34,7 +34,7 @@ A name is imported where it is used, in a `.kay` file and in a `.ts` file alike;
 | `elementSize` | An element's width and height as reactive values, observed while an island lives. See [Islands](/essentials/islands#reading-an-elements-size) |
 | `mediaQuery`, `reducedMotion` | Whether a media query, or reduced motion, matches, following a change while an island lives. See [Islands](/essentials/islands#following-a-media-query) |
 | `online`, `pageVisible`, `inView` | Whether the browser has a connection, whether the tab is shown, and whether an element shows in the viewport, following a change while an island lives. See [Islands](/essentials/islands#following-the-connection-the-tab-and-the-scroll) |
-| `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...); `Schema` is the type of what it builds, `Static<typeof schema>` the value's type, and `s.typebox` the TypeBox builder underneath, unstable |
+| `s` | The schema builder for actions, config and content (`s.object`, `s.string`, ...), strict by default; `Schema` is the type of what it builds and `Static<typeof schema>` the value's type |
 | `Static`, `InputOf` | Types: what a schema describes, and an action's input. See [Forms and actions](/essentials/forms-and-actions#one-schema-for-the-server-and-the-browser) |
 | `action` | A form post or island call checked by a schema. See [Forms and actions](/essentials/forms-and-actions) |
 | `ActionError`, `ActionRedirectError` | What an action called from an island fails with, as the `error` of its result or what `.orThrow()` throws: its schema's messages, or the redirect it answered |
@@ -48,7 +48,7 @@ A name is imported where it is used, in a `.kay` file and in a `.ts` file alike;
 | `navigation` | Where an in-place navigation stands (`status()`, `pending()`, `to()`, `error()`), and its hooks: `onBeforeNavigate`, which may cancel one, and `onNavigate`, after each shown page. See [Islands](/essentials/islands#page-navigation) |
 | `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` answers `{ ok, data }` or `{ ok: false, error }`, the `ApiError` having the route's `status` (0 when no answer came), a `message` safe to show, `errors` per field and the route's `data`. See [API routes](/guides/api-routes) |
 | `apiUrl` | Where a route of an API module is served, under `base` and `endpoints.api`, for code that needs the URL rather than a call. See [API routes](/guides/api-routes) |
-| `publicEnv` | The variables marked `s.Public` in `defineEnv`, exposed to islands |
+| `publicEnv` | The variables marked `s.public` in `defineEnv`, exposed to islands |
 | `route` | The path of a page from its pattern and params, typed from your pages and encoded. See [Routing](/essentials/routing#linking-to-a-page-with-params) |
 | `refuse` | Thrown in an action or a `beforeX` hook to stop it with a message, field errors and data, answered as `ctx.deny` is in an action; elsewhere it is a 500. See [Hooks](/guides/hooks#changing-or-refusing) |
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |

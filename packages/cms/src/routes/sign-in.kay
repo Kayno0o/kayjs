@@ -13,10 +13,10 @@ import { settings } from '../settings'
 // The one screen an anonymous visitor may open: the guard is the sign-in's own.
 export const page = { guards: false, seo: { noindex: true, sitemap: false } }
 
-export const signIn = action(s.Object({
-  password: s.String({ maxLength: 500 }),
-  redirect: s.Optional(s.String({ maxLength: 2000 })),
-}), async ({ password, redirect }, ctx) => {
+export const signIn = action({
+  password: s.string({ max: 500 }),
+  redirect: s.string({ optional: true, max: 2000 }),
+}, async ({ password, redirect }, ctx) => {
   const { passwords } = await probe(ctx)
 
   if (passwords && await passwords.lockedOut())

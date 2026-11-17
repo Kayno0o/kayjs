@@ -13,6 +13,6 @@ async function* echo(text: string): AsyncGenerator<Progress> {
   yield { text: bare ? text.slice(5) : text, calls: [], ...!bare && { sources } }
 }
 
-export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => echo(messages.at(-1)!.content))
+export const reply = action({ messages: s.list(s.object({ role: s.enum(['user', 'assistant']), content: s.string({ max: 4000 }) }), { min: 1, max: 50 }) }, ({ messages }) => echo(messages.at(-1)!.content))
 ---
 p Echoing

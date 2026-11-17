@@ -22,4 +22,4 @@ export default api()
       await notifications.markRead(user, body.id)
 
     return notifications.inbox(user)
-  }, { body: s.Object({ id: s.Optional(s.String({ maxLength: 100 })) }) })
+  }, { body: s.object({ id: s.string({ optional: true, max: 100 }) }) })

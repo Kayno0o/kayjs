@@ -11,7 +11,7 @@
 import { contactForm } from '@kayjs/mail'
 import { s, action } from 'kay'
 
-export const contact = action(...contactForm({ fields: { phone: s.Optional(s.String({ maxLength: 30 })) }, reach: 'hello@example.com' }))
+export const contact = action(...contactForm({ fields: { phone: s.string({ optional: true, max: 30 }) }, reach: 'hello@example.com' }))
 ---
 ```
 
