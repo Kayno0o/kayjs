@@ -9,6 +9,7 @@ import { componentName, ROUTE_FILES } from '../compiler'
 import { parseProgram } from '../compiler/estree'
 import { constBindings, exportedObject, propertiesOf, unwrapped } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
+import { layerFilesOf } from './ui-layers'
 
 // Where an app sets the parts and variants of its components and its libraries'.
 export const UI_FILE = 'src/ui.ts'
@@ -413,37 +414,15 @@ export function uiOf(root: string): UiSource | undefined {
   return ui
 }
 
-// The files extensions contribute `defineUi` entries from, by project root, in the order of the config; set as the config loads.
-const layerFiles = new Map<string, string[]>()
-
-// A project's root as the layers are filed under it: through a symlink or not, it is one project.
-function rootKey(root: string): string {
-  try {
-    return realpathSync(root)
-  }
-  catch {
-    return resolve(root)
-  }
-}
-
 const layerReads = new Map<string, { stamp: string, ui: UiSource | undefined }>()
 
-// Records the `ui` files of the extensions for a project: absolute, or relative to its root.
-export function setUiLayers(root: string, extensions: readonly { ui?: string | undefined }[] | undefined): void {
-  const files = (extensions ?? []).flatMap(({ ui }) => ui === undefined ? [] : [resolve(root, ui)])
-
-  if (files.length === 0)
-    layerFiles.delete(rootKey(root))
-  else
-    layerFiles.set(rootKey(root), files)
-}
 
 // What the extensions' `ui` files say, in config order, each read as `src/ui.ts` is and resolving names against the app; a file that does not exist is skipped.
 export function uiLayersOf(root: string): UiSource[] {
   const base = join(resolve(root), 'src')
   const found: UiSource[] = []
 
-  for (const file of layerFiles.get(rootKey(root)) ?? []) {
+  for (const file of layerFilesOf(root)) {
     const stat = statSync(file, { throwIfNoEntry: false })
     const key = `${base}\0${file}`
 
@@ -477,12 +456,12 @@ export function uiLayerClasses(root: string): string[] {
 
 // Where classes of components may be set from: the extensions' `ui` files and the app's `src/ui.ts`, whether they exist now or not, for a rebuild when one is written or removed.
 export function uiPathsOf(root: string): string[] {
-  return [...layerFiles.get(rootKey(root)) ?? [], join(root, UI_FILE)]
+  return [...layerFilesOf(root), join(root, UI_FILE)]
 }
 
 // The `ui` files of the project's extensions, as the config listed them.
 export function uiLayerPathsOf(root: string): string[] {
-  return layerFiles.get(rootKey(root)) ?? []
+  return layerFilesOf(root)
 }
 
 // Every file that sets a component's classes now: the extensions' `ui` files, then the app's `src/ui.ts` when there is one.

@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'bun:test'
-import { setUiLayers, uiEntryOf, uiFilesOf, uiPathsOf } from '../src/build/ui'
+import { uiEntryOf, uiFilesOf, uiPathsOf } from '../src/build/ui'
+import { setUiLayers } from '../src/build/ui-layers'
 import { uiProblems } from '../src/check/ui'
 import { scratchDir } from './scratch'
 

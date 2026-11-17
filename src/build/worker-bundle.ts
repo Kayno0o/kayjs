@@ -5,7 +5,7 @@ import process from 'node:process'
 import { apiStubs } from '../server/api-modules'
 import { kayPlugin } from './plugin'
 import { withoutStyles } from './styles'
-import { setUiLayers } from './ui'
+import { setUiLayers } from './ui-layers'
 
 // What a browser build hands the process bundling one of its workers.
 export interface WorkerBundle {
