@@ -89,6 +89,8 @@ export type { FileHooks, FileStore, PutOptions, StoredFile, UrlOptions } from '.
 export { diskFiles, files, memoryFiles, s3Files } from './storage'
 export type { RenderToStringOptions } from './string'
 export { renderLocale, renderToString } from './string'
+export type { Issue, Refusal, Source, Validated, ValidateOptions } from './validate'
+export { validate } from './validate'
 export { CspViolationError } from './violations'
 export type { BunWebSocketConstructor } from './web-socket'
 export { WebSocket } from './web-socket'
@@ -96,8 +98,6 @@ export type { VerifyWorkOptions, WorkChallengeOptions } from './work-scope'
 export { verifyWork, workChallenge } from './work-scope'
 export type { StartOptions, WaitResult, Workflow, WorkflowContext, WorkflowOptions, WorkflowStatus, WorkflowStep } from './workflow'
 export { workflow } from './workflow'
-export type { Issue, Refusal, Source, Validated, ValidateOptions } from './validate'
-export { validate } from './validate'
 export { forgetLocalMirrors } from './writes'
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
