@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { inRequestLocale } from '../src/server/api'
-import { refusedFields } from '../src/server/field-errors'
+import { messagesOf } from '../src/server/validate'
 import { testSite } from '../src/test'
 
 const FIXTURE = 'tests/fixtures/api-locale'
@@ -190,7 +190,7 @@ describe('input an API route refuses, other validators and edge cases', () => {
   })
 
   it('keeps a __proto__ field', () => {
-    const fields = refusedFields({}, { all: [{ path: '/__proto__', summary: 'Expected string', schema: {}, value: 1 }] } as never)
+    const fields = messagesOf([{ path: '__proto__', key: 'kay.invalid.type', params: {}, message: 'Expected string' }])
 
     expect(Object.keys(fields)).toEqual(['__proto__'])
     expect(JSON.stringify(fields)).toBe('{"__proto__":"Expected string"}')

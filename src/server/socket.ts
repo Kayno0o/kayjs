@@ -1,11 +1,11 @@
 import type { Elysia } from 'elysia'
-import { getSchemaValidator, ValidationError } from 'elysia'
+import type { Issue } from './validate'
 import { ElysiaWS } from 'elysia/ws'
 import { underKayDev } from '../build/assets'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
-import { refusedFields } from './field-errors'
 import { bindReply } from './rooms'
+import { isRefusal, messagesOf, validate } from './validate'
 import { kayWord } from './words'
 import { admissionOf, frameGuard } from './ws-limits'
 
@@ -27,7 +27,7 @@ export interface SocketRoute {
 }
 
 type Peer = ElysiaWS
-type Checked = { value: unknown } | { refused: ValidationError, schema: unknown } | Promise<{ value: unknown } | { refused: ValidationError, schema: unknown }>
+type Checked = { value: unknown } | { refused: Issue[] } | Promise<{ value: unknown } | { refused: Issue[] }>
 
 interface Replying {
   validator?: { provider?: string, Check?: (value: unknown) => boolean, schema?: { '~standard': { validate: (value: unknown) => unknown } } }
@@ -154,7 +154,7 @@ export async function adopt(ws: ElysiaWS, route: SocketRoute): Promise<ElysiaWS>
       const checked = route.check === undefined ? undefined : await route.check(decoded.value)
 
       if (checked && 'refused' in checked) {
-        socket.send(refusal('kay.socket.invalid', refusedFields(checked.schema, checked.refused)))
+        socket.send(refusal('kay.socket.invalid', messagesOf(checked.refused)))
 
         return undefined
       }
@@ -249,62 +249,34 @@ interface BodyCheck {
   check: NonNullable<SocketRoute['check']>
 }
 
-// The `body` of a websocket route as an HTTP route's: a message arrives cleaned and decoded, `at: '1'` as `1` for an integer, and one the schema refuses is answered with the fields it names.
-// Elysia's validation is left out of the route and done here, with the validator Elysia would have built.
+// The `body` of a websocket route as an HTTP route's: a message is a JSON value, read as the schema types it, and one the schema refuses is answered with the fields it names.
+// Elysia's validation is left out of the route and done here, by `validate`.
 export function socketBody(app: Elysia, body: unknown, name: () => string): BodyCheck | undefined {
   if (body === undefined)
     return undefined
 
-  const { definitions } = app as unknown as { definitions: { typebox: never, type: never } }
-  const validator = getSchemaValidator(body as never, { modules: definitions.typebox, models: definitions.type, normalize: app.config.normalize })
+  const { definitions } = app as unknown as { definitions: { type: Record<string, unknown> } }
+  const schema = typeof body === 'string' ? definitions.type[body] : body
 
-  if (validator === undefined)
+  if (typeof schema !== 'object' || schema === null)
     return undefined
 
   let loggedAt = 0
 
-  // Under `kay dev` only, and at most once a second per route: the sender is told which fields, the developer which route, in quotes as what a client sent may hold control codes.
-  const refuse = (refused: ValidationError): { refused: ValidationError, schema: unknown } => {
-    if (underKayDev() && performance.now() - loggedAt >= 1000) {
-      loggedAt = performance.now()
-      kayLog('warn', `the websocket route ${JSON.stringify(name())} refused a message of its body: ${JSON.stringify(refused.all[0]?.summary ?? 'it does not match')}`)
-    }
-
-    return { refused, schema: body }
-  }
-
-  if (validator.provider === 'standard') {
-    return {
-      check: async (value) => {
-        const result = await (validator as unknown as { schema: { '~standard': { validate: (value: unknown) => Promise<{ issues?: never[], value?: unknown }> | { issues?: never[], value?: unknown } } } }).schema['~standard'].validate(value)
-
-        return result.issues ? refuse(new ValidationError('message', validator, value, false, result.issues as never)) : { value: result.value }
-      },
-    }
-  }
-
   return {
-    check: (value) => {
-      let cleaned: unknown
+    check: async (value) => {
+      const result = await validate(schema, value, { source: 'json' })
 
-      // A structure the cleaner cannot walk is refused as a failed check is, never passed on unstripped.
-      try {
-        cleaned = validator.Clean?.(value) ?? value
-      }
-      catch {
-        return refuse(new ValidationError('message', validator, value))
+      if (!isRefusal(result))
+        return { value: result.value }
+
+      // Under `kay dev` only, and at most once a second per route: the sender is told which fields, the developer which route, in quotes as what a client sent may hold control codes.
+      if (underKayDev() && performance.now() - loggedAt >= 1000) {
+        loggedAt = performance.now()
+        kayLog('warn', `the websocket route ${JSON.stringify(name())} refused a message of its body: ${JSON.stringify(result.errors[0]?.message ?? 'it does not match')}`)
       }
 
-      if (validator.Check(cleaned) === false)
-        return refuse(new ValidationError('message', validator, cleaned))
-
-      try {
-        return { value: validator.hasTransform ? validator.Decode(cleaned) : cleaned }
-      }
-      catch {
-        // A transform that refuses the value is a refused message too.
-        return refuse(new ValidationError('message', validator, cleaned))
-      }
+      return { refused: result.errors }
     },
   }
 }

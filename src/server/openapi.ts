@@ -8,6 +8,7 @@ import { posix } from 'node:path'
 import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
+import { declaredInputs } from './api-input'
 import { API_PREFIX, KAY_PREFIX, openApiPaths, referenced } from './api-modules'
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
@@ -208,7 +209,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
   for (const module of modules) {
     for (const route of module.instance.routes) {
       const method = route.method.toUpperCase()
-      const hooks = route.hooks as Record<string, unknown> & { detail?: { summary?: string, description?: string, tags?: string[], deprecated?: boolean, hide?: boolean, operationId?: string, tool?: boolean | string | ActionTool } }
+      const hooks = { ...route.hooks as object, ...declaredInputs(route.hooks) } as Record<string, unknown> & { detail?: { summary?: string, description?: string, tags?: string[], deprecated?: boolean, hide?: boolean, operationId?: string, tool?: boolean | string | ActionTool } }
 
       if ((!METHODS.has(method) && method !== 'ALL') || hooks.detail?.hide === true)
         continue

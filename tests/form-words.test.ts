@@ -4,7 +4,7 @@ import { describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
 import { servePages } from '../src/server/app'
-import { fieldMessage, validated } from '../src/server/field-errors'
+import { fieldMessage } from '../src/server/field-errors'
 import { testSite } from '../src/test'
 
 type Rules = Record<string, { properties: Record<string, { error?: string }> }>
@@ -72,14 +72,5 @@ describe('the error functions of a schema', () => {
     expect(fieldMessage(schema, '/either')).toBe('branch')
     expect(fieldMessage(schema, '/__proto__')).toBeUndefined()
     expect(fieldMessage(schema, '/constructor')).toBeUndefined()
-  })
-
-  it('are left out of the copy Elysia validates with, the schema itself untouched', () => {
-    const copy = validated(schema as never) as unknown as typeof schema
-
-    expect(copy).not.toBe(schema)
-    expect(copy.properties['a/b']).not.toHaveProperty('error')
-    expect(schema.properties['a/b'].error()).toBe('slashed')
-    expect(validated(copy as never)).toBe(copy as never)
   })
 })

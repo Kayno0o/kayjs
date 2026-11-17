@@ -40,7 +40,7 @@ export function refusals(check: TypeCheck<TSchema>, value: unknown, keyOf: (poin
 }
 
 // A block of a `blocks()` list that fails is reported by the fields of its own type, as the union of all the types would only say the item is not valid; a block naming no declared type keeps the union's error.
-function* withoutBlockUnions(issues: Iterable<ValueError>): Generator<ValueError> {
+export function* withoutBlockUnions(issues: Iterable<ValueError>): Generator<ValueError> {
   for (const issue of issues) {
     const own = variantOf(issue)
 

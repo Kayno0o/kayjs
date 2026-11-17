@@ -3,11 +3,9 @@ import type { ParamRule, QueryRules } from '../runtime/query-param'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { ARRIVAL_PARAM } from '../runtime/arrival'
-import { formInput } from '../runtime/form'
-import { errorText } from './field-errors'
 import { pageSetting } from './page-settings'
-import { compiledCheck, fieldOf, refusals, summaryOf } from './schema-check'
 import { Denied } from './signals'
+import { isRefusal, messagesOf, validateNow } from './validate'
 
 export type ReadFields = { value: Record<string, unknown> } | { refused: Map<string, string> }
 
@@ -149,30 +147,11 @@ export function readQueryLeniently(schema: unknown, url: URL): Readonly<Record<s
 }
 
 // Text read the way a form's fields are, a top-level field left out taking its schema's default, then checked and decoded: the value, or a message per field refused.
-// `form` is `formInput`'s: a GET form leaves an unticked checkbox out of its query, while nothing leaves a variable out of the environment on purpose, nor pads it with spaces by mistake.
+// `form` is the difference between a query and the environment: a GET form leaves an unticked checkbox out of its query, while nothing leaves a variable out of the environment on purpose, nor pads it with spaces by mistake.
 export function readFields(schema: TSchema, input: Record<string, unknown>, form = true): ReadFields {
-  const filled = { ...input }
-  const required = (schema as { required?: string[] }).required ?? []
+  const result = validateNow<Record<string, unknown>>(schema, input, { source: form ? 'query' : 'env' })
 
-  for (const [name, field] of Object.entries((schema as ObjectSchema).properties ?? {})) {
-    // A blank list is the empty one, as `persisted.query` writes it, never one blank item; a blank optional field with a default is left out, so the default fills in. Only here: an action's body goes through `formInput` alone.
-    if (form && filled[name] === '' && (field as { type?: unknown }).type === 'array')
-      filled[name] = []
-    else if (form && filled[name] === '' && field.default !== undefined && !required.includes(name))
-      delete filled[name]
-
-    if (filled[name] === undefined && field.default !== undefined)
-      filled[name] = structuredClone(field.default)
-  }
-
-  const value = formInput(schema, filled, form) as Record<string, unknown>
-  const check = compiledCheck(schema)
-
-  // Decoding turns what a schema reads from text, such as an `s.Date()`, into the value its type says.
-  if (check.Check(value))
-    return { value: check.Decode<Record<string, unknown>>(value) }
-
-  return { refused: refusals(check, value, fieldOf, issue => errorText((issue.schema as { error?: unknown }).error) ?? summaryOf(issue)) }
+  return isRefusal(result) ? { refused: new Map(Object.entries(messagesOf(result.errors))) } : { value: result.value }
 }
 
 // The rules of a page's `query` schema, which its islands' `queryParam` reads its params by: a param the rules cannot tell the type of reads as its text.

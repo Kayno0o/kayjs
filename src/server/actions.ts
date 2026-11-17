@@ -1,5 +1,5 @@
 import type { CookieMap } from 'bun'
-import type { Elysia, TSchema, ValidationError } from 'elysia'
+import type { Elysia, TSchema } from 'elysia'
 import type { Server } from 'elysia/universal'
 import type { ActionsConfig } from '../config'
 import type { GuardContext, Locals, RouteParams } from '../runtime'
@@ -20,10 +20,9 @@ import type { Unmatched } from './page-routes'
 import type { ToolOutputs } from './tool-outputs'
 import { relative } from 'node:path'
 import { KayError } from '../compiler/errors'
-import { decodeCall, failure, FORM_CALL, FORM_FIELD, isAction, isFailure, protectionFields } from '../runtime/action'
+import { decodeCall, failure, FORM_CALL, FORM_FIELD, honeypotField, isAction, isFailure, protectionFields, STAMP_FIELD } from '../runtime/action'
 import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
-import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { thrownRefusal } from '../runtime/refuse'
 import { withDefaultBounds } from '../runtime/schema-bounds'
@@ -40,7 +39,6 @@ import { routerPath } from './base'
 import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
 import { BACK_PARAMETER, crossSiteResponse, isCrossSite, postedFrom, TEXT } from './cross-site'
-import { fieldMessage, refusedFields, validated } from './field-errors'
 import { fileBodyLimit } from './file-limit'
 import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
@@ -61,6 +59,7 @@ import { carryContext } from './security'
 import { actionStoppers, Denied, NotFound, Redirect, stoppers } from './signals'
 import { toolSettings } from './tool-settings'
 import { answered, replyTrace, SERVER_SPAN, traced } from './trace'
+import { isRefusal, messagesOf, validate } from './validate'
 import { visitAs } from './visit'
 import { kayWord } from './words'
 import { onceWritten } from './writes'
@@ -93,9 +92,6 @@ const HTML = /^text\/html\b/
 const HEAD_START = /<head\b[^>]*>/i
 // The `action` of a form posting to an action, the site's `base` before it if any.
 const FORM_ACTION = /(<form\b[^>]*?\saction=")([^"]*\/_kay\/action\/[^"#]*)/gi
-
-// Elysia names a file it refuses `body.<field>`.
-const BODY_PREFIX = /^body\./
 
 export interface ActionOptions {
   // Shows a failed action's message instead of a generic one.
@@ -200,7 +196,6 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 
         return carryContext(context.set, response)
       }, context.request), {
-        body: validated(value.schema),
         transform: async (context) => {
           refuseCrossSite(context.request)
 
@@ -226,36 +221,34 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           if (typeof form === 'string')
             requestRecord(context.request).postedForm = form
 
-          context.body = asForm ? formInput(value.schema, withFixedFields(withoutEmptyFiles(context.body), context.request)) : callInput(context.body)
+          context.body = asForm ? withFixedFields(withoutEmptyFiles(context.body), context.request) : callInput(context.body)
         },
-        // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
-        ...(guards.length > 0 && {
-          beforeHandle: async (context: { request: Request }) => {
-            const { pageParams = {}, pageUrl } = requestRecord(context.request)
+        // The guards first, so a caller they refuse learns nothing of the input, then the input against the schema: the handler reads the value it reads.
+        beforeHandle: async (context: { request: Request, body: unknown, server: Server | null }) => {
+          const { pageParams = {}, pageUrl } = requestRecord(context.request)
+          const { request } = context
 
-            return inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), pageParams, pageUrl, options))
-          },
-        }),
+          return inLocale(request, options, async () => {
+            if (guards.length > 0) {
+              const refusal = await admit(guards, sharedContext(request, () => ({ ...context })), pageParams, pageUrl, options)
+
+              if (refusal)
+                return refusal
+            }
+
+            const posted = context.body
+            const result = await validate(value.schema, isCall(request) && !isFormCall(request) ? posted : withoutKayFields(posted, value), { source: isCall(request) && !isFormCall(request) ? 'json' : 'form' })
+
+            if (isRefusal(result))
+              return failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: isCall(request) ? {} : submittedValues(posted), errors: messagesOf(result.errors) }, context.server, back)
+
+            context.body = result.value
+
+            return undefined
+          })
+        },
         error: async (context) => {
-          const { code, error, request, body, server, set } = context
-
-          if ((code === 'VALIDATION' || code === 'INVALID_FILE_TYPE') && guards.length > 0) {
-            const { pageParams = {}, pageUrl } = requestRecord(request)
-            const refusal = await inLocale(request, options, async () => guardsFirst(guards, sharedContext(request, () => ({ ...context })), pageParams, pageUrl, options))
-
-            if (refusal)
-              return refusal
-          }
-
-          if (code === 'VALIDATION')
-            return inLocale(request, options, async () => refused(value, error, request, server, back))
-
-          // Elysia checks a top-level `s.File({ type })` against the file's bytes once the schema passed.
-          if (code === 'INVALID_FILE_TYPE') {
-            const field = error.property.replace(BODY_PREFIX, '')
-
-            return inLocale(request, options, async () => failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: submittedValues(body), errors: { [field]: fieldError(value, field) ?? kayWord('kay.action.invalidFile') } }, server, back))
-          }
+          const { error, set } = context
 
           // Read as unknown: some apps' Elysia types narrow the error to an intersection holding `number`.
           const refusal: unknown = error
@@ -436,9 +429,14 @@ function callInput(body: unknown): unknown {
   }
 }
 
-// The `error` option the schema gives a top-level field, read in the request's locale.
-function fieldError(action: ServerAction<TSchema, unknown>, field: string): string | undefined {
-  return fieldMessage(action.schema, `/${field}`)
+// The post without the fields kay adds to a form itself, which the schema never names: the form it came from, the stamp `minTime` reads and the honeypot.
+function withoutKayFields(body: unknown, action: ServerAction<TSchema, unknown>): unknown {
+  if (typeof body !== 'object' || body === null || Array.isArray(body))
+    return body
+
+  const honeypot = honeypotField(action.protection)
+
+  return Object.fromEntries(Object.entries(body).filter(([name]) => name !== FORM_FIELD && name !== STAMP_FIELD && name !== honeypot))
 }
 
 // Browsers send `Origin` on every POST, so a form another site submits on the user's behalf is refused before anything else runs.
@@ -770,13 +768,6 @@ function encodeOrExplain(value: unknown, what: string): string {
 
     throw reason === undefined ? error : new KayError('live-value-invalid', `kay: ${what} cannot reach the browser: ${reason}`)
   }
-}
-
-// Input the schema refused: a message per field, the schema's own `error` when it has one, a function `error` called in the request's locale.
-async function refused(action: ServerAction<TSchema, unknown>, error: Readonly<ValidationError>, request: Request, server: Server | null, back: Back): Promise<Response> {
-  const errors = refusedFields(action.schema, error)
-
-  return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 422, values: submittedValues(error.value), errors }, server, back)
 }
 
 // A call gets the failure as JSON; a plain form post gets the page it came from, rendered with the failure.
