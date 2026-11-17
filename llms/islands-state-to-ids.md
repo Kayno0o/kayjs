@@ -13,7 +13,7 @@
 - A module's `memo` is computed afresh on each read on the server.
 - `persisted.cookie('theme', 'light')` from `kay` is a signal that keeps its value across pages and visits in a cookie named `theme`, which the server reads too, so a page rendered for the request shows the kept value from the first paint, and answers with `Vary: Cookie`.
 - A page's `--- server` fence, which loads its data before the render, reads a `persisted.cookie()` signal by calling it: `open()` there is the request's value, decoded and checked against `values` as the render does, the default when the cookie is missing or refused, so the fence needs no `ctx.cookies` and no knowledge of the cookie's encoding. The page then answers with `Vary: Cookie`.
-- A page `kay build` prerendered renders a `persisted` signal's default, and the island corrects it as it hydrates.
+- A page `kay build` prerendered renders a `persisted` signal's default, in its server fence too, and the island corrects it as it hydrates.
 - The cookie is named as it is given, so it never reuses the name of a cookie the app sets itself.
 - `persisted` has one entry per storage, `persisted.cookie()`, `persisted.local()` and `persisted.session()`, each taking the options its storage can use, and a call always names its storage: a bare `persisted(name, value)`, which kept a cookie without saying so, works until 1.108 and `kay upgrade` writes `.cookie` for it (`deprecated-persisted-call`). The `storage` option is gone since 1.105.
 - A query param is not persisted but `queryParam`, below: `persisted.query(name, value, options)` is `queryParam(name, { default: value, ...options })`, works until 1.108 and `kay upgrade` rewrites it (`deprecated-persisted-query`).

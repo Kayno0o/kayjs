@@ -5,7 +5,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { setRequestOutcome } from '../runtime/action'
 import { setEndedEntryNote } from '../runtime/ended-entry'
 import { readParam } from '../runtime/query-param'
-import { setLoadScope, setServerScope } from '../runtime/reactive'
+import { setRequestCookieScope, setServerScope } from '../runtime/reactive'
 import { setCurrentUrl } from '../runtime/with-query'
 import { requestCookies } from './cookies'
 import { requestUrl } from './request-url'
@@ -21,11 +21,12 @@ setServerScope(() => store.getStore())
 const loads = new AsyncLocalStorage<{ url: URL, scope: LoadScope }>()
 
 setCurrentUrl(() => loads.getStore()?.url ?? (store.getStore()?.request === undefined ? undefined : requestUrl(store.getStore()!.request!)))
-setLoadScope(() => loads.getStore()?.scope)
+setRequestCookieScope(() => loads.getStore()?.scope)
 
+// `cookieRead` runs once the load read a cookie, the page then depending on it.
 // Runs a page's or a layout's load, which reads the page it answers through `withQuery`, and a persisted cookie signal through the request's cookies, as the render reads them.
-export function inLoad<T>(url: URL, request: Request, run: () => T): T {
-  return loads.run({ url, scope: { cookie: cookieReader(request) } }, run)
+export function inLoad<T>(url: URL, request: Request, cookieRead: () => void, run: () => T): T {
+  return loads.run({ url, scope: { cookie: cookieReader(request, cookieRead) } }, run)
 }
 
 // Reads the request's cookies on the first call, which makes the page depend on them, then `first` runs.

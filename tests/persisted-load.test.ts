@@ -23,6 +23,16 @@ it('reads the default with no cookie', async () => {
   expect(await folder()).toBe('none')
 })
 
+it('makes the answer private, and varies on the cookie even when the page sets its own caching', async () => {
+  const plain = await site.as(persistedCookie('open', 'a')).visit('/')
+  const cached = await site.as(persistedCookie('open', 'a')).visit('/?cache')
+
+  expect(plain.headers.get('cache-control')).toBe('private, no-cache')
+  expect(plain.headers.get('vary')?.toLowerCase()).toContain('cookie')
+  expect(cached.headers.get('cache-control')).toBe('public, max-age=60')
+  expect(cached.headers.get('vary')?.toLowerCase()).toContain('cookie')
+})
+
 it('keeps concurrent requests apart', async () => {
   const seen = await Promise.all(['a', 'b', 'a', 'b', 'none'].map(async value => folder(persistedCookie('open', value))))
 

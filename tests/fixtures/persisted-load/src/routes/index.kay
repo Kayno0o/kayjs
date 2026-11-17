@@ -1,8 +1,13 @@
 --- server
 import { open } from '../lib/open'
 
-// The fence reads the request's cookie through the signal, before the page renders.
+// The fence reads the request's cookie through the signal, before the page renders, after a wait so requests interleave.
+await Bun.sleep(5)
+
 const folder = open()
+
+if (ctx.url.searchParams.has('cache'))
+  ctx.headers.set('cache-control', 'public, max-age=60')
 ---
 main
   p.folder {folder}

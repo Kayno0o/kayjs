@@ -495,7 +495,7 @@ async function runLoad(file: string, module: PageModule, ctx: PageContext<Record
     return {}
 
   const load = module.load
-  const run = async () => traced(() => `kay.load ${projectPath(file)}`, {}, async () => inLoad(ctx.url, ctx.request, async () => await load(ctx) ?? {}))
+  const run = async () => traced(() => `kay.load ${projectPath(file)}`, {}, async () => inLoad(ctx.url, ctx.request, () => ctx.headers.append('vary', 'cookie'), async () => await load(ctx) ?? {}))
 
   if (!timings)
     return run()
