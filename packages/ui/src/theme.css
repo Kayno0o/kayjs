@@ -966,6 +966,15 @@
     grid-area: text;
   }
 
+  /* The preview alone: the field stays in the form, out of sight. */
+  .kui-markdown-grid:where([data-view='preview']) {
+    grid-template-areas: 'view';
+
+    > .kui-markdown-editor {
+      @apply hidden;
+    }
+  }
+
   /* The height of its buttons, which load after the editor, so the field does not jump. */
   .kui-markdown-bar {
     @apply flex min-h-6 flex-wrap items-center gap-1;

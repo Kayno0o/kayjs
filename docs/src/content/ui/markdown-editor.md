@@ -52,6 +52,8 @@ The editor puts the HTML through `sanitizeHtml` (images and tables kept), so a s
 
 `previewing` shows or hides the preview from the page, and `onPreviewChange({ previewing })` hears each toggle, so a page driving `previewing` can set it back.
 
+`view` picks what shows: `edit` the field alone, `split` the field beside the preview, `preview` the preview alone. In `preview` the field stays in the form but out of sight, and the toolbar and the Preview button are gone, so a page with its own Edit and Preview switch sets `view` from there. The Preview button toggles between `edit` and `split` and reports it through `onViewChange({ view })`. `view` wins over `previewing`, and without a `preview` function the editor is always `edit`.
+
 ## Image uploads
 
 With `onImage({ file })`, a pasted or dropped image is embedded behind a placeholder at once and swapped for its url once the function resolves. If it throws, the placeholder is removed and `uploadFailure` is toasted. `name` submits the text in a plain form.

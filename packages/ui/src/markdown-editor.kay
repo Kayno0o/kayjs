@@ -24,7 +24,7 @@ const EDITS: Record<ToolbarAction, (text: string, start: number, end: number) =>
 
 const look = recipe({ parts: { wrap: 'kui-markdown', grid: 'kui-markdown-grid', root: 'kui-markdown-editor', bar: 'kui-markdown-bar', barFailed: 'kui-markdown-bar-failed', extra: 'kui-markdown-extra flex flex-wrap items-center gap-0.5', preview: 'kui-markdown-preview', previewBody: 'kui-markdown-preview-body kui-prose' } })
 
-const { value = '', invalid, label, onInput, onChange, onImage, onImageError, toolbar = true, actions, preview, previewing, onPreviewChange, previewTrusted = false, previewHtml, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+const { value = '', invalid, label, onInput, onChange, onImage, onImageError, toolbar = true, actions, preview, previewing, onPreviewChange, view, onViewChange, previewTrusted = false, previewHtml, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // Marks the editor as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
   // Names the editor for screen readers, as an `aria-label` of its text area: a FormField draws the visible label, and `aria-label` still wins where both are written.
@@ -56,6 +56,10 @@ const { value = '', invalid, label, onInput, onChange, onImage, onImageError, to
   // Whether the preview shows, when the parent sets it; the Preview button toggles it on its own, and `onPreviewChange` reports each change so a parent driving `previewing` can set it back.
   previewing?: boolean | undefined
   onPreviewChange?: ((event: { previewing: boolean }) => unknown) | undefined
+  // Which parts show: `edit` the field alone, `split` the field beside the preview, `preview` the preview alone, with the field kept in the form and the toolbar gone. It wins over `previewing`, and an app with its own Edit | Preview switch sets it from there. Without `preview` the editor is always `edit`. The Preview button toggles `edit` and `split`, and does not show in `preview`.
+  view?: 'edit' | 'split' | 'preview' | undefined
+  // Called with the view after the Preview button changes it; a parent driving `view` sets it back.
+  onViewChange?: ((event: { view: 'edit' | 'split' | 'preview' }) => unknown) | undefined
   // Classes for the HTML of the preview, so it takes the styles the page gives rendered Markdown, such as a prose class.
   previewClass?: string | undefined
   // Tells screen readers how to leave the field, since Tab on a list item indents it.
@@ -128,6 +132,18 @@ effect(() => {
     previewShown = previewing
 })
 
+const viewSet = signal<'edit' | 'split' | 'preview' | undefined>(untrack(() => view))
+
+effect(() => {
+  if (view !== undefined)
+    viewSet = view
+})
+
+// What shows now: `view` when given, else the Preview button's state; never more than the field without a `preview` function.
+function mode(): 'edit' | 'split' | 'preview' {
+  return preview ? viewSet() ?? (previewShown() ? 'split' : 'edit') : 'edit'
+}
+
 // The toolbar and the preview pane are separate chunks, fetched once the editor shows buttons or the preview is first asked for: an editor with neither never loads their icons and code.
 // Each is held in a list of at most one component, as a template draws a component from a list.
 const toolbarView = signal<(typeof import('./internal/markdown-toolbar.kay'))['default'][]>([])
@@ -152,7 +168,7 @@ effect(() => {
 })
 
 effect(() => {
-  if (previewShown() && untrack(previewView).length === 0)
+  if (mode() !== 'edit' && untrack(previewView).length === 0)
     void loadView(async () => import('./internal/markdown-preview.kay'), view => previewView = [view])
 })
 
@@ -188,10 +204,15 @@ function applyEdit(el: HTMLTextAreaElement, edit: TextEdit, takeFocus = true): v
 }
 
 function togglePreview(): void {
-  const next = !previewShown()
+  const next = mode() !== 'split'
 
   previewShown = next
+
+  if (viewSet() !== undefined)
+    viewSet = next ? 'split' : 'edit'
+
   onPreviewChange?.({ previewing: next })
+  onViewChange?.({ view: next ? 'split' : 'edit' })
 }
 
 
@@ -421,18 +442,18 @@ const previewParts = () => previewClass === undefined ? undefined : { body: prev
 // A markdown field that writes like an editor, under a toolbar and beside a preview if asked: Ctrl+B, Ctrl+I and Ctrl+K wrap the selection, Enter continues a list and Tab indents one, Escape then Tab leaving the field, a pasted page turns into markdown, and pasted or dropped images upload behind a placeholder.
 // The textarea comes first in the document, so the label a form field puts around the editor names it and not the first button; the bar is placed above it by the grid.
 div(part="wrap")
-  div(part="grid" data-preview={previewShown() ? '' : undefined})
+  div(part="grid" data-preview={mode() === 'split' ? '' : undefined} data-view={mode()})
     textarea.kui-field-input(part="root" aria-label={label} {...rest} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text = event.currentTarget.value; onInput?.({ value: event.currentTarget.value }) }} onBlur={left} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
-    if builtIn().length > 0 || preview || actions
+    if mode() !== 'preview' && (builtIn().length > 0 || preview || actions)
       div(part="bar" role="toolbar" aria-label={wording('ui.markdownEditor.toolbar', 'Formatting')})
         if toolbarFailed()
           span(part="barFailed" role="alert") {wording('ui.markdownEditor.toolbarFailure', 'The toolbar could not be loaded')}
         for View of toolbarView() key={View}
-          View(actions={builtIn()} hasPreview={preview !== undefined} previewing={previewShown()} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
+          View(actions={builtIn()} hasPreview={preview !== undefined} previewing={mode() === 'split'} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
         if actions
           div(part="extra")
             | {actions(tools)}
-    if previewShown() && preview
+    if mode() !== 'edit' && preview
       if previewView().length === 0 && previewHtml !== undefined
         div(part="preview" role="region" aria-label={wording('ui.markdownEditor.preview', 'Preview')} aria-busy="false")
           div(part="previewBody" class={previewClass} innerHTML={previewHtml})

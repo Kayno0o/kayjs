@@ -2215,6 +2215,7 @@ component default
   onImageError?: ((event: { file: File; error: unknown; }) => unknown) | undefined
   onInput?: ((event: { value: string; }) => unknown) | undefined
   onPreviewChange?: ((event: { previewing: boolean; }) => unknown) | undefined
+  onViewChange?: ((event: { view: "edit" | "preview" | "split"; }) => unknown) | undefined
   parts?: undefined | {
   root?: string | undefined;
   wrap?: string | undefined;
@@ -2233,6 +2234,7 @@ component default
   toolbar?: boolean | readonly ("bold" | "bulletList" | "heading" | "image" | "italic" | "link" | "numberedList")[] | undefined
   uploadFailure?: string | undefined
   value?: string | undefined
+  view?: "edit" | "preview" | "split" | undefined
 
 [./masonry.kay] default
 component default

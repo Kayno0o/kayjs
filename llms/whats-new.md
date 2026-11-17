@@ -26,6 +26,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `assets.manifest.shareTarget` lists the installed app in a device's share sheet, posting the shared title, text, link and files to an action ([web manifest](sitemap-search-fonts.md#favicon-and-web-manifest)).
 - kayjs-ui's `Badge` takes `dot`, a small dot in its colour before the label ([Badge](/ui/badge#a-dot)).
 - kayjs-ui's `TabNav` takes `variant="segmented"`, its links drawn as Segmented's tray of keys, still links with `aria-current` ([TabNav](/ui/tab-nav#segmented)).
+- kayjs-ui's `MarkdownEditor` takes `view` (`edit`, `split` or `preview`) and `onViewChange`, so a note can show the preview alone, with the field kept in the form and no toolbar, or the field alone ([MarkdownEditor](/ui/markdown-editor)).
 
 ## 1.105.0
 

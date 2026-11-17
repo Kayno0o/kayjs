@@ -406,6 +406,57 @@ describe('MarkdownEditor preview', () => {
   })
 })
 
+describe('MarkdownEditor view', () => {
+  const preview = async (markdown: string) => `<p>${markdown}</p>`
+  const grid = (root: Element) => root.querySelector('.kui-markdown-grid')!
+
+  test('preview shows the pane alone: field kept, toolbar and Preview button gone', async () => {
+    const state = await editor('one', undefined, { preview, view: 'preview' })
+
+    await until(() => state.root.querySelector('.kui-markdown-preview-body')?.innerHTML === '<p>one</p>')
+
+    expect(grid(state.root).getAttribute('data-view')).toBe('preview')
+    expect(grid(state.root).hasAttribute('data-preview')).toBe(false)
+    expect(state.root.querySelector('[role=toolbar]')).toBeNull()
+    expect(state.area.value).toBe('one')
+    expect(state.area.isConnected).toBe(true)
+  })
+
+  test('edit shows the field with the toolbar and no pane', async () => {
+    const state = await editor('one', undefined, { preview, view: 'edit' })
+
+    await settle()
+
+    expect(grid(state.root).getAttribute('data-view')).toBe('edit')
+    expect(state.root.querySelector('.kui-markdown-preview')).toBeNull()
+    expect(named(state.root, 'Bold')).not.toBeNull()
+  })
+
+  test('split is the field and the pane, and the Preview button reports the view', async () => {
+    const views: string[] = []
+    const state = await editor('one', undefined, { preview, view: 'split', onViewChange: (next: string) => views.push(next) })
+
+    await until(() => state.root.querySelector('.kui-markdown-preview-body')?.innerHTML === '<p>one</p>')
+
+    expect(grid(state.root).getAttribute('data-view')).toBe('split')
+
+    named(state.root, 'Preview').click()
+    await settle()
+
+    expect(grid(state.root).getAttribute('data-view')).toBe('edit')
+    expect(state.root.querySelector('.kui-markdown-preview')).toBeNull()
+    expect(views).toEqual(['edit'])
+  })
+
+  test('without a preview function the view is the field', async () => {
+    const state = await editor('one', undefined, { view: 'preview' })
+
+    await settle()
+
+    expect(grid(state.root).getAttribute('data-view')).toBe('edit')
+  })
+})
+
 describe('MarkdownEditor onChange', () => {
   test('hears the text once the field is left, while onInput hears each edit', async () => {
     const committed: string[] = []
