@@ -246,7 +246,9 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
             if (isRefusal(result))
               return failed(request, new Headers(), cookieJar(request).cookies, { action: value.url, status: 422, values: isCall(request) ? {} : submittedValues(posted), errors: messagesOf(result.errors) }, context.server, back)
 
+            // The copy the guards were handed is the one the handler is run with.
             context.body = result.value
+            sharedContext(request, () => ({ ...context })).body = result.value
 
             return undefined
           })

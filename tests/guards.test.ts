@@ -214,7 +214,7 @@ describe('requireGuards', () => {
 })
 
 describe('input a guarded route\'s schema refuses', () => {
-  const NAMED = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const rename = action(t.Object({ name: t.String({ maxLength: 3 }) }), input => input.name)\n---\nh1 Admin\n'
+  const NAMED = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const rename = action(t.Object({ name: t.String({ maxLength: 3 }) }), input => input.name)\nexport const tag = action(t.Object({ tags: t.Array(t.String()) }), (input) => {\n  (globalThis as { tagged?: unknown }).tagged = input.tags\n})\n---\nh1 Admin\n'
   const BROKEN = 'import { guard } from \'kay\'\n\nexport default guard(({ locals }) => {\n  if ((locals as { user?: { id: string } }).user!.id === \'\')\n    throw new Error(\'no user\')\n})\n'
   let dir = ''
   let app: Awaited<ReturnType<typeof pages>>
@@ -267,6 +267,17 @@ describe('input a guarded route\'s schema refuses', () => {
 
     expect(admitted.status).toBe(422)
     expect(admitted.body).toContain('name')
+  })
+
+  it('hands an admitted action the value its schema read, a lone form field made a list', async () => {
+    const response = await app.handle(new Request('http://localhost/_kay/action/routes/admin/index.kay/tag', {
+      method: 'POST',
+      headers: { 'referer': 'http://localhost/admin', 'content-type': 'application/x-www-form-urlencoded', 'x-admin': '1' },
+      body: 'tags=one',
+    }))
+
+    expect(response.status).toBe(303)
+    expect((globalThis as { tagged?: unknown }).tagged).toEqual(['one'])
   })
 
   it('answers an API route\'s caller the guards refuse with their refusal, never the validation error', async () => {
