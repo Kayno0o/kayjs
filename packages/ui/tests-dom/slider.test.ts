@@ -68,7 +68,7 @@ test('tells onInput the number while dragging and the shown value follows', asyn
 
 test('writes the share up to the thumb as its fill, by drag, by its parent and after a reset', async () => {
   const { input, drag, root } = await open()
-  const fill = () => input.style.getPropertyValue('--kui-range-fill')
+  const fill = () => input.style.getPropertyValue('--range-fill')
   const form = root.querySelector<HTMLFormElement>('#form')!
 
   expect(fill()).toBe('40%')
@@ -84,7 +84,7 @@ test('writes the share up to the thumb as its fill, by drag, by its parent and a
   click(root.querySelector('#set'))
   await settle()
   expect(fill()).toBe('80%')
-  expect(root.querySelector<HTMLInputElement>('#named')!.style.getPropertyValue('--kui-range-fill')).toBe('20%')
+  expect(root.querySelector<HTMLInputElement>('#named')!.style.getPropertyValue('--range-fill')).toBe('20%')
 })
 
 test('follows a value its parent sets', async () => {

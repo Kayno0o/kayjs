@@ -151,10 +151,10 @@ test('the slider writes the share played as its fill, keeping up with the playba
   const track = part('track')[0] as HTMLInputElement
 
   await move(60)
-  expect(track.style.getPropertyValue('--kui-range-fill')).toBe('50%')
+  expect(track.style.getPropertyValue('--range-fill')).toBe('50%')
 
   await move(30)
-  expect(track.style.getPropertyValue('--kui-range-fill')).toBe('25%')
+  expect(track.style.getPropertyValue('--range-fill')).toBe('25%')
 })
 
 test('chapters are listed with their start and marked on the timeline, the one playing aria-current, with a link and the actions slot beside each', async () => {
