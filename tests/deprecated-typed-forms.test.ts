@@ -2,6 +2,8 @@ import { mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { check } from '../src/check'
+import { applySafeFixes } from '../src/check/fixes'
+import { secretKeys } from '../src/check/secret-keys'
 import { scratchDir } from './scratch'
 
 setDefaultTimeout(120_000)
@@ -223,6 +225,48 @@ describe('1.105 forms the type check finds', () => {
 
       expect(reported).toHaveLength(1)
       expect(reported[0]?.fixes?.every(fix => !fix.safe)).toBe(true)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  const IMPORTS = 'import { call } from \'kay\'\nimport notes from \'../api/notes\'\n\n'
+  const unsafeReads: Record<string, string> = {
+    'a destructure of the result': 'export async function total() {\n  const list = await call(notes, \'/\')\n  const { ok } = list\n\n  return ok ? list.total : 0\n}\n',
+    'a data read of the result': 'export async function total() {\n  const list = await call(notes, \'/\')\n  const { data } = list\n\n  return [data, list.total]\n}\n',
+    'a computed key': 'export async function total() {\n  const list = await call(notes, \'/\')\n  const key = \'ok\'\n\n  return [list[\'ok\'], list[key], list.total]\n}\n',
+    'the result handed on': 'function show(value: unknown) {\n  return value\n}\n\nexport async function total() {\n  const list = await call(notes, \'/\')\n\n  show(list)\n\n  return list.total\n}\n',
+    'a name declared twice': 'export async function total() {\n  const list = await call(notes, \'/\')\n\n  return list.total\n}\n\nexport async function other() {\n  const list = { total: 2 }\n\n  return list.total\n}\n',
+  }
+
+  for (const [label, body] of Object.entries(unsafeReads)) {
+    it(`offers and does not apply a fix beside ${label}`, async () => {
+      const root = await project({ ...FILES, 'src/lib/total.ts': IMPORTS + body })
+
+      try {
+        const reported = (await check(root)).filter(one => one.file.endsWith('total.ts') && one.code === 'deprecated-call-result')
+
+        expect(reported.length).toBeGreaterThan(0)
+        expect(reported.every(one => one.fixes?.every(fix => !fix.safe))).toBe(true)
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    })
+  }
+
+  it('reaches the config of an extension with the other config lints', async () => {
+    const root = await scratchDir('typed-forms-')
+
+    try {
+      await Bun.write(join(root, 'src/mine.ts'), 'import type { KayExtension } from \'kay/server\'\n\nexport const mine: KayExtension = { name: \'mine\', config: { mcp: { key: true } } }\n')
+
+      const found = await secretKeys(root, {})
+
+      expect(found).toHaveLength(1)
+      await applySafeFixes(root, found)
+      expect(await Bun.file(join(root, 'src/mine.ts')).text()).toContain('mcp: { token: true }')
     }
     finally {
       await rm(root, { recursive: true, force: true })

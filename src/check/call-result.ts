@@ -89,15 +89,76 @@ function awaitedBy(all: Walked[], subject: Node, at: number): Node | undefined {
   return declarator?.type === 'VariableDeclarator' && declarator.init?.type === 'AwaitExpression' ? declarator.init : undefined
 }
 
-// Whether the code reads what only a result has, on the name the `await` is bound to or in the pattern it is destructured by, so `.orThrow()` would take it away.
+// The nodes that bind a name: a declaration, a parameter, a destructured name or a catch parameter.
+function bindingNodes(all: Walked[]): Set<Node> {
+  const found = new Set<Node>()
+  const add = (node: Node | null | undefined): void => {
+    if (node)
+      found.add(node)
+  }
+
+  for (const { node } of all) {
+    const holder = node as unknown as { params?: Node[], param?: Node, left?: Node, argument?: Node, elements?: (Node | null)[], properties?: Node[] }
+
+    if (node.type === 'VariableDeclarator') {
+      add(node.id)
+    }
+    else if (node.type === 'ObjectPattern') {
+      for (const property of holder.properties ?? [])
+        add(property.type === 'Property' ? property.value : property)
+    }
+    else if (node.type === 'ArrayPattern') {
+      for (const element of holder.elements ?? [])
+        add(element)
+    }
+    else if (node.type === 'AssignmentPattern') {
+      add(holder.left)
+    }
+    else if (node.type === 'RestElement') {
+      add(holder.argument)
+    }
+    else if (node.type === 'CatchClause') {
+      add(holder.param)
+    }
+    else {
+      for (const param of holder.params ?? [])
+        add(param)
+    }
+  }
+
+  return found
+}
+
+// Whether the name is bound more than once in the file, so a read of it may be of another binding than the nearest declaration.
+function boundTwice(all: Walked[], name: string): boolean {
+  const bindings = bindingNodes(all)
+
+  return all.filter(({ node }) => node.type === 'Identifier' && node.name === name && bindings.has(node)).length > 1
+}
+
+// Whether the code uses the name the `await` is bound to in any way but reading a field a result has no key of (`list.items`), or the pattern it is destructured by names a result's key: `list.ok`, `list['ok']`, `list[key]`, `const { ok } = list` or `list` handed on, so `.orThrow()` could take away what is read.
 function readsResult(all: Walked[], bound: Node | undefined): boolean {
   if (bound === undefined)
     return false
 
-  if (bound.type === 'Identifier')
-    return all.some(({ node }) => node.type === 'MemberExpression' && !node.computed && node.object.type === 'Identifier' && node.object.name === bound.name && node.property.type === 'Identifier' && RESULT_KEYS.has(node.property.name))
+  if (bound.type === 'Identifier') {
+    const bindings = bindingNodes(all)
 
-  return bound.type === 'ObjectPattern' && bound.properties.some(property => property.type === 'Property' && property.key.type === 'Identifier' && RESULT_KEYS.has(property.key.name))
+    return all.some(({ node, parent }) => {
+      if (node.type !== 'Identifier' || node.name !== bound.name || node === bound || bindings.has(node))
+        return false
+
+      if (parent?.type === 'MemberExpression' && parent.property === node && !parent.computed)
+        return false
+
+      if (parent?.type === 'Property' && parent.key === node && !parent.computed && !parent.shorthand)
+        return false
+
+      return !(parent?.type === 'MemberExpression' && parent.object === node && !parent.computed && parent.property.type === 'Identifier' && !RESULT_KEYS.has(parent.property.name))
+    })
+  }
+
+  return bound.type === 'ObjectPattern' && bound.properties.some(property => property.type !== 'Property' || property.computed || (property.key.type === 'Identifier' && RESULT_KEYS.has(property.key.name)))
 }
 
 // A read on a call's answer that is no field of a `CallResult`, an island call awaited as data as it was before 1.105: the answer is `{ ok: true, data }` or `{ ok: false, error }` since, so `.orThrow()` after the call gives the data and throws a refusal as it did.
@@ -150,7 +211,7 @@ export function callResultLint(message: string, source: string, span: Span | und
 
   const known = importedNames(program)
   const name = rootName(call.callee)
-  const safe = name !== undefined && known.has(name) && !readsResult(all, bound)
+  const safe = name !== undefined && known.has(name) && !readsResult(all, bound) && !(bound?.type === 'Identifier' && boundTwice(all, bound.name))
 
   return { ...report, fixes: [{ title: 'Write `.orThrow()` after the call', safe, edits: [{ start: call.end, end: call.end, text: '.orThrow()' }] }] }
 }
