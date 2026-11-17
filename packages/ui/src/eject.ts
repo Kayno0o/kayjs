@@ -18,6 +18,8 @@ const WORD_BOUNDARY = /(?<=[a-z0-9])(?=[A-Z])/g
 const DASHED = /(?:^|-)([a-z0-9])/g
 // A module specifier written in an import, an export from or a dynamic import: the quote, then the specifier.
 const SPECIFIER = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"\n]+)\2/g
+// An `import type` or `export type` statement, up to the specifier's closing quote: nothing of it is left at runtime.
+const TYPE_ONLY = /\b(?:import|export)\s+type\s[^;'"]*?\bfrom\s*(['"])[^'"\n]+\1/g
 
 export interface Ejection {
   // The component's file under the library's `src/`, as `card.kay`.
@@ -57,11 +59,14 @@ function nameOf(file: string): string {
 }
 
 // The specifiers a source writes, with where each starts and ends.
-function specifiers(text: string): { specifier: string, start: number, end: number }[] {
+function specifiers(text: string): { specifier: string, start: number, end: number, typeOnly: boolean }[] {
+  const typeEnds = new Set([...text.matchAll(TYPE_ONLY)].map(match => match.index + match[0].length - 1))
+
   return [...text.matchAll(SPECIFIER)].map((match) => {
     const start = match.index + match[1]!.length + 1
+    const end = start + match[3]!.length
 
-    return { specifier: match[3]!, start, end: start + match[3]!.length }
+    return { specifier: match[3]!, start, end, typeOnly: typeEnds.has(end) }
   })
 }
 
@@ -94,11 +99,11 @@ function resolved(from: string, specifier: string): string | undefined {
   return undefined
 }
 
-function relativeImports(from: string, text: string): string[] {
-  return specifiers(text).flatMap(({ specifier }) => {
+function relativeImports(from: string, text: string): { file: string, typeOnly: boolean }[] {
+  return specifiers(text).flatMap(({ specifier, typeOnly }) => {
     const file = specifier.startsWith('.') ? resolved(from, specifier) : undefined
 
-    return file === undefined ? [] : [file]
+    return file === undefined ? [] : [{ file, typeOnly }]
   })
 }
 
@@ -124,9 +129,15 @@ function isPublic(path: string): boolean {
 // What copying `file` takes along: the files it reaches that no other file of the library reaches, since a shared module copied would split its state in two.
 export async function plan(file: string): Promise<Ejection> {
   const imports = new Map<string, string[]>()
+  // What each file imports for its runtime: a file only another's types reach is not shared, as its copy splits no state.
+  const runtime = new Map<string, string[]>()
 
-  for (const path of await libraryFiles())
-    imports.set(path, relativeImports(path, await readFile(join(LIBRARY, path), 'utf8')))
+  for (const path of await libraryFiles()) {
+    const found = relativeImports(path, await readFile(join(LIBRARY, path), 'utf8'))
+
+    imports.set(path, found.map(({ file }) => file))
+    runtime.set(path, found.filter(({ typeOnly }) => !typeOnly).map(({ file }) => file))
+  }
 
   const kept = new Set<string>()
   const queue = [file]
@@ -146,7 +157,7 @@ export async function plan(file: string): Promise<Ejection> {
     changed = false
 
     for (const path of kept) {
-      if (path !== file && (isPublic(path) || [...imports].some(([importer, targets]) => !kept.has(importer) && targets.includes(path)))) {
+      if (path !== file && (isPublic(path) || [...runtime].some(([importer, targets]) => !kept.has(importer) && targets.includes(path)))) {
         kept.delete(path)
         changed = true
       }
