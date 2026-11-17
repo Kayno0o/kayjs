@@ -35,12 +35,13 @@ const { icon, tone = 'neutral', color, size = 'md', label, href, style, ...rest 
   icon?: IconSlot | IconProps | undefined
   // Any CSS colour, such as `#8fb8f4` or `oklch(0.7 0.1 250)`: it replaces the tone's, the tile tinted with it and the icon drawn in it.
   color?: string | undefined
-  // Names the tile for screen readers; without it the tile is decorative.
-  label?: string | undefined
-  // Makes the tile a link.
-  href?: string | undefined
   style?: string | undefined
-}>()
+} & (
+  // `label` names the tile for screen readers; without it the tile is decorative.
+  | { label?: string | undefined, href?: undefined }
+  // `href` makes the tile a link, which has no text to name it: `label` is required.
+  | { label: string, href: string }
+)>()
 ---
 snippet content()
   if icon

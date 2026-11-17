@@ -75,5 +75,6 @@ main
     IconTile#tile-color(icon="info" color="#8fb8f4" size="lg" label="Private")
     IconTile#tile-tone(icon="info" tone="danger")
     IconTile#tile-letter(color="#e8a24a") f
+    IconTile#tile-link(icon="info" href="/sites" label="Sites")
     Stat#stat-tile(value={3} label="alerts" icon="alert" iconTile={{ tone: 'danger' }})
     Widget#widget-tile(title="Traffic" icon="info" iconTile)

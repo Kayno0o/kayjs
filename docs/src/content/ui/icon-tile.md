@@ -18,7 +18,7 @@ description: An icon, or a letter, on a small rounded tile tinted in a colour.
 
 ## A link, a name
 
-`href` makes the tile a link. `label` names it for screen readers; without it the tile is decorative, the item's name being written beside it.
+`href` makes the tile a link, and a link has no text to name it, so `label` is required with it: `kay check` fails for an `href` without one, and the label becomes its `aria-label`. Without an `href`, `label` is optional and the tile is decorative without it, the item's name being written beside it.
 
 ## In a Stat or a Widget
 

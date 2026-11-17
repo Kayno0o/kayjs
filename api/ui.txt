@@ -2016,18 +2016,12 @@ component default
 
 [./icon-tile.kay] default
 component default
-  children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
+  | { children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
-  color?: string | undefined
-  href?: string | undefined
-  icon?: IconProps | IconSlot | undefined
-  label?: string | undefined
-  parts?: undefined | { root?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }
-  size?: "lg" | "md" | "sm" | undefined
-  style?: string | undefined
-  tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
+}; color?: string | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; parts?: undefined | { root?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }; size?: "lg" | "md" | "sm" | undefined; style?: string | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined }
+  | { children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
+  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
+}; color?: string | undefined; href: string; icon?: IconProps | IconSlot | undefined; label: string; parts?: undefined | { root?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }; size?: "lg" | "md" | "sm" | undefined; style?: string | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined }
 
 [./icon.kay] default
 component default
