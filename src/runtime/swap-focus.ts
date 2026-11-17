@@ -5,6 +5,9 @@ import { HYDRATED, ISLAND } from './markers'
 import { hashTarget } from './navigation'
 
 const WATCH_BOUND_MS = 30_000
+// What ends each pending replay of kept keys, and the fields whose island was told them, so it hears them once.
+const replaying = new Set<() => void>()
+const told = new WeakSet<Element>()
 
 type Island = HTMLElement & { _$k?: boolean }
 type Field = HTMLInputElement | HTMLTextAreaElement
@@ -20,6 +23,10 @@ function byName(element: Element | null): Element | null {
 
 // The element focused before, found again on a refreshed page or on Back and Forward between entries of one path; on a new page, the element its hash points at, else its autofocus field, its heading or its main, so a screen reader starts there, the title announced. Back and Forward skip the autofocus field, which the visitor left already, and a position an entry saved leaves the hash alone, as it does the scroll.
 export async function moveFocus(swap: Swap, policy: Policy, hash: string): Promise<void> {
+  // The replays of an older swap's keys end here, as this swap's own are registered after.
+  for (const end of replaying)
+    end()
+
   if (policy.focus === 'refused' && swap.refused && await showRefusal(document.forms[swap.refused.form], swap.refused.control))
     return
 
@@ -88,16 +95,24 @@ function carryCaret(from: Element | null, to: HTMLElement, held: string | undefi
 function replayOnHydrate(field: Field, island: Island): void {
   let typed = noteOf(field)
   const heard = new AbortController()
-  const timer = setTimeout(() => heard.abort(), WATCH_BOUND_MS)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const end = () => {
+    clearTimeout(timer)
+    heard.abort()
+    replaying.delete(end)
+  }
 
+  timer = setTimeout(end, WATCH_BOUND_MS)
+  replaying.add(end)
   island.addEventListener('input', (event) => {
     if (event.target === field)
       typed = noteOf(field)
   }, { signal: heard.signal, capture: true })
   island.addEventListener(HYDRATED, () => {
-    clearTimeout(timer)
-    heard.abort()
-    putBack(found(field), { ...typed, replay: true })
+    end()
+
+    if (island.isConnected)
+      putBack(found(field), { ...typed, replay: true })
   }, { signal: heard.signal, once: true })
 }
 
@@ -145,9 +160,10 @@ const watching = new Set<() => void>()
 
 // Hydration kept what was typed when the field already holds it, and the island heard it through the events queued for it. A number or email field has no selection, so no caret.
 function putBack(now: Element | null, typed: Typed | undefined): void {
-  if (!typed || !(now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement) || (now.value === typed.value && !typed.replay))
+  if (!typed || !(now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement) || (now.value === typed.value && !(typed.replay && !told.has(now))))
     return
 
+  told.add(now)
   now.value = typed.value
   now.dispatchEvent(new InputEvent('input', { bubbles: true }))
 
