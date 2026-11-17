@@ -111,12 +111,13 @@ function realOf(path: string): string {
 // The `.kay` components a file imports that its templates may draw lazily: each with the key naming its chunk (its path from the root) and the props it draws only inside a branch that may not render.
 export function importedComponents(file: string, source: string, root: string): ImportedComponents {
   const found: Record<string, ImportedComponent> = {}
+  const self = realOf(file)
 
   for (const { source: specifier } of importsOf(source)) {
     const path = resolveFrom(specifier, file)
 
     // A component drawing itself stays eager whatever its import is written as: its module is the one loading, so a chunk would only make its nested draws late.
-    if (path !== undefined && realOf(path) === realOf(file))
+    if (path !== undefined && realOf(path) === self)
       continue
 
     const facts = path === undefined ? undefined : factsOf(path, new Set())
