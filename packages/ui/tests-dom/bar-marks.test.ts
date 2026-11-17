@@ -1,5 +1,5 @@
 import type { Mounted } from 'kay/test'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import BarMarks from '../tests/fixture/src/components/bar-marks.kay'
 import { click } from './dom'
@@ -128,5 +128,41 @@ describe('BarChart marks', () => {
 
     await settle()
     expect(driven.root.querySelector('#lined [data-part="cursor"]')).not.toBeNull()
+  })
+
+  test('Sparkline, ContributionGraph and ScatterChart draw the mark the app steers them to', async () => {
+    const { root } = await marks({ steered: 1 })
+    const lit = (selector: string) => [...root.querySelectorAll(selector)].map(mark => mark.hasAttribute('data-lit'))
+
+    expect(lit('#spark-steered [data-part="item"]')).toEqual([false, true, false])
+    expect(lit('#grid-steered [data-part="cell"]')).toEqual([false, true])
+    expect(lit('#dots-steered [data-part="dot"]')).toEqual([false, true])
+  })
+
+  test('LineChart follows a point with an address on a click without a drag and on Enter, and reads the address out', async () => {
+    const { root } = await marks()
+    const overlay = root.querySelector<HTMLElement>('#linked [data-part="overlay"]')!
+    const opened = spyOn(window, 'open').mockImplementation(() => null)
+    const pointer = (type: string) => overlay.dispatchEvent(new PointerEvent(type, { clientX: 0, clientY: 0, button: 0, bubbles: true }))
+
+    try {
+      pointer('pointermove')
+      pointer('pointerdown')
+      pointer('pointerup')
+      await settle()
+      expect(opened).toHaveBeenCalledWith('https://example.com/a', '_blank', 'noopener,noreferrer')
+      expect(overlay.getAttribute('aria-valuetext')).toBe('a: Runs 1; https://example.com/a')
+      opened.mockClear()
+      overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      expect(opened).toHaveBeenCalledTimes(1)
+      overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }))
+      overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      await settle()
+      expect(opened).toHaveBeenCalledTimes(1)
+      expect(overlay.getAttribute('aria-valuetext')).toBe('c: Runs 2')
+    }
+    finally {
+      opened.mockRestore()
+    }
   })
 })
