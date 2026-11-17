@@ -39,6 +39,15 @@ test('draws a native range input named by its label, holding the value and the b
   expect(root.querySelector('#delay')?.closest('.kui-slider')?.querySelector('[data-part=label]')?.textContent).toBe('Delay')
 })
 
+test('draws the value on the label\'s row, before the track, and on its own row above it without a label', async () => {
+  const { root } = await open()
+  const parts = (id: string) => [...root.querySelector(`#${id}`)!.closest('.kui-slider')!.children].map(child => child.getAttribute('data-part'))
+
+  expect(parts('delay')).toEqual(['label', 'value', 'input'])
+  expect(parts('quiet')).toEqual(['label', 'input'])
+  expect(parts('bare')).toEqual(['value', 'input'])
+})
+
 test('shows the value through formatValue, and without it as the bare number', async () => {
   const { shown, root } = await open()
 

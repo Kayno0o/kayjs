@@ -90,7 +90,7 @@ function held(event: Event) {
 div({...root} part="root")
   if showLabel
     span(part="label") {label}
-  input({...field} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? field['aria-invalid']} part="input" ref={sliderRef} type="range" aria-label={field['aria-label'] || label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} aria-busy={busy() ? 'true' : undefined} onInput={moved} onChange={event => released(event.currentTarget)} onMouseDown={held} onTouchStart={held} onKeyDown={held})
   if showValue
-    // Not an `output`, which a form reset empties; the input itself speaks the value.
+    // Not an `output`, which a form reset empties; the input itself speaks the value. Before the track, so the grid puts it on the label's row.
     span(part="value" aria-hidden="true") {words(shown())}
+  input({...field} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? field['aria-invalid']} part="input" ref={sliderRef} type="range" aria-label={field['aria-label'] || label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} aria-busy={busy() ? 'true' : undefined} onInput={moved} onChange={event => released(event.currentTarget)} onMouseDown={held} onTouchStart={held} onKeyDown={held})

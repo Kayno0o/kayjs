@@ -12,6 +12,7 @@ form#form
   Slider(inputProps={{ id: 'named' }} label="Pause" name="named" min={0} max={10} value={2} aria-label="Pause between two sends")
   Slider(inputProps={{ id: 'locked' }} label="Locked" name="locked" min={0} max={10} value={5} disabled)
   Slider(inputProps={{ id: 'quiet' }} label="Quiet" name="quiet" min={0} max={10} value={3} showValue={false})
+  Slider(inputProps={{ id: 'bare' }} label="Bare" name="bare" min={0} max={10} value={4} showLabel={false})
   button#set(type="button" onClick={() => delay = 80}) Set
   button#reset(type="reset") Reset
   p#state {delay()}
