@@ -22,7 +22,7 @@ import { API_MOUNT } from '../runtime/live'
 import { runInLocale } from '../runtime/locale-state'
 import { withDefaultBounds } from '../runtime/schema-bounds'
 import { contextLocale, guardsFirst, passGuards, requestState } from './actions'
-import { InputRefused, validatingInputs } from './api-input'
+import { InputRefusedError, validatingInputs } from './api-input'
 import { withDecodedParams } from './api-params'
 import { importModule } from './bundle'
 import { timeoutMs } from './config-limits'
@@ -251,7 +251,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         // Before the module's own `onError`, so no custom answer to refused input reaches a caller the guards refuse.
         .onError(async (context) => {
           // Past the guards, a failing response schema or a handler's own throw is no input to keep from a refused caller.
-          if (!(context.error instanceof InputRefused) || guards.length === 0 || admitted.has(context.request))
+          if (!(context.error instanceof InputRefusedError) || guards.length === 0 || admitted.has(context.request))
             return undefined
 
           const refusal = await answeringRequest(context.request, async () => inApiLocale(context.request, options, async () => guardsFirst(guards, sharedContext(context.request, () => ({ ...context })), (context as { params?: Record<string, unknown> }).params ?? {}, undefined, options)))
@@ -553,7 +553,7 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
 // Input the route's `body`, `query`, `params`, `headers` or `cookie` refused, answered as an action answers it: `{ errors, status }`, a message per field in the request's locale.
 // A mismatch of the route's own response is the route's bug and is left to the caller.
 function refusedInput({ error, set }: { request: Request, error: unknown, code: unknown, set: { status?: number | string } }): { errors: Record<string, string>, status: 422 } | undefined {
-  if (!(error instanceof InputRefused))
+  if (!(error instanceof InputRefusedError))
     return undefined
 
   set.status = 422

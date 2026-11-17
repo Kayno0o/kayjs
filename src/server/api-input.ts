@@ -12,13 +12,13 @@ type Input = typeof INPUTS[number]
 type Hooks = Partial<Record<Input, unknown>> & { transform?: unknown, standaloneValidator?: Partial<Record<Input, unknown>>[], [DECLARED]?: Partial<Record<Input, object>> }
 
 // Input a route's schema refused. It carries Elysia's `VALIDATION` code and the shape of its error, so an `onError` hook that answers refused input still reads it as it did.
-export class InputRefused extends Error {
+export class InputRefusedError extends Error {
   readonly code = 'VALIDATION'
   readonly status = 422
 
   constructor(readonly type: Input, readonly errors: Issue[]) {
     super(`Invalid ${type}: ${errors.map(issue => issue.message).join('; ')}`)
-    this.name = 'InputRefused'
+    this.name = 'InputRefusedError'
   }
 
   get all(): { path: string, message: string, summary: string }[] {
@@ -121,7 +121,7 @@ export function validatingInputs(hooks: unknown, inLocale: <T>(request: Request,
     const refused = new Map<string, Issue>()
 
     for (const schema of schemas) {
-      const result = await inLocale(request, async () => validate(schema, given, { source: sourceOf(input, request) }))
+      const result = await inLocale(request, async () => validate(schema, given, { source: sourceOf(input, request), trim: false }))
 
       if (!isRefusal(result)) {
         outputs.push(result.value)
@@ -136,7 +136,7 @@ export function validatingInputs(hooks: unknown, inLocale: <T>(request: Request,
     }
 
     if (refused.size > 0)
-      throw new InputRefused(input, [...refused.values()])
+      throw new InputRefusedError(input, [...refused.values()])
 
     const plain = outputs.every(output => typeof output === 'object' && output !== null && !Array.isArray(output))
 

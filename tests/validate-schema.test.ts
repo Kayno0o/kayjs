@@ -57,6 +57,14 @@ describe('validate', () => {
     expect(await validate(s.object({ a: s.string() }, { extra: 'strip' }), { a: 'x', b: 1 }, { source: 'json' })).toEqual({ value: { a: 'x' } })
   })
 
+  it('drops the spaces around a form\'s text, and keeps them with trim: false', async () => {
+    const line = s.object({ prefix: s.string() })
+
+    expect(await validate(line, { prefix: ' > ' }, { source: 'form' })).toEqual({ value: { prefix: '>' } })
+    expect(await validate(line, { prefix: ' > ' }, { source: 'form', trim: false })).toEqual({ value: { prefix: ' > ' } })
+    expect(await validate(line, { prefix: ' > ' }, { source: 'query', trim: false })).toEqual({ value: { prefix: ' > ' } })
+  })
+
   it('reports each place once, a list item by its index', async () => {
     const result = await validate(schema, { name: 'ab', tags: ['a', 'b', 'c'] }, { source: 'json' })
 

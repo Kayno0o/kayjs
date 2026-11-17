@@ -38,7 +38,8 @@ const TRAILING_DIGITS = /\d+$/
 // A form posts text, as a query string is, and each field once per value or not at all: a top-level field is read the way its schema expects before it is validated.
 // The server reads every post this way, and the browser a form it checks before posting it.
 // `form` reads the text as a form sent it: a required list or boolean absent as empty or unticked, which only a form means by leaving it out, the spaces around what was typed dropped, and an optional field left blank as left out.
-export function formInput(schema: TSchema, body: unknown, form = true): unknown {
+// `trim` false keeps the spaces around a text, as an API route reads what it is posted.
+export function formInput(schema: TSchema, body: unknown, form = true, trim = form): unknown {
   const { properties, required = [] } = schema as { properties?: Record<string, FieldSchema>, required?: string[] }
 
   if (!properties || typeof body !== 'object' || body === null)
@@ -59,7 +60,7 @@ export function formInput(schema: TSchema, body: unknown, form = true): unknown 
     }
 
     // Spaces around what was typed are no part of it, so `minLength` counts the text.
-    const text = form && field.trim !== false && !isSecret(name) ? trimmed(value) : value
+    const text = trim && field.trim !== false && !isSecret(name) ? trimmed(value) : value
 
     if (optional && text === '' && (form || !acceptsBlank(field)))
       delete fields[name]

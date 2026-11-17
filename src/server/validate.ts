@@ -32,6 +32,8 @@ export interface ValidateOptions {
   source: Source
   // The locale state the messages are worded in, the running request's by default.
   locale?: LocaleState | undefined
+  // `false` keeps the spaces around the text a form or a query sent, which an action drops: an API route reads what it is posted as it came.
+  trim?: boolean | undefined
 }
 
 export function isRefusal(result: Validated): result is Refusal {
@@ -154,7 +156,7 @@ function stripped(schema: unknown, value: unknown, dropUnknown = false): unknown
 }
 
 // What a form posts for a list, a boolean or a number is text, and a blank list is the empty one: a top-level field read as its schema expects, the defaults of what was left out filled in.
-function readText(schema: unknown, value: unknown, form: boolean): unknown {
+function readText(schema: unknown, value: unknown, form: boolean, trim: boolean): unknown {
   const input = isPlain(value) ? { ...value } : {}
   const { properties, required = [] } = (isNode(schema) ? schema : {}) as { properties?: Record<string, Node>, required?: string[] }
 
@@ -167,21 +169,21 @@ function readText(schema: unknown, value: unknown, form: boolean): unknown {
   }
 
   // The defaults go in before the text is read, so a list left out reads as its default and not as the empty list a form's missing list is.
-  return formInput(schema as TSchema, withDefaults(schema, input), form)
+  return formInput(schema as TSchema, withDefaults(schema, input), form, form && trim)
 }
 
-function prepare(schema: unknown, value: unknown, source: Source): unknown {
-  const read = source === 'json' ? withDefaults(schema, value) : readText(schema, value, source !== 'env' && source !== 'params')
+function prepare(schema: unknown, value: unknown, source: Source, trim: boolean): unknown {
+  const read = source === 'json' ? withDefaults(schema, value) : readText(schema, value, source !== 'env' && source !== 'params', trim)
 
   // A browser posts controls the app does not own, a named submit button or a widget: a form's unknown fields are dropped, where JSON and a query are strict.
   return stripped(schema, read, source === 'form')
 }
 
 // Every place the value fails a schema, once each, the first reason for it.
-function checked(schema: TSchema, source: Source, value: unknown): Validated {
+function checked(schema: TSchema, source: Source, value: unknown, trim = true): Validated {
   const view = source === 'json' ? strictView(schema) : schema
   const check = compiledCheck(view)
-  const read = prepare(view, value, source)
+  const read = prepare(view, value, source, trim)
 
   if (check.Check(read)) {
     try {
@@ -256,9 +258,9 @@ interface StandardResult {
 }
 
 // Any Standard Schema validator: its text sources are read by its JSON Schema when it has one, then it validates the value itself.
-async function standard(schema: object, source: Source, value: unknown): Promise<Validated> {
+async function standard(schema: object, source: Source, value: unknown, trim: boolean): Promise<Validated> {
   const rules = source === 'json' ? undefined : jsonSchemaOf(schema)
-  const read = rules === undefined ? value : prepare(rules, value, source)
+  const read = rules === undefined ? value : prepare(rules, value, source, trim)
   const result = await (schema as { '~standard': { validate: (value: unknown) => StandardResult | Promise<StandardResult> } })['~standard'].validate(read)
 
   if (result.issues === undefined)
@@ -281,12 +283,12 @@ async function standard(schema: object, source: Source, value: unknown): Promise
 }
 
 // The value a schema reads from `source`, or where and why it is refused: the one path every input of kay goes through, an action's, an API route's, a socket's message, the environment and the browser's check of a form. A Standard Schema validator may be async, which a caller that cannot await reads with `validateNow`.
-export async function validate<Value = unknown>(schema: object, value: unknown, { source, locale }: ValidateOptions): Promise<Validated<Value>> {
+export async function validate<Value = unknown>(schema: object, value: unknown, { source, locale, trim = true }: ValidateOptions): Promise<Validated<Value>> {
   const run = async (): Promise<Validated> => {
     if (isStandardSchema(schema))
-      return standard(schema, source, value)
+      return standard(schema, source, value, trim)
 
-    const result = checked(schema as TSchema, source, value)
+    const result = checked(schema as TSchema, source, value, trim)
 
     if (isRefusal(result))
       return result
@@ -300,9 +302,9 @@ export async function validate<Value = unknown>(schema: object, value: unknown, 
 }
 
 // `validate` for a caller that cannot await, such as the boot reading the environment; a Standard Schema validator answering with a promise is refused.
-export function validateNow<Value = unknown>(schema: object, value: unknown, { source, locale }: ValidateOptions): Validated<Value> {
+export function validateNow<Value = unknown>(schema: object, value: unknown, { source, locale, trim = true }: ValidateOptions): Validated<Value> {
   if (isStandardSchema(schema))
     throw new KayError('config-invalid', 'kay: validateNow reads a TypeBox schema, as a Standard Schema validator may answer with a promise: use validate')
 
-  return (locale === undefined ? checked(schema as TSchema, source, value) : runInLocale(locale, () => checked(schema as TSchema, source, value))) as Validated<Value>
+  return (locale === undefined ? checked(schema as TSchema, source, value, trim) : runInLocale(locale, () => checked(schema as TSchema, source, value, trim))) as Validated<Value>
 }

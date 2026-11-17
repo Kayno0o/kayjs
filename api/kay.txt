@@ -4236,7 +4236,7 @@ interface UrlOptions
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] validate
-function validate<Value = unknown>(schema: object, value: unknown, { source, locale }: ValidateOptions): Promise<Validated<Value>>
+function validate<Value = unknown>(schema: object, value: unknown, { source, locale, trim }: ValidateOptions): Promise<Validated<Value>>
 
 [./server] Validated
 type Validated<Value = unknown> = { value: Value } | Refusal
@@ -4245,6 +4245,7 @@ type Validated<Value = unknown> = { value: Value } | Refusal
 interface ValidateOptions
   locale?: LocaleState | undefined
   source: Source
+  trim?: boolean | undefined
 
 [./server] verifyWork
 function verifyWork(solution: null | string | undefined, scope: string, options?: VerifyWorkOptions): Promise<ProofOfWorkRefusal | undefined>
