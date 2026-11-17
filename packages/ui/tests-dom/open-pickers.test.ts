@@ -116,6 +116,40 @@ test('a HoverCard tells the app it closed on Escape, and shows again once the ap
   expect(calls).toEqual(['card true', 'card false', 'card true'])
 })
 
+test('a HoverCard with a trigger shows after openDelay, hides after closeDelay, and follows open', async () => {
+  const { root, calls } = await picker()
+  const card = root.querySelector<HTMLElement>('#tcard')!
+  const trigger = root.querySelector<HTMLElement>('#thover')!
+
+  trigger.dispatchEvent(new Event('pointerenter'))
+  await clock.elapse(100)
+
+  expect(card.matches(':popover-open')).toBe(false)
+
+  await clock.elapse(250)
+
+  expect(card.matches(':popover-open')).toBe(true)
+  expect(card.getAttribute('data-placement')).toBe('right-end')
+  expect(trigger.getAttribute('aria-describedby')).toBe('tcard')
+
+  trigger.dispatchEvent(new Event('pointerleave'))
+  await clock.elapse(100)
+
+  expect(card.matches(':popover-open')).toBe(false)
+  expect(calls).toEqual(['tcard true', 'tcard false'])
+
+  click(root.querySelector('#pin'))
+  await clock.elapse(10)
+
+  expect(card.matches(':popover-open')).toBe(true)
+
+  click(root.querySelector('#pin'))
+  await clock.elapse(100)
+
+  expect(card.matches(':popover-open')).toBe(false)
+  expect(calls).toEqual(['tcard true', 'tcard false', 'tcard true', 'tcard false'])
+})
+
 test('Menu, AppSwitcher, ConfirmDelete and Toaster spread their attributes on the trigger or root', async () => {
   const { root } = await picker()
 

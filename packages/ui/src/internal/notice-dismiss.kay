@@ -4,12 +4,14 @@ import IconButton from '../icon-button.kay'
 
 const look = recipe({ parts: { root: '' } })
 
-const { label, open, onDismiss } = props<{
+const { label, open, onOpenChange, onDismiss } = props<{
   // Names the button.
   label: string
   // Shows the notice when the page sets it; the button hides it on its own, and a page passing `open` again shows it.
   open?: boolean | undefined
-  // Called when the button is pressed, after the notice is hidden.
+  // Called with `{ open: false }` when the button is pressed, after the notice is hidden.
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
+  // The same press with no argument.
   onDismiss?: (() => unknown) | undefined
 }>()
 
@@ -28,6 +30,7 @@ effect(() => {
 
 function dismiss() {
   shown = false
+  onOpenChange?.({ open: false })
   onDismiss?.()
 }
 ---

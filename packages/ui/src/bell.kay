@@ -2,14 +2,14 @@
 import type { JSX } from 'kay'
 import { ctx } from 'kay'
 import type { BellItem } from './bell'
-import type { PopoverPlacement } from './popover'
+import type { Placement } from './popover'
 import BellInbox from './bell-inbox.kay'
 
 // The attributes it does not name reach the BellInbox island, so they are only those an island can be sent: no handler or ref.
 const { label, placement, items, unread, appBadge, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'ref' | `on${string}`> & {
   // Names the button and the list it opens; the `ui.bell.label` message by default.
   label?: string | undefined
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   // Notifications from the app's own source in place of the signed-in visitor's inbox, a list the page read: the Bell then draws for anyone, signed in or not. For a source loaded in the browser or a callback, use `BellInbox` in an island.
   items?: readonly BellItem[] | undefined
   // The unread count of `items`; their unread ones by default.

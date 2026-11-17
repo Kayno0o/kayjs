@@ -8,7 +8,7 @@ description: Text with a tooltip that the keyboard reaches as well as the pointe
 
 For more than a string, give an `@content` block instead of `text`: its markup, a bold name over a line of detail say, is drawn in the tooltip. The keyboard reaches it the same way, and the screen reader hears its text.
 
-`placement` says where the tooltip sits, as a CSS `position-area`: `top` by default, or `bottom`, `left`, `right`. Any other attribute of a `span` goes on the element.
+`placement` says where the tooltip sits, as on [Popover](/ui/popover): `top` by default, or any other [placement](/ui/popover#trigger-and-placement). A CSS `position-area` of your own still works. Any other attribute of a `span` goes on the element.
 
 A button with a reason it is off needs no wrapper: a [Button](/ui/button) that is `disabled` and has a `data-tooltip` stays reachable.
 

@@ -6,6 +6,10 @@ description: A form's outcome or a refusal, said in place where the page stays.
 
 `tone` is `neutral` (the default), `accent`, `info`, `success`, `warning` or `danger`. A danger is an alert, read out at once; the other tones are a status, read once the reader is idle. `label` is the message, and children follow it, such as a link.
 
+## Closing
+
+`dismissible` adds a close button that hides the notice. `open` adds it too, and lets the page decide whether the notice shows: `onOpenChange({ open: false })` is called when the button is pressed, so set `open` back to `false` there. `onDismiss` is the same press with no argument, and stays.
+
 ## Compact
 
 `size="sm"` drops the box for a line of text, such as under a form's fields.

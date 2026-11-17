@@ -1324,7 +1324,15 @@ function leftField(event: FocusEvent): string | undefined
 function showIssues(form: HTMLFormElement, byField: Record<string, string>): Promise<boolean>
 
 [./lib/hover-card] HoverCardPlacement
-type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'
+type HoverCardPlacement = Placement
+
+[./lib/hover-card] HoverCardTriggerProps
+interface HoverCardTriggerProps
+  data-hover-card: string
+  onBlur: () => void
+  onFocus: (event: FocusEvent) => void
+  onPointerEnter: (event: PointerEvent) => void
+  onPointerLeave: () => void
 
 [./lib/icon-picker] IconChoice
 interface IconChoice
@@ -1509,7 +1517,15 @@ const formIssues: Context<(() => Record<string, string>) | undefined>
 function holdToasts(hold: ToastHold, on: boolean): void
 
 [./lib/index] HoverCardPlacement
-type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'
+type HoverCardPlacement = Placement
+
+[./lib/index] HoverCardTriggerProps
+interface HoverCardTriggerProps
+  data-hover-card: string
+  onBlur: () => void
+  onFocus: (event: FocusEvent) => void
+  onPointerEnter: (event: PointerEvent) => void
+  onPointerLeave: () => void
 
 [./lib/index] IconChoice
 interface IconChoice
@@ -1744,6 +1760,9 @@ interface PaletteLink extends PaletteBase
 type PanelProps<Tag extends 'div' | 'ul' = 'div'> = Omit<JSX.IntrinsicElements[Tag], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'hidden' | 'style'> & {
   // Written after the component's own declarations, so it wins. style?: string | undefined }
 
+[./lib/index] Placement
+type Placement = 'top' | 'bottom' | 'left' | 'right' | 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end' | 'left-start' | 'left-end' | 'right-start' | 'right-end'
+
 [./lib/index] Plate
 interface Plate
   scale: number
@@ -1760,7 +1779,7 @@ type PopoverLookButtonProps = PopoverButtonProps & Pick<Look, 'variant' | 'size'
 type PopoverPanelProps = PanelProps
 
 [./lib/index] PopoverPlacement
-type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
+type PopoverPlacement = Placement
 
 [./lib/index] PopoverRole
 type PopoverRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid' | 'group' | 'region' | 'none' | (string & {})
@@ -2774,6 +2793,9 @@ function whenReleased(show: () => void): void
 type PanelProps<Tag extends 'div' | 'ul' = 'div'> = Omit<JSX.IntrinsicElements[Tag], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'hidden' | 'style'> & {
   // Written after the component's own declarations, so it wins. style?: string | undefined }
 
+[./lib/popover] Placement
+type Placement = 'top' | 'bottom' | 'left' | 'right' | 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end' | 'left-start' | 'left-end' | 'right-start' | 'right-end'
+
 [./lib/popover] PopoverButtonProps
 type PopoverButtonProps = Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'id' | 'type' | 'popovertarget' | 'aria-expanded' | 'style'>
 
@@ -2784,7 +2806,7 @@ type PopoverLookButtonProps = PopoverButtonProps & Pick<Look, 'variant' | 'size'
 type PopoverPanelProps = PanelProps
 
 [./lib/popover] PopoverPlacement
-type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
+type PopoverPlacement = Placement
 
 [./lib/popover] PopoverRole
 type PopoverRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid' | 'group' | 'region' | 'none' | (string & {})

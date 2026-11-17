@@ -3,7 +3,7 @@ import type { JSX, Snippet } from 'kay'
 import type { BellItem, BellItems, BellTriggerProps, InboxItem } from './bell'
 import { bellItem } from './bell'
 
-import type { PopoverLookButtonProps, PopoverPanelProps, PopoverPlacement, PopoverTriggerProps } from './popover'
+import type { Placement, PopoverLookButtonProps, PopoverPanelProps, PopoverTriggerProps } from './popover'
 import { call, effect, memo, recipe, resource, signal } from 'kay'
 import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
@@ -34,7 +34,7 @@ const look = recipe({
 const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, appBadge = true, onRead, open, onOpenChange, item: drawRow, trigger, panelProps = {}, triggerProps = {}, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   // Names the button and the list it opens; the `ui.bell.label` message by default.
   label?: string | undefined
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   // The app's own notifications in place of the signed-in visitor's inbox: a list, or a function answering one.
   items?: BellItems<Item> | undefined
   // The unread count of a custom source; the unread items of `items` by default.

@@ -3,7 +3,7 @@ import type { Source } from 'kay'
 import { signal } from 'kay'
 import Notice from '@kayjs/ui/notice.kay'
 
-const { onDismiss, sourced } = props<{ onDismiss: () => void, sourced: Pick<Source, 'error' | 'pending' | 'retry'> }>()
+const { onDismiss, onOpenChange, sourced } = props<{ onDismiss: () => void, onOpenChange: (event: { open: boolean }) => void, sourced: Pick<Source, 'error' | 'pending' | 'retry'> }>()
 
 const shown = signal(true)
 ---
@@ -21,7 +21,7 @@ Notice#forced-hidden(label="Forced" hidden)
 #closable
   Notice(label="Closable" dismissible onDismiss={onDismiss})
 #controlled
-  Notice(label="Controlled" open={shown()} onDismiss={() => shown = false})
+  Notice(label="Controlled" open={shown()} onOpenChange={({ open }) => { shown = open; onOpenChange({ open }) }})
 #reopen
   button#show(type="button" onClick={() => shown = true}) Show
 #hidden

@@ -4,7 +4,7 @@ import { fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import type { OptionsSource } from './options-source'
 import type { MultiSelectOption } from './multi-select'
-import type { PopoverButtonProps, PopoverPanelProps, PopoverPlacement } from './popover'
+import type { Placement, PopoverButtonProps, PopoverPanelProps } from './popover'
 import { effect, postedValues, recipe, signal } from 'kay'
 import { stepIndex } from './cycle'
 import { afterPause, isRemote, searchOptions } from './options-source'
@@ -89,7 +89,7 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   // Opens on a search box; on by default past eight options.
   search?: boolean | undefined
   disabled?: boolean | undefined
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   // Shows the panel when the page sets it; the trigger, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
   onOpenChange?: ((event: { open: boolean }) => unknown) | undefined

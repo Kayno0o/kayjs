@@ -1,5 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
+import type { Placement } from './popover'
 import { recipe, uid } from 'kay'
 
 // 'kui-tooltip-target' stays as the component's name for an app's CSS.
@@ -8,8 +9,8 @@ const look = recipe({ parts: { root: 'kui-tooltip-target', content: 'hidden' } }
 const { text, placement, content, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'tabindex'> & {
   // What the tooltip says, shown by TooltipHost as the pointer or the keyboard lands on the element. Without one, or a `content` block, the span is plain text, no tab stop.
   text?: string | undefined
-  // Where it sits, as a CSS `position-area`: `top` by default, or `bottom`, `left`, `right`.
-  placement?: string | undefined
+  // Where it sits, a `Placement` as on Popover: `top` by default. Any CSS `position-area` string still works.
+  placement?: Placement | (string & {}) | undefined
   // Draws the tooltip's body as markup in place of `text`, such as a bold name over a line of detail: TooltipHost copies it in as the tooltip shows. It wins over `text`.
   content?: Snippet | undefined
 }>()

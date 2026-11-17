@@ -1,7 +1,11 @@
 import type { JSX } from 'kay'
 import type { Look } from './button-props'
 
-export type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
+// Where a floating panel sits against what it is anchored to: a side, centred on it, or a side with `-start` or `-end` to line up with that edge. The browser flips it when there is no room.
+export type Placement = 'top' | 'bottom' | 'left' | 'right' | 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end' | 'left-start' | 'left-end' | 'right-start' | 'right-end'
+
+// The name `Placement` replaces, kept as an alias for three minors.
+export type PopoverPlacement = Placement
 
 // What the panel is to assistive technology: a `dialog` by default, `menu`, `listbox`, `tree` or `grid` for a panel that is one, any other ARIA role such as `group`, or `none` when the panel only holds content that carries its own role.
 export type PopoverRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid' | 'group' | 'region' | 'none' | (string & {})

@@ -28,7 +28,7 @@ A `span` with `data-tooltip` is not a tab stop, so the keyboard never shows its 
 
 ## Placement
 
-`data-tooltip-placement` sets where the tooltip sits, as a CSS `position-area`: `top` by default, or `bottom`, `left`, `right`.
+`data-tooltip-placement` sets where the tooltip sits: a [placement](/ui/popover#trigger-and-placement) such as `bottom` or `right-start`, or a CSS `position-area`, `top` by default.
 
 <Demo name="tooltip-host/placement" />
 

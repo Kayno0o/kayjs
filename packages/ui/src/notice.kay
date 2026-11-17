@@ -27,7 +27,7 @@ const look = recipe({
 // What `icon` set to `true` draws for each tone.
 const TONE_ICON = { neutral: 'info', accent: 'info', info: 'info', success: 'success', warning: 'alert', danger: 'alert' } as const
 
-const { source, tone = source === undefined ? 'neutral' : 'danger', label, size = 'md', icon, actions, dismissible = false, open, onDismiss, dismissLabel = wording('ui.notice.dismiss', 'Dismiss'), retryLabel = wording('ui.notice.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
+const { source, tone = source === undefined ? 'neutral' : 'danger', label, size = 'md', icon, actions, dismissible = false, open, onOpenChange, onDismiss, dismissLabel = wording('ui.notice.dismiss', 'Dismiss'), retryLabel = wording('ui.notice.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
   // Any source an island reads (a `resource`, a `stream`, a `track()` handle, an `infiniteList`, a `local`): the notice shows while its `error()` is set, says the error's message unless `label` does, and offers a retry button that calls its `retry` and waits while it is `pending`. Its tone is `danger` unless `tone` says.
   source?: Pick<Source, 'error' | 'pending' | 'retry'> | undefined
   // Names the retry button of a `source`.
@@ -43,7 +43,9 @@ const { source, tone = source === undefined ? 'neutral' : 'danger', label, size 
   dismissible?: boolean | undefined
   // Whether the notice is shown, when the page decides: set it back to `false` in `onDismiss` to keep it hidden. Giving it adds the close button as `dismissible` does.
   open?: boolean | undefined
-  // Called when the close button is pressed, after the notice is hidden. Passing one makes the whole notice hydrate, as any function a static component passes an island.
+  // Called with `{ open: false }` when the close button is pressed, after the notice is hidden, as every overlay reports its transitions. Passing one makes the whole notice hydrate, as any function a static component passes an island.
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
+  // The same press, with no argument: an alias of `onOpenChange` that stays. Both are called when both are given.
   onDismiss?: (() => unknown) | undefined
   // Names the close button.
   dismissLabel?: string | undefined
@@ -73,4 +75,4 @@ div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} dat
         Button(label={retryLabel} size="sm" busy={source.pending()} disabled={source.pending()} onClick={retry})
       | {actions}
   if closable()
-    NoticeDismiss(part="dismiss" label={dismissLabel} open={open} onDismiss={onDismiss})
+    NoticeDismiss(part="dismiss" label={dismissLabel} open={open} onOpenChange={onOpenChange} onDismiss={onDismiss})

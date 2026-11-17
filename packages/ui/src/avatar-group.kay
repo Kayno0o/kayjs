@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { GroupedAvatar } from './avatar-group'
 import type { OptionsSource } from './options-source'
-import type { PopoverButtonProps, PopoverPanelProps, PopoverPlacement } from './popover'
+import type { Placement, PopoverButtonProps, PopoverPanelProps } from './popover'
 import type { Size } from './size'
 import { recipe } from 'kay'
 import { wording } from 'kay/words'
@@ -37,7 +37,7 @@ const { items, avatars: oldAvatars, max = 4, size = 'md', label, moreLabel, more
   moreLabel?: string | ((count: number) => string) | undefined
   // Makes the chip a link to the page listing everyone, in place of the popover.
   moreHref?: string | undefined
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   // Shows the popover when the page sets it; the chip, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
   onOpenChange?: ((event: { open: boolean }) => unknown) | undefined

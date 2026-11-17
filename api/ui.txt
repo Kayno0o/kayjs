@@ -158,7 +158,15 @@ interface FilterField
 const formIssues: Context<(() => Record<string, string>) | undefined>
 
 [.] HoverCardPlacement
-type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'
+type HoverCardPlacement = Placement
+
+[.] HoverCardTriggerProps
+interface HoverCardTriggerProps
+  data-hover-card: string
+  onBlur: () => void
+  onFocus: (event: FocusEvent) => void
+  onPointerEnter: (event: PointerEvent) => void
+  onPointerLeave: () => void
 
 [.] IconChoice
 interface IconChoice
@@ -393,6 +401,9 @@ interface PaletteLink extends PaletteBase
 type PanelProps<Tag extends 'div' | 'ul' = 'div'> = Omit<JSX.IntrinsicElements[Tag], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'role' | 'hidden' | 'style'> & {
   // Written after the component's own declarations, so it wins. style?: string | undefined }
 
+[.] Placement
+type Placement = 'top' | 'bottom' | 'left' | 'right' | 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end' | 'left-start' | 'left-end' | 'right-start' | 'right-end'
+
 [.] Plate
 interface Plate
   scale: number
@@ -409,7 +420,7 @@ type PopoverLookButtonProps = PopoverButtonProps & Pick<Look, 'variant' | 'size'
 type PopoverPanelProps = PanelProps
 
 [.] PopoverPlacement
-type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
+type PopoverPlacement = Placement
 
 [.] PopoverRole
 type PopoverRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid' | 'group' | 'region' | 'none' | (string & {})
@@ -842,7 +853,7 @@ component default
   initial?: string | undefined;
   name?: string | undefined;
 }
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   style?: string | undefined
   tile?: ((app: SwitcherApp) => Element) | undefined
   trigger?: ((attributes: MenuTriggerProps) => Element) | undefined
@@ -936,7 +947,7 @@ component default
   item?: string | undefined;
   row?: string | undefined;
   name?: string | undefined;
-}; placement?: PopoverPlacement | undefined; rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined; retryLabel?: string | undefined; size?: "xl" | Size | undefined; triggerProps?: PopoverButtonProps | undefined }
+}; placement?: Placement | undefined; rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined; retryLabel?: string | undefined; size?: "xl" | Size | undefined; triggerProps?: PopoverButtonProps | undefined }
   | { avatar?: ((person: GroupedAvatar) => Element) | undefined; avatars: OptionsSource<GroupedAvatar>; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }; failureLabel?: string | undefined; items?: undefined; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
@@ -953,7 +964,7 @@ component default
   item?: string | undefined;
   row?: string | undefined;
   name?: string | undefined;
-}; placement?: PopoverPlacement | undefined; rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined; retryLabel?: string | undefined; size?: "xl" | Size | undefined; triggerProps?: PopoverButtonProps | undefined }
+}; placement?: Placement | undefined; rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined; retryLabel?: string | undefined; size?: "xl" | Size | undefined; triggerProps?: PopoverButtonProps | undefined }
 
 [./avatar.kay] default
 component default
@@ -1099,7 +1110,7 @@ component default
   announce?: string | undefined;
   count?: string | undefined;
 }
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   trigger?: ((attributes: BellTriggerProps, unread: () => number) => Element) | undefined
   triggerProps?: PopoverLookButtonProps | undefined
   unread?: number | undefined
@@ -1109,7 +1120,7 @@ component default
   appBadge?: boolean | undefined
   items?: readonly BellItem[] | undefined
   label?: string | undefined
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   unread?: number | undefined
 
 [./breadcrumb.kay] default
@@ -1987,11 +1998,15 @@ component default
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
+  closeDelay?: number | undefined
   id?: string | undefined
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
+  open?: boolean | undefined
+  openDelay?: number | undefined
   parts?: undefined | { root?: string | undefined; stand?: string | undefined; }
-  placement?: HoverCardPlacement | undefined
+  placement?: Placement | undefined
   style?: string | undefined
+  trigger?: ((attributes: HoverCardTriggerProps) => Element) | undefined
 
 [./icon-button.kay] default
 component default
@@ -2353,7 +2368,7 @@ component default
   shortcut?: string | undefined;
   group?: string | undefined;
 }
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   retryLabel?: string | undefined
   size?: Size | undefined
   style?: string | undefined
@@ -2434,7 +2449,7 @@ component default
   empty?: string | undefined;
 }
   placeholder?: string | undefined
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   search?: boolean | undefined
   searchLabel?: string | undefined
   selectedLabel?: ((count: number) => string) | string | undefined
@@ -2467,6 +2482,7 @@ component default
   icon?: IconProps | IconSlot | boolean | undefined
   label?: string | undefined
   onDismiss?: (() => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   open?: boolean | undefined
   parts?: undefined | {
   root?: string | undefined;
@@ -2591,7 +2607,7 @@ component default
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   open?: boolean | undefined
   parts?: undefined | { root?: string | undefined; anchor?: string | undefined; }
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   role?: PopoverRole | undefined
   style?: string | undefined
   trigger?: ((attributes: PopoverTriggerProps) => Element) | undefined
@@ -3924,7 +3940,7 @@ component default
 }
   content?: Element
   parts?: undefined | { root?: string | undefined; content?: string | undefined; }
-  placement?: string | undefined
+  placement?: (string & {}) | Placement | undefined
   text?: string | undefined
 
 [./tree-view.kay] default

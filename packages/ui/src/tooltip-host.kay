@@ -3,11 +3,22 @@ import type { Duration, JSX } from 'kay'
 import { durationMs, effect, onCleanup, recipe, signal, untrack } from 'kay'
 import { claim } from './claim'
 
-// An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default. `data-hint` is a tooltip for the pointer alone, for text the keyboard has no stop on. `data-tooltip-content` names, by id, a hidden element whose children the tooltip shows in place of a string, which `Tooltip`'s `@content` block draws.
+// An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a `Placement` or any CSS `position-area`, `top` by default. `data-hint` is a tooltip for the pointer alone, for text the keyboard has no stop on. `data-tooltip-content` names, by id, a hidden element whose children the tooltip shows in place of a string, which `Tooltip`'s `@content` block draws.
 const CARRIER = '[data-tooltip], [data-hint], [data-tooltip-content]'
 // The anchor name the tooltip's recipe positions against.
 const ANCHOR = '--tooltip-anchor'
 const WHITESPACE = /\s+/
+// The CSS `position-area` of each `Placement` with a `-start` or `-end`; any other value, a plain side included, is a position-area of the app's own and is used as written.
+const AREAS: Record<string, string> = {
+  'top-start': 'block-start span-inline-end',
+  'top-end': 'block-start span-inline-start',
+  'bottom-start': 'block-end span-inline-end',
+  'bottom-end': 'block-end span-inline-start',
+  'left-start': 'inline-start span-block-end',
+  'left-end': 'inline-start span-block-start',
+  'right-start': 'inline-end span-block-end',
+  'right-end': 'inline-end span-block-start',
+}
 // A control a tap acts on, whose tooltip a tap leaves alone, as it does what the tap asked instead.
 const CONTROL = 'a[href], button, input, select, textarea, summary, label, [contenteditable], [role=button], [role=link], [role=menuitem], [role=tab], [role=option], [role=checkbox], [role=radio], [role=switch]'
 // The id of the tooltip panel, which the element it shows for points at with `aria-describedby`.
@@ -211,7 +222,9 @@ effect(() => {
   if (added)
     target.element.setAttribute('aria-describedby', described ? `${described} ${PANEL_ID}` : PANEL_ID)
 
-  element.style.setProperty('position-area', target.element.dataset.tooltipPlacement ?? 'top')
+  const placement = target.element.dataset.tooltipPlacement ?? 'top'
+
+  element.style.setProperty('position-area', AREAS[placement] ?? placement)
 
   // A content block is copied in with its ids stripped, so the copy never repeats one the page holds, and the original stays hidden where it is.
   if (target.content && holder) {

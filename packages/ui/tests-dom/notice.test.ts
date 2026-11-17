@@ -7,15 +7,17 @@ import { click } from './dom'
 
 let mounted: Mounted | undefined
 let dismissed = 0
+const opened: boolean[] = []
 
 afterEach(() => {
   mounted?.unmount()
   mounted = undefined
   dismissed = 0
+  opened.length = 0
 })
 
 async function root() {
-  mounted = await mountComponent(Notices, { onDismiss: () => dismissed++, sourced: { error: () => undefined, pending: () => false, retry: () => undefined } })
+  mounted = await mountComponent(Notices, { onDismiss: () => dismissed++, onOpenChange: ({ open }: { open: boolean }) => opened.push(open), sourced: { error: () => undefined, pending: () => false, retry: () => undefined } })
 
   return mounted.root
 }
@@ -66,6 +68,7 @@ test('a controlled notice follows open, hides on its button and shows again when
   await settle()
 
   expect(box(page, 'controlled').hidden).toBe(true)
+  expect(opened).toEqual([false])
   expect(box(page, 'hidden').hidden).toBe(true)
 
   click(page.querySelector('#show'))

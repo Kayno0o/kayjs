@@ -6,7 +6,7 @@ description: A panel anchored to a trigger, built on the browser's popover.
 
 ## Trigger and placement
 
-The `@trigger(attributes)` block renders the button, which spreads the `attributes` it is handed. A click on it toggles the panel, and a click outside or Escape closes it. `placement` is `bottom-start`, `bottom-end`, `top-start` or `top-end`, flipped by the browser when there is no room.
+The `@trigger(attributes)` block renders the button, which spreads the `attributes` it is handed. A click on it toggles the panel, and a click outside or Escape closes it. `placement` is `top`, `bottom`, `left` or `right`, each also with `-start` or `-end` to line up with an edge, flipped by the browser when there is no room. It is the same type, `Placement`, on Menu, BellInbox, MultiSelect, HoverCard and Tooltip.
 
 ## Role and name
 

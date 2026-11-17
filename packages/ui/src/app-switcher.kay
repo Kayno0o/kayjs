@@ -7,7 +7,7 @@ import type { SwitcherApp } from './app-switcher'
 import type { IconSlot } from './defaults'
 import { isExternal } from './outside'
 import type { NewTab } from './outside'
-import type { PopoverPanelProps, PopoverPlacement } from './popover'
+import type { Placement, PopoverPanelProps } from './popover'
 import { recipe } from 'kay'
 import { wording } from 'kay/words'
 import { colorStyle } from './color'
@@ -53,7 +53,7 @@ const { id, apps, current, label = wording('ui.appSwitcher.label', 'Apps'), icon
   label?: string | undefined
   // The trigger's icon, a grid of dots by default.
   icon?: IconSlot | IconProps | undefined
-  placement?: PopoverPlacement | undefined
+  placement?: Placement | undefined
   // Shows the panel when the page sets it; the trigger, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
   onOpenChange?: ((event: { open: boolean }) => unknown) | undefined

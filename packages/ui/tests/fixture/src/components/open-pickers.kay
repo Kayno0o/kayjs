@@ -24,6 +24,7 @@ const range = signal<'from' | 'to' | false>(false)
 const switcher = signal(false)
 
 const anchor = signal<Element | null>(null)
+const pinned = signal(false)
 ---
 button#open-multi(onClick={() => multi = true}) Open multi
 button#open-date(onClick={() => date = true}) Open date
@@ -41,6 +42,11 @@ Combobox(label="Planet" options={planets} open={combo()} onOpenChange={({ open: 
 AppSwitcher(id="switcher" apps={apps} open={switcher()} onOpenChange={({ open: shown }) => { calls.push(`switcher ${shown}`); switcher = shown }} data-testid="switch" aria-describedby="hint" style="color: red")
 
 HoverCard#card(anchor={anchor()} onOpenChange={({ open: shown }) => calls.push(`card ${shown}`)}) Detail
+button#pin(onClick={() => pinned = !pinned()}) Pin
+HoverCard#tcard(open={pinned()} openDelay={300} closeDelay={50} placement="right-end" onOpenChange={({ open: shown }) => calls.push(`tcard ${shown}`)})
+  @trigger(attributes)
+    button#thover({...attributes}) Hover me
+  | Trigger detail
 Menu(id="menu" label="Actions" icon="plus" items={[{ label: 'One' }]} data-testid="menu" style="color: blue")
 ConfirmDelete(message="Sure?" failureLabel="No" onConfirm={() => undefined} data-testid="confirm")
 Toaster(data-testid="toaster")

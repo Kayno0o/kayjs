@@ -1,8 +1,14 @@
 ---
-description: A card anchored to whichever element the page picks at run time, shown on hover or focus.
+description: A card shown beside an element on hover or focus, from a trigger or an element the page picks at run time.
 ---
 
 <Demo name="hover-card/basic" />
+
+## Trigger
+
+For one element, the `@trigger(attributes)` block renders it, spreading the `attributes` it is handed as on [Popover](/ui/popover): `@trigger(attributes)`, then `button({...attributes})`. The card shows when the pointer rests on it for `openDelay` (200 ms) or when it is focused, and stays `closeDelay` (150 ms) after either leaves, so the pointer can cross onto the card. `open` shows it from the page, and setting it back to `false` hides it.
+
+## Anchor
 
 `anchor` is the element the card sits beside, or `undefined` for none: the card shows while there is one. The page sets it from `onPointerEnter` and `onFocus` and clears it on `onPointerLeave` and `onBlur`, so one card serves many elements. An element inside an SVG works too, the card following it as the plate pans or zooms.
 
@@ -14,7 +20,7 @@ The pointer can move onto the card: when your code clears the anchor, the card w
 
 ## Placement
 
-`placement` is `top` (the default), `bottom`, `left`, `right`, or `top-start`, `top-end`, `bottom-start`, `bottom-end`, flipped by the browser when there is no room.
+`placement` is `top` (the default), `bottom`, `left`, `right`, each also with `-start` or `-end`, flipped by the browser when there is no room. It is the same `Placement` as on Popover.
 
 ## Id
 
