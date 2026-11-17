@@ -331,6 +331,42 @@ it('still drops the import of an external module behind export * when bundling, 
   await expect(import(out)).rejects.toThrow('core is not defined')
 })
 
+// The names `export *` leaves out in ESM must not turn into a duplicate export in the rewrite (#2703).
+// The barrels import a builtin, so the bundle carries them, and their stars name what the test process holds for the shared files.
+describe('an export * from a shared module', () => {
+  async function read(files: Record<string, string>, imports: string): Promise<string> {
+    const at = await project({ ...files, 'page.kay': `---\n${imports}\n---\np.out {out}\n` })
+    const { root, unmount } = await mountComponent(await componentAt(at('page.kay')))
+    const text = root.querySelector('.out')!.textContent
+
+    unmount()
+
+    return text
+  }
+
+  it('keeps a name the file exports itself over the same name from the star', async () => {
+    expect(await read({
+      'core.ts': 'export const word = \'star\'\nexport const other = \'other\'\n',
+      'barrel.ts': 'import \'fs\'\nexport * from \'./core\'\nexport const word = \'local\'\n',
+    }, 'import { word, other } from \'./barrel\'\nconst out = word + other')).toBe('localother')
+  })
+
+  it('leaves out a name two stars export, as ESM makes it ambiguous', async () => {
+    expect(await read({
+      'a.ts': 'export const dup = 1\nexport const first = \'a\'\n',
+      'b.ts': 'export const dup = 2\nexport const second = \'b\'\n',
+      'barrel.ts': 'import \'fs\'\nexport * from \'./a\'\nexport * from \'./b\'\n',
+    }, 'import { first, second } from \'./barrel\'\nconst out = first + second')).toBe('ab')
+  })
+
+  it('keeps an export named with dollar signs', async () => {
+    expect(await read({
+      'core.ts': 'export const $$ = \'dollars\'\n',
+      'barrel.ts': 'import \'fs\'\nexport * from \'./core\'\n',
+    }, 'import { $$ as out } from \'./barrel\'')).toBe('dollars')
+  })
+})
+
 describe('a package whose package.json cannot be read', () => {
   it('bundles a package whose package.json cannot be read, with a note', async () => {
     const at = await project({

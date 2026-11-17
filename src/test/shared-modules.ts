@@ -131,13 +131,17 @@ function versionOf(path: string): string {
   return stat === undefined ? 'missing' : `${stat.mtimeMs}:${stat.size}`
 }
 
-function importsOf(path: string, loader: 'ts' | 'tsx' | 'js' | 'jsx'): { path: string }[] {
+function transpilerFor(loader: 'ts' | 'tsx' | 'js' | 'jsx'): Bun.Transpiler {
   let transpiler = transpilers.get(loader)
 
   if (!transpiler)
     transpilers.set(loader, transpiler = new Bun.Transpiler({ loader }))
 
-  return transpiler.scanImports(readFileSync(path, 'utf8'))
+  return transpiler
+}
+
+function importsOf(path: string, loader: 'ts' | 'tsx' | 'js' | 'jsx'): { path: string }[] {
+  return transpilerFor(loader).scanImports(readFileSync(path, 'utf8'))
 }
 
 // What one file asks of the bundle, from its own source alone.
@@ -310,15 +314,33 @@ export function sharedModules(apiDirs: string[]): Bun.BunPlugin {
         const stars = [...text.matchAll(EXPORT_STAR)]
         let contents = text
 
+        if (stars.length === 0)
+          return undefined
+
+        const loader = SCANNED.get(extname(path))!
+        // ESM leaves out of a star the names the file exports itself and those two stars export; named re-exports would be a duplicate export instead.
+        const taken = new Set<string>(transpilerFor(loader).scan(text).exports)
+        const starred: { statement: string, quote: string, specifier: string, names: string[] | undefined }[] = []
+        const counts = new Map<string, number>()
+
         for (const [statement, quote, specifier] of stars) {
           const shared = sharedFile(specifier!, path)
+          const names = shared === undefined ? undefined : Object.keys(await import(shared) as object).filter(name => name !== 'default')
 
-          if (shared === undefined)
+          starred.push({ statement, quote: quote!, specifier: specifier!, names })
+
+          for (const name of new Set(names))
+            counts.set(name, (counts.get(name) ?? 0) + 1)
+        }
+
+        for (const { statement, quote, specifier, names } of starred) {
+          if (names === undefined)
             continue
 
-          const names = Object.keys(await import(shared) as object).filter(name => name !== 'default')
+          const kept = names.filter(name => !taken.has(name) && counts.get(name) === 1)
 
-          contents = contents.replace(statement, names.length === 0 ? `import ${quote}${specifier}${quote}` : `export { ${names.join(', ')} } from ${quote}${specifier}${quote}`)
+          // A function replacer, as a name with `$` is no replacement pattern.
+          contents = contents.replace(statement, () => kept.length === 0 ? `import ${quote}${specifier}${quote}` : `export { ${kept.join(', ')} } from ${quote}${specifier}${quote}`)
         }
 
         return contents === text ? undefined : { contents, loader: SCANNED.get(extname(path))! }
