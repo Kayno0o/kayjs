@@ -858,6 +858,32 @@ describe('theme.css', () => {
     expect(sourceOf('card')).toMatch(/border-\[length:var\(--border-width\)\]/)
   })
 
+  test('scatters the starfield with random() only inside @supports, reading the star tokens, and leaves the tiles as they are outside it', async () => {
+    const sky = await Bun.file(`${ROOT}src/starfield.css`).text()
+    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
+    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${sky}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: sheets(tailwind) })
+    const css = compiler.build(['starfield'])
+    const start = sky.indexOf('@supports (top: random(0px, 1px))')
+    const scatter = sky.slice(start)
+    const tiles = sky.slice(0, sky.lastIndexOf('/*', start))
+
+    expect(start).toBeGreaterThan(0)
+    expect(css).toContain('@supports (top: random(0px, 1px))')
+    // One box-shadow list of about 270 stars on a 1px fixed box, with no tiles.
+    expect(scatter).toMatch(/background-image: none/)
+    expect(scatter).toMatch(/width: 1px;\s*height: 1px/)
+    expect(scatter).toMatch(/box-shadow: var\(--w64\), var\(--w64\), var\(--w64\),/)
+    for (const token of ['--color-star)', '--color-star-cool)', '--color-star-warm)']) expect(scatter).toContain(`var(${token}`)
+    expect(scatter).not.toMatch(/rgb\(|#[0-9a-f]{3,6}/i)
+    expect(scatter.match(/random\(/g)!.length).toBeGreaterThan(16)
+
+    // Outside the block: the eleven tiled dots over four prime sizes, and nothing of the scatter.
+    expect(tiles.match(/radial-gradient\(/g)).toHaveLength(11)
+    expect(tiles).toMatch(/background-size:\s*173px 173px,\s*173px 173px,\s*173px 173px,\s*241px 241px,\s*241px 241px,\s*241px 241px,\s*337px 337px,\s*337px 337px,\s*337px 337px,\s*461px 461px,\s*461px 461px;/)
+    expect(tiles).not.toContain('random(')
+    expect(tiles).not.toContain('box-shadow')
+  })
+
   test('ships the starfield alone, its dots reading --color-star tokens that follow the scheme and stand off the ground in both', async () => {
     const sky = await Bun.file(`${ROOT}src/starfield.css`).text()
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)

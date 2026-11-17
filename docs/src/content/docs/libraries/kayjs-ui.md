@@ -80,7 +80,9 @@ Soft sets `--label-case`, `--tracking-label` and `--shadow-raised`. Brutalist se
 
 A skin's rules sit at one class of specificity or none, so a rule of yours with one class in `@layer components` beats them. Unlayered CSS and the classes of `src/ui.ts` already did. The key's hover is the one exception, at two classes like the theme's own.
 
-`starfield` sets `--color-background` and `isolation: isolate` on the element and draws eleven dots in three tints on its `::before`, a fixed layer behind the content, so an app that styles `.starfield::before` knows. `class="starfield bg-surface"` changes the ground. Where the browser supports `random()`, the sky is scattered stars instead of tiles.
+`starfield` sets `--color-background` and `isolation: isolate` on the element and draws eleven dots in three tints on its `::before`, a fixed layer behind the content, so an app that styles `.starfield::before` knows. `class="starfield bg-surface"` changes the ground. Where the browser supports `random()`, the sky is about 270 stars scattered over the viewport, as one `box-shadow` list on a 1px `::before` painted once, instead of tiles.
+
+A `background-image` list of your own on `.starfield::before` belongs in `@supports not (top: random(0px, 1px))`, or it paints onto that 1px box.
 
 The utility also works without the space skin, in light and dark. Import `@kayjs/ui/starfield.css` after the theme and put `class="starfield"` on `body`: your fonts and `color-scheme` stay, and the dots follow the scheme, white by night and ink by day. They read `--color-star`, `--color-star-cool` and `--color-star-warm`, so a `@theme` of yours retints the sky without restyling `::before`.
 
