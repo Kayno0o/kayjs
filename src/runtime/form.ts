@@ -51,7 +51,7 @@ export function formInput(schema: TSchema, body: unknown, form = true): unknown 
 
     if (value === undefined) {
       // A required list may well be empty, and an unticked checkbox posts nothing; a required file list is no file chosen, refused as missing.
-      if (form && !optional && ((field.type === 'array' && field.items?.format !== 'binary') || field.type === 'boolean'))
+      if (form && !optional && ((field.type === 'array' && field.items?.format !== 'binary') || isBoolean(field)))
         fields[name] = field.type === 'array' ? [] : false
 
       continue
@@ -92,7 +92,7 @@ function fromText(field: FieldSchema | undefined, value: unknown): unknown {
   if (field !== undefined && isNumeric(field))
     return DECIMAL.test(value) ? Number(value) : Number.NaN
 
-  if (field?.type === 'boolean')
+  if (field !== undefined && isBoolean(field))
     return BOOLEAN_TEXT.get(value) ?? value
 
   // A form posts a line break as CRLF, where the textarea the visitor typed in holds and counts it as one character: read as LF, a `maxLength` matches what the browser allowed and the text is stored as it was written.
@@ -100,6 +100,11 @@ function fromText(field: FieldSchema | undefined, value: unknown): unknown {
 }
 
 // `s.Number()`, or `s.Integer()` and `s.Numeric()`, which Elysia writes as a number or a numeric string; `s.Date()` takes a number too, but not only.
+// A boolean, or the text of one as `s.boolean()` reads it.
+function isBoolean(field: FieldSchema): boolean {
+  return field.type === 'boolean' || (field.anyOf?.some(member => member.type === 'boolean') ?? false)
+}
+
 function isNumeric(field: FieldSchema): boolean {
   return field.type === 'number' || field.type === 'integer' || (field.anyOf?.every(member => isNumeric(member) || NUMERIC_FORMATS.has(member.format)) ?? false)
 }

@@ -89,7 +89,7 @@ function stringOf(options: StringOptions | undefined, extra: Record<string, unkn
     ...keywords(options ?? {}),
     ...extra,
     ...options?.min !== undefined && { minLength: options.min },
-    maxLength: options?.max ?? DEFAULT_MAX_LENGTH,
+    maxLength: options?.max ?? (typeof options?.maxLength === 'number' ? options.maxLength : DEFAULT_MAX_LENGTH),
     ...pattern !== undefined && { pattern },
   })
 }
@@ -144,14 +144,9 @@ function boolean<const Options extends FieldOptions<boolean>>(options?: Options)
   return wrapped(schema.BooleanString({ ...rest(options, FIELD_KEYS), ...keywords(options ?? {}) }), options)
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$/
-
-// A `Date`, read from its ISO text: `2026-03-01` or `2026-03-01T10:30:00Z`, no other form.
+// A `Date`, read from the text or the number of one as Elysia's `Date` does, until `validate()` reads dates alone.
 function date<const Options extends FieldOptions<Date>>(options?: Options): Built<ReturnType<Builder['Date']>, Options> {
-  const text = schema.String({ pattern: ISO_DATE.source, maxLength: 64 })
-  const field = schema.Transform(text).Decode(value => new Date(value)).Encode(value => value.toISOString())
-
-  return wrapped(Object.assign(field, rest(options, FIELD_KEYS), keywords(options ?? {})), options) as never
+  return wrapped(schema.Date({ ...rest(options, FIELD_KEYS), ...keywords(options ?? {}) }), options)
 }
 
 // Elysia's `UnionEnum` fills the first value in as `default`, so an optional field read as that value when left out and a required one was never refused; kay leaves `default` out unless the options give one.
@@ -196,7 +191,7 @@ export interface ObjectOptions extends FieldOptions {
 
 // The fields of an object, `shape` a record of schemas, which is refused with a 422 when it carries a key the shape lacks; `{ extra: 'strip' }` drops it instead. Anywhere kay takes a schema, a plain record is this object, so `s.object()` is rarely written.
 function object<Shape extends Record<string, Schema>, const Options extends ObjectOptions>(shape: Shape, options?: Options): Built<ReturnType<typeof schema.Object<Shape>>, Options> {
-  return wrapped(schema.Object(shape, { ...rest(options, [...FIELD_KEYS, 'extra']), ...keywords(options ?? {}), ...options?.extra !== 'strip' && { additionalProperties: false } }), options)
+  return wrapped(schema.Object(shape, { ...options?.extra !== 'strip' && { additionalProperties: false }, ...rest(options, [...FIELD_KEYS, 'extra']), ...keywords(options ?? {}) }), options)
 }
 
 // An object of any keys, each holding `value`.
@@ -209,13 +204,23 @@ export interface ListOptions extends FieldOptions<unknown[]> {
   max?: number | undefined
 }
 
+// A list of files is bounded by `max` alone, as the body limit of an upload reads it, so a list of any other item is the one capped at 1,000.
+function maxItemsOf(item: Schema, options: ListOptions | undefined): Record<string, unknown> {
+  const max = options?.max ?? (typeof options?.maxItems === 'number' ? options.maxItems : undefined)
+
+  if (max !== undefined)
+    return { maxItems: max }
+
+  return (item as { format?: unknown }).format === 'binary' ? {} : { maxItems: DEFAULT_MAX_ITEMS }
+}
+
 // A list of `item`, at most `max` long (1,000 when not given).
 function list<Item extends Schema, const Options extends ListOptions>(item: Item, options?: Options): Built<ReturnType<typeof schema.Array<Item>>, Options> {
   return wrapped(schema.Array(item, {
     ...rest(options, [...FIELD_KEYS, 'min', 'max']),
     ...keywords(options ?? {}),
     ...options?.min !== undefined && { minItems: options.min },
-    maxItems: options?.max ?? DEFAULT_MAX_ITEMS,
+    ...maxItemsOf(item, options),
   }), options)
 }
 

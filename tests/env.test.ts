@@ -271,6 +271,7 @@ describe('kay env', () => {
     expect((await loadConfig(root)).publicEnv).toBeDefined()
     expect(publicEnvFiles(root)).toEqual(['src/env.ts'])
     expect(publicEnvFiles(await project({ 'src/env.ts': 'const s = 1\n', 'src/env.test.ts': 's.Public(1)\n', 'src/a.kay': 'p s.Public(1)\n' }))).toEqual(['src/a.kay'])
+    expect(publicEnvFiles(await project({ 'src/env.ts': 'export const a = s.public(s.string())\n' }))).toEqual(['src/env.ts'])
   })
 
   it('marks s.Secret as a secret required in production, with kay env and kay build run without it', async () => {

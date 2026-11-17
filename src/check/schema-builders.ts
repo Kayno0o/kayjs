@@ -109,7 +109,7 @@ function optionalEdit(call: Call, base: number): Edit | undefined {
 
   const open = base + options.start
 
-  return { start: open, end: open + 1, text: options.properties.length === 0 ? '{ optional: true' : '{ optional: true,' }
+  return { start: open, end: open + 1, text: options.properties.length === 0 ? '{ optional: true ' : '{ optional: true,' }
 }
 
 // The PascalCase builders of `s`, which kay 1.106 replaces with its own lowercase ones, and the `'2m'` sizes of a file field, which are `'2mb'` as every size is.

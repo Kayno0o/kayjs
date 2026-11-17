@@ -2,6 +2,7 @@ import type { TSchema } from 'elysia'
 import type { Static } from '../src/runtime/schema'
 import { describe, expect, expectTypeOf, it } from 'bun:test'
 import { getSchemaValidator } from 'elysia'
+import { formInput } from '../src/runtime/form'
 import { DEFAULT_MAX_ITEMS, s } from '../src/runtime/schema'
 import { DEFAULT_MAX_LENGTH } from '../src/runtime/schema-bounds'
 
@@ -68,14 +69,29 @@ describe('s, kay\'s own builders', () => {
     expectTypeOf<Static<ReturnType<typeof s.int>>>().toEqualTypeOf<number>()
   })
 
-  it('reads a date from ISO text only', () => {
-    const date = s.date()
+  it('reads a date as Elysia\'s Date does, so a publish field and the cms editor still find it', () => {
+    const date = s.date({ default: new Date('2026-01-01') })
 
     expectTypeOf<Static<typeof date>>().toEqualTypeOf<Date>()
     expect(valid(date, '2026-03-01')).toBe(true)
     expect(valid(date, '2026-03-01T10:30:00Z')).toBe(true)
-    expect(valid(date, '03/01/2026')).toBe(false)
-    expect(valid(date, 1_700_000_000_000)).toBe(false)
+    expect(JSON.stringify(date)).toContain('"type":"Date"')
+  })
+
+  it('keeps a bound written under the keyword of the old builders, and a strict object an app sets open', () => {
+    expect(s.string({ maxLength: 5 })).toMatchObject({ maxLength: 5 })
+    expect(s.list(s.string(), { maxItems: 5 })).toMatchObject({ maxItems: 5 })
+    expect(s.object({ a: s.string() }, { additionalProperties: true })).toMatchObject({ additionalProperties: true })
+    expect('maxItems' in s.list(s.file())).toBe(false)
+    expect(s.list(s.file(), { max: 3 })).toMatchObject({ maxItems: 3 })
+  })
+
+  it('reads a ticked or unticked boolean off a form as s.Boolean does', () => {
+    const shape = s.object({ ok: s.boolean() })
+
+    expect(formInput(shape, { ok: 'on' })).toEqual({ ok: true })
+    expect(formInput(shape, {})).toEqual({ ok: false })
+    expect(formInput(shape, { ok: 'false' })).toEqual({ ok: false })
   })
 
   it('takes the values of an enum from a list or from the keys of a record, with no default of its own', () => {

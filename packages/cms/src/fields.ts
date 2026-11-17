@@ -82,6 +82,8 @@ const HINTED = new Set<string>(['text', 'textarea', 'markdown', 'number', 'integ
 const LONG_TEXT = 120
 // The bound `s.string()` puts on a string with none of its own (DEFAULT_MAX_LENGTH of kay): no editor's limit, so neither a textarea nor an attribute.
 const DEFAULT_BOUND = 10_000
+// The bound `s.list()` puts on a list with none of its own.
+const DEFAULT_ITEMS = 1000
 
 function isLong(maxLength: unknown): boolean {
   return typeof maxLength === 'number' && maxLength !== DEFAULT_BOUND && maxLength > LONG_TEXT
@@ -248,7 +250,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
       if (entering.options.lines === true && typeOf(withoutNull(inner.items).schema) === 'string' && choicesOf(withoutNull(inner.items).schema) === undefined)
         return { ...base, kind: 'lines' }
 
-      return { ...base, kind: 'list', item: unpaired(fieldOf(0, inner.items, true)), numbered: withoutNull(inner.items).schema.title === undefined, minItems: bound(inner.minItems), maxItems: bound(inner.maxItems), ...entering.options.titleField !== undefined && { titleField: entering.options.titleField } }
+      return { ...base, kind: 'list', item: unpaired(fieldOf(0, inner.items, true)), numbered: withoutNull(inner.items).schema.title === undefined, minItems: bound(inner.minItems), maxItems: listBound(inner.maxItems), ...entering.options.titleField !== undefined && { titleField: entering.options.titleField } }
     case 'object':
       return { ...base, kind: 'group', fields: fieldsOf(inner) }
     case undefined:
@@ -271,7 +273,7 @@ function blocksOf(base: FieldBase, schema: JsonSchema): Field {
       blocks.push({ type: name, label: variant.title ?? humanize(name), fields: fieldsOf({ ...variant, properties, required: variant.required?.filter(key => key !== 'type') }) })
   }
 
-  return { ...base, kind: 'list', item: { key: 0, label: '', required: true, kind: 'group', fields: [] }, numbered: false, minItems: bound(schema.minItems), maxItems: bound(schema.maxItems), blocks }
+  return { ...base, kind: 'list', item: { key: 0, label: '', required: true, kind: 'group', fields: [] }, numbered: false, minItems: bound(schema.minItems), maxItems: listBound(schema.maxItems), blocks }
 }
 
 const LIMIT_KEYS = ['minLength', 'maxLength', 'minimum', 'maximum'] as const
@@ -429,6 +431,11 @@ function enteringOf(inner: JsonSchema, outer: JsonSchema): { base: Partial<Field
   }
 
   return { base: Object.fromEntries(Object.entries(entered).filter(([, value]) => value !== undefined)), options }
+}
+
+// The most items a list takes, none when it is the bound `s.list()` puts on a list with none of its own.
+function listBound(value: unknown): number | undefined {
+  return value === DEFAULT_ITEMS ? undefined : bound(value)
 }
 
 function bound(value: unknown): number | undefined {
