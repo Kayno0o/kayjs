@@ -46,3 +46,15 @@ describe('the manifest\'s share target', () => {
     expect(Object.fromEntries(new URL(response.headers.get('location')!, 'http://localhost').searchParams)).toMatchObject({ url: 'https://example.com/b', title: '', files: '' })
   })
 })
+
+describe('a share target naming an action that is not there', () => {
+  const booting = async (action: string) => testSite({ root: 'tests/fixtures/share-target', islands: false, assets: { manifest: { shareTarget: { action } } } })
+
+  it('stops the boot on a file that is no page of the app', async () => {
+    await expect(booting('src/routes/shared.kay#receive')).rejects.toThrow('kay: the manifest\'s shareTarget.action, src/routes/shared.kay#receive, names a file that is no page or layout of the app')
+  })
+
+  it('stops the boot on an export that is no action of the page', async () => {
+    await expect(booting('src/routes/share.kay#recieve')).rejects.toThrow('src/routes/share.kay#recieve, names no action: src/routes/share.kay exports no action called recieve')
+  })
+})

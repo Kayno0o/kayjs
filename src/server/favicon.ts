@@ -324,6 +324,20 @@ export function manifestJson(name: string | undefined, description: string | und
 // An action written as its page file and export name is served at the URL `actionUrl` gives it; a path is a route of the site.
 const ACTION_REFERENCE = /^(?:\.\/)?([^#\\]+\.kay)#([A-Z_a-z$][\w$]*)$/
 
+// Stops the boot on a share target naming a page file that is no route or layout of the app, or an export of it that is no action; `actions` holds the URLs the server registered, `files` the page files, relative to the root.
+export function checkShareAction(share: ManifestShareTarget | undefined, actions: ReadonlySet<string>, files: ReadonlySet<string>): void {
+  const reference = share === undefined || share.action.startsWith('/') ? null : ACTION_REFERENCE.exec(share.action)
+
+  if (reference === null || actions.has(actionUrl(reference[1]!, reference[2]!)))
+    return
+
+  const file = reference[1]!
+
+  throw new KayError('favicon-invalid', files.has(file)
+    ? `kay: the manifest's shareTarget.action, ${share!.action}, names no action: ${file} exports no action called ${reference[2]}`
+    : `kay: the manifest's shareTarget.action, ${share!.action}, names a file that is no page or layout of the app`)
+}
+
 function shareTargetJson(share: ManifestShareTarget, page: (path: string, what: string) => string): object {
   const reference = share.action.startsWith('/') ? null : ACTION_REFERENCE.exec(share.action)
 

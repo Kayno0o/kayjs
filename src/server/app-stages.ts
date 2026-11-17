@@ -19,7 +19,7 @@ import type { ServedPage } from './render'
 import type { RouteTable } from './route-table'
 import type { Claim, ServedPaths } from './served-paths'
 import type { PageSetup } from './setup'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { MAPS_DIR } from '../build/assets'
 import { pageHooks, servedPageHooks } from '../config-extensions'
@@ -52,7 +52,7 @@ import { entryUrls } from './entry-urls'
 import { servePublicEnv } from './env'
 import { browserStackMapper, devStackMapper } from './error-maps'
 import { serveErrorReports } from './errors'
-import { FAVICON_DIR, faviconSource, faviconVersion, serveFavicons } from './favicon'
+import { checkShareAction, FAVICON_DIR, faviconSource, faviconVersion, serveFavicons } from './favicon'
 import { loadGuard, requiredGuards } from './guards'
 import { refuseUnknownHosts } from './host-allowlist'
 
@@ -565,6 +565,7 @@ export async function appRoutes(boot: Boot, actionOptions: ActionOptions, jobsPa
   const api = await serveApi(app, apiModules, actionOptions, setup.extensionApp)
 
   apiMountsServed.push(...apiModules.map(module => module.mount))
+  checkShareAction(boot.options.assets?.manifest?.shareTarget, new Set(actionLimits.keys()), new Set(routes.flatMap(route => [...route.layouts, ...route.actionModules ?? [], route.file]).map(file => relative(boot.project.root, file).replaceAll('\\', '/'))))
   boot.registered.actions = actionLimits.size > 0
   boot.registered.api = api.mounted
 
