@@ -26,7 +26,7 @@ The new project has these.
 - A `tsconfig.json` keeping the Astro project's `paths`.
 - `src/server.ts` when the Astro site renders on demand (`output: 'server'` or an adapter); otherwise it is a static site built with `kay build --static`.
 - Tailwind, ESLint, the Forgejo workflow and the Dockerfile when the Astro project had them.
-- A `.gitignore` holding the Astro project's own entries too, a `fonts` entry in `kay.config.ts` for each Fontsource package the layouts imported, and none of the Astro project's ESLint or UnoCSS packages.
+- A `.gitignore` holding the Astro project's own entries too, an `assets.fonts` entry in `kay.config.ts` for each Fontsource package the layouts imported, and none of the Astro project's ESLint or UnoCSS packages.
 
 It never writes over a file that exists.
 
@@ -48,7 +48,7 @@ Run without `--outdir`, it writes the `.kay` files next to the `.astro` ones and
 | `set:html` | `innerHTML` through `trustHtml` |
 | A layout's `<head>` | A `head` block |
 | `<Icon name="mdi:sun" />` from astro-icon | The icon imported from `~icons/mdi/sun`, drawn as a tag (see [Images](/essentials/styling-and-assets)) |
-| `import '@fontsource/inter/400.css'` | A `fonts` entry in `kay.config.ts` |
+| `import '@fontsource/inter/400.css'` | An `assets.fonts` entry in `kay.config.ts` |
 | `import text from './x.svg?raw'` | `import text from './x.svg' with { type: 'text' }` |
 
 A page reads like this before.

@@ -181,7 +181,7 @@ export default defineConfig({
 })
 ```
 
-Past it, a page answers 504 through the nearest `_error.kay`, an action call fails with 504, and an API route or endpoint answers `504 Gateway Timeout`. The timeout is logged and handed to `observe.onError`.
+Past it, a page answers 504 through the nearest `_error.kay`, an action call fails with 504, and an API route or endpoint answers `504 Gateway Timeout`. The timeout is logged and handed to `onError`.
 
 Every page, guard, endpoint and action context has `ctx.signal`, which aborts at the timeout and when the visitor leaves. Pass it to `fetch` or a database call so the work stops with the request:
 
@@ -268,7 +268,7 @@ A request that carries a `traceparent` header joins the caller's trace, so a cal
 
 To read another format, set `ops.observe.extract` to a function from the request's headers to an OpenTelemetry context, such as `headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. Set it to `false` to ignore incoming traces, which a public edge should do, as anyone can send a `traceparent` that asks for sampling.
 
-`observe: { serverTiming: true }` sends a `Server-Timing` header with the time of the guards, the module imports, the loads and the render. Development always does. It covers every page rendered per request, and the server islands of a prerendered one. Actions, endpoints and API routes send it too, with the time of their guards and their handler.
+`ops: { observe: { serverTiming: true } }` sends a `Server-Timing` header with the time of the guards, the module imports, the loads and the render. Development always does. It covers every page rendered per request, and the server islands of a prerendered one. Actions, endpoints and API routes send it too, with the time of their guards and their handler.
 
 <ReadMore href="/llms/production#request-logs">The log fields and the sink for your own entries are in the full production reference, the span attributes in the tracing reference.</ReadMore>
 

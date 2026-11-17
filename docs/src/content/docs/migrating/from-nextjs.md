@@ -159,7 +159,7 @@ export const theme = persisted.cookie('theme', 'light')
 | `revalidateTag`, `revalidatePath` | `invalidate(key)`, or `invalidatePage(path => ...)` from `kay/cache` |
 | `generateMetadata` and `metadata` | A `head` block, see [Head and SEO](/essentials/head-and-seo) |
 | `next/image` | An imported image is its URL, `img(src={photo})`, which kay sizes and serves in modern formats |
-| `next/font` | `fonts` in `kay.config.ts`, which self-hosts font files, see [Styling and assets](/essentials/styling-and-assets#fonts) |
+| `next/font` | `assets.fonts` in `kay.config.ts`, which self-hosts font files, see [Styling and assets](/essentials/styling-and-assets#fonts) |
 | `next/link` | A plain `a(href="/about")`, which `kay check` verifies |
 | `useRouter().push('/todos')` | `navigate('/todos')` from `kay` |
 | `.env` and `NEXT_PUBLIC_` | `defineEnv` for the server, `s.Public` fields of it for the browser |

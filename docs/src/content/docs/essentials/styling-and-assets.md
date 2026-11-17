@@ -425,7 +425,7 @@ A name that climbs out with `../`, a symlink that leads out of the folder, an em
 
 ## Fonts
 
-`fonts` in `kay.config.ts` self-hosts font files, declared with `@font-face` in every page's head. List an installed Fontsource package once.
+`assets.fonts` in `kay.config.ts` self-hosts font files, declared with `@font-face` in every page's head. List an installed Fontsource package once.
 
 ```ts
 export default defineConfig({
