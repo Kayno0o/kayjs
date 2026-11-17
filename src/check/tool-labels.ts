@@ -11,6 +11,8 @@ import { snakeCase } from '../server/snake-case'
 const SOURCE_FILE = /\.(?:kay|[cm]?ts|tsx)$/
 const DECLARATION_FILE = /\.d\.[cm]?ts$/
 const EXPORTED = /\bexport\s+(?:const|let|var|function|async\s+function)\s+([A-Za-z_$][\w$]*)/g
+// The props of a Chat keyed by tool name.
+const PROPS = new Set(['toolLabels', 'toolIcons'])
 const QUOTED = /(['"`])([A-Z][\w-]*)\1/gi
 // A name a second tool of the same name got: `add_note_2`.
 const NUMBERED = /^(.+)_\d+$/
@@ -18,13 +20,13 @@ const NUMBERED = /^(.+)_\d+$/
 interface Labelled {
   file: string
   source: string
-  keys: { name: string, at: number, end: number }[]
-  // The source with the keys of the `toolLabels` blanked, which is where tool names are searched, so a key never vouches for itself.
+  keys: { prop: string, name: string, at: number, end: number }[]
+  // The source with the keys of the `toolLabels` and `toolIcons` blanked, which is where tool names are searched, so a key never vouches for itself.
   rest: string
 }
 
-// A key of a Chat's `toolLabels` that names no tool of the project: an action is a tool named by its export (`homeState` is `home_state`) or by its `tool.name`, and a function tool by its `name`, so a key matching none of them, nor any string the project writes, is a tool that was renamed or never was.
-// Only a `toolLabels` written as an object literal is read, and only what the project's own modules write is searched.
+// A key of a Chat's `toolLabels` or `toolIcons` that names no tool of the project: an action is a tool named by its export (`homeState` is `home_state`) or by its `tool.name`, and a function tool by its `name`, so a key matching none of them, nor any string the project writes, is a tool that was renamed or never was.
+// Only a `toolLabels` or `toolIcons` written as an object literal is read, and only what the project's own modules write is searched.
 export async function unknownToolLabels(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('unknown-tool-label', options.lints) === 'allow')
     return []
@@ -32,12 +34,12 @@ export async function unknownToolLabels(root: string, options: CheckOptions): Pr
   const files = (await findProjectFiles(root, SOURCE_FILE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
   const read = async (paths: string[]) => Promise.all(paths.map(async file => ({ file, source: await Bun.file(file).text() })))
   const written = await read(files.filter(file => file.endsWith('.kay')))
-  const labelled = written.flatMap(({ file, source }) => source.includes('toolLabels') ? labelsIn(file, source) : [])
+  const labelled = written.flatMap(({ file, source }) => source.includes('toolLabels') || source.includes('toolIcons') ? labelsIn(file, source) : [])
 
   if (labelled.length === 0)
     return []
 
-  // The other modules are read once a `toolLabels` is found, as only they say which tools exist.
+  // The other modules are read once one is found, as only they say which tools exist.
   const texts = [...written, ...await read(files.filter(file => !file.endsWith('.kay')))]
   const known = new Set<string>()
   const labelledFiles = new Map(labelled.map(item => [item.file, item.rest]))
@@ -63,7 +65,7 @@ export async function unknownToolLabels(root: string, options: CheckOptions): Pr
       if (level === 'allow' || known.has(key.name) || known.has(NUMBERED.exec(key.name)?.[1] ?? ''))
         continue
 
-      found.push({ file, ...positionAt(source, key.at), end: key.end, message: `\`toolLabels\` names \`${key.name}\`, which no tool of this project is called`, help: 'name the tool as the model calls it: its export in snake case (`homeState` is `home_state`), its `tool.name` or the `name` of its `tool()`; or drop the key and give the action `tool: { label }`', code: 'unknown-tool-label', severity: level === 'warn' ? 'warning' : 'error' })
+      found.push({ file, ...positionAt(source, key.at), end: key.end, message: `\`${key.prop}\` names \`${key.name}\`, which no tool of this project is called`, help: 'name the tool as the model calls it: its export in snake case (`homeState` is `home_state`), its `tool.name` or the `name` of its `tool()`; or drop the key and give the action `tool: { label }`', code: 'unknown-tool-label', severity: level === 'warn' ? 'warning' : 'error' })
     }
   }
 
@@ -76,7 +78,7 @@ function labelsIn(file: string, source: string): Labelled[] {
 
   for (const element of elementsIn(parseKay(source).template)) {
     for (const attribute of element.attributes) {
-      if (attribute.kind !== 'expression' || source.slice(attribute.name.start, attribute.name.end) !== 'toolLabels')
+      if (attribute.kind !== 'expression' || !PROPS.has(source.slice(attribute.name.start, attribute.name.end)))
         continue
 
       const expression = parseObject(source.slice(attribute.expression.start, attribute.expression.end))
@@ -93,7 +95,7 @@ function labelsIn(file: string, source: string): Labelled[] {
         const name = keyName(property.key)
 
         if (name !== undefined)
-          keys.push({ name, at: attribute.expression.start + property.key.start, end: attribute.expression.start + property.key.end })
+          keys.push({ prop: source.slice(attribute.name.start, attribute.name.end), name, at: attribute.expression.start + property.key.start, end: attribute.expression.start + property.key.end })
       }
     }
   }
