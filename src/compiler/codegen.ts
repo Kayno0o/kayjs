@@ -293,7 +293,7 @@ class ModuleShell {
     else if (head && this.kind === 'island')
       this.emitIslandTitle(head)
 
-    this.b.add('\nreturn ')
+    this.b.add(`\n${this.mode === 'dom' && this.facts.ambientForm ? `const KayHere = ${helperName('formHere')}()\n` : ''}return `)
     this.template(template, errors)
     this.exports()
 
@@ -329,7 +329,7 @@ class ModuleShell {
     if (server)
       b.add(`import type { ${this.pageContextType()} as KayPageContext, PageData as KayPageData${this.guardValues() !== undefined ? ', GuardValues as KayGuardValues' : ''}${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''}${this.actionsTyped ? ', ActionFor as KayActionFor' : ''} } from 'kay'\n`)
 
-    const kayHelpers: KayHelper[] = [...facts.actionForm ? ['formAction' as const] : [], ...ambientHelpers(facts)]
+    const kayHelpers: KayHelper[] = [...facts.actionForm ? ['formAction' as const] : [], ...ambientHelpers(facts, mode)]
 
     if (this.rootBlocks().length > 0)
       kayHelpers.push('fill')

@@ -195,7 +195,7 @@ form(action={add})
     p Saving...
 ```
 
-A `pending` block in a snippet or a component follows the form it renders in as well.
+A `pending` block in a snippet or a component follows the form it renders in as well, on a static page and in an island, a snippet declared outside the form included.
 
 The block is hidden when the page renders, after the answer, after a refused post and with JavaScript off. It stays shown until the page a redirect leads to is in, and while a page from another origin, or a reload after a lost answer, is loading. A load that never replaces the page, such as a download, loses it after ten seconds. Its text goes to screen readers through a polite live region the runtime writes outside the form.
 

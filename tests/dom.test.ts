@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { stringify } from 'devalue'
 import { kay } from '../src/build/plugin'
 import { compileKay } from '../src/compiler'
 import { patch } from '../src/runtime/dev-patch'
@@ -3105,6 +3106,90 @@ describe('a form submitted in the browser', () => {
 
     expect(err).toBe('')
     expect(JSON.parse(out)).toEqual({ reasons: ['refused'], busy: [null, null] })
+  })
+})
+
+describe('an error and a pending line outside the form they render in, in an island', () => {
+  const PAGE = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String() }), ({ title }) => title)\nexport const other = action(t.Object({ title: t.String() }), ({ title }) => title)\n---\np Page\n'
+  const HEAD = '---\nimport { signal } from \'kay\'\nimport { add, other } from \'./page.kay\'\nimport Row from \'./row.kay\'\n\nconst shown = signal(false)\nconst ready = Promise.resolve(1)\n'
+  const BUTTONS = 'button#add(type="button" onClick={() => void add({ title: \'ab\' })}) Add\nbutton#other(type="button" onClick={() => void other({ title: \'ab\' })}) Other\nbutton#show(type="button" onClick={() => shown.set(true)}) Show\n'
+  const ROW = '---\n---\ndiv.row\n  error title\n'
+  const ROW_LATER = '---\nimport { signal } from \'kay\'\n\nconst shown = signal(false)\n---\nbutton.reveal(type="button" onClick={() => shown.set(true)}) Reveal\nif shown()\n  p.late\n    error title\n'
+  const outside = site({ 'page.kay': PAGE, 'row.kay': ROW, 'main.kay': `${HEAD}---\nsnippet note\n  error title\n  pending\n    p.saving Saving\nform.a(action={add})\n  {note()}\nform.b(action={other})\n  {note()}\n${BUTTONS}` })
+  const awaited = site({ 'page.kay': PAGE, 'row.kay': ROW, 'main.kay': `${HEAD}---\nsnippet note\n  await ready\n    p Loading\n  then value\n    p.after {value}\n    error title\nform.a(action={add})\n  {note()}\n${BUTTONS}` })
+  const rerendered = site({ 'page.kay': PAGE, 'row.kay': ROW, 'main.kay': `${HEAD}---\nsnippet note\n  if shown()\n    error title\nform.a(action={add})\n  {note()}\n${BUTTONS}` })
+  const child = site({ 'page.kay': PAGE, 'row.kay': ROW, 'main.kay': `${HEAD}---\nform.a(action={add})\n  Row\nform.b(action={other})\n  Row\n${BUTTONS}` })
+  const childLater = site({ 'page.kay': PAGE, 'row.kay': ROW_LATER, 'main.kay': `${HEAD}---\nform.a(action={add})\n  Row\n${BUTTONS}` })
+
+  const refuse = () => spyOn(globalThis, 'fetch').mockImplementation((async () => new Response(stringify({ errors: { title: 'Too short' }, data: undefined }), { status: 422, headers: { 'x-kay-failure': '1' } })) as unknown as typeof fetch)
+  // What each form of the page shows as an error.
+  const shown = (root: Element) => [...root.querySelectorAll('form')].map(form => form.querySelector('.error')?.textContent ?? null)
+
+  async function posted(mount: ReturnType<typeof site>, button: string, run: (root: HTMLElement) => Promise<void>): Promise<void> {
+    const fetchStub = refuse()
+    const { root, dispose } = await mount()
+
+    try {
+      await settle()
+      root.querySelector<HTMLElement>(button)!.click()
+      await settle()
+      await settle()
+      await run(root)
+    }
+    finally {
+      fetchStub.mockRestore()
+      await dispose()
+    }
+  }
+
+  it('shows a snippet declared outside the forms the message of the form it was called in, and only that form', async () => {
+    await posted(outside, '#add', async (root) => {
+      expect(shown(root)).toEqual(['Too short', null])
+    })
+  })
+
+  it('shows the pending block of a snippet while the action of its own form is in flight, not the other form\'s', async () => {
+    const fetchStub = spyOn(globalThis, 'fetch').mockImplementation((async () => new Promise<Response>(() => undefined)) as unknown as typeof fetch)
+    const { root, dispose } = await outside()
+
+    try {
+      await settle()
+      root.querySelector<HTMLElement>('#add')!.click()
+      await settle()
+      expect([...root.querySelectorAll('form')].map(form => form.querySelector('[data-kay-pending]')?.hasAttribute('hidden'))).toEqual([false, true])
+    }
+    finally {
+      fetchStub.mockRestore()
+      await dispose()
+    }
+  })
+
+  it('shows the line of a snippet inside an await block, once it settled', async () => {
+    await posted(awaited, '#add', async (root) => {
+      expect(shown(root)).toEqual(['Too short'])
+    })
+  })
+
+  it('shows the line of a snippet inside an if the state shows after the form was captured', async () => {
+    await posted(rerendered, '#add', async (root) => {
+      root.querySelector<HTMLElement>('#show')!.click()
+      await settle()
+      expect(shown(root)).toEqual(['Too short'])
+    })
+  })
+
+  it('shows a child component the message of its own form among two', async () => {
+    await posted(child, '#other', async (root) => {
+      expect(shown(root)).toEqual([null, 'Too short'])
+    })
+  })
+
+  it('shows the line of a child component inside an if it opens later', async () => {
+    await posted(childLater, '#add', async (root) => {
+      root.querySelector<HTMLElement>('.reveal')!.click()
+      await settle()
+      expect(shown(root)).toEqual(['Too short'])
+    })
   })
 })
 

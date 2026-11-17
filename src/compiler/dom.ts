@@ -1,11 +1,12 @@
 import type { ClassTable } from '../runtime/class-table'
-import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, PendingNode, Span, TemplateFacts, TryNode } from './ast'
+import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, PendingNode, SnippetNode, Span, TemplateFacts, TryNode } from './ast'
 import type { Declaration, DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import type { BindingPlan, LinkPlan } from './plan'
 import { mayLeaveSite } from '../runtime/outside'
 import { marksServerIsland, modifiersOf } from './ast'
 import { fieldBindings } from './dom-fields'
+import { FormHere } from './dom-here'
 import { addHandler, listenerOptions } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
 import { addKeyParameters, addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
@@ -44,6 +45,7 @@ export class DomTemplate extends TemplateWriter {
   private readonly catches: string[] = []
   // Whether the code may write a link's `href`, which an app with locales localizes through `kay/i18n-links`: only a module doing so imports it.
   private writesLinks = false
+  private readonly here = new FormHere()
 
   // `errors`: what a refused form's fields are described by.
   // `located`, in development: the source position each element carries for `kay dev`'s inspector.
@@ -120,7 +122,9 @@ export class DomTemplate extends TemplateWriter {
 
     switch (item.kind) {
       case 'expression':
-        b.add(`KayInsert(${at}, () => (`).addSource(item.node.expression).add('));')
+        b.add(`KayInsert(${at}, () => `)
+        this.here.expression(b, item.node.expression, this.src, this.formOf(item.line), helperName(this.scoping))
+        b.add(');')
 
         break
       case 'component':
@@ -187,20 +191,23 @@ export class DomTemplate extends TemplateWriter {
 
         break
       case 'error':
-        if (this.formOf(item.node)) {
-          const target = this.formOf(item.node)!
+        // With no form around it in the file, the message is read again when the action answers, outside any render, from the form the function was called in.
+        b.wrap(item.node, () => {
+          const target = this.formOf(item.node)
 
-          b.wrap(item.node, () => {
-            b.add(`KayInsert(${at}, () => ${helperName('errorParagraph')}(KayFormError((`).addSource(target).add(`), ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, this.errors?.lines.get(item.node))}));`)
-          })
-        }
-        else {
-          // The form it renders in, taken now: the message is read again when the action answers, outside any render.
-          b.add(`{ const KayHere = ${helperName('formHere')}(); KayInsert(${at}, () => ${helperName('errorParagraph')}(${helperName('formError')}(KayHere, ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, undefined)})); }`)
-        }
+          b.add(`KayInsert(${at}, () => ${helperName('errorParagraph')}(${helperName('formError')}(`)
+
+          this.here.target(b, target)
+          b.add(`, ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, target ? this.errors?.lines.get(item.node) : undefined)}));`)
+        })
 
         break
     }
+  }
+
+  protected override snippetDeclaration(node: SnippetNode): void {
+    if (!this.here.declare(this.b, node, this.source(node.name), this.facts.forms, helperName('formHere'), () => this.childrenValue(node.children)))
+      super.snippetDeclaration(node)
   }
 
   private declaration(item: Declaration): void {
@@ -432,15 +439,14 @@ export class DomTemplate extends TemplateWriter {
     return property === 'innerHTML' && !raw && checksMarkup(this.src, expression, this.ownMarkup) ? helperName('checkedMarkup') : ''
   }
 
-  // An island's `pending` block shows while a call of its form's action is in flight, however the handler made it; with no form around it in the file, the action of the form it renders in, taken now.
+  // An island's `pending` block shows while a call of its form's action is in flight, however the handler made it; with no form around it in the file, the action of the form the function was called in.
   private followCalls(pending: PendingNode, node: TemplateNode): Binding {
     const followed = this.formOf(pending)
 
     return (variable) => {
-      if (followed)
-        this.b.add(`KayEffect(() => ${helperName('pendingCall')}(${variable(node)}, (`).addSource(followed).add(')));')
-      else
-        this.b.add(`{ const KayHere = ${helperName('formHere')}(); KayEffect(() => ${helperName('pendingCall')}(${variable(node)}, KayHere)); }`)
+      this.b.add(`KayEffect(() => ${helperName('pendingCall')}(${variable(node)}, `)
+      this.here.target(this.b, followed)
+      this.b.add('));')
     }
   }
 

@@ -9,7 +9,7 @@ import { parsedBindingNames } from './pattern-names'
 export type Item
   = | { kind: 'text', text: string }
     | { kind: 'element', node: ElementNode }
-    | { kind: 'expression', node: TextExpression }
+    | { kind: 'expression', node: TextExpression, line: Node }
     | { kind: 'component', node: ElementNode }
     | { kind: 'slot', node: ElementNode }
     | { kind: 'if', node: IfNode }
@@ -91,7 +91,7 @@ export function childItems(nodes: Node[]): Item[] {
           if (part.kind === 'element')
             element(part)
           else if (part.kind === 'expression')
-            items.push({ kind: 'expression', node: part })
+            items.push({ kind: 'expression', node: part, line: node })
           else if (part.text !== '')
             text(part.text)
         }
@@ -244,7 +244,7 @@ export function fixedSource(element: ElementNode): string {
   return names.length === 0 ? '' : `, { ${names.map(name => `${JSON.stringify(name)}: ""`).join(', ')} }`
 }
 
-// What an `error` or `pending` line outside every form of its file reads: the form it renders in, and the message the action gave a field; the import drops a repeat.
-export function ambientHelpers(facts: { ambientForm: boolean }): ('formHere' | 'formError')[] {
-  return facts.ambientForm ? ['formHere', 'formError'] : []
+// What an `error` or `pending` line outside every form of its file reads: the form it renders in, and the message the action gave a field; in the browser a snippet called in a form is built in that form's scope; the import drops a repeat.
+export function ambientHelpers(facts: { ambientForm: boolean, snippet: boolean, forms: ReadonlyMap<unknown, unknown> }, mode: string): ('formHere' | 'formError' | 'issueScope')[] {
+  return [...facts.ambientForm ? ['formHere' as const, 'formError' as const] : [], ...mode === 'dom' && facts.snippet && facts.forms.size > 0 ? ['issueScope' as const] : []]
 }
