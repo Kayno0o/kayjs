@@ -326,6 +326,6 @@ export function isUtility(design: Design, word: string): boolean {
 const RUNTIME_MERGE = /\bclass\s*=\s*(?!["'])|\.\.\.[\w$({[]|\bparts?\b|\brecipe\b/
 
 // Whether a module may hand the browser classes to merge: a `.kay` file with a class expression, a spread, a part or a recipe, or `src/ui.ts`, which writes parts.
-export function mergesAtRuntime(file: string): boolean {
-  return (file.endsWith('.kay') || file.endsWith(UI_FILE)) && RUNTIME_MERGE.test(readSource(file).text)
+export function mergesAtRuntime(file: string, uiFiles: readonly string[] = []): boolean {
+  return (file.endsWith('.kay') || file.endsWith(UI_FILE) || uiFiles.includes(file)) && RUNTIME_MERGE.test(readSource(file).text)
 }

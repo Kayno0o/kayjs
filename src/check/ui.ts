@@ -75,7 +75,7 @@ function componentProblems(ui: UiSource, component: UiComponent, report: (span: 
   }
 }
 
-// What one `defineUi` file sets that the components it names do not have: an unknown or ambiguous component, an unknown part, and a file the compiler cannot read as written. An extension's file may name components this app lacks, so it is not told of those.
+// What one `defineUi` file sets that the components it names do not have: an unknown or ambiguous component, an unknown part, and a file the compiler cannot read as written. An extension's file may name components this app lacks, so it is not told of those, only of a name two components bear.
 function sourceProblems(ui: UiSource, own: boolean): CheckDiagnostic[] {
   forgetNames(ui)
 
@@ -93,7 +93,7 @@ function sourceProblems(ui: UiSource, own: boolean): CheckDiagnostic[] {
     else if (file !== undefined)
       named.set(file, component)
 
-    if (own || file !== undefined)
+    if (own || file !== undefined || (isComponentName(component.specifier) && componentMatches(ui, component).length > 1))
       componentProblems(ui, component, report)
   }
 

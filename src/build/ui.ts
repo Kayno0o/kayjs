@@ -414,6 +414,17 @@ export function uiOf(root: string): UiSource | undefined {
 
 // The files extensions contribute `defineUi` entries from, by project root, in the order of the config; set as the config loads.
 const layerFiles = new Map<string, string[]>()
+
+// A project's root as the layers are filed under it: through a symlink or not, it is one project.
+function rootKey(root: string): string {
+  try {
+    return realpathSync(root)
+  }
+  catch {
+    return resolve(root)
+  }
+}
+
 const layerReads = new Map<string, { stamp: string, ui: UiSource | undefined }>()
 
 // Records the `ui` files of the extensions for a project: absolute, or relative to its root.
@@ -421,9 +432,9 @@ export function setUiLayers(root: string, extensions: readonly { ui?: string | u
   const files = (extensions ?? []).flatMap(({ ui }) => ui === undefined ? [] : [resolve(root, ui)])
 
   if (files.length === 0)
-    layerFiles.delete(resolve(root))
+    layerFiles.delete(rootKey(root))
   else
-    layerFiles.set(resolve(root), files)
+    layerFiles.set(rootKey(root), files)
 }
 
 // What the extensions' `ui` files say, in config order, each read as `src/ui.ts` is and resolving names against the app; a file that does not exist is skipped.
@@ -431,7 +442,7 @@ export function uiLayersOf(root: string): UiSource[] {
   const base = join(resolve(root), 'src')
   const found: UiSource[] = []
 
-  for (const file of layerFiles.get(resolve(root)) ?? []) {
+  for (const file of layerFiles.get(rootKey(root)) ?? []) {
     const stat = statSync(file, { throwIfNoEntry: false })
     const key = `${base}\0${file}`
 
@@ -454,11 +465,14 @@ export function uiLayersOf(root: string): UiSource[] {
   return found
 }
 
-// Every file that sets a component's classes: the extensions' `ui` files, then the app's `src/ui.ts` when there is one.
-export function uiFilesOf(root: string): string[] {
-  const app = join(root, UI_FILE)
+// Where classes of components may be set from: the extensions' `ui` files and the app's `src/ui.ts`, whether they exist now or not, for a rebuild when one is written or removed.
+export function uiPathsOf(root: string): string[] {
+  return [...layerFiles.get(rootKey(root)) ?? [], join(root, UI_FILE)]
+}
 
-  return [...uiLayersOf(root).map(({ file }) => file), ...statSync(app, { throwIfNoEntry: false }) === undefined ? [] : [app]]
+// Every file that sets a component's classes now: the extensions' `ui` files, then the app's `src/ui.ts` when there is one.
+export function uiFilesOf(root: string): string[] {
+  return uiPathsOf(root).filter(file => statSync(file, { throwIfNoEntry: false }) !== undefined)
 }
 
 function partsOf(parts: UiEntry['parts']): Record<string, string> {

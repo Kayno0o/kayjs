@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'bun:test'
-import { setUiLayers, uiEntryOf, uiFilesOf } from '../src/build/ui'
+import { setUiLayers, uiEntryOf, uiFilesOf, uiPathsOf } from '../src/build/ui'
 import { uiProblems } from '../src/check/ui'
 import { scratchDir } from './scratch'
 
@@ -53,6 +53,17 @@ describe('extension ui files', () => {
     await write('ext/one.ts', `export default { Panel: { parts: { head: 'changed-and-longer' } } }\n`)
 
     expect(uiEntryOf(root, card)?.parts).toEqual({ head: 'changed-and-longer', root: 'app-root' })
+  })
+
+  it('lists the paths of files that are gone, so a rebuild follows their removal, and finds them through a symlinked root', async () => {
+    const link = `${root}-link`
+
+    await Bun.spawn(['ln', '-sfn', root, link]).exited
+    setUiLayers(link, [{ ui: 'ext/gone.ts' }])
+
+    expect(uiPathsOf(root)).toEqual([join(link, 'ext/gone.ts'), join(root, 'src/ui.ts')])
+    expect(uiFilesOf(root)).toEqual([join(root, 'src/ui.ts')])
+    await Bun.spawn(['rm', link]).exited
   })
 
   it('names nothing once no extension lists a file', async () => {

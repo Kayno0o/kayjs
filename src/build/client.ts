@@ -54,7 +54,7 @@ import { styleImports, withoutStyles, writeComponentStylesheets } from './styles
 import { mergingSupports } from './supports'
 import { warnBuiltThemeVariables } from './theme-vars'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
-import { uiFilesOf } from './ui'
+import { uiFilesOf, uiPathsOf } from './ui'
 import { kayFiles, variantFile, VariantIndex } from './variants'
 
 export interface ClientOptions extends Pick<KayConfig, ClientBuildKey> {
@@ -215,7 +215,8 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
 
     const classTableText = JSON.stringify([classTable, islandTable])
     // `src/ui.ts` is written into the components it restyles, none of which imports it, so no chunk lists it among its inputs.
-    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || uiFilesOf(realRoot).includes(file) || file === join(realRoot, AWAIT_ALERT_FILE)) || previous.classTable !== classTableText || (!options.hot && (previous.sources.actionForms !== sources.actionForms || previous.sources.actionProps !== sources.actionProps))
+
+    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || uiPathsOf(realRoot).includes(file) || file === join(realRoot, AWAIT_ALERT_FILE)) || previous.classTable !== classTableText || (!options.hot && (previous.sources.actionForms !== sources.actionForms || previous.sources.actionProps !== sources.actionProps))
     const stylesAgain = !previous || await increments!.stylesChanged(previous, sources, texts)
 
     if (previous && islandsAgain)
@@ -487,10 +488,11 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
   const reaching = await reachingAny(outside.map(file => realpathSync(file)), entries, edges)
   const reachingOutside = outside.filter(file => reaching.has(realpathSync(file)))
   const alert = join(root, AWAIT_ALERT_FILE)
-  const written = [...bundled, ...uiFilesOf(root), ...existsSync(alert) ? [alert] : [], ...reachingOutside]
+  const uiFiles = uiFilesOf(root)
+  const written = [...bundled, ...uiFiles, ...existsSync(alert) ? [alert] : [], ...reachingOutside]
 
   // The browser merges classes only where a component writes a class that is not a literal, a spread or a part; two literals side by side were resolved while compiling.
-  if (!written.some(file => mergesAtRuntime(file)))
+  if (!written.some(file => mergesAtRuntime(file, uiFiles)))
     return undefined
 
   const words = new Set(written.flatMap(file => fileWords(file)))
