@@ -111,5 +111,6 @@ describe('authGuard() from kayjs-auth', () => {
     const { auth } = testApp()
 
     expect(() => auth.guard({ fresh: 'soon' as '1s' })).toThrow('fresh')
+    expect(() => authGuard({ fresh: 'soon' as '1s' })).toThrow('fresh')
   })
 })

@@ -2,6 +2,7 @@ import type { Duration } from 'kay'
 import type { Auth, AuthRequirement } from './auth'
 import { guard as kayGuard } from 'kay'
 import { KayError } from 'kay/library'
+import { freshMs } from './request'
 
 /** What `authGuard()` takes, as `auth.guard()` does: where an anonymous visitor goes, the requirement a user meets and the scope a token holds, and whether two-factor is asked of the user (see `twoFactor.require`). */
 export interface GuardOptions {
@@ -14,6 +15,9 @@ export interface GuardOptions {
 
 // The `auth.guard()` of the app's `auth()`, for a `_guard.ts` with no module to import it from: `export default authGuard()`. It asks the `auth` of the request, so it works with a `authCore` of the app's own too.
 export function authGuard(options: GuardOptions = {}) {
+  if (options.fresh !== undefined)
+    freshMs(options.fresh)
+
   return kayGuard<{ auth: Auth }>(async (ctx) => {
     const { auth } = ctx.locals
 
