@@ -126,7 +126,7 @@ span(part="root" {...rest})
       if trigger
         | {trigger(named(attributes), unread)}
       else
-        IconButton(icon="bell" label={name()} variant="ghost" aria-haspopup="true" {...triggerProps} {...attributes})
+        IconButton(icon="bell" variant="ghost" aria-haspopup="true" {...triggerProps} label={triggerProps.label ?? name()} {...attributes})
     div(part="list" aria-label={label})
       if items().length === 0 && !waiting()
         p(part="empty") {wording('ui.bell.empty', 'No notifications')}
