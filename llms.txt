@@ -120,7 +120,7 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Upgrading to 1.105, config](llms/upgrading-1-105-config.md): config and hooks
 - [Upgrading, older](llms/upgrading-archive.md): the minors before 1.105
 - [What's new](llms/whats-new.md): what each recent release adds
-- [What's new, older](llms/whats-new-archive.md): the releases before 1.104.3
+- [What's new, older](llms/whats-new-archive.md): the releases before 1.105
 - [Privacy and personal data](llms/privacy.md): what kay keeps, erasing a person
 - [Events and names](llms/events.md): DOM events, cookie and key rules
 - [Notifications](llms/notifications.md): `notify()`, the Bell

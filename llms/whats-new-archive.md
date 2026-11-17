@@ -1,8 +1,8 @@
 # What's new, older releases
 
-What each release before 1.104.3 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.105 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased (continued)
+## 1.105.0 (continued)
 
 - A page's `page` takes `seo: { title, description, image, canonical, noindex, sitemap, lastmod, search, feed }` and `cache: '1h' | { browser, shared, swr } | 'private' | false`, `head(title=... description=... image=... canonical=... noindex)` takes the same shorthand in a template, and `seo.noindex` in kay.config.ts keeps a whole site out of search engines: see [Head and site metadata](head.md) and [A CDN in front of prerendered pages](cdn-caching.md); `ttl`, `cacheControl` and the top-level `noindex`, `sitemap`, `lastmod`, `search` and `feed` are deprecated (`deprecated-page-seo`, `deprecated-page-cache`).
 - `form(action={save} values={todo})` fills every field from a record, text, numbers, dates, checkboxes, radios and selects, a date by its field's type, and a refused post's values still win in the form that posted ([forms](actions.md#fill-a-form-from-a-record)).
@@ -62,3 +62,9 @@ What each release before 1.104.3 added, and the end of a newest release that was
 - An `error` or `pending` line in a snippet or a child component follows the form it is rendered in while it renders, so a field row can hold its own message and busy state; they stay as the markup form of `add.form.error('title')` and `add.pending()` ([Actions](actions.md#show-that-a-form-is-posting), [snippets](templates-elements-slots-snippets.md#snippets)).
 
 Releases before 1.104.3 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+
+- A `.ws()` route of an `api()` module speaks one JSON protocol, rooms included: every frame is JSON both ways, so a string, number, boolean or `null` reads back typed; a frame is measured before it is parsed and the upgrade is no longer wrapped; a message that is no JSON or fails `body` is answered `{ error: { key, fields } }`, never the schema, which `socket().onRefused` reads; `rooms({ reply })` checks what a room sends, for a route whose `response` is a status map too and against the models of the app each room's route belongs to; an `api()` route's refused upgrade frees its connection place at once ([API routes](api-routes.md#api-routes), [Rooms](rooms.md)).
+- A refusal is one call, `ctx.deny(status, { message, errors, data })` in a guard, a page, an action and an endpoint, and `refuse(status, { ... })` throws it from anywhere; in an action it fails the post as `ctx.fail` did, which is now its deprecated spelling, as are `deny(status, 'text')` and `refuse('text', { ... })`. Helpers refuse a bad argument with a `KayError` coded `argument-invalid` ([Actions](actions.md#refused-posts), [Errors](errors-runtime.md))
+- Eight lints that flagged a page shipped broken are errors now, not warnings: `unreturned-fail`, `brace-in-attribute`, `signal-set-call`, `constant-signal`, `literal-tag`, `positional-key`, `unkeyed-rows` and `once-read-prop` ([Lints](lints.md), [upgrading](upgrading.md)).
+
+Releases before 1.105 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
