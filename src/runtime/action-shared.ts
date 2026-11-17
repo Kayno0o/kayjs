@@ -242,9 +242,9 @@ export interface ActionContext<Params extends Readonly<Record<string, unknown>> 
   fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data, errors?: FieldErrors<Field>) => Failure<Data>
 }
 
-// `ctx.deny` of an action: a refusal with `data` or `errors` is typed as a `Failure`, one with a message alone (or none) is `never`, so it narrows what follows as a guard's does.
+// `ctx.deny` of an action: a refusal with a `message`, `data` or `errors` is typed as a `Failure`, one with no options is `never`, so it narrows what follows as a guard's does.
 export interface ActionDeny<Field extends string = string> {
-  <const Status extends number = number>(status?: Status & ErrorStatus<Status>, options?: { message?: string | undefined, errors?: undefined, data?: undefined }): never
+  <const Status extends number = number>(status?: Status & ErrorStatus<Status>, options?: { message?: undefined, errors?: undefined, data?: undefined }): never
   <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, options: DenyOptions<Data, Field>): Failure<Data>
   // What a helper taking the guard's `deny` sees: an action's context passes as one.
   <const Status extends number = number>(status?: Status & ErrorStatus<Status>, options?: DenyOptions<ErrorData>): never

@@ -70,7 +70,7 @@ describe('ctx.deny in an action', () => {
     expect(response.headers.get('content-type')).toContain('text/html')
   })
 
-  it('stops as a guard does when it carries nothing, so a guard run with the action context refuses the same way', async () => {
+  it('stops with plain text when it carries nothing', async () => {
     const bare = await post('bare', {}, true)
 
     expect([bare.status, await bare.text()]).toEqual([409, 'Conflict'])
@@ -87,6 +87,12 @@ describe('ctx.deny in an action', () => {
     expect(decodeServerValue(await island.text())).toMatchObject({ errors: { '': 'Members only' } })
     expect(page.status).toBe(403)
     expect(page.headers.get('content-type')).toContain('text/html')
+  })
+
+  it('stops with plain text for an empty message, as for none', async () => {
+    const empty = await post('emptyMessage', {}, true)
+
+    expect([empty.status, await empty.text()]).toEqual([403, 'Forbidden'])
   })
 
   it('puts no form message where only data or fields are given, and a text data is the message', async () => {

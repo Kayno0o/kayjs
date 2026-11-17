@@ -88,16 +88,16 @@ export function stoppers(request: Request): Pick<RequestContext, 'redirect' | 'n
   }
 }
 
-// `ctx.deny(status, { message, errors, data })` in an action fails the post as `ctx.fail` does, a form re-rendered with the message, the fields and `data`, a call throwing an `ActionError`. A deny with no options, or the old text form, stops as a guard's does, so a guard run with an action's context refuses the same way.
+// `ctx.deny(status, { message, errors, data })` in an action fails the post as `ctx.fail` does, a form re-rendered with the message, the fields and `data`, a call throwing an `ActionError`. A deny with no options, or the old text form, stops as a guard's does.
 export function actionStoppers(request: Request): Pick<RequestContext, 'redirect' | 'notFound' | 'deny'> {
   const { deny: stop, ...rest } = stoppers(request)
 
   const deny = (status = 403, second?: string | DenyOptions<ErrorData>, data?: ErrorData): never => {
-    if (typeof second === 'string' || status < 400 || status > 599)
+    if (typeof second === 'string' || !Number.isInteger(status) || status < 400 || status > 599)
       return stop(status, second as string, data)
 
-    if (second === undefined || (second.message === undefined && second.data === undefined && Object.keys(second.errors ?? {}).length === 0))
-      return stop(status, second)
+    if (second === undefined || ((second.message === undefined || second.message === '') && second.data === undefined && Object.keys(second.errors ?? {}).length === 0))
+      return stop(status)
 
     // A text `data` with no `message` is the form's message, as `ctx.fail` made it; one with only data or fields has no form message, as `ctx.fail` had none.
     throw new RefusedError({ status, message: second.message ?? (typeof second.data === 'string' ? second.data : ''), errors: (second.errors ?? {}) as Record<string, string>, data: second.data })
