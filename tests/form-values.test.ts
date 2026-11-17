@@ -76,7 +76,8 @@ describe('a form given the record its fields start from', () => {
     const server = compileKay(source, 'page.kay', { output: 'html' }).tsx
     const browser = compileKay(source, 'page.kay', { output: 'dom' }).tsx
 
-    expect(server).toContain('KayFormInitial((todo), "title")')
+    // The server types an input the template gives no `type` by its schema, which the browser has not.
+    expect(server).toContain('KayFormInitial((todo), "title", KaySchemaType)')
     expect(server).toContain('KayFormInitialChecked((todo), "done", undefined)')
     expect(browser).toContain('KayFormInitial((todo), "title")')
     expect(browser).toContain('KayFormInitialChecked((todo), "done", undefined)')

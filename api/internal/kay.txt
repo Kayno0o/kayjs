@@ -526,6 +526,9 @@ function formKey(kept?: boolean): string
 [./html] formOptions
 function formOptions(target: unknown, name: string): string
 
+[./html] formType
+function formType(target: unknown, name: string): string | undefined
+
 [./html] head
 function head(tags: HeadTag[]): void
 
@@ -612,7 +615,7 @@ function refillOptions(posted: string | undefined, markup: string, value?: (() =
 function reportRenderFailure(error: unknown): void
 
 [./html] schemaFill
-function schemaFill(target: unknown, name: string, value: () => string, checked: () => string): string
+function schemaFill(target: unknown, name: string, value: (type: string | undefined) => string, checked: () => string): string
 
 [./html] selectOptions
 function selectOptions(value: unknown, markup: string, only?: boolean): string

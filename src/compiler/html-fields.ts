@@ -46,10 +46,10 @@ interface Fill {
 
 // A field's `value`, or `checked` for a boolean. An input that writes no `type` takes the one its schema gives it, so which of the two it is is only known as it renders.
 export function addFieldFill(b: CodeBuilder, src: string, element: ElementNode, markup: Markup, fill: Fill, field: FormField, typed: boolean): void {
-  const one = (filled: 'value' | 'checked', box = fill.box) => addFilled(b, src, element, { ...fill, filled, box, own: filled === fill.filled ? fill.own : undefined, schemaType: true })
+  const one = (filled: 'value' | 'checked', box = fill.box, schemaType = true) => addFilled(b, src, element, { ...fill, filled, box, own: filled === fill.filled ? fill.own : undefined, schemaType })
 
   if (!(typed && field.marked && fill.filled === 'value')) {
-    markup.dynamic(() => one(fill.filled))
+    markup.dynamic(() => one(fill.filled, fill.box, false))
 
     return
   }

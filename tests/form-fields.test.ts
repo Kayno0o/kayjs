@@ -261,7 +261,7 @@ describe('a field typed by its schema, the gaps a review found', () => {
     const { html } = await site.visit('/typed')
 
     expect(html).toContain('<option value="a&gt;b">Angle</option>')
-    expect(html).toContain('<select name="plan" disabled><option value="basic">basic</option><option value="plus">plus</option></select>')
+    expect(html).toContain('<select name="plan" disabled required><option value="basic">basic</option><option value="plus">plus</option></select>')
   })
 
   it('reselects an option value holding a > after a refused post', async () => {
@@ -276,13 +276,13 @@ describe('a field typed by its schema, the gaps a review found', () => {
     const { typed } = await import(join(import.meta.dir, 'fixtures/form-fields/src/routes/typed.kay')) as { typed: Action<Record<string, string | boolean>, unknown> }
     const refused = await site.submit(typed, { email: 'a@b.co', topic: 'sales', age: '20', price: '1', born: '2020-01-01' }, { from: '/typed' })
 
-    expect(html).toMatch(/<input name="consent"[^>]*type="checkbox"[^>]* value="yes"/)
+    expect(html).toMatch(/<input name="consent" value="yes"[^>]*type="checkbox"/)
     expect(refused.html).not.toMatch(/<input name="consent"[^>]*checked/)
   })
 
   it('gives a file in a component requiring it no aria-required, as a typed one', async () => {
     const { html } = await site.visit('/typed')
-    const file = /<div class="required"><input[^>]*>/.exec(html)?.[0] ?? ''
+    const file = (/<div class="required"><input[^>]*>/).exec(html)?.[0] ?? ''
 
     expect(file).toContain('type="file"')
     expect(file).not.toContain('aria-required')

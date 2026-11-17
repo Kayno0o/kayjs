@@ -21,7 +21,6 @@ export const typed = action(s.object({
 }), (_input, ctx) => ctx.fail(409, 'Taken'))
 
 const record = { born: new Date(Date.UTC(2020, 0, 5, 12)) }
----
 --- script
 import RequiredField from '../components/required-field.kay'
 ---

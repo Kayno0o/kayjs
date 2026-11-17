@@ -69,10 +69,7 @@ export function autocompleteOf(field: FieldSchema, name: string): string | undef
   if (field.type !== 'string' || field.format === 'binary')
     return undefined
 
-  if (field.format === 'email' || field.format === 'url')
-    return field.format
-
-  return autocompleteByName(name)
+  return field.format === 'email' || field.format === 'url' ? field.format : autocompleteByName(name)
 }
 
 // The token a field name asks for, whatever its schema says.

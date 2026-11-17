@@ -13,9 +13,9 @@ const UNLABELLED_TYPES = new Set(['hidden', 'submit', 'reset', 'button', 'image'
 const NAMING = ['aria-label', 'aria-labelledby', 'title']
 const HEADING = /^h([1-6])$/
 
-// Whether the schema gives a `field` its `autocomplete` at render: `email` for an email field, and what the name of a password asks for.
-function schemaAutocompletes(field: string | undefined, type: string): boolean {
-  return field !== undefined && (type === 'email' || autocompleteByName(field) !== undefined)
+// Whether an input has an `autocomplete`: written, or given by the schema at render, `email` for an email field and what the name of a password asks for.
+function givesAutocomplete(written: boolean, field: string | undefined, type: string): boolean {
+  return written || (field !== undefined && (type === 'email' || autocompleteByName(field) !== undefined))
 }
 
 const UI_IMPORT = /^import\b[^\n]*['"]@kayjs\/ui\/[^'"\n]*['"];?[ \t]*$/gm
@@ -563,7 +563,7 @@ function elementLints(file: KayFile): Diagnostic[] {
         lint(pointer.name, 'mouse-only-event', `\`${text(pointer.name)}\` has no keyboard counterpart on this \`${element.name}\``, { note: 'what the pointer reveals or hides is never reached by a keyboard user, whom only focus tells', help: `handle \`${wanted}\` the same way, on an element the keyboard reaches` })
     }
 
-    if (element.name === 'input' && type !== undefined && FILLED_TYPES.has(type) && !has(element, 'autocomplete') && !schemaAutocompletes(staticValue(element, 'field'), type))
+    if (element.name === 'input' && type !== undefined && FILLED_TYPES.has(type) && !givesAutocomplete(has(element, 'autocomplete'), staticValue(element, 'field'), type))
       lint(element, 'missing-autocomplete', `This \`${type}\` input has no \`autocomplete\``, { note: 'a browser or a password manager fills a field from it, which people with motor or memory difficulties rely on', help: type === 'email' ? 'write `autocomplete="email"`, or `username`' : 'write `autocomplete="current-password"` or `new-password`' })
 
     const autocomplete = staticValue(element, 'autocomplete')

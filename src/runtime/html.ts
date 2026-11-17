@@ -681,10 +681,7 @@ export function formType(target: unknown, name: string): string | undefined {
 export function schemaFill(target: unknown, name: string, value: (type: string | undefined) => string, checked: () => string): string {
   const field = schemaOf(target)?.properties?.[name]
 
-  if (field && isBoolean(field))
-    return checked()
-
-  return value(field && schemaInputType(field) === 'date' ? 'date' : undefined)
+  return field && isBoolean(field) ? checked() : value(field && schemaInputType(field) === 'date' ? 'date' : undefined)
 }
 
 // The `p` an `error` line shows a refused form's message in, nothing while there is none.
