@@ -186,6 +186,18 @@ test('RelationGraph draws the neighbours in list order up to max, each a link or
   expect((await one('/relation-graph', '#alone [data-part=status]')).text).toBe('No related items.')
 })
 
+test('Sparkline draws a line, or a line over an area, in its tone and colour, and a gap splits it into runs', async () => {
+  const draw = async (id: string) => (await find('/sparkline', `#${id} [data-part=plot] path`)).map(path => [attr(path, 'data-part'), attr(path, 'data-tone'), attr(path, 'd'), attr(path, 'style')])
+
+  expect(await draw('line')).toEqual([['line', 'accent', 'M12.5,96 L37.5,59.2 L62.5,77.6 L87.5,4', null]])
+  expect(await draw('area')).toEqual([['area', 'success', 'M12.5,100 L12.5,96 L37.5,59.2 L62.5,77.6 L87.5,4 L87.5,100 Z', null], ['line', 'success', 'M12.5,96 L37.5,59.2 L62.5,77.6 L87.5,4', null]])
+  // The runs are [3], [5, 4] and [8]: a lone value is a dot, and only a run of two or more has an area under it.
+  expect(await draw('gap')).toEqual([['area', 'accent', 'M41.67,100 L41.67,59.2 L58.33,77.6 L58.33,100 Z', 'fill: #2a9d8f; fill-opacity: 0.15'], ['line', 'accent', 'M8.33,96 h0 M41.67,59.2 L58.33,77.6 M91.67,4 h0', 'stroke: #2a9d8f']])
+  expect(await find('/sparkline', '#line [data-part=bar]')).toEqual([])
+  expect((await find('/sparkline', '#line [data-part=item]')).map(item => attr(item, 'aria-hidden'))).toEqual(['true', 'true', 'true', 'true'])
+  expect(attr(await one('/sparkline', '#line'), 'aria-label')).toBe('Line')
+})
+
 test('Tooltip is a tab stop carrying its text for TooltipHost', async () => {
   const found = await one('/buttons', '#tip')
 

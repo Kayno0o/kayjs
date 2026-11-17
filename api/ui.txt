@@ -3261,6 +3261,7 @@ component default
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
   kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
 }
+  color?: string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   hints?: readonly (string | undefined)[] | undefined
@@ -3270,10 +3271,19 @@ component default
   onActive?: ((index: null | number) => unknown) | undefined
   onActiveChange?: ((event: { index: null | number; }) => unknown) | undefined
   onSelect?: ((event: { item: SparkMark; }) => unknown) | undefined
-  parts?: undefined | { root?: string | undefined; bar?: string | undefined; item?: string | undefined; }
+  parts?: undefined | {
+  root?: string | undefined;
+  bar?: string | undefined;
+  point?: string | undefined;
+  plot?: string | undefined;
+  area?: string | undefined;
+  line?: string | undefined;
+  item?: string | undefined;
+}
   tone?: Tone | undefined
   tones?: readonly (Tone | undefined)[] | undefined
   values: readonly (null | number)[]
+  variant?: "area" | "bars" | "line" | undefined
 
 [./split-layout.kay] default
 component default

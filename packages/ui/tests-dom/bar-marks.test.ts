@@ -92,6 +92,23 @@ describe('BarChart marks', () => {
     expect(root.querySelector('#dots [data-part="tooltip"] .dot')?.textContent).toBe('Q?')
   })
 
+  test('a Sparkline line names each point through its hint, shows a dot on the active one and skips a gap', async () => {
+    const { root, heard } = await marks()
+    const items = root.querySelectorAll('#trend [data-part="item"]')
+
+    expect([...items].map(item => [item.tagName, item.getAttribute('aria-label'), item.getAttribute('data-hint')])).toEqual([['BUTTON', 'one', 'one'], ['BUTTON', 'none', 'none'], ['BUTTON', 'two', 'two'], ['BUTTON', 'three', 'three']])
+    expect(root.querySelector('#trend [data-part="point"]')).toBeNull()
+    items[2]!.dispatchEvent(new Event('pointerenter'))
+    await settle()
+    expect(root.querySelectorAll('#trend [data-part="point"]')).toHaveLength(1)
+    expect(items[2]!.contains(root.querySelector('#trend [data-part="point"]'))).toBe(true)
+    items[1]!.dispatchEvent(new Event('focus'))
+    await settle()
+    expect(root.querySelector('#trend [data-part="point"]')).toBeNull()
+    click(items[3]!)
+    expect(heard).toEqual(['trend:2', 'trend:1', { index: 3, value: 3 }])
+  })
+
   test('LineChart hears the point a click without a drag lands on, the active one and Enter, and draws a controlled one', async () => {
     const { root, heard } = await marks()
     const overlay = root.querySelector('#lined [data-part="overlay"]')!

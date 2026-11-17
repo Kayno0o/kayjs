@@ -1,0 +1,9 @@
+---
+import Sparkline from '@kayjs/ui/sparkline.kay'
+
+const counts = [12, 18, 9, 30, 44, null, 21, 0, 15, 27, 33, 19]
+const hints = counts.map((count, hour) => `${hour + 8}:00, ${count ?? 'no reading'}`)
+---
+.max-w-xs.flex.flex-col.gap-4
+  Sparkline(variant="area" values={counts} hints={hints} label="Requests per hour from 8:00, no reading at 13:00, busiest at 12:00")
+  Sparkline(variant="line" values={counts} tone="success" hints={hints} label="The same requests as a line")

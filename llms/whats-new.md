@@ -13,6 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Keys typed into a field during a query `navigate()` reach its island once it has hydrated, so an island that writes the value it was given back into the field, as kayjs-ui's `TextInput` does, no longer overwrites them ([navigation](navigation.md)).
 - kayjs-ui's `TreeView` takes a `@row(node)` block that draws a row's icon and label, such as a tinted tile and a name, the row keeping its chevron, link, keys and roving focus, and `trailingShown` keeps the `@actions` block visible on every row, for an age or a count ([TreeView](/ui/tree-view#your-own-row)).
 - kayjs-ui's `RelationGraph` draws an item and its neighbours on a ring, joined by lines, each neighbour a link, a button or a muted gap, in the keyboard order of `items`, which can be a list, a promise or a function; `@neighbour` and `@middle` replace the text ([RelationGraph](/ui/relation-graph)).
+- kayjs-ui's `Sparkline` takes `variant="line"` or `"area"`: a line through the values, with a tint under it for an area, in `tone` or any `color`, a `null` splitting it into runs; `hints`, `onSelect`, `href` and the keyboard work as on bars, and `plot`, `line`, `area` and `point` are its new parts ([Sparkline](/ui/sparkline#a-line-or-an-area)).
 
 ## 1.105.0
 

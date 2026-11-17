@@ -6,4 +6,7 @@ import '../app.css'
 main
   Sparkline#spark(values={[2, 4, 0, Number.NaN, 1]} tone="success" tones={[undefined, undefined, 'danger']} hints={['two', 'four']} label="Visits per hour, 7 in all")
   Sparkline#flat(values={[0, 0]} label="Nothing yet")
+  Sparkline#line(variant="line" values={[3, 5, 4, 8]} label="Line")
+  Sparkline#area(variant="area" values={[3, 5, 4, 8]} tone="success" label="Area")
+  Sparkline#gap(variant="area" values={[3, null, 5, 4, Number.NaN, 8]} color="#2a9d8f" label="Gap")
   StatusStrip#strip(cells={['success', 'danger', undefined, 'warning']} hints={['ok']} label="Up 3 of 4 checks")

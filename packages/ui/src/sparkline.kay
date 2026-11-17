@@ -12,20 +12,30 @@ import { wording } from 'kay/words'
 // 'kui-sparkline' stays as the component's name for an app's CSS. A bar is coloured by its own `data-tone`, which wins over `tone`.
 const look = recipe({
   parts: {
-    root: 'kui-sparkline flex h-[var(--spark-height,1.5rem)] w-full items-end gap-px',
-    item: 'flex h-full min-w-0 flex-1 items-end border-0 bg-transparent p-0 no-underline outline-none data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-lit:bg-surface',
+    root: 'kui-sparkline relative flex h-[var(--spark-height,1.5rem)] w-full items-end gap-px',
+    item: 'relative flex h-full min-w-0 flex-1 items-end border-0 bg-transparent p-0 no-underline outline-none data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-lit:bg-surface',
     bar: 'min-h-px w-full rounded-t-[1px] bg-accent data-[tone=neutral]:bg-muted data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
+    // The line and area variants draw one SVG over the items, which stay the hit areas.
+    plot: 'pointer-events-none absolute inset-0 size-full overflow-visible',
+    area: 'fill-accent/15 data-[tone=neutral]:fill-muted/15 data-[tone=muted]:fill-muted/15 data-[tone=accent]:fill-accent/15 data-[tone=success]:fill-success/15 data-[tone=warning]:fill-warning/15 data-[tone=danger]:fill-danger/15 data-[tone=info]:fill-info/15',
+    line: 'fill-none stroke-accent stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round] [vector-effect:non-scaling-stroke] data-[tone=neutral]:stroke-muted data-[tone=muted]:stroke-muted data-[tone=accent]:stroke-accent data-[tone=success]:stroke-success data-[tone=warning]:stroke-warning data-[tone=danger]:stroke-danger data-[tone=info]:stroke-info',
+    // The dot on the value the pointer or the focus is on.
+    point: 'pointer-events-none absolute left-1/2 size-1.5 -translate-1/2 rounded-full bg-accent data-[tone=neutral]:bg-muted data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
   },
 })
 
-const { values, tone = 'accent', tones, hints, onSelect, href, newTab, onActiveChange, onActive, active, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
-  // One bar per value, the largest filling the height; a `null`, a zero or a negative value leaves a hairline.
+const { values, variant = 'bars', tone = 'accent', color, tones, hints, onSelect, href, newTab, onActiveChange, onActive, active, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+  // One bar per value, the largest filling the height; a `null`, a zero or a negative value leaves a hairline. A `line` or an `area` runs from the lowest value to the highest, and a `null` or a value that is not a finite number breaks it in two.
   values: readonly (number | null)[]
-  // Colours every bar; `accent` by default.
+  // `bars` (the default), a `line` through the values, or an `area`: the same line with a tint under it.
+  variant?: 'bars' | 'line' | 'area' | undefined
+  // Colours every bar, or the line and its area; `accent` by default.
   tone?: Tone | undefined
-  // One tone per bar, which wins over `tone`.
+  // Any CSS colour in place of the tone's, such as an item's hue.
+  color?: string | undefined
+  // One tone per bar, or per dot on a line, which wins over `tone`.
   tones?: readonly (Tone | undefined)[] | undefined
-  // One note per bar, shown under the pointer by TooltipHost; the keyboard and screen readers have `label` alone.
+  // One note per bar or point, shown under the pointer by TooltipHost; the keyboard and screen readers have `label` alone.
   hints?: readonly (string | undefined)[] | undefined
   // Makes every bar a button handing back its index and value; with `href` too, a bar that has an address stays a link and a plain click goes to this.
   onSelect?: ((event: { item: SparkMark }) => unknown) | undefined
@@ -96,6 +106,42 @@ function pressed(event: MouseEvent, at: number) {
   void onSelect({ item: mark(at) })
 }
 
+const bars = () => variant === 'bars'
+
+// The values as a line in a 100 by 100 box with the lowest near the bottom and the highest near the top, a flat run halfway up, each value at the middle of its column; a gap in the values splits it into runs.
+const level = memo(() => {
+  const read = values.filter(finite)
+
+  return { low: Math.min(...read), high: Math.max(...read) }
+})
+const row = (at: number) => 100 * (at + 0.5) / values.length
+const height = (value: number) => level().high === level().low ? 50 : 96 - (value - level().low) / (level().high - level().low) * 92
+const round = (value: number) => Math.round(value * 100) / 100
+
+const runs = memo(() => {
+  const found: { x: number, y: number }[][] = []
+  let run: { x: number, y: number }[] = []
+
+  values.forEach((value, at) => {
+    if (finite(value)) {
+      run.push({ x: round(row(at)), y: round(height(value)) })
+    }
+    else if (run.length > 0) {
+      found.push(run)
+      run = []
+    }
+  })
+
+  if (run.length > 0)
+    found.push(run)
+
+  return found
+})
+
+// A lone value between gaps is a zero-length stroke, which the round cap draws as a dot.
+const lineD = memo(() => runs().map(run => run.length === 1 ? `M${run[0]!.x},${run[0]!.y} h0` : `M${run.map(point => `${point.x},${point.y}`).join(' L')}`).join(' '))
+const areaD = memo(() => runs().filter(run => run.length > 1).map(run => `M${run[0]!.x},100 L${run.map(point => `${point.x},${point.y}`).join(' L')} L${run.at(-1)!.x},100 Z`).join(' '))
+
 // Each bar's height against the largest value; a reading that is not a finite number leaves a hairline.
 const percent = (value: number | null) => largest() > 0 && finite(value) ? Math.max(0, value) / largest() * 100 : 0
 ---
@@ -108,7 +154,16 @@ if values.length === 0
     p.kui-sparkline-empty(part="root" {...rest} role="status") {emptyLabel ?? wording('ui.sparkline.empty', 'No data yet.')}
 else
   snippet bar(value: number | null, at: number)
-    span(part="bar" data-tone={tones?.[at] ?? tone} style={`height: ${percent(value)}%`})
+    if bars()
+      span(part="bar" data-tone={tones?.[at] ?? tone} style={`height: ${percent(value)}%${color ? `; background-color: ${color}` : ''}`})
+    else if marks.current() === at && finite(value)
+      span(part="point" data-tone={tones?.[at] ?? tone} style={`top: ${round(height(value))}%${color ? `; background-color: ${color}` : ''}`})
+  snippet drawing()
+    if !bars() && lineD() !== ''
+      svg(part="plot" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false")
+        if variant === 'area' && areaD() !== ''
+          path(part="area" data-tone={tone} d={areaD()} style={color ? `fill: ${color}; fill-opacity: 0.15` : undefined})
+        path(part="line" data-tone={tone} d={lineD()} style={color ? `stroke: ${color}` : undefined})
   if interactive()
     div(part="root" {...rest} role="group" aria-label={label})
       for value, at of values key={at}
@@ -121,8 +176,10 @@ else
         else
           span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined})
             {bar(value, at)}
+      {drawing()}
   else
     div(part="root" {...rest} role="img" aria-label={label})
       for value, at of values key={at}
         span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined})
           {bar(value, at)}
+      {drawing()}
