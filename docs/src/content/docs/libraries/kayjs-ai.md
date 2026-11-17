@@ -234,7 +234,7 @@ A chat reads each finished reply aloud when it takes `speak`, an action that ans
 
 A newer reply, a send or a new conversation stops the reading, a browser that refuses to play unasked leaves a play button on the turn, and a refusal of the action or a failed reading shows a notice. `autoplay={false}` leaves the choice to the visitor with a play button under each reply, `bind:speaking` lets the page stop it, and `onSpeak`, `onSpeakEnd` and `onSpeakFail` mark each transition.
 
-<ReadMore href="/llms/kayjs-ai-chat-speaking">The speak action, the play button, its words and callbacks.</ReadMore>
+<ReadMore href="/llms/kayjs-ai-speech-and-embeddings">The speak action, the play button, its words and callbacks.</ReadMore>
 
 An inline `Chat` can show a New conversation button beside its field with `newButton`. It appears once the conversation has a turn, stops a reply under way and clears the log, the field and what `remember` kept. `labels.new` names it and `icons.new` replaces its plus. To start over from your own control instead, dispatch a `kai:chat-new` event on the `.kai-chat` element.
 

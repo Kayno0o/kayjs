@@ -176,6 +176,16 @@ test('a play that breaks fails with the label, a refusal of the action with its 
   expect(down.problem()).toBe('Could not read')
 })
 
+test('a broken audio reports its failure once and keeps the turn to play again', async () => {
+  const { read, refused, told } = reader(WAV)
+
+  FakeAudio.mode = 'breaks'
+  await read({ id: 1, text: 'One' })
+  FakeAudio.all[0]!.dispatchEvent(new Event('error'))
+
+  expect([told, refused()]).toEqual([['fail:1:Could not read'], 1])
+})
+
 test('a reading that ends in an error event fails, and a new reading clears the notice', async () => {
   const { read, problem } = reader(WAV)
 
@@ -198,4 +208,8 @@ test('speakData answers the audio as base64 with its type', async () => {
 
   expect(data.type).toBe('audio/wav')
   expect(new Blob([Uint8Array.from(atob(data.audio), character => character.charCodeAt(0))]).size).toBeGreaterThan(44)
+})
+
+test('keeps an underscore inside a word and drops the ones that mark emphasis', () => {
+  expect(spokenText('Call _this_ snake_case name')).toBe('Call this snake_case name')
 })

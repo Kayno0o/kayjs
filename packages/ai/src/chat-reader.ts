@@ -30,7 +30,7 @@ export function spokenText(markdown: string): string {
     .replaceAll(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replaceAll(/\[\d+\]/g, '')
     .replaceAll(/^\s{0,3}(?:#{1,6}|[>\-*+]|\d+\.)\s+/gm, '')
-    .replaceAll(/[`*_~|]/g, '')
+    .replaceAll(/[`*~|]|(?<![\p{L}\p{N}])_+|_+(?![\p{L}\p{N}])/gu, '')
     .replaceAll(/\s+/g, ' ')
     .trim()
 }
@@ -56,7 +56,7 @@ function addressOf(answer: string | { audio: string, type?: string | undefined }
   return { src: URL.createObjectURL(new Blob([bytes], { type: answer.type ?? DEFAULT_TYPE })), owned: true }
 }
 
-// Reads replies aloud, one at a time: the turn being read from the request to the end of the audio, the turn whose play the browser refused, and the last failure. A newer `read` or a `stop` ends the one under way, and an answer or a play that comes back after it is dropped.
+// Reads replies aloud, one at a time: the turn being read from the request to the end of the audio, the turn that needs a press to play (the browser refused it, or its reading failed), and the last failure. A newer `read` or a `stop` ends the one under way, and an answer or a play that comes back after it is dropped.
 export function createReader(options: ReaderOptions) {
   const playing = signal<number | undefined>(undefined)
   const refused = signal<number | undefined>(undefined)
@@ -84,9 +84,11 @@ export function createReader(options: ReaderOptions) {
     problem.set(undefined)
   }
 
+  // A failure ends the run, so the error event and the rejected play() of one broken audio count once.
   function fail(reading: Reading, error: unknown) {
     const message = messageOf(error, options.failedLabel())
 
+    run++
     release()
     playing.set(undefined)
 
@@ -94,6 +96,7 @@ export function createReader(options: ReaderOptions) {
       return
 
     problem.set(message)
+    refused.set(reading.id)
     options.onFail?.(reading, message)
   }
 

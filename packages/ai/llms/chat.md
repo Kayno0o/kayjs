@@ -60,7 +60,7 @@ Chat(action={reply} transcribe={dictate})
 - Its troubles show in a notice: a refused call says its `ctx.fail` message under 500 and `labels.transcribeFailed` otherwise, empty text `labels.unheard`, and the microphone's own (blocked, missing, in use, unplugged, no https, a browser that cannot record) kayjs-ui's [RecordButton](../../ui/llms/forms-and-steps.md#recordbutton) words, `ui.recordButton.*`. The status region says when recording starts and stops, then `labels.transcribing` until what was said is sent.
 - Words: `ai.chat.record` (`labels.record`, `Speak a message`), `transcribing`, `unheard` and `transcribeFailed`; `icons.record` replaces the microphone. The recorder's code loads only in a chat with `transcribe`.
 
-A chat reads each finished reply aloud with `speak`, an action turning its text into audio, with a play button where the browser refuses to play unasked: [Reading replies aloud](chat-speaking.md).
+A chat reads each finished reply aloud with `speak`, an action turning its text into audio, with a play button where the browser refuses to play unasked: [Read a chat's replies aloud](speech-and-embeddings.md#read-a-chats-replies-aloud).
 
 ### Regenerating and editing
 

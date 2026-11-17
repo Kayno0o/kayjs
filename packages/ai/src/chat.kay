@@ -247,7 +247,7 @@ effect(() => {
     if (wanted === false && reader.playing() !== undefined)
       reader.stop()
     else if (wanted === true && reader.playing() === undefined && last !== undefined && speak !== undefined)
-      void reader.read({ id: last.id, text: spokenText(withoutApproval(last.content)) }, true)
+      void reader.read({ id: last.id, text: spokenText(withoutApproval(last.content)) })
   })
 })
 
