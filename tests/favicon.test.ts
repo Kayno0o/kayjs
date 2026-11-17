@@ -462,6 +462,18 @@ describe('the manifest\'s share target', () => {
     expect(manifest.share_target).toEqual({ action: '/docs/share', method: 'POST', enctype: 'application/x-www-form-urlencoded', params: { title: 'title', text: 'text', url: 'link' } })
   })
 
+  it('reads a path of the site with a # as a path, never as an action', () => {
+    const manifest = JSON.parse(manifestJson('Kay site', undefined, { shareTarget: { action: '/x/share.kay#go' } })) as { share_target: { action: string } }
+
+    expect(manifest.share_target.action).toBe('/x/share.kay#go')
+  })
+
+  it('puts an action under the mount point', () => {
+    const manifest = JSON.parse(manifestJson('Kay site', undefined, { shareTarget: { action: './src/routes/share.kay#receive' } }, '/docs')) as { share_target: { action: string } }
+
+    expect(manifest.share_target.action).toBe('/docs/_kay/action/src/routes/share.kay/receive')
+  })
+
   it('leaves it out unless asked', () => {
     expect(JSON.parse(manifestJson('Kay site', undefined, {}))).not.toHaveProperty('share_target')
   })

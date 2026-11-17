@@ -624,7 +624,7 @@ describe('the worker', () => {
 describe('the worker handlers', () => {
   type Listener = (event: unknown) => void
 
-  async function run(base: string): Promise<{ shown: { title: string, options: Record<string, unknown> }[], opened: string[], focused: string[], fire: (type: string, event: object) => Promise<void> }> {
+  async function run(base: string, navigator: object = {}): Promise<{ shown: { title: string, options: Record<string, unknown> }[], opened: string[], focused: string[], fire: (type: string, event: object) => Promise<void> }> {
     const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base, extensions: [push()] })
     const script = await (await app.handle(new Request(`http://localhost/sw.js`))).text()
     const listeners = new Map<string, Listener>()
@@ -640,6 +640,7 @@ describe('the worker handlers', () => {
         claim: async () => undefined,
       },
       skipWaiting: () => undefined,
+      navigator,
     }
 
     runInNewContext(script, { self: scope, location: new URL('https://x.example/'), URL })
@@ -683,6 +684,29 @@ describe('the worker handlers', () => {
     } } })
     await worker.fire('push', {})
     expect(worker.shown.map(({ title }) => title)).toEqual(['x.example', 'x.example'])
+  })
+
+  it('sets the app badge from a push\'s count, clears it at 0 and ignores any other value', async () => {
+    const told: (number | null)[] = []
+    const worker = await run('', { setAppBadge: async (count: number) => void told.push(count), clearAppBadge: async () => void told.push(null) })
+
+    for (const badge of [3, 0, -1, 1.5, '4', null])
+      await worker.fire('push', { data: { json: () => ({ title: 'x', badge }) } })
+
+    expect(told).toEqual([3, null])
+    expect(worker.shown).toHaveLength(6)
+  })
+
+  it('draws the notification whatever the browser does with the badge', async () => {
+    const without = await run('')
+    const refusing = await run('', { setAppBadge: async () => {
+      throw new Error('refused')
+    } })
+
+    await without.fire('push', { data: { json: () => ({ title: 'x', badge: 2 }) } })
+    await refusing.fire('push', { data: { json: () => ({ title: 'x', badge: 2 }) } })
+    expect(without.shown).toHaveLength(1)
+    expect(refusing.shown).toHaveLength(1)
   })
 
   it('focuses the tab already on the page a click names, else opens it', async () => {

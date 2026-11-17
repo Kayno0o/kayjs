@@ -32,6 +32,13 @@ describe('the manifest\'s share target', () => {
     expect(Object.fromEntries(query)).toEqual({ title: 'A page', text: 'Worth a read', url: 'https://example.com/a', files: 'note.pdf:5' })
   })
 
+  it('refuses a share another site posts', async () => {
+    const { action } = (await manifest()).share_target
+
+    for (const headers of [{ 'sec-fetch-site': 'cross-site' }, { origin: 'https://evil.example' }])
+      expect((await site.fetch(action, { method: 'POST', body: new URLSearchParams({ url: 'https://example.com/b' }), headers, redirect: 'manual' })).status).toBe(403)
+  })
+
   it('takes a share of a link alone, posted as a form', async () => {
     const { action } = (await manifest()).share_target
     const response = await site.fetch(action, { method: 'POST', body: new URLSearchParams({ url: 'https://example.com/b' }), headers: { 'sec-fetch-site': 'none' }, redirect: 'manual' })

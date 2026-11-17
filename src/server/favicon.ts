@@ -325,7 +325,7 @@ export function manifestJson(name: string | undefined, description: string | und
 const ACTION_REFERENCE = /^(?:\.\/)?([^#\\]+\.kay)#([A-Z_a-z$][\w$]*)$/
 
 function shareTargetJson(share: ManifestShareTarget, page: (path: string, what: string) => string): object {
-  const reference = ACTION_REFERENCE.exec(share.action)
+  const reference = share.action.startsWith('/') ? null : ACTION_REFERENCE.exec(share.action)
 
   if (reference === null && !SITE_PATH.test(share.action))
     throw new KayError('favicon-invalid', `kay: the manifest's shareTarget.action is an action as 'src/routes/share.kay#receive' or a path of the site such as '/share', not ${JSON.stringify(share.action)}`)

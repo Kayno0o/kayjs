@@ -37,6 +37,7 @@ export function pushLoose(): boolean {
   return underKayDev() || looseForTest
 }
 
+const MOST_BADGE = 999_999
 const pending = new Set<Promise<void>>()
 
 // Pushes what `notify()` stored to the person's devices without making `notify` wait for the push services, and never fails it.
@@ -50,7 +51,7 @@ export function pushAlongside(user: string, message: { title: string, url?: stri
       const { sendPush } = await import('./push')
 
       if ((await pushStore().list(user)).length > 0)
-        await sendPush(user, badge === undefined ? message : { ...message, badge: await badge() })
+        await sendPush(user, badge === undefined ? message : { ...message, badge: await countOf(badge) })
     }
     catch (error) {
       kayLog('warn', `notify() could not push a notification to ${user}`, error)
@@ -60,6 +61,18 @@ export function pushAlongside(user: string, message: { title: string, url?: stri
 
   pending.add(job)
   void job.finally(() => pending.delete(job))
+}
+
+// The badge is a courtesy: a count that cannot be read leaves it out, and one past what a push carries is cut to it.
+async function countOf(badge: () => Promise<number> | number): Promise<number | undefined> {
+  try {
+    return Math.min(await badge(), MOST_BADGE)
+  }
+  catch (error) {
+    kayLog('warn', 'notify() could not read the unread count for the app badge', error)
+
+    return undefined
+  }
 }
 
 // Resolves once every push `notify()` started has been answered, for a test reading what a push service got.
