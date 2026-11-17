@@ -7,7 +7,7 @@ import { scan } from './renamed-exports'
 type Member = NodeOfType<'MemberExpression'>
 
 const NEEDLE = /[aA]uth\b/
-const AUTH_NAME = /auth$/i
+const AUTH_NAME = /^auth$/
 
 // The methods of a group renamed in 1.105 to the verbs every group shares (`list`, `get`, `create`, `update`, `delete`, `revoke`), by group.
 const GROUPED: Record<string, Record<string, string>> = {
@@ -47,7 +47,7 @@ function isPlain(node: Node): node is Member & { property: NodeOfType<'Identifie
 }
 
 // kayjs-auth's methods that moved in 1.105: the verbs of a group (`organizations.members()` is `organizations.listMembers()`, `account.saveProfile()` is `account.updateProfile()`), `magicLink.signInWithCode` into `email`, and the ones on `auth` itself into the group they belong to (`auth.requireAdmin()` is `auth.admin.require()`, `auth.provedLately()` is `auth.proof.recent()`).
-// Found on a call whose receiver is named `auth` or ends in it, in the TypeScript files and `.kay` files of the project, as `kay check` reads no types; a template expression is not read. The old names work until 1.108.
+// Found on a call whose receiver is named `auth` (`ctx.locals.auth`, `locals.auth`), in the TypeScript files and `.kay` files of the project, as `kay check` reads no types; a template expression is not read. The old names work until 1.108.
 export async function authMethods(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-auth-methods', options.lints) === 'allow')
     return []

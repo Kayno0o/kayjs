@@ -66,7 +66,7 @@ describe('deprecated-auth-methods', () => {
   })
 
   it('keeps `members` of a receiver that is not an auth', async () => {
-    const { found } = await fixed({ 'src/b.ts': 'export const x = (auth: Auth, org: Org) => org.organizations.members(1) && auth.members(2)\n' })
+    const { found } = await fixed({ 'src/b.ts': 'export const x = (auth: Auth, org: Org) => org.organizations.members(1) && auth.members(2) && googleAuth.scopes() && oauth.reprove()\n' })
 
     expect(found).toHaveLength(0)
   })

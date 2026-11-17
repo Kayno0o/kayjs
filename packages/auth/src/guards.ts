@@ -14,7 +14,7 @@ export interface RouteGuardOptions<Role extends string, Scope extends string> {
   redirect?: string | undefined
   require?: AuthRequirement<Role> | undefined
   scope?: ScopeRequirement<Scope> | undefined
-  // A duration such as `'10m'`: the user must have signed in or re-proved (`auth.reprove`) within it, else a 403 whose `data.code` is `'stale'`, for the page to ask for the password or the passkey again. A bearer token never has, so it is refused.
+  // A duration such as `'10m'`: the user must have signed in or re-proved (`auth.proof.renew`) within it, else a 403 whose `data.code` is `'stale'`, for the page to ask for the password or the passkey again. A bearer token never has, so it is refused.
   fresh?: Duration | undefined
   // true asks every user this guard lets through for two-factor; left out, `twoFactor.require` of the app decides. The security page and the second-factor page are never held back, whatever guard runs.
   twoFactor?: true | undefined

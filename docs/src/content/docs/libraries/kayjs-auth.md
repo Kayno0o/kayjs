@@ -450,7 +450,7 @@ export const auth = authCore({
 
 A `label` is a string, or an object by locale such as `{ en: 'Bio', fr: 'Biographie' }`. The page shows the one for its own locale.
 
-A page of your own calls `auth.account.getProfile(locale)` and `auth.account.updateProfile(values)`. `saveProfile` throws when `pages` has no `profile`.
+A page of your own calls `auth.account.getProfile(locale)` and `auth.account.updateProfile(values)`. `updateProfile` throws when `pages` has no `profile`.
 
 ## Switching features off
 
@@ -464,7 +464,7 @@ Turning `twoFactor` off only stops new users from setting it up. A user who alre
 
 To make it a must, give `twoFactor: { require: ['admin'] }`, which takes what a guard's `require` takes.
 
-A user it names who has not turned it on is sent to the security page by `authGuard()` and `requireAdmin()`, and comes back once it is on. Anything that is not a page gets a 403, and a gate only ever answers 403.
+A user it names who has not turned it on is sent to the security page by `authGuard()` and `admin.require()`, and comes back once it is on. Anything that is not a page gets a 403, and a gate only ever answers 403.
 
 Every `auth.admin` method answers `{ ok: false, error: { code: 'two-factor-required' } }`, and OAuth consent answers `access_denied`. The security page and the second-factor page are never held back, and `securityPage` names your own.
 
@@ -494,7 +494,7 @@ An action takes that answer with `passkeyAssertion` for a sign-in, a second fact
 
 Registering, password resets and magic links ask for a proof of work by default, and a password sign-in from the third attempt. The browser hashes for some tens of milliseconds before the request goes through, with no third party and no cookie.
 
-The prebuilt pages carry it. Your own form carries `captchaChallenge` in a `data-kay-work` field, and your action passes its solution on as `captcha`. `kay check` reports a call to `password.register`, `password.requestReset`, `magicLink.request` or `password.signIn` with no `captcha` option (`missing-captcha`), since without the token it answers `{ ok: false, error: { code: 'captcha' } }` and the form fails with no message.
+The prebuilt pages carry it. Your own form carries `captcha.challenge` in a `data-kay-work` field, and your action passes its solution on as `captcha`. `kay check` reports a call to `password.register`, `password.requestReset`, `magicLink.request` or `password.signIn` with no `captcha` option (`missing-captcha`), since without the token it answers `{ ok: false, error: { code: 'captcha' } }` and the form fails with no message.
 
 ```kay
 --- server
@@ -583,7 +583,7 @@ if (found.ok) {
 }
 ```
 
-- `admin.listUsers({ search, offset, limit })` gives the users newest first, with `total`. `admin.getUser(id)` gives one, with `admin` telling whether they meet the `admin` option. `admin.roles()` lists the roles an admin may give.
+- `admin.listUsers({ search, offset, limit })` gives the users newest first, with `total`. `admin.getUser(id)` gives one, with `admin` telling whether they meet the `admin` option. `admin.listRoles()` lists the roles an admin may give.
 - `admin.grantRole(id, role)` and `admin.revokeRole(id, role)` take a role your `roles` option declares. If two admins revoke each other's role at the same moment, at least one stays an admin, and a revoke that would have left none is undone and answers `last-admin`. Two admins deleting their own accounts at the same moment are held to the same rule, which needs an `admin` option that reads the user's roles.
 - `admin.ban(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `admin.unban(id)` lifts it. An admin cannot ban themselves or another admin.
 - `admin.deleteUser(id)` deletes the user as `account.delete` does, notifications and mailing lists included (for a verified address). An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
@@ -593,13 +593,13 @@ if (found.ok) {
 It can keep the account: return `false`, or throw `refuse(409, { message: 'Ada has open orders' })` from `kay`, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }`. Any other throw refuses with 500 and is reported with the source `auth.beforeDelete`. A guest or an unverified account the prune cannot delete stays and is tried again at the next run.
 
 - `admin.impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `admin.stopImpersonating()` signs back in as themselves. Every write to the user's organizations is refused meanwhile with `impersonating`.
-- `admin.auditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
+- `admin.listAuditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 
 The impersonated user is mailed that an admin signed in as them, to a verified address only and best effort: a failing mailer is logged and the impersonation goes on. It ends after 30 minutes whatever the activity, the admin then back as themselves and an `impersonation-ended` event recorded as `expired`.
 
-Changing a user needs a sign-in or `reprove()` under ten minutes old. Otherwise the method answers `'stale'`. Reading users takes no such proof.
+Changing a user needs a sign-in or `proof.renew()` under ten minutes old. Otherwise the method answers `'stale'`. Reading users takes no such proof.
 
-Your own sensitive routes ask for the same with `fresh`: `auth.guard({ fresh: '10m' })` or `requireUser({ fresh: '10m' })` refuses a session signed in or re-proved longer ago with a 403 whose `data.code` is `'stale'`, a bearer token always, and the page then calls `reprove()` with the password, the passkey or the code and retries.
+Your own sensitive routes ask for the same with `fresh`: `auth.guard({ fresh: '10m' })` or `requireUser({ fresh: '10m' })` refuses a session signed in or re-proved longer ago with a 403 whose `data.code` is `'stale'`, a bearer token always, and the page then calls `proof.renew()` with the password, the passkey or the code and retries.
 
 ### Admin pages
 
@@ -644,13 +644,13 @@ if (made.ok)
 ```
 
 - `organizations.list()` lists the user's memberships and `organizations.get(ref)` gives one, by id or slug.
-- `organizations.members(ref)`, `organizations.setMemberRoles(ref, userId, roles)`, `organizations.removeMember(ref, userId)` and `organizations.leave(ref)` manage who is in it. `members` gives the others' emails only to a member holding the `manage` role; for anyone else their `email` is `null`, and their own stays.
+- `organizations.listMembers(ref)`, `organizations.updateMemberRoles(ref, userId, roles)`, `organizations.deleteMember(ref, userId)` and `organizations.leave(ref)` manage who is in it. `members` gives the others' emails only to a member holding the `manage` role; for anyone else their `email` is `null`, and their own stays.
 - `organizations.update(ref, { name, slug })` renames it and `organizations.delete(ref)` deletes it. Only owners delete.
 - Creating, renaming or deleting an organization, changing roles, removing members and everything about invitations (sending, listing, revoking, accepting, declining) need a signed-in browser session. A bearer token or an OAuth token for an API client or an AI agent cannot do them, so a leaked key cannot wipe a team.
 
-`organizations.invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`, or to the prebuilt `/auth/invitation` page when you set none. It needs a mailer. The page reads `organizations.invitation(id)` and posts to an action calling `organizations.acceptInvitation(id)`. Only an account verified at the invited address joins, and only while the member who invited them still manages the organization and holds the roles it gives.
+`organizations.invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`, or to the prebuilt `/auth/invitation` page when you set none. It needs a mailer. The page reads `organizations.getInvitation(id)` and posts to an action calling `organizations.acceptInvitation(id)`. Only an account verified at the invited address joins, and only while the member who invited them still manages the organization and holds the roles it gives.
 
-`organizations.myInvitations()` lists those open to the user, and `organizations.rejectInvitation(id)` turns one down and answers `{ ok }`, `{ ok: false, error: { code: 'not-found' } }` for one not open to the user. `organizations.invitations(ref)` and `organizations.revokeInvitation(ref, id)` are for managers.
+`organizations.listMyInvitations()` lists those open to the user, and `organizations.rejectInvitation(id)` turns one down and answers `{ ok }`, `{ ok: false, error: { code: 'not-found' } }` for one not open to the user. `organizations.listInvitations(ref)` and `organizations.revokeInvitation(ref, id)` are for managers.
 
 `auth.memberOf('admin')` is a requirement met by a member holding that role in the organization the route's `org` param names.
 
@@ -696,7 +696,7 @@ authCore({
 a(href="/auth/discord?redirect=/account" data-prefetch="false") Sign in with Discord
 ```
 
-A sign-in stores none of the provider's tokens unless the app asks. Set `keepTokens: true` on the entry to keep them, encrypted, for `oauth.providerToken('discord')`. Unlinking a provider and deleting the account then revoke the token at the provider when it has a revocation endpoint (Discord, Google, GitLab, Apple, Twitch, X, and OpenID Connect providers that list one). GitHub and Microsoft have none, so the user ends the grant in their provider settings.
+A sign-in stores none of the provider's tokens unless the app asks. Set `keepTokens: true` on the entry to keep them, encrypted, for `oauth.getProviderToken('discord')`. Unlinking a provider and deleting the account then revoke the token at the provider when it has a revocation endpoint (Discord, Google, GitLab, Apple, Twitch, X, and OpenID Connect providers that list one). GitHub and Microsoft have none, so the user ends the grant in their provider settings.
 
 Opening that link again while a sign-in is under way goes on with it, and never cancels a provider being linked to an account.
 
