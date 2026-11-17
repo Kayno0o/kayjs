@@ -98,3 +98,10 @@ it('carries the request query before the target fragment, merged into a query of
   expect(redirectLocation('/new#top', '')).toBe('/new#top')
   expect(redirectLocation('https://x.example/p#top', '?utm=1')).toBe('https://x.example/p?utm=1#top')
 })
+
+it('keeps a request param whose name is not valid percent-encoding, and does not throw on one', () => {
+  expect(redirectLocation('/new?a=1', '?a=%zz')).toBe('/new?a=1')
+  expect(redirectLocation('/new?a=1', '?%zz=1&b=2')).toBe('/new?a=1&%zz=1&b=2')
+  expect(redirectLocation('/new?%zz=2', '?%zz=1&b=2')).toBe('/new?%zz=2&b=2')
+  expect(redirectLocation('/new?%E0=2', '?%E0=1&%E0%A4=3')).toBe('/new?%E0=2&%E0%A4=3')
+})
