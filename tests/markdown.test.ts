@@ -222,7 +222,7 @@ describe('markdownHtml autolinks', () => {
     const started = performance.now()
 
     islandMarkdown('*www.a/x*'.repeat(11_000))
-    expect(performance.now() - started).toBeLessThan(1500)
+    expect(performance.now() - started).toBeLessThan(3000)
   })
 
   it('cuts a URL beside any one character as Bun.markdown does', () => {

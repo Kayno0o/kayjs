@@ -4,7 +4,7 @@ const HOST = /[a-z\d](?:[\w-]|\.(?=[\w-]))*/iy
 const ALNUM_END = /[a-z\d]$/i
 const NEXT = /[\s.,!?;&)\]<}]|$/y
 const LABEL = /(?:https?|ftp):\/\/[\w.-]*|www\.[\w.-]*/iy
-// How far a URL is read: a scan that fails runs to the end of its path, which hostile text repeats.
+// How far a URL is read: a scan that fails runs to the end of its path, which hostile text repeats, and a longer URL stays text.
 const REACH = 2000
 const OPENERS = /[\s([{]$/
 // Each part, what it may end with and the closers its last character may be followed by instead.
@@ -43,7 +43,7 @@ export function autolinkLength(whole: string): number {
     end += found.length
   }
 
-  return endsAutolink(text, end) ? end : 0
+  return endsAutolink(text, end) && (end < REACH || whole.length === REACH) ? end : 0
 }
 
 /** The start of a URL that `text` starts with: the part marked leaves as text when a word is stuck to it. */
