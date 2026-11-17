@@ -20,13 +20,31 @@ interface Scanned {
   // The content of each string literal and template chunk, as `[start, end]` offsets.
   strings: [number, number][]
   // The `x.dataset.<flag>` member expressions, and whether each is assigned, updated or deleted.
-  datasets: { node: Node, written: boolean }[]
+  datasets: { node: Node, written: boolean, direct: boolean }[]
+}
+
+const WRAPPERS = new Set(['ChainExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
+
+// The expression under any wrappers.
+function unwrapped(node: Node): Node {
+  let inner = node
+
+  while (inner.type === 'ChainExpression' || inner.type === 'TSNonNullExpression' || inner.type === 'ParenthesizedExpression')
+    inner = inner.expression
+
+  return inner
+}
+
+function isDataset(node: Node): boolean {
+  const inner = unwrapped(node)
+
+  return inner.type === 'MemberExpression' && !inner.computed && inner.property.type === 'Identifier' && inner.property.name === 'dataset'
 }
 
 // What the parsed program holds that names a flag, so a regex literal or a comment cannot shift what is a string.
 function scan(source: string): Scanned {
   const found: Scanned = { strings: [], datasets: [] }
-  const visit = (node: Node, parent: Node | undefined) => {
+  const visit = (node: Node, ancestors: Node[]) => {
     if (node.type === 'Literal' && typeof node.value === 'string') {
       found.strings.push([node.start + 1, node.end - 1])
     }
@@ -34,17 +52,25 @@ function scan(source: string): Scanned {
       // The span holds its delimiters: a backtick or `}` before, a backtick or `${` after.
       found.strings.push([node.start + 1, node.end - (source[node.end - 1] === '`' ? 1 : 2)])
     }
-    else if (node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier' && DATASET_NAMES.has(node.property.name) && node.object.type === 'MemberExpression' && !node.object.computed && node.object.property.type === 'Identifier' && node.object.property.name === 'dataset') {
-      const assigned = parent?.type === 'AssignmentExpression' && parent.left === node
+    else if (node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier' && DATASET_NAMES.has(node.property.name) && isDataset(node.object)) {
+      // Through `?.`, `!` and parentheses: `delete el?.dataset.keepScroll` and `el.dataset!.keepScroll = 1` write it.
+      let at = ancestors.length - 1
+      let target: Node = node
 
-      found.datasets.push({ node, written: assigned || parent?.type === 'UpdateExpression' || (parent?.type === 'UnaryExpression' && parent.operator === 'delete') })
+      while (at >= 0 && WRAPPERS.has(ancestors[at]!.type))
+        target = ancestors[at--]!
+
+      const parent = ancestors[at]
+      const assigned = parent?.type === 'AssignmentExpression' && parent.left === target
+
+      found.datasets.push({ node, written: assigned || parent?.type === 'UpdateExpression' || (parent?.type === 'UnaryExpression' && parent.operator === 'delete'), direct: unwrapped(node.object) === node.object })
     }
 
     for (const child of childrenOf(node))
-      visit(child, node)
+      visit(child, [...ancestors, node])
   }
 
-  visit(parseProgram(source, { lang: 'ts', recover: true }).program, undefined)
+  visit(parseProgram(source, { lang: 'ts', recover: true }).program, [])
 
   return found
 }
@@ -90,11 +116,11 @@ export async function linkFlagTests(root: string, levels: LintLevels | undefined
       report(match.index, end, `\`${name}\` is \`${written}\`, deprecated since 1.105: a template written with the new attribute no longer matches this`, `select \`[${written}]\`; an attribute read follows the new name, whose value is \`${next.value}\` where the old one was present`, fixes)
     }
 
-    for (const { node, written } of datasets) {
+    for (const { node, written, direct } of datasets) {
       const member = node as Node & { object: Node, property: Node & { name: string } }
       const old = OLD_LINK_FLAGS[DATASET_NAMES.get(member.property.name)!]!
       const to = `dataset.${old.name.slice(5)} === '${old.value}'`
-      const fixes: Fix[] | undefined = written ? undefined : [{ title: `write ${to}`, safe: false, edits: [{ start: node.start, end: node.end, text: `(${source.slice(member.object.start, member.object.end).replace(DATASET_END, '')}${to})` }] }]
+      const fixes: Fix[] | undefined = written || !direct ? undefined : [{ title: `write ${to}`, safe: false, edits: [{ start: node.start, end: node.end, text: `(${source.slice(member.object.start, member.object.end).replace(DATASET_END, '')}${to})` }] }]
 
       report(node.start, node.end, `\`dataset.${member.property.name}\` is \`${to}\`, deprecated since 1.105: the template's attribute is \`${old.name}\``, `read \`${to}\`; a write is set on \`${old.name}\` by hand`, fixes)
     }

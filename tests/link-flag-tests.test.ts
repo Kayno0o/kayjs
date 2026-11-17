@@ -89,6 +89,14 @@ describe('deprecated-link-flags in the app\'s tests', () => {
     })
   })
 
+  it('counts a write through an optional chain, a non-null assertion or parentheses, with no fix', async () => {
+    await withFiles({ 'tests/a.test.ts': 'delete el?.dataset.keepScroll\nel.dataset!.keepScroll = \'\'\n;(el.dataset).keepScroll = \'\'\nel.dataset.noPrefetch! = \'\'\nconst read = el.dataset!.noTransition\n' }, async (root) => {
+      const found = await linkFlagTests(root, undefined)
+
+      expect(found.map(d => [d.line, d.fixes])).toEqual([[1, undefined], [2, undefined], [3, undefined], [4, undefined], [5, undefined]])
+    })
+  })
+
   it('takes the level the config gives', async () => {
     await withFiles({ 'tests/a.test.ts': 'page.find(\'[data-keep-scroll]\')\n' }, async (root) => {
       expect((await linkFlagTests(root, { 'deprecated-link-flags': 'deny' })).map(d => d.severity)).toEqual(['error'])
