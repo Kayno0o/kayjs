@@ -1,5 +1,6 @@
 import type { ElementNode, ForNode, IfNode, KayFile, Node, Span, TextNode } from '../src/compiler/ast'
 import { describe, expect, it } from 'bun:test'
+import { compileKay } from '../src/compiler'
 import { parseKay } from '../src/compiler/parser'
 
 function parse(source: string): KayFile {
@@ -123,6 +124,15 @@ describe('fence', () => {
     expect(first[0]?.fixes?.[0]?.edits).toEqual([{ start: 4, end: 11, text: '' }])
     expect(parse('--- server\nconst a = 1\n--- script\nconst b = 2\n---\np {a}\n').diagnostics).toEqual([])
     expect(parse('---\nconst a = 1\n---\npre\n  | --- script\n').diagnostics).toEqual([])
+  })
+
+  it('rejects `--- script` first in a compile, and its fix writes `---` in a CRLF file too', () => {
+    const source = '--- script\r\nconst n = 1\r\n--- style\r\np { color: red }\r\n---\r\np {n}\r\n'
+    const found = compileKay(source, 'thing.kay').diagnostics.filter(d => d.code === 'fence-invalid')
+
+    expect(found).toHaveLength(1)
+    expect(source.slice(found[0]!.start, found[0]!.end)).toBe('--- script')
+    expect(found[0]!.fixes?.[0]?.edits).toEqual([{ start: 3, end: 10, text: '' }])
   })
 
   it('closes a fence on the labeled line opening the next one, `--- script` naming the component script', () => {

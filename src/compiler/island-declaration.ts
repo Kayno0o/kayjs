@@ -186,7 +186,8 @@ export function spelledOutFirstFence(source: string, line: Span | undefined, wor
     return []
 
   return [{
-    ...line,
+    start: line.start,
+    end: word.end,
     code: 'fence-invalid',
     message: '`--- script` cannot open a file: the script is written `---`',
     help: '`--- script` is only for a script that follows a `--- server`, `--- module` or `--- style` fence',
