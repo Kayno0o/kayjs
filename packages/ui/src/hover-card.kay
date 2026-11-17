@@ -23,7 +23,7 @@ const { id, anchor, open, openDelay = 200, closeDelay = 150, trigger, placement 
   anchor?: Element | null | undefined
   // Renders the element the card is for, which spreads the attributes it is handed: `@trigger(attributes)`, then `button({...attributes})`. Hovering or focusing it shows the card, after `openDelay` for the pointer.
   trigger?: Snippet<[attributes: HoverCardTriggerProps]> | undefined
-  // Shows the card on its `trigger` when the page sets it, and hides it when it is set back to `false`; the pointer, focus and Escape work on their own as well, each reported to `onOpenChange`.
+  // Shows the card on its `trigger` when the page sets it, and hides it when it is set back to `false`; the pointer, focus and Escape show and hide it too, each reported to `onOpenChange`, but while `open` is `true` it stays shown after the pointer or focus leaves.
   open?: boolean | undefined
   // How long the pointer rests on the `trigger` before the card shows, as a number of milliseconds; focus shows it at once.
   openDelay?: number | undefined
@@ -63,17 +63,31 @@ function wake(target: Element, delay: number) {
     waking = setTimeout(() => hot = target, delay)
 }
 
-function sleep() {
+// The pointer and focus each hold the card, so it stays while one of them is still on the trigger.
+const held = { pointer: false, focus: false }
+
+function sleep(by?: 'pointer' | 'focus') {
+  if (by)
+    held[by] = false
+
   clearTimeout(waking)
-  hot = null
+
+  if (!held.pointer && !held.focus)
+    hot = null
 }
 
 // What `trigger` spreads: the pointer waits `openDelay`, focus does not.
 const triggerProps: HoverCardTriggerProps = {
-  'onPointerEnter': event => wake(event.currentTarget as Element, openDelay),
-  'onPointerLeave': sleep,
-  'onFocus': event => wake(event.currentTarget as Element, 0),
-  'onBlur': sleep,
+  'onPointerEnter': (event) => {
+    held.pointer = true
+    wake(event.currentTarget as Element, openDelay)
+  },
+  'onPointerLeave': () => sleep('pointer'),
+  'onFocus': (event) => {
+    held.focus = true
+    wake(event.currentTarget as Element, 0)
+  },
+  'onBlur': () => sleep('focus'),
   'data-hover-card': panelId,
 }
 
@@ -193,8 +207,11 @@ function follow(target: Element) {
 
 // `open` going to `false` hides a card its trigger showed.
 effect(() => {
-  if (open === false)
+  if (open === false) {
+    held.pointer = false
+    held.focus = false
     untrack(sleep)
+  }
 })
 
 effect(() => {
