@@ -135,8 +135,7 @@ effect(() => {
 const viewSet = signal<'edit' | 'split' | 'preview' | undefined>(untrack(() => view))
 
 effect(() => {
-  if (view !== undefined)
-    viewSet = view
+  viewSet = view
 })
 
 // What shows now: `view` when given, else the Preview button's state; never more than the field without a `preview` function.

@@ -966,12 +966,12 @@
     grid-area: text;
   }
 
-  /* The preview alone: the field stays in the form, out of sight. */
+  /* The preview alone: the field stays in the form, out of sight but focusable, so a browser refusing it as invalid can still show it. */
   .kui-markdown-grid:where([data-view='preview']) {
     grid-template-areas: 'view';
 
     > .kui-markdown-editor {
-      @apply hidden;
+      @apply sr-only;
     }
   }
 
