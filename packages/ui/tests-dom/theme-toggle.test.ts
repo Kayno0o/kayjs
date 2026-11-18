@@ -19,24 +19,24 @@ afterEach(() => {
 
 const root = () => document.documentElement
 
-test('picking a mode puts it on html, keeps it in the cookie and tells onChange', async () => {
-  const heard: unknown[][] = []
+test('picking a mode puts it on html, keeps it in the cookie and tells onValueChange', async () => {
+  const heard: { value: string }[] = []
 
-  mounted = await mountComponent(await library('theme-toggle'), { onChange: (...args: unknown[]) => heard.push(args) })
+  mounted = await mountComponent(await library('theme-toggle'), { onValueChange: (event: { value: string }) => heard.push(event) })
   expect(root().hasAttribute('data-theme')).toBe(false)
   expect([...mounted.root.querySelectorAll('input')].map(input => input.checked)).toEqual([true, false, false])
 
   await mounted.click('input[value="dark"]')
   expect(root().getAttribute('data-theme')).toBe('dark')
   expect(document.cookie).toContain('theme=')
-  expect(heard.map(args => args[0])).toEqual(['dark'])
+  expect(heard.map(event => event.value)).toEqual(['dark'])
 
   await mounted.click('input[value="system"]')
   expect(root().hasAttribute('data-theme')).toBe(false)
-  expect(heard.map(args => args[0])).toEqual(['dark', 'system'])
+  expect(heard.map(event => event.value)).toEqual(['dark', 'system'])
 })
 
-test('onValueChange hears one event and takes the place of the deprecated onChange', async () => {
+test('onValueChange hears one event, and the removed onChange is never called', async () => {
   const heard: unknown[][] = []
   const old: unknown[][] = []
 
@@ -57,7 +57,7 @@ test('modes picks and words the choices, and a mode stays in the order given', a
 test('a value held by the app is followed and kept out of the cookie', async () => {
   const heard: string[] = []
 
-  mounted = await mountComponent(await library('theme-toggle'), { value: 'light', onChange: (mode: string) => heard.push(mode) })
+  mounted = await mountComponent(await library('theme-toggle'), { value: 'light', onValueChange: ({ value }: { value: string }) => heard.push(value) })
   expect(root().getAttribute('data-theme')).toBe('light')
 
   await mounted.click('input[value="dark"]')
@@ -67,7 +67,7 @@ test('a value held by the app is followed and kept out of the cookie', async () 
 })
 
 test('a change refused by a promise is neither applied for good nor kept', async () => {
-  mounted = await mountComponent(await library('theme-toggle'), { onChange: async () => false })
+  mounted = await mountComponent(await library('theme-toggle'), { onValueChange: async () => false })
   await mounted.click('input[value="dark"]')
   await settle()
   expect(document.cookie).not.toContain('theme=')
@@ -75,10 +75,10 @@ test('a change refused by a promise is neither applied for good nor kept', async
   expect(root().hasAttribute('data-theme')).toBe(false)
 })
 
-test('a promise from onChange holds the choice until it resolves', async () => {
+test('a promise from onValueChange holds the choice until it resolves', async () => {
   let release: (answer: boolean) => void = () => undefined
 
-  mounted = await mountComponent(await library('theme-toggle'), { onChange: async () => new Promise<boolean>(resolve => release = resolve) })
+  mounted = await mountComponent(await library('theme-toggle'), { onValueChange: async () => new Promise<boolean>(resolve => release = resolve) })
   await mounted.click('input[value="light"]')
   expect(document.cookie).not.toContain('theme=')
   release(true)
