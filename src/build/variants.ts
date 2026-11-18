@@ -331,7 +331,7 @@ function topLevel(text: string, char: '?' | ':'): number[] {
   return found
 }
 
-// Where the brace opened just before `from` closes, past the strings in between; -1 when it never does.
+// Where the brace opened just before `from` closes, past the strings in between; -1 when it never does, or a template literal holds a `${`, whose nesting is not tracked.
 function closingBrace(text: string, from: number): number {
   let depth = 1
   let quote = ''
@@ -342,6 +342,8 @@ function closingBrace(text: string, from: number): number {
     if (quote !== '') {
       if (char === '\\')
         at++
+      else if (quote === '`' && char === '$' && text[at + 1] === '{')
+        return -1
       else if (char === quote)
         quote = ''
     }

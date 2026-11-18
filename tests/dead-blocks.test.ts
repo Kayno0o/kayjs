@@ -70,6 +70,11 @@ describe('specializedSource on an attribute with a false condition', () => {
     expect(absent('td(a={uses(\'x\') && y ? 1 : \'}\'} b={z})')).toBe('td(a={false && y ? 1 : \'}\'} b={z})')
   })
 
+  it('leaves a condition with a template literal holding ${ unfolded', () => {
+    expect(absent('td(a={uses(\'x\') && y ? `${z}}` : undefined})')).toBe('td(a={false && y ? `${z}}` : undefined})')
+    expect(absent('td(a={uses(\'x\') && y ? `a:b` : undefined})')).toBe('td(a={undefined})')
+  })
+
   it('keeps the true branch when the feature is on', () => {
     expect(specializedSource('---\n---\ntd(a={uses(\'x\') && y ? 1 : undefined})', new Set(['x'])).split('\n')[2]).toBe('td(a={true && y ? 1 : undefined})')
   })
