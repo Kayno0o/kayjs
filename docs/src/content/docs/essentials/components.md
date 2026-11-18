@@ -52,7 +52,7 @@ p {greeting}
 Badge(label="new")
 ```
 
-Import what you use, as in any TypeScript module: `signal`, `memo`, `persisted`, `navigate`, `s` and `action` from `kay`, `t` from `kay/i18n`, `cached` from `kay/cache`. `props` is the one name that needs no import. `kay check` names the entry when you forget, and `kay check --fix` or your editor's quick fix writes the import.
+Import what you use, as in any TypeScript module: `signal`, `memo`, `persisted`, `navigate`, `s` and `action` from `kay`, `t` from `kay/i18n`, `cached` from `kay/cache`. `props` and `island` need no import: the compiler reads them out of the component. `kay check` names the entry when you forget, and `kay check --fix` or your editor's quick fix writes the import.
 
 [Modules](/reference/modules) says which entry holds what. A script importing only helpers that compute the same on both sides, such as `route`, `apiUrl` or `withBase`, keeps the component static: [Islands](/essentials/islands) lists them.
 

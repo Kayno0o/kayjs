@@ -11,7 +11,7 @@ import { defineConfig, pages, session } from 'kay/server'
 import { collection } from 'kay/content'
 ```
 
-A name is imported where it is used, in a `.kay` file and in a `.ts` file alike; only `props` needs no import. A type is imported with `import type`. A name used with no import is a type error, and `kay check --fix` writes the import of any name a `kay/*` entry exports.
+A name is imported where it is used, in a `.kay` file and in a `.ts` file alike; only `props` and `island` need no import, as the compiler reads them out of the component. A type is imported with `import type`. A name used with no import is a type error, and `kay check --fix` writes the import of any name a `kay/*` entry exports.
 
 `s` comes from `kay`, whichever side runs the module, and has the lighter browser build. `kay/server` exported it too before 1.105, and still does until 1.108: `kay upgrade` moves the import.
 
