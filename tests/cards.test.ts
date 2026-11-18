@@ -26,7 +26,7 @@ const CLI = resolve('src/cli.ts')
 const config = {
   site: 'https://cards.example',
   seo: { name: 'Cards' },
-  fonts: [{ family: 'Archivo Black', src: join(FONTS, 'archivo-black-latin-400-normal.woff2') }],
+  assets: { fonts: [{ family: 'Archivo Black', src: join(FONTS, 'archivo-black-latin-400-normal.woff2') }] },
   root: FIXTURE,
   prebuilt: false,
 }
@@ -309,7 +309,7 @@ describe('share cards', () => {
     const built = join(dir, 'card-logo.png')
 
     try {
-      const fonts = await prepareFonts(FIXTURE, config.fonts, dir)
+      const fonts = await prepareFonts(FIXTURE, config.assets.fonts, dir)
       const build = await setupCards({ dir, clientDir: client, fonts, logo: join(FIXTURE, 'src/logo.svg'), collect: true })
 
       expect(await Bun.file(built).exists()).toBe(true)
@@ -375,7 +375,7 @@ describe('share cards', () => {
 
     try {
       await Bun.write(join(client, 'assets', 'card-hero.png'), Bun.file(join(FIXTURE, 'src/hero.png')))
-      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, cache), name: 'Cards', collect: true })
+      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: await prepareFonts(FIXTURE, config.assets.fonts, cache), name: 'Cards', collect: true })
 
       const url = shareCard({ title: 'Built   at\nbuild time', image: hero })
 
@@ -405,7 +405,7 @@ describe('share cards', () => {
     const client = clientDir(FIXTURE)
 
     try {
-      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, dir) })
+      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.assets.fonts, dir) })
 
       expect(await Bun.file(join(dir, 'card.key')).exists()).toBe(false)
 
@@ -526,7 +526,7 @@ describe('share cards of a site with a name per locale', () => {
     const state = (locale: string) => ({ settings, path: '/', locale, messages: new Map() })
 
     try {
-      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, cache), name: { fr: 'Les cartes', en: 'The cards' }, defaultLocale: 'fr', collect: true })
+      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: await prepareFonts(FIXTURE, config.assets.fonts, cache), name: { fr: 'Les cartes', en: 'The cards' }, defaultLocale: 'fr', collect: true })
 
       const urls = ['fr', 'en'].map(locale => runInLocale(state(locale), () => shareCard({ title: 'Same title' })))
 
@@ -580,7 +580,7 @@ describe('share cards on an imported SVG', () => {
 
   // The card of `image` written at build time, as a JPEG; `image` has to be a file of the client build.
   async function built(dir: string, client: string, cache: string, images: string[], extra: { bundled?: boolean } = {}): Promise<string[]> {
-    await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, cache), name: 'Cards', collect: true, ...extra })
+    await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.assets.fonts, cache), name: 'Cards', collect: true, ...extra })
 
     const urls = images.map(image => shareCard({ title: 'On a banner', image }))
 
@@ -622,7 +622,7 @@ describe('share cards on an imported SVG', () => {
     try {
       await Bun.write(join(client, 'assets', 'card-test-banner.svg'), Bun.file(banner))
 
-      const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, dir), name: 'Cards' })
+      const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.assets.fonts, dir), name: 'Cards' })
       const server = new Elysia()
 
       serveCards(server, cards, { clientDir: client, cacheDir: join(dir, 'cache') })
@@ -660,7 +660,7 @@ describe('share cards on an imported SVG', () => {
       for (const file of await written(client))
         await rm(join(client, 'images', file), { force: true })
 
-      const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, dir), name: 'Cards', bundled: true })
+      const cards = await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.assets.fonts, dir), name: 'Cards', bundled: true })
       const server = new Elysia()
 
       serveCards(server, cards, { clientDir: client, cacheDir: join(dir, 'cache-2') })
@@ -669,7 +669,7 @@ describe('share cards on an imported SVG', () => {
       expect((await server.handle(new Request(`http://localhost${shareCard({ title: 'On a banner', image: `${asset}-other.svg` })}`))).status).toBe(500)
 
       // A build no longer asking for the SVG drops its drawing.
-      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, dir), name: 'Cards', collect: true })
+      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.assets.fonts, dir), name: 'Cards', collect: true })
       await writeCards(client, cache)
       expect(await drawings()).toEqual([])
     }
@@ -707,7 +707,7 @@ describe('share cards on an imported SVG', () => {
 
     try {
       await Bun.write(join(client, 'assets', 'card-test-banner.svg'), 'not an svg')
-      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.fonts, cache), name: 'Cards', collect: true })
+      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(FIXTURE, config.assets.fonts, cache), name: 'Cards', collect: true })
       shareCard({ title: 'On a banner', image: `${asset}.svg` })
       await expect(writeCards(client, cache)).rejects.toThrow('is not an SVG kay can draw')
 
@@ -720,7 +720,7 @@ describe('share cards on an imported SVG', () => {
   })
 
   it('refuses an SVG that is not imported, naming what is taken', async () => {
-    await setupCards({ dir: join(clientDir(FIXTURE), '..'), clientDir: clientDir(FIXTURE), fonts: await prepareFonts(FIXTURE, config.fonts, uploads), name: 'Cards' })
+    await setupCards({ dir: join(clientDir(FIXTURE), '..'), clientDir: clientDir(FIXTURE), fonts: await prepareFonts(FIXTURE, config.assets.fonts, uploads), name: 'Cards' })
 
     for (const image of ['/uploads/banner.svg', '/_kay/files/abc.svg', 'https://cdn.example/banner.svg?v=2'])
       expect(() => shareCard({ title: 'Hello', image })).toThrow('an SVG is taken only when imported, not from images.dirs, images.remote or a stored file')

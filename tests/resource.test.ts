@@ -195,7 +195,7 @@ await Promise.all(Object.entries(files).map(async ([path, source]) => {
   await writeFile(join(dir, path), source)
 }))
 
-const dirs = { routes: relative(process.cwd(), join(dir, 'src/routes')), api: relative(process.cwd(), join(dir, 'src/api')), components: relative(process.cwd(), join(dir, 'src/components')) }
+const dirs = { routes: relative(process.cwd(), join(dir, 'src/routes')), api: relative(process.cwd(), join(dir, 'src/api')) }
 const sites = {
   plain: await testSite({ config: { guards: { default: 'open' }, dirs }, styles: true }),
   dev: await testSite({ config: { guards: { default: 'open' }, dirs }, dev: true, styles: true }),
