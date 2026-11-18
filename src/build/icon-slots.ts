@@ -16,6 +16,7 @@ const TYPE_WORD = /^(?:string|undefined|null|true|false|any|unknown|number|boole
 const LOWERCASE = /^[a-z]/
 const SLOT_NAME = /^\w+/
 const IN_PACKAGES = /[\\/]node_modules[\\/]/
+const UI_ICON = /[\\/](?:packages[\\/]ui|node_modules[\\/]@kayjs[\\/]ui)[\\/]src[\\/]icon\.kay$/
 const SCANNED = /\.(?:kay|[cm]?[jt]sx?)$/
 
 // The registry modules of kayjs-ui, by where the project reaches it: in a checkout or under `node_modules`.
@@ -73,7 +74,8 @@ export async function iconSlotsOf(root: string, entries: Iterable<string>, libra
     }
   }))
 
-  return dynamic ? undefined : slots
+  // Without kayjs-ui's Icon among the files read, its components were not followed (a library the project does not declare), and their slots are unknown.
+  return dynamic || ![...reached].some(file => UI_ICON.test(file)) ? undefined : slots
 }
 
 const REGISTRY = /^(\s*icons: |export const addedIcons\b[^=\n]*= )\{ ([^{}\n]*) \}(,?)$/m
