@@ -2,6 +2,7 @@ import type { Caller } from './action-owner'
 import type { ActionStream, CallOptions, CallQueue, Outcome } from './action-shared'
 import type { Duration } from './duration'
 import type { ConnectionStatus } from './live'
+import { withFixed } from './action-encode'
 import { ActionError, ActionRedirectError } from './action-error'
 import { networkFailures, superseding } from './action-marks'
 import { refreshed, refreshedIn, refreshedUnlessFollowed } from './action-navigate'
@@ -145,32 +146,6 @@ async function hooked<Event>(hook: ((event: Event) => unknown) | undefined, even
   catch (error) {
     console.error(error)
   }
-}
-
-// A call of an action `with()` fixed fields of is made with them, over the ones it is given, as a form posting to its URL does: a field fixed to `null` or `undefined` is left out there, so the given one stays.
-function withFixed(input: unknown, fixed: Record<string, unknown> | undefined): unknown {
-  if (fixed === undefined)
-    return input
-
-  const set = Object.entries(fixed).filter(([name, value]) => name !== '__proto__' && value !== undefined && value !== null)
-
-  if (!(input instanceof FormData))
-    return { ...input as object | undefined, ...Object.fromEntries(set) }
-
-  const names = new Set(set.map(([name]) => name))
-  const copy = new FormData()
-
-  for (const [name, value] of input) {
-    if (!names.has(name))
-      copy.append(name, value)
-  }
-
-  for (const [name, value] of set) {
-    for (const item of Array.isArray(value) ? value : [value])
-      copy.append(name, item instanceof Date ? item.toISOString() : String(item))
-  }
-
-  return copy
 }
 
 // Refreshes what a call changed once it is done, started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; a site with `navigation: false` shows a call's effects itself.

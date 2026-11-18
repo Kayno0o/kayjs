@@ -5,8 +5,10 @@ import type { PageReading } from './page'
 import type { SiteScope } from './site-scope'
 import type { CallArguments, FormValue, SubmitInit, Tested, TestSite } from './site-types'
 import { encodeCall, minTimeOf, readActionResponse, SETTLED, STAMP_FIELD } from '../runtime/action'
+import { withFixed } from '../runtime/action-encode'
 import { durationSeconds } from '../runtime/duration'
 import { PAGE_HEADER, WORK_HEADER, WORK_SCRIPT } from '../runtime/swap'
+import { FIXED_FIELDS } from '../runtime/wire'
 import { solveWork } from '../runtime/work'
 import { signStamp, stampTime } from '../server/stamp'
 import { proofOfWork, signWork } from '../server/work'
@@ -65,9 +67,15 @@ async function streamedValues(stream: Connection<unknown> & Settles, url: string
   return values
 }
 
+// The URL a form posts `action` to: the one carrying the fields `with` fixed, else its own.
+function postedUrl(action: Action): string {
+  return (action as { formUrl?: string }).formUrl ?? action.url
+}
+
 export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<TestSite, 'call' | 'submit' | 'expectRefused'> {
   const call: TestSite['call'] = async (action, ...[input, init = {}]) => {
-    const { headers, body } = encodeCall(input)
+    // As an island's call sends them, over its input.
+    const { headers, body } = encodeCall(withFixed(input, (action as { [FIXED_FIELDS]?: Record<string, unknown> })[FIXED_FIELDS]))
 
     const sent: Record<string, string> = { ...headers, origin: ORIGIN }
 
@@ -100,7 +108,7 @@ export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<
       const page = typeof init.from === 'object' ? init.from : undefined
       const from = typeof init.from === 'object' ? init.from.url : init.from ?? '/'
       const url = page && formUrl(page, action)
-      const posted = url === undefined ? action.url : url.pathname + url.search
+      const posted = url === undefined ? postedUrl(action) : url.pathname + url.search
       const form = new NativeFormData()
 
       const rendered = page && url && renderedStamp(page, url)

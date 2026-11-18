@@ -15,6 +15,32 @@ export interface EncodedCall {
   body: string | FormData
 }
 
+// A call of an action `with()` fixed fields of is made with them, over the ones it is given, as a form posting to its URL does: a field fixed to `null` or `undefined` is left out there, so the given one stays.
+export function withFixed(input: unknown, fixed: Record<string, unknown> | undefined): unknown {
+  if (fixed === undefined)
+    return input
+
+  const set = Object.entries(fixed).filter(([name, value]) => name !== '__proto__' && value !== undefined && value !== null)
+
+  if (!(input instanceof FormData))
+    return { ...input as object | undefined, ...Object.fromEntries(set) }
+
+  const names = new Set(set.map(([name]) => name))
+  const copy = new FormData()
+
+  for (const [name, value] of input) {
+    if (!names.has(name))
+      copy.append(name, value)
+  }
+
+  for (const [name, value] of set) {
+    for (const item of Array.isArray(value) ? value : [value])
+      copy.append(name, item instanceof Date ? item.toISOString() : String(item))
+  }
+
+  return copy
+}
+
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
 export function encodeCall(input: unknown): EncodedCall {
   // Sent as the form it is, for the server to read as a form post and answer as a call.

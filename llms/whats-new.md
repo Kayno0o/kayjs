@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's centred modal `Dialog` is as tall as its content again, capped at the viewport less 2rem (`size="full"` still fills it), and the opened dialog box no longer draws a browser focus ring round itself (a regression of the 1.105 placement change).
 - An island reading a `queryParam` follows a swap that changes only the query, a link `?x=1` or a component's `param=` navigation, and Back and Forward, whatever its render mode: a signal made outside a component and shared by islands reads the address again after each swap and traversal, as one in a component does ([islands](islands.md#keep-a-filter-in-the-url)).
 - On a static build or a `prerender` page, an island reading a `queryParam` is drawn again from the address when the page is opened with a query, instead of reporting `did not match its server markup`; the build warns naming each page holding one ([prerendering](prerendering.md#static-export)).
+- `site.call(action.with(fields), input)` and `site.submit(action.with(fields), input, { from: '/path' })` send the fields `with` fixes, as an island's call and a form's post do, instead of answering 422 for a missing field ([testing](testing.md)).
 
 ## 1.108.0
 
