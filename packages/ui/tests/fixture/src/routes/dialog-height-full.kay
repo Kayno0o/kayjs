@@ -1,0 +1,6 @@
+---
+import DialogHeight from '../components/dialog-height.kay'
+import '../app.css'
+---
+main
+  DialogHeight(full)

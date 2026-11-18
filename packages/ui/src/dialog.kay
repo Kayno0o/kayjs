@@ -11,7 +11,7 @@ import { closeWatcher, discardAndClose, followsHref, leave, renderedOpen, syncOp
 // The width comes from `--dialog-w`, which `size` sets, so one size is one width in every placement, less the margin only a centred dialog keeps.
 const look = recipe({
   parts: {
-    root: 'flex w-full flex-col overflow-hidden border-solid border-border-strong bg-surface p-0 [&[open]:not(:modal)]:fixed [&[open]:not(:modal)]:z-30 [&[open]:not(:modal):not([data-modal=false])]:shadow-[0_0_0_100vmax_rgb(0_0_0/0.5)]',
+    root: 'flex w-full flex-col overflow-hidden border-solid focus-visible:outline-none border-border-strong bg-surface p-0 [&[open]:not(:modal)]:fixed [&[open]:not(:modal)]:z-30 [&[open]:not(:modal):not([data-modal=false])]:shadow-[0_0_0_100vmax_rgb(0_0_0/0.5)]',
     head: 'flex shrink-0 items-center gap-2 border-b border-border px-5 py-3',
     title: 'min-w-0 flex-1 text-lg [font-weight:var(--font-weight-semibold)] tracking-label text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     // The body of a `bare` dialog writes data-bare too, as a child cannot read the attribute of its parent in a utility.
@@ -21,7 +21,7 @@ const look = recipe({
   variants: {
     // Where the dialog sits: `center` (the default) over the page, or `right` as a panel along that edge, which slides in.
     placement: {
-      center: { root: 'kui-dialog m-auto h-[var(--dialog-h,auto)] max-h-[calc(100dvh-2rem)] max-w-[min(var(--dialog-w,42rem),calc(100vw-2rem))] rounded-lg border-[length:var(--border-width)] [&[open]:not(:modal)]:inset-0 [&[open]:not(:modal)]:h-fit' },
+      center: { root: 'kui-dialog m-auto h-[var(--dialog-h,fit-content)] max-h-[calc(100dvh-2rem)] max-w-[min(var(--dialog-w,42rem),calc(100vw-2rem))] rounded-lg border-[length:var(--border-width)] [&[open]:not(:modal)]:inset-0 [&[open]:not(:modal)]:h-fit' },
       right: { root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh max-w-[min(var(--dialog-w,42rem),100vw)] border-0 border-l-[length:var(--border-width)] text-foreground [transition:translate_calc(0.2s*var(--motion-scale))_ease-out,overlay_calc(0.2s*var(--motion-scale))_allow-discrete,display_calc(0.2s*var(--motion-scale))_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] backdrop:bg-black/50 data-dock:overflow-visible data-dock:[transition:none] data-dock:open:starting:[translate:none] data-dock:[&:not([open])]:[translate:none]', title: 'truncate' },
     },
     // The width, the one vocabulary of every overlay: `sm`, `md` (the default), `lg`, or `full`, which takes the whole viewport width and height less the margin, for content such as a canvas that fills the dialog.

@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kayjs-ui's centred modal `Dialog` is as tall as its content again, capped at the viewport less 2rem (`size="full"` still fills it), and the opened dialog box no longer draws a browser focus ring round itself (a regression of the 1.105 placement change).
+
 ## 1.108.0
 
 - kayjs-ui's `BarChart` leaves `goals` out of an island that never writes them, a `ConfirmDelete` leaves out the inline pair (`ask`), the trigger looks and `details` it is never given, and the confirm words no longer carry the questions' queue: a plain `ConfirmDelete` island holds 3.1 KB less of kayjs-ui, a `BarChart` 1.6 KB, and a `Dialog`'s discard question loads when first asked, 1.2 KB less ([kayjs-ui](../packages/ui/llms/table.md))

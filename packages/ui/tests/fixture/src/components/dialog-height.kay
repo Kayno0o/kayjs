@@ -1,0 +1,11 @@
+---
+import Dialog from '@kayjs/ui/dialog.kay'
+
+// A modal Dialog holding one line, open on the first paint: `full` takes the whole viewport less the margin.
+const { full = false } = props<{ full?: boolean }>()
+const close = () => undefined
+---
+if full
+  Dialog#full(open title="Full" size="full" onOpenChange={close}) Body
+else
+  Dialog#plain(open title="One line" onOpenChange={close}) Body
