@@ -221,7 +221,7 @@ p {game.miners[0].ore}
 - `linked(() => board.tiers)` from `kay` is a writable signal that follows its source: an island edits it locally, and it takes its source's value again whenever that changes: `tiers = moved` shows the edit, and once a refresh or the next page gives a new `board`, `tiers()` reads its tiers.
 - A `linked` signal drops its edit when its source changes, even when the source comes back to the value it was edited over.
 - `linked` reads a prop of a component inside an island, or of an island marked `persist`, the ones whose props change in place, a prop given unchanged keeping its edit.
-- A top-level island whose props changed on a refresh renders afresh from them, its dialogs and focus lost: one whose state should outlive a refresh, such as an editor, is marked `persist`, so it stays and takes the new props.
+- An island stays on a refresh and takes the new props in place, its dialogs, focus and signals kept: what it reads from `props` in its template or an effect follows them, a `signal(light)` seeded from a prop keeps the first value, and `linked(() => light)` is the form that follows. A list whose items move is kept by `persist={id}`.
 - `selection<Key>(initial?)` from `kay` holds one selected string or number key among many rows, or none. It is a signal: it reads as `selected()` and writes as `selected = id`.
 - `selected.is(row.id)` re-runs only for the rows a change selects or unselects, not every row: `tr(class={{ danger: selected.is(row.id) }})`.
 

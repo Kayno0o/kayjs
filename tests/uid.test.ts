@@ -122,7 +122,9 @@ describe('uid', () => {
     const second = await withPageToken('kfixed', async () => render().result)
 
     expect(second).toBe(first)
-    expect(first).toContain('data-uid="kfixed-0-"')
+    // Each island's prefix comes from its component and its index among its kind, so one added before it moves no other's ids.
+    expect(first).toMatch(/data-uid="kfixed-p\w{1,6}-"/)
+    expect(first).toMatch(/data-uid="kfixed-p\w{1,6}_1-"/)
   })
 
   it('keeps a token to its own render while others run at the same time', async () => {

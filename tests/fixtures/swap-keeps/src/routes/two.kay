@@ -1,0 +1,7 @@
+--- server
+import Tally from '../components/tally.kay'
+---
+head
+  title Two
+h1 Two
+Tally

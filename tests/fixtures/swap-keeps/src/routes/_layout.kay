@@ -1,0 +1,11 @@
+--- server
+import Menu from '../components/menu.kay'
+
+const path = ctx.url.pathname
+---
+Menu(path={path})
+nav
+  a.one(href="/") One
+  a.two(href="/two") Two
+main
+  slot

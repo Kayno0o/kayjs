@@ -228,7 +228,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   let loaded: [Awaited<ReturnType<IslandRegistry[string]>>, Awaited<ReturnType<typeof staticSlots>>, Awaited<ReturnType<typeof livePropsOf>>, void | undefined]
 
   try {
-    loaded = await Promise.all([load(), staticSlots(registry, element), livePropsOf(element), reviveActionsIn(element.dataset.props)])
+    loaded = await Promise.all([load(), staticSlots(registry, element), livePropsOf(), reviveActionsIn(element.dataset.props)])
 
     // What the server drew of its lazy components loads first, so the markup is claimed as it stands.
     const drawn = (globalThis as { $kayLoadDrawn?: (island: HTMLElement) => Promise<void> }).$kayLoadDrawn
@@ -256,7 +256,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   }
 
   const given = element.dataset.props === undefined ? {} : decodeServerValue(element.dataset.props) as Record<string, unknown>
-  const [props, update] = live ? live(given) : [given, undefined]
+  const [props, update] = live(given)
 
   for (const [key, slot] of Object.entries(slots))
     Object.defineProperty(props, key, { value: slot, enumerable: true, configurable: true })
@@ -316,9 +316,9 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   element.dispatchEvent(new Event(HYDRATED))
 }
 
-// Its own chunk, which only a page holding a persistent island loads: the one kind of island the next page gives other props to.
-async function livePropsOf(element: HTMLElement): Promise<typeof import('./live-props').liveProps | undefined> {
-  return element.dataset.persist === undefined ? undefined : (await import('./live-props')).liveProps
+// Its own chunk, loaded with every island's: a swap keeps an island and gives it the next page's props.
+async function livePropsOf(): Promise<typeof import('./live-props').liveProps> {
+  return (await import('./live-props')).liveProps
 }
 
 // The static slots a static parent gave the island, whose code only a page holding such an island loads.

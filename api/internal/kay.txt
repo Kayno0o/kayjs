@@ -842,6 +842,9 @@ function pageTitle(read: () => string, raw: boolean): void
 [./island] collectIslands
 function collectIslands<T>(render: () => T, salt?: string | undefined, chunks?: Record<string, string> | undefined): { result: T; islands: RenderedIslands; }
 
+[./island] inLayout
+function inLayout<T>(file: string | undefined, run: () => T): T
+
 [./island] insideIsland
 function insideIsland(): boolean
 

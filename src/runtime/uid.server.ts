@@ -50,7 +50,7 @@ export function withSlotIslands<T>(prefix: string, run: () => T): T {
 }
 
 // The prefix of the next island the server renders, written on its slot.
-// A `persist` island takes it from its key instead of its place, so the page that replaces one at the same URL, with the same token, cannot give another island the ids the kept one still holds.
+// An island takes it from its key (a `persist` one's own, else its component's with its layout's) and its index among those of that key, not from its place in the page, so the page that replaces one at the same URL, with the same token, cannot give another island the ids the kept one still holds.
 export function islandPrefix(persist?: string): string {
   if (!page)
     return freshPrefix()
@@ -65,5 +65,5 @@ export function islandPrefix(persist?: string): string {
 
   page.kept.set(persist, seen + 1)
 
-  return `${page.token}-p${Bun.hash(persist).toString(36)}${seen === 0 ? '' : `_${seen}`}-`
+  return `${page.token}-p${Bun.hash(persist).toString(36).slice(-6)}${seen === 0 ? '' : `_${seen}`}-`
 }

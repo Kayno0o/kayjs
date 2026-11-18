@@ -439,7 +439,7 @@ async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: 
 
     root()
     head.commit()
-    inFlight.typing = process.env.NODE_ENV !== 'production' && navigation.typed === true
+    inFlight.typing = swap.intent === 'refresh' || (process.env.NODE_ENV !== 'production' && navigation.typed === true)
 
     try {
       swapBody(next, policy, held, left)

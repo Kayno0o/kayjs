@@ -22,6 +22,23 @@ import { ACTION_PREFIX, encodeValue, unsendable } from './wire'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.
 let depth = 0
+// The layout file whose own markup is rendering, none inside the page or a block it fills: the islands it draws are marked with it, as a navigation keeping that layout keeps them.
+let layout: string | undefined
+
+// Renders `run` as the markup of `file`, a layout, or of the page for none.
+export function inLayout<T>(file: string | undefined, run: () => T): T {
+  const outer = layout
+
+  layout = file
+
+  try {
+    return run()
+  }
+  finally {
+    layout = outer
+  }
+}
+
 // The islands of the page being rendered: it ships the entry when it holds any, and preloads the chunks of those hydrating right away.
 let rendered: RenderedIslands | undefined
 
@@ -217,14 +234,14 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       return browserOnly ? renderedHtml('') as unknown as JSX.Element : component!(own)
 
     // Rendered here, in the parent, so an island among them is one of its own; unmarked in edit mode, as the island's own markup is.
-    // A `persist` island's slots stay in the DOM across a same-URL swap, so their ids come from its key as its own do, not from the page's count.
-    const ids = persist === undefined ? undefined : islandPrefix(persist)
-    const slots = withFieldMarks(undefined, () => ids === undefined ? staticSlots(own) : withIds(`${ids}s-`, () => withSlotIslands(`${ids}i`, () => staticSlots(own))))
+    // Any island may stay in the DOM across a swap, so its ids and those of its slots come from its key, a `persist` one's own else its component's (and its layout's) with its index among them, not from its place in the page, which a render adding another island would shift under the one kept.
+    const ids = islandPrefix(persist ?? (layout === undefined ? id : `${layout}\0${id}`))
+    const slots = withFieldMarks(undefined, () => withIds(`${ids}s-`, () => withSlotIslands(`${ids}i`, () => staticSlots(own))))
     const given = slots.length === 0 ? own : withSlots(own, slots)
     const serialized = withFieldMarks(undefined, () => serializeProps(`${id} ${why}`, own, slots))
 
     // The browser counts the island's ids from it again as it hydrates.
-    const prefix = ids ?? islandPrefix()
+    const prefix = ids
 
     depth++
 
@@ -266,7 +283,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       const lazies = lazyAttribute(keys, waits)
       // A page rendered once is shown at every query: the browser draws this island afresh from the address it is opened at, rather than claiming markup made for the default one.
       const byQuery = queried && prerendering() && !browserOnly ? ' data-query' : ''
-      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazies}${cause === undefined ? '' : ` data-why=${quotedAttribute(cause)}`}${marked}${titled}${shipped}${browserOnly ? ' data-client' : ''}${byQuery}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
+      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazies}${cause === undefined ? '' : ` data-why=${quotedAttribute(cause)}`}${marked}${titled}${shipped}${browserOnly ? ' data-client' : ''}${byQuery}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${layout === undefined ? '' : ` data-layout="${escapeAttribute(layout)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
 
       return markup as unknown as JSX.Element
     }

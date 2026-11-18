@@ -1,0 +1,34 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import Card from '../components/card.kay'
+import Tally from '../components/tally.kay'
+import { state } from '../state'
+
+export const bump = action(t.Object({}), () => {
+  state.count++
+
+  return 'done'
+})
+export const drop = action(t.Object({}), () => {
+  state.hideFirst = true
+
+  return 'done'
+})
+---
+head
+  title One
+h1 One
+Tally
+details.faq
+  summary Faq
+  p Answer
+details.auto(open={state.count % 2 === 1})
+  summary Auto
+  p Opened by the server
+form.search
+  input.q(type="text" name="q" value="")
+if !state.hideFirst
+  Card(persist="first" label="first" bump={bump} drop={drop})
+Card(persist="second" label={`second ${state.count}`} bump={bump} drop={drop})
+Card(label={`loose ${state.count}`} bump={bump} drop={drop})

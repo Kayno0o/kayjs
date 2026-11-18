@@ -1,0 +1,10 @@
+---
+import { signal } from 'kay'
+
+const { path } = props<{ path: string }>()
+const open = signal(false)
+---
+div.menu
+  button.menu-toggle(type="button" onClick={() => open.set(value => !value)}) Menu
+  p.menu-open {open() ? 'open' : 'closed'}
+  p.menu-path {path}

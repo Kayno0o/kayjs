@@ -1,0 +1,6 @@
+---
+import { signal } from 'kay'
+
+const taken = signal(0)
+---
+button.tally(type="button" onClick={() => taken.set(value => value + 1)}) Tally {taken()}

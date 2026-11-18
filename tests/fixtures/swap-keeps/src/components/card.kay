@@ -1,0 +1,13 @@
+---
+import type { Action } from 'kay'
+import { signal } from 'kay'
+
+const { label, bump, drop } = props<{ label: string, bump: Action<Record<string, never>, string>, drop: Action<Record<string, never>, string> }>()
+const open = signal(false)
+---
+div.card
+  button.toggle(type="button" onClick={() => open.set(value => !value)}) Toggle
+  p.open {open() ? 'open' : 'closed'}
+  p.label {label}
+  button.bump(type="button" onClick={() => void bump({})}) Bump
+  button.drop(type="button" onClick={() => void drop({})}) Drop

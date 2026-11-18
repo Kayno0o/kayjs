@@ -2,6 +2,14 @@
 
 What each release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a version missing here broke nothing. Through 1.x a breaking change ships in a minor; from 2.0.0 it ships in a major, and a minor or a patch breaks nothing.
 
+## 1.110.0
+
+### A swap keeps an island whose props changed
+
+- A refresh (an action's, `refresh()`, a live value's) used to end an island whose props changed and hydrate it afresh; it now stays, with its signals, open dialogs and focus, and takes the new props in place. A value the island seeds from a prop once, `signal(light)`, keeps the first value: write `linked(() => light)` for one that follows, or give the island a `persist={key}` that changes to start it afresh. A list whose items move keeps each island by `persist={id}`.
+- A visit to a page with the same layout keeps the islands the layout renders (a menu, a folded group) with their state; the page's own islands are still ended. An island of a layout that used to start closed on every page now stays as it was left.
+- A refresh keeps a field a visitor typed in and a `details` they toggled unless the server changed that value, where it used to show the server's again.
+
 ## 1.109.0
 
 ### The 1.105 config, page, server and store forms are gone

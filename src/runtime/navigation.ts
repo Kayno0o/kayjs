@@ -117,7 +117,11 @@ export const navigation: {
   traversed?: (state: unknown) => boolean
   // Development: set while `kay dev` refreshes the page for an edit, where a field the edit leaves as it was keeps what was typed into it.
   typed?: boolean
-} = { shown: '', at: 0, page: 0, current: 0, released: false, loads: 0 }
+  // What a `details` the visitor toggled showed as `open` in the render the server gave, noted at its first toggle: a refresh leaves its state to the visitor while the server's stays that.
+  opened: WeakMap<Element, boolean>
+  // The `details` whose `open` a swap just wrote, so the `toggle` it fires is not taken for the visitor's.
+  written: WeakSet<Element>
+} = { shown: '', at: 0, page: 0, current: 0, released: false, loads: 0, opened: new WeakMap(), written: new WeakSet() }
 
 // Run once a swap to another path is shown: what an action streams to a caller no island owns closes there.
 export const leaving = new Set<() => void>()

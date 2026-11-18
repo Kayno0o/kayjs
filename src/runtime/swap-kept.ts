@@ -8,6 +8,8 @@ import { decodeServerValue } from './wire'
 
 const PERSISTENT = 'slot[data-persist]'
 const SERVER_ISLAND = 'slot[data-kay-server]'
+// The islands a layout rendered, which a navigation keeping the layout keeps.
+const LAYOUT_ISLAND = 'slot[data-component][data-layout]'
 // What a script put in the body to outlive every page, a live region an announcer fills for one: the next body never holds it, so the morph leaves it where it is, never moved, as a live region taken out and put back may go unread.
 const LASTING = ':scope > [data-kay-keep]'
 
@@ -92,7 +94,8 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
   const scrolls = new Map<Element, readonly [left: number, top: number]>()
 
   // Read before the first move, and only when the next page has an island to keep, so every read shares one layout instead of forcing one after each move.
-  const candidates = policy.islands === 'unchanged' ? `${PERSISTENT},${ISLAND}` : PERSISTENT
+  const matching = policy.islands === 'all' ? ISLAND : LAYOUT_ISLAND
+  const candidates = `${PERSISTENT},${matching}`
 
   for (const root of [...body.querySelector(candidates) ? old.querySelectorAll(candidates) : [], ...lives]) {
     for (const element of [root, ...root.querySelectorAll('*')]) {
@@ -132,37 +135,11 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
       markCurrent(live, placeholder)
       keep(placeholder, live)
 
-      const props = placeholder.dataset.props
-
-      // What the next page gives it, which it reads from now on, or once it hydrates.
-      if (props !== live.dataset.props) {
-        if (props === undefined)
-          delete live.dataset.props
-        else
-          live.dataset.props = props
-
-        live._$p?.(props === undefined ? {} : decodeServerValue(props) as object)
-      }
+      givePropsOf(live, placeholder)
     }
   }
 
-  if (policy.islands === 'unchanged') {
-    const unchanged = [...old.querySelectorAll<KeptIsland>(ISLAND)]
-
-    for (const placeholder of body.querySelectorAll<HTMLElement>(ISLAND)) {
-      // One in the static slot of an island kept went along with it, or away with the copy it replaced.
-      if (!body.contains(placeholder) || standIns.has(placeholder) || [...kept].some(island => island.contains(placeholder)))
-        continue
-
-      const index = unchanged.findIndex(live => old.contains(live) && live.dataset.component === placeholder.dataset.component && live.dataset.props === placeholder.dataset.props && live.dataset.slots === placeholder.dataset.slots && (live.dataset.slots === undefined || (live._$h ?? live.innerHTML) === placeholder.innerHTML))
-
-      if (index !== -1) {
-        const [live] = unchanged.splice(index, 1)
-
-        keep(placeholder, live!)
-      }
-    }
-  }
+  keepMatched(old, body, matching, kept, standIns, keep)
 
   // Every island left is taken away, as the morph never keeps one.
   navigation.hooks!.dispose(old)
@@ -220,6 +197,53 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
     for (let parent = (document.querySelector('[autofocus]') ?? document.querySelector('h1'))?.parentElement; parent && parent !== document.body; parent = parent.parentElement)
       parent.scrollTo(0, 0)
   }
+}
+
+// An island of the next page that has its match among those of this one, the same component in the same place, stays and takes the new props: what the visitor did in it is its own.
+function keepMatched(old: Element, body: Element, matching: string, kept: ReadonlySet<Element>, standIns: ReadonlyMap<Element, Element>, keep: (placeholder: Element, live: Element) => void): void {
+  const live = new Map<string, KeptIsland[]>()
+
+  for (const island of old.querySelectorAll<KeptIsland>(matching)) {
+    if (island.dataset.persist === undefined && ![...kept].some(other => other.contains(island)))
+      live.set(placeOf(island), [...live.get(placeOf(island)) ?? [], island])
+  }
+
+  if (live.size === 0)
+    return
+
+  for (const placeholder of body.querySelectorAll<HTMLElement>(matching)) {
+    // One in the static slot of an island kept went along with it, or away with the copy it replaced.
+    if (placeholder.dataset.persist !== undefined || !body.contains(placeholder) || standIns.has(placeholder) || [...kept].some(island => island.contains(placeholder)))
+      continue
+
+    const match = live.get(placeOf(placeholder))?.shift()
+
+    if (match && old.contains(match) && match.dataset.slots === placeholder.dataset.slots && (match.dataset.slots === undefined || (match._$h ?? match.innerHTML) === placeholder.innerHTML)) {
+      markCurrent(match, placeholder)
+      keep(placeholder, match)
+      givePropsOf(match, placeholder)
+    }
+  }
+}
+
+// Where an island stands among the others, which the next page's copy of it is paired by: its layout and component, in order.
+function placeOf(island: HTMLElement): string {
+  return `${island.dataset.layout ?? ''}\0${island.dataset.component}`
+}
+
+// What the next page gives a kept island, which it reads from now on, or once it hydrates.
+function givePropsOf(live: KeptIsland, next: HTMLElement): void {
+  const props = next.dataset.props
+
+  if (props === live.dataset.props)
+    return
+
+  if (props === undefined)
+    delete live.dataset.props
+  else
+    live.dataset.props = props
+
+  live._$p?.(props === undefined ? {} : decodeServerValue(props) as object)
 }
 
 const KAY_MARKS = new Set<string | null>([null, 'page', 'true'])

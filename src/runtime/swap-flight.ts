@@ -8,20 +8,20 @@ export interface Policy {
   scroll: 'top' | 'saved' | 'keep'
   // What gets focus: the new page's autofocus field or heading, its title announced, the element focused before, or the refused form's field.
   focus: 'page' | 'kept' | 'refused'
-  // The islands kept: those marked `persist`, or besides them every one whose component and props did not change.
-  islands: 'persist' | 'unchanged'
+  // The islands kept: those marked `persist`, besides them those of a layout the next page has too (`layout`) or any island of the same component in the same place (`all`), each taking the next page's props in place.
+  islands: 'layout' | 'all'
   // Whether the page changes through a view transition, once its stylesheets opt in.
   transition: boolean
 }
 
 const POLICIES: Record<Intent, Policy> = {
-  visit: { history: 'push', scroll: 'top', focus: 'page', islands: 'persist', transition: true },
-  query: { history: 'push', scroll: 'keep', focus: 'kept', islands: 'persist', transition: true },
-  traverse: { history: 'none', scroll: 'saved', focus: 'page', islands: 'persist', transition: true },
-  refresh: { history: 'none', scroll: 'keep', focus: 'kept', islands: 'unchanged', transition: false },
-  redirect: { history: 'replace', scroll: 'keep', focus: 'kept', islands: 'persist', transition: true },
-  refusal: { history: 'none', scroll: 'keep', focus: 'refused', islands: 'persist', transition: true },
-  error: { history: 'none', scroll: 'top', focus: 'page', islands: 'persist', transition: true },
+  visit: { history: 'push', scroll: 'top', focus: 'page', islands: 'layout', transition: true },
+  query: { history: 'push', scroll: 'keep', focus: 'kept', islands: 'layout', transition: true },
+  traverse: { history: 'none', scroll: 'saved', focus: 'page', islands: 'layout', transition: true },
+  refresh: { history: 'none', scroll: 'keep', focus: 'kept', islands: 'all', transition: false },
+  redirect: { history: 'replace', scroll: 'keep', focus: 'kept', islands: 'layout', transition: true },
+  refusal: { history: 'none', scroll: 'keep', focus: 'refused', islands: 'layout', transition: true },
+  error: { history: 'none', scroll: 'top', focus: 'page', islands: 'layout', transition: true },
 }
 
 // What the swaps under way share, which each one reads before it acts: `navigation.current` is the token of the latest one started, which every swap that is not it gives way to.
@@ -36,7 +36,7 @@ export const inFlight: {
   late?: LateParts | undefined
   // The click listener of the view transition running, at most one.
   transition?: ((event: MouseEvent) => void) | undefined
-  // Whether the commit under way keeps what was typed into the fields the next page renders as they were, which `kay dev` asks of a refresh for an edit.
+  // Whether the commit under way keeps what the visitor changed (a field's value, a `details`' `open`) where the server's render did not change it: a refresh does, and so does `kay dev` for an edit.
   typing: boolean
   // The selects the commit under way found renamed, whose options show what the next page renders.
   renamed: Set<Element>

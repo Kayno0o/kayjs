@@ -72,6 +72,7 @@ export function startNavigation(given: NavigationHooks): void {
   window.addEventListener('click', onClick)
   ;(document as { _$kf?: typeof onClick })._$kf = onClick
   document.addEventListener('focusin', onFocus)
+  document.addEventListener('toggle', onToggle, true)
   window.addEventListener('popstate', onPopState)
   // `pagehide` saves the scroll for a full load only: back or forward between entries of this document fires `popstate` once the entry already changed, too late to save the one left, so the entry is kept up to date as the page scrolls.
   window.addEventListener('scroll', onScroll, { passive: true })
@@ -88,6 +89,14 @@ export async function loadSwap(): Promise<typeof import('./page-swap')> {
 async function loadFormSubmits(): Promise<typeof import('./form-submits')> {
   // A condition Bun folds before it splits chunks: an import left in the navigation-only entry, which bundles the module, would split that entry in three.
   return typeof KAY_NAV_ENTRY === 'undefined' ? formsModule ??= import('./form-submits') : Promise.reject(new Error('unreachable'))
+}
+
+// Notes what a `details` showed before its visitor first toggled it, which a refresh compares with the server's.
+function onToggle(event: Event): void {
+  const details = event.target
+
+  if (details instanceof HTMLDetailsElement && !navigation.written.delete(details) && !navigation.opened.has(details))
+    navigation.opened.set(details, !details.open)
 }
 
 // Until the forms' listener runs, which then takes the forms a swap brings or a focus lands in itself.

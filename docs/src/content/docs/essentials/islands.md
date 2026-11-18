@@ -331,6 +331,12 @@ It differs on every call, so draw it in a handler or after mount. An id in marku
 
 A page with an island or a form swaps the next page in without a reload.
 
+A swap keeps what you changed and applies what the server changed. After an action or `refresh()`, an island stays as it is and takes its new props in place, a `details` you opened stays open, and a field you typed in keeps its text, unless the server changed that value.
+
+A seed such as `signal(light)` keeps the first value, so write `linked(() => light)` to follow the prop. A layout's islands, a sidebar's folded group for one, stay as they are from page to page.
+
+Mark an island `persist={id}` when the items of a list move, so each is found by its key. Pass `{ refresh: false }` to a call to leave the page alone.
+
 An island marked `persist` lives on from page to page. `Player(persist)` in a layout keeps a song playing, and in a browser with `Element.moveBefore` an iframe in it stays loaded. What the next page renders again stays as it is, so a sidebar keeps its scroll, and so does a scrolled panel inside the island, in every browser.
 
 Each swap moves focus to the element the URL's `#fragment` points at, else the new page's `autofocus` field, else its `h1`, else its `main`. It also announces the title to screen readers.

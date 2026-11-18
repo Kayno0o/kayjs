@@ -21,7 +21,7 @@ import { collectHead, head as setHead } from '../runtime/head'
 import { child, component, html, newServerIslands, withinComponent, withServerIslands } from '../runtime/html'
 import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
-import { unrevivableAction } from '../runtime/island.server'
+import { inLayout, unrevivableAction } from '../runtime/island.server'
 import { resourcesUsed, resourcesWanted, withSeeds } from '../runtime/live-resource.server'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
@@ -359,10 +359,12 @@ function registerSeo(module: PageModule): void {
 
 // The page inside its layouts, each through `component`, so what a layout provides reaches its page.
 // A layout's named slot is read off its page: reading one renders the page first, once, which hands the layout the blocks it wrote.
-export function viewOf(modules: PageModule[], data: Record<string, unknown>[], entry?: HeadTag[]): () => unknown {
+export function viewOf(modules: PageModule[], data: Record<string, unknown>[], entry?: HeadTag[], files?: readonly string[]): () => unknown {
   const page = modules.length - 1
   const chain = newFillChain(modules.length)
   const declared = modules.map(module => module.slots)
+  // The layout a module renders as, for the islands it draws to carry it: none for the page.
+  const layoutOf = (index: number) => index < page && files?.[index] !== undefined ? projectPath(files[index]) : undefined
 
   // Set after its layouts' heads and before its own, which each replace what the entry gave.
   let view = () => {
@@ -373,7 +375,7 @@ export function viewOf(modules: PageModule[], data: Record<string, unknown>[], e
 
     registerSeo(modules[page]!)
 
-    return component(modules[page]!.default, data[page]!)
+    return inLayout(undefined, () => component(modules[page]!.default, data[page]!))
   }
 
   for (let index = page - 1; index >= 0; index--) {
@@ -400,14 +402,14 @@ export function viewOf(modules: PageModule[], data: Record<string, unknown>[], e
 
           const found = filledBy(chain, declared, index, name)
 
-          return found && withinComponent(modules[found.at]!.default, found.block)
+          return found && inLayout(layoutOf(found.at), () => withinComponent(modules[found.at]!.default, found.block))
         } })
       }
 
       chain.at = index
       registerSeo(modules[index]!)
 
-      return component(modules[index]!.default, props)
+      return inLayout(layoutOf(index), () => component(modules[index]!.default, props))
     }
   }
 
@@ -451,7 +453,7 @@ function seedBlocks(deferred: PendingBlock[], seeds: ReadonlyMap<string, Seed>):
 }
 
 function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions, rules: QueryRules | undefined, entry?: HeadTag[]): string | Pieced | ReadableStream<Uint8Array> {
-  const view = viewOf(modules, data, entry)
+  const view = viewOf(modules, data, entry, files)
   const chunks = islandChunks(client)
   // A prerendered page holds each server island between marks the server splits it at.
   const scan = options.prerendering ? Object.assign(newServerIslands(true), { awaits: options.awaits }) : undefined

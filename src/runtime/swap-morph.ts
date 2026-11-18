@@ -1,4 +1,5 @@
 import { ISLAND } from './markers'
+import { navigation } from './navigation'
 import { inFlight } from './swap-flight'
 
 const NOTHING: ReadonlySet<Node> = new Set()
@@ -37,9 +38,9 @@ function alike(live: Node, next: Node): boolean {
   return live.id === other.id && live.getAttribute('class') === other.getAttribute('class') && (!OPAQUE_TAGS.has(live.localName) || (!live.matches(OPAQUE) && !other.matches(OPAQUE)))
 }
 
-// Whether a field keeps what was typed into it: it is the same field and the edit left what the server renders in it as it was, so only a visitor changed it.
+// Whether a field keeps what was typed into it: it is the same field and the render left what the server renders in it as it was, so only a visitor changed it.
 function typedKept(live: Element, other: Element): boolean {
-  if (process.env.NODE_ENV === 'production' || !inFlight.typing)
+  if (!inFlight.typing)
     return false
 
   if (live instanceof HTMLInputElement && other instanceof HTMLInputElement)
@@ -72,6 +73,30 @@ function holdTabStop(element: Element): void {
   }, { once: true, signal: held.signal })
 }
 
+// Whether a `details` the visitor toggled keeps its state: the render leaves what the server wrote as `open` when the visitor toggled it, so only the visitor changed it. One the server changed takes the server's, and is the visitor's again from its next toggle.
+function keepsOpen(live: Element, other: Element): boolean {
+  if (!inFlight.typing || !(live instanceof HTMLDetailsElement))
+    return false
+
+  const served = navigation.opened.get(live)
+
+  if (served === undefined)
+    return false
+
+  if (other.hasAttribute('open') === served)
+    return true
+
+  navigation.opened.delete(live)
+
+  return false
+}
+
+// A change the morph makes to `open`, whose `toggle` event is not the visitor's.
+function wrote(live: Element, name: string): void {
+  if (name === 'open' && live instanceof HTMLDetailsElement)
+    navigation.written.add(live)
+}
+
 // Makes the live node read as the next one, keeping it and each child of it the next page renders again.
 function morph(live: Node, next: Node): void {
   if (!(live instanceof Element)) {
@@ -89,29 +114,37 @@ function morph(live: Node, next: Node): void {
   // Read before the attributes and the children become the next page's, which the defaults come from.
   const typed = typedKept(live, other)
 
-  if (process.env.NODE_ENV !== 'production' && inFlight.typing && live instanceof HTMLSelectElement && live.name !== (other as HTMLSelectElement).name)
+  if (inFlight.typing && live instanceof HTMLSelectElement && live.name !== (other as HTMLSelectElement).name)
     inFlight.renamed.add(live)
 
   // An element's open state is closed through it, as the attribute alone would leave a modal dialog blocking the page.
   if (live instanceof HTMLDialogElement && live.open && !other.hasAttribute('open'))
     live.close()
 
+  const opened = keepsOpen(live, other)
+
   for (const { name, value } of other.attributes) {
-    if (live.getAttribute(name) !== value)
+    if (live.getAttribute(name) !== value && !(opened && name === 'open')) {
+      wrote(live, name)
       live.setAttribute(name, value)
+    }
   }
 
   if (other.hasAttribute('tabindex'))
     heldTabStops.get(live)?.abort()
 
   for (const name of live.getAttributeNames()) {
-    if (other.hasAttribute(name))
+    if (other.hasAttribute(name) || (opened && name === 'open'))
       continue
 
-    if (name === 'tabindex' && live === document.activeElement)
+    if (name === 'tabindex' && live === document.activeElement) {
       holdTabStop(live)
-    else
-      live.removeAttribute(name)
+
+      continue
+    }
+
+    wrote(live, name)
+    live.removeAttribute(name)
   }
 
   morphChildren(live, other)
