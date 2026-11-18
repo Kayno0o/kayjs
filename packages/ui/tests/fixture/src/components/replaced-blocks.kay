@@ -1,0 +1,35 @@
+---
+import { signal } from 'kay'
+import AvatarGroup from '@kayjs/ui/avatar-group.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import DescriptionList from '@kayjs/ui/description-list.kay'
+import Masonry from '@kayjs/ui/masonry.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+
+// Each list is built again, its items copies under the same keys, whenever the counter moves.
+const version = signal(0)
+const options = () => [{ value: 'x', label: `X${version()}` }, { value: 'y', label: 'Y' }]
+const people = () => [{ key: 'a', name: `Ann${version()}` }]
+const terms = () => [{ key: 't', label: 'Term', note: `Note${version()}` }]
+const tiles = () => [{ id: 'm', text: `Tile${version()}` }]
+---
+button#bump(type="button" onClick={() => version++}) Bump
+ChipGroup(options={options()} label="Chips")
+  @option(option)
+    input(data-block="chip" aria-label="chip" value={option.label})
+Segmented(options={options()} label="Segments")
+  @option(option)
+    input(data-block="segment" aria-label="segment" value={option.label})
+RadioGroup(options={options()} label="Radios")
+  @option(option)
+    input(data-block="radio" aria-label="radio" value={option.label})
+DescriptionList(items={terms()})
+  @value(item)
+    input(data-block="term" aria-label="term" value={item.note})
+AvatarGroup(items={people()})
+  @avatar(person)
+    input(data-block="avatar" aria-label="avatar" value={person.name})
+Masonry(items={tiles()} key={tile => tile.id})
+  @tile(item)
+    input(data-block="tile" aria-label="tile" value={item.text})

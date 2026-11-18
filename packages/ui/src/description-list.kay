@@ -1,5 +1,6 @@
 --- <Item extends DescriptionItem>
 import type { JSX, Snippet } from 'kay'
+import { followedRow } from './followed-row'
 import type { DescriptionItem } from './description-list'
 import { recipe } from 'kay'
 import { wording } from 'kay/words'
@@ -40,7 +41,7 @@ else
         dt(part="term") {item.label}
         dd(part="detail")
           if item.value === undefined && value
-            | {value(item)}
+            | {followedRow(() => item, view => value!(view))}
           else if item.value === undefined
             | -
           else

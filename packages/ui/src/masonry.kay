@@ -1,5 +1,6 @@
 --- <Item>
 import type { JSX, Snippet } from 'kay'
+import { followedRow } from './followed-row'
 import { effect, elementSize, memo, onCleanup, onMount, recipe, signal, untrack } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import { isInfiniteList } from './infinite-list'
@@ -88,6 +89,6 @@ function measure(node: HTMLElement, id: Key) {
 div(part="root" {...rest} ref={element => { root = element; rootSize.ref(element) }} style={`--_masonry-min: ${minWidth}px; --_masonry-gap: ${gap}px; --_masonry-lanes: ${lanes()};${layout() ? ` height: ${layout()!.height}px;` : ''}${style ? ` ${style}` : ''}`} data-laid-out={layout() ? '' : undefined})
   for item, index of all() key={key(item)}
     div(part="tile" ref={element => measure(element, key(item))} style={place(index) ? `--_masonry-lane: ${place(index)!.lane}; --_masonry-top: ${place(index)!.top}px;` : undefined} data-placed={place(index) ? '' : undefined} data-pending={place(index) && !heights().has(key(item)) ? '' : undefined})
-      | {tile(item)}
+      | {followedRow(() => item, view => tile(view))}
 if list
   LoadMore(items={list})

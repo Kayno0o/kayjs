@@ -1,5 +1,6 @@
 --- <Value extends string | number | null, Held extends Value | null = Value>
 import type { JSX, Snippet } from 'kay'
+import { followedRow } from './followed-row'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import { postedValue, recipe, uid, untrack, withQuery } from 'kay'
@@ -124,7 +125,7 @@ snippet radios()
         input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, list(), start()))} type="radio" name={group} required={required} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})
         span(part="label")
           if drawRow
-            | {drawRow(option)}
+            | {followedRow(() => option, view => drawRow!(view))}
           else
             if option.icon
               Icon(icon={option.icon} part="icon")

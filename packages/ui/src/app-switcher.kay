@@ -1,5 +1,6 @@
 ---
 import type { JSX } from 'kay'
+import { followedRow } from './followed-row'
 import type { IconProps } from 'kay/icons'
 import type { Snippet } from 'kay'
 import type { MenuTriggerProps } from './menu'
@@ -122,13 +123,13 @@ Popover({...panelProps} id={id} placement={placement} role="none" open={open} pa
     for app of apps key={app.key}
       a(part="tile" href={app.href} {...attributesOf(app)} aria-current={app.key === current ? 'true' : undefined} data-tooltip={app.description} data-color={appColor(app) === undefined ? undefined : ''} style={appColor(app)})
         if appIcon
-          | {appIcon(app)}
+          | {followedRow(() => app, view => appIcon!(view))}
         else if app.icon
           Icon(icon={app.icon} part="icon")
         else
           span(part="initial" aria-hidden="true" data-color={appColor(app) === undefined ? undefined : ''}) {app.label.slice(0, 1)}
         span(part="name")
           if tile
-            | {tile(app)}
+            | {followedRow(() => app, view => tile!(view))}
           else
             | {app.label}

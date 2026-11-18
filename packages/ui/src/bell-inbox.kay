@@ -1,5 +1,6 @@
 --- <Item extends BellItem>
 import type { JSX, Snippet } from 'kay'
+import { followedRow } from './followed-row'
 import type { BellItem, BellItems, BellTriggerProps, InboxItem } from './bell'
 import { bellItem } from './bell'
 
@@ -143,7 +144,7 @@ span(part="root" {...rest})
         if linked(note.href) then url
           a(part="item" href={url} {...tabOf(url, note.newTab)} onClick={() => send(note.key)})
             if drawRow
-              | {drawRow(note)}
+              | {followedRow(() => note, view => drawRow!(view))}
             else
               span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
               span(part="title") {note.label}
@@ -152,7 +153,7 @@ span(part="root" {...rest})
         else
           button(part="item" type="button" onClick={() => send(note.key)})
             if drawRow
-              | {drawRow(note)}
+              | {followedRow(() => note, view => drawRow!(view))}
             else
               span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
               span(part="title") {note.label}

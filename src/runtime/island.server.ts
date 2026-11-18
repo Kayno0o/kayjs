@@ -291,8 +291,8 @@ function staysPlain(depth: number, client: boolean, lives: readonly unknown[], p
     if (key === 'hydrate' || key === 'persist' || (key === 'render' && (props as { render?: unknown }).render === 'client') || key === USE_FALLBACK)
       return false
 
-    // What an island would send for the browser to finish (a promise) keeps the use an island.
-    if (!descriptor.get && (isThenable(descriptor.value) || holdsMarkup(descriptor.value)))
+    // What an island would send for the browser to finish (a promise, an action) keeps the use an island.
+    if (!descriptor.get && (isThenable(descriptor.value) || holdsMarkup(descriptor.value) || isAction(descriptor.value)))
       return false
   }
 

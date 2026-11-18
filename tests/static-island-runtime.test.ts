@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { ACTION } from '../src/runtime/action-shared'
 import { child } from '../src/runtime/html'
 import { island, IslandPropsError } from '../src/runtime/island.server'
 
@@ -29,6 +30,12 @@ describe('an island that lists the props making it interactive', () => {
 
     expect(html).not.toContain('<slot')
     expect(called).toBe(1)
+  })
+
+  it('is an island for an action in a prop it does not list, which is sent to the browser', () => {
+    const action = Object.assign(() => undefined, { [ACTION]: true, url: '/_kay/action/pick' })
+
+    expect(drawn({ sortable: false, onPick: action })).toContain('<slot')
   })
 
   it('stays an island where the use asks to hydrate or persist, where the component asks itself, or where it follows a live value', () => {

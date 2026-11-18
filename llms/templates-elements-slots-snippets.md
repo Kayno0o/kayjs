@@ -100,7 +100,7 @@ Card(title="Todos")
 
 A prop taking markup is typed `Snippet` from `kay`: `Snippet` for the children and a block with no parameters, `Snippet<[Item, number]>` for markup the component calls with values, once per row for instance. `@name(a, b)`, a local `snippet` passed as `name={feature}` and `slot name(a, b)` all use it, a fill with other parameters, or a `@name` written without the parameters the prop is called with, is a `kay check` error (the second names the parameters to write), and `slot name` on a prop that is no `Snippet` is reported at the name.
 
-No function reaches the browser, so a static component passing one to an island is the `island-prop` error, fixed with `island()`, and a layout or a page with a `--- server` fence cannot pass one.
+No function reaches the browser, so a static component passing one to an island is the `island-prop` error (unless the island lists `interactive` props and the use writes none, which renders as markup), fixed with `island()`, and a layout or a page with a `--- server` fence cannot pass one.
 
 A static component that only islands render is part of them, so it can.
 
@@ -141,5 +141,5 @@ List(items={todos})
 - A name another snippet, an import, a script const, a prop or a loop variable already holds is reported at the snippet, and assigning one is refused.
 - It can hold components, a bare `slot` of the component declaring it, `if`, `for`, `await`, `match` and other snippets, and is a plain function, so `List(row={feature})` passes it where a prop takes a function, which the component renders with `slot row(item, i)`.
 - An `error` or `pending` line in a snippet follows the form the snippet is rendered in while it renders, as one in a component does, unless the form it is declared in is around it, which it keeps reading. In an island the snippet, like the children a component is given, takes the form it is called in once, as it is called, so a line inside an `await` block or an `if` shown later reads the same form, and a snippet declared outside the form works as one declared inside; call it in the form's own markup, `{note()}` or inside a larger expression. A component an `await` or an `if` of the snippet shows later reads no form: put the line in the snippet itself. `add.form.error('title')` and `add.pending()` take the action from anywhere.
-- A static component passing one to an island is the `island-prop` error, as it is for a `@row(item)` block.
+- A static component passing one to an island is the `island-prop` error, as it is for a `@row(item)` block, unless the island lists `interactive` props and the use writes none.
 - Markup used by several files is a component; a snippet is for one file.

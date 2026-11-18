@@ -1,5 +1,6 @@
 --- <Value extends string | number>
 import type { JSX, Snippet } from 'kay'
+import { followedRow } from './followed-row'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import { effect, postedValues, recipe, signal, uid, untrack } from 'kay'
@@ -169,7 +170,7 @@ snippet chips()
         input(part="input" ref={element => element.defaultChecked = untrack(() => picked().includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-required={required ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
         span(part="label")
           if drawRow
-            | {drawRow(option)}
+            | {followedRow(() => option, view => drawRow!(view))}
           else
             if option.icon
               Icon(icon={option.icon} part="icon")

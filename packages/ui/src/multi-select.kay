@@ -2,6 +2,7 @@
 import type { FieldSize } from './field-look'
 import { fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import type { JSX, Snippet } from 'kay'
+import { followedRow } from './followed-row'
 import type { OptionsSource } from './options-source'
 import type { MultiSelectOption } from './multi-select'
 import type { Placement, PopoverButtonProps, PopoverPanelProps } from './popover'
@@ -266,7 +267,7 @@ div(part="root" {...rest} ref={ref} data-posted={sent === undefined ? undefined 
           input(part="checkbox" type="checkbox" checked={picked().includes(option.value)} disabled={option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => set(toggledValue(pool(), picked(), option.value))})
           if drawRow
             span(part="label")
-              | {drawRow(option)}
+              | {followedRow(() => option, view => drawRow!(view))}
           else
             if option.icon
               Icon(icon={option.icon} part="icon")

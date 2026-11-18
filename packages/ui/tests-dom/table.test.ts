@@ -7,6 +7,7 @@ import FeatureTable from '../tests/fixture/src/components/feature-table.kay'
 import FilteredTable from '../tests/fixture/src/components/filtered-table.kay'
 import ListedTable from '../tests/fixture/src/components/listed-table.kay'
 import PagedTable from '../tests/fixture/src/components/paged-table.kay'
+import ReplacedBlocks from '../tests/fixture/src/components/replaced-blocks.kay'
 import ReplacedRows from '../tests/fixture/src/components/replaced-rows.kay'
 import SelectableFeed from '../tests/fixture/src/components/selectable-feed.kay'
 import SelectableTable from '../tests/fixture/src/components/selectable-table.kay'
@@ -980,5 +981,27 @@ describe('Table rows replaced with the same keys', () => {
     await settle()
     expect(root.querySelector('p.note')).toBe(note)
     expect(note.textContent).toBe('5 days at risk 1')
+  })
+})
+
+describe('Components drawing a block per item, the items replaced with the same keys', () => {
+  test('keep the nodes of the block, which reads the new item', async () => {
+    mounted = await mountComponent(ReplacedBlocks, {})
+
+    const { root } = mounted
+    const kinds = ['chip', 'segment', 'radio', 'term', 'avatar', 'tile']
+    const before = kinds.map(kind => root.querySelector<HTMLInputElement>(`input[data-block=${kind}]`))
+
+    expect(before.every(Boolean)).toBe(true)
+
+    click(root.querySelector('#bump'))
+    await settle()
+
+    for (const [index, kind] of kinds.entries()) {
+      const input = root.querySelector<HTMLInputElement>(`input[data-block=${kind}]`)
+
+      expect(input, kind).toBe(before[index]!)
+      expect(input!.value, kind).toMatch(/1$/)
+    }
   })
 })

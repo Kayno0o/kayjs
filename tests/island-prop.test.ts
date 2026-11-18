@@ -153,6 +153,10 @@ describe('island-prop, decided by the types of what is passed', () => {
       'src/components/blocks.kay': component('import Listed from \'./listed.kay\'', 'Listed(label={row => `#${row}`})\nListed\n  @label(row)\n    p {row}\n'),
       'src/components/turned-on.kay': component('import Listed from \'./listed.kay\'', 'Listed(selectable label={row => `#${row}`})\nListed(selectable={true})\n  @label(row)\n    p {row}\n'),
       'src/components/hands-on.kay': component('import Listed from \'./listed.kay\'', 'Listed(onPick={() => 1})'),
+      'src/components/client.kay': '---\nisland({ render: \'client\', interactive: { selectable: false } })\nconst { label } = props<{ label?: (row: number) => string }>()\n---\np {String(label)}\n',
+      'src/components/client-use.kay': component('import Client from \'./client.kay\'', 'Client(label={row => String(row)})'),
+      'src/components/widened.kay': '---\nisland({ interactive: { selectable: false } })\nconst { label } = props<{ label?: (row: number) => string }>()\n---\np {String(label)}\n',
+      'src/components/widened-use.kay': component('import Widened from \'./widened.kay\'', 'Widened(label={row => String(row)})\nWidened(selectable label={row => String(row)})'),
       'src/components/nested.kay': component('import Listed from \'./listed.kay\'', 'Listed(data={[{ run() { return 1 } }]})'),
       'src/components/default-on.kay': component('import On from \'./on.kay\'', 'On(label={row => String(row)})'),
       'src/components/spreads.kay': component('import Listed from \'./listed.kay\'\nconst more = {}', 'Listed({...more} label={row => String(row)})'),
@@ -161,12 +165,14 @@ describe('island-prop, decided by the types of what is passed', () => {
 
     try {
       expect(lints(await check(root), root)).toEqual([
+        ['components/client-use.kay', 'island-prop', 5],
         ['components/default-on.kay', 'island-prop', 5],
         ['components/generic-block.kay', 'island-prop', 10],
         ['components/nested.kay', 'island-prop', 5],
         ['components/spreads.kay', 'island-prop', 6],
         ['components/turned-on.kay', 'island-prop', 5],
         ['components/turned-on.kay', 'island-prop', 7],
+        ['components/widened-use.kay', 'island-prop', 6],
       ])
     }
     finally {
