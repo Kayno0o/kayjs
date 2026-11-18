@@ -299,6 +299,71 @@ function splitTop(text: string, operator: '&&' | '||'): string[] | undefined {
   return parts
 }
 
+// The depth-0 positions of `char` in `text`, outside brackets and strings; a `?.` and a `??` are no ternary.
+function topLevel(text: string, char: '?' | ':'): number[] {
+  const found: number[] = []
+  let depth = 0
+  let quote = ''
+
+  for (let at = 0; at < text.length; at++) {
+    const here = text[at]!
+
+    if (quote !== '') {
+      if (here === '\\')
+        at++
+      else if (here === quote)
+        quote = ''
+    }
+    else if (here === '\'' || here === '"' || here === '`') {
+      quote = here
+    }
+    else if (here === '(' || here === '[' || here === '{') {
+      depth++
+    }
+    else if (here === ')' || here === ']' || here === '}') {
+      depth--
+    }
+    else if (here === char && depth === 0 && (char === ':' || (text[at + 1] !== '.' && text[at + 1] !== '?'))) {
+      found.push(at)
+    }
+  }
+
+  return found
+}
+
+// An attribute `name={cond ? value : undefined}` whose condition is false is `{undefined}`, which the compiler leaves unbound. Only a ternary with no other at its top level is read.
+function foldAbsentAttributes(line: string): string {
+  let result = line
+  let from = 0
+
+  for (;;) {
+    const open = result.indexOf('={', from)
+
+    if (open === -1)
+      return result
+
+    const start = open + 2
+    let depth = 1
+    let end = start
+
+    for (; end < result.length && depth > 0; end++) {
+      if (result[end] === '{')
+        depth++
+      else if (result[end] === '}')
+        depth--
+    }
+
+    const inner = result.slice(start, end - 1)
+    const question = topLevel(inner, '?')[0]
+    const colons = topLevel(inner, ':')
+
+    from = start
+
+    if (depth === 0 && question !== undefined && colons.length === 1 && inner.slice(colons[0]! + 1).trim() === 'undefined' && alwaysFalse(inner.slice(0, question)))
+      result = `${result.slice(0, start)}undefined${result.slice(end - 1)}`
+  }
+}
+
 // A destructured default that only an absent feature reads, `label = uses('x') ? wording('a', 'A') : ''` once the call is false: the closure it would make is left out.
 const ABSENT_DEFAULT = / = false(?: \|\| false)* \? wording\([^()]*\) : ''/g
 const DEAD_SPREAD = /^(\s*)\.\.\.\(false(?: \|\| false)*\)\s*$/
@@ -343,7 +408,7 @@ export function specializedSource(source: string, present: ReadonlySet<string>, 
     if (hit === null) {
       // A call in an attribute or a text expression is folded as one in the script.
       if (lines[at]!.includes('uses('))
-        lines[at] = replaced(lines[at]!)
+        lines[at] = foldAbsentAttributes(replaced(lines[at]!))
 
       continue
     }

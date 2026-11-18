@@ -5,8 +5,10 @@ import type { CodeBuilder } from './mapping'
 import type { BindingPlan, LinkPlan } from './plan'
 import { mayLeaveSite } from '../runtime/outside'
 import { marksServerIsland, modifiersOf } from './ast'
+import { neverShown, neverTaken } from './dead-code'
 import { fieldBindings } from './dom-fields'
 import { FormHere } from './dom-here'
+import { propertyBindings } from './dom-property'
 import { addHandler, listenerOptions } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
 import { addKeyParameters, addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
@@ -107,12 +109,18 @@ export class DomTemplate extends TemplateWriter {
       }
       else {
         b.add(`{ const [KayS, KayE] = KayMarkers(${parent}); `)
-        this.dynamic(item, 'null', 'KayS', 'KayE')
+        this.slot(item, 'null', 'KayS', 'KayE')
         b.add(' } ')
       }
     }
 
     b.add(`${'} '.repeat(blocks)}})`)
+  }
+
+  // A dynamic part, but for an `if` that draws nothing: its markers are in the markup and there is no block to run.
+  private slot(item: DynamicItem, element: string, start: string, end: string): void {
+    if (item.kind !== 'if' || !neverShown(this.src, item.node))
+      this.dynamic(item, element, start, end)
   }
 
   // A dynamic part rendered into an element's content, or between two markers.
@@ -218,7 +226,7 @@ export class DomTemplate extends TemplateWriter {
     // A chain naming no value needs no memo of it.
     b.add(`${node.branches.some(branch => branch.alias) ? 'KayBranches' : 'KayChoose'}(${at}, [`)
 
-    for (const branch of node.branches) {
+    for (const branch of node.branches.filter(each => !neverTaken(this.src, each))) {
       b.wrap(branch, () => {
         b.add('[() => (').addSource(branch.test).add('), (')
 
@@ -540,18 +548,7 @@ export class DomTemplate extends TemplateWriter {
             break
           case 'value':
             this.notesLink(link, attribute.name)
-            own.push((variable) => {
-              b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(attribute.name)}, `)
-
-              if (attribute.action)
-                b.add('KayFormAction((').addSource(attribute.expression).add('))')
-              else if (attribute.name === 'href' && link.leaving)
-                b.add(`KayOutside(${variable(node)}, (`).addSource(attribute.expression).add(`)${link.rel ? ', true' : ''})`)
-              else
-                b.add('(').addSource(attribute.expression).add(')')
-
-              b.add(`${link.written && attribute.name === 'href' ? ', true' : ''}));`)
-            })
+            own.push(...propertyBindings(b, this.src, attribute, link, node))
 
             break
         }
@@ -620,14 +617,14 @@ export class DomTemplate extends TemplateWriter {
           html += this.templateOf(item.node, this.child(node, 'element'), bindings)
         }
         else if (sole) {
-          bindings.push(variable => this.dynamic(item, variable(node), 'null', 'null'))
+          bindings.push(variable => this.slot(item, variable(node), 'null', 'null'))
         }
         else {
           const start = this.child(node, 'start')
           const end = this.child(node, 'end')
 
           html += START_MARKER + END_MARKER
-          bindings.push(variable => this.dynamic(item, 'null', variable(start), variable(end)))
+          bindings.push(variable => this.slot(item, 'null', variable(start), variable(end)))
         }
       }
 

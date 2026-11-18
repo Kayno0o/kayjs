@@ -126,7 +126,7 @@ describe('a feature on when the prop is left out', () => {
     const text = '---\nconst a = uses(\'x\', true)\n---\nspan(data-x={uses(\'x\', true) ? 1 : undefined}) one\n'
 
     expect(usesNames(text)).toEqual(['x'])
-    expect(specializedSource(text, new Set()).split('\n')).toEqual(['---', 'const a = false', '---', 'span(data-x={false ? 1 : undefined}) one', ''])
+    expect(specializedSource(text, new Set()).split('\n')).toEqual(['---', 'const a = false', '---', 'span(data-x={undefined}) one', ''])
     expect(specializedSource(text, new Set(['x'])).split('\n')[3]).toBe('span(data-x={true ? 1 : undefined}) one')
   })
 

@@ -249,15 +249,15 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   openRowLabel?: ((row: Row) => string) | undefined
 } & ({ rows: RowsSource<Row>, items?: undefined, list?: undefined } | { rows?: undefined, items: InfiniteList<Row>, list?: undefined } | { rows?: undefined, items?: undefined, list: InfiniteList<Row> })>()
 
-if ((rest as { onSelect?: unknown }).onSelect !== undefined)
+if (uses('onSelect') && (rest as { onSelect?: unknown }).onSelect !== undefined)
   throw new KayError('argument-invalid', 'kayjs-ui: a Table has no onSelect since 1.91; use onSelectedChange')
 
-if (expandable && (uses('virtual') && virtual))
+if (uses('expandable') && expandable && (uses('virtual') && virtual))
   throw new KayError('argument-invalid', 'kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
 
 const list = uses('items') || uses('list') ? infinite ?? legacy : undefined
 
-if (pageSize !== undefined && ((uses('virtual') && virtual) || list))
+if (uses('pageSize') && pageSize !== undefined && ((uses('virtual') && virtual) || list))
   throw new KayError('argument-invalid', 'kayjs-ui: a Table with a pageSize cannot be virtual or take a list, which already hold their rows by the window or by the page')
 
 const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: failure => onError?.(failure) })
@@ -267,18 +267,18 @@ const columns = memo(() => given.map(column => resolvedColumn(column, sortable))
 // A Table drawn as plain markup has no script to sort with, so it keeps its sort in the URL under `sort` unless `sortParam` names another, and its headers link to it.
 // kay-allow once-read-prop: the sort's param is chosen when the table is made
 const sortKey = uses('sortParam') ? sortParam ?? (plain && sortable ? 'sort' : undefined) : undefined
-const keptKey = sortKey === undefined ? undefined : queryParam(sortKey, { default: '' })
-const directionParam = sortKey === undefined ? undefined : sortKey === 'sort' ? 'direction' : `${sortKey}Direction`
-const keptDirection = directionParam === undefined ? undefined : queryParam(directionParam, { default: '' })
+const keptKey = uses('sortParam') && sortKey !== undefined ? queryParam(sortKey, { default: '' }) : undefined
+const directionParam = uses('sortParam') && sortKey !== undefined ? sortKey === 'sort' ? 'direction' : `${sortKey}Direction` : undefined
+const keptDirection = uses('sortParam') && directionParam !== undefined ? queryParam(directionParam, { default: '' }) : undefined
 const restored = uses('sortable', true) ? restoredSort(columns(), keptKey?.(), keptDirection?.()) : undefined
 const current = signal(restored ?? sort)
 let following = restored === undefined
 // The search box and the extra fields, decided when the table is made.
 const search = uses('filter') || uses('fields') || uses('filterParam') ? tableFilter({ filterParam, fields, reserved: [sortKey, directionParam, ...pageSize === undefined ? [] : [pageParam, limitParam]] }) : undefined
 // A table over a list searches on the server, so a `filterParam` alone shows the box.
-const searching = () => filter !== undefined || (list !== undefined && filterParam !== undefined)
-const fielded = () => (search?.extra.length ?? 0) > 0
-const filtering = () => search?.active() ?? false
+const searching = uses('filter') || uses('filterParam') || uses('fields') ? () => filter !== undefined || (list !== undefined && filterParam !== undefined) : undefined
+const fielded = uses('filter') || uses('filterParam') || uses('fields') ? () => (search?.extra.length ?? 0) > 0 : undefined
+const filtering = uses('filter') || uses('filterParam') || uses('fields') ? () => search?.active() ?? false : undefined
 
 if (uses('sort')) {
   effect(() => {
@@ -327,13 +327,15 @@ const select = uses('selectable') ? selection({ rowKey, rows, kept, selected: ()
 const tableId = uid()
 const expansion = uses('expandable') ? expanding({ tableId, rowKey, expanded: () => expanded, onOpenChange: () => onOpenChange }) : undefined
 const linked = () => (uses('rowHref') || uses('onRowClick')) && (rowHref !== undefined || onRowClick !== undefined)
-const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
+const sorting = uses('sortable', true) ? (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key : undefined
 
-const endpoint = memo(() => {
-  const value = exportable
+const endpoint = uses('exportable')
+  ? memo(() => {
+    const value = exportable
 
-  return typeof value === 'string' ? value : undefined
-})
+    return typeof value === 'string' ? value : undefined
+  })
+  : undefined
 
 const pager = uses('pageSize')
   ? paging({ pageSize: () => pageSize, pageSizes: () => pageSizes, page: () => page, pageParam: () => pageParam, limitParam: () => limitParam, onPageChange: () => onPageChange, shown, restarts: () => {
@@ -416,7 +418,7 @@ const sortHref = uses('sortable', true)
 
 const ariaSort = uses('sortable', true)
   ? (column: Column<Row>): 'ascending' | 'descending' | undefined => {
-    if (!sorting(column))
+    if (!sorting!(column))
       return undefined
 
     return current()?.direction === 'asc' ? 'ascending' : 'descending'
@@ -424,9 +426,9 @@ const ariaSort = uses('sortable', true)
   : undefined
 ---
 div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={(uses('virtual') && virtual) ? '' : undefined} tabindex={scrolls() ? '0' : undefined} role={scrolls() && regionName() ? 'region' : undefined} aria-label={scrolls() ? regionName() : (rest as { 'aria-label'?: string })['aria-label']})
-  if (uses('filter') || uses('filterParam') || uses('fields')) && (searching() || fielded())
+  if (uses('filter') || uses('filterParam') || uses('fields')) && (searching!() || fielded!())
     div(part="filter")
-      if searching()
+      if searching!()
         label(part="field")
           span.kui-label-text(part="filterLabel") {filterLabel}
           input.kui-field-input(part="filterInput" type="search" value={search!.typed()} placeholder={filterPlaceholder} autocomplete="off" onInput={event => search!.typed.set(event.currentTarget.value)})
@@ -437,7 +439,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
             Select(value={search!.values[index]!()} options={field.options} emptyOption onChange={({ value }) => search!.values[index]!.set(value)})
           else
             input.kui-field-input(part="filterInput" type="search" value={search!.values[index]!()} autocomplete="off" onInput={event => search!.values[index]!.set(event.currentTarget.value)})
-    p(part="count" role="status") {list ? (filtering() && !list.pending() ? counted!(rows().length) : '') : (search!.typed() ? counted!(kept().length) : '')}
+    p(part="count" role="status") {list ? (filtering!() && !list.pending() ? counted!(rows().length) : '') : (search!.typed() ? counted!(kept().length) : '')}
   if (uses('selectable') && selectable) || (uses('exportable') && exportable) || (uses('columnToggle') && columnToggle)
     div(part="selection")
       if uses('columnToggle') && columnToggle
@@ -454,10 +456,10 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
           div(part="bulk")
             | {bulk(select!.chosen(), () => select!.commit([]))}
       if uses('exportable') && exportable
-        if (waiting() ? undefined : endpoint()) then address
+        if (waiting() ? undefined : endpoint!()) then address
           Button(href={exportHref(address, current(), filterParam ?? 'q', search?.typed() ?? '', search?.fieldsNow() ?? {})} download={exportName} label={exportLabel} variant="ghost" size="sm")
         else
-          Button(label={exportLabel} variant="ghost" size="sm" disabled={waiting()} onClick={endpoint() ? undefined : () => downloadCsv(shown(), shownColumns(), exportName)})
+          Button(label={exportLabel} variant="ghost" size="sm" disabled={waiting()} onClick={endpoint!() ? undefined : () => downloadCsv(shown(), shownColumns(), exportName)})
   p(part="status" role="status") {skeleton() && (!list || !list.pending()) ? loadingLabel : ''}
   if source.failed()
     div(part="failure" role="alert")
@@ -478,20 +480,20 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
         for column of shownColumns() key={column.key}
           th(part="headCell" class={column.class} style={columnStyle(column)} scope="col" data-align={column.align ?? 'start'} data-sticky={column.sticky} aria-sort={ariaSort?.(column)})
             if uses('sortable', true) && column.sortValue && plain && keptKey
-              a(part="sortButton" href={sortHref!(column)} rel="nofollow" data-direction={sorting(column) ? current()?.direction : undefined})
+              a(part="sortButton" href={sortHref!(column)} rel="nofollow" data-direction={sorting!(column) ? current()?.direction : undefined})
                 if uses('header') && header
                   | {header(column)}
                 else
                   | {column.header}
-                if sorting(column)
+                if sorting!(column)
                   Icon(icon="chevron" part="sortIcon")
             else if uses('sortable', true) && column.sortValue
-              button(part="sortButton" type="button" data-direction={sorting(column) ? current()?.direction : undefined} onClick={() => toggle!(column)})
+              button(part="sortButton" type="button" data-direction={sorting!(column) ? current()?.direction : undefined} onClick={() => toggle!(column)})
                 if uses('header') && header
                   | {header(column)}
                 else
                   | {column.header}
-                if sorting(column)
+                if sorting!(column)
                   Icon(icon="chevron" part="sortIcon")
             else if uses('header') && header
               | {header(column)}
@@ -502,7 +504,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
         tr(part="spacer" aria-hidden="true" style={`height: ${windowed.before()}px`})
           td(colspan={columnCount()} style="padding: 0; border: 0")
       for row, position of drawn() key={rowKeyOf(row, rowKey)}
-        tr(part="row" data-linked={linked() ? '' : undefined} data-virtual-index={windowed ? windowed.start() + position : undefined} aria-rowindex={windowed ? windowed.start() + position + 2 : undefined} aria-selected={uses('selectable') && selectable ? (select!.chosenSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false') : undefined})
+        tr(part="row" data-linked={(uses('rowHref') || uses('onRowClick')) && linked() ? '' : undefined} data-virtual-index={uses('virtual') && windowed ? windowed.start() + position : undefined} aria-rowindex={uses('virtual') && windowed ? windowed.start() + position + 2 : undefined} aria-selected={uses('selectable') && selectable ? (select!.chosenSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false') : undefined})
           if uses('expandable') && expandable
             td(part="toggleCell")
               IconButton(part="toggle" icon="chevron" variant="ghost" size="xs" label={(expandLabel ?? (item => wording('ui.table.expandRow', 'Details of {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} aria-expanded={expansion!.openSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false'} aria-controls={expansion!.detailId(row)} onClick={() => expansion!.toggleRow(rowKeyOf(row, rowKey))})
@@ -535,7 +537,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
               for cellIndex of skeletonCells() key={cellIndex}
                 td(part="skeletonCell")
                   span(part="skeletonBar")
-        else if !broke() && (list ? filtering() : rows().length > 0) && uses('noMatch') && noMatch
+        else if !broke() && (list ? filtering!() : rows().length > 0) && uses('noMatch') && noMatch
           tr
             td(part="emptyCell" colspan={columnCount()})
               | {noMatch}
