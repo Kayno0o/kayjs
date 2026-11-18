@@ -3,11 +3,11 @@ import { testSite } from '../src/test'
 
 describe('a page param holding an encoded slash', () => {
   it.each([
-    ['production', {}, ''],
-    ['dev', { dev: true }, ''],
-    ['a base and trailing slash', { base: '/shop', trailingSlash: 'always' as const }, '/'],
-  ])('reads %s decoded once', async (_name, options, slash) => {
-    const site = await testSite({ root: 'tests/fixtures/routing', config: options })
+    ['production', false, {}, ''],
+    ['dev', true, {}, ''],
+    ['a base and trailing slash', false, { base: '/shop', trailingSlash: 'always' as const }, '/'],
+  ])('reads %s decoded once', async (_name, dev, config, slash) => {
+    const site = await testSite({ root: 'tests/fixtures/routing', dev, config })
 
     try {
       for (const [sent, read] of [['a%2Fb', 'a/b'], ['%2Fabout', '/about'], ['%252F', '%2F'], ['%2E%2E%2Fx', '../x']])
