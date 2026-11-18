@@ -32,6 +32,7 @@ import { pruneNodes, pruneUtilityLayer } from './class-rules'
 import { buildClassTable, mergesAtRuntime } from './class-table'
 import { entryFile, KAY_OUTPUT, lazyEntryKey } from './entry-files'
 import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, liftSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
+import { iconSlotsOf, slotsKey } from './icon-slots'
 import { Increments, realPaths, sameEntries } from './increments'
 import { keepBundleMapCached, pruneKeptMaps } from './kept-maps'
 import { hoistLayerOrder } from './layer-order'
@@ -226,7 +227,7 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
     if (previous && islandsAgain)
       await increments!.stopMaps(false)
 
-    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, sources.files, sources.actionForms, sources.actionProps, options, classTable, islandTable) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
+    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, sources.files, sources.actionForms, sources.actionProps, options, classTable, islandTable, await iconSlotsOf(root, sources.islands.values(), sources.libraries, graph)) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
     const styleUses = styles ? styles.uses : previous!.styleUses
     const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, ...classTable && { classTable }, ...styleUses && { styleUses }, ...options.hot && { problems: sources.problems }, ...key !== undefined && { options: key } }
 
@@ -507,12 +508,12 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
 // `inputs` holds the modules of each chunk, `maps` the source maps written.
 interface Bundled { manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }
 
-async function bundleIslands(root: string, islands: Map<string, string>, files: string[], actionForms: boolean, actionProps: boolean, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<Bundled> {
-  return inRounds(async last => bundleRound(root, islands, files, actionForms, actionProps, options, last, classTable, islandTable))
+async function bundleIslands(root: string, islands: Map<string, string>, files: string[], actionForms: boolean, actionProps: boolean, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable, iconSlots?: ReadonlySet<string>): Promise<Bundled> {
+  return inRounds(async last => bundleRound(root, islands, files, actionForms, actionProps, options, last, classTable, islandTable, iconSlots))
 }
 
 // One build of the islands, which `foldStubs` ends when lazy components that do not pay were left.
-async function bundleRound(root: string, islands: Map<string, string>, files: string[], actionForms: boolean, actionProps: boolean, options: ClientOptions, last: boolean, classTable?: ClassTable, islandTable?: ClassTable): Promise<Bundled> {
+async function bundleRound(root: string, islands: Map<string, string>, files: string[], actionForms: boolean, actionProps: boolean, options: ClientOptions, last: boolean, classTable?: ClassTable, islandTable?: ClassTable, iconSlots?: ReadonlySet<string>): Promise<Bundled> {
   const navigation = options.client?.navigation ?? true
 
   if (islands.size === 0 && !navigation)
@@ -567,13 +568,13 @@ async function bundleRound(root: string, islands: Map<string, string>, files: st
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
   const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_NAV_ENTRY': 'undefined', 'KAY_FRENCH': options.french === true ? 'true' : 'undefined', 'KAY_I18N': options.i18n === true ? 'true' : 'undefined', 'KAY_NO_ACTION_PROPS': options.hot !== true && !actionProps ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.client?.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.client?.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
   const external = publicEnv !== undefined ? [publicEnv] : []
-  const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, variants, localeLinks: options.i18n === true, cacheDir: projectPaths(root).cache, settings: options.librarySettings, anchor, anchored, direct, inspect: options.inspect, api: trees, external, classTable }), ...options.plugins ?? []]
+  const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, variants, localeLinks: options.i18n === true, cacheDir: projectPaths(root).cache, settings: options.librarySettings, iconSlots, anchor, anchored, direct, inspect: options.inspect, api: trees, external, classTable }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 
   // Without the registry in the boot, each island is an entry point of its own.
   const islandFiles = options.hot ? [] : [...entries.values()]
-  const chunk = await runtimeChunk(entryFile, { plugins: plugins(), define, external, islands: islandFiles, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.librarySettings, options.inspect, options.client?.navigation, trees, islandFiles, eagerKeys()])}\0${await Bun.file(bootFile).text()}` } })
+  const chunk = await runtimeChunk(entryFile, { plugins: plugins(), define, external, islands: islandFiles, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.librarySettings, slotsKey(iconSlots), options.inspect, options.client?.navigation, trees, islandFiles, eagerKeys()])}\0${await Bun.file(bootFile).text()}` } })
 
   // In development the entry keeps its own code, the islands it imports by their hashed names included: the runtime's chunk then stays as it was through an edit of an island, which swaps in alone.
   // A second entry point importing the runtime alone has Bun give it that chunk of its own, which it would otherwise merge into the entry's.

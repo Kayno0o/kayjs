@@ -106,6 +106,8 @@ export default settings
 
 `kay check` checks this module against `UiSettings`; the server, the browser, `kay build` and `bun test` all render with it.
 
+The default registry ships to the browser cut to the slots the islands can draw: the build reads the strings the modules an island reaches write (`icon="close"`, `icon: 'close'`), and an `icon={name}` in the app's own code, a slot named from a variable, keeps the whole registry. A slot an island picks from data fetched at run time, never written as a string in the project, is not in the cut registry: write it somewhere in the project (an array of the names it may take does) or ship your own settings, which stay whole.
+
 ### Restyle a component
 
 See [Restyle a component](restyle.md): `class` as a string or an object of parts, `src/ui.ts`, the recipes and the contract every component keeps.
