@@ -23,12 +23,13 @@ export async function buildFiles(root: string, extensions: KayExtension[] | unde
   const ownFiles = new Set(own)
   const editor = extensionEditor(root, extensions)
   // The pages of the libraries the app mounts, which it reaches through its config rather than an import.
-  const mountedFiles = (await Promise.all(routeMounts(root, extensions).map(async mount => existsSync(mount.dir) ? findKayFiles(mount.dir) : []))).flat()
+  const mounts = routeMounts(root, extensions)
+  const mountedFiles = (await Promise.all(mounts.map(async mount => existsSync(mount.dir) ? findKayFiles(mount.dir) : []))).flat()
   const mounted = [...new Set([...mountedFiles, ...editor === undefined ? [] : [editor]])].filter(file => !ownFiles.has(file))
   const installed = await findKayLibraries(root)
   // An extension reached with no dependency on it, as a workspace link or a folder above the root, is a library whose islands the pages it wraps still render.
-  const outside = (dir: string) => relative(root, dir).startsWith('..') && !realpathSync(dir).split(sep).includes('node_modules')
-  const mountDirs = routeMounts(root, extensions).filter(mount => mount.reaching !== 'context' && existsSync(mount.dir) && outside(mount.dir)).map(mount => mount.dir)
+  const outside = (path: string) => existsSync(path) && relative(root, path).startsWith('..') && !realpathSync(path).split(sep).includes('node_modules')
+  const mountDirs = mounts.filter(mount => mount.reaching !== 'context' && outside(mount.dir)).map(mount => mount.dir)
   const libraries = [...installed, ...await extensionPackages(root, installed, [...mountDirs, ...editor === undefined || !outside(editor) ? [] : [dirname(editor)]])]
   const fromLibraries = await reachableLibraryFiles(root, libraries, [...own, ...mounted], graph)
 
