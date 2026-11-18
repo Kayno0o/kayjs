@@ -9,4 +9,11 @@ export const ISLAND_LINTS = {
     wrong: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) {count()}',
     right: '---\nimport Counter from \'../components/counter.kay\'\n---\nCounter',
   },
+  'signal-from-prop': {
+    level: 'warn',
+    group: 'islands',
+    summary: 'A `signal` seeded from a destructured prop at the top of an island\'s script, `signal(light)` or `signal(todo.title)`: an island stays when the page gives it new props, as after an action or a refresh, so the signal keeps the first value. `linked(() => light)` follows the prop and can still be written; `kay check --fix` writes it. A prop named `initial...` or `default...` is left alone, as is a comment `// kay-allow signal-from-prop`.',
+    wrong: '---\nimport { signal } from \'kay\'\n\nconst { light } = props<{ light: string }>()\nconst picked = signal(light)\n---\nbutton(onClick={() => picked = \'warm\'}) {picked()}',
+    right: '---\nimport { linked } from \'kay\'\n\nconst { light } = props<{ light: string }>()\nconst picked = linked(() => light)\n---\nbutton(onClick={() => picked = \'warm\'}) {picked()}',
+  },
 } as const satisfies Record<string, Lint>

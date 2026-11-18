@@ -1,7 +1,7 @@
 ---
 import type { JSX, Snippet } from 'kay'
 import type { Placement, PopoverRole, PopoverTriggerProps } from './popover'
-import { effect, recipe, signal, uid } from 'kay'
+import { effect, linked, recipe, uid } from 'kay'
 import { popupOf } from './popup-role'
 import { trackPointer, whenReleased } from './pointer-held'
 
@@ -33,7 +33,7 @@ trackPointer()
 
 const panelId = id ?? uid()
 const anchor = `--_popover-${panelId}`
-const shown = signal(open)
+const shown = linked(() => open)
 let panel: HTMLDivElement | undefined
 
 // The browser's popover owns showing, light dismiss, Escape and giving focus back; this only follows `open` when the page sets it.

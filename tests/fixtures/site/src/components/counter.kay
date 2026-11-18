@@ -3,6 +3,7 @@ import { signal } from 'kay'
 import './counter.css'
 
 const { start } = props<{ start: number }>()
+// kay-allow signal-from-prop: it counts from where it starts
 const count = signal(start)
 ---
 button.counter(onClick={() => count.set(c => c + 1)}) Clicked {count()}

@@ -170,7 +170,7 @@ describe('kay explain', () => {
     const [heading, blank, ...rows] = lintList('islands').split('\n')
 
     expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
-    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'page-island', 'island-prop', 'hydration-mismatch', 'unowned-effect', 'unkeyed-rows'])
+    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'page-island', 'signal-from-prop', 'island-prop', 'hydration-mismatch', 'unowned-effect', 'unkeyed-rows'])
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code, and every lint\'s examples hold', () => {
@@ -1526,5 +1526,37 @@ describe('once-read-prop', () => {
     expect(found(`// kay-allow-file once-read-prop\nlet last = items.length - 1${used}`)).toEqual([])
     expect(lints(island(`let last = items.length - 1${used}`), { lints: { 'once-read-prop': 'deny' } }).filter(d => d.code === 'once-read-prop')[0]?.severity).toBe('error')
     expect(lints(island(`let last = items.length - 1${used}`), { lints: { 'once-read-prop': 'allow' } }).filter(d => d.code === 'once-read-prop')).toEqual([])
+  })
+})
+
+describe('signal-from-prop', () => {
+  const island = (body: string, imports = 'signal') => `---\nimport { ${imports} } from 'kay'\n\nconst { light, todo, initialOpen } = props<{ light: string, todo: { title: string }, initialOpen: boolean }>()\n${body}\n---\nbutton(onClick={() => picked = 'x'}) {picked()}`
+  const found = (source: string) => compileKay(source, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'signal-from-prop')
+  const applied = (source: string) => found(source).flatMap(d => d.fixes![0]!.edits).sort((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
+
+  it('reports a signal seeded from a prop, whole or by a chain of properties', () => {
+    expect(found(island('const picked = signal(light)'))).toHaveLength(1)
+    expect(found(island('const picked = signal(todo.title)'))).toHaveLength(1)
+    expect(lints(island('const picked = signal(light)'))).toContainEqual({ code: 'signal-from-prop', severity: 'warning', at: 'signal(light)' })
+  })
+
+  it('fixes it to linked, replacing the import when signal has no other use and adding to it when it has', () => {
+    expect(applied(island('const picked = signal(light)'))).toContain('import { linked } from \'kay\'')
+    expect(applied(island('const picked = signal(light)'))).toContain('const picked = linked(() => light)')
+    expect(applied(island('const picked = signal(todo.title)\nconst other = signal(0)\nother = 1'))).toContain('import { linked, signal } from \'kay\'')
+    expect(applied(island('const picked = signal(light)', 'linked, signal'))).toContain('import { linked, signal } from \'kay\'')
+  })
+
+  it('leaves a seed prop, another value, a name declared again and an allowed line alone', () => {
+    expect(found(island('const picked = signal(initialOpen)'))).toEqual([])
+    expect(found(island('const picked = signal(0)'))).toEqual([])
+    expect(found(island('const picked = signal(light.toUpperCase())'))).toEqual([])
+    expect(found(island('const picked = signal(light) // kay-allow signal-from-prop'))).toEqual([])
+    expect(found(island('const picked = linked(() => light)', 'linked'))).toEqual([])
+    expect(found(island('function make(light: string) { return signal(light) }\nconst picked = signal(0)'))).toEqual([])
+  })
+
+  it('is a warning in the islands group, listed with the island lints', () => {
+    expect(LINTS['signal-from-prop']).toMatchObject({ level: 'warn', group: 'islands' })
   })
 })

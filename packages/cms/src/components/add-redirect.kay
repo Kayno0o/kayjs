@@ -14,6 +14,7 @@ import type { RedirectStatus } from '../missing'
 // The box offers the site's paths holding what is typed, asked for as it is typed and not sent with the page.
 const { path, suggested, onAdd, editing = false, to = '', status = 307 } = props<{ path: string, suggested?: string | undefined, onAdd: (from: string, to: string, status: RedirectStatus) => Promise<void>, editing?: boolean, to?: string, status?: RedirectStatus }>()
 
+// kay-allow signal-from-prop: the editor is made for one redirect
 const typed = signal(to)
 // kay-allow once-read-prop: the editor is made for one redirect
 const wasPermanent = status === 308 || status === 301
