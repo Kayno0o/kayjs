@@ -2,8 +2,10 @@ import type { EnvVariable } from '../server/env'
 import type { EnvSchemaRecord } from '../server/env-state'
 import type { Command } from './command'
 import type { EnvFiles } from './env-compare'
+import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
-import { join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { CONFIG_FILE } from '../config'
 import { loadConfigWithin } from '../config-loader'
 import { bagOf } from '../config-switch'
 import { projectPaths } from '../project'
@@ -115,6 +117,21 @@ async function configuredEnvFiles(root: string): Promise<EnvFiles | undefined> {
   return env === false ? undefined : bagOf(env) ?? await defaultEnvFiles(root)
 }
 
+// Whether `file` is under `root` and not under a project of its own nested inside it.
+function ownedBy(root: string, file: string): boolean {
+  const path = relative(root, file)
+
+  if (path === '..' || path.startsWith(`..${sep}`) || isAbsolute(path))
+    return false
+
+  for (let dir = dirname(file); dir !== root && dir.length > root.length; dir = dirname(dir)) {
+    if (existsSync(join(dir, CONFIG_FILE)))
+      return false
+  }
+
+  return true
+}
+
 // The path of an extension's module relative to the root, none when it does not resolve, which the build reports.
 function resolvedUnder(root: string, path: string): string[] {
   try {
@@ -126,8 +143,10 @@ function resolvedUnder(root: string, path: string): string[] {
 }
 
 export async function listEnv(root: string): Promise<{ variables: Listed[], unread: { file: string, error: string }[] }> {
-  const config = await loadConfigWithin(root)
   const recorded = listingEnv()
+  // A call with no file to place it is this project's only when made while it loads.
+  const mark = recorded.length
+  const config = await loadConfigWithin(root)
   const shown = (file: string) => relative(root, file)
   const unread: { file: string, error: string }[] = []
   // The server entry listens as it is imported, so its own schema is left out.
@@ -155,7 +174,7 @@ export async function listEnv(root: string): Promise<{ variables: Listed[], unre
   }
 
   // The calls of this project only, each module's last: a module the config imported and one read again by an earlier listing of this process are counted once.
-  const declared = [...new Map(recorded.filter(({ file }) => file === undefined || !relative(root, file).startsWith('..')).map(call => [`${call.file}:${Object.keys(call.schema.properties).join()}`, call])).values()]
+  const declared = [...new Map(recorded.filter(({ file }, index) => file === undefined ? index >= mark : ownedBy(root, file)).map(call => [`${call.file}:${Object.keys(call.schema.properties).join()}`, call])).values()]
 
   // A library built at import time declares its own variables for the app, which says more than the extension's list, so the list adds only the rest.
   const declaredNames = new Set(declared.flatMap(({ schema }) => Object.keys(schema.properties)))

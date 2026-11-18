@@ -28,7 +28,7 @@ export function loading(): boolean {
 }
 
 // The caller's file in a stack frame such as `at /app/src/env.ts:3:20` or `at env (file:///app/src/env.ts:3:20)`.
-const FRAME_FILE = /^at (?:.*? \()?(?:file:\/\/)?(\/[^():]+):\d+:\d+\)?$/
+const FRAME_FILE = /^at (?:.*? \()?(?:file:\/\/)?(\/[^():]+):(\d+:\d+)\)?$/
 // A library of kay declares its variables for the app that builds it, so the app's module is the one to list them under.
 const KAY_LIBRARY = /^@kayjs\/(?!kay(?:\/|$))/
 const libraries = new Map<string, boolean>()
@@ -40,6 +40,8 @@ export interface DeclaredEnv {
   schema: EnvSchemaRecord
   // The file that called `defineEnv`, a library's call counted as its caller's, when the stack tells.
   file?: string | undefined
+  // The call's place, `file:line:column`: a module read again declares at the same place, and its call replaces the earlier one.
+  site?: string | undefined
 }
 
 // Every call of `defineEnv` since a command began building without the environment, the config's own imports included, as `kay env` cannot import a module the config already loaded again. The listing takes the calls of its project and reads the modules calling `defineEnv` that are left.
@@ -55,18 +57,33 @@ export function recordEnv(schema: EnvSchemaRecord, declaredBy: (...args: never[]
   if (found === undefined)
     return
 
-  found.push({ schema, file: callerFile(declaredBy) })
+  const { file, site } = callerFrame(declaredBy)
+  const earlier = site === undefined ? -1 : found.findIndex(call => call.site === site)
+
+  if (earlier === -1)
+    found.push({ schema, file, site })
+  else
+    found[earlier] = { schema, file, site }
 }
 
 // The file that called `declaredBy`, a library of kay's call counted as its caller's: the frames above `declaredBy` are left out, so the first one left is whoever called it.
 export function callerFile(declaredBy: (...args: never[]) => unknown): string | undefined {
+  return callerFrame(declaredBy).file
+}
+
+function callerFrame(declaredBy: (...args: never[]) => unknown): { file?: string, site?: string } {
   const holder: { stack?: string } = {}
 
   Error.captureStackTrace(holder, declaredBy)
 
-  const files = (holder.stack ?? '').split('\n').map(line => FRAME_FILE.exec(line.trim())?.[1])
+  for (const line of (holder.stack ?? '').split('\n')) {
+    const [, file, position] = FRAME_FILE.exec(line.trim()) ?? []
 
-  return files.find(file => file !== undefined && !inLibrary(file))
+    if (file !== undefined && !inLibrary(file))
+      return { file, site: `${file}:${position}` }
+  }
+
+  return {}
 }
 
 // Whether `file` belongs to a package of kay's libraries, by the name in the nearest package.json.

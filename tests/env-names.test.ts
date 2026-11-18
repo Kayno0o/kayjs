@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { listEnv } from '../src/commands/env'
-import { buildingWithoutEnv } from '../src/server/env-state'
+import { buildingWithoutEnv, listingEnv, recordEnv } from '../src/server/env-state'
 import { scratchDir } from './scratch'
 
 const dirs: string[] = []
@@ -34,6 +34,46 @@ describe('environment variable names', () => {
 
     expect(kays.length).toBeGreaterThan(4)
     expect(kays.filter(name => !name.startsWith('KAY_') && !HOST_SET.has(name))).toEqual([])
+  })
+})
+
+describe('the variables of one project\'s listing', () => {
+  const env = (name: string) => `import { s } from 'kay'\nimport { defineEnv } from 'kay/server'\n\nexport const env = defineEnv(s.Object({ ${name}: s.String() }))\n`
+
+  it('leave out another project of the process, and a project nested in this one', async () => {
+    buildingWithoutEnv()
+
+    const first = await project({ 'kay.config.ts': 'import \'./src/env\'\nexport default { assets: { favicon: false } }\n', 'src/env.ts': env('FIRST_ONLY') })
+    const second = await project({
+      'kay.config.ts': 'import \'./inner/src/env\'\nexport default { assets: { favicon: false } }\n',
+      'inner/kay.config.ts': 'export default {}\n',
+      'inner/src/env.ts': env('INNER_ONLY'),
+      'src/env.ts': env('SECOND_ONLY'),
+    })
+    const names = async (root: string) => (await listEnv(root)).variables.map(({ name }) => name)
+
+    expect(await names(first)).toContain('FIRST_ONLY')
+    expect(await names(second)).toContain('SECOND_ONLY')
+    expect(await names(second)).not.toContain('FIRST_ONLY')
+    expect(await names(second)).not.toContain('INNER_ONLY')
+  })
+
+  it('drop a call a module made again at the same place with another schema', () => {
+    buildingWithoutEnv()
+    listingEnv().length = 0
+
+    let calls = 0
+    // Not a tail call, which the engine leaves out of the stack.
+    const declare = (name: string) => {
+      recordEnv({ properties: { [name]: {} } }, declare)
+      calls++
+    }
+
+    for (const name of ['OLD_NAME', 'NEW_NAME'])
+      declare(name)
+
+    expect(calls).toBe(2)
+    expect(listingEnv().map(({ schema }) => Object.keys(schema.properties))).toEqual([['NEW_NAME']])
   })
 })
 
