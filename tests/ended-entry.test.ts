@@ -75,7 +75,7 @@ describe.each(['', '/docs'])('an entry whose unpublishAt passed, under base %p',
     finally {
       await scratch.remove()
     }
-  }, 60_000)
+  })
 
   it('lets a redirect from config win over the 410', async () => {
     const { scratch, app } = await endedSite(base, { '/talks/ending': '/talks' })
@@ -86,7 +86,7 @@ describe.each(['', '/docs'])('an entry whose unpublishAt passed, under base %p',
     finally {
       await scratch.remove()
     }
-  }, 60_000)
+  })
 
   it('lets a redirect added while the site runs win over the 410', async () => {
     const { scratch, app } = await endedSite(base)
@@ -100,7 +100,7 @@ describe.each(['', '/docs'])('an entry whose unpublishAt passed, under base %p',
       await removeRuntimeRedirect('/talks/ending')
       await scratch.remove()
     }
-  }, 60_000)
+  })
 })
 
 describe('an ended entry\'s page', () => {
@@ -114,7 +114,7 @@ describe('an ended entry\'s page', () => {
     finally {
       await scratch.remove()
     }
-  }, 60_000)
+  })
 
   it('answers 410 under trailingSlash always, the path counted without its slash', async () => {
     const { scratch, app } = await endedSite('', undefined, 'always')
@@ -129,7 +129,7 @@ describe('an ended entry\'s page', () => {
     finally {
       await scratch.remove()
     }
-  }, 60_000)
+  })
 
   it('lists a visit to it among the missing paths, an editor\'s 410 for the path answering without listing it again', async () => {
     const { scratch, app } = await endedSite('')
@@ -149,7 +149,7 @@ describe('an ended entry\'s page', () => {
       await removeRuntimeRedirect('/talks/ending')
       await scratch.remove()
     }
-  }, 60_000)
+  })
 })
 
 const FRENCH = { locale: 'fr', messages: new Map(), path: '/', settings: { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false } }
