@@ -278,7 +278,7 @@ if !connected()
 
 ### The action caller
 
-- The code that posts an action call and reads its answer loads with the first call, so an island that only declares or passes an action does not carry it. An island holding an action caller loads it at idle, so a call made as the page goes away finds it in; a chunk a deploy dropped reloads the page as other chunks do.
+- The code that runs an action call (its queue, timeout and retries, the post and its answer) loads with the first call, so an island that only declares or passes an action does not carry it; the action's own state (`pending()`, `data()`, `status()`, `error()`) is there from the first paint, and a call counts as pending at once, before that code is in, its `onStart` hook running when it is. A call whose code never loads rejects without running its hooks. An island holding an action caller loads it at idle, so a call made as the page goes away finds it in; a chunk a deploy dropped reloads the page as other chunks do.
 
 ### Components that load when they first draw
 

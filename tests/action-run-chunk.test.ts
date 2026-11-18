@@ -10,10 +10,11 @@ afterAll(async () => {
   await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))
 })
 
-// A header only the code that posts a call writes.
+// A header only the code that posts a call writes, and a message only the code that queues and retries one holds.
 const POSTING = 'idempotency-key'
+const QUEUING = 'Superseded by a later call'
 
-it('keeps the code that posts an action call out of every file an island loads up front, in a chunk of its own the first call loads', async () => {
+it('keeps the code that runs an action call out of every file an island loads up front, in a chunk of its own the first call loads', async () => {
   const root = resolve(await fixtureCopy('action-streams'))
 
   dirs.push(root)
@@ -25,6 +26,6 @@ it('keeps the code that posts an action call out of every file an island loads u
 
   expect(Object.keys(client.islands).length).toBeGreaterThan(0)
   // The page swap's own entry carries its copy for forms, so a chunk of the island build and that one are the two.
-  expect(holding.map(([name]) => name).filter(name => !name.startsWith('nav-'))).toEqual([expect.stringMatching(/^action-post-/)])
-  expect((await Promise.all(up.map(text))).filter(code => code.includes(POSTING))).toEqual([])
+  expect(holding.map(([name]) => name).filter(name => !name.startsWith('nav-'))).toEqual([expect.stringMatching(/^action-run-/)])
+  expect((await Promise.all(up.map(text))).filter(code => code.includes(POSTING) || code.includes(QUEUING))).toEqual([])
 }, 120_000)

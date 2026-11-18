@@ -168,7 +168,7 @@ A visitor who asks for less data (`Save-Data: on` or `prefers-reduced-data`) get
 
 ## What loads when
 
-The code that sends an action call is not in the island's first load. An island that holds an action loads it once the browser is idle, so a call made as the page goes away finds it in, and the first call fetches it otherwise. A failed fetch is tried again after one second and after three before the call fails as any call that could not be sent.
+The code that sends an action call is not in the island's first load, and what an action shows (`pending()`, `data()`, `status()`) does not wait for it: a call is pending at once, its `onStart` hook running once the code is in. An island that holds an action loads it when the browser is idle, and the first call fetches it otherwise. A failed fetch is tried again after one second and after three, then the call fails without running its hooks.
 
 ## What loads when
 

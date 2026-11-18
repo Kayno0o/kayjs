@@ -6,9 +6,9 @@ let loads = 0
 
 // The chunk that posts a call fails to load, as on a lost connection.
 plugin({
-  name: 'action-post-unreachable',
+  name: 'action-run-unreachable',
   setup(build) {
-    build.onLoad({ filter: /action-post\.ts$/ }, () => {
+    build.onLoad({ filter: /action-run\.ts$/ }, () => {
       loads++
 
       throw new TypeError('Failed to fetch dynamically imported module')
@@ -16,7 +16,7 @@ plugin({
   },
 })
 
-it('rejects a call whose posting code never loads, after trying it again twice, with nothing left pending', async () => {
+it('rejects a call whose code never loads, after trying it again twice, with nothing left pending', async () => {
   const { reviveActions } = await import('../src/runtime/action-call')
 
   reviveActions()

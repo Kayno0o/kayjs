@@ -1,24 +1,19 @@
-import type { Caller } from './action-owner'
+import type { Lane } from './action-run'
 import type { Action, ActionErrorDetail, ActionStartDetail, ActionStream, ActionSuccessDetail, CallOptions, CallQueue, Outcome, TrackedCall } from './action-shared'
 import type { ApiError } from './api-error'
 import type { CallPromise, CallResult, TrackHooks } from './call-result'
-import type { Duration } from './duration'
-import type { ConnectionStatus, LoadStatus } from './live'
+import type { LoadStatus } from './live'
 import { ActionError, ActionRedirectError } from './action-error'
 import { PAYLOAD_PARAM, payloadQuery, withFields } from './action-form'
 import { networkFailures, refusedAt, superseding } from './action-marks'
-import { refreshed, refreshedIn, refreshedUnlessFollowed } from './action-navigate'
-import { onStreamEnd, SETTLED } from './action-owner'
+import { onStreamEnd } from './action-owner'
 import { ACTION } from './action-shared'
-import { actionFailed, apiErrorOf, failed, messageOf, unreachable } from './api-error'
+import { actionFailed, failed, messageOf, unreachable } from './api-error'
 import { withoutBase } from './base'
 import { skew } from './build'
 import { settling, signalAborted, trackCalls, whenIdle } from './call-result'
-import { durationSeconds, isZeroDuration } from './duration'
 import { navigation } from './navigation'
-import { released, undoable } from './optimistic'
 import { pageData } from './page-data'
-import { randomId } from './random-id'
 import { getOwner, liveOwner, onCleanup, ownSignal, untrack } from './reactive'
 import { OUTCOME_SCRIPT } from './swap'
 import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, FIXED_FIELDS, malformed, serverWritten } from './wire'
@@ -30,122 +25,12 @@ export { OUTCOME_SCRIPT }
 
 const QUERY = /\?.*/
 
+// Once loaded, a call is made in the same task, as one made from `pagehide` must be: a dynamic import resolves a task later, when the page may be gone.
+let running: typeof import('./action-run') | undefined
+const CODE_RETRIES = 2
+
 // A property of the handle an action builds, readable and listed.
 const read = (value: unknown) => ({ value, enumerable: true })
-
-const RETRY_DELAY_MS = 500
-const CODE_RETRIES = 2
-// Once loaded, a call is posted in the same task, as one made from `pagehide` must be: a dynamic import resolves a task later, when the page may be gone.
-let posting: typeof import('./action-post') | undefined
-
-function idempotencyKey(): string {
-  return randomId()
-}
-
-// The calls of an action, or of one `track()` handle, that `queue` orders: `tail` settles when the last `serial` call is done, `latest` is the call in flight a newer one aborts.
-interface Lane {
-  tail: Promise<unknown>
-  queue?: CallQueue | undefined
-  latest?: AbortController | undefined
-}
-
-// One signal for several, aborting with the reason of the first to abort. A lone one is returned as it is, so a browser that has no `AbortSignal.any` still runs the call; `stop` lets go of the listeners, and `always` makes a signal of its own whose sources can be let go of before the call ends.
-function join(sources: (AbortSignal | undefined)[], always = false): { signal: AbortSignal | undefined, stop: (only?: AbortSignal) => void } {
-  const list = sources.filter(source => source !== undefined)
-
-  if (list.length < 2 && !always)
-    return { signal: list[0], stop: () => undefined }
-
-  const controller = new AbortController()
-  const forwards = list.map(source => [source, () => controller.abort(source.reason)] as const)
-
-  for (const [source, forward] of forwards) {
-    if (source.aborted) {
-      controller.abort(source.reason)
-
-      break
-    }
-
-    source.addEventListener('abort', forward, { once: true })
-  }
-
-  return {
-    signal: controller.signal,
-    stop: (only) => {
-      for (const [source, forward] of forwards) {
-        if (only === undefined || only === source)
-          source.removeEventListener('abort', forward)
-      }
-    },
-  }
-}
-
-// Waits for `ms`, or for the calls ahead when given a promise, giving up at once when the signal aborts meanwhile.
-async function waitFor(wait: number | Promise<unknown>, signal: AbortSignal | undefined): Promise<void> {
-  signal?.throwIfAborted()
-
-  let stop = () => undefined as void
-
-  try {
-    await new Promise<unknown>((resolve, reject) => {
-      const abort = () => reject(signal!.reason)
-      const id = typeof wait === 'number' ? setTimeout(resolve, wait) : undefined
-
-      if (typeof wait !== 'number') {
-        void (async () => {
-          try {
-            resolve(await wait)
-          }
-          catch (error) {
-            reject(error)
-          }
-        })()
-      }
-
-      signal?.addEventListener('abort', abort, { once: true })
-      stop = () => {
-        clearTimeout(id)
-        signal?.removeEventListener('abort', abort)
-      }
-    })
-  }
-  finally {
-    stop()
-  }
-}
-
-// How long a wait of the call's lasts: nothing for a zero, a clear error for text that is no duration.
-function waitOf(value: Duration | undefined, what: string): number | undefined {
-  return value === undefined || isZeroDuration(value) ? undefined : durationSeconds(value, what) * 1000
-}
-
-// Whether a failure is one a retry may repeat: the server's answer or the network's failure, never a redirect, an abort or something thrown before the post was sent. Unless `when` says otherwise, a 503 (the server turned the call away) and a failure before the post was sent are, and nothing else, as a post that reached the server may have run.
-function retryOf(retry: CallOptions['retry']): { times: number, delay: number, again: (error: unknown, sent: boolean) => boolean } {
-  const options = typeof retry === 'number' ? { times: retry } : retry
-
-  return {
-    times: options?.times ?? 0,
-    delay: waitOf(options?.delay, 'retry.delay') ?? RETRY_DELAY_MS,
-    again: (error, sent) => {
-      if (error instanceof ActionRedirectError || !(error instanceof ActionError || networkFailures.has(error as object) || (error as { name?: unknown } | null)?.name === 'TimeoutError'))
-        return false
-
-      const failure = apiErrorOf(error)
-
-      return options?.when ? options.when(failure) : failure.status === 503 || (!sent && (failure.status === 0 || failure.status === 502))
-    },
-  }
-}
-
-// A hook never fails the call it observes: a throw, or a rejection, is logged.
-async function hooked<Event>(hook: ((event: Event) => unknown) | undefined, event: Event): Promise<void> {
-  try {
-    await hook?.(event)
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
 
 // On the server, the form post the request being answered carries: null for none, undefined outside a request.
 let requestOutcome: (() => Outcome | null | undefined) | undefined
@@ -221,32 +106,6 @@ function lazySignal<T>(value: T): [read: () => T, write: (next: T) => void, peek
   }, () => current]
 }
 
-// A call of an action `with()` fixed fields of is made with them, over the ones it is given, as a form posting to its URL does: a field fixed to `null` or `undefined` is left out there, so the given one stays.
-function withFixed(input: unknown, fixed: Record<string, unknown> | undefined): unknown {
-  if (fixed === undefined)
-    return input
-
-  const set = Object.entries(fixed).filter(([name, value]) => name !== '__proto__' && value !== undefined && value !== null)
-
-  if (!(input instanceof FormData))
-    return { ...input as object | undefined, ...Object.fromEntries(set) }
-
-  const names = new Set(set.map(([name]) => name))
-  const copy = new FormData()
-
-  for (const [name, value] of input) {
-    if (!names.has(name))
-      copy.append(name, value)
-  }
-
-  for (const [name, value] of set) {
-    for (const item of Array.isArray(value) ? value : [value])
-      copy.append(name, item instanceof Date ? item.toISOString() : String(item))
-  }
-
-  return copy
-}
-
 // Checks a form against the action's schema in the browser, as the server would, and hands `show` the messages to read as a refusal's, undefined for none; one field checked replaces that field's message and leaves the others.
 function validator(url: () => string, failed: () => { errors: Record<string, string> } | undefined, show: (errors: Record<string, string> | undefined) => unknown): (form: HTMLFormElement, field?: string) => Promise<boolean> {
   return async (form, field) => {
@@ -294,187 +153,30 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
   }
   const error = (field = '') => failed()?.errors[field]
   const validate = validator(url, failed, errors => called(navigation.page, errors === undefined ? null : { action: url(), status: 422, values: {}, errors, data: undefined }))
+  const host = { url, shift, called, progress: setProgress, latest: (turn: number) => turn === started }
 
-  const run = async (lane: Lane, input: unknown, options?: CallOptions) => {
-    // The page the call was made on, whose outcome it is even once the visitor went elsewhere.
-    const page = navigation.page
-    const visits = navigation.visits
-    const left = () => navigation.visits !== visits
-    // The island calling, from its setup or a handler, whose end ends a stream the call answers with; else the page, as long as no other path is shown.
-    const caller: Caller = { owner: liveOwner(getOwner()), arrivals: navigation.arrivals }
-    const mode = options?.queue ?? lane.queue ?? 'parallel'
-
-    const turn = ++started
+  // The state a call changes is the action's own and is read from the first paint, so a call counts itself in flight at once and hands the rest to the code that runs it, which loads with the first call.
+  const run = async (lane: Lane, input: unknown, fixed: Record<string, unknown> | undefined, options?: CallOptions) => {
+    const start = { page: navigation.page, visits: navigation.visits, caller: { owner: liveOwner(getOwner()), arrivals: navigation.arrivals }, turn: ++started }
 
     shift(1)
-    called(page, null)
-    void hooked(options?.onStart, { input })
+    called(start.page, null)
 
-    let undo: (() => void) | undefined
-    let posted = false
-    let sent = false
-    let timedOut = false
-    // A stream keeps the call in flight until it ends.
-    let streaming = false
-    let answer: unknown
-    let failure: unknown
-    let release: (() => void) | undefined
-    // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; a site with `navigation: false` shows a call's effects itself.
-    const refreshPage = () => {
-      const scope = options?.refresh
-
-      if (scope === false || left())
-        return
-
-      if (scope === undefined || scope === true) {
-        if (navigation.hooks)
-          void (scope === true ? refreshed() : refreshedUnlessFollowed(caller.invalidated))
-      }
-      else {
-        const asked = [scope].flat()
-        const names = asked.filter(source => typeof source === 'string')
-
-        if (names.length > 0 && navigation.hooks)
-          void refreshed(names)
-
-        void refreshedIn(asked.filter(source => typeof source !== 'string'))
-      }
-    }
-    const later = mode === 'latest' ? new AbortController() : undefined
-    // What aborts the call as a whole: its own signal, and a later call of a `latest` queue, which stops mattering once the post is answered.
-    const whole = join([options?.signal, later?.signal], later !== undefined)
-    const timeoutOption = options?.timeout
-    const timeout = waitOf(timeoutOption, 'timeout')
+    let code: typeof import('./action-run')
 
     try {
-      undo = options?.optimistic ? undoable(options.optimistic) : undefined
-
-      if (later) {
-        const reason = new DOMException('Superseded by a later call', 'AbortError')
-
-        superseding.add(reason)
-        lane.latest?.abort(reason)
-        lane.latest = later
-      }
-
-      if (mode === 'serial') {
-        const before = lane.tail
-
-        lane.tail = Promise.all([before, new Promise<void>((resolve) => {
-          release = resolve
-        })])
-        await waitFor(before, whole.signal)
-      }
-
-      const attempts = retryOf(options?.retry)
-      // One key for every try of the call, which a handler reads from `ctx.request` to tell a repeat from a new call.
-      const key = attempts.times > 0 ? idempotencyKey() : undefined
-
-      for (let attempt = 0; ; attempt++) {
-        // The wait for the answer counts from the moment the post is sent, and each try has its own.
-        const limit = timeout === undefined ? undefined : new AbortController()
-        const attemptSignal = join([whole.signal, limit?.signal])
-        let timer: ReturnType<typeof setTimeout> | undefined
-        let sentNow = false
-
-        try {
-          answer = await (await postingCode()).post(url(), input, setProgress, attemptSignal.signal, () => {
-            sent = sentNow = true
-            clearTimeout(timer)
-            timer = limit && setTimeout(() => {
-              timedOut = true
-              limit.abort(new DOMException(`The action call timeout of ${String(timeoutOption)} passed before the server answered`, 'TimeoutError'))
-            }, timeout)
-          }, left, caller, { key, options })
-
-          break
-        }
-        catch (error) {
-          // Only the upload path says `sent: false`, as `fetch` gives no such signal and `onSent` has run before it: the default retry of an unsent post covers an upload alone.
-          if (attempt >= attempts.times || whole.signal?.aborted === true || !attempts.again(error, sentNow && (error as { sent?: unknown } | null)?.sent !== false))
-            throw error
-
-          await waitFor(attempts.delay * 2 ** attempt, whole.signal)
-        }
-        finally {
-          clearTimeout(timer)
-          attemptSignal.stop()
-        }
-      }
-
-      posted = true
-      whole.stop(later?.signal)
-      release?.()
-      release = undefined
-
-      const streamEnded = (status: ConnectionStatus) => {
-        if (status === 'done') {
-          called(page, { action: url(), succeeded: true, data: untrack((answer as ActionStream<unknown>).last) }, turn)
-          refreshPage()
-        }
-
-        shift(-1)
-      }
-
-      streaming = onStreamEnd(answer, streamEnded)
-
-      if (streaming) {
-        // A retry of the stream is the call running again.
-        caller.retried = (again) => {
-          shift(1)
-          again[SETTLED](streamEnded)
-        }
-      }
-
-      if (!streaming) {
-        called(page, { action: url(), succeeded: true, data: answer }, turn)
-        refreshPage()
-      }
-
-      void hooked(options?.onSuccess, { data: answer })
-
-      return answer
+      code = running ?? await runCode()
     }
     catch (error) {
-      failure = error
+      shift(-1)
 
-      // A redirect leaves the page as it is until the next one shows.
-      if (!posted && !(error instanceof ActionRedirectError))
-        undo?.()
-
-      // The server may have run a call aborted or timed out once it was sent, which the page then shows as it stands.
-      if (sent && (options?.signal?.aborted === true || timedOut))
-        refreshPage()
-
-      if (error instanceof ActionError && !(error instanceof ActionRedirectError))
-        called(page, { action: url(), status: error.status, values: {}, errors: error.errors, data: error.data }, turn)
-
-      if (!(error instanceof ActionRedirectError) && whole.signal?.aborted !== true)
-        void hooked(options?.onError, { error: apiErrorOf(error) })
+      if (host.latest(start.turn))
+        setProgress(undefined)
 
       throw error
     }
-    finally {
-      // A stream is aborted by the call's own signal until it ends.
-      if (!streaming)
-        whole.stop()
 
-      release?.()
-
-      if (undo)
-        released(undo)
-
-      if (!streaming)
-        shift(-1)
-
-      if (turn === started)
-        setProgress(undefined)
-
-      if (lane.latest === later)
-        lane.latest = undefined
-
-      void hooked(options?.onSettled, failure === undefined ? { data: answer } : { error: apiErrorOf(failure) })
-    }
+    return code.run(host, start, lane, input, fixed, options)
   }
 
   const bound = binder(run, url)
@@ -542,16 +244,16 @@ function formHook<Detail extends { action: string }, Told>(url: () => string, st
 }
 
 // A call and `track()` carrying the fields given, over one action's state: a `with` of the action follows the same calls.
-function binder(run: (lane: Lane, input: unknown, options?: CallOptions) => Promise<unknown>, url: () => string): Bound {
+function binder(run: (lane: Lane, input: unknown, fixed: Record<string, unknown> | undefined, options?: CallOptions) => Promise<unknown>, url: () => string): Bound {
   const actionLane: Lane = { tail: Promise.resolve() }
 
   return fields => ({
     // eslint-disable-next-line ts/promise-function-async -- an async function would wrap the call's promise, which carries `orThrow()`
-    call: (input: unknown, options?: CallOptions) => settling(run(actionLane, withFixed(input, fields), options), error => signalAborted(options) ? undefined : refusalOf(url)(error)),
+    call: (input: unknown, options?: CallOptions) => settling(run(actionLane, input, fields, options), error => signalAborted(options) ? undefined : refusalOf(url)(error)),
     track: (handle) => {
       const lane: Lane = { tail: Promise.resolve(), queue: handle?.queue }
 
-      return tracked(async (input, options) => run(lane, withFixed(input, fields), options), url, handle)
+      return tracked(async (input, options) => run(lane, input, fields, options), url, handle)
     },
   })
 }
@@ -599,7 +301,7 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
 
 let warming = false
 
-// An island holding an action caller loads the posting code once the browser is idle, so a call made as the page goes away (`pagehide`, which cannot wait for a chunk) finds it in; it stays out of the first load. A failure is left for the call itself to retry and report, so an idle load never reloads the page.
+// An island holding an action caller loads the code running a call once the browser is idle, so a call made as the page goes away (`pagehide`, which cannot wait for a chunk) finds it in; it stays out of the first load. A failure is left for the call itself to retry and report, so an idle load never reloads the page.
 function warmCode(): void {
   if (warming || typeof window === 'undefined')
     return
@@ -608,7 +310,7 @@ function warmCode(): void {
 
   const load = async () => {
     try {
-      posting = await import('./action-post')
+      running = await import('./action-run')
     }
     catch {}
   }
@@ -619,15 +321,11 @@ function warmCode(): void {
     setTimeout(() => void load(), 200)
 }
 
-function postingCode(): typeof import('./action-post') | Promise<typeof import('./action-post')> {
-  return posting ?? postCode()
-}
-
-// A flaky connection gets the chunk retried after 1 s and 3 s, as a lazy component's is. The code that posts a call, loaded by the first call; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and the call fails as any call that could not be sent.
-async function postCode(): Promise<typeof import('./action-post')> {
+// A flaky connection gets the chunk retried after 1 s and 3 s, as a lazy component's is. The code that runs a call, loaded by the first call; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and the call fails as any call that could not be sent.
+async function runCode(): Promise<typeof import('./action-run')> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return posting = await import('./action-post')
+      return running = await import('./action-run')
     }
     catch (error) {
       if (attempt >= CODE_RETRIES) {
