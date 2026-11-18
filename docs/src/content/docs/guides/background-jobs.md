@@ -101,7 +101,7 @@ A job that throws is retried after a growing wait. One that runs out of attempts
 
 A queue's hooks are waited for, up to 10 seconds each, before the worker takes its next job. With `concurrency` above 1, a retry's `onStart` may run before the previous `onRetry` has finished.
 
-Under `kay dev`, the dev tool's Jobs tab lists every queue's jobs and retries or deletes a failed one ([the dev tool](/guides/performance/#jobs)).
+Under `kay dev`, the dev tool's Jobs tab lists every queue's jobs and retries or deletes a failed one ([the dev tool](/guides/performance#jobs)).
 
 A workflow run shows as its state, running, sleeping until a time, waiting for an event or failed, with its last steps, and buttons to send the event it waits for, with its data typed as JSON, or cancel it.
 

@@ -12,9 +12,9 @@ const DOC = /^- \[[^\]]+\]\((llms\/[\w-]+\.md)\)/gm
 // A link to a doc, `actions.md` from another doc or `llms/server.md#locals` from llms.txt, made a link to its page under /llms.
 const DOC_LINK = /\]\((?:llms\/)?([\w-]+)\.md(#[\w-]+)?\)/g
 
-// A link out of a doc to another file of the repo, as the forge resolves it: `../packages/ui/llms/forms.md` or `../packages/cms/llms.txt` from llms/, `../../../llms/privacy.md` from a library's topic.
-export const CROSS_PATH_SOURCE = String.raw`(?:\.\.\/)+(?:packages\/\w+\/llms(?:\/[\w-]+\.md|\.txt)|llms\/[\w-]+\.md)`
-const CROSS_PATH = /^(?:\.\.\/)+(?:packages\/(\w+)\/llms(?:\/([\w-]+)\.md)?|llms\/([\w-]+)\.md)/
+// A link out of a doc to another file of the repo, as the forge resolves it: `../packages/ui/llms/forms.md` or `../packages/cms/llms.txt` from llms/, `../../../llms/privacy.md` from a library's topic, `packages/ui/llms.txt` from llms.txt at the root.
+export const CROSS_PATH_SOURCE = String.raw`(?:\.\.\/)*packages\/\w+\/llms(?:\/[\w-]+\.md|\.txt)|(?:\.\.\/)+llms\/[\w-]+\.md`
+const CROSS_PATH = /^(?:(?:\.\.\/)*packages\/(\w+)\/llms(?:\/([\w-]+)\.md)?|(?:\.\.\/)+llms\/([\w-]+)\.md)/
 const CROSS_LINK = new RegExp(String.raw`\]\((${CROSS_PATH_SOURCE})(#[\w-]+)?\)`, 'g')
 // A link target naming a doc, as a doc writes it, whole: `production.md#check`, `../packages/ui/llms/forms.md`.
 const DOC_TARGET = /^(?:llms\/)?([\w-]+)\.md(#[\w-]+)?$/

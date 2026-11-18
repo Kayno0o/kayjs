@@ -206,7 +206,7 @@ Only an import written as `import Table from '@kayjs/ui/table.kay'` (or a relati
 
 ## Restyle a component
 
-A component with parts takes a `class` string for the root and `parts` as an object of parts, `Card(parts={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its name, with its import path as the fallback ([Restyle a component from src/ui.ts](/essentials/styling-and-assets/#restyle-a-component-from-srcuits)):
+A component with parts takes a `class` string for the root and `parts` as an object of parts, `Card(parts={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its name, with its import path as the fallback ([Restyle a component from src/ui.ts](/essentials/styling-and-assets#restyle-a-component-from-srcuits)):
 
 ```ts
 import { defineUi } from 'kay'

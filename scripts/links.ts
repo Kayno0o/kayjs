@@ -7,12 +7,15 @@ import { renderMarkdown } from '../src/content/markdown'
 const ROOT = join(import.meta.dir, '..')
 // A link to a page of the site in Markdown or a ReadMore, anchor left out: `](/essentials/routing#layouts)`, `href="/llms/server"`.
 const SITE_LINK = /(?:\]\(|href=")(\/[\w/-]*?)\/?(#[\w-]*)?[)"]/g
+// A link written with a trailing slash, which the site redirects to the page without it, and a link to a Markdown file, which is no page of the site.
+const SLASHED_LINK = /(?:\]\(|href=")(\/[\w/-]*[\w-]\/)(?:#[\w-]*)?[)"]/g
+const FILE_LINK = /\]\(([\w./-]+\.md)(?:#[\w-]*)?\)/g
 // Code blocks and spans, whose links are examples rather than links of the site.
 const CODE = /```[\s\S]*?```|`[^`\n]*`/g
 
 // A link between the Markdown files of llms/, `](islands.md#navigation)`, one by path into a library or another doc, `](../packages/ui/llms/forms.md)`, or into the same file, `](#navigation)`.
 export const LINK = new RegExp(String.raw`\]\(((?:llms\/)?[\w-]+\.md|${CROSS_PATH_SOURCE})?(#[\w-]+)?\)`, 'g')
-const CROSS = /^\.\.\//
+const CROSS = /^(?:\.\.\/|packages\/)/
 const HOME_LINK = /href[=:] ?["'](\/[\w/-]*?)\/?(?:#([\w-]+))?["']/g
 const LLMS_PREFIX = /^llms\//
 const docHref = (path: string) => CROSS.test(path) ? crossHref(path) : `/llms/${path.replace(LLMS_PREFIX, '').slice(0, -'.md'.length)}`
@@ -85,7 +88,15 @@ export async function brokenLinks(overrides: ReadonlyMap<string, string> = new M
 
   // The docs content: links to pages of the site, outside code.
   for (const file of files) {
-    for (const [, path, anchor] of (await Bun.file(join(docsRoot, file)).text()).replace(CODE, '').matchAll(SITE_LINK)) {
+    const text = (await Bun.file(join(docsRoot, file)).text()).replace(CODE, '')
+
+    for (const [, path] of text.matchAll(SLASHED_LINK))
+      broken.push(`${file}: ${path} (the site redirects a link with a trailing slash: write it without)`)
+
+    for (const [, path] of text.matchAll(FILE_LINK))
+      broken.push(`${file}: ${path} (a Markdown file is no page of the site: link the page)`)
+
+    for (const [, path, anchor] of text.matchAll(SITE_LINK)) {
       resolve(file, path!, anchor?.slice(1))
 
       if (anchor !== undefined && path!.endsWith('-archive'))

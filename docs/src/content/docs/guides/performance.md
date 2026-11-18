@@ -105,9 +105,9 @@ The tab and what it asks of the server exist under `kay dev` only. A production 
 
 ## Jobs
 
-The Jobs tab lists the queues of your app ([Queues](/guides/background-jobs/#queues)) and the jobs in each: running, waiting and failed. An app with no queue and no maintenance task has no Jobs tab.
+The Jobs tab lists the queues of your app ([Queues](/guides/background-jobs#queues)) and the jobs in each: running, waiting and failed. An app with no queue and no maintenance task has no Jobs tab.
 
-A job shows how many attempts it has used out of the queue's `attempts`, its payload, and for a failed job the error of its last run. The count on the tab is the number of failed jobs. A [workflow](/guides/background-jobs/#workflows) run shows its state and last steps, with Send for the event it waits for and Cancel in place of Delete.
+A job shows how many attempts it has used out of the queue's `attempts`, its payload, and for a failed job the error of its last run. The count on the tab is the number of failed jobs. A [workflow](/guides/background-jobs#workflows) run shows its state and last steps, with Send for the event it waits for and Cancel in place of Delete.
 
 Below the queues, Maintenance lists the upkeep kay and its libraries run, with when each last ran and the error of a failed pass.
 
@@ -119,7 +119,7 @@ Like the Data tab, it exists under `kay dev` only.
 
 The Styles tab shows what `src/ui.ts` can restyle in the component under your pointer. Open the tab, then move over the page. It lists the component's parts with the classes its recipe gives them, its variants and their values, and the theme tokens those classes use.
 
-Type classes in the box of a part and press Write. kay sets that part in `src/ui.ts` ([Restyle a component](/essentials/styling-and-assets/#restyle-a-component-from-srcuits)) and the page reloads with it. If the app has no `src/ui.ts`, the tab creates it. If the file holds something the tab cannot edit in place, such as a part written as a variable, it says why and leaves the file alone.
+Type classes in the box of a part and press Write. kay sets that part in `src/ui.ts` ([Restyle a component](/essentials/styling-and-assets#restyle-a-component-from-srcuits)) and the page reloads with it. If the app has no `src/ui.ts`, the tab creates it. If the file holds something the tab cannot edit in place, such as a part written as a variable, it says why and leaves the file alone.
 
 Like the Data tab, it exists under `kay dev` only.
 
@@ -133,7 +133,7 @@ It flags an image served at more than four times the pixels it shows (an SVG is 
 
 The Performance tab shows the Web Vitals of the page load as the browser reports them. LCP, CLS and INP each appear against their good limit, 2.5 s, 0.1 and 200 ms.
 
-The dev tool shows your own load only. To see what real visitors get, add `vitals()` ([Measuring how fast pages load](/guides/privacy/#measuring-how-fast-pages-load)).
+The dev tool shows your own load only. To see what real visitors get, add `vitals()` ([Measuring how fast pages load](/guides/privacy#measuring-how-fast-pages-load)).
 
 Above the weight is the page's footprint: its DOM elements, its requests, its EcoIndex grade and the grams of CO2e one view costs, the same figures `kay build` prints for a route.
 

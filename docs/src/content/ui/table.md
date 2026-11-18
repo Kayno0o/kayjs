@@ -8,7 +8,7 @@ description: A table of rows described by columns, with sortable headers and an 
 
 Give a column a `sortValue` to make its header sortable: `true` sorts by the row's own value at `key`, a function sorts by what it returns. `defaultDirection` sets the first click's direction, and `onSortChange({ sort })` reports each sort. With `serverSort`, the table only reflects the sort in its headers and your data source orders the rows. `sortable={false}` removes every sortable header, `numeric` columns included, for rows loaded page by page that a click would sort alone.
 
-For rows loaded page by page, `items={list}` from `infiniteList` is better: the table sorts on the server instead, see [LoadMore](load-more.md). A table takes `rows` or `items`, one of the two, and `kay check` fails one with neither.
+For rows loaded page by page, `items={list}` from `infiniteList` is better: the table sorts on the server instead, see [LoadMore](/ui/load-more). A table takes `rows` or `items`, one of the two, and `kay check` fails one with neither.
 
 `sortParam` keeps the sort in the page's URL: `sortParam="sort"` writes the column's key as `?sort=` and its direction as `?direction=`. A reload, a shared link or back and forward sort the same, the URL's sort wins over `sort` on load, and a click replaces the history entry. Any other name writes the direction as `<name>Direction`.
 
@@ -54,7 +54,7 @@ The link covers the row, so its text cannot be selected with the mouse and a `to
 
 ## Filtering
 
-A `filter` adds a search box. On a table over an `infiniteList` it filters on the server instead, see [LoadMore](load-more.md). `filterLabel` names it, `Filter` by default, and `filterPlaceholder` fills it. `filterParam` keeps the typed text in the page's URL under that query parameter, so a reload or a shared link filters the same. Without it the text stays on the page.
+A `filter` adds a search box. On a table over an `infiniteList` it filters on the server instead, see [LoadMore](/ui/load-more). `filterLabel` names it, `Filter` by default, and `filterPlaceholder` fills it. `filterParam` keeps the typed text in the page's URL under that query parameter, so a reload or a shared link filters the same. Without it the text stays on the page.
 
 `countLabel(count)` words how many rows the filter keeps, as screen readers hear it. `noMatch` is shown in place of the rows when the filter hides every one, and `empty` otherwise.
 

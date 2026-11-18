@@ -88,7 +88,7 @@ head
                       | ;{' '}
                     | handed to{' '}
                     code {call}
-      p.spread #[code class] takes a string for the root, or an object of these parts. See #[a(href="/essentials/styling-and-assets/#style-a-part-of-a-component") Style a part of a component].
+      p.spread #[code class] takes a string for the root, or an object of these parts. See #[a(href="/essentials/styling-and-assets#style-a-part-of-a-component") Style a part of a component].
     else
-      p.spread It has no part other than its root: #[code class] takes a string. See #[a(href="/essentials/styling-and-assets/#style-a-part-of-a-component") Style a part of a component] for components that have parts.
+      p.spread It has no part other than its root: #[code class] takes a string. See #[a(href="/essentials/styling-and-assets#style-a-part-of-a-component") Style a part of a component] for components that have parts.
   Pager(previous={previous} next={next} source={`${libraryRoot('kayjs-ui')}/src/${component.slug}.kay`})

@@ -244,6 +244,22 @@ describe('the documentation site', () => {
     expect(broken).toEqual([])
   })
 
+  it('links the overview to the page of each library, not to its llms.txt file', async () => {
+    const overview = (await loadReference()).find(page => page.slug === 'overview')!
+
+    for (const library of ['auth', 'ui', 'mail', 'cms', 'ai'])
+      expect(overview.body).toContain(`](/llms/kayjs-${library})`)
+
+    expect(overview.body).not.toContain('llms.txt)')
+  })
+
+  it('redirects no path that a page of the people\'s reference serves', async () => {
+    const { default: config } = await import('../docs/kay.config')
+    const served = new Set([...new Bun.Glob('docs/**/*.md').scanSync(join(root, 'docs/src/content'))].map(file => `/${file.slice('docs/'.length, -'.md'.length)}`))
+
+    expect(Object.keys(config.redirects ?? {}).filter(path => served.has(path))).toEqual([])
+  })
+
   it('links the release notes to the pages the site serves for the links of whats-new.md', async () => {
     const page = (await loadReference()).find(page => page.slug === 'whats-new')!
     const targets = (markdown: string) => [...markdown.matchAll(LINK_TARGET)].map(match => match[1]!)

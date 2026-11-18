@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { ai } from '@kayjs/ai'
@@ -16,8 +16,8 @@ const umamiHost = process.env.UMAMI_HOST?.trim() || 'http://umami:3000'
 
 const MARKDOWN_EXTENSION = /\.md$/
 
-// The full reference moved from /reference to /llms; /reference/checks is the people's page on kay check now.
-const moved = readdirSync(join(import.meta.dir, '../llms')).map(file => file.replace(MARKDOWN_EXTENSION, '')).filter(topic => topic !== 'checks')
+// The full reference moved from /reference to /llms, except the topics the people's reference has a page of: /reference/checks and /reference/events.
+const moved = readdirSync(join(import.meta.dir, '../llms')).map(file => file.replace(MARKDOWN_EXTENSION, '')).filter(topic => !existsSync(join(import.meta.dir, 'src/content/docs/reference', `${topic}.md`)))
 
 // Beside this file whatever the folder the server starts from, so the build and the tests meet the one file `kay start` does.
 const chatCounts = sqliteRates(join(import.meta.dir, 'data/ai.sqlite'))
