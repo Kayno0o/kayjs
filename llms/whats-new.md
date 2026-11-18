@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-ui's `Checkbox`, `RadioGroup` choices and `Toggle` rows are at least 24px tall, the tap target of WCAG 2.5.8, whatever the label's line height.
+- kayjs-ui's `Segmented` keeps each option's label on one line and scrolls sideways inside its container when the options do not fit, and a `Badge` wraps its text between words inside its parent, instead of overflowing it.
 
 ## 1.109.0
 

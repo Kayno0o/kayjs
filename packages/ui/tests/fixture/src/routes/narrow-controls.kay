@@ -1,0 +1,17 @@
+---
+import '../app.css'
+import Badge from '@kayjs/ui/badge.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
+import PlanetTabs from '../components/planet-tabs.kay'
+
+const whites = ['Coolest', 'Cool', 'Neutral', 'Warm', 'Warmest'].map(label => ({ value: label, label }))
+---
+main
+  #narrow(style="width: 200px")
+    Segmented#segmented(label="White" options={whites} value="Neutral")
+    Badge#badge(label="Off, the sun turns it on when somebody is in")
+    ChipGroup#chips(label="White" options={whites})
+    Toggle#toggle(label="Turn the light on when somebody is in the room")
+    PlanetTabs
