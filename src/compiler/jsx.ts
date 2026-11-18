@@ -4,7 +4,7 @@ import type { ElementShape } from './plan'
 import type { Sites } from './rewrite-types'
 import { bindsOwnProp, failedBlockOf, handedParts, isSlot, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
-import { addConstValue, addKeyParameters, addRowItem, contentOf, rowKeying, slotValue } from './items'
+import { addConstValue, addKeyParameters, addRowItem, contentOf, rowKeying, slotValue, usedProps } from './items'
 import { addMergedClass, addShorthandClass, quoteAttribute } from './jsx-class'
 import { addFieldName, addInheritedName, addWrittenField } from './jsx-field'
 import { DYNAMIC_TAG } from './mapping'
@@ -904,8 +904,9 @@ export class JsxTemplate {
   }
 
   // Reports a function passed to an island, `0` standing for the prop.
+  // The props the use writes go along, as an object type, so an island that lists its interactive props takes a function from a use turning none of them on; a spread may carry any, so it sends none.
   private emitFunctionPropCheck(element: ElementNode, name: Span) {
-    this.b.add('{...KayFunctionProp(').addSource(element.tag).add(')(').wrap(name, () => this.b.add('0')).add(')}')
+    this.b.add('{...KayFunctionProp(').addSource(element.tag).add(usedProps(element, span => this.text(span))).add(')(').wrap(name, () => this.b.add('0')).add(')}')
   }
 
   // `bind:value={name}` reads the signal and writes it back from the matching input event.

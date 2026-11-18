@@ -526,8 +526,8 @@ describe('elements', () => {
 
     const source = '---\nimport List from \'./list.kay\'\n---\nList(items={[1]})\n  @row(n)\n    li {n}'
 
-    expect(compileKay(source, '_layout.kay', { check: true }).tsx).toContain('<List items={[1]} {...KayFunctionProp(List)(0)} row={n => <li>{n}</li>} />')
-    expect(compileKay(source, 'test.kay', { check: true }).tsx).toContain('<List items={[1]} {...KayFunctionProp(List)(0)} row={n => <li>{n}</li>} />')
+    expect(compileKay(source, '_layout.kay', { check: true }).tsx).toContain('<List items={[1]} {...KayFunctionProp(List, { "items": 0, "row": 0 })(0)} row={n => <li>{n}</li>} />')
+    expect(compileKay(source, 'test.kay', { check: true }).tsx).toContain('<List items={[1]} {...KayFunctionProp(List, { "items": 0, "row": 0 })(0)} row={n => <li>{n}</li>} />')
   })
 
   it('renders a block prop through a named slot, the lines under a slot standing in when there is none', () => {
@@ -1189,7 +1189,7 @@ describe('generic components', () => {
   it('leaves a function given to a component unwrapped in check output, so a generic one types its parameters', () => {
     const code = compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[1]} show={n => String(n)})', '_layout.kay', { check: true }).tsx
 
-    expect(code).toContain('<List items={[1]} {...KayFunctionProp(List)(0)} show={n => String(n)} />')
+    expect(code).toContain('<List items={[1]} {...KayFunctionProp(List, { "items": 0, "show": 0 })(0)} show={n => String(n)} />')
   })
 
   it('checks the parts of a literal prop a page sends, not the literal, so a generic component types it', () => {
@@ -1206,7 +1206,7 @@ describe('generic components', () => {
   it('checks a method in a literal prop a page sends as a function given to the component', () => {
     const code = compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[{ run() { return 1 } }]})', '_layout.kay', { check: true }).tsx
 
-    expect(code).toContain('<List {...KayFunctionProp(List)(0)} items={[{ run() { return 1 } }]} />')
+    expect(code).toContain('<List {...KayFunctionProp(List, { "items": 0 })(0)} items={[{ run() { return 1 } }]} />')
 
     // Beside a getter, which keeps the object whole, the check of the object covering it.
     expect(compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[{ get n() { return 1 }, run() { return 1 } }]})', '_layout.kay', { check: true }).tsx).toContain('<List items={[KayProp(List)(({ get n() { return 1 }, run() { return 1 } }))]} />')

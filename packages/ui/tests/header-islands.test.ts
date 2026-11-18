@@ -21,3 +21,18 @@ it('draws an AppHeader and a SiteNav as markup until the page sets the menu', as
     await site.close()
   }
 }, 60_000)
+
+it('draws a Table with a @cell block from a page as markup, the block rendered by the server', async () => {
+  const site = await testSite({ root: `${import.meta.dir}/fixture`, config: { extensions: [ui()] } })
+
+  try {
+    const { html } = await site.visit('/linked-cells')
+
+    expect(html).toContain('href="#audit-1"')
+    expect(html).toContain('href="#audit-2"')
+    expect(html).not.toContain('src/table.kay')
+  }
+  finally {
+    await site.close()
+  }
+}, 60_000)

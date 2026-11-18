@@ -43,6 +43,17 @@ export type BoundValue<Tag, Key> = Key extends keyof PropsOfComponent<Tag> ? Mar
 // Lets the checker tell islands from plain components.
 export interface IslandBrand { readonly [ISLAND]: true }
 
+declare const ASKED: unique symbol
+
+// What an island lists in `island({ interactive })`, kept in its type so a use that turns none of those props on is known to render as plain markup, which takes a function.
+export interface IslandAsked<Interactive extends Readonly<Record<string, boolean>>> { readonly [ASKED]: Interactive }
+
+// The props that make a use an island whatever the component lists.
+type IslandOptionKeys = 'hydrate' | 'persist' | 'render' | 'fallback'
+
+// Whether a use naming these props turns none of the component's interactive ones on: a prop it may leave out is on by default, and a spread, which names nothing, may carry any.
+type StaysPlain<Component, Used> = Component extends IslandAsked<infer Interactive> ? true extends Interactive[keyof Interactive] ? false : [Used & (keyof Interactive | IslandOptionKeys)] extends [never] ? true : false : false
+
 // What an interactive component's default export is; only islands take `hydrate`.
 // What a static parent passes an island besides its props: when it hydrates, and whether it lives on across navigations, `persist` keeping it by its component, `persist="key"` by a key of its own.
 // `fallback` is the markup a client-only use shows on the server until the browser renders the island, written as an `@fallback` block: it reaches the island under a key of kay's own, so a component's `fallback` prop of another kind is its own.
@@ -328,7 +339,8 @@ export type PlainIslandProp<Component, Value> = Component extends IslandBrand ? 
 export type SlotCall = (...args: any[]) => JSX.Element
 
 // A function written in the attribute is checked apart from its value, which a wrapping call would stop a generic component from typing: `0` stands for the attribute.
-export type FunctionProp<Component> = Component extends IslandBrand ? { kayLint: 'island-prop', kayAlways: true, kayError: Unsendable } : 0
+// `Names` is the props the use writes, as an object type: a use turning no interactive prop of an island on is plain markup, which takes a function.
+export type FunctionProp<Component, Names extends object = Record<string, unknown>> = Component extends IslandBrand ? true extends StaysPlain<Component, keyof Names> ? 0 : { kayLint: 'island-prop', kayAlways: true, kayError: Unsendable } : 0
 
 // What `defer()` returns, a plain promise: an `await` block takes any promise, so nothing marks one.
 export type Deferred<T> = Promise<T>

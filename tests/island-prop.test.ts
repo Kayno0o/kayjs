@@ -142,6 +142,36 @@ describe('island-prop, decided by the types of what is passed', () => {
     }
   })
 
+  it('takes a function and a block with parameters from a use turning none of the listed interactive props on', async () => {
+    const listed = '---\nisland({ interactive: { selectable: false } })\nimport { signal } from \'kay\'\n\nconst { selectable, onPick, label } = props<{ selectable?: boolean, onPick?: () => void, label?: (row: number) => string }>()\nconst n = signal(0)\n---\nbutton(onClick={() => n++}) {String(selectable)} {String(onPick)} {String(label)}\n'
+    const generic = '---<Row extends { id: number }>\nisland({ interactive: { selectable: false } })\nimport { signal } from \'kay\'\n\nconst { rows, selectable } = props<{ rows: Row[], selectable?: boolean }>()\nconst n = signal(0)\n---\nbutton(onClick={() => n++}) {rows.length} {String(selectable)}\n  slot cell(rows[0]!)\n'
+    const on = '---\nisland({ interactive: { selectable: true } })\nimport { signal } from \'kay\'\n\nconst { selectable, label } = props<{ selectable?: boolean, label?: (row: number) => string }>()\nconst n = signal(0)\n---\nbutton(onClick={() => n++}) {String(selectable)} {String(label)}\n'
+    const root = await project({
+      'src/components/listed.kay': listed,
+      'src/components/generic.kay': generic,
+      'src/components/on.kay': on,
+      'src/components/blocks.kay': component('import Listed from \'./listed.kay\'', 'Listed(label={row => `#${row}`})\nListed\n  @label(row)\n    p {row}\n'),
+      'src/components/turned-on.kay': component('import Listed from \'./listed.kay\'', 'Listed(selectable label={row => `#${row}`})\nListed(selectable={true})\n  @label(row)\n    p {row}\n'),
+      'src/components/hands-on.kay': component('import Listed from \'./listed.kay\'', 'Listed(onPick={() => 1})'),
+      'src/components/default-on.kay': component('import On from \'./on.kay\'', 'On(label={row => String(row)})'),
+      'src/components/spreads.kay': component('import Listed from \'./listed.kay\'\nconst more = {}', 'Listed({...more} label={row => String(row)})'),
+      'src/components/generic-block.kay': component('import Generic from \'./generic.kay\'', 'Generic(rows={[{ id: 1 }]})\n  @cell(row)\n    p {row.id}\n\nGeneric(rows={[{ id: 1 }]} selectable)\n  @cell(row)\n    p {row.id}\n'),
+    })
+
+    try {
+      expect(lints(await check(root), root)).toEqual([
+        ['components/default-on.kay', 'island-prop', 5],
+        ['components/generic-block.kay', 'island-prop', 10],
+        ['components/spreads.kay', 'island-prop', 6],
+        ['components/turned-on.kay', 'island-prop', 5],
+        ['components/turned-on.kay', 'island-prop', 7],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('is cleared by the levels, and by the fix an author applies, never by `kay check --fix`', async () => {
     const root = await project(files())
 
@@ -207,8 +237,8 @@ describe('island({ render: \'static\' }), and a component with no pin, both left
   it('types what it passes an island as a static component, pinned or not', () => {
     expect(compileKay(passing('island({ render: \'static\' })'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker)')
     expect(compileKay(passing('---'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker)')
-    expect(compileKay('---\nisland({ render: \'static\' })\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker)')
-    expect(compileKay('---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker)')
+    expect(compileKay('---\nisland({ render: \'static\' })\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker, ')
+    expect(compileKay('---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker, ')
   })
 })
 

@@ -1,4 +1,5 @@
 import type { Diagnostic } from './ast'
+import type { IslandDeclaration } from './island-declaration'
 import type { AwaitAlert } from './names'
 import type { ScriptAnalysis } from './script'
 import { AWAIT_FAILED_KEY } from '../runtime/await-failed'
@@ -55,4 +56,12 @@ export function islandMessages(source: string, client = false, lives: string[] =
     return `, ${JSON.stringify(keys)}, true`
 
   return keys.length > 0 ? `, ${JSON.stringify(keys)}` : ''
+}
+
+// The export of an island that lists `interactive` props, its type keeping the list, so a use turning none of them on, which renders as markup, can be handed a function; unchanged for a component that is an island in every use.
+export function islandExport(expression: string, island: IslandDeclaration | undefined, options: { client?: boolean | undefined, lives?: string[] | undefined }): string {
+  if (island?.interactive === undefined || options.client || (options.lives?.length ?? 0) > 0 || island.hydrate !== undefined || island.persist !== undefined)
+    return `\nexport default ${expression}\n`
+
+  return `\nimport type { IslandAsked as KayIslandAsked } from 'kay'\nconst KayIslandExport = ${expression}\nexport default KayIslandExport as typeof KayIslandExport & KayIslandAsked<${JSON.stringify(island.interactive)}>\n`
 }

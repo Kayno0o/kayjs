@@ -154,7 +154,7 @@ Comments(postId={post.id} hydrate="visible")
 
 A component that wants one of these wherever it is used declares it first in its script, `island({ persist: true, hydrate: 'idle' })`, and the `hydrate` and `persist` a parent writes win over it. The call is read as written, so `kay check` reports a value it cannot read, a second call, and one on a component that cannot be an island. It was `export const island = { ... }` in a `--- module` fence, which `kay upgrade` rewrites and which works until 1.108.
 
-A component can also say which props make a use of it an island: `island({ interactive: { selectable: false, pageSize: false } })`, each prop with whether it is on when a use leaves it out. A page that uses it with none of them on, and passes no function, gets plain markup and ships no script for it.
+A component can also say which props make a use of it an island: `island({ interactive: { selectable: false, pageSize: false } })`, each prop with whether it is on when a use leaves it out. A page that uses it with none of them on, gets plain markup and ships no script for it. A function it is handed, such as a block that takes parameters, is called on the server, so it is no `island-prop` error while none of them is on.
 
 A use inside another island is part of that island as before, and an island inside the plain markup stays an island of its own. `kay explain island` lists the props of a component that has them.
 

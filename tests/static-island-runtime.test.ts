@@ -11,15 +11,24 @@ const part = (_props: Props) => null
 const drawn = (props: Props, lives: readonly unknown[] = [], asks: Parameters<typeof island>[8] = ASKS) => child(island<Props>('part.kay', part, [], false, 'is interactive', lives, undefined, undefined, asks)(props))
 
 describe('an island that lists the props making it interactive', () => {
-  it('is an island by a default that is on, a value that is on or a prop it does not list that is a function', () => {
+  it('is an island by a default that is on, a value that is on, or a function it lists', () => {
     expect(drawn({})).toContain('<slot data-component="part.kay"')
     expect(drawn({ sortable: false, selectable: true })).toContain('<slot')
-    expect(() => drawn({ sortable: false, onPick: () => undefined })).toThrow(IslandPropsError)
+    expect(() => drawn({ sortable: false, selectable: (() => true) as never })).toThrow(IslandPropsError)
   })
 
   it('is plain markup when none is on', () => {
     expect(drawn({ sortable: false })).not.toContain('<slot')
     expect(drawn({ sortable: false, selectable: false })).not.toContain('<slot')
+  })
+
+  it('is plain markup with a function it does not list, which the server calls', () => {
+    let called = 0
+    const props = { sortable: false, onPick: () => void called++ }
+    const html = child(island<Props>('part.kay', p => p.onPick?.() ?? null, [], false, 'is interactive', [], undefined, undefined, ASKS)(props))
+
+    expect(html).not.toContain('<slot')
+    expect(called).toBe(1)
   })
 
   it('stays an island where the use asks to hydrate or persist, where the component asks itself, or where it follows a live value', () => {

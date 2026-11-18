@@ -1,0 +1,17 @@
+---
+import type { Column } from '@kayjs/ui'
+import Table from '@kayjs/ui/table.kay'
+import '../app.css'
+
+interface Audit { id: number, when: string, score: number }
+
+const columns: Column<Audit>[] = [{ key: 'when', header: 'When' }, { key: 'score', header: 'Score', numeric: true }]
+const rows: Audit[] = [{ id: 1, when: 'Monday', score: 3 }, { id: 2, when: 'Tuesday', score: 5 }]
+---
+main
+  Table(columns={columns} rows={rows} rowKey="id" label="Audits")
+    @cell(row, column)
+      if column.key === 'when'
+        a(href={`#audit-${row.id}`}) {row.when}
+      else
+        | {row.score}

@@ -190,7 +190,7 @@ A LineChart leaves out `marks`, `onMark`, `onSelect`, `href` and `tooltip` (abou
 
 A ConfirmDelete with no call site writing `ask`, `triggerLook` or `details` leaves the inline pair out of its island, about 3 KB less with the confirm words held apart from the questions' queue, and a Dialog asks whether to discard typed text from code that loads with the first question, about 1.2 KB off its island.
 
-A Table drawn by a page, or a server component, with none of those props except `sortParam`, and no function prop, is plain markup: no island, and no script for the page.
+A Table drawn by a page, or a server component, with none of those props except `sortParam`, is plain markup, whatever blocks (`@cell(row, column)`, `@header`) and functions it is given, which the server calls: no island, and no script for the page.
 
 It still sorts. Its sortable headers are links to the current page with the sort in the query, `?sort=name&direction=asc`, the other params kept and `aria-sort` set on the sorted header, and the server sorts `rows` before drawing them. `sortParam` names the param (and `<name>Direction`) for a page with two such tables. Sorting by link needs a page the server renders per request, as a static file ignores the query.
 

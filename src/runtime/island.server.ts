@@ -280,7 +280,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
   return carryFailed(component, render) as IslandComponent<P>
 }
 
-// Whether a use of an island that follows no live value, whose `island()` call lists the props that make it interactive, turns none of them on: no listed prop has a value (or a default) that is on, the use asks for no hydration of its own, and none of its props is a function, which an island refuses to send and the use is told of as before.
+// Whether a use of an island that follows no live value, whose `island()` call lists the props that make it interactive, turns none of them on: no listed prop has a value (or a default) that is on, the use asks for no hydration of its own, and none of its props is a promise or markup. A function, a block taking parameters among them, does not keep a use an island: a use turning none of the listed props on renders on the server, which calls it.
 function staysPlain(depth: number, client: boolean, lives: readonly unknown[], props: object, asks: IslandAsks | undefined): boolean {
   const wants = asks?.interactive
 
@@ -291,8 +291,8 @@ function staysPlain(depth: number, client: boolean, lives: readonly unknown[], p
     if (key === 'hydrate' || key === 'persist' || (key === 'render' && (props as { render?: unknown }).render === 'client') || key === USE_FALLBACK)
       return false
 
-    // What an island would refuse to send, or send for the browser to finish (a promise), keeps the use an island.
-    if (!descriptor.get && (typeof descriptor.value === 'function' || isThenable(descriptor.value) || holdsMarkup(descriptor.value)))
+    // What an island would send for the browser to finish (a promise) keeps the use an island.
+    if (!descriptor.get && (isThenable(descriptor.value) || holdsMarkup(descriptor.value)))
       return false
   }
 
@@ -307,12 +307,12 @@ function isThenable(value: unknown): boolean {
   return typeof value === 'object' && value !== null && typeof Reflect.get(value, 'then') === 'function'
 }
 
-// Whether the props could cross to the browser, so a use that an island would refuse is still told of it.
+// Whether the props, a function aside, could cross to the browser, so a use that an island would refuse is still told of it.
 function sendable(props: object): boolean {
   const plain: Record<string, unknown> = {}
 
   for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(props))) {
-    if (!descriptor.get)
+    if (!descriptor.get && typeof descriptor.value !== 'function')
       plain[key] = descriptor.value
   }
 

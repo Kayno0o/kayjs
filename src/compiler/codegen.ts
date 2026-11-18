@@ -18,7 +18,7 @@ import { emitHeadTag, emitHeadText } from './head-tags'
 import { awaitAlertTail, htmlHelperImport, HtmlTemplate } from './html'
 import { withoutComma } from './import-edits'
 import { sourceLocator } from './inspect'
-import { islandMessages, withAlertKeys } from './island-arguments'
+import { islandExport, islandMessages, withAlertKeys } from './island-arguments'
 import { ambientHelpers, constDeclaration } from './items'
 import { JsxTemplate } from './jsx'
 import { lazyDomImport, lazyEdits, lazyNoteImport } from './lazy-imports'
@@ -617,11 +617,11 @@ class ModuleShell {
     if (this.kind === 'twin')
       b.add(`\nexport default ${this.mode === 'html' && this.options.failedCode !== undefined ? `Object.assign((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props), { kayFailed: KayFailed })` : `((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props))`} as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
     else if (this.kind === 'island' && widened && !this.genericComponent)
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.islandTail(src)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}\n`)
+      b.add(islandExport(`KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.islandTail(src)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}`, this.script.island, this.options))
     else if (widened && this.kind !== 'island')
       b.add(`\nexport default ${name} as typeof ${name}${this.widenedCall(`typeof ${name}`)}\n`)
     else if (this.kind === 'island')
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${this.islandTail(src)})${this.genericIslandType()}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
+      b.add(islandExport(`KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${this.islandTail(src)})${this.genericIslandType()}${widened ? this.widenedCall(`typeof ${name}`) : ''}`, this.script.island, this.options))
   }
 
   // The arguments after the component that `island()` takes: its message keys, the live values and cause of a server render, and what its `island()` call asks, the hydrate and persist the component asks for wherever it is used.

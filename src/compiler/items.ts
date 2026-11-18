@@ -248,3 +248,13 @@ export function fixedSource(element: ElementNode): string {
 export function ambientHelpers(facts: { ambientForm: boolean, snippet: boolean, forms: ReadonlyMap<unknown, unknown> }, mode: string): ('formHere' | 'formError' | 'issueScope')[] {
   return [...facts.ambientForm ? ['formHere' as const, 'formError' as const] : [], ...mode === 'dom' && facts.snippet && facts.forms.size > 0 ? ['issueScope' as const] : []]
 }
+
+// The props a use writes, as the object type `KayFunctionProp` takes after the component; none for a use with a spread, which may carry any.
+export function usedProps(element: ElementNode, text: (span: Span) => string): string {
+  if (element.attributes.some(attribute => attribute.kind === 'spread'))
+    return ''
+
+  const names = [...element.attributes.flatMap(attribute => attribute.kind === 'spread' ? [] : [attribute.name]), ...element.children.flatMap(child => child.kind === 'slot' ? [child.name] : [])]
+
+  return `, { ${names.map(name => `${JSON.stringify(text(name))}: 0`).join(', ')} }`
+}

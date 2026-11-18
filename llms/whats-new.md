@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's `Segmented` keeps each option's label on one line and scrolls sideways inside its container when the options do not fit, and a `Badge` wraps its text between words inside its parent, instead of overflowing it.
 - kayjs-ui's `BarChart` draws each shown x-axis label in a box as wide as its text, centred on its column, and no box for a column with no label, so a chart of many columns no longer has labels running past their own box.
 - A task list item (`- [ ] a`) inside `.kui-prose`, such as a MarkdownEditor preview, shows no bullet and a drawn box in the accent hanging where the bullet was, not the browser's dimmed checkbox; the space skin draws it too.
+- A component listing `island({ interactive })` takes a function or a block with parameters from a use turning none of those props on, so a page's `Table` with an `@cell(row, column)` block is plain markup with the block rendered by the server, and no longer an `island-prop` error ([islands](islands.md#make-a-component-interactive)).
 
 ## 1.109.0
 
