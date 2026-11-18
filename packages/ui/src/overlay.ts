@@ -1,6 +1,5 @@
 import type { Discard } from './confirm'
 import { navigate } from 'kay'
-import { confirmDiscard } from './confirm'
 
 // The width every overlay (Dialog, SidePanel, CommandPalette, FormDialog) takes by name: `sm`, `md` (the default), `lg`, or `full`, which fills the window less the margin.
 export type OverlaySize = 'sm' | 'md' | 'lg' | 'full'
@@ -39,6 +38,7 @@ export function closeWatcher({ modal, docked = false, dirty, edited, autosave = 
 const asking = new WeakSet<HTMLDialogElement>()
 
 // Asks whether to drop what was typed and closes the overlay once the reader says so; a second request while the question is open is dropped.
+// The question's code loads with the first ask, so a dialog nobody types into never carries it; a chunk that cannot load leaves the dialog open, as a refusal would.
 export async function discardAndClose(dialog: HTMLDialogElement | undefined, discard: Exclude<Discard, false> | undefined): Promise<void> {
   if (dialog === undefined || asking.has(dialog))
     return
@@ -46,8 +46,11 @@ export async function discardAndClose(dialog: HTMLDialogElement | undefined, dis
   asking.add(dialog)
 
   try {
-    if (await confirmDiscard(discard))
+    if (await (await import('./confirm')).confirmDiscard(discard))
       dialog.close()
+  }
+  catch (error) {
+    console.error('kayjs-ui: the question of a dialog could not be asked', error)
   }
   finally {
     asking.delete(dialog)

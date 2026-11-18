@@ -845,6 +845,22 @@ type Discard = Pick<ConfirmOptions, 'title' | 'message' | 'confirmLabel' | 'canc
 [./lib/confirm] questions
 function questions(): Asked[]
 
+[./lib/confirm-words] confirmWords
+function confirmWords<Title = string>(tone: Tone, given: {
+  label?: string | undefined;
+  title?: Title | undefined;
+  confirmLabel?: string | undefined;
+  pendingLabel?: string | undefined;
+  cancelLabel?: string | undefined;
+}): {
+  trigger: string;
+  title: NonNullable<Title> | string;
+  confirm: string;
+  pending: string;
+  cancel: string;
+  look: "accent" | "danger" | "info" | "success" | "warning";
+}
+
 [./lib/context] default
 const default: ContextDefinition<{ inbox: boolean; }>
 

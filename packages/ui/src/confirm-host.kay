@@ -4,7 +4,8 @@ import { effect, onCleanup, onMount, signal, untrack } from 'kay'
 import { claim, claimed } from './claim'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
-import { answer, confirmWords, questions } from './confirm'
+import { answer, questions } from './confirm'
+import { confirmWords } from './confirm-words'
 import type { Asked } from './confirm'
 
 const { fallback = false, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'children' | 'role'> & {

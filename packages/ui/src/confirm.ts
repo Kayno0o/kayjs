@@ -3,6 +3,8 @@ import { signal } from 'kay'
 import { wording } from 'kay/words'
 import { claimed } from './claim'
 
+export { confirmWords } from './confirm-words'
+
 export interface ConfirmOptions {
   // The question.
   message: string
@@ -48,23 +50,6 @@ export async function confirm(options: ConfirmOptions | string): Promise<boolean
 export function answer(question: Asked, answered: boolean): void {
   questions.set(list => list.filter(item => item.id !== question.id))
   question.settle(answered)
-}
-
-// The words of a confirm by its tone, shared by `confirm` and `ConfirmDelete`: a `danger` one speaks of deleting, any other of confirming, `label` standing in for every word it does not name.
-export function confirmWords<Title = string>(tone: Tone, given: { label?: string | undefined, title?: Title | undefined, confirmLabel?: string | undefined, pendingLabel?: string | undefined, cancelLabel?: string | undefined }) {
-  const danger = tone === 'danger'
-  const trigger = given.label ?? (danger ? wording('ui.confirmDelete.delete', 'Delete') : wording('ui.confirmDelete.confirm', 'Confirm'))
-  const confirmText = given.confirmLabel ?? (danger ? wording('ui.confirmDelete.delete', 'Delete') : trigger)
-
-  return {
-    trigger,
-    title: given.title ?? (danger ? wording('ui.confirmDelete.title', 'Confirm Deletion') : trigger),
-    confirm: confirmText,
-    pending: given.pendingLabel ?? (danger ? wording('ui.confirmDelete.pending', 'Deleting…') : confirmText),
-    cancel: given.cancelLabel ?? wording('ui.confirmDelete.cancel', 'Cancel'),
-    // The button colour: a neutral confirm is an accent one.
-    look: (tone === 'neutral' ? 'accent' : tone) satisfies Tone,
-  }
 }
 
 // What a Dialog or SidePanel asks before dropping typed text: the app words it, or turns it off with `false` to keep the close locked.

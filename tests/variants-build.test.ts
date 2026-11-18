@@ -111,6 +111,36 @@ describe('a component with features', () => {
     expect(whole.length - plain.length).toBeGreaterThan(4000)
   }, 120_000)
 
+  it('leaves the goals out of a BarChart written without them', async () => {
+    const chart = (props: string) => `---\nimport { signal } from 'kay'\nimport BarChart from '@kayjs/ui/bar-chart.kay'\nconst values = signal([1, 2])\n---\nbutton(onClick={() => values.set([])}) Clear\nBarChart(label="Runs" labels={['a', 'b']} series={[{ name: 'Runs', values: values() }]}${props})\n`
+    const plain = await (await built({ Plain: chart('') })).text('Plain')
+    const goals = await (await built({ Goals: chart(' goals={[{ value: 1, title: \'Pass\' }]}') })).text('Goals')
+
+    expect(goals).toContain('goalLabel')
+    expect(plain).not.toContain('goalLabel')
+  }, 120_000)
+
+  it('leaves the inline question and the details out of a ConfirmDelete written without them, and the discard question out of its dialog', async () => {
+    const confirm = (props: string) => `---\nimport ConfirmDelete from '@kayjs/ui/confirm-delete.kay'\n---\nConfirmDelete(message="Delete?" onConfirm={async () => {}}${props})\n`
+    const plain = await (await built({ Plain: confirm('') })).text('Plain')
+    const inline = await (await built({ Inline: confirm(' ask="inline"') })).text('Inline')
+
+    // The armed pair is drawn only for `ask="inline"`, and the questions' queue and the discard words belong to no ConfirmDelete.
+    expect(inline).toContain('inline-flex items-center gap-1')
+    expect(plain).not.toContain('inline-flex items-center gap-1')
+    expect(plain).not.toContain('ui.confirm.discardTitle')
+    expect(plain).not.toContain('questions')
+  }, 120_000)
+
+  it('loads the discard question of a Dialog when it is first asked, not with the island', async () => {
+    const dialog = '---\nimport { signal } from \'kay\'\nimport Dialog from \'@kayjs/ui/dialog.kay\'\nconst open = signal(false)\n---\nbutton(onClick={() => open.set(true)}) Open\nDialog(open={open()} title="Hi" onOpenChange={() => open.set(false)})\n  p Body\n'
+    const client = await built({ Plain: dialog })
+    const text = await client.text('Plain')
+
+    expect(text).toContain('Hi')
+    expect(text).not.toContain('ui.confirm.discardTitle')
+  }, 120_000)
+
   it('leaves the selection and the tooltip out of a ScatterChart, and the marks and the selection out of a LineChart, written without them', async () => {
     const scatter = (props: string) => `---\nimport { signal } from 'kay'\nimport ScatterChart from '@kayjs/ui/scatter-chart.kay'\nconst points = signal([{ key: 'a', x: 1, y: 2, label: 'a' }])\n---\nbutton(onClick={() => points.set([])}) Clear\nScatterChart(label="Runs" points={points()}${props})\n`
     const line = (props: string) => `---\nimport { signal } from 'kay'\nimport LineChart from '@kayjs/ui/line-chart.kay'\nconst values = signal([1, 2])\n---\nbutton(onClick={() => values.set([])}) Clear\nLineChart(label="Runs" labels={['a', 'b']} series={[{ name: 'Runs', values: values() }]}${props})\n`

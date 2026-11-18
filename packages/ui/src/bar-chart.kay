@@ -24,18 +24,31 @@ const look = recipe({
     columns: 'absolute inset-0 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
     column: 'flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface data-lit:bg-surface data-[kind=link]:no-underline data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-stacked:flex-col-reverse data-stacked:items-stretch data-stacked:justify-start data-stacked:gap-0',
     // A stub is the mark a column keeps where its series gives it a colour or a note but no height; a stacked bar is squared and sized by its height alone.
-    // The events sit over the columns in cells of the same widths, each rule in the middle of its column.
-    events: 'pointer-events-none absolute inset-0 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
-    eventCell: 'relative min-w-0 flex-1',
-    event: `${EVENT_LOOK.event} inset-y-0 left-1/2`,
-    eventRule: EVENT_LOOK.eventRule,
     bar: 'min-h-px min-w-px flex-1 rounded-t-sm data-stub:h-1 data-stacked:flex-none data-stacked:rounded-none',
     axis: 'ml-10 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
     // The first and the last label line up with the plot's edges, so a label wider than its slot spills inward and not out of the figure.
     axisLabel: 'flex min-w-0 flex-1 justify-center data-[edge=start]:justify-start data-[edge=end]:justify-end text-2xs whitespace-nowrap text-[var(--color-muted)]',
-    goal: GOAL_LOOK.goal,
-    goalLabel: GOAL_LOOK.goalLabel,
-    tooltip: TOOLTIP_LOOK,
+    // The parts of a feature no call site writes stay out of the island's code (`uses`).
+    ...(uses('marks'))
+      ? {
+        // The events sit over the columns in cells of the same widths, each rule in the middle of its column.
+        events: 'pointer-events-none absolute inset-0 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
+        eventCell: 'relative min-w-0 flex-1',
+        event: `${EVENT_LOOK.event} inset-y-0 left-1/2`,
+        eventRule: EVENT_LOOK.eventRule,
+      }
+      : {},
+    ...(uses('goals'))
+      ? {
+        goal: GOAL_LOOK.goal,
+        goalLabel: GOAL_LOOK.goalLabel,
+      }
+      : {},
+    ...(uses('tooltip'))
+      ? {
+        tooltip: TOOLTIP_LOOK,
+      }
+      : {},
     legend: 'm-0 flex list-none flex-wrap gap-4 p-0 pl-1',
     legendItem: 'flex items-center gap-1.5 text-xs text-muted',
     key: 'size-2 shrink-0',
@@ -90,7 +103,7 @@ const { labels, series, formatValue = (value: number) => formatNumber(value), fo
 const drawnGoals = memo(() => uses('goals') ? validGoals(goals) : [])
 const ratios = memo(() => barRatios(series.map(item => item.values), uses('stacked') && stacked, labels.length, { max: uses('max') ? max : undefined, floor: Math.max(0, ...drawnGoals().map(goal => goal.value)) }))
 const goalsOnAxis = memo(() => drawnGoals().filter(goal => ratios().top > 0 && goal.value >= 0 && goal.value <= ratios().top))
-const goalNotes = memo(() => goalsOnAxis().map(goal => goalText(goal, formatValue)))
+const goalNotes = memo(() => uses('goals') ? goalsOnAxis().map(goal => goalText(goal, formatValue)) : [])
 const ticks = memo(() => valueTicks(ratios().top))
 const times = memo(() => labelTimes(labels))
 const shown = uses('xLabels') ? memo(() => new Set(xLabels ? tickIndices(labels.length) : [])) : undefined
@@ -228,9 +241,10 @@ else
           else
             span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={uses('stacked') && stacked ? '' : undefined} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
-      for goal, at of goalsOnAxis() key={at}
-        span(part="goal" aria-hidden="true" style={`bottom: ${goal.value / ratios().top * 100}%${goalColor(goal) ? `; ${goalColor(goal)}` : ''}`})
-          span(part="goalLabel") {goal.title}
+      if uses('goals')
+        for goal, at of goalsOnAxis() key={at}
+          span(part="goal" aria-hidden="true" style={`bottom: ${goal.value / ratios().top * 100}%${goalColor(goal) ? `; ${goalColor(goal)}` : ''}`})
+            span(part="goalLabel") {goal.title}
       if uses('marks') && placed().length > 0
         div(part="events" style={gaps()} aria-hidden={placed().some(item => item.event.href) || onMark ? undefined : 'true'})
           for _, at of labels key={at}

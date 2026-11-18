@@ -4,19 +4,29 @@ import { effect, recipe, signal } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import IconButton from './icon-button.kay'
-import { confirmWords } from './confirm'
+import { confirmWords } from './confirm-words'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 import type { Size } from './size'
 import type { Tone } from './tone'
+import { uses } from './uses'
 
 // 'kui-confirm-delete-link' stays on the link trigger as its name for an app's CSS and the always-hidden guard.
 const frame = recipe({
   parts: {
     root: '',
-    armed: 'inline-flex items-center gap-1',
     message: 'text-muted',
-    details: 'mt-2 text-sm',
+    // The inline pair and the details stay out of an island whose call sites never write `ask` or `details` (`uses`).
+    ...(uses('ask'))
+      ? {
+        armed: 'inline-flex items-center gap-1',
+      }
+      : {},
+    ...(uses('details'))
+      ? {
+        details: 'mt-2 text-sm',
+      }
+      : {},
   },
   variants: {
     // An icon by default; `button` is a labelled danger button, for a dialog footer, `link` a plain underlined text button, for a confirm inside running text, and `none` draws no trigger, for an app that opens it from elsewhere with `open`.
@@ -62,7 +72,10 @@ const { message, details, onConfirm, open, onOpenChange, failureLabel, success, 
   variant?: 'solid' | 'ghost' | 'inline' | undefined
 }>()
 
-const kind = () => triggerLook ?? 'icon'
+const kind = () => uses('triggerLook') ? triggerLook ?? 'icon' : 'icon'
+
+// Asked in place of the trigger, which only a call site that writes `ask` can do.
+const inline = () => uses('ask') && ask === 'inline'
 
 const danger = () => tone === 'danger'
 // The danger preset of `confirm()`: the words and the colours come from the same place.
@@ -83,7 +96,7 @@ let armed: HTMLElement | undefined
 // Opened from elsewhere than the trigger, the focus goes back to what held it before.
 effect(() => {
   if (isOpen() && typeof document !== 'undefined')
-    opener ??= ask === 'inline' && document.activeElement instanceof HTMLElement ? document.activeElement : undefined
+    opener ??= inline() && document.activeElement instanceof HTMLElement ? document.activeElement : undefined
   else if (!isOpen())
     opener = undefined
 })
@@ -106,7 +119,7 @@ function start(event: MouseEvent) {
 function close() {
   setOpen(false)
 
-  if (ask === 'inline') {
+  if (inline()) {
     const back = opener
 
     queueMicrotask(() => back?.focus())
@@ -124,7 +137,7 @@ async function confirm() {
 
   if (done)
     close()
-  else if (ask === 'inline')
+  else if (inline())
     queueMicrotask(() => armed?.querySelector('button')?.focus())
 }
 
@@ -135,13 +148,13 @@ function keyDown(event: KeyboardEvent) {
   }
 }
 ---
-if kind() === 'button'
-  Button({...rest} label={triggerLabel()} tone={look()} disabled={disabled} hidden={ask === 'inline' && isOpen()} part="root" onClick={start})
-else if kind() === 'link'
-  button.kui-confirm-delete-link({...rest} part="root" type="button" disabled={disabled} hidden={ask === 'inline' && isOpen()} onClick={start}) {triggerLabel()}
-else if kind() !== 'none'
-  IconButton({...rest} icon={danger() ? 'delete' : 'success'} label={triggerLabel()} size={size} variant={variant} tone={variant === undefined ? undefined : tone} disabled={disabled} hidden={ask === 'inline' && isOpen()} part="root" onClick={start})
-if ask === 'inline'
+if uses('triggerLook') && kind() === 'button'
+  Button({...rest} label={triggerLabel()} tone={look()} disabled={disabled} hidden={inline() && isOpen()} part="root" onClick={start})
+else if uses('triggerLook') && kind() === 'link'
+  button.kui-confirm-delete-link({...rest} part="root" type="button" disabled={disabled} hidden={inline() && isOpen()} onClick={start}) {triggerLabel()}
+else if !uses('triggerLook') || kind() !== 'none'
+  IconButton({...rest} icon={danger() ? 'delete' : 'success'} label={triggerLabel()} size={size} variant={variant} tone={variant === undefined ? undefined : tone} disabled={disabled} hidden={inline() && isOpen()} part="root" onClick={start})
+if uses('ask') && ask === 'inline'
   if isOpen()
     // Armed by a click, so the focus moves onto the button that deletes.
     span(part="armed" ref={element => { armed = element; queueMicrotask(() => element.querySelector('button')?.focus()) }} role="group" aria-label={message} onKeyDown={keyDown})
@@ -153,6 +166,6 @@ else
       Button(label={cancelLabel} disabled={pending()} onClick={close})
       Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending() || disabled} onClick={confirm})
     p(part="message") {message}
-    if details
+    if uses('details') && details
       div(part="details")
         | {details}
