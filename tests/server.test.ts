@@ -1847,11 +1847,11 @@ describe('special pages', () => {
   it('hands every error it logs to onError with its request, and logs a reporter that throws', async () => {
     const reported: string[] = []
     const watched = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes' }, onError: ({ error, request }) => {
-        reported.push(`${new URL(request!.url).pathname}${new URL(request!.url).search}: ${(error as Error).message}`)
+      reported.push(`${new URL(request!.url).pathname}${new URL(request!.url).search}: ${(error as Error).message}`)
 
-        if (reported.length === 1)
-          throw new Error('Tracker down')
-      } }, prebuilt: true })
+      if (reported.length === 1)
+        throw new Error('Tracker down')
+    } }, prebuilt: true })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
