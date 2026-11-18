@@ -288,7 +288,7 @@ if (uses('sort')) {
   })
 }
 
-if (uses('items') || uses('list'))
+if (uses('items'))
   followList(() => list, current, () => search?.asked() ?? { text: '', fields: {} })
 
 // The rows the filter keeps, all of them without one.
@@ -561,5 +561,5 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 | {column.footer ?? ''}
   if uses('pageSize') && pager!.paged() && !skeleton()
     Pagination(part="pager" page={pager!.pageShown()} total={shown().length} pageSize={pager!.sizeNow()} sizes={pageSizes} param={pageParam} limitParam={limitParam} onPage={({ page }) => pager!.goTo(page)} onSize={({ size }) => pager!.resize(size)})
-  if (uses('items') || uses('list')) && list
+  if (uses('items')) && list
     LoadMore(items={list})
