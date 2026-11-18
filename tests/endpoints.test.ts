@@ -7,7 +7,7 @@ import { claimEndpoints } from '../src/server/endpoint-claims'
 import { exportedEndpoints } from '../src/server/endpoints'
 import { claimPublic } from '../src/server/public'
 import { refuseClashes } from '../src/server/route-table'
-import { routeMounts, scanEndpoints, scanRoutes } from '../src/server/routes'
+import { contextReadsOf, routeMounts, scanEndpoints, scanRoutes } from '../src/server/routes'
 import { ServedPaths } from '../src/server/served-paths'
 import { parsingRoutes, routePaths } from './elysia'
 import { scratchDir } from './scratch'
@@ -111,5 +111,24 @@ describe('an endpoint beside an extension layout that reaches files', () => {
     const found = await scanEndpoints(join(dir, 'src/routes'), mounts)
 
     expect(found.map(({ pattern, guards }) => [pattern, guards.length])).toEqual([['/a.txt', 1]])
+  })
+
+  it('records what the endpoints\' guards reach, so a server from the build scans them', async () => {
+    const dir = await scratchDir('endpoint-record-')
+
+    await Promise.all([
+      Bun.write(join(dir, 'src/routes/a/_404.kay'), 'p missing\n'),
+      Bun.write(join(dir, 'src/routes/a/b/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(() => ({}))\n'),
+      Bun.write(join(dir, 'src/routes/a/b/x.txt.ts'), 'export function GET() {\n  return new Response(\'x\')\n}\n'),
+      Bun.write(join(dir, 'lib/layout/_layout.kay'), 'slot\n'),
+      Bun.write(join(dir, 'lib/toast.kay'), 'p toast\n'),
+    ])
+
+    const routesDir = join(dir, 'src/routes')
+    const mounts = routeMounts(dir, [{ name: 'lib', layout: { file: 'lib/layout/_layout.kay', reaching: ['lib/toast.kay'] } }])
+    const reads = await contextReadsOf(routesDir, mounts)
+    const found = await scanEndpoints(routesDir, mounts, { ...reads, recorded: true })
+
+    expect(found.map(({ pattern }) => pattern)).toEqual(['/a/b/x.txt'])
   })
 })

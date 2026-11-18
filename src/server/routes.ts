@@ -240,13 +240,12 @@ export function servedPaths(routes: Route[]): Set<string> {
   return new Set(routes.flatMap(route => patternShapes(route.pattern)))
 }
 
-// Every file the reach walk meets while scanning the routes and the fallback pages, with what it reads of each, for `kay build` to record.
+// Every file the reach walk meets while scanning the routes, the fallback pages and the endpoints, with what it reads of each, for `kay build` to record.
 export async function contextReadsOf(routesDir: string, mounts: RouteMount[]): Promise<ContextReads> {
   const reads: ContextReads = { keys: new Map(), edges: new Map(), recorded: false }
 
   await scanRoutes(routesDir, mounts, reads)
   await specialPagesOf(routeTrees(routesDir, mounts), '', reads)
-
   return reads
 }
 
