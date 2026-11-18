@@ -220,6 +220,30 @@ describe('kay upgrade', () => {
     }
   })
 
+  it('moves a 1.103 app to 1.108 through the 1.107 stop, which still holds the 1.104 lints, writing its package names before it runs', async () => {
+    const files = { 'kay.config.ts': 'import { ui } from \'@kaynooo/kayjs-ui/extension\'\nexport default { extensions: [ui()] }\n' }
+    const root = await project(MANIFEST.replace('^1.40.2', '~1.103.0').replace('~1.40.1', '~1.103.0'), files)
+    const { deps, calls } = fakes({ '@kayjs/kay': '1.108.0', '@kayjs/ui': '1.108.0', '@kaynooo/kayjs': '1.103.0', '@kaynooo/kayjs-ui': '1.103.0' }, ['1.104'])
+    const configs: string[] = []
+    const kay = deps.kay
+
+    deps.kay = async (dir, args, capture, env) => {
+      configs.push(await Bun.file(join(dir, 'kay.config.ts')).text())
+
+      return kay(dir, args, capture, env)
+    }
+
+    try {
+      expect(await quietly(async () => upgradeProject(root, deps))).toBe(0)
+      expect(calls.installs.map(changes => changes.map(change => change.spec))).toEqual([['~1.107.0', 'npm:@kayjs/kay@~1.107.0'], ['~1.108.0', 'npm:@kayjs/kay@~1.108.0']])
+      expect(calls.kay.filter(args => args[0] === 'check')[0]).toEqual(['check', '--fix', '--since', '1.104'])
+      expect(configs.every(config => config === renamePackages(files['kay.config.ts']))).toBe(true)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('writes the new names in the project\'s files before the installed kay runs, as its config import must resolve once the old packages are gone', async () => {
     const files = {
       'kay.config.ts': 'import { ui } from \'@kaynooo/kayjs-ui/extension\'\nexport default { extensions: [ui()] }\n',
@@ -1391,8 +1415,8 @@ describe('kay check --since', () => {
   })
 })
 
-describe('kay check --fix --since 1.104', () => {
-  it('renames the packages of a project whose config still imports an old name that no longer resolves, loading the config as renamed', async () => {
+describe('kay check on a project still naming the old packages', () => {
+  it('loads a config that imports an old name that no longer resolves, as renamed, and leaves the file as it is', async () => {
     // Outside the checkout, whose parents' node_modules still hold the old names: only kay and @kayjs/ui are installed, as `bun install` leaves an app after the rename.
     const root = await mkdtemp(join(tmpdir(), 'rename-check-'))
 
@@ -1407,11 +1431,11 @@ describe('kay check --fix --since 1.104', () => {
     ])
 
     try {
-      const child = Bun.spawn([process.execPath, CLI, 'check', '--fix', '--since', '1.104', root], { stdout: 'pipe', stderr: 'pipe' })
+      const child = Bun.spawn([process.execPath, CLI, 'check', '--since', '1.104', root], { stdout: 'pipe', stderr: 'pipe' })
       const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
       expect(stdout + stderr).not.toContain('Cannot find')
-      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toContain('\'@kayjs/ui/extension\'')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toContain('\'@kaynooo/kayjs-ui/extension\'')
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -34,7 +34,7 @@ import { browserModules, islandEdges } from './island-modules'
 import { componentImporters, islandOnlyComponents, renderedInIslands } from './island-only'
 import { linkFlagTests } from './link-flag-tests'
 import { FILES_MARKER, stampOf } from './loaded'
-import { renamedPackages } from './renamed-packages'
+
 import { configSeoLints } from './seo'
 import { serverOnlyInIsland } from './server-only-reads'
 import { fromCompile } from './shadow-types'
@@ -106,13 +106,13 @@ export function configProblems(root: string, options: CheckOptions, types: Shado
 // The collections may still be read, which only the feeds and their own problems wait for.
 export async function projectProblems(root: string, options: CheckOptions, collections: ContentChecks | Promise<ContentChecks>, memory?: ProbeMemory, scanned?: ServedProject): Promise<CheckDiagnostic[]> {
   return inWalkScope(async () => {
-    const [content, messages, boot, modules, packages, linkTests] = await Promise.all([collections, checkMessages(root, options, memory), (async () => {
+    const [content, messages, boot, modules, linkTests] = await Promise.all([collections, checkMessages(root, options, memory), (async () => {
       const read = await collections
 
       return bootProblems(resolve(root), options, read.feeds, scanned, read.routes)
-    })(), moduleLints(root, options), renamedPackages(root, options.lints), linkFlagTests(root, options.lints)])
+    })(), moduleLints(root, options), linkFlagTests(root, options.lints)])
 
-    return [...content.problems, ...messages, ...boot, ...modules, ...packages, ...linkTests, ...uiProblems(root), ...contextModuleProblems(root)]
+    return [...content.problems, ...messages, ...boot, ...modules, ...linkTests, ...uiProblems(root), ...contextModuleProblems(root)]
   })
 }
 

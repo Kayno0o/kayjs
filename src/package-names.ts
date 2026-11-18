@@ -1,4 +1,4 @@
-// kay and its libraries were published under the `@kaynooo` scope up to 1.103 and are under `@kayjs` since 1.104: the new name of each, which `kay upgrade` and the `deprecated-package-names` lint move an app to.
+// kay and its libraries were published under the `@kaynooo` scope up to 1.103 and are under `@kayjs` since 1.104: the new name of each, which `kay upgrade` moves an app to.
 export const RENAMED_PACKAGES: Readonly<Record<string, string>> = {
   '@kaynooo/kayjs': '@kayjs/kay',
   '@kaynooo/kayjs-ai': '@kayjs/ai',

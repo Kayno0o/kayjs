@@ -2,6 +2,12 @@
 
 What each release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a version missing here broke nothing. Through 1.x a breaking change ships in a minor; from 2.0.0 it ships in a major, and a minor or a patch breaks nothing.
 
+## 1.108.0
+
+### The `deprecated-package-names` lint is gone
+
+A project still importing `@kaynooo/kayjs*` is not reported any more, and `kay check --fix` no longer rewrites it: write `@kayjs/kay` and `@kayjs/<library>` (`ui`, `auth`, `mail`, `cms`, `ai`) in the imports, config keys, stylesheets and `package.json` yourself, or run `kay upgrade`, which still moves an app off the old names, stopping at 1.107 first.
+
 ## 1.107.0
 
 ### `TSchema` is gone from `kay/library`

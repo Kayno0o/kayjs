@@ -34,7 +34,7 @@ import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHook
 import { pagesOptions } from '../src/check/pages-options'
 import { rateEnforce } from '../src/check/rate-enforce'
 import { refusalCalls } from '../src/check/refusal-calls'
-import { renamedPackages } from '../src/check/renamed-packages'
+
 import { routeKeys } from '../src/check/route-keys'
 import { schemaBuilders } from '../src/check/schema-builders'
 import { secretKeys } from '../src/check/secret-keys'
@@ -118,7 +118,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-store-ms': storeMs,
   'deprecated-env-files': envFiles,
   'deprecated-context-import': contextImport,
-  'deprecated-package-names': async (root, options) => renamedPackages(root, options.lints),
+
   // Its fix is safe only in a project that lists kayjs-ui, where the new form comes from.
   'deprecated-mail-form': async (root, options) => {
     await Bun.write(join(root, 'package.json'), '{ "dependencies": { "@kayjs/ui": "*" } }')
