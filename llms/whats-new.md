@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kayjs-ui's `Checkbox`, `RadioGroup` choices and `Toggle` rows are at least 24px tall, the tap target of WCAG 2.5.8, whatever the label's line height.
+
 ## 1.109.0
 
 - An endpoint file (`src/routes/a.txt.ts`) no longer stops an app with a root `_guard.ts` and an extension layout that reaches files, as kayjs-auth's, from starting or passing `kay check` (`the layouts of the extensions are placed before what the pages reach was opened`): the endpoints are scanned after what the pages reach is open, as the pages are.

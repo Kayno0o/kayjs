@@ -1,0 +1,10 @@
+---
+import '../app.css'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
+---
+main
+  Checkbox#box(label="Shuffle the questions")
+  RadioGroup#radios(label="Order" options={[{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]})
+  Toggle#toggle(label="Daily digest")
