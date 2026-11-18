@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.109.0
 
 - An endpoint file (`src/routes/a.txt.ts`) no longer stops an app with a root `_guard.ts` and an extension layout that reaches files, as kayjs-auth's, from starting or passing `kay check` (`the layouts of the extensions are placed before what the pages reach was opened`): the endpoints are scanned after what the pages reach is open, as the pages are.
 - `kay env` and `kay check` list the variables of a `defineEnv` module that kay.config.ts imports, as for any other module, so a variable required in production and missing from `.env.example` is reported ([environment](environment.md)).
