@@ -299,7 +299,10 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = [], r
 }
 
 // The app's endpoint files, then each mounted library's that the app has none of at the same path.
-export async function scanEndpoints(routesDir: string, mounts: RouteMount[] = []): Promise<Endpoint[]> {
+// Their guards place the special pages' layouts, so what the pages reach is open first, as a lookup of special pages opens it.
+export async function scanEndpoints(routesDir: string, mounts: RouteMount[] = [], reads?: ContextReads): Promise<Endpoint[]> {
+  await openReaches(mounts, reads, false)
+
   const trees = routeTrees(routesDir, mounts)
   const endpoints: Endpoint[] = []
   const read: LayoutsRead = new Map()

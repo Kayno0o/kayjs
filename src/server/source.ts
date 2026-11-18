@@ -38,7 +38,7 @@ export interface ProjectSource {
   routes: (project: Pick<Project, 'root' | 'mode' | 'paths'>, mounts: RouteMount[]) => Promise<Route[]>
   fallback: (project: Pick<Project, 'root' | 'mode' | 'paths'>, mounts: RouteMount[]) => Promise<SpecialPages>
   api: (root: string, config: Pick<KayConfig, 'dirs' | 'extensions' | 'endpoints'>) => Promise<ApiModule[]>
-  endpoints: (routesDir: string, mounts: RouteMount[]) => Promise<Endpoint[]>
+  endpoints: (project: Pick<Project, 'root' | 'mode' | 'paths'>, mounts: RouteMount[]) => Promise<Endpoint[]>
   // The file names under `src/plugins`: an executable holds the ones it was built with.
   plugins: (root: string) => string[]
   // The paths under `src/jobs`, held as `plugins` is.
@@ -98,7 +98,7 @@ const DISK: ProjectSource = {
   fallback: async ({ root, mode, paths }, mounts) => specialPagesOf(routeTrees(paths.routes, mounts), '', mode.prebuilt ? await readContextRecord(paths.output, root) : undefined),
   // Imported as it is asked for, as the API modules' actions read the locales, which read this.
   api: async (root, config) => (await import('./api-modules')).projectApi(root, config),
-  endpoints: async (routesDir, mounts) => scanEndpoints(routesDir, mounts),
+  endpoints: async ({ root, mode, paths }, mounts) => scanEndpoints(paths.routes, mounts, mode.prebuilt ? await readContextRecord(paths.output, root) : undefined),
   plugins: root => pluginFiles(root),
   jobs: root => jobFiles(root),
   extensionCatalogs: (_, files) => files.filter(file => existsSync(file)),
