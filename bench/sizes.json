@@ -48,13 +48,13 @@
     }
   },
   "ui-list": {
-    "gzip": 68017,
+    "gzip": 67772,
     "files": 42,
     "packages": {
       "app": 6043,
       "icons": 2608,
       "kay": 56713,
-      "kayjs-ui": 95182
+      "kayjs-ui": 94094
     }
   }
 }

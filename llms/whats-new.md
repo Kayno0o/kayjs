@@ -2,14 +2,15 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- An island ships only the kayjs-ui icons it can draw: with kayjs-ui in the app's dependencies the default registry is cut to the slots the project writes as strings, about 8 KB minified off an island drawing a Dialog, and a slot named from a variable in the app keeps it whole; the app's own icon settings stay whole ([kayjs-ui setup](../packages/ui/llms/setup.md))
+- A component of an island that leaves a feature out (kayjs-ui's `Table` with no filter, selection, paging or detail rows) no longer ships the markers and the effects of the blocks it never draws, and an `aria-` or `data-` attribute of such a feature is not bound: a plain `Table` island carries 1.7 KB less of kayjs-ui's code, 9.9 KB in all, as any component declaring `uses()` features carries less.
+
 ## 1.107.0
 
 - `--- script` as a file's first fence is a compile error naming `---`, and the `deprecated-script-fence` lint is gone ([components](components.md)).
-- `kay new` pins kay with `^` from 2.0.0, when a breaking change is a major, and with `~` through 1.x, where a minor may break; the semver policy is stated in [Upgrading](upgrading.md) and the install pages ([project](project.md))
 - `kay new` pins kay with `~` through 1.x and with `^` from 2.0.0, when a breaking change becomes a major ([Upgrading](upgrading.md))
-- An island ships only the kayjs-ui icons it can draw: the default registry is cut to the slots written as strings in the modules the island reaches, about 9 KB minified off an island drawing a Dialog, and a slot named from a variable in the app keeps it whole; the app's own icon settings stay whole ([kayjs-ui setup](../packages/ui/llms/setup.md))
-- An island ships only the kayjs-ui icons it can draw: the default registry is cut to the slots the project writes as strings, about 9 KB minified off an island drawing a Dialog, and a slot named from a variable in the app keeps it whole; the app's own icon settings stay whole ([kayjs-ui setup](../packages/ui/llms/setup.md))
-- An island ships only the kayjs-ui icons it can draw: with kayjs-ui in the app's dependencies the default registry is cut to the slots the project writes as strings, about 8 KB minified off an island drawing a Dialog, and a slot named from a variable in the app keeps it whole; the app's own icon settings stay whole ([kayjs-ui setup](../packages/ui/llms/setup.md))
 - A component an island draws only where it may not render at first paint (inside an `if`, a `match` case, `@failed`, or the body of a closed `Dialog` or `FormDialog`) loads when that branch first draws, with nothing to declare: the page preloads what the server drew, a visitor reaching for the island loads the rest ahead, and a failed chunk is retried and reported; the code that posts an action call loads with its first call, retried after 1 s and 3 s when the load fails ([islands](islands.md#components-that-load-when-they-first-draw)).
 - An island whose closed forms and dialogs hold words that are also component names loads less: a name in a string or a comment no longer keeps a component eager, and `Form`, `FormDialog` and `SaveForm` load their sending code on the first send. An island with a table, a closed form dialog and a select in it sheds 4.6 KB gzip of eager JS ([islands](islands.md))
 - `action({ input, ...options }, handler)`: an action takes its options first with its input in them, as an API route does; the old argument order works until 2.0 and `kay upgrade` rewrites it ([actions](actions.md))
@@ -17,7 +18,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - An island validates with the same schema: `validate(schema, value, { source })` from `kay` is the server's `validate` in the browser (JSON Schema built by the browser's `s`, a Standard Schema validator called as it is), its code a chunk the first call loads ([Schemas](schemas.md#schemas)).
 - `kay check` names a Standard Schema validator with no `~standard.jsonSchema` (`schema-without-json-schema`) where an action's `input` or an API route's `body`, `query`, `params`, `headers` or `cookie` takes it, in `.ts` modules and `.kay` fences ([Schemas](schemas.md#schemas)).
 - kayjs-ui's `Table` draws its failure row's retry as a plain button with a `retry` part, so an island holding a plain Table ships 6 KB less (the `Button`, its busy state and the icon set stay out unless the page uses them) ([restyle](https://git.kaynooo.fr/kaynooo/kayjs/src/branch/main/packages/ui/llms/restyle.md)).
-- A component of an island that leaves a feature out (kayjs-ui's `Table` with no filter, selection, paging or detail rows) no longer ships the markers and the effects of the blocks it never draws, and an `aria-` or `data-` attribute of such a feature is not bound: a plain `Table` island carries 1.7 KB less of kayjs-ui's code, 9.9 KB in all, as any component declaring `uses()` features carries less.
 
 ## 1.106.0
 
