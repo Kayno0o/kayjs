@@ -10,8 +10,8 @@ The `deprecated-page-island`, `deprecated-island-fence`, `deprecated-island-attr
 
 - A page without a `--- server` fence that needs the browser is the `page-island` error: move what needs the browser into a component and render it from the page.
 - `--- island`, `--- client` and `--- static` are unknown fences, and `export const island = { ... }` in a `--- module` fence is a `fence-invalid` error: write `island({ render, hydrate, persist, interactive })` first in the component's script.
-- `hydrate="client"` on a use is `render="client"`, and `server="defer"` is `server defer`: the old forms are `server-island-invalid` errors, and `hydrate="client"` a type error.
-- `data-keep-scroll`, `data-no-transition` and `data-no-prefetch` do nothing: write `data-scroll="keep"`, `data-transition="false"` and `data-prefetch="false"`.
+- `hydrate="client"` on a use is `render="client"`, and `server="defer"` is `server defer`: `server="defer"` is a `server-island-invalid` error and `hydrate="client"` an `attribute-invalid` one.
+- `data-keep-scroll`, `data-no-transition` and `data-no-prefetch` are read by nothing and are an `unknown-link-flag` error: write `data-scroll="keep"`, `data-transition="false"` and `data-prefetch="false"`.
 - A `// kay-allow uncaught-await` comment and a `lints: { 'uncaught-await': ... }` entry are an unknown lint, and `defineConfig` types no such `lints` key: remove them.
 - `listen(window, ...)` is `listen(() => window, ...)`: `listen` takes a function returning its target, and a value is a type error, and in a `.kay` file a server read of `window`.
 - Import `mount`, `Mounted`, `s`, `RateLimit` and `RateLimitRefusal` from `kay` and `sqliteCache` from `kay/cache`: `kay/mount` is no entry any more and `kay/server` no longer exports them.

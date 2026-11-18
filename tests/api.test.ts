@@ -63,7 +63,7 @@ it('classifies what the docs call internal', () => {
   for (const entry of ['./html', './dom', './dom-loop', './dom-image', './pending', './i18n-links', './island', './await', './client', './arrival', './jsx-runtime', './internal', './internal/title', './internal/server', './library', './library/auth-mails'])
     expect(isInternal('kay', entry, 'x'), entry).toBe(true)
 
-  for (const entry of ['.', './server', './mount', './bun', './test', './compiler', './content'])
+  for (const entry of ['.', './server', './bun', './test', './compiler', './content'])
     expect(isInternal('kay', entry, 'x'), entry).toBe(false)
 
   expect(isInternal('kay', '.', 'BindableMark')).toBe(true)

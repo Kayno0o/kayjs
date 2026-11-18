@@ -33,12 +33,6 @@ describe('a component reading a persisted value a module exports', () => {
     expect(result.diagnostics).toEqual([])
   })
 
-  it('is an island in every use, whatever its `island` export lists', () => {
-    const source = `---\nimport { history } from './history'\nexport const island = { interactive: ['on'] }\n---\np {history()}\n`
-
-    expect(compile(source).cause?.interactive).toBeUndefined()
-  })
-
   it('is no island when it only imports a plain export of that module, or a signal that is not persisted', () => {
     const plain = '---\nimport { label } from \'./history\'\n---\np {label}\n'
 

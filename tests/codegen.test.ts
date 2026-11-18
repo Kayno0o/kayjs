@@ -627,6 +627,11 @@ describe('islands', () => {
     expect(use('media(min-width: 1px')).toEqual([expect.stringContaining('needs a media query')])
   })
 
+  it('refuses hydrate="client", which is render="client" since 1.105', () => {
+    expect(errors('---\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="client")')).toEqual([expect.stringContaining('is `render="client"`')])
+    expect(errors('---\nimport Counter from "./counter.kay"\n---\nCounter(render="client")')).toEqual([])
+  })
+
   it('makes the component an island for the values of kay its fences import', () => {
     const source = '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({}), async () => 1)\n---\n---\nimport { memo, signal } from \'kay\'\n\nconst count = signal(0)\nconst double = memo(() => count() * 2)\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()}\n'
 

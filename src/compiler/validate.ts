@@ -15,6 +15,7 @@ import { libraryComponents } from './deprecated-ui-props'
 import { modifierProblems } from './event-modifiers'
 import { valuesCall } from './form-info'
 import { shorthandProblems } from './head-shorthand'
+import { hydrateProblem } from './island-problems'
 import { kayCtxImport } from './script-shared'
 import { attributeProblem, fieldProblem } from './validate-fields'
 import { AttributeFixes, PART_NAME, PART_NAME_LIST } from './validate-fixes'
@@ -59,8 +60,6 @@ const RAW_TEXT = new Set(['style', 'script'])
 const CONTENT_ATTRIBUTES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
 // One string literal, the way CSS with braces is written in a template's text.
 const STRING_LITERAL = /^\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\$]|\\.|\$(?!\{))*`)\s*$/
-// A `media(...)` hydrate with a query between its brackets.
-const MEDIA_HYDRATE = /^media\(\s*\S.*\)$/s
 // What only a static parent passes an island.
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
 // Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a control's `role`.
@@ -560,8 +559,8 @@ class Validator {
       if (element.component && (this.options.island !== undefined || this.options.insideIsland) && (ISLAND_OPTIONS.has(name) || (name === 'render' && attribute.kind === 'static' && attribute.text === 'client')))
         this.error('attribute-ineffective', attribute.name, `\`${name}\` has no effect inside an island`, { note: 'an island hydrates and lives on as a whole' })
 
-      if (element.component && name === 'hydrate' && attribute.kind === 'static' && attribute.text.startsWith('media(') && !MEDIA_HYDRATE.test(attribute.text))
-        this.error('attribute-invalid', attribute.name, '`hydrate="media(...)"` needs a media query', { help: 'write the query in the brackets: `hydrate="media(max-width: 40rem)"`' })
+      if (element.component && name === 'hydrate' && attribute.kind === 'static' && hydrateProblem(attribute.text))
+        this.error('attribute-invalid', attribute.name, ...hydrateProblem(attribute.text)!)
 
       if (attribute === serverIsland?.attribute)
         this.serverIsland(serverIsland, failedBlockOf(element, this.src))

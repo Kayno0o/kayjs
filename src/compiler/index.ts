@@ -367,6 +367,9 @@ export function compileKay(original: string, filename: string, options: CompileO
   // Type checking only, so a page still runs while it is fixed, and fails there in development naming the same fixes.
   const serverData = server?.data.map(data => data.name) ?? []
 
+  // The `island` export of the `--- module` fence read before 1.109 is an error in every output, as it declares nothing now.
+  diagnostics.push(...ignoredIslandExport(script))
+
   if (checked && !client)
     diagnostics.push(...coded(browserReads(file, island !== undefined, serverData, routeFile), 'browser-only-read'), ...coded(serverImportReads(file, script, server, island !== undefined), 'server-import-in-island'))
 
@@ -382,7 +385,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...linkFlags(file), ...deprecatedPartsClass(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...linkFlags(file), ...deprecatedPartsClass(file), ...deprecatedPageSettings(source, server))
   }
 
   if (checked && pin !== undefined)

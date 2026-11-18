@@ -36,6 +36,13 @@ describe('unknown-link-flag', () => {
     expect(unknown(`${SERVER}a(href="/x" data-scroll="keep" data-transition="false" data-reload data-prefetch="eager" data-part="a" data-field data-pending data-tooltip="x" data-hint="y" data-provider="p" data-testid="t" data-kay-retry) go\n`).at).toEqual([])
   })
 
+  it('reports the names before 1.105, which nothing reads, with the flag to write', () => {
+    const found = unknown(`${SERVER}a(href="/x" data-keep-scroll) go\na(href="/y" data-no-transition) go\na(href="/z" data-no-prefetch) go\n`)
+
+    expect(found.at).toEqual(['data-keep-scroll', 'data-no-transition', 'data-no-prefetch'])
+    expect(found.help).toEqual(['write `data-scroll="keep"`', 'write `data-transition="false"`', 'write `data-prefetch="false"`'])
+  })
+
   it('leaves a name that goes on after a flag, or a word near one, to the app', () => {
     expect(unknown(`${SERVER}a(href="/x" data-scrolled data-scroll-x data-reloading data-prefetched data-translation data-transitions data-read data-presence data-keep-scroll-x) go\n`).at).toEqual([])
   })

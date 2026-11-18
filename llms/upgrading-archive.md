@@ -44,7 +44,7 @@ What each minor release before 1.105 broke, and what an app changed to move to i
 
 ### Query params, persisted state, navigation and effects have one API each
 
-Every old form below works until 1.108, `kay check` reports it as a `deprecated-*` warning, and `kay upgrade` rewrites it. The rewrite reads script fences and TypeScript files: a call written in a template expression, such as an `onClick` handler, stays and works.
+Every old form below was reported by `kay check` as a `deprecated-*` warning and rewritten by `kay upgrade`; the ones noted as gone went in 1.109. The rewrite reads script fences and TypeScript files: a call written in a template expression, such as an `onClick` handler, stays and works.
 
 - `persisted.query(name, value, options)` is `queryParam(name, { default: value, ...options })`, the one signal of a query param, which also takes `values` (`deprecated-persisted-query`).
 - `persisted(name, value)` is `persisted.cookie(name, value)`: a call names its storage (`deprecated-persisted-call`).

@@ -101,7 +101,7 @@ function clientOnlyImports(source: string): Set<string> {
 
   visitNodes(file.template, (node) => {
     if (node.kind === 'element' && node.component) {
-      const client = node.attributes.some(attribute => attribute.kind === 'static' && ['hydrate', 'render'].includes(source.slice(attribute.name.start, attribute.name.end)) && attribute.text === 'client')
+      const client = node.attributes.some(attribute => attribute.kind === 'static' && source.slice(attribute.name.start, attribute.name.end) === 'render' && attribute.text === 'client')
 
       uses.set(node.name, (uses.get(node.name) ?? true) && client)
     }

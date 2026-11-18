@@ -17,6 +17,9 @@ export const LINK_LINTS = {
 // The attributes a link, or an element around links, takes to say how the swap follows it, named as the options of `navigate()` are: `scroll`, `transition`, `prefetch`, and `reload` for a full load.
 const FLAGS = new Set(['data-scroll', 'data-transition', 'data-prefetch', 'data-reload'])
 
+// The names before 1.105, which nothing reads any more: a link using one would follow as a plain link, a sign-out link prefetched included.
+const REMOVED: Record<string, string> = { 'data-keep-scroll': 'data-scroll="keep"', 'data-no-transition': 'data-transition="false"', 'data-no-prefetch': 'data-prefetch="false"' }
+
 // The name an attribute is written with, none for a spread or a `{name}` shorthand.
 function nameOf(attribute: Attribute): Span | undefined {
   return attribute.kind === 'spread' || (attribute.kind === 'expression' && attribute.shorthand !== undefined) ? undefined : attribute.name
@@ -52,6 +55,14 @@ export function linkFlags(file: KayFile): Diagnostic[] {
         continue
 
       const name = file.source.slice(at.start, at.end)
+      const removed = REMOVED[name]
+
+      if (removed !== undefined) {
+        found.push({ ...at, code: 'unknown-link-flag', message: `\`${name}\` is no navigation flag of a link any more`, note: 'nothing reads it since 1.109, so the link follows as a plain one', help: `write \`${removed}\``, checkOnly: true })
+
+        continue
+      }
+
       const meant = name.startsWith('data-') && !FLAGS.has(name) ? nearest(name) : undefined
 
       if (meant === undefined)

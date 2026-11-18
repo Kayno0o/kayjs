@@ -168,6 +168,9 @@ describe('an island export of the module fence', () => {
   it('is reported, as a constant or listed, since the `island()` call of the script says what it asks', () => {
     for (const source of ['--- module\nexport const island = { hydrate: \'idle\' } as const\n---\nbutton Go\n', '--- module\nconst island = { hydrate: \'idle\' } as const\nexport { island }\n---\nbutton Go\n'])
       expect(problems(source)).toEqual([expect.stringContaining('exports no `island`')])
+
+    // Reported in every output, as the export declares nothing now.
+    expect(compileKay('--- module\nexport const island = { hydrate: \'idle\' } as const\n---\nbutton Go\n', 'asks.kay', { output: 'html', root: scratch, component: true }).diagnostics.filter(diagnostic => diagnostic.code === 'fence-invalid')).toHaveLength(1)
   })
 
   it('is not reported when the script declares the call', () => {
