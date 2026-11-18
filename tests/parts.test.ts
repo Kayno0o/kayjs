@@ -7,7 +7,7 @@ import { kay } from '../src/build/plugin'
 import { compileKay } from '../src/compiler'
 import { installClassTable } from '../src/runtime/class-table'
 import { child } from '../src/runtime/html'
-import { handParts, partClass, partHanded, partsClass } from '../src/runtime/values'
+import { handParts, partClass, partHanded, partProps, partsClass } from '../src/runtime/values'
 import { settle } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -415,6 +415,28 @@ describe('kay check on parts', () => {
     expect(handParts(['mt-4', handed])).toEqual({ root: ['mt-4', undefined], spinner: 'size-5' })
     expect(handParts([handed], { head: 'p-6' })).toEqual({ head: 'p-6', spinner: 'size-5' })
     expect(handParts(['mt-4'], { head: 'p-6' })).toEqual({ head: 'p-6' })
+  })
+
+  it('gives a call the class and the parts of one list, read when asked', () => {
+    let reads = 0
+    const props = partProps(() => {
+      reads++
+
+      return [['mt-4', partClass({ class: 'from-caller', parts: { root: 'p-2' } }, 'root')], { head: 'p-6' }]
+    })
+
+    expect(reads).toBe(0)
+    expect(props.class).toBe('mt-4 p-2 from-caller')
+    expect(props.parts).toEqual({ head: 'p-6' })
+    expect(Object.keys(props)).toEqual(['class', 'parts'])
+  })
+
+  it('writes a part handed to a component as one source, not a class and a parts getter', () => {
+    const code = compileKay('---\nimport Busy from \'./busy.kay\'\n---\nBusy.mt-4(part="spinner")\n', 'src/part.kay', { output: 'dom' }).tsx
+
+    expect(code).toContain('KayPartProps(() => [[')
+    expect(code).not.toContain('KayPartsClass')
+    expect(code.match(/KayPartClass\(__props, "spinner"\)/g)).toHaveLength(1)
   })
 
   it('keeps what a written part and a handed one give the same nested part', () => {

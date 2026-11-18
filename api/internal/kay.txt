@@ -86,7 +86,7 @@ interface TemplateHelpers
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
   partClass: (props: unknown, part: string) => unknown
   partHanded: (part: string, list: readonly unknown[]) => unknown
-  partsClass: (list: readonly unknown[]) => unknown
+  partProps: (read: () => readonly [list: readonly unknown[], written?: unknown]) => unknown
   staticFor: <T>(each: Iterable<T> | false | null | undefined, rendered: Element, fallback?: Element) => Element
 
 [.] TemplateValues
@@ -354,8 +354,8 @@ function partClass(props: unknown, part: string): unknown
 [./dom] partHanded
 function partHanded(part: string, list: readonly unknown[]): unknown
 
-[./dom] partsClass
-function partsClass(list: readonly unknown[]): string | undefined
+[./dom] partProps
+function partProps(read: () => readonly [list: readonly unknown[], written?: unknown]): { readonly class: string | undefined; readonly parts: unknown; }
 
 [./dom] playTransitions
 function playTransitions(given: Transitions): void
@@ -614,8 +614,8 @@ function partClass(props: unknown, part: string): unknown
 [./html] partHanded
 function partHanded(part: string, list: readonly unknown[]): unknown
 
-[./html] partsClass
-function partsClass(list: readonly unknown[]): string | undefined
+[./html] partProps
+function partProps(read: () => readonly [list: readonly unknown[], written?: unknown]): { readonly class: string | undefined; readonly parts: unknown; }
 
 [./html] prerendering
 function prerendering(): boolean

@@ -13,7 +13,7 @@ import { addBoundWrites, calledByBinds, changeOf } from './bound-props'
 import { joinTexts } from './class-items'
 import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
-import { closeHandParts, handsEntry, openClassList, writtenParts } from './hand-parts'
+import { closeHandParts, handedItem, handsEntry, openClassList, writesTogether, writtenParts } from './hand-parts'
 import { IMAGE_OPTIONS, imageDefaults as imageDefaultsOf, imageOptions, placeholderOff, writeImageArguments } from './image-attributes'
 import { contentOf } from './items'
 import { controlId, fieldAttribute, inheritedAttributes, inheritedField } from './markup-fields'
@@ -362,7 +362,7 @@ export abstract class TemplateWriter {
   // `except` is a slot that is no prop, as a server island's `@failed`.
   protected componentProps(element: ElementNode, getters: boolean, except?: SlotNode): void {
     const { b } = this
-    const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
+    const spreads = element.attributes.some(attribute => attribute.kind === 'spread') || writesTogether(element, this.src, this.facts.parts)
 
     if (spreads)
       b.add(`${helperName('merge')}(`)
@@ -557,11 +557,18 @@ export abstract class TemplateWriter {
 
     // A call that hands a part on always holds parts in its list, which carry the classes as their root: its `class` is the one a spread would bring, left off.
     const hands = element.component && handedParts(element, this.src, this.facts.parts).length > 0
+    const together = writesTogether(element, this.src, this.facts.parts)
 
-    if (hands ? spreads : mergedClass)
+    if (together) {
+      closeObject()
+      b.add(objects++ > 0 ? ', ' : '')
+      this.mergedClass(element, classAttribute, spreads, writtenParts(element, this.src), true)
+    }
+
+    if (!together && (hands ? spreads : mergedClass))
       entry('class', () => hands ? b.add('undefined') : this.mergedClass(element, classAttribute, spreads), !hands)
 
-    if (element.component && parts.length > 0)
+    if (!together && element.component && parts.length > 0)
       entry('parts', () => this.mergedClass(element, classAttribute, spreads, writtenParts(element, this.src)), true)
 
     if (!keepOpen)
@@ -697,7 +704,7 @@ export abstract class TemplateWriter {
   }
 
   // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, an array of every source, which a component gets merged into one string, as its `class?: string` prop takes it. With `handing`, the `parts` a component call that hands parts on gets in its place, laid over the `parts` it writes.
-  protected mergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined, spreads: boolean, handing?: readonly Attribute[]): void {
+  protected mergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined, spreads: boolean, handing?: readonly Attribute[], together = false): void {
     const { b } = this
     const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
     const parts = partsOf(element, this.src, this.facts.parts)
@@ -726,27 +733,15 @@ export abstract class TemplateWriter {
     }
 
     // The parts handed on come before the call's own, so the entry the caller gives the called component's root is the last word.
-    for (const part of handed) {
-      items.push({
-        emit: () => {
-          b.add(`${helperName('partHanded')}(${JSON.stringify(part)}, [`)
-
-          for (const emit of this.recipeItem(part)) {
-            emit()
-            b.add(', ')
-          }
-
-          b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})])`)
-        },
-      })
-    }
+    for (const part of handed)
+      items.push(handedItem(b, part, this.recipeItem(part)))
 
     for (const part of parts)
       items.push(...this.recipeItem(part).map(emit => ({ emit })), { emit: () => b.add(`${helperName('partClass')}(${PROPS}, ${JSON.stringify(part)})`) })
 
     const written = this.classTable === undefined ? items : joinTexts(items, texts => this.joinLiterals(texts))
 
-    openClassList(b, element.component, parts.length > 0, handing)
+    openClassList(b, element.component, handing, together)
     for (const [index, item] of written.entries()) {
       if (index > 0)
         b.add(', ')
@@ -756,7 +751,7 @@ export abstract class TemplateWriter {
       else
         item.emit()
     }
-    closeHandParts(b, element.component, handing)
+    closeHandParts(b, element.component, handing, together)
   }
 
   // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else rendered.

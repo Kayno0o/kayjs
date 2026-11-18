@@ -211,6 +211,18 @@ export function handParts(list: readonly unknown[], written?: unknown): unknown 
   return all.length < 2 ? all[0] : mergeParts(all)
 }
 
+// The `class` and `parts` of a call handing a part of this component on, both read from one list (and the `parts` the call writes): the one prop pair a call site writes, as `partsClass` and `handParts` give them.
+export function partProps(read: () => readonly [list: readonly unknown[], written?: unknown]): { readonly class: string | undefined, readonly parts: unknown } {
+  return {
+    get class() {
+      return partsClass(read()[0])
+    },
+    get parts() {
+      return handParts(...read())
+    },
+  }
+}
+
 // The entry of a part that is a component is its own parts, as `partClass` reads it from a prop.
 function entryParts(entry: unknown): unknown {
   return typeof entry === 'object' && entry !== null && !Array.isArray(entry) ? taggedParts(entry as Record<string, unknown>) : entry

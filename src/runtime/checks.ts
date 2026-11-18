@@ -387,7 +387,7 @@ export interface TemplateHelpers {
   componentClass: <const List extends readonly unknown[]>(list: List) => ComponentClass<List>
   partClass: (props: unknown, part: string) => unknown
   partHanded: (part: string, list: readonly unknown[]) => unknown
-  partsClass: (list: readonly unknown[]) => unknown
+  partProps: (read: () => readonly [list: readonly unknown[], written?: unknown]) => unknown
   handParts: (list: readonly unknown[], written?: unknown) => unknown
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
   head: (tags: { tag: string, props: Record<string, unknown> }[]) => void

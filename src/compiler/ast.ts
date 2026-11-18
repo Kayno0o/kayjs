@@ -489,7 +489,7 @@ export function isChildrenSlot(node: Node): boolean {
   return isSlot(node) && (node as ElementNode).outlet === undefined
 }
 
-export type TemplateHelper = 'For' | 'componentClass' | 'handParts' | 'partClass' | 'partHanded' | 'partsClass'
+export type TemplateHelper = 'For' | 'componentClass' | 'handParts' | 'partClass' | 'partHanded' | 'partProps'
 
 // Whether an entry of `src/ui.ts` has variants, which read the component's props: without them its parts are static classes, written into the template as they are.
 export function uiHasVariants(entry: UiEntry): boolean {
@@ -701,7 +701,7 @@ function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
       facts.helpers.add('partClass')
 
     if (facts.parts.implicit?.component) {
-      facts.helpers.add('partsClass')
+      facts.helpers.add('partProps')
       facts.helpers.add('handParts')
     }
   }
@@ -747,7 +747,7 @@ function factsOf(file: KayFile): TemplateFacts {
         facts.helpers.add('partClass')
 
         if (node.component) {
-          facts.helpers.add('partsClass')
+          facts.helpers.add('partProps')
           facts.helpers.add('handParts')
         }
 
@@ -785,7 +785,7 @@ function factsOf(file: KayFile): TemplateFacts {
     markRoot(facts.parts, file.template)
 
     if (facts.parts.implicit?.component) {
-      facts.helpers.add('partsClass')
+      facts.helpers.add('partProps')
       facts.helpers.add('handParts')
     }
   }

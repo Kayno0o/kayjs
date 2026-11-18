@@ -21,7 +21,7 @@ declare const KAY_FRENCH: true | undefined
 export { holdSubmits, listenSubmit, listenSubmitWith, listenWith } from './form-hold'
 export { renderEffect as effect, memo, untrack } from './reactive'
 export { transition } from './transition'
-export { checkedMarkup, componentClass, handParts, merge, omit, partClass, partHanded, partsClass, spreadAttributes, spreadWith } from './values'
+export { checkedMarkup, componentClass, handParts, merge, omit, partClass, partHanded, partProps, spreadAttributes, spreadWith } from './values'
 
 // Several sibling nodes rendered as one: a block or a component returning more than one node. Its first and last nodes stay in place while what sits between changes.
 export class Range {
