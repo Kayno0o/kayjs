@@ -40,7 +40,7 @@ export interface DeclaredEnv {
   schema: EnvSchemaRecord
   // The file that called `defineEnv`, a library's call counted as its caller's, when the stack tells.
   file?: string | undefined
-  // The call's place, `file:line:column`: a module read again declares at the same place, and its call replaces the earlier one.
+  // The call's place, the stack's `file:line:column` frames: a module read again declares at the same place, and its call replaces the earlier one.
   site?: string | undefined
 }
 
@@ -76,14 +76,15 @@ function callerFrame(declaredBy: (...args: never[]) => unknown): { file?: string
 
   Error.captureStackTrace(holder, declaredBy)
 
-  for (const line of (holder.stack ?? '').split('\n')) {
+  const frames = (holder.stack ?? '').split('\n').flatMap((line) => {
     const [, file, position] = FRAME_FILE.exec(line.trim()) ?? []
 
-    if (file !== undefined && !inLibrary(file))
-      return { file, site: `${file}:${position}` }
-  }
+    return file === undefined ? [] : [{ file, place: `${file}:${position}` }]
+  })
+  const file = frames.find(frame => !inLibrary(frame.file))?.file
 
-  return {}
+  // The whole stack, so a helper wrapping `defineEnv` and called for several schemas gives each its own place.
+  return file === undefined ? {} : { file, site: frames.map(({ place }) => place).join(' < ') }
 }
 
 // Whether `file` belongs to a package of kay's libraries, by the name in the nearest package.json.
