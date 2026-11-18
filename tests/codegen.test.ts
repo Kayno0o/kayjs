@@ -667,11 +667,10 @@ describe('fences', () => {
       ['---\nimport { signal } from \'kay\'\nconst a = \'one\nconst b = "two\n---\np {a}\n', 1],
       ['--- server\nimport { listTodos } from \'../da\nexport const page = {}\n---\n---\nconst label = "x\n---\np x\n', 2],
       ['---\nimport { signal } from \'kay\'\nconst count = 1\nconst label = \'x\n---\np {count}\n', 1],
-      ['--- client\nconst label = "x\n---\np x\n', 1],
     ]
 
     for (const [source, broken] of components) {
-      const { tsx, map, diagnostics } = compileKay(source, 'test.kay', { check: true, lints: { 'deprecated-island-fence': 'allow' } })
+      const { tsx, map, diagnostics } = compileKay(source, 'test.kay', { check: true })
       const lines = source.split('\n')
       const fenceLines = lines.slice(0, lines.findLastIndex(line => line.startsWith('---'))).filter(line => !line.startsWith('---'))
 

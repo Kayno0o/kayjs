@@ -33,7 +33,7 @@ export interface LoadTimeBrowserRead {
   diagnostic: Diagnostic
 }
 
-// A module of the project that touches a browser-only global as it loads and that a server render imports: a page, a layout or a component they render, which is not `--- client`, and the modules they pull in. It throws on the server the first time the page is rendered, as the module is evaluated.
+// A module of the project that touches a browser-only global as it loads and that a server render imports: a page, a layout or a component they render, which is not client-only, and the modules they pull in. It throws on the server the first time the page is rendered, as the module is evaluated.
 // A read inside a function is left out, as only a call decides whether it runs, and so is one a `typeof` or a `try` guards.
 // Reported at the read, naming the first component reaching the module. What the server never renders is left out: a component used only with `render="client"`, and an island the build demotes to the browser for a package it imports, asked as the build asks.
 export async function browserGlobalAtLoad(root: string, components: Map<string, string>, routes: string, cacheDir?: string): Promise<LoadTimeBrowserRead[]> {

@@ -71,8 +71,6 @@ cms [.] CollectionSettings.onUpload	1.108	deprecated-hook-names	Written `afterUp
 kay [./compiler] CompileResult.why	2.0.0	-	Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. Removed in 2.0.0. No lint: a field of the compile result that tools read, nothing in an app's source.
 kay [./library/auth-mails] AuthMailData.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [./library] refuse	1.108	deprecated-refuse-call	`refuse(status, { message, errors, data })`. Removed in 1.108; `deprecated-refuse-call` rewrites it.
-kay [./mount] Mounted	1.108.0	deprecated-import-path	Import `Mounted` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
-kay [./mount] mount	1.108.0	deprecated-import-path	Import `mount` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] KayConfig.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.favicon	1.108	deprecated-config-groups	Written `assets.favicon`; `deprecated-config-groups` rewrites it. Removed in 1.108.
@@ -89,17 +87,13 @@ kay [./server] PagesOptions.onStart	1.108	deprecated-app-hooks	Written `onListen
 kay [./server] PagesOptions.publicCache	1.108	deprecated-config-groups	Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./server] PagesOptions.search	1.108	deprecated-client-keys	Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./server] QueueOptions.lostAfter	1.108	deprecated-job-options	`timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it.
-kay [./server] RateLimit	1.108.0	deprecated-import-path	Import `RateLimit` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
-kay [./server] RateLimitRefusal	1.108.0	deprecated-import-path	Import `RateLimitRefusal` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] RateLimiter.enforce	1.108	deprecated-rate-enforce	`check(ctx, message?)`, as `limiter().enforce(key)` counts under a key and refuses nothing. Removed in 1.108; `deprecated-rate-enforce` rewrites it.
 kay [./server] SignOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [./server] UrlOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [./server] WorkChallengeOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [./server] WorkflowOptions.lostAfter	1.108	deprecated-job-options	`timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it.
 kay [./server] diskFiles	1.108	deprecated-disk-files	`diskFiles({ dir, ...hooks })`. Removed in 1.108; `deprecated-disk-files` rewrites it.
-kay [./server] s	1.108.0	deprecated-import-path	Import `s` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] schedule	1.108	deprecated-schedule-call	`schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it.
-kay [./server] sqliteCache	1.108.0	deprecated-import-path	Import `sqliteCache` from `kay/cache`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./test] TestOptions.env	1.108	deprecated-env-files	Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.favicon	1.108	deprecated-config-groups	Written `assets.favicon`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.fonts	1.108	deprecated-config-groups	Written `assets.fonts`; `deprecated-config-groups` rewrites it. Removed in 1.108.

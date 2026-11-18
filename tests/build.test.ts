@@ -2241,7 +2241,7 @@ describe('the size report', () => {
       'src/clicks.kay': 'button(type="button" onClick={() => {}}) Go\n',
       'src/field.kay': '---\nlet text = \'\'\n---\ninput(bind:value={text})\n',
       'src/state.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\np {n()}\n',
-      'src/client.kay': '--- client\nconst x = 1\n---\np {x}\n',
+      'src/client.kay': '---\nisland({ render: "client" })\nconst x = 1\n---\np {x}\n',
       'src/handle.kay': '---\nlet el\n---\ndiv(ref={el}) Here\n',
       'src/ago.kay': '---\nimport { relativeTime } from \'kay/i18n\'\n---\np {relativeTime(new Date())}\n',
       'src/routes/index.kay': '---\nimport Clicks from \'../clicks.kay\'\nimport Field from \'../field.kay\'\nimport State from \'../state.kay\'\nimport Client from \'../client.kay\'\nimport Handle from \'../handle.kay\'\nimport Ago from \'../ago.kay\'\n---\nClicks\nField\nState\nClient\nHandle\nAgo\n',
@@ -2254,7 +2254,7 @@ describe('the size report', () => {
       'src/clicks.kay': '`onClick`, line 1',
       'src/field.kay': '`bind:value`, line 4',
       'src/state.kay': '`signal` from kay',
-      'src/client.kay': 'a `--- client` fence',
+      'src/client.kay': 'an `island({ render: \'client\' })` declaration',
       'src/handle.kay': '`ref`, line 4',
       'src/ago.kay': '`relativeTime` from kay/i18n',
     })
@@ -2263,7 +2263,7 @@ describe('the size report', () => {
       'src/clicks.kay': { kind: 'attribute', name: 'onClick', line: 1 },
       'src/field.kay': { kind: 'attribute', name: 'bind:value', line: 4 },
       'src/state.kay': { kind: 'value', name: 'signal', line: 2 },
-      'src/client.kay': { kind: 'client', name: '--- client', line: 1 },
+      'src/client.kay': { kind: 'client', name: 'island()', line: 2 },
       'src/handle.kay': { kind: 'attribute', name: 'ref', line: 4 },
       'src/ago.kay': { kind: 'value', name: 'relativeTime', line: 2 },
     })
@@ -2401,11 +2401,11 @@ describe('the build report', () => {
         'src/routes/alias.kay': '---\nimport A from \'~/a.kay\'\n---\nA\n',
         'src/routes/both.kay': '---\nimport A from \'../a.kay\'\nimport B from \'../b.kay\'\n---\nA\nB\n',
         'src/routes/form.kay': 'form(action={add})\n  input(name="title")\n',
-        'src/routes/defer.kay': '---\nimport A from \'../a.kay\'\n---\nA(server="defer")\n',
+        'src/routes/defer.kay': '---\nimport A from \'../a.kay\'\n---\nA(server defer)\n',
         'src/routes/plain.kay': 'p Plain\n',
         'src/routes/visible.kay': '---\nimport A from \'../a.kay\'\n---\nA(hydrate="visible")\n',
         'src/routes/eager.kay': '---\nimport A from \'../a.kay\'\n---\nA(hydrate="load")\n',
-        'src/c.kay': '--- module\nexport const island = { persist: { key: \'c\' }, hydrate: \'visible\' } as const\n--- island\n---\np C\n',
+        'src/c.kay': '---\nisland({ persist: \'c\', hydrate: \'visible\' })\n---\np C\n',
         'src/routes/asks.kay': '---\nimport C from \'../c.kay\'\n---\nC\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
 

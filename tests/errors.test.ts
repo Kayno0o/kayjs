@@ -116,7 +116,7 @@ describe('compile errors', () => {
     expect(codes('div\n    p\n  span\n')).toContain('template-syntax')
     expect(codes('head\n  title A\nhead\n  title B\n')).toContain('head-invalid')
     expect(codes('---\nconst { a } = props<{ a: string }>()\nconst { b } = props<{ b: string }>()\n---\np {a}\n')).toContain('fence-invalid')
-    expect(codes('--- client\nconst n = 1\n---\np {n}\n', 'src/routes/_layout.kay')).toContain('client-route-fence')
+    expect(codes('---\nisland({ render: "client" })\nconst n = 1\n---\np {n}\n', 'src/routes/_layout.kay')).toContain('client-route-fence')
   })
 
   it('refuse a --- server fence in a component, not in a page or a special file', () => {

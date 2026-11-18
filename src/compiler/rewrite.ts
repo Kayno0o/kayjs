@@ -10,7 +10,7 @@ import { parseProgram } from './estree'
 import { derivedSpan, INITIAL_PROP } from './live-reads'
 import { PERSISTED_ENTRIES } from './module-signals'
 import { CURRENT, HANDED, LOAD, PROBE, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
-import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, LIVE_STATE, LIVE_WRITES, LOGICAL, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, readOutside, rowReadOnly, signatureNames, sourceEnds, sourceSpan, syntaxError, tagPosition, typeQueryOf, uncalledSignal, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
+import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, LIVE_STATE, LIVE_WRITES, LOGICAL, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, readOutside, rowReadOnly, signatureNames, sourceSpan, syntaxError, tagPosition, typeQueryOf, uncalledSignal, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
 import { Scanner } from './rewrite-scan'
 import { markTagValue } from './rewrite-tags'
 import { analyze } from './scope'
@@ -103,9 +103,6 @@ class RewriteFinder {
     }
     else if (path.is('Identifier')) {
       this.globalRead(path)
-    }
-    else if (path.is('CallExpression')) {
-      this.listenTarget(path)
     }
     else if (path.is('ArrowFunctionExpression')) {
       this.rows(path)
@@ -634,18 +631,6 @@ class RewriteFinder {
 
     if (binding && valueReferences(binding).length === 0)
       this.unread.add(prop.binding.local.start)
-  }
-
-  // `listen(window, ...)` takes its target as a function, so a server render never reads `window`.
-  private listenTarget(path: Path<CallExpression>) {
-    const target = path.node.arguments[0]
-    const span = !target || target.type === 'ArrowFunctionExpression' || target.type === 'FunctionExpression' || target.type === 'SpreadElement' || importedFromKay(path.scope, path.node.callee) !== 'listen' ? undefined : sourceEnds(this.input.map, target)
-
-    if (!span)
-      return
-
-    this.insert(span.start, '() => (')
-    this.insert(span.end, ')')
   }
 
   private assignment(path: Path<AssignmentExpression | UpdateExpression>) {

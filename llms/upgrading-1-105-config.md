@@ -18,7 +18,7 @@ What 1.105 changed in kay.config.ts, the hooks, the stores and the guards of fea
 
 ### `defineContext` from `kay/server`, `env` is `envFiles`
 
-`import { defineContext } from 'kay/server'`, as `defineEnv`; `kay/library` keeps it until 1.108. The `env: { compose, example }` of kay.config.ts is `envFiles`, which also takes `false`; `env` works until 1.108. `kay upgrade` rewrites both (`deprecated-context-import`, `deprecated-env-files`). The session cookie now takes its `SameSite` and `Secure` from `security.cookies` unless `session({ sameSite })` is set: an app that set `sameSite: 'strict'` there gets a strict session cookie, which signs a visitor out on a link from another site, so set `session({ sameSite: 'lax' })` beside it where that matters.
+`import { defineContext } from 'kay/server'`, as `defineEnv`; `kay/library` dropped it in 1.109. The `env: { compose, example }` of kay.config.ts is `envFiles`, which also takes `false`; `env` works until 1.108. `kay upgrade` rewrites `env` (`deprecated-env-files`). The session cookie now takes its `SameSite` and `Secure` from `security.cookies` unless `session({ sameSite })` is set: an app that set `sameSite: 'strict'` there gets a strict session cookie, which signs a visitor out on a link from another site, so set `session({ sameSite: 'lax' })` beside it where that matters.
 
 ### `assets`, `ops` and `i18n` group the config's keys
 

@@ -5,10 +5,8 @@ import { ifAlias } from './if-alias'
 import { rolesOf, spelledOutFirstFence } from './island-declaration'
 import { Scanner } from './scanner'
 
-// `--- server`, `--- client`, `--- island`, `--- static`, `--- script`, `--- module`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
+// `--- server`, `--- script`, `--- module`, `--- style`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- script <T>` takes both.
 const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
-// The names a script fence takes beside none: `client` renders in the browser only, `island` and `static` pin the role.
-const SCRIPT_FENCES: ReadonlySet<string> = new Set(['client', 'script', 'island', 'static'])
 const CLOSING_FENCE = /^---(?:[ \t]*$|[ \t]*[a-z<])/gm
 const BARE_LINE = /^---[ \t]*$/
 const CLOSING_LINE = /---[ \t]*(?=\r?\n|$)/y
@@ -103,7 +101,7 @@ export function parseKay(source: string): KayFile {
   // The bare `---` closing a named fence while no script fence is open yet, which a later bare `---` was meant to be the script fence of.
   let bareClosing: Span | undefined
 
-  // Fences come first, in any order: `---` or `--- script` holds the component script, `--- client` one rendering in the browser only, `--- island` and `--- static` pin its role, `--- server` the code that runs on the server only, `--- module` the module-level code, which exports values.
+  // Fences come first, in any order: `---` or `--- script` holds the component script, `--- server` the code that runs on the server only, `--- module` the module-level code, which exports values.
   // A labeled fence line also closes the fence before it, so `--- server` code can run straight into `--- script`.
   while (true) {
     BLANK_LINES.lastIndex = templateStart
@@ -114,7 +112,7 @@ export function parseKay(source: string): KayFile {
     if (!fence)
       break
 
-    const kind = fence[2] === undefined || SCRIPT_FENCES.has(fence[2]) ? 'script' : fence[2]
+    const kind = fence[2] === undefined ? 'script' : fence[2]
     const spaced = fence[1] !== ''
     const bodyStart = fence.index + fence[0].length
 
@@ -134,7 +132,7 @@ export function parseKay(source: string): KayFile {
     }
 
     if (!spaced || (kind !== 'script' && kind !== 'server' && kind !== 'module' && kind !== 'style')) {
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, `--- island` or `--- static` to pin its role, `--- server` for server code, `--- module` for module-level code that exports values, or `--- style` for CSS scoped to the component' })
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `island({ render, hydrate, persist })` first in it to declare its role, `--- server` for server code, `--- module` for module-level code that exports values, or `--- style` for CSS scoped to the component' })
     }
     else if (fences[kind]) {
       diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `A file has one ${kind === 'script' ? 'script' : `\`--- ${kind}\``} fence` })
@@ -162,7 +160,7 @@ export function parseKay(source: string): KayFile {
     }
   }
 
-  const { island, client, pin } = rolesOf(source, fences.script, fenceWord)
+  const { island, client, pin } = rolesOf(source, fences.script)
 
   const parser = new TemplateParser(source, templateStart, diagnostics)
   const template = parser.parseTemplate()
@@ -181,7 +179,7 @@ function explainSecondFence(source: string, closing: Span, diagnostics: Diagnost
   if (!stray)
     return
 
-  stray.help = 'a second fence takes a name once a `--- server` or `--- module` fence is there: write the one closing it as `--- script` (or `--- client`)'
+  stray.help = 'a second fence takes a name once a `--- server` or `--- module` fence is there: write the one closing it as `--- script`'
   stray.fixes = [{ title: 'Name the script fence', edits: [{ start: closing.start, end: closing.end, text: '--- script' }], safe: true }]
 }
 

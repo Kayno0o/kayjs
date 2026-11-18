@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 import { transformKay } from '../src/build/transform'
 import { compileKay } from '../src/compiler'
-import { DEPRECATED_LINTS } from '../src/compiler/deprecated-lints'
+import { LINTS } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
 
 const page = 'src/routes/p.kay'
 const slice = (source: string, span: { start: number, end: number }) => source.slice(span.start, span.end)
 const imported = { './clock': { clock: 'live' as const }, './prefs': { theme: 'persisted' as const } }
-const warned = (source: string, filename = page, options = {}) => compileKay(source, filename, { check: true, page: true, importedSignals: imported, ...options }).diagnostics.filter(diagnostic => diagnostic.code === 'deprecated-page-island')
+const warned = (source: string, filename = page, options = {}) => compileKay(source, filename, { check: true, page: true, importedSignals: imported, ...options }).diagnostics.filter(diagnostic => diagnostic.code === 'page-island')
 
 const handler = 'button(onClick={() => 1}) b\n'
 const signal = '---\nimport { signal } from \'kay\'\nconst n = signal(0)\n---\np {n()}\n'
@@ -15,7 +15,7 @@ const live = '---\nimport { clock } from \'./clock\'\n---\np {clock()}\n'
 const persisted = '---\nimport { theme } from \'./prefs\'\n---\np {theme()}\n'
 
 describe('a plain page that is an island', () => {
-  it('is a warning at the handler in the check, and still an island in every output', () => {
+  it('is an error at the handler in the check, and still an island in every output', () => {
     for (const output of [undefined, 'html', 'dom'] as const) {
       const found = warned(handler, page, { output })
 
@@ -23,7 +23,7 @@ describe('a plain page that is an island', () => {
       expect(found[0]!.message).toContain('line 1')
       expect(found[0]!.help).toContain('component')
       expect(found[0]!.checkOnly).toBe(true)
-      expect(found[0]!.severity).toBe('warning')
+      expect(found[0]!.severity).toBe('error')
       expect(found[0]!.fixes).toBeUndefined()
       expect(compileKay(handler, page, { output, page: true }).island).toBeDefined()
     }
@@ -55,8 +55,8 @@ describe('a plain page that is an island', () => {
     expect(() => transformKay(handler, `${root}/src/routes/p.kay`, { target: 'ssr', root })).not.toThrow()
   })
 
-  it('has a lint that is deprecated since 1.105, with no safe fix', () => {
-    expect(DEPRECATED_LINTS['deprecated-page-island'].since).toBe('1.105')
+  it('is a deny lint with no fix', () => {
+    expect(LINTS['page-island'].level).toBe('deny')
   })
 })
 
@@ -104,7 +104,7 @@ describe('a name the template reads that only the server fence imports', () => {
 
     expect(compiled.island).toBeDefined()
     expect(compiled.tsx).not.toContain('import { formatFileSize }')
-    expect(compileKay(hydrating, route, { page: true, check: true }).diagnostics.map(diagnostic => diagnostic.code)).not.toContain('deprecated-page-island')
+    expect(compileKay(hydrating, route, { page: true, check: true }).diagnostics.map(diagnostic => diagnostic.code)).not.toContain('page-island')
   })
 
   it('says nothing once the script fence imports it too, for a page that does not hydrate, or for a type', () => {

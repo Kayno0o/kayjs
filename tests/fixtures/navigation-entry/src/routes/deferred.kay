@@ -8,4 +8,4 @@ import Join from '../components/join.kay'
 ---
 h1 Deferred
 Join(to={join})
-Join(server="defer" to={join})
+Join(server defer to={join})

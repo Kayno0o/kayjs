@@ -77,7 +77,7 @@ describe('the build and the await blocks of a prerendered page', () => {
     it(`says nothing of a block inside a server island marked ${mode}`, async () => {
       const root = await project({
         'src/components/Late.kay': PAGE(slow(1), AWAIT),
-        'src/routes/index.kay': PAGE('import Late from \'../components/Late.kay\'', mode === 'true' ? 'Late(server)' : 'Late(server="defer")'),
+        'src/routes/index.kay': PAGE('import Late from \'../components/Late.kay\'', mode === 'true' ? 'Late(server)' : 'Late(server defer)'),
       })
       const { code, report, output } = await kayBuild([root, '--no-check'])
 

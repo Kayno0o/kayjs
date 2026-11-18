@@ -14,4 +14,4 @@ h1 Shop
 input.note
 a.quiet(href="/quiet") Quiet
 a.page(href="/page") Page
-Stock(server="defer" count={stock})
+Stock(server defer count={stock})

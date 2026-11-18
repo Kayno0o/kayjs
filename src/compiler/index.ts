@@ -15,17 +15,15 @@ import { actionOf, drawIcons, elementsIn, INTERACTIVE_ATTRIBUTE, SERVER_IN_ISLAN
 import { browserReads } from './browser'
 import { wrapActionButtons } from './button-forms'
 import { generate, isInteractive, islandCause, lineOf } from './codegen'
-import { retiredAllowComments } from './deprecated-allow'
-import { deprecatedChildrenProp } from './deprecated-children'
-import { deprecatedIslandAttributes, deprecatedIslandForms, islandProblems } from './deprecated-island'
 import { deprecatedPageSettings } from './deprecated-page'
 import { deprecatedPartsClass } from './deprecated-parts'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { openRedirects } from './fence-redirects'
 import { cwd, scopeStorage } from './host'
-import { ignoredIslandExport, interactiveProps, islandMessages, malformedInteractive, withAlertKeys } from './island-arguments'
+import { ignoredIslandExport, islandMessages, withAlertKeys } from './island-arguments'
 import { describeCause } from './island-cause'
 import { markerMismatch } from './island-marker'
+import { islandProblems } from './island-problems'
 import { lazyImportsOf } from './lazy-imports'
 import { linkFlags } from './link-flags'
 import { applyLints, templateLints } from './lints'
@@ -83,7 +81,7 @@ export interface CompileOptions {
   twinBuild?: boolean | undefined
   // The props the component's call sites write, when all are known: the `...rest` of its props leaves out only these of the ones it declares.
   writtenProps?: ReadonlySet<string> | undefined
-  // Whether the file is a page of a routes directory (`isPageFile`), which nothing renders inside an island, so a page without a server fence reads its loops as static as the build does, is refused `--- client` and `--- island`, and is no island by its pin; `false` says it is a component, where a root `@block` is refused.
+  // Whether the file is a page of a routes directory (`isPageFile`), which nothing renders inside an island, so a page without a server fence reads its loops as static as the build does, is refused `island()`, and is no island by its pin; `false` says it is a component, where a root `@block` is refused.
   page?: boolean | undefined
   // Whether the file is known to be a component, which has no `--- server` fence: a library checked on its own has pages no routes directory names, so only a caller knowing its routes says so.
   component?: boolean | undefined
@@ -91,7 +89,7 @@ export interface CompileOptions {
   lints?: LintLevels | undefined
   // Type checking only: the types alone, for a file whose problems nothing reads, so the ones only `kay check` reports are not looked for.
   typesOnly?: boolean | undefined
-  // Renders in the browser only, as `--- client` does: set when a package the component imports cannot load on the server.
+  // Renders in the browser only, as `island({ render: 'client' })` does: set when a package the component imports cannot load on the server.
   clientOnly?: boolean | undefined
   // Type-checking a static component only islands render: its children render inline with it, so the props it passes them are not serialized.
   insideIsland?: boolean | undefined
@@ -182,9 +180,9 @@ function browserCause(file: KayFile, script: ScriptAnalysis, value: ReturnType<t
   return value === undefined || binding === undefined ? undefined : { kind: value.kind, name: value.local, span: binding.span, line: lineOf(file.source, binding.span.start) }
 }
 
-// The cause with the props the component's `island` export lists as making a use interactive, when it lists some: a client-only component and one following a live or persisted value are islands in every use.
+// The cause with the props the component's `island()` lists as making a use interactive, when it lists some: a client-only component and one following a live or persisted value are islands in every use.
 function withInteractive(cause: IslandCause | undefined, script: ScriptAnalysis): IslandCause | undefined {
-  const interactive = interactiveProps(script)
+  const interactive = script.island?.interactive
 
   return cause !== undefined && interactive !== undefined && cause.kind !== 'client' && cause.kind !== 'live' && cause.kind !== 'persisted' ? { ...cause, interactive } : cause
 }
@@ -204,12 +202,12 @@ function staticPin(span: Span, cause: IslandCause): Diagnostic {
   return { ...span, code: 'static-pin', message: `This component is declared \`island({ render: 'static' })\`, and is an island: ${describeCause(cause)}`, note: 'it needs the browser, so it hydrates there', help: 'take that out of the component, or declare it `island()`' }
 }
 
-// A page without a server fence that is an island for a handler, a `kay` value or a live or persisted import: a page renders once, so a component should hold what needs the browser. It works until 1.108.
-function deprecatedPageIsland(page: boolean, route: boolean, client: boolean, check: boolean | undefined, raw: IslandCause | undefined, cause: IslandCause | undefined): Diagnostic[] {
+// A page without a server fence that is an island for a handler, a `kay` value or a live or persisted import: a page renders once, so a component should hold what needs the browser.
+function pageIsland(page: boolean, route: boolean, client: boolean, check: boolean | undefined, raw: IslandCause | undefined, cause: IslandCause | undefined): Diagnostic[] {
   if (!page || route || client || check !== true || raw === undefined || cause === undefined)
     return []
 
-  return [{ ...raw.span, code: 'deprecated-page-island', checkOnly: true, message: `A page is never an island since 1.105, and this one is for ${describeCause(cause)}`, note: 'a page renders once on the server, so nothing in it should run in the browser', help: 'move what needs the browser into a component of its own and render it from the page' }]
+  return [{ ...raw.span, code: 'page-island', checkOnly: true, message: `A page is never an island, and this one is for ${describeCause(cause)}`, note: 'a page renders once on the server, so nothing in it should run in the browser', help: 'move what needs the browser into a component of its own and render it from the page' }]
 }
 
 // What the server fence declares for the template: its data and its exports, which the script reads as declared rather than as kay values to import.
@@ -219,9 +217,9 @@ function serverNames(server: ServerAnalysis | undefined): string[] | undefined {
 
 // What a component's script and template say of its role in the browser, from one analysis.
 interface Role {
-  // A `--- client` component or an interactive one, an island whatever its file.
+  // A client-only component or an interactive one, an island whatever its file.
   always: boolean
-  // A `--- island` fence: an island unless the file is a page, a layout or a special page, which is never one by its pin.
+  // An `island()` pin: an island unless the file is a page, a layout or a special page, which is never one by its pin.
   pinned: boolean
   // It imports a live or persisted value, which makes a file that is not a layout, a special page or one with a server fence an island.
   live: boolean
@@ -263,7 +261,7 @@ function roleOf(original: string, imported: ImportedSignals | undefined, page: b
 }
 
 // Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
-// `page` says the file is a page of the routes directory (`isPageFile`), which its `--- island` fence does not make an island.
+// `page` says the file is a page of the routes directory (`isPageFile`), which its `island()` declaration does not make an island.
 export function rendersAsIsland(original: string, imported?: ImportedSignals, page = false): boolean {
   const { always, live, pinned, server } = roleOf(original, imported, page)
 
@@ -356,7 +354,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     ...coded(server ? separatePageSettings(source, server) : [], 'page-settings-invalid'),
     ...validate(file, script, server, generateOptions),
     ...coded(unparsed ? [] : found.diagnostics, 'signal-misuse'),
-    ...deprecatedPageIsland(pageFile, routeFile, client, options.check, rawCause, cause),
+    ...pageIsland(pageFile, routeFile, client, options.check, rawCause, cause),
     ...coded(pin?.kind === 'static' && cause !== undefined && rawCause !== undefined && !routeFile && island !== undefined ? [staticPin(rawCause.span, { ...cause, interactive: undefined })] : [], 'static-pin'),
   ]
 
@@ -384,7 +382,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...retiredAllowComments(source), ...deprecatedIslandForms(file, script), ...deprecatedIslandAttributes(file), ...deprecatedChildrenProp(file, script), ...linkFlags(file), ...deprecatedPartsClass(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script, island !== undefined), ...malformedInteractive(script))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...linkFlags(file), ...deprecatedPartsClass(file), ...deprecatedPageSettings(source, server), ...ignoredIslandExport(script))
   }
 
   if (checked && pin !== undefined)
@@ -537,7 +535,7 @@ function takeBlock(file: KayFile, filename: string, options: CompileOptions, scr
     const at = file.source.slice(block.start, block.end).search(new RegExp(`(?<![\\w$])${name.replaceAll('$', '\\$')}(?![\\w$])`, 'g'))
     const start = at < 0 ? block.name.start : block.start + at
 
-    file.diagnostics.push({ start, end: at < 0 ? block.name.end : start + name.length, code: 'fallback-invalid', message: `\`@${which}\` of ${which === 'failed' ? 'a' : 'a `--- client`'} component reads \`${name}\`, which the server does not have`, note: 'the server renders it without running the script', help: 'write static markup, or import what it needs' })
+    file.diagnostics.push({ start, end: at < 0 ? block.name.end : start + name.length, code: 'fallback-invalid', message: `\`@${which}\` of ${which === 'failed' ? 'a' : 'a client-only'} component reads \`${name}\`, which the server does not have`, note: 'the server renders it without running the script', help: 'write static markup, or import what it needs' })
   }
 
   return { code: compiled.tsx.replace(FALLBACK_COMPONENT, which === 'failed' ? 'function KayFailed(' : 'function KayFallback('), classes: compiled.classes }

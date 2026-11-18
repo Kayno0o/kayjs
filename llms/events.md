@@ -11,7 +11,7 @@ kay and its libraries tell an app what happened with DOM events, and keep what a
 
 ### Events
 
-- A public event is `<lib>:<verb>` (`kay:`, `kai:` for kayjs-ai, `kui:` for kayjs-ui) fired on `document`, with an object `detail`. A plain script (an analytics tag, a lightbox) listens with `document.addEventListener('kay:renew', ...)`, an island with the function hook of the table below, which ends with the island and hands an object of its own where the event hands `detail`; `listen(() => document, 'kay:navigate', ...)` in an island is `deprecated-island-events`. An event with no hook in the table (`kay:renew`, the dev events, the chat's) stays a `listen(() => document, ...)` for an island too. An event an app sends to a component is dispatched on `document` too, `new CustomEvent('kai:chat-send', { detail: { text } })`.
+- A public event is `<lib>:<verb>` (`kay:`, `kai:` for kayjs-ai, `kui:` for kayjs-ui) fired on `document`, with an object `detail`. A plain script (an analytics tag, a lightbox) listens with `document.addEventListener('kay:renew', ...)`, an island with the function hook of the table below, which ends with the island and hands an object of its own where the event hands `detail`. An event with no hook in the table (`kay:renew`, the dev events, the chat's) stays a `listen(() => document, ...)` for an island too. An event an app sends to a component is dispatched on `document` too, `new CustomEvent('kai:chat-send', { detail: { text } })`.
 - An event about one element (`kay:action-*` on a form, `kui:hold-defaults` on a form) bubbles, so `document` hears it as well.
 
 | Event | Fires | `detail` | Hook of an island |

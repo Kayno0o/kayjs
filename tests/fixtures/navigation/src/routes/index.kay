@@ -30,5 +30,5 @@ Box
 form(action={note})
   input(name="text")
   button.note Note
-Aside(server="defer")
+Aside(server defer)
 div(style="height: 3000px")

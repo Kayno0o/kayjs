@@ -8,7 +8,6 @@ import type { RouteSize, SizeReport } from './report'
 import { realpathSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { actionOf, elementsIn, serverIslandOf, someNode } from '../compiler/ast'
-import { exportedHydrate } from '../compiler/island-arguments'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript } from '../compiler/script'
 import { bindingNames, scopedBlocks } from '../compiler/template-reads'
@@ -365,10 +364,10 @@ function isWaiting(hydrate: string | undefined): boolean {
   return hydrate === 'visible' || hydrate === 'idle' || hydrate === 'interaction' || hydrate?.startsWith('media(') === true
 }
 
-// Whether the component's `--- module` fence exports `island = { hydrate: 'visible' }` or another waiting value, which every use that writes no `hydrate` of its own gets.
+// Whether the component's `island()` asks for `hydrate: 'visible'` or another waiting value, which every use that writes no `hydrate` of its own gets.
 function asksToWait(source: string): boolean {
   const parsed = parseKay(source)
-  const hydrate = exportedHydrate(analyzeScript(source, parsed.script, [], parsed.module))
+  const hydrate = analyzeScript(source, parsed.script, [], parsed.module).island?.hydrate
 
   return isWaiting(hydrate)
 }

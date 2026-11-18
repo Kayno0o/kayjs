@@ -10,6 +10,6 @@ import Remote from '../components/remote.kay'
 head
   title Deferred refresh
 h1 Deferred refresh
-Remote(server="defer" label="one" to={stay})
+Remote(server defer label="one" to={stay})
 Refresher
 a.self(href="/deferred-refresh") Self

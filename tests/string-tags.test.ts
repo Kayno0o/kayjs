@@ -69,12 +69,12 @@ describe('a tag held in a value as text', () => {
     expect(await inBrowser(source, props)).toBe('ILJ')
   })
 
-  it('keeps a held component with server="defer" a server island on the server, whichever value holds it', () => {
+  it('keeps a held component with server defer a server island on the server, whichever value holds it', () => {
     const sources = [
-      '---\nconst { Example } = props<{ Example: () => string }>()\n---\nExample(server="defer")',
-      '---\nimport { pick } from \'./pick\'\nconst Example = pick(\'x\')\n---\nExample(server="defer")',
-      '---\nimport { demo } from \'./demo\'\nconst { component: Example } = demo(\'x\')\n---\nExample(server="defer")',
-      '---\nconst { items } = props<{ items: (() => string)[] }>()\n---\nfor Item of items\n  Item(server="defer")',
+      '---\nconst { Example } = props<{ Example: () => string }>()\n---\nExample(server defer)',
+      '---\nimport { pick } from \'./pick\'\nconst Example = pick(\'x\')\n---\nExample(server defer)',
+      '---\nimport { demo } from \'./demo\'\nconst { component: Example } = demo(\'x\')\n---\nExample(server defer)',
+      '---\nconst { items } = props<{ items: (() => string)[] }>()\n---\nfor Item of items\n  Item(server defer)',
     ]
 
     for (const source of sources) {

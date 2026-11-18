@@ -61,6 +61,9 @@ function hydrateOf(name: string, attribute: { type: string, value?: unknown } | 
   return name in HYDRATE ? { value: HYDRATE[name] } : undefined
 }
 
+// `client:only` is `render="client"`, the other directives a `hydrate` value.
+const hydrateAttribute = (hydrate: string): string => hydrate === 'client' ? 'render="client"' : `hydrate="${hydrate}"`
+
 export interface RawBlock {
   tag: string
   attributes: string
@@ -611,7 +614,7 @@ class Translator {
     }
 
     if (hydrate !== undefined)
-      attributes.push(`hydrate="${hydrate}"`)
+      attributes.push(hydrateAttribute(hydrate))
 
     // Several static classes left out of the shorthand join in one attribute.
     const classes = attributes.filter(attribute => attribute.startsWith('class="'))

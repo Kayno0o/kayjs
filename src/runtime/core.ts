@@ -216,15 +216,15 @@ export function throttled<T>(source: () => T, delay: Duration, options?: EffectO
 type EventMapOf<T> = T extends Window ? WindowEventMap : T extends Document ? DocumentEventMap : T extends HTMLElement ? HTMLElementEventMap : T extends MediaQueryList ? MediaQueryListEventMap : Record<string, Event>
 
 // Listens to `type` events on `target`, `window` or `document` for instance, while the island lives; nothing listens while the server renders.
-// `target` is a function returning it, `listen(() => window, ...)`, so `window` is never read on the server and a signal or a `ref` it reads is followed: its new value listens as it changes. In a `.kay` file the compiler still wraps a target given as a value, which `deprecated-listen-target` reports.
+// `target` is a function returning it, `listen(() => window, ...)`, so `window` is never read on the server and a signal or a `ref` it reads is followed: its new value listens as it changes.
 // Returns what stops it before the island ends, which the `signal` of its options does too.
 // The handler runs under the owner `listen` was called in, so a stream it starts closes with that island or block.
 // kept: free
-export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: T | (() => T | null | undefined), type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions): () => void {
+export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: () => T | null | undefined, type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions): () => void {
   const owner = getOwner()
 
   return lasting('listen', handler, () => createEffect(() => {
-    const at = typeof target === 'function' ? target() : target
+    const at = target()
 
     if (!at)
       return

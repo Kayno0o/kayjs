@@ -2709,12 +2709,12 @@ describe('a stream an island starts', () => {
   const listening = site({
     'page.kay': PAGE,
     'main.kay': `---\nimport { signal } from 'kay'\nimport Listener from './listener.kay'\n\nconst shown = signal(true)\n---\nbutton.hide(onClick={() => shown.set(false)}) Hide\nif shown()\n  Listener\n`,
-    'listener.kay': `---\nimport { listen } from 'kay'\nimport { quiet } from './page.kay'\n\nasync function start() {\n  ${records}.push(await quiet().orThrow())\n}\n\nlisten(window, 'keydown', () => void start())\n---\np Listening\n`,
+    'listener.kay': `---\nimport { listen } from 'kay'\nimport { quiet } from './page.kay'\n\nasync function start() {\n  ${records}.push(await quiet().orThrow())\n}\n\nlisten(() => window, 'keydown', () => void start())\n---\np Listening\n`,
   })
   const retargeted = site({
     'page.kay': PAGE,
     'main.kay': `---\nimport { signal } from 'kay'\nimport Listener from './listener.kay'\n\nconst shown = signal(true)\n---\nbutton.hide(onClick={() => shown.set(false)}) Hide\nif shown()\n  Listener\n`,
-    'listener.kay': `---\nimport { listen, signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst target = signal<EventTarget>(window)\n\nasync function start() {\n  ${records}.push(await quiet().orThrow())\n}\n\nlisten(target(), 'keydown', () => void start())\n---\nbutton.move(onClick={() => target.set(document)}) Move\n`,
+    'listener.kay': `---\nimport { listen, signal } from 'kay'\nimport { quiet } from './page.kay'\n\nconst target = signal<EventTarget>(window)\n\nasync function start() {\n  ${records}.push(await quiet().orThrow())\n}\n\nlisten(target, 'keydown', () => void start())\n---\nbutton.move(onClick={() => target.set(document)}) Move\n`,
   })
   const awaiting = site({
     'page.kay': PAGE,

@@ -75,14 +75,12 @@ describe('formatKay', () => {
     expect(formatKay('---<T extends { id: number }>  \nconst { items } = props<{ items: T[] }>()\n---\np {items.length}\n').code).toBe('--- <T extends { id: number }>\nconst { items } = props<{ items: T[] }>()\n---\np {items.length}\n')
   })
 
-  it('keeps `--- client` on its fence line, with the type parameters of a generic one', () => {
-    expect(formatKay('--- client   <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n').code).toBe('--- client <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
-    expect(formatKay('---  client\nconst a = 1\n---\np {a}\n').code).toBe('--- client\nconst a = 1\n---\np {a}\n')
+  it('keeps `--- script` on its fence line, with the type parameters of a generic one', () => {
+    expect(formatKay('--- server\nconst x = 1\n--- script   <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n').code).toBe('--- server\nconst x = 1\n--- script <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
   })
 
   it('joins adjacent fences on the labeled line opening the second', () => {
     expect(formatKay('--- server\nconst a = 1\n---\n---\nconst b = 2\n---\np {a}\n').code).toBe('--- server\nconst a = 1\n--- script\nconst b = 2\n---\np {a}\n')
-    expect(formatKay('--- client\nconst b = 2\n---\n\n--- server\nconst a = 1\n---\np {a}\n').code).toBe('--- client\nconst b = 2\n--- server\nconst a = 1\n---\np {a}\n')
   })
 
   it('writes attribute lists canonically, inline ones included', () => {

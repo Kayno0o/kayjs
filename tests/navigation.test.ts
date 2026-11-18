@@ -2258,7 +2258,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       expect(await go('a.keep-link')).toEqual({ scroll: 'kept', transitions: 1, swapped: true })
       expect(await go('a.group-link')).toEqual({ scroll: 'kept', transitions: 0, swapped: true })
 
-      // The nearest data-scroll decides, "top" (or the old data-keep-scroll="false") meaning a plain scroll to the top.
+      // The nearest data-scroll decides, "top" meaning a plain scroll to the top.
       expect(await go('a.false-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
       expect(await go('a.nested-false-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })
       expect(await go('a.false-group-link')).toEqual({ scroll: 0, transitions: 1, swapped: true })

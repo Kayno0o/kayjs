@@ -109,7 +109,7 @@ describe('a context of keyed loaders', () => {
     const dir = await scratchDir('request-keys-retry-')
     const file = resolve(dir, 'flaky.ts')
 
-    await Bun.write(file, 'import { defineContext } from \'kay/library\'\n\nexport const calls: string[] = []\n\nexport default defineContext({\n  async a() {\n    calls.push(\'a\')\n    await Bun.sleep(5)\n\n    if (calls.filter(call => call === \'a\').length === 1)\n      throw new Error(\'store down\')\n\n    return 1\n  },\n  b() {\n    calls.push(\'b\')\n\n    return 2\n  },\n})\n')
+    await Bun.write(file, 'import { defineContext } from \'kay/server\'\n\nexport const calls: string[] = []\n\nexport default defineContext({\n  async a() {\n    calls.push(\'a\')\n    await Bun.sleep(5)\n\n    if (calls.filter(call => call === \'a\').length === 1)\n      throw new Error(\'store down\')\n\n    return 1\n  },\n  b() {\n    calls.push(\'b\')\n\n    return 2\n  },\n})\n')
     const { calls } = await import(file) as { calls: string[] }
     const request = new Request('http://localhost/flaky')
 

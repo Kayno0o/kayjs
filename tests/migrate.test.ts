@@ -162,7 +162,7 @@ import Counter from './Counter.astro'
 Counter(hydrate="visible")
 Counter
 Counter(hydrate="media(max-width: 50em)")
-Counter(hydrate="client")
+Counter(render="client")
 `)
   })
 

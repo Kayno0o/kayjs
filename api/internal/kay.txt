@@ -998,12 +998,6 @@ const DEFAULT_MAX_LENGTH: 10000
 [./library] defaultSqliteFile
 function defaultSqliteFile(legacy?: readonly string[], root?: string): string
 
-[./library] defineContext
-function defineContext<Values extends object>(load: (request: Request) => Promise<Values> | Values): ContextDefinition<Values>
-function defineContext<Loaders extends Record<string, (request: Request) => unknown>>(loaders: Loaders): ContextDefinition<{
-  [Key in keyof Loaders]: Awaited<ReturnType<Loaders[Key]>>;
-}>
-
 [./library] delayAfter
 function delayAfter(every: number, quiet: number, ceiling?: number): number
 

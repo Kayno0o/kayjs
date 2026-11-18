@@ -7,4 +7,4 @@ import Counted from '../components/counted.kay'
 ---
 h1 Typed
 Counted(server)
-Counted(server="defer")
+Counted(server defer)

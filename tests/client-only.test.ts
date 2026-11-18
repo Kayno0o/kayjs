@@ -26,14 +26,14 @@ const DOM_ONLY = {
 const FILES: Record<string, string> = {
   ...DOM_ONLY,
   'chart.kay': '---\nimport { describe } from \'dom-only\'\nimport { signal } from \'kay\'\n\nconst { label } = props<{ label: string }>()\nconst clicks = signal(0)\n---\nbutton.chart(onClick={() => clicks.set(c => c + 1)}) {label} {describe()} {clicks()}\n',
-  'width.kay': '--- client\nconst { unit } = props<{ unit: string }>()\nconst width = window.innerWidth\n---\nspan.width {width}{unit}\n',
+  'width.kay': '---\nisland({ render: "client" })\nconst { unit } = props<{ unit: string }>()\nconst width = window.innerWidth\n---\nspan.width {width}{unit}\n',
   'panel.kay': '---\nimport { signal } from \'kay\'\nimport Width from \'./width.kay\'\n\nconst open = signal(0)\n---\nsection\n  button.toggle(onClick={() => open.set(o => o + 1)}) {open()}\n  Width(unit="px")\n  p.after after\n',
   'bad.kay': '---\nconst { unit } = props<{ unit: string }>()\nconst width = window.innerWidth\n---\np {width}{unit}\n',
   'plain.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nb.plain {n()}\n',
-  'skeleton.kay': '--- client\nconst { n } = props<{ n: number }>()\nconst width = window.innerWidth\n---\nb.real {n}:{width}\n@fallback\n  b.skeleton waiting\n',
-  'boom.kay': '--- client\nimport { onCleanup } from \'kay\'\n\nconst log = (globalThis as { cleaned?: string[] }).cleaned ??= []\nonCleanup(() => log.push(\'cleaned\'))\n---\np.first first\nif true\n  b.second second\n  u {(() => { throw new Error(\'midway\') })()}\n@fallback\n  i.hold held\n',
-  'avatar.kay': '--- client\nconst { fallback } = props<{ fallback: string }>()\nconst width = window.innerWidth\n---\nb.av {fallback}:{width}\n',
-  'page.kay': '---\nimport Avatar from \'./avatar.kay\'\nimport Chart from \'./chart.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Skeleton from \'./skeleton.kay\'\nimport Width from \'./width.kay\'\n---\nmain\n  Chart(label="sales")\n  Panel\n  Width(unit="em")\n  Plain(hydrate="client")\n  Plain(hydrate="client")\n    @fallback\n      i.hold held\n  Skeleton(n={2})\n  Skeleton(n={3})\n    @fallback\n      i.own mine\n  Avatar(fallback="hi")\n',
+  'skeleton.kay': '---\nisland({ render: "client" })\nconst { n } = props<{ n: number }>()\nconst width = window.innerWidth\n---\nb.real {n}:{width}\n@fallback\n  b.skeleton waiting\n',
+  'boom.kay': '---\nisland({ render: "client" })\nimport { onCleanup } from \'kay\'\n\nconst log = (globalThis as { cleaned?: string[] }).cleaned ??= []\nonCleanup(() => log.push(\'cleaned\'))\n---\np.first first\nif true\n  b.second second\n  u {(() => { throw new Error(\'midway\') })()}\n@fallback\n  i.hold held\n',
+  'avatar.kay': '---\nisland({ render: "client" })\nconst { fallback } = props<{ fallback: string }>()\nconst width = window.innerWidth\n---\nb.av {fallback}:{width}\n',
+  'page.kay': '---\nimport Avatar from \'./avatar.kay\'\nimport Chart from \'./chart.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Skeleton from \'./skeleton.kay\'\nimport Width from \'./width.kay\'\n---\nmain\n  Chart(label="sales")\n  Panel\n  Width(unit="em")\n  Plain(render="client")\n  Plain(render="client")\n    @fallback\n      i.hold held\n  Skeleton(n={2})\n  Skeleton(n={3})\n    @fallback\n      i.own mine\n  Avatar(fallback="hi")\n',
 }
 
 let dir: string
@@ -59,12 +59,12 @@ describe('client-only islands', () => {
     expect(html).toContain(`<slot data-component="${ids.chart}" data-props='[{"label":1},"sales"]' data-client></slot>`)
   })
 
-  it('leaves the slot of a `--- client` component empty, and its part inside another island', () => {
+  it('leaves the slot of a client-only component empty, and its part inside another island', () => {
     expect(html).toContain(`<slot data-component="${ids.width}" data-props='[{"unit":1},"em"]' data-client></slot>`)
     expect(html).toContain('<section><button class="toggle">0</button><!--[--><!--]--><p class="after">after</p></section>')
   })
 
-  it('renders an island the browser only with `hydrate="client"`', () => {
+  it('renders an island the browser only with `render="client"`', () => {
     expect(html).toContain(`<slot data-component="${ids.plain}" data-props="[{}]" data-client></slot>`)
   })
 
@@ -198,7 +198,7 @@ describe('the fallback of a client-only component', () => {
   const compile = (source: string) => compileKay(source, join(root, 'src/widget.kay'), { output: 'html', component: true, root })
 
   it('keeps its shorthand classes and the scope attribute of the component\'s styles', () => {
-    const compiled = compile('--- client\nconst w = window.innerWidth\n---\n--- style\n.map { color: red }\n---\np.real {w}\n@fallback\n  .map.animate-pulse\n')
+    const compiled = compile('---\nisland({ render: "client" })\nconst w = window.innerWidth\n---\n--- style\n.map { color: red }\n---\np.real {w}\n@fallback\n  .map.animate-pulse\n')
 
     expect(compiled.classes).toContain('animate-pulse')
     expect(compiled.tsx).toContain('function KayFallback(')
@@ -206,19 +206,19 @@ describe('the fallback of a client-only component', () => {
   })
 
   it('copies the imports it names, and reports a script value or prop it reads', () => {
-    const compiled = compile('--- client\nimport Icon from \'./icon.kay\'\nimport Other from \'./other.kay\'\nconst { n } = props<{ n: number }>()\nconst width = window.innerWidth\n---\np.real {n}\n@fallback\n  Icon\n  b {width}\n  i {n}\n  u {Math.max(1, 2)}\n')
+    const compiled = compile('---\nisland({ render: "client" })\nimport Icon from \'./icon.kay\'\nimport Other from \'./other.kay\'\nconst { n } = props<{ n: number }>()\nconst width = window.innerWidth\n---\np.real {n}\n@fallback\n  Icon\n  b {width}\n  i {n}\n  u {Math.max(1, 2)}\n')
 
     expect(compiled.tsx).toContain('import Icon from')
     expect(compiled.tsx).not.toContain('import Other from')
     expect(compiled.tsx.indexOf('import Icon from')).toBeLessThan(compiled.tsx.indexOf('function KayFallback('))
     expect(compiled.diagnostics.map(diagnostic => diagnostic.message)).toEqual([
-      '`@fallback` of a `--- client` component reads `width`, which the server does not have',
-      '`@fallback` of a `--- client` component reads `n`, which the server does not have',
+      '`@fallback` of a client-only component reads `width`, which the server does not have',
+      '`@fallback` of a client-only component reads `n`, which the server does not have',
     ])
   })
 
   it('reads the script\'s declarations from the parsed script: each name of a list, a default in a pattern', () => {
-    const reported = (script: string, fallback: string) => compile(`--- client\n${script}\n---\np.real\n@fallback\n  ${fallback}\n`).diagnostics.map(diagnostic => diagnostic.message.match(/reads `(\w+)`/)?.[1])
+    const reported = (script: string, fallback: string) => compile(`---\nisland({ render: "client" })\n${script}\n---\np.real\n@fallback\n  ${fallback}\n`).diagnostics.map(diagnostic => diagnostic.message.match(/reads `(\w+)`/)?.[1])
 
     expect(reported('const a = 1, b = 2', 'b {b}')).toEqual(['b'])
     expect(reported('const { a = 1 } = props<{ a?: number }>()', 'b {a}')).toEqual(['a'])
@@ -227,7 +227,7 @@ describe('the fallback of a client-only component', () => {
   })
 
   it('reports no read of a name that is not the script\'s, a const inside a script function, a template binder or an object key', () => {
-    const reported = (script: string, fallback: string) => compile(`--- client\n${script}\n---\np.real\n@fallback\n  ${fallback}\n`).diagnostics.map(diagnostic => diagnostic.message)
+    const reported = (script: string, fallback: string) => compile(`---\nisland({ render: "client" })\n${script}\n---\np.real\n@fallback\n  ${fallback}\n`).diagnostics.map(diagnostic => diagnostic.message)
 
     expect(reported('function run() { const inner = 1 }', 'b {inner}')).toEqual([])
     expect(reported('const item = 1', 'for item of [1, 2]\n    i {item}')).toEqual([])
@@ -241,7 +241,7 @@ describe('the fallback of a client-only component', () => {
   })
 
   it('reports a script name read as a shorthand, a spread, a template part, a chain or beside a shadowing parameter, and an enum declared by the script', () => {
-    const reported = (script: string, fallback: string) => compile(`--- client\n${script}\n---\np.real\n@fallback\n  ${fallback}\n`).diagnostics.map(diagnostic => diagnostic.message.match(/reads `(\w+)`/)?.[1])
+    const reported = (script: string, fallback: string) => compile(`---\nisland({ render: "client" })\n${script}\n---\np.real\n@fallback\n  ${fallback}\n`).diagnostics.map(diagnostic => diagnostic.message.match(/reads `(\w+)`/)?.[1])
 
     expect(reported('const width = 1', 'b {JSON.stringify({ width })}')).toEqual(['width'])
     expect(reported('const rest = {}', 'b({...rest})')).toEqual(['rest'])
@@ -253,7 +253,7 @@ describe('the fallback of a client-only component', () => {
   })
 
   it('compiles an empty block', () => {
-    const compiled = compile('--- client\nconst w = window.innerWidth\n---\np.real {w}\n@fallback\n')
+    const compiled = compile('---\nisland({ render: "client" })\nconst w = window.innerWidth\n---\np.real {w}\n@fallback\n')
 
     expect(compiled.diagnostics).toEqual([])
     expect(compiled.tsx).toContain('function KayFallback(')
@@ -350,22 +350,16 @@ describe('browser-only globals read while rendering', () => {
     expect(reads('--- server\nconst status = \'ok\'\n---\np {status}\nfor event of [status] key={event}\n  span {event}\n')).toEqual([])
   })
 
-  it('leaves the target of `listen` alone, which the compiler hands over as a function the server never calls', () => {
-    const source = '---\nimport { listen, signal } from \'kay\'\n\nconst key = signal(\'\')\nlisten(window, \'keydown\', event => key = event.key)\nlisten(window.visualViewport!, \'resize\', () => key = \'\')\n---\np {key()}\n'
+  it('leaves the function target of `listen` alone, which the server never calls, and reads a target given as a value', () => {
+    const source = '---\nimport { listen, signal } from \'kay\'\n\nconst key = signal(\'\')\nlisten(() => window, \'keydown\', event => key = event.key)\nlisten(() => window.visualViewport!, \'resize\', () => key = \'\')\n---\np {key()}\n'
     const compiled = (output: 'dom' | 'html') => compileKay(source, join(process.cwd(), 'widget.kay'), { output, hydratable: true }).tsx
 
     expect(reads(source)).toEqual([])
-    expect(reads(source.replace('listen(window,', 'listen(document.title.length ? window : window,'))).toEqual([])
-    expect(reads(source.replace('listen(window,', 'listen(window[localStorage.key(0)!] as Window, document.title,')).map(read => read.text)).toEqual(['document'])
-
-    expect(reads(source.replace('listen(window,', 'listen(document,'))).toEqual([])
-    expect(reads(source.replace('listen(window,', 'listen(document.body,'))).toEqual([])
-    expect(reads(source.replace('listen(window,', 'listen(document.documentElement,'))).toEqual([])
-    expect(reads(source.replace('listen(window,', 'listen(() => document,'))).toEqual([])
+    expect(reads(source.replace('listen(() => window,', 'listen(window,')).map(read => read.text)).toEqual(['window'])
 
     for (const output of ['dom', 'html'] as const) {
-      expect(compiled(output)).toContain('listen(() => (window), \'keydown\'')
-      expect(compiled(output)).toContain('listen(() => (window.visualViewport!), \'resize\'')
+      expect(compiled(output)).toContain('listen(() => window, \'keydown\'')
+      expect(compiled(output)).toContain('listen(() => window.visualViewport!, \'resize\'')
     }
   })
 
@@ -378,9 +372,9 @@ describe('browser-only globals read while rendering', () => {
     expect(compileKay(island, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => [diagnostic.note, diagnostic.help])).toEqual([['what the island renders from it will not match the server\'s markup when it hydrates', 'read it in `effect` or `onMount`, or render the component in the browser only with `island({ render: \'client\' })`']])
   })
 
-  it('refuses `--- client` on a layout or a page with a server fence', () => {
-    expect(compileKay('--- client\n---\nslot\n', join(process.cwd(), '_layout.kay')).diagnostics.map(diagnostic => [diagnostic.message, diagnostic.note])).toEqual([['A page, layout or special page cannot render in the browser only', 'it renders on the server']])
-    expect(compileKay('--- server\nconst a = 1\n---\n--- client\n---\np {a}\n', join(process.cwd(), 'page.kay')).diagnostics).toHaveLength(1)
+  it('refuses `island({ render: "client" })` on a layout or a page with a server fence', () => {
+    expect(compileKay('---\nisland({ render: "client" })\n---\nslot\n', join(process.cwd(), '_layout.kay')).diagnostics.map(diagnostic => [diagnostic.message, diagnostic.note])).toEqual([['A page, layout or special page cannot render in the browser only', 'it renders on the server']])
+    expect(compileKay('--- server\nconst a = 1\n--- script\nisland({ render: "client" })\n---\np {a}\n', join(process.cwd(), 'page.kay')).diagnostics).toHaveLength(1)
   })
 
   it('reads past names the template binds over the script\'s, and leaves guarded reads alone', () => {
@@ -391,7 +385,7 @@ describe('browser-only globals read while rendering', () => {
     expect(reads(guards)).toEqual([])
   })
 
-  it('offers no `--- client` on a layout or special page, nor switches one for a package it imports', () => {
+  it('offers no `island({ render: "client" })` on a layout or special page, nor switches one for a package it imports', () => {
     const layout = compileKay('---\nconst title = document.title\n---\nh1 {title}\nslot\n', join(process.cwd(), '_layout.kay'), { check: true })
     const page = compileKay('--- server\nconst a = 1\n---\n---\nimport { signal } from \'kay\'\n\nconst n = signal(a)\n---\nbutton(onClick={() => n.set(v => v + 1)}) {n()}\n', join(process.cwd(), 'page.kay'), { output: 'html', includeServer: true, hydratable: true, clientOnly: true })
 
@@ -400,7 +394,7 @@ describe('browser-only globals read while rendering', () => {
     expect(page.tsx).not.toContain('undefined, [], true')
   })
 
-  it('adds a script fence to a component without one, and reports nothing in a `--- client` one', () => {
+  it('adds a script fence to a component without one, and reports nothing in a client-only one', () => {
     expect(reads('p {window.location.href}\n')).toEqual([{ text: 'window', message: '`window` exists only in the browser', fixes: ['---\nisland({ render: \'client\' })\n---\np {window.location.href}\n'] }])
     expect(reads('---\nisland({ render: \'client\' })\nconst width = window.innerWidth\n---\np {width}\n')).toEqual([])
   })

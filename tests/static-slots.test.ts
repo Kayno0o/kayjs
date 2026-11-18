@@ -100,7 +100,7 @@ describe('static slots', () => {
     expect(document.querySelector('span.label')?.textContent).toBe('Plain text')
   })
 
-  it('renders a component pinned `--- island` as an island passing a function or a block taking parameters on, one passing only data staying static', () => {
+  it('renders a component pinned `island()` as an island passing a function or a block taking parameters on, one passing only data staying static', () => {
     expect(pageHtml).toContain(`<slot data-component="tests/fixtures/slots/toolbar.kay" data-props='[{"label":1},"Tool"]'><div class="toolbar"><button class="pick">`)
     expect(pageHtml).toContain('<slot data-component="tests/fixtures/slots/rows.kay" data-props="[{}]">')
     expect(pageHtml).toContain('<div class="counted"><slot data-component="tests/fixtures/slots/counter.kay"')

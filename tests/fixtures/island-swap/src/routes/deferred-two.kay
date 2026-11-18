@@ -9,6 +9,6 @@ import Remote from '../components/remote.kay'
 head
   title Deferred two
 h1 Deferred two
-Remote(server="defer" label="one" to={stay})
-Remote(server="defer" label="other" to={stay})
+Remote(server defer label="one" to={stay})
+Remote(server defer label="other" to={stay})
 a.back(href="/deferred") Back

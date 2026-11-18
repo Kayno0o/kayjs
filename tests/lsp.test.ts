@@ -688,7 +688,7 @@ describe('kay lsp imports', () => {
     expect(actions.map(action => applyEdits(source, action.edit!.changes![editor.uri(page)]!)).some(text => text.includes('import { signal } from \'kay\''))).toBe(true)
   })
 
-  it('reports a browser-only global read while rendering next to the type errors, fixed with an effect or `--- client`', async () => {
+  it('reports a browser-only global read while rendering next to the type errors, fixed with an effect or `island({ render: "client" })`', async () => {
     const source = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nlocalStorage.clear()\n---\np {count().missing}\nbutton(onClick={() => count = 1}) +\n'
     const diagnostics = await editor.change(page, source, 6)
     const line = { start: { line: 4, character: 0 }, end: { line: 4, character: 12 } }

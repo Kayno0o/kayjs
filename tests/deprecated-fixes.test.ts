@@ -15,7 +15,6 @@ import { clientKeys } from '../src/check/client-keys'
 import { cmsOptions } from '../src/check/cms-options'
 import { configGroups } from '../src/check/config-groups'
 import { configSwitches } from '../src/check/config-switches'
-import { contextImport } from '../src/check/context-import'
 import { envFiles } from '../src/check/env-files'
 
 import { applySafeFixes } from '../src/check/fixes'
@@ -30,7 +29,7 @@ import { imagesKeys } from '../src/check/images-keys'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
 import { liveApi } from '../src/check/live-api'
 import { mailApi } from '../src/check/mail-api'
-import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
+import { navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
 import { pagesOptions } from '../src/check/pages-options'
 import { rateEnforce } from '../src/check/rate-enforce'
 import { refusalCalls } from '../src/check/refusal-calls'
@@ -91,9 +90,6 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-persisted-query': persistedQuery,
   'deprecated-navigate-query': navigateQuery,
   'deprecated-navigation-hooks': navigationHooks,
-  'deprecated-island-events': islandEvents,
-  'deprecated-listen-target': listenTarget,
-  'deprecated-import-path': movedImports,
   'deprecated-schema-builders': schemaBuilders,
   'deprecated-action-options': actionOptions,
   'deprecated-test-helpers': testHelpers,
@@ -117,7 +113,6 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-ttl-names': ttlNames,
   'deprecated-store-ms': storeMs,
   'deprecated-env-files': envFiles,
-  'deprecated-context-import': contextImport,
 
   // Its fix is safe only in a project that lists kayjs-ui, where the new form comes from.
   'deprecated-mail-form': async (root, options) => {
@@ -129,7 +124,6 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
 
 // Every deprecated lint has a `safe` fix, which `kay upgrade` applies, that turns its `wrong` example into its `right` one (#2843). A lint whose old form no fix can rewrite without risk goes here with the reason, and `kay upgrade` leaves it to `llms/upgrading.md`: moving code into a new file is the one today.
 const NO_SAFE_FIX: Partial<Record<Name, string>> = {
-  'deprecated-page-island': 'moving what needs the browser into a component is a new file and a new import, not an edit in place',
   'deprecated-mail-send': 'a call reaches the request\'s mailer only when its function is handed the context, which an edit in place cannot know',
 }
 
@@ -150,7 +144,7 @@ describe('every deprecated lint has a safe fix', () => {
   it('lists each lint\'s check, so a new one cannot go without', () => {
     const compiled = names.filter(name => !(name in SITE))
 
-    expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-ai-links', 'deprecated-auth-signed', 'deprecated-children-prop', 'deprecated-image-options', 'deprecated-island-attributes', 'deprecated-island-fence', 'deprecated-link-flags', 'deprecated-mail-send', 'deprecated-page-cache', 'deprecated-page-island', 'deprecated-page-seo', 'deprecated-parts-class', 'deprecated-ui-callbacks', 'deprecated-ui-input', 'deprecated-ui-items', 'deprecated-ui-props', 'deprecated-uncaught-await'])
+    expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-ai-links', 'deprecated-auth-signed', 'deprecated-image-options', 'deprecated-mail-send', 'deprecated-page-cache', 'deprecated-page-seo', 'deprecated-parts-class', 'deprecated-ui-callbacks', 'deprecated-ui-input', 'deprecated-ui-items', 'deprecated-ui-props'])
     expect(Object.keys(NO_SAFE_FIX).filter(name => !names.includes(name as Name))).toEqual([])
   })
 

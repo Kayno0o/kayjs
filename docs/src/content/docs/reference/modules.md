@@ -120,7 +120,6 @@ Types include `BrowserError` and `CspViolationError`, the browser errors and CSP
 | `kay/test/preload` | The preload `kay test` loads, and a project's `bunfig.toml` lists for a plain `bun test`; it also closes the test sites and copies a database per file from a `pg-orm.config.ts`. See [Testing](/guides/testing#a-database-for-each-test-file) |
 | `kay/test/dom` | Registers happy-dom's DOM, popover API included, which `mountComponent` loads on its first mount. See [Testing](/guides/testing#one-component) |
 | `kay/bun` | `kay`, the Bun plugin compiling `.kay` files for a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
-| `kay/mount` | `mount`, which `kay` exports too and is the home of: the entry stays until 1.108. It renders a component into an element on a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
 | `kay/eslint` | The ESLint processor for `.kay` files. See [Checks](/reference/checks) |
 | `kay/tsconfig.json` | The base tsconfig a project extends |
 | `kay/jsx-runtime` | Where TypeScript finds the JSX types, through the `jsxImportSource` of the base tsconfig. Nothing to import |

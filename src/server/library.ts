@@ -50,8 +50,6 @@ export { openSqlite } from '../runtime/sqlite.server'
 export { parseEvents } from '../runtime/sse'
 export type { MaybePromise } from '../runtime/store-base'
 export { lengthMs } from '../runtime/store-base'
-/** @deprecated Import `defineContext` from `kay/server`; `deprecated-context-import` rewrites it. Removed in 1.108. */
-export { defineContext } from '../runtime/template-context'
 export type { ContextDefinition } from '../runtime/template-context'
 export { acceptedLocales, matchLocale, validLocale } from './accept-language'
 export { APP_SQLITE_FILE, appDatabase, defaultSqliteFile } from './app-database'

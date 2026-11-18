@@ -89,7 +89,7 @@ listen(() => window, 'online', refresh, { signal: abort.signal })
 
 `island()` is the fix, applied by `kay check --fix` where the value is always a function and offered where its type is a union holding one, as the component may be static on some pages. A page, a layout or a special page is never an island: pass the island data, or go through a component of its own. When the check was skipped, rendering throws an `IslandPropsError` naming the prop and the same fix.
 
-Write `island()` first in the script to say it is meant. The component is then an island on every page that renders it, whatever it passes. It was the `--- island` fence line, which `kay upgrade` rewrites and which works until 1.108.
+Write `island()` first in the script to say it is meant. The component is then an island on every page that renders it, whatever it passes.
 
 Write `island({ render: 'static' })` to say it is not. If anything in the component would make it an island, an `onClick` or a `signal`, `kay check` and `kay build` stop with the error `static-pin` at that line, naming what it is. A function it hands an island is `island-prop`. A pin does not change what a page, a layout or a special page is: they are never islands, and `island()` on one is reported as `island-marker`.
 
@@ -138,7 +138,7 @@ Collapsible(title="Details")
 
 A function or a class instance cannot be sent. A static component passing one to an island is the error `island-prop`: declare `island()` on it.
 
-A page should not become an island. A handler, a `bind:`, a `ref`, a signal or a live or persisted value in a page that has no `--- server` fence still makes it one through 1.107, and `kay check` warns about it (`deprecated-page-island`); 1.108 refuses it. Move that part to a component and render it from the page.
+A page should not become an island. A handler, a `bind:`, a `ref`, a signal or a live or persisted value in a page that has no `--- server` fence is an error in `kay check` (`page-island`). Move that part to a component and render it from the page.
 
 ## When to hydrate
 
@@ -469,7 +469,7 @@ p Window is {width()}px wide
 
 `kay check` reports a read of one of them while the component renders, and `kay check --fix` moves a call such as `localStorage.setItem(...)` into `effect` for you. It also reports a module of your app that reads one as it loads when a page imports it (the `browser-global-at-load` lint). A server render that still fails on one names the global, the component and the line reading it, in development and in production logs.
 
-A component that cannot render on the server at all, such as one wrapping a map library, declares `island({ render: 'client' })`. It renders in the browser only. It was the `--- client` fence line, which `kay upgrade` rewrites and which works until 1.108.
+A component that cannot render on the server at all, such as one wrapping a map library, declares `island({ render: 'client' })`. It renders in the browser only.
 
 ```kay
 ---
@@ -485,7 +485,7 @@ onMount(() => drawMap(center))
 .map
 ```
 
-The server sends an empty slot for it, which shifts the layout when the map appears. Give it a fallback to show in the meantime: an `@fallback` block at the root of the component's template for every use, or one written under a use, `Map(center={center} render="client")`, for that use alone (it was `hydrate="client"`). The browser replaces it when the island renders.
+The server sends an empty slot for it, which shifts the layout when the map appears. Give it a fallback to show in the meantime: an `@fallback` block at the root of the component's template for every use, or one written under a use, `Map(center={center} render="client")`, for that use alone. The browser replaces it when the island renders.
 
 A component's own fallback is static markup: it cannot read the script's values, but it can use the script's imports, and `kay check` reports a value or prop it reads.
 
@@ -512,7 +512,7 @@ onMount(() => drawMap(center))
 
 `every(interval, run)` runs `run` on a timer while the island lives, `interval` being a duration such as `'1s'`. `every('1s', () => now = Date.now())` ticks a clock. The timer pauses while the tab is hidden and runs once as it shows again; pass `{ background: true }` to keep it running. An interval of zero, a negative one or one that is not a duration throws.
 
-`listen(() => window, 'keydown', event => ...)` listens to an event of `window` or `document`, the target being a function returning it: that is the one form, which a `.ts` module runs on the server too, and a `ref` or a signal follows as it changes. `listen(window, ...)` works until 1.108, `kay upgrade` wrapping the target (`deprecated-listen-target`). It removes the listener when the island ends.
+`listen(() => window, 'keydown', event => ...)` listens to an event of `window` or `document`, the target being a function returning it: that is the one form, which a `.ts` module runs on the server too, and a `ref` or a signal follows as it changes. It removes the listener when the island ends.
 
 Call it with an arrow function or read the target as `event.currentTarget`, as the callback has no `this`. An `effect()` or `onCleanup()` inside the callback belongs to the island and builds up with every event, as in an element's handler, so keep them out of it.
 

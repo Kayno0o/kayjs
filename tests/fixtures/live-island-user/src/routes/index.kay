@@ -6,4 +6,4 @@ import Inbox from '../components/inbox.kay'
 head
   title Deferred
 h1 Deferred
-Inbox(server="defer")
+Inbox(server defer)

@@ -17,7 +17,6 @@ import { isPageFile, pageDirs } from '../build/page-dirs'
 import { mentionsServerOnly } from '../build/server-only'
 import { importedSignals } from '../build/signals'
 import { browserRole, onceReadChecks } from '../compiler'
-import { RETIRED_LINTS } from '../compiler/deprecated-allow'
 import { moduleChecks, turnsCaptchaOff } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
@@ -32,7 +31,6 @@ import { dockerfileProblems } from './dockerfile'
 import { CONTENT_CHECK, contentPropsCheck } from './generated'
 import { browserModules, islandEdges } from './island-modules'
 import { componentImporters, islandOnlyComponents, renderedInIslands } from './island-only'
-import { linkFlagTests } from './link-flag-tests'
 import { FILES_MARKER, stampOf } from './loaded'
 
 import { configSeoLints } from './seo'
@@ -106,13 +104,13 @@ export function configProblems(root: string, options: CheckOptions, types: Shado
 // The collections may still be read, which only the feeds and their own problems wait for.
 export async function projectProblems(root: string, options: CheckOptions, collections: ContentChecks | Promise<ContentChecks>, memory?: ProbeMemory, scanned?: ServedProject): Promise<CheckDiagnostic[]> {
   return inWalkScope(async () => {
-    const [content, messages, boot, modules, linkTests] = await Promise.all([collections, checkMessages(root, options, memory), (async () => {
+    const [content, messages, boot, modules] = await Promise.all([collections, checkMessages(root, options, memory), (async () => {
       const read = await collections
 
       return bootProblems(resolve(root), options, read.feeds, scanned, read.routes)
-    })(), moduleLints(root, options), linkFlagTests(root, options.lints)])
+    })(), moduleLints(root, options)])
 
-    return [...content.problems, ...messages, ...boot, ...modules, ...linkTests, ...uiProblems(root), ...contextModuleProblems(root)]
+    return [...content.problems, ...messages, ...boot, ...modules, ...uiProblems(root), ...contextModuleProblems(root)]
   })
 }
 
@@ -296,9 +294,6 @@ function lintConfigProblems(root: string, lints: LintLevels = {}): CheckDiagnost
 
   return levelEntries(lints).flatMap(([name, level]) => {
     const at = { file, ...locate(['lints', name]) }
-
-    if (RETIRED_LINTS.has(name))
-      return []
 
     if (!isLint(name) && !isLintGroup(name))
       return [{ ...at, message: `\`lints\` names \`${name}\`, which is no lint or group`, help: '`kay explain` lists them' }]

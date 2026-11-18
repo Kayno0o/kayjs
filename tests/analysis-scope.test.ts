@@ -5,7 +5,7 @@ import * as markdown from '../src/compiler/markdown-block'
 const SOURCES: [name: string, file: string, text: string][] = [
   ['static', 'card.kay', 'p hi\n'],
   ['interactive', 'counter.kay', '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(onClick={() => n = n() + 1}) {n()}\n'],
-  ['client', 'map.kay', '--- client\nconst x = 1\n---\np {x}\n'],
+  ['client', 'map.kay', '---\nisland({ render: "client" })\nconst x = 1\n---\np {x}\n'],
   ['passing a function', 'list.kay', '---\nimport Picker from \'./picker.kay\'\n\nfunction pick() {}\n---\nPicker(select={pick})\n'],
   ['route file with a handler', '_layout.kay', '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(onClick={() => n = 1}) x\n'],
   ['server page', 'page.kay', '--- server\nconst a = 1\n---\np {a}\n'],

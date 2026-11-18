@@ -164,15 +164,9 @@ export function declaredIsland(source: string, script: Span): IslandDeclaration 
   }
 }
 
-// The role the fence line (`--- client`, `--- island`, `--- static`) or else the `island()` call gives the component, which `client` and `pin` of the parsed file carry whichever wrote it.
-export function rolesOf(source: string, script: Span | undefined, fence: Span & { word: string } | undefined): { island: IslandDeclaration | undefined, client: Span | undefined, pin: (Span & { kind: 'island' | 'static' }) | undefined } {
+// The role the `island()` call gives the component, which `client` and `pin` of the parsed file carry.
+export function rolesOf(source: string, script: Span | undefined): { island: IslandDeclaration | undefined, client: Span | undefined, pin: (Span & { kind: 'island' | 'static' }) | undefined } {
   const island = script === undefined ? undefined : declaredIsland(source, script)
-
-  if (fence?.word === 'client')
-    return { island, client: fence, pin: undefined }
-
-  if (fence?.word === 'island' || fence?.word === 'static')
-    return { island, client: undefined, pin: { kind: fence.word, start: fence.start, end: fence.end } }
 
   if (island === undefined)
     return { island, client: undefined, pin: undefined }

@@ -93,13 +93,12 @@ function markPending(link: Element | undefined): void {
   link?.setAttribute('data-pending', '')
 }
 
-// The nearest `data-scroll` decides, `"top"` meaning a plain scroll to the top, and the nearest `data-transition`, `"false"` meaning none; `data-keep-scroll` and `data-no-transition` are their names before 1.105, read until 1.108.
+// The nearest `data-scroll` decides, `"top"` meaning a plain scroll to the top, and the nearest `data-transition`, `"false"` meaning none.
 function linkOptions(link: Element): Pick<Swap, 'scroll' | 'transition'> {
-  const keeper = link.closest('[data-scroll],[data-keep-scroll]')
-  const changer = link.closest('[data-transition],[data-no-transition]')
-  const kept = keeper?.getAttribute('data-scroll') ?? keeper?.getAttribute('data-keep-scroll')
+  const keeper = link.closest('[data-scroll]')
+  const changer = link.closest('[data-transition]')
 
-  return { scroll: keeper && kept !== 'top' && kept !== 'false' ? 'keep' : undefined, transition: !changer || (!changer.hasAttribute('data-no-transition') && changer.getAttribute('data-transition') !== 'false') }
+  return { scroll: keeper && keeper.getAttribute('data-scroll') !== 'top' ? 'keep' : undefined, transition: changer?.getAttribute('data-transition') !== 'false' }
 }
 
 async function swapTo(url: URL, swap: Swap): Promise<void> {

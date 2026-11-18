@@ -109,7 +109,7 @@ describe('the handle of a helper that lasts as long as an island', () => {
   it('listen: stops listening, once or twice, or on abort', () => {
     const target = document.createElement('div')
     const heard = mock(() => undefined)
-    const { handle } = island(() => core.listen(target, 'click', heard))
+    const { handle } = island(() => core.listen(() => target, 'click', heard))
 
     target.click()
     handle()
@@ -120,7 +120,7 @@ describe('the handle of a helper that lasts as long as an island', () => {
     const abort = new AbortController()
     const signalled = mock(() => undefined)
 
-    island(() => core.listen(target, 'click', signalled, { signal: abort.signal }))
+    island(() => core.listen(() => target, 'click', signalled, { signal: abort.signal }))
     target.click()
     abort.abort()
     target.click()
@@ -231,7 +231,7 @@ describe('the handle of a helper that lasts as long as an island', () => {
     element.removeEventListener = remove
 
     const { dispose, handle } = island(() => {
-      core.listen(target, 'click', heard)
+      core.listen(() => target, 'click', heard)
       shortcut.shortcut('/', pressed)
       leave.guardLeave(() => true)
       followLog.followLog(element)
@@ -336,7 +336,7 @@ describe('the handle of a helper that lasts as long as an island', () => {
     abort.signal.addEventListener = add as typeof abort.signal.addEventListener
     reactive.renderOnServer(() => {
       reactive.root(() => {
-        core.listen(target, 'click', heard, { signal: abort.signal })
+        core.listen(() => target, 'click', heard, { signal: abort.signal })
         core.every('5ms', heard, { signal: abort.signal })
       })
     })
@@ -350,7 +350,7 @@ describe('the handle of a helper that lasts as long as an island', () => {
     const target = document.createElement('div')
     const heard = mock(() => undefined)
 
-    island(() => core.listen(target, 'click', heard, null as unknown as undefined))
+    island(() => core.listen(() => target, 'click', heard, null as unknown as undefined))
     target.click()
     expect(heard).toHaveBeenCalledTimes(1)
   })

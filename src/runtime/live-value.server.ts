@@ -248,7 +248,7 @@ function readOwn(slot: ServerSlot): unknown {
   return value
 }
 
-// An island's server render notes the live values it imports, so the page proves them though the render did not read them, as when a handler or a `--- client` fence reads one later. A keyed value is left out: its key is not known before it is read.
+// An island's server render notes the live values it imports, so the page proves them though the render did not read them, as when a handler or a client-only component reads one later. A keyed value is left out: its key is not known before it is read.
 export function noteLives(handles: readonly unknown[]): void {
   for (const handle of handles) {
     const slot = typeof handle === 'function' ? slotOfHandle.get(handle) : undefined

@@ -2104,7 +2104,7 @@ describe('listen', () => {
     const heard: string[] = []
     const dispose = root((dispose) => {
       listen(target, 'ping', event => heard.push(event.type))
-      listen(first, 'once', event => heard.push(event.type), { once: true })
+      listen(() => first, 'once', event => heard.push(event.type), { once: true })
 
       return dispose
     })
@@ -2145,7 +2145,7 @@ describe('effects with no owner', () => {
   // Each call hands a function of its own, as a warning is given once per function.
   let calls = 0
   const named = () => Object.defineProperty(() => undefined, 'name', { value: `unowned${++calls}` })
-  const unowned = { effect: () => effect(named()), watch: () => watch(() => 1, named()), every: () => every('1s', named()), listen: () => listen(new EventTarget(), 'ping', named()) }
+  const unowned = { effect: () => effect(named()), watch: () => watch(() => 1, named()), every: () => every('1s', named()), listen: () => listen(() => new EventTarget(), 'ping', named()) }
 
   for (const [name, start] of Object.entries(unowned)) {
     it(`warn in development when ${name} runs at module scope, naming it`, () => {

@@ -168,14 +168,14 @@ describe('fence', () => {
     expect(parse(`${opening}\nconst a = 1\n---\np hi`).diagnostics[0]?.message).toContain(message)
   })
 
-  it('reads `--- client` as the script fence of a component rendering in the browser only, generic ones included', () => {
-    const client = parse('--- client\nconst a = 1\n---\np hi\n')
-    const generic = parse('--- client <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
+  it('reads `island({ render: "client" })` as what makes a component render in the browser only, generic ones included', () => {
+    const client = parse('---\nisland({ render: "client" })\nconst a = 1\n---\np hi\n')
+    const generic = parse('--- <T extends string>\nisland({ render: "client" })\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
 
-    expect(text(client, client.script)).toBe('const a = 1\n')
-    expect(text(client, client.client)).toBe('client')
+    expect(text(client, client.script)).toBe('island({ render: "client" })\nconst a = 1\n')
+    expect(text(client, client.client)).toBe('island({ render: "client" })')
     expect(text(generic, generic.typeParameters)).toBe('T extends string')
-    expect(text(generic, generic.client)).toBe('client')
+    expect(text(generic, generic.client)).toBe('island({ render: "client" })')
     expect([...client.diagnostics, ...generic.diagnostics]).toEqual([])
     expect(parse('---\nconst a = 1\n---\np hi\n').client).toBeUndefined()
   })

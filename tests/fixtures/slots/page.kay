@@ -19,7 +19,7 @@ main
   Panel(open={false})
     p.hidden Hidden at first
     Counter(start={10})
-  Panel(hydrate="client")
+  Panel(render="client")
     p.client Client only
   Label Plain text
   Toolbar(label="Tool")

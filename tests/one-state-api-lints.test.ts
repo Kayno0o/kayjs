@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { expect, it } from 'bun:test'
 
 import { applySafeFixes } from '../src/check/fixes'
-import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
+import { navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
 import { scratchDir } from './scratch'
 
 type Check = typeof persistedCall
@@ -75,20 +75,6 @@ it('moves the navigation hooks onto navigation', async () => {
   expect(text).toContain(`import { navigation } from 'kay'`)
 })
 
-it('wraps a bare listen target in a function', async () => {
-  const { text } = await fixed(listenTarget, `import { listen } from 'kay'\nlisten(window, 'resize', () => 1)\n`)
-
-  expect(text).toContain(`listen(() => window, 'resize'`)
-})
-
-it('moves an import from kay/mount and kay/server to its home', async () => {
-  const { text } = await fixed(movedImports, `import { mount } from 'kay/mount'\nimport { sqliteCache } from 'kay/server'\n`)
-
-  expect(text).toContain(`from 'kay'`)
-  expect(text).toContain(`from 'kay/cache'`)
-  expect(text).not.toContain('kay/mount')
-})
-
 it('rewrites every persisted.query call of a file at once, and keeps the import it still needs', async () => {
   const { text } = await fixed(persistedQuery, `import { persisted } from 'kay'\nconst a = persisted.query('a', '')\nconst b = persisted.query('b', 1, { values: [1, 2] })\n`)
 
@@ -107,79 +93,4 @@ it('moves both navigation hooks of a file with one fix', async () => {
   const { text } = await fixed(navigationHooks, `import { onNavigate, onBeforeNavigate, signal } from 'kay'\nonBeforeNavigate(() => true)\nonNavigate(() => 1)\n`)
 
   expect(text).toBe(`import { signal, navigation } from 'kay'\nnavigation.onBeforeNavigate(() => true)\nnavigation.onNavigate(() => 1)\n`)
-})
-
-it('moves one name out of an import that keeps others, before, between or after them', async () => {
-  const mixed = await fixed(movedImports, `import { defineEnv, s, sqliteCache } from 'kay/server'\n`)
-
-  expect(mixed.text).toBe(`import { defineEnv } from 'kay/server'\nimport { s } from 'kay'\nimport { sqliteCache } from 'kay/cache'\n`)
-
-  const before = await fixed(movedImports, `import { s, defineEnv, type RateLimit } from 'kay/server'\n`)
-
-  expect(before.text).toBe(`import { defineEnv } from 'kay/server'\nimport { s, type RateLimit } from 'kay'\n`)
-
-  const typed = await fixed(movedImports, `import type { RateLimit, Foo } from 'kay/server'\n`)
-
-  expect(typed.text).toBe(`import type { Foo } from 'kay/server'\nimport type { RateLimit } from 'kay'\n`)
-})
-
-it('wraps only window, document and members of them as a listen target', async () => {
-  const globals = await fixed(listenTarget, `import { listen } from 'kay'\nlisten(document.body, 'click', () => 1)\n`)
-
-  expect(globals.text).toContain(`listen(() => document.body, 'click'`)
-
-  const signal = await fixed(listenTarget, `import { listen, signal } from 'kay'\nconst panel = signal<HTMLElement>()\nlisten(panel, 'scroll', () => 1)\n`)
-
-  expect(signal.found).toBe(0)
-})
-
-it('rewrites an island listening to the swap\'s events when the handler takes no parameter, and leaves listen imported while another call needs it', async () => {
-  const { text, fixable, found } = await fixed(islandEvents, `import { listen } from 'kay'\nlisten(() => document, 'kay:navigate', () => 1)\nlisten(() => document, 'kay:navigate-start', function () {\n  return 2\n})\n`)
-
-  expect(found).toBe(2)
-  expect(fixable).toBe(2)
-  expect(text).toBe(`import { navigation } from 'kay'\nnavigation.onNavigate(() => 1)\nnavigation.onStart(function () {\n  return 2\n})\n`)
-
-  const kept = await fixed(islandEvents, `import { listen } from 'kay'\nlisten(() => document, 'kay:navigate-error', () => 1)\nlisten(() => window, 'resize', () => 2)\n`)
-
-  expect(kept.text).toBe(`import { listen, navigation } from 'kay'\nnavigation.onError(() => 1)\nlisten(() => window, 'resize', () => 2)\n`)
-})
-
-it('reports an island listening to a form or a handler reading the event with the hook to write, and no fix', async () => {
-  const { text, found, fixable } = await fixed(islandEvents, `import { listen } from 'kay'\nlisten(() => document, 'kay:navigate', event => event.detail.url)\nlisten(() => form, 'kay:action-start', () => 1)\nlisten(() => document, 'kay:consent', () => 2)\n`)
-
-  expect(found).toBe(3)
-  expect(fixable).toBe(0)
-  expect(text).toContain(`'kay:action-start'`)
-})
-
-it('leaves a plain script listening to the events of kay, and an unrelated event of an island', async () => {
-  const plain = await fixed(islandEvents, `document.addEventListener('kay:navigate', () => 1)\n`)
-  const other = await fixed(islandEvents, `import { listen } from 'kay'\nlisten(() => document, 'kay:renew', () => 1)\nlisten(() => document, 'click', () => 2)\n`)
-
-  expect(plain.found + other.found).toBe(0)
-})
-
-it('leaves an island that has a navigation of its own to the app', async () => {
-  const { found, fixable } = await fixed(islandEvents, `import { listen } from 'kay'\nconst navigation = 1\nlisten(() => document, 'kay:navigate', () => navigation)\n`)
-
-  expect(found).toBe(1)
-  expect(fixable).toBe(0)
-})
-
-it('keeps listen imported when a template or another call still reads it, and leaves a nested rewritable call without a fix', async () => {
-  const root = await scratchDir('one-state-api-')
-  const file = join(root, 'src/part.kay')
-
-  await Bun.write(file, `---\nimport { listen } from 'kay'\n\nlisten(() => document, 'kay:navigate', () => 1)\n---\nbutton(onClick={() => listen(() => window, 'resize', () => 2)}) x\n`)
-
-  const found = await islandEvents(root, {})
-
-  await applySafeFixes(root, found)
-  expect(await Bun.file(file).text()).toContain(`import { listen, navigation } from 'kay'`)
-
-  const nested = await fixed(islandEvents, `import { listen } from 'kay'\nlisten(() => document, 'kay:navigate', () => {\n  listen(() => document, 'kay:navigate-start', () => 1)\n})\n`)
-
-  expect(nested.found).toBe(2)
-  expect(nested.fixable).toBe(0)
 })

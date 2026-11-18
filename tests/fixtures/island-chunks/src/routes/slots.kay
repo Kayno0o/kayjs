@@ -5,5 +5,5 @@ import Panel from '../components/panel.kay'
 h1 Slots
 Panel
   Alpha
-Panel(hydrate="client")
+Panel(render="client")
   Alpha

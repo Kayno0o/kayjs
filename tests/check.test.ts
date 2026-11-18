@@ -941,13 +941,13 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('reports an `island-prop` error for a static component passing an island a function, unless it is an island by `--- island`', async () => {
-    const component = (fence: string) => `${fence}\nimport Child from './island.kay'\nfunction pick() {}\n---\nChild(format={pick})\n`
+  it('reports an `island-prop` error for a static component passing an island a function, unless it is an island by `island()`', async () => {
+    const component = (call: string) => `---\n${call}import Child from './island.kay'\nfunction pick() {}\n---\nChild(format={pick})\n`
     const root = await scratchProject({
       'src/routes/index.kay': '---\nimport Bare from \'../components/bare.kay\'\nimport Fenced from \'../components/fenced.kay\'\nimport Pinned from \'../components/pinned.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nBare\nFenced\nPinned\nPlain\n',
-      'src/components/bare.kay': component('---'),
-      'src/components/fenced.kay': component('--- island'),
-      'src/components/pinned.kay': component('--- static'),
+      'src/components/bare.kay': component(''),
+      'src/components/fenced.kay': component('island()\n'),
+      'src/components/pinned.kay': component('island({ render: "static" })\n'),
       'src/components/plain.kay': '---\nimport Child from \'./plain-child.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n',
       'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: () => void }>()\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n',
       'src/components/plain-child.kay': '---\nconst { format } = props<{ format: () => void }>()\n---\np {format.name}\n',
@@ -2707,24 +2707,6 @@ describe.concurrent('kay check, edge cases', () => {
       const found = (await check(root, { lints: { 'no-such-lint': 'deny', 'missing-alt': 'denyy' } as unknown as CheckOptions['lints'] })).filter(d => d.file === join(root, 'kay.config.ts'))
 
       expect(found.map(d => [d.line, d.column])).toEqual([[5, 5], [6, 5]])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('reports the retired `uncaught-await` entry of `lints` as deprecated, not unknown or a type error, and its fix removes the line', async () => {
-    const config = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lints: {\n    \'uncaught-await\': \'allow\',\n    \'missing-alt\': \'allow\',\n  },\n})\n'
-    const root = await scratchProject({ 'kay.config.ts': config, 'src/routes/index.kay': 'p home\n' })
-
-    try {
-      const found = (await check(root, { lints: { 'uncaught-await': 'allow', 'missing-alt': 'allow' } })).filter(d => d.file === join(root, 'kay.config.ts'))
-
-      expect(found.map(d => [d.code, d.line])).toEqual([['deprecated-uncaught-await', 5]])
-      expect(found[0]!.fixes?.[0]?.safe).toBe(true)
-
-      await applySafeFixes(root, found)
-      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(config.replace('    \'uncaught-await\': \'allow\',\n', ''))
     }
     finally {
       await rm(root, { recursive: true, force: true })

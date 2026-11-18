@@ -183,7 +183,7 @@ function ownProps<P extends object>(props: P & IslandOptions, renderClient: bool
 }
 
 // On the server an interactive component renders inside a `<slot>` the browser hydrates, its props serialized for the client.
-// A client-only one, `client` or rendered with `hydrate="client"`, holds only its fallback in the slot, the use's `@fallback` block else the component's own, until the browser renders into it, and inside another island renders nothing.
+// A client-only one, `island({ render: 'client' })` or rendered with `render="client"`, holds only its fallback in the slot, the use's `@fallback` block else the component's own, until the browser renders into it, and inside another island renders nothing.
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
 // `messages` are the keys its source passes `t()` as they are written, which it may only look up once in the browser. `lives` are the live values it imports, which the page proves though only the browser may read them.
 // `cause` is only passed under `kay dev`, which writes it as the `data-why` the dev tool's Islands tab shows, so production markup is the same with or without it.
@@ -192,7 +192,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     const when = props.hydrate ?? asks?.hydrate
     const persist = persistKey(props.persist ?? asks?.persist, id)
     const renderClient = props.render === 'client'
-    const browserOnly = client || when === 'client' || renderClient
+    const browserOnly = client || renderClient
     const waits = isWaiting(when, id)
     const own = ownProps(props, renderClient, browserOnly)
 
@@ -280,7 +280,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
   return carryFailed(component, render) as IslandComponent<P>
 }
 
-// Whether a use of an island that follows no live value, whose `export const island` lists the props that make it interactive, turns none of them on: no listed prop has a value (or a default) that is on, the use asks for no hydration of its own, and none of its props is a function, which an island refuses to send and the use is told of as before.
+// Whether a use of an island that follows no live value, whose `island()` call lists the props that make it interactive, turns none of them on: no listed prop has a value (or a default) that is on, the use asks for no hydration of its own, and none of its props is a function, which an island refuses to send and the use is told of as before.
 function staysPlain(depth: number, client: boolean, lives: readonly unknown[], props: object, asks: IslandAsks | undefined): boolean {
   const wants = asks?.interactive
 

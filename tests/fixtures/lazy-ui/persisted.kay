@@ -1,6 +1,5 @@
---- module
-export const island = { persist: true } as const
---- island
+---
+island({ persist: true })
 import { signal } from 'kay'
 import Heavy from './heavy.kay'
 import Shell from './shell.kay'

@@ -579,7 +579,7 @@ describe('kay explain --format json', () => {
     expect(all.lints.map(lint => lint.name)).toEqual(Object.keys(LINTS))
     expect(all.lints[0]).toEqual({ name: 'unread-name', group: 'code', level: 'deny', summary: LINTS['unread-name'].summary })
     expect(islands.groups).toEqual({ islands: LINT_GROUPS.islands })
-    expect(islands.lints.map(lint => lint.name)).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'island-prop', 'hydration-mismatch', 'unowned-effect', 'unkeyed-rows'])
+    expect(islands.lints.map(lint => lint.name)).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'page-island', 'island-prop', 'hydration-mismatch', 'unowned-effect', 'unkeyed-rows'])
   })
 
   it('explains one lint with its examples, and answers a name that is none with an error document', async () => {
@@ -595,7 +595,7 @@ describe('kay explain --format json', () => {
 describe('kay fmt --format json', () => {
   it('gives the files it formatted, or with --check would, and what does not parse as problems', async () => {
     const root = await project({
-      'src/a.kay': '---  client\nconst a = 1\n---\np {a}\n',
+      'src/a.kay': '---  <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n',
       'src/b.kay': 'p Fine\n',
       'src/c.kay': 'p Bad\neach x in y\n',
     })
@@ -607,7 +607,7 @@ describe('kay fmt --format json', () => {
     expect(report.changed).toEqual(['src/a.kay'])
     expect([report.errors, report.warnings]).toEqual([1, 0])
     expect(report.problems.map(({ file, line }) => ({ file, line }))).toEqual([{ file: 'src/c.kay', line: 2 }])
-    expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe('---  client\nconst a = 1\n---\np {a}\n')
+    expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe('---  <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
 
     await rm(join(root, 'src/c.kay'))
 
@@ -615,7 +615,7 @@ describe('kay fmt --format json', () => {
 
     expect(written.code).toBe(0)
     expect(document<unknown>(written.stdout)).toEqual({ errors: 0, warnings: 0, problems: [], written: true, changed: ['src/a.kay'] })
-    expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe('--- client\nconst a = 1\n---\np {a}\n')
+    expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe('--- <T extends string>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
   })
 
   it('answers a path that is none with an error document', async () => {

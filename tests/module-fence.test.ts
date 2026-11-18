@@ -15,7 +15,7 @@ const scratch = await scratchDir('module-fence-')
 const MARKERS = /<!--[[\]]-->/g
 const files: Record<string, string> = {
   'counter.kay': '--- module\nimport { signal } from \'kay\'\n\nexport const visits = signal(0)\nexport function label(count: number): string {\n  return `${count} visits`\n}\nlet renders = 0\n--- script\nconst { name } = props<{ name: string }>()\nrenders++\n---\np {name}: {label(renders)}\n',
-  'asks.kay': '--- module\nexport const island = { persist: true, hydrate: \'idle\' } as const\n--- island\n---\nbutton Go\n',
+  'asks.kay': '---\nisland({ persist: true, hydrate: \'idle\' })\n---\nbutton Go\n',
   'asks-page.kay': '---\nimport Asks from \'./asks.kay\'\nimport Own from \'./asks.kay\'\n---\nAsks\nOwn(persist="mine" hydrate="load")\n',
   'reader.kay': '---\nimport { label } from \'./counter.kay\'\n---\nspan {label(2)}\n',
 }
@@ -56,12 +56,12 @@ describe('the module fence', () => {
   })
 
   it('refuses props, a default export, a second fence and a client component in it', () => {
-    const messages = (source: string) => compileKay(source, 'part.kay', { check: true, lints: { 'deprecated-island-fence': 'allow' } }).diagnostics.map(diagnostic => diagnostic.message)
+    const messages = (source: string) => compileKay(source, 'part.kay', { check: true }).diagnostics.map(diagnostic => diagnostic.message)
 
     expect(messages('--- module\nconst { a } = props<{ a: string }>()\n---\np x\n')).toEqual([expect.stringContaining('declares no props')])
     expect(messages('--- module\nexport default 1\n---\np x\n')).toEqual([expect.stringContaining('default export')])
     expect(messages('--- module\nexport const a = 1\n---\n--- module\nexport const b = 2\n---\np x\n')).toEqual([expect.stringContaining('one `--- module` fence')])
-    expect(messages('--- client\nlet a = 1\n---\n--- module\nexport const b = 2\n---\np {a}\n')).toEqual([expect.stringContaining('no `--- module` fence')])
+    expect(messages('---\nisland({ render: "client" })\nlet a = 1\n--- module\nexport const b = 2\n---\np {a}\n')).toEqual([expect.stringContaining('no `--- module` fence')])
   })
 })
 
@@ -152,32 +152,25 @@ describe('the island a module fence exports', () => {
   })
 
   it('is handed to the server island and to no other output', () => {
-    const generic = '--- module\nexport const island = { hydrate: \'idle\' } as const\n--- island <T>\nconst { rows } = props<{ rows: T[] }>()\n---\np {rows.length}\n'
+    const generic = '--- <T>\nisland({ hydrate: \'idle\' })\nconst { rows } = props<{ rows: T[] }>()\n---\np {rows.length}\n'
     const plain = files['asks.kay']!
 
     for (const source of [plain, generic]) {
-      expect(compileKay(source, 'asks.kay', { output: 'html', root: scratch }).tsx).toMatch(/, island\)/)
-      expect(compileKay(source, 'asks.kay', { output: 'dom', root: scratch }).tsx).not.toMatch(/, island\)/)
+      expect(compileKay(source, 'asks.kay', { output: 'html', root: scratch }).tsx).toContain('"hydrate":"idle"')
+      expect(compileKay(source, 'asks.kay', { output: 'dom', root: scratch }).tsx).not.toContain('"hydrate":"idle"')
     }
   })
 })
 
-describe('an island export the compiler would ignore', () => {
+describe('an island export of the module fence', () => {
   const problems = (source: string) => compileKay(source, 'asks.kay', { output: 'html', root: scratch, check: true, component: true }).diagnostics.filter(diagnostic => diagnostic.code === 'fence-invalid').map(diagnostic => diagnostic.message)
 
-  it('is reported for a listed export, which only `export const island` is read as', () => {
-    const [message] = problems('--- module\nconst island = { hydrate: \'idle\' } as const\nexport { island }\n--- island\n---\nbutton Go\n')
-
-    expect(message).toContain('`export const island = ')
+  it('is reported, as a constant or listed, since the `island()` call of the script says what it asks', () => {
+    for (const source of ['--- module\nexport const island = { hydrate: \'idle\' } as const\n---\nbutton Go\n', '--- module\nconst island = { hydrate: \'idle\' } as const\nexport { island }\n---\nbutton Go\n'])
+      expect(problems(source)).toEqual([expect.stringContaining('exports no `island`')])
   })
 
-  it('is reported on a component that is no island, where nothing would read it', () => {
-    const [message] = problems('--- module\nexport const island = { hydrate: \'idle\' } as const\n--- static\n---\np Hi\n')
-
-    expect(message).toContain('is no island')
-  })
-
-  it('is not reported on an island that exports it as a constant', () => {
+  it('is not reported when the script declares the call', () => {
     expect(problems(files['asks.kay']!)).toEqual([])
   })
 })

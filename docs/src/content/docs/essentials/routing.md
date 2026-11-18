@@ -265,7 +265,7 @@ ContactForm(server token={token})
 Reviews(server defer)
 ```
 
-`server` renders the island into the page before it is sent. `server defer` (written `server="defer"` before 1.105) sends the page as prerendered, and the browser fetches the island as it nears the screen.
+`server` renders the island into the page before it is sent. `server defer` sends the page as prerendered, and the browser fetches the island as it nears the screen.
 
 When a form posts back to the same page, or a link leads to a page rendering the same island with the same placeholder, the island stays on screen while its new copy is fetched, so the page does not jump.
 

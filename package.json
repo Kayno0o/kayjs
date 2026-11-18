@@ -150,10 +150,6 @@
       "types": "./types/runtime/client.d.ts",
       "default": "./src/runtime/client.ts"
     },
-    "./mount": {
-      "types": "./types/runtime/mount.compat.d.ts",
-      "default": "./src/runtime/mount.compat.ts"
-    },
     "./compiler": {
       "types": "./types/compiler/public.d.ts",
       "default": "./src/compiler/public.ts"

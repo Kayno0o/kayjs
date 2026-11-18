@@ -32,7 +32,7 @@ const files: Record<string, string> = {
   'link.kay': '---\nconst { attrs } = props<{ attrs: Record<string, unknown> }>()\n---\na(part="link" href="/x" {...attrs}) go\n',
   'link-class.kay': '---\nconst { attrs } = props<{ attrs: Record<string, unknown> }>()\n---\na.p-2(part="link" href="/x" {...attrs}) go\n',
   '_layout.kay': 'main.p-2(part="page") page\n',
-  'client.kay': '--- client\nlet count = 0\n---\nsection.card\n  header(part="head") {count}\n',
+  'client.kay': '---\nisland({ render: "client" })\nlet count = 0\n---\nsection.card\n  header(part="head") {count}\n',
   'node_modules/uilib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n',
   'calls-rule.kay': '---\nimport Card from \'./card.kay\'\nconst user = { name: \'Ada\' } as { name: string } | undefined\nconst own = \'p-3\'\nconst size = \'p-5\'\nconst on = true\n---\nCard(title="a" class={{ active: user && user.name }})\nCard(title="b" class={{ active: true, head: \'p-4\' }})\nCard(title="c" class={{ head: \'p-6\' }})\nCard(title="d" class={{ root: \'mt-4\', body: \'p-8\' }})\nCard(title="e" parts={{ head: own }} class={{ head: \'p-6\' }})\nCard(title="f" class={{ head: size }})\nCard(title="g" class={{ head: on ? \'p-6\' : \'p-7\' }})\n',
   'old-call.kay': '---\nimport Card from \'./card.kay\'\nconst on = true\nconst size = \'p-5\'\nconst rest = { id: \'x\' }\n---\nCard.mt-2(title="a" class={{ head: on ? \'p-6\' : \'p-7\' }}) a\nCard({...rest} title="b" class={{ head: \'p-8\' }}) b\nCard(title="c" parts={{ head: \'p-1\' }} class={{ head: \'p-9\' }}) c\nCard(title="d" class={{ head: size }}) d\n',

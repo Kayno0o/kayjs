@@ -22,13 +22,13 @@ describe('the island cause', () => {
   it('names the kind, the name and the span of what makes a component an island', () => {
     const handler = 'p a\nbutton(onClick={() => 1}) b\n'
     const signalSource = '---\nimport { signal } from \'kay\'\nconst n = signal(0)\n---\np {n()}\n'
-    const client = '--- client\nconst x = 1\n---\np {x}\n'
+    const client = '---\nisland({ render: "client" })\nconst x = 1\n---\np {x}\n'
 
     expect(cause(handler)).toMatchObject({ kind: 'attribute', name: 'onClick', line: 2 })
     expect(slice(handler, cause(handler)!.span)).toBe('onClick')
     expect(cause(signalSource)).toMatchObject({ kind: 'value', name: 'signal', source: 'kay', line: 2 })
     expect(slice(signalSource, cause(signalSource)!.span)).toBe('signal')
-    expect(cause(client)).toMatchObject({ kind: 'client', line: 1 })
+    expect(cause(client)).toMatchObject({ kind: 'client', line: 2 })
     expect(cause('p a\n')).toBeUndefined()
   })
 
@@ -99,7 +99,7 @@ describe('kay explain island', () => {
       'package.json': '{"name":"x","type":"module"}',
       'src/components/button.kay': 'button(onClick={() => 1}) Go\n',
       'src/components/plain.kay': 'p Plain\n',
-      'src/components/wrap.kay': '--- island\nimport Button from \'./button.kay\'\nfunction pick() {}\n---\nButton(format={pick})\n',
+      'src/components/wrap.kay': '---\nisland()\nimport Button from \'./button.kay\'\nfunction pick() {}\n---\nButton(format={pick})\n',
       'src/routes/_layout.kay': 'main\n  button(onClick={() => 1}) Menu\n  slot\n',
       'src/routes/server.kay': '--- server\nconst n = 1\n---\nbutton(onClick={() => 1}) {n}\n',
       'src/routes/index.kay': '---\nimport Button from \'../components/button.kay\'\n---\nButton\n',
@@ -110,7 +110,7 @@ describe('kay explain island', () => {
   }
 
   it('says that a component listing its interactive props is an island only in a use that turns one on', async () => {
-    const root = await project({ 'src/components/part.kay': '--- module\nexport const island = { interactive: { sortable: true, selectable: false } } as const\n--- island\nconst { sortable = true, selectable = false } = props<{ sortable?: boolean, selectable?: boolean }>()\n---\nbutton(onClick={() => 1}) {sortable}{selectable}\n' })
+    const root = await project({ 'src/components/part.kay': '---\nisland({ interactive: { sortable: true, selectable: false } })\nconst { sortable = true, selectable = false } = props<{ sortable?: boolean, selectable?: boolean }>()\n---\nbutton(onClick={() => 1}) {sortable}{selectable}\n' })
     const one = await kay(['explain', 'island', 'src/components/part.kay'], root)
 
     expect(one.stdout).toContain('a use that turns on none of `sortable` (on unless `false`), `selectable` renders as markup with no script')
@@ -119,9 +119,9 @@ describe('kay explain island', () => {
   })
 
   it('reports an interactive list the compiler cannot read, and leaves a client-only component out of the decision', () => {
-    const module = (list: string) => `--- module\nexport const island = { interactive: ${list} } as const\n--- island\nconst { a = false } = props<{ a?: boolean }>()\n---\nbutton(onClick={() => 1}) {a}\n`
+    const module = (list: string) => `---\nisland({ interactive: ${list} })\nconst { a = false } = props<{ a?: boolean }>()\n---\nbutton(onClick={() => 1}) {a}\n`
     const bad = compileKay(module('{ a: flag }'), 'src/components/part.kay', { check: true }).diagnostics.filter(each => each.code === 'fence-invalid')
-    const client = compileKay('--- module\nexport const island = { interactive: { a: false } } as const\n--- client\nconst x = 1\n---\np {x}\n', 'src/components/part.kay')
+    const client = compileKay('---\nisland({ render: "client", interactive: { a: false } })\nconst x = 1\n---\np {x}\n', 'src/components/part.kay')
 
     expect(bad).toHaveLength(1)
     expect(compileKay(module('{ a: false }'), 'src/components/part.kay').cause?.interactive).toEqual({ a: false })
@@ -141,7 +141,7 @@ describe('kay explain island', () => {
     expect(JSON.parse(plain.stdout)).toMatchObject({ file: 'src/components/plain.kay', role: 'static' })
     expect((JSON.parse(all.stdout) as { islands: unknown[] }).islands).toEqual([
       { file: 'src/components/button.kay', role: 'island', how: 'inferred', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 1 }) },
-      { file: 'src/components/wrap.kay', role: 'island', how: 'inferred', cause: expect.objectContaining({ kind: 'island', name: '--- island', line: 1 }) },
+      { file: 'src/components/wrap.kay', role: 'island', how: 'declared', declared: 'island()', cause: expect.objectContaining({ kind: 'island', name: 'island()', line: 2 }) },
       { file: 'src/routes/_layout.kay', role: 'island', how: 'inferred', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 2 }) },
       { file: 'src/routes/server.kay', role: 'island', how: 'inferred', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 4 }) },
     ])
@@ -155,7 +155,7 @@ describe('kay explain island', () => {
       kay(['explain', 'island', 'src/routes/server.kay'], root),
     ])
 
-    expect(JSON.parse(pinned.stdout)).toMatchObject({ file: 'src/components/wrap.kay', role: 'island', cause: { kind: 'island', name: '--- island', line: 1, description: 'a `--- island` fence' } })
+    expect(JSON.parse(pinned.stdout)).toMatchObject({ file: 'src/components/wrap.kay', role: 'island', cause: { kind: 'island', name: 'island()', line: 2, description: 'an `island()` declaration' } })
     expect(JSON.parse(layout.stdout)).toMatchObject({ role: 'island', cause: { kind: 'attribute', name: 'onClick', line: 2 } })
     expect(server.stdout).toContain('src/routes/server.kay: an island')
   })

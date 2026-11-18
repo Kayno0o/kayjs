@@ -130,7 +130,7 @@ describe('the type check beside kay dev', () => {
   it('shows `island-prop`, a lint only the types find, for a static component passing an island a function', async () => {
     const root = await project({
       'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst { v } = props<{ v: unknown }>()\nconst n = signal(0)\n---\nbutton(onClick={() => n++}) {String(v)}\n',
-      'src/components/pinned.kay': '--- static\nimport Island from \'./island.kay\'\nfunction pick() {}\n---\nIsland(v={pick})\n',
+      'src/components/pinned.kay': '---\nisland({ render: "static" })\nimport Island from \'./island.kay\'\nfunction pick() {}\n---\nIsland(v={pick})\n',
       'src/routes/index.kay': '---\nimport Pinned from \'../components/pinned.kay\'\n---\nPinned\n',
     })
     const events: Event[] = []

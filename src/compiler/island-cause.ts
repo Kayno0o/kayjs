@@ -5,7 +5,7 @@ export type IslandCauseKind = 'client' | 'island' | 'attribute' | 'value' | 'liv
 
 export interface IslandCause {
   kind: IslandCauseKind
-  // The attribute (`onClick`, `bind:value`, `ref`), the `kay` value (`signal`) or the live value; `--- client` or `--- island` for the fence.
+  // The attribute (`onClick`, `bind:value`, `ref`), the `kay` value (`signal`) or the live value; `island()` for the declaration.
   name: string
   // Where it is in the file, which the editor reveals.
   span: Span
@@ -13,7 +13,7 @@ export interface IslandCause {
   line: number
   // The `kay` value's module, as `kay`.
   source?: string | undefined
-  // The props the component's `island` export says make a use interactive, each with whether it is on when left out: a use turning none on renders no island.
+  // The props the component's `island()` call says make a use interactive, each with whether it is on when left out: a use turning none on renders no island.
   interactive?: Readonly<Record<string, boolean>> | undefined
 }
 
@@ -32,9 +32,9 @@ function staticUse(interactive: Readonly<Record<string, boolean>>): string {
 function causeText(cause: IslandCause): string {
   switch (cause.kind) {
     case 'client':
-      return cause.name === 'island()' ? 'an `island({ render: \'client\' })` declaration' : 'a `--- client` fence'
+      return 'an `island({ render: \'client\' })` declaration'
     case 'island':
-      return cause.name === 'island()' ? 'an `island()` declaration' : 'a `--- island` fence'
+      return 'an `island()` declaration'
     case 'attribute':
       return `\`${cause.name}\`, line ${cause.line}`
     case 'value':
@@ -48,8 +48,8 @@ function causeText(cause: IslandCause): string {
 
 // What the cause is, in a few words.
 export const CAUSE_KINDS: Record<IslandCauseKind, string> = {
-  client: 'an `island({ render: \'client\' })` declaration (or a `--- client` fence): the component renders in the browser only',
-  island: 'an `island()` declaration (or a `--- island` fence): the author declared the component an island',
+  client: 'an `island({ render: \'client\' })` declaration: the component renders in the browser only',
+  island: 'an `island()` declaration: the author declared the component an island',
   attribute: 'an `on*`, `bind:` or `ref` attribute: the browser handles it',
   value: 'a `kay` value of the browser, such as `signal` or `effect`, that its script uses',
   live: 'a live value its script imports: the browser follows it',
@@ -57,4 +57,4 @@ export const CAUSE_KINDS: Record<IslandCauseKind, string> = {
 }
 
 // The rule, as `kay explain island` says it.
-export const ISLAND_RULE = 'A component is an island when it needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script, a live or persisted value it imports, or an `island()` declaration (the `--- client` and `--- island` fences before it); what an island renders is part of it. A static component that passes an island a function or a block taking parameters is an `island-prop` error, and is made an island by `island()`. A component whose `island({ interactive })` lists `interactive` props is an island only in a use that turns one on: any other use renders as markup with no script.'
+export const ISLAND_RULE = 'A component is an island when it needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script, a live or persisted value it imports, or an `island()` declaration; what an island renders is part of it. A static component that passes an island a function or a block taking parameters is an `island-prop` error, and is made an island by `island()`. A component whose `island({ interactive })` lists `interactive` props is an island only in a use that turns one on: any other use renders as markup with no script.'

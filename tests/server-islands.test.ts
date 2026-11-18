@@ -211,7 +211,7 @@ describe('server islands', () => {
 
           await Bun.write(join(copy, 'src/components/rows.kay'), rowsKay(nested))
           await Bun.write(join(copied, 'rows.kay'), pageKay('server '))
-          await Bun.write(join(copied, 'later.kay'), pageKay('server="defer" '))
+          await Bun.write(join(copied, 'later.kay'), pageKay('server defer '))
           await Bun.write(join(copy, 'src/messages/en.ts'), messages(''))
           await Bun.write(join(copy, 'src/messages/fr.ts'), messages(FRENCH))
 
@@ -308,7 +308,7 @@ describe('server islands', () => {
 
   it('takes `@failed` out of a deferred use\'s props, and refuses it on an inline one', () => {
     const compile = (call: string) => compileKay(`---\nimport Card from './card.kay'\n---\n${call}\n`, 'src/routes/index.kay', { output: 'html', check: true })
-    const html = compile('Card(server="defer" title="a")\n  @failed\n    p No luck\n  @other\n    p Other').tsx
+    const html = compile('Card(server defer title="a")\n  @failed\n    p No luck\n  @other\n    p Other').tsx
     const messages = (call: string) => compile(call).diagnostics.map(diagnostic => diagnostic.message)
 
     expect(html).toContain('KayServerIsland(Card, { "title": "a", get "other"() { return ')
@@ -342,7 +342,7 @@ describe('server islands', () => {
     expect(compile('Icon').tsx).toContain('Card.kayFailed = KayFailed')
     expect(compile('Icon').tsx.match(/^import Icon /gm)).toHaveLength(1)
 
-    const use = compileKay('---\nimport Card from \'./card.kay\'\nimport Icon from \'./icon.kay\'\n---\nCard(server="defer")\n  @failed\n    Icon(server)\n', 'src/routes/index.kay', { output: 'html', check: true })
+    const use = compileKay('---\nimport Card from \'./card.kay\'\nimport Icon from \'./icon.kay\'\n---\nCard(server defer)\n  @failed\n    Icon(server)\n', 'src/routes/index.kay', { output: 'html', check: true })
 
     expect(use.diagnostics.map(diagnostic => diagnostic.message)).toContain('`@failed` holds a server island')
   })
@@ -435,7 +435,7 @@ describe('server islands', () => {
   })
 
   it('compiles the mark to a server island on the server, a plain component in an island', () => {
-    const source = '---\nimport Card from \'./card.kay\'\n---\nCard(server title="a")\nCard(server="defer" noscript="More")\n'
+    const source = '---\nimport Card from \'./card.kay\'\n---\nCard(server title="a")\nCard(server defer noscript="More")\n'
     const html = compileKay(source, 'src/routes/index.kay', { output: 'html' }).tsx
     const dom = compileKay(source, 'src/components/twin.kay', { output: 'dom' }).tsx
 
@@ -447,7 +447,7 @@ describe('server islands', () => {
     expect(dom).not.toContain('More')
     expect(messages('Card(server="later")')).toContain('`server` takes no value')
     expect(messages('Card(server noscript="More")')).toContain('`noscript` only goes with `server defer`')
-    expect(messages('Card(server="defer" noscript)')).toContain('`noscript` takes the text of its link')
+    expect(messages('Card(server defer noscript)')).toContain('`noscript` takes the text of its link')
   })
 })
 

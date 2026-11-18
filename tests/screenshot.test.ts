@@ -609,7 +609,7 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
     await route('stall.png.ts', 'export async function GET() {\n  await Bun.sleep(120_000)\n\n  return new Response(\'\')\n}\n')
     await route('hang.kay', 'img(src="/stall.png" loading="eager" alt="")\n')
     await mkdir(join(root, 'src/components'), { recursive: true })
-    await Bun.write(join(root, 'src/components/bad.kay'), '--- client\nconst label = (): string => {\n  throw new Error(\'client boom\')\n}\n---\np {label()}\n')
+    await Bun.write(join(root, 'src/components/bad.kay'), '---\nisland({ render: "client" })\nconst label = (): string => {\n  throw new Error(\'client boom\')\n}\n---\np {label()}\n')
     await route('bad.kay', '---\nimport Bad from \'../components/bad.kay\'\n---\nBad\n')
 
     stop = await dev(root, { port: freePort(), log: () => undefined, quiet: true })

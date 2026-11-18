@@ -2,13 +2,11 @@ import type { Diagnostic, Fix, KayFile, Span } from './ast'
 import type { Node, NodeOfType, Program } from './estree'
 import type { Path } from './scope'
 import { visitNodes } from './ast'
-import { wordEdit } from './deprecated-island'
 import { isPlainProperty, parseProgram } from './estree'
 import { TS_EXPRESSIONS, viaGlobalThis } from './estree-shapes'
 import { browserGlobals } from './host'
 import { importEdits } from './import-edits'
 import { parameterNames } from './items'
-import { importedFromKay } from './rewrite-reads'
 import { analyzeScript } from './script'
 import { walkScope } from './walk'
 
@@ -130,7 +128,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
       const through = path.node.name === 'globalThis' ? viaGlobalThis(path) : undefined
       const { name } = through ?? path.node
 
-      if (!names.has(name) || !path.isReferencedIdentifier() || (through === undefined && path.scope.hasBinding(name, true)) || inType(path) || listenTarget(path))
+      if (!names.has(name) || !path.isReferencedIdentifier() || (through === undefined && path.scope.hasBinding(name, true)) || inType(path))
         return
 
       const holder = path.parentPath!.node
@@ -251,15 +249,6 @@ function inChain(path: Path): boolean {
   }
 
   return false
-}
-
-// A read in the target of `listen(window, 'keydown', ...)`, which the compiler hands `listen` as a function the browser calls.
-function listenTarget(path: Path): boolean {
-  return path.find((parent) => {
-    const call = parent.parentPath?.node
-
-    return call?.type === 'CallExpression' && call.arguments[0] === parent.node && importedFromKay(parent.scope, call.callee) === 'listen'
-  }) !== null
 }
 
 // `memo(() => ...)` and `rows.map(row => ...)` run the function they take before they return.
@@ -464,6 +453,5 @@ function clientFix(file: KayFile): Fix[] {
 
   const call = { start: file.script.start, end: file.script.start, text: 'island({ render: \'client\' })\n' }
 
-  // The fence's own pin word goes: it would win over the call.
-  return [{ title, edits: file.pin === undefined || file.scriptLine === undefined ? [call] : [wordEdit(file.scriptLine, file.pin.end, file.source.slice(0, file.scriptLine.start)), call] }]
+  return [{ title, edits: [call] }]
 }

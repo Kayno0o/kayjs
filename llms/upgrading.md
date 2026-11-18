@@ -2,6 +2,22 @@
 
 What each release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a version missing here broke nothing. Through 1.x a breaking change ships in a minor; from 2.0.0 it ships in a major, and a minor or a patch breaks nothing.
 
+## 1.109.0
+
+### The island and template forms of 1.105 are gone
+
+The `deprecated-page-island`, `deprecated-island-fence`, `deprecated-island-attributes`, `deprecated-island-events`, `deprecated-link-flags`, `deprecated-children-prop`, `deprecated-uncaught-await`, `deprecated-import-path`, `deprecated-context-import` and `deprecated-listen-target` lints are gone with the forms they reported; run `kay upgrade` on 1.108 first, which rewrote each but the page island.
+
+- A page without a `--- server` fence that needs the browser is the `page-island` error: move what needs the browser into a component and render it from the page.
+- `--- island`, `--- client` and `--- static` are unknown fences, and `export const island = { ... }` in a `--- module` fence is a `fence-invalid` error: write `island({ render, hydrate, persist, interactive })` first in the component's script.
+- `hydrate="client"` on a use is `render="client"`, and `server="defer"` is `server defer`: the old forms are `server-island-invalid` errors, and `hydrate="client"` a type error.
+- `data-keep-scroll`, `data-no-transition` and `data-no-prefetch` do nothing: write `data-scroll="keep"`, `data-transition="false"` and `data-prefetch="false"`.
+- A `// kay-allow uncaught-await` comment and a `lints: { 'uncaught-await': ... }` entry are an unknown lint, and `defineConfig` types no such `lints` key: remove them.
+- `listen(window, ...)` is `listen(() => window, ...)`: `listen` takes a function returning its target, and a value is a type error, and in a `.kay` file a server read of `window`.
+- Import `mount`, `Mounted`, `s`, `RateLimit` and `RateLimitRefusal` from `kay` and `sqliteCache` from `kay/cache`: `kay/mount` is no entry any more and `kay/server` no longer exports them.
+- `defineContext` is imported from `kay/server`: `kay/library` no longer exports it.
+- `children?: Snippet` beside a bare `slot` and `listen(() => document, 'kay:navigate', ...)` in an island are reported no more: both still work, and the function hook is the form to write.
+
 ## 1.108.0
 
 ### The `deprecated-package-names` lint is gone
@@ -83,7 +99,7 @@ In the browser, `const last = items.length - 1` or `const twice = count() * 2` a
 
 ### An `await` with no `catch` shows an alert
 
-A rejected `await` block with no `catch` and no `try` around it used to remove its pending block and show nothing; it renders `<span class="kay-await-failed" role="alert" data-kay-await-failed>` now (the `kay.await.failed` message), so the `uncaught-await` lint is gone. `deprecated-uncaught-await` (`kay check --fix`) removes a `// kay-allow uncaught-await` comment, and a `lints: { 'uncaught-await': ... }` entry of kay.config.ts. `AwaitProps` of `kay` no longer has `fallback`, the compiler's own channel for a `try`'s `catch`.
+A rejected `await` block with no `catch` and no `try` around it used to remove its pending block and show nothing; it renders `<span class="kay-await-failed" role="alert" data-kay-await-failed>` now (the `kay.await.failed` message), so the `uncaught-await` lint is gone, and in 1.109 a `// kay-allow uncaught-await` comment or a `lints` entry naming it is an unknown lint. `AwaitProps` of `kay` no longer has `fallback`, the compiler's own channel for a `try`'s `catch`.
 
 ### A `for` over rows with no `id` needs a `key` in every component
 
@@ -91,11 +107,11 @@ A rejected `await` block with no `catch` and no `try` around it used to remove i
 
 ### `slot` types the children and blocks of a component
 
-A component no longer declares `children?: Snippet`, nor an optional block it renders with `slot name`: its template types them, so a call passing a block the component has no `slot` for is a `kay check` error. `children?: Snippet` beside a bare `slot` works until 1.108 and `kay check --fix` removes it (`deprecated-children-prop`); declare `children: Snippet` to require the children.
+A component no longer declares `children?: Snippet`, nor an optional block it renders with `slot name`: its template types them, so a call passing a block the component has no `slot` for is a `kay check` error. Its lint went in 1.109; declare `children: Snippet` to require the children.
 
 ### A link's flags are named as `navigate()`'s options
 
-`data-keep-scroll` is `data-scroll="keep"` (`data-keep-scroll="false"` is `data-scroll="top"`), `data-no-transition` is `data-transition="false"` and `data-no-prefetch` is `data-prefetch="false"`, typed on every element, so a wrong value is a `kay check` error; a wrapper another library marks `data-scroll` now keeps its links' scroll. The old names work until 1.108 and `kay check --fix` writes the new ones (`deprecated-link-flags`). A `data-` name one letter from a flag, as `data-prefech`, is the `unknown-link-flag` error.
+`data-keep-scroll` is `data-scroll="keep"` (`data-keep-scroll="false"` is `data-scroll="top"`), `data-no-transition` is `data-transition="false"` and `data-no-prefetch` is `data-prefetch="false"`, typed on every element, so a wrong value is a `kay check` error; a wrapper another library marks `data-scroll` now keeps its links' scroll. The old names went in 1.109. A `data-` name one letter from a flag, as `data-prefech`, is the `unknown-link-flag` error.
 
 ### A component's parts are the `parts` attribute
 

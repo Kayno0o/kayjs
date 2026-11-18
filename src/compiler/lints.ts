@@ -1,13 +1,12 @@
 import type { AllowRules } from './allow-comments'
 import type { Diagnostic, ElementNode, ForNode, KayFile, TextChunk } from './ast'
-import type { RetiredLint } from './deprecated-allow'
 import type { Scope } from './template-scopes'
 import { accessibilityLints, MARKUP_LINTS } from './a11y'
 import { allowComments, honoured, refusedComments } from './allow-comments'
 import { keyedByPosition, walkNodes } from './ast'
-import { RETIRED_LINTS } from './deprecated-allow'
 import { DEPRECATED_LINTS } from './deprecated-lints'
 import { I18N_LINTS } from './i18n-lints'
+import { ISLAND_LINTS } from './island-lints'
 import { positionAt } from './mapping'
 import { VOID_ELEMENTS } from './markup'
 import { nestingLints } from './nesting'
@@ -432,10 +431,11 @@ export const LINTS = {
   'island-marker': {
     level: 'deny',
     group: 'islands',
-    summary: 'An `island()` declaration (or a `--- island` fence line) on a page, a layout or a special page: they render on the server and are never islands. Move what needs the browser to a component of its own.',
+    summary: 'An `island()` declaration on a page, a layout or a special page: they render on the server and are never islands. Move what needs the browser to a component of its own.',
     wrong: '--- server\nconst title = \'Home\'\n--- script\nisland()\n---\nh1 {title}',
     right: '--- server\nconst title = \'Home\'\n---\nh1 {title}',
   },
+  ...ISLAND_LINTS,
   'island-prop': {
     level: 'deny',
     group: 'islands',
@@ -694,7 +694,7 @@ export type LintName = keyof typeof LINTS
 
 // `satisfied` is set by kay from the extensions' `satisfies`, never written in `kay.config.ts`: the lints an extension answers for a place it fills in by itself.
 // `comments` is no lint's level: it sets what a `// kay-allow` comment must hold to count.
-export type LintLevels = Partial<Record<LintName | LintGroup | RetiredLint, LintLevel>> & { satisfied?: LintName[] | undefined, comments?: AllowRules | undefined }
+export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>> & { satisfied?: LintName[] | undefined, comments?: AllowRules | undefined }
 
 export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
 
@@ -783,7 +783,7 @@ export function applyLints(diagnostics: Diagnostic[], source: string, levels: Li
 }
 
 function unknownLints(source: string): Diagnostic[] {
-  return allowComments(source).flatMap(comment => comment.names.filter(({ name }) => !isLint(name) && !RETIRED_LINTS.has(name)).map(({ name, start }): Diagnostic => ({ start, end: start + name.length, code: 'unknown-lint', message: `Unknown lint \`${name}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })))
+  return allowComments(source).flatMap(comment => comment.names.filter(({ name }) => !isLint(name)).map(({ name, start }): Diagnostic => ({ start, end: start + name.length, code: 'unknown-lint', message: `Unknown lint \`${name}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })))
 }
 
 // The template's own lints: what it can say from the markup alone.

@@ -6,7 +6,7 @@ What each minor release before 1.105 broke, and what an app changed to move to i
 
 ### An island declares its settings with `island()`
 
-`island({ render, hydrate, persist, interactive })` first in a component's script replaces the `--- island`, `--- client` and `--- static` fence lines and `export const island = { ... }` in a `--- module` fence: `--- client` is `island({ render: 'client' })`, `--- island` is `island()`, `--- static` is `island({ render: 'static' })`, and the export's `persist`, `hydrate` and `interactive` move into the call. On a use, `hydrate="client"` is `render="client"` and `server="defer"` is `server defer`. `kay upgrade` rewrites them (`deprecated-island-fence`, `deprecated-island-attributes`), and they work until 1.108. kayjs-ui's `table.kay`, `site-nav.kay` and `app-header.kay` and kayjs-ai's `chat-launcher.kay` no longer export `island`: they declare it with the call, and an app reading that export reads the component's `interactive` props from its docs instead.
+`island({ render, hydrate, persist, interactive })` first in a component's script replaces the `--- island`, `--- client` and `--- static` fence lines and `export const island = { ... }` in a `--- module` fence: `--- client` is `island({ render: 'client' })`, `--- island` is `island()`, `--- static` is `island({ render: 'static' })`, and the export's `persist`, `hydrate` and `interactive` move into the call. On a use, `hydrate="client"` is `render="client"` and `server="defer"` is `server defer`. The old forms went in 1.109. kayjs-ui's `table.kay`, `site-nav.kay` and `app-header.kay` and kayjs-ai's `chat-launcher.kay` no longer export `island`: they declare it with the call, and an app reading that export reads the component's `interactive` props from its docs instead.
 
 ### `formatDuration` takes a duration with its unit
 
@@ -50,9 +50,9 @@ Every old form below works until 1.108, `kay check` reports it as a `deprecated-
 - `persisted(name, value)` is `persisted.cookie(name, value)`: a call names its storage (`deprecated-persisted-call`).
 - `navigate({ query: changes }, options)` is `navigate.query(changes, options)`: `navigate(href)` goes to a page, `navigate.query()` changes the query of this one (`deprecated-navigate-query`).
 - `onNavigate(fn)` and `onBeforeNavigate(fn)` are `navigation.onNavigate(fn)` and `navigation.onBeforeNavigate(fn)`, the hooks of the source (`deprecated-navigation-hooks`).
-- An island listening to `kay:navigate`, `kay:navigate-start`, `kay:navigate-error`, `kay:navigate-stall`, `kay:action-start`, `kay:action-success`, `kay:action-error`, `kay:consent` or `kay:install` with `listen` uses the function hook: `navigation.onNavigate`, `onStart`, `onError` and `onStall`, `add.onStart`, `onData` and `onError` of an action (`{ input }`, `{ error, input }`), the `consent` signal, `installPrompt.available()`. The events still fire for a plain script, and the old listener works until 1.108 (`deprecated-island-events`, which rewrites the swap's events when the handler takes no parameter; the others are reported with the hook to write).
-- `listen(window, ...)` is `listen(() => window, ...)`: the target is one form, a function (`deprecated-listen-target`).
-- `mount` and `Mounted` are imported from `kay`, not `kay/mount`; `s`, `RateLimit` and `RateLimitRefusal` from `kay`, not `kay/server`; `sqliteCache` from `kay/cache`, not `kay/server` (`deprecated-import-path`).
+- An island listening to `kay:navigate`, `kay:navigate-start`, `kay:navigate-error`, `kay:navigate-stall`, `kay:action-start`, `kay:action-success`, `kay:action-error`, `kay:consent` or `kay:install` with `listen` uses the function hook: `navigation.onNavigate`, `onStart`, `onError` and `onStall`, `add.onStart`, `onData` and `onError` of an action (`{ input }`, `{ error, input }`), the `consent` signal, `installPrompt.available()`. The events still fire for a plain script, and the old listener went on working: its lint went in 1.109.
+- `listen(window, ...)` is `listen(() => window, ...)`: the target is one form, a function, and a value went in 1.109.
+- `mount` and `Mounted` are imported from `kay`, not `kay/mount`; `s`, `RateLimit` and `RateLimitRefusal` from `kay`, not `kay/server`; `sqliteCache` from `kay/cache`, not `kay/server`; the old imports went in 1.109.
 
 ### The `storage` option of `persisted()` is gone
 
@@ -97,7 +97,7 @@ Toggle, Checkbox, Slider, ColorInput, Combobox and DateInput put the attributes 
 
 ### A page is never an island
 
-A page without a `--- server` fence that has an `on*`, `bind:` or `ref`, a browser value of `kay` such as `signal`, or a live or persisted import used to become an island. It still does through 1.107, and `kay check` warns with `deprecated-page-island` at that line; 1.108 refuses it. Move what needs the browser into a component of its own and render it from the page: the component is the island. No `kay upgrade` fix exists, as the fix moves code into a new file.
+A page without a `--- server` fence that has an `on*`, `bind:` or `ref`, a browser value of `kay` such as `signal`, or a live or persisted import used to become an island. It still does through 1.107, and 1.109 refuses it with `page-island`. Move what needs the browser into a component of its own and render it from the page: the component is the island. No `kay upgrade` fix exists, as the fix moves code into a new file.
 
 Releases before 1.105 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
 

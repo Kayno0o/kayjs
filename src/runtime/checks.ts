@@ -8,8 +8,8 @@ import type { Component, JSX } from './jsx'
 declare const ISLAND: unique symbol
 declare const BINDABLE: unique symbol
 
-// When an island hydrates: right away, once the browser is idle, once it scrolls near the viewport, on the first interaction inside it, or once a media query matches (`media(max-width: 40rem)`); `client` renders it in the browser only, right away.
-export type HydrateWhen = 'load' | 'idle' | 'visible' | 'interaction' | `media(${string})` | 'client'
+// When an island hydrates: right away, once the browser is idle, once it scrolls near the viewport, on the first interaction inside it, or once a media query matches (`media(max-width: 40rem)`).
+export type HydrateWhen = 'load' | 'idle' | 'visible' | 'interaction' | `media(${string})`
 
 // What an `if` renders its block on, its condition's type without the falsy values, `false` and `0` included as `NonNullable` keeps them.
 export type Truthy<T> = Exclude<T, false | 0 | 0n | '' | null | undefined>
@@ -54,7 +54,7 @@ export interface IslandOptions {
   fallback?: JSX.Element | undefined
 }
 
-// What a component's `export const island` asks of its parents: `hydrate` and `persist` as an `IslandOptions` does, and `interactive`, the props that make a use of it an island, each with the value it has when a use leaves it out. A use whose props turn none of them on, and that hands the island no function, renders as plain markup that ships no JavaScript.
+// What a component's `island()` call asks of its parents: `hydrate` and `persist` as an `IslandOptions` does, and `interactive`, the props that make a use of it an island, each with the value it has when a use leaves it out. A use whose props turn none of them on, and that hands the island no function, renders as plain markup that ships no JavaScript.
 export interface IslandAsks {
   hydrate?: HydrateWhen | undefined
   persist?: boolean | string | undefined

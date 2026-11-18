@@ -68,20 +68,20 @@ describe('a module a server render reaches that reads a browser global as it loa
       expect(await found({ ...page, 'src/lib/width.ts': `export const width = 1\n${body}\n`, 'src/lib/client-only.ts': 'export const x = window.name\n' }), body).toEqual([])
   })
 
-  it('leaves a component only a `--- client` one renders, and one no page renders', async () => {
+  it('leaves a component only a client-only one renders, and one no page renders', async () => {
     const marker = { 'src/components/marker.kay': '---\nimport { width } from \'../lib/width\'\n---\np {width}\n', 'src/lib/width.ts': 'export const width = window.innerWidth\n' }
 
-    expect(await found({ 'src/routes/index.kay': '--- client\nimport Marker from \'../components/marker.kay\'\n---\nMarker\n', ...marker })).toEqual([])
+    expect(await found({ 'src/routes/index.kay': '---\nisland({ render: "client" })\nimport Marker from \'../components/marker.kay\'\n---\nMarker\n', ...marker })).toEqual([])
     expect(await found({ 'src/routes/index.kay': 'p hi\n', ...marker })).toEqual([])
     expect(await found({ 'src/routes/index.kay': '---\nimport Marker from \'../components/marker.kay\'\n---\nMarker\n', ...marker })).toEqual(['src/lib/width.ts:1 `window` exists only in the browser'])
   })
 
-  it('leaves what the server never renders: a component used only with `hydrate="client"`, and an island the build demotes for a package that throws on load', async () => {
+  it('leaves what the server never renders: a component used only with `render="client"`, and an island the build demotes for a package that throws on load', async () => {
     const marker = { 'src/components/marker.kay': '---\nimport { width } from \'../lib/width\'\n---\np {width}\n', 'src/lib/width.ts': 'export const width = window.innerWidth\n' }
     const use = (tag: string) => ({ 'src/routes/index.kay': `---\nimport Marker from '../components/marker.kay'\n---\n${tag}\n`, ...marker })
 
-    expect(await found(use('Marker(hydrate="client")'))).toEqual([])
-    expect(await found(use('Marker(hydrate="client")\n  Marker'))).toEqual(['src/lib/width.ts:1 `window` exists only in the browser'])
+    expect(await found(use('Marker(render="client")'))).toEqual([])
+    expect(await found(use('Marker(render="client")\n  Marker'))).toEqual(['src/lib/width.ts:1 `window` exists only in the browser'])
     expect(await found(use('Marker(hydrate="visible")'))).toEqual(['src/lib/width.ts:1 `window` exists only in the browser'])
 
     const island = '---\nimport { signal } from \'kay\'\nimport { draw } from \'needs-dom\'\nimport { width } from \'../lib/width\'\n\nconst count = signal(width)\n---\nbutton(onClick={() => draw(count++)}) {count()}\n'
@@ -102,9 +102,9 @@ describe('a module a server render reaches that reads a browser global as it loa
     expect(await through('const globalThis = { window: { innerWidth: 1 } }\nexport const a = globalThis.window.innerWidth')).toEqual([])
   })
 
-  it('leaves a module no page imports, and one only a `--- client` component imports', async () => {
+  it('leaves a module no page imports, and one only a client-only component imports', async () => {
     expect(await found({ 'src/routes/index.kay': 'p hi\n', 'src/lib/width.ts': 'export const width = window.innerWidth\n' })).toEqual([])
-    expect(await found({ 'src/routes/index.kay': '--- client\nimport { width } from \'../lib/width\'\n---\np {width}\n', 'src/lib/width.ts': 'export const width = window.innerWidth\n' })).toEqual([])
+    expect(await found({ 'src/routes/index.kay': '---\nisland({ render: "client" })\nimport { width } from \'../lib/width\'\n---\np {width}\n', 'src/lib/width.ts': 'export const width = window.innerWidth\n' })).toEqual([])
   })
 
   it('leaves a package alone, as its own load is probed', async () => {

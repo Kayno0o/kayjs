@@ -60,7 +60,7 @@ describe('a component reading a persisted value a module exports', () => {
   })
 
   it('is pinned static as an error, as any other island cause', () => {
-    const pinned = `--- static\nimport { history } from './history'\n---\np {history()}\n`
+    const pinned = `---\nisland({ render: "static" })\nimport { history } from './history'\n---\np {history()}\n`
 
     expect(compile(pinned).diagnostics.map(diagnostic => diagnostic.code)).toContain('static-pin')
   })

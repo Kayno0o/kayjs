@@ -44,7 +44,6 @@ import { clientKeys } from './client-keys'
 import { cmsOptions } from './cms-options'
 import { configGroups } from './config-groups'
 import { configSwitches } from './config-switches'
-import { contextImport } from './context-import'
 
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
@@ -71,14 +70,13 @@ import { liveApi } from './live-api'
 
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
-import { islandEvents, listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
+import { navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
 import { unreadOpenSettings } from './open-settings'
 import { pagesOptions } from './pages-options'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { rateEnforce } from './rate-enforce'
 import { refusalCalls } from './refusal-calls'
 import { removedUiTokens } from './removed-ui-tokens'
-import { retiredLintLevels } from './retired-lints'
 import { routeKeys } from './route-keys'
 import { routeShadow, routeShadowPath } from './route-shadow'
 import { schemaBuilders } from './schema-builders'
@@ -205,9 +203,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => persistedQuery(root, options),
   async ({ root, options }) => navigateQuery(root, options),
   async ({ root, options }) => navigationHooks(root, options),
-  async ({ root, options }) => islandEvents(root, options),
-  async ({ root, options }) => listenTarget(root, options),
-  async ({ root, options }) => movedImports(root, options),
 
   async ({ root, options }) => schemaBuilders(root, options),
   async ({ root, options }) => schemaJson(root, options),
@@ -227,7 +222,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => configSwitches(root, options),
   async ({ root, options }) => imagesKeys(root, options),
   async ({ root, options }) => clientKeys(root, options),
-  async ({ root, options }) => retiredLintLevels(root, options),
   async ({ root, options }) => configGroups(root, options),
   async ({ root, options }) => i18nKeys(root, options),
   async ({ root, options }) => secretKeys(root, options),
@@ -242,7 +236,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => authRateLimits(root, options),
   async ({ root, options }) => authMethods(root, options),
   async ({ root, options }) => envFiles(root, options),
-  async ({ root, options }) => contextImport(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

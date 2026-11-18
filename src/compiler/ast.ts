@@ -230,10 +230,9 @@ export function sectionOf(element: ElementNode, source: string): Extract<Attribu
   return attribute?.kind === 'boolean' || attribute?.kind === 'expression' ? attribute : undefined
 }
 
-// `Card(server)` renders per request inside a prerendered page, `Card(server defer)` once the browser fetches it on approach (`server="defer"` before 1.105).
+// `Card(server)` renders per request inside a prerendered page, `Card(server defer)` once the browser fetches it on approach.
 export const SERVER_ISLAND_ATTRIBUTE = 'server'
 export const SERVER_ISLAND_DEFER = 'defer'
-export const SERVER_ISLAND_MODES = new Set(['defer'])
 // Beside `defer`, the text of a link to the page with the island in place, for a browser without JavaScript.
 export const SERVER_ISLAND_NOSCRIPT = 'noscript'
 // The block under a deferred server island call, or at the root of the component, shown once the island failed for good.
@@ -243,7 +242,7 @@ export const SERVER_IN_ISLAND = '`server` has no effect inside an island'
 
 export interface ServerIslandMark {
   attribute: NamedAttribute
-  // Undefined for a value no mode answers to.
+  // Undefined for a value, which no mode answers to.
   mode: 'inline' | 'defer' | undefined
   noscript: NamedAttribute | undefined
   // The bare `defer` written beside `server`, the word of `server defer`, which is no prop either.
@@ -263,8 +262,7 @@ export function serverIslandOf(element: ElementNode, source: string): ServerIsla
 
   // `defer` is the mark only as a bare word beside `server`: alone, or with a value, it is a prop of the component, which may have one of its own.
   const defer = [named(SERVER_ISLAND_DEFER)].find(candidate => candidate?.kind === 'boolean')
-  const written = attribute.kind === 'static' && SERVER_ISLAND_MODES.has(attribute.text) ? attribute.text as 'defer' : undefined
-  const mode = attribute.kind === 'boolean' ? ['inline', 'defer'][Number(defer !== undefined)] as 'inline' | 'defer' : written
+  const mode = attribute.kind === 'boolean' ? ['inline', 'defer'][Number(defer !== undefined)] as 'inline' | 'defer' : undefined
 
   return { attribute, mode, noscript: named(SERVER_ISLAND_NOSCRIPT), defer }
 }
@@ -566,9 +564,9 @@ export interface KayFile {
   style?: Span | undefined
   // Inside the angle brackets of `--- <T extends Row>`: the component function's type parameters.
   typeParameters?: Span | undefined
-  // The `client` of `--- client`: the component renders in the browser only.
+  // The `island({ render: 'client' })` call: the component renders in the browser only.
   client?: Span | undefined
-  // The `island` or `static` of `--- island` and `--- static`: the author pins the component's role, and the compiler holds it to the pin.
+  // The `island()` or `island({ render: 'static' })` call: the author pins the component's role, and the compiler holds it to the pin.
   pin?: (Span & { kind: 'island' | 'static' }) | undefined
   // The `island({ ... })` the script opens with, which sets `client` or `pin` as the fence lines do.
   island?: IslandDeclaration | undefined

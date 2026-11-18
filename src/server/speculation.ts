@@ -51,7 +51,7 @@ export function prefetchMeta(prefetch: Prefetch = 'moderate'): string {
 
 // Never kay's own routes or the API, as the page swap leaves them too, nor a download or a link search engines are told not to follow, as a sign-out link often is.
 function rules(eagerness: Exclude<Prefetch, false>, nearest: boolean, base = '', apiPath = '/api'): string {
-  const where = { and: [{ href_matches: `${base}/*` }, { not: { href_matches: `${base}/_kay/*` } }, { not: { href_matches: `${base}${apiPath}/*` } }, { not: { href_matches: `${base}${apiPath}` } }, { not: { selector_matches: `[data-no-prefetch], ${nearest ? `${OPTED_OUT}, ` : ''}[download], [rel~=nofollow]` } }] }
+  const where = { and: [{ href_matches: `${base}/*` }, { not: { href_matches: `${base}/_kay/*` } }, { not: { href_matches: `${base}${apiPath}/*` } }, { not: { href_matches: `${base}${apiPath}` } }, { not: { selector_matches: `${nearest ? `${OPTED_OUT}, ` : ''}[download], [rel~=nofollow]` } }] }
 
   return `<script type="speculationrules">${JSON.stringify({ prefetch: [{ source: 'document', where, eagerness }] })}</script>`
 }

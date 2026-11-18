@@ -170,14 +170,14 @@ describe('kay explain', () => {
     const [heading, blank, ...rows] = lintList('islands').split('\n')
 
     expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
-    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'island-prop', 'hydration-mismatch', 'unowned-effect', 'unkeyed-rows'])
+    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'page-island', 'island-prop', 'hydration-mismatch', 'unowned-effect', 'unkeyed-rows'])
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code, and every lint\'s examples hold', () => {
     // One the types find, or one found in kay.config.ts or the rendered pages, is proved by `kay check`'s and `kay build`'s own tests.
     for (const [code, lint] of Object.entries(LINTS).filter(([, lint]) => !('typed' in lint) && !('site' in lint))) {
       // A page lint reads the example as the page of a route.
-      const options = code === 'deprecated-page-island' ? { page: true } : {}
+      const options = code === 'page-island' ? { page: true } : {}
 
       expect(lints(lint.wrong, options).map(d => d.code)).toContain(code)
       expect(lints(lint.right, options).map(d => d.code)).not.toContain(code)
@@ -1205,7 +1205,7 @@ describe('server-only-import', () => {
 
   it('reports invalidatePage and sqliteCache imported from kay/cache by what runs in the browser, an island\'s script and a client fence', () => {
     const island = '---\nimport { signal } from \'kay\'\nimport { cached, invalidatePage as refresh, sqliteCache } from \'kay/cache\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}'
-    const client = '--- client\nimport { invalidatePage } from \'kay/cache\'\n\nconsole.log(invalidatePage)\n---\np x'
+    const client = '---\nisland({ render: "client" })\nimport { invalidatePage } from \'kay/cache\'\n\nconsole.log(invalidatePage)\n---\np x'
 
     expect(only(island)).toEqual([
       { code: 'server-only-import', severity: 'error', at: 'invalidatePage as refresh' },

@@ -10,7 +10,7 @@ const page = (script: string, template = 'button(onClick={() => count = 1}) {cou
 
 describe('unowned-effect', () => {
   it('flags an effect, watch, every, listen, onMount or onCleanup made in an event handler', () => {
-    for (const call of ['effect(() => count())', 'watch(count, () => {})', 'every(\'1s\', () => {})', 'listen(window, \'resize\', () => {})', 'onMount(() => {})', 'onCleanup(() => {})'])
+    for (const call of ['effect(() => count())', 'watch(count, () => {})', 'every(\'1s\', () => {})', 'listen(() => window, \'resize\', () => {})', 'onMount(() => {})', 'onCleanup(() => {})'])
       expect(lints(page('', `button(onClick={() => ${call}}) go`)), call).toEqual([['unowned-effect', call.slice(0, call.indexOf('('))]])
 
     expect(lints(page('', 'button(onClick={() => { count = 1; effect(() => count()) }}) go'))).toEqual([['unowned-effect', 'effect']])
@@ -19,7 +19,7 @@ describe('unowned-effect', () => {
   it('flags one made in a timer, a promise callback, a listen handler or after an await', () => {
     expect(lints(page('setTimeout(() => effect(() => count()), 10)'))).toEqual([['unowned-effect', 'effect']])
     expect(lints(page('Promise.resolve().then(() => onCleanup(() => {}))'))).toEqual([['unowned-effect', 'onCleanup']])
-    expect(lints(page('listen(window, \'keydown\', () => effect(() => count()))'))).toEqual([['unowned-effect', 'effect']])
+    expect(lints(page('listen(() => window, \'keydown\', () => effect(() => count()))'))).toEqual([['unowned-effect', 'effect']])
     expect(lints(page('async function load() {\n  await fetch(\'/x\')\n  effect(() => count())\n}'))).toEqual([['unowned-effect', 'effect']])
     expect(lints(page('effect(async () => {\n  await Promise.resolve()\n  onCleanup(() => {})\n})'))).toEqual([['unowned-effect', 'onCleanup']])
   })
@@ -44,7 +44,7 @@ describe('unowned-effect', () => {
     const messages = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.filter(diagnostic => diagnostic.code === 'unowned-effect').map(diagnostic => diagnostic.message)
 
     expect(messages(page('', 'button(onClick={() => effect(() => count())}) go'))[0]).toContain('each event adds one')
-    expect(messages(page('listen(window, \'keydown\', () => effect(() => count()))'))[0]).toContain('each event adds one')
+    expect(messages(page('listen(() => window, \'keydown\', () => effect(() => count()))'))[0]).toContain('each event adds one')
     expect(messages(page('setTimeout(() => effect(() => count()), 10)'))[0]).toContain('lives until the page goes')
   })
 
@@ -53,8 +53,8 @@ describe('unowned-effect', () => {
     expect(lints(page('', 'div(ref={el => effect(() => el.title = String(count()))})'))).toEqual([])
   })
 
-  it('reaches a `--- client` component too', () => {
-    expect(lints(page('', 'button(onClick={() => effect(() => count())}) go').replace('---\nimport', '--- client\nimport'))).toEqual([['unowned-effect', 'effect']])
+  it('reaches a client-only component too', () => {
+    expect(lints(page('', 'button(onClick={() => effect(() => count())}) go').replace('---\nimport', '---\nisland({ render: "client" })\nimport'))).toEqual([['unowned-effect', 'effect']])
   })
 
   it('is a lint a kay-allow comment and the lint level reach', () => {

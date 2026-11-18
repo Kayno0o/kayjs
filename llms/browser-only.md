@@ -30,9 +30,9 @@ onMount(() => drawMap(center))
 - An island importing a package that throws on a browser-only global as it loads renders in the browser only, with nothing to write.
 - Each package is imported once, in a Bun process of its own, and the answer is kept per package version in `.kay/cache`.
 - The server never loads such a package: an island's server module carries none of its script.
-- A component declaring `island({ render: 'client' })` always renders in the browser only, and is an island even without state. It was the `--- client` fence line, which `kay upgrade` rewrites (`deprecated-island-fence`) and which works until 1.108.
+- A component declaring `island({ render: 'client' })` always renders in the browser only, and is an island even without state.
 - Pages, layouts and special pages render on the server, so they cannot declare it.
-- `render="client"` renders one use of an island in the browser only: `Map(center={center} render="client")`. It was `hydrate="client"` (`deprecated-island-attributes`): `hydrate` says only when an island hydrates.
+- `render="client"` renders one use of an island in the browser only: `Map(center={center} render="client")`. `hydrate` says only when an island hydrates.
 
 ### Fallback while the browser renders
 

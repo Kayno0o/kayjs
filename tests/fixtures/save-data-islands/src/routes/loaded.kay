@@ -5,4 +5,4 @@ head
   title Loaded
 h1 Loaded
 Quick(name="load" hydrate="load")
-Quick(name="client" hydrate="client")
+Quick(name="client" render="client")

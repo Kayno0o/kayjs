@@ -601,7 +601,7 @@ interface HoneypotOptions<Field extends string = string>
   pretend?: boolean | undefined
 
 [.] HydrateWhen
-type HydrateWhen = 'load' | 'idle' | 'visible' | 'interaction' | `media(${string})` | 'client'
+type HydrateWhen = 'load' | 'idle' | 'visible' | 'interaction' | `media(${string})`
 
 [.] InputOf
 type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : never
@@ -683,7 +683,7 @@ function lengthMs(value: `${number}d` | `${number}h` | `${number}m` | `${number}
 function linked<T>(source: () => T): Signal<T>
 
 [.] listen
-function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: (() => T | null | undefined) | T, type: K, handler: (event: EventMapOf<T>[K]) => void, options?: AddEventListenerOptions | boolean | undefined): () => void
+function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: () => T | null | undefined, type: K, handler: (event: EventMapOf<T>[K]) => void, options?: AddEventListenerOptions | boolean | undefined): () => void
 
 [.] live
 function live<T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(initial: PlainValue<T>, options: LiveOptions<Ttl> & {
@@ -2765,14 +2765,6 @@ interface MarkdownOptions
 [./markdown] markdownReady
 function markdownReady(): Promise<void>
 
-[./mount] mount
-/** @deprecated Import `mount` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
-function mount<P extends object>(component: (props: P) => unknown, element: Element, ...[props]: PropsOf<P>): Mounted<P>
-
-[./mount] Mounted
-/** @deprecated Import `Mounted` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
-type Mounted<P extends object> = MountedIn<P>
-
 [./params] integer
 function integer(value: string): number | undefined
 
@@ -3023,7 +3015,6 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
     paths?: Loadable<Record<string, Record<string, string>>> | undefined;
   } & DeprecatedI18n, [unknown]>;
   head?: unknown;
-  client?: Checked<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig, [unknown]>;
   onError?: unknown;
   base?: unknown;
   env?: Checked<"env" extends keyof Config ? Config[keyof Config & "env"] : unknown, {
@@ -3040,6 +3031,7 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   dirs?: Checked<"dirs" extends keyof Config ? Config[keyof Config & "dirs"] : unknown, DirsConfig, [unknown]>;
   limits?: Checked<"limits" extends keyof Config ? Config[keyof Config & "limits"] : unknown, LimitsConfig, [unknown]>;
   endpoints?: Checked<"endpoints" extends keyof Config ? Config[keyof Config & "endpoints"] : unknown, EndpointsConfig, [unknown]>;
+  client?: Checked<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig, [unknown]>;
   actions?: Checked<"actions" extends keyof Config ? Config[keyof Config & "actions"] : unknown, ActionsConfig, [unknown]>;
   minify?: unknown;
   lang?: unknown;
@@ -3772,10 +3764,6 @@ function rateKey(address: string): string
 [./server] rateLimit
 function rateLimit(name: string, limit: RateLimit): RateLimiter
 
-[./server] RateLimit
-/** @deprecated Import `RateLimit` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
-type RateLimit = RateLimitIn
-
 [./server] RateLimiter
 interface RateLimiter extends RateLimit
   check: (ctx: Pick<GuardContext, "cookies" | "deny" | "headers" | "locale" | "locals" | "request">, message?: ((wait: number) => string) | string | undefined) => Promise<void>
@@ -3787,10 +3775,6 @@ interface RateLimiter extends RateLimit
   onLimit?: ((refusal: RateLimitRefusal) => Promise<void> | void) | undefined
   store?: RateStore | undefined
   window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
-
-[./server] RateLimitRefusal
-/** @deprecated Import `RateLimitRefusal` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
-type RateLimitRefusal = RateLimitRefusalIn
 
 [./server] Refusal
 interface Refusal
@@ -3925,66 +3909,6 @@ interface Route
   params: string[]
   pattern: string
   special: SpecialPages
-
-[./server] s
-/** @deprecated Import `s` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
-const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
-  String: (property?: ElysiaStringOptions | undefined) => TString;
-  Numeric: (property?: NumberOptions | undefined) => TNumber;
-  NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>;
-  Integer: (property?: IntegerOptions | undefined) => TInteger;
-  Date: (property?: DateOptions | undefined) => TDate;
-  BooleanString: (property?: SchemaOptions | undefined) => TBoolean;
-  ObjectString: <T extends TProperties>(properties: T, options?: ObjectOptions | undefined) => TObject<T>;
-  ArrayString: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
-  ArrayQuery: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
-  File: TFile;
-  Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
-  Nullable: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull]>;
-  MaybeEmpty: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull, TUndefined]>;
-  Cookie: <T extends TProperties>(properties: T, {
-    domain, expires, httpOnly, maxAge, path, priority, sameSite, secure, secrets, sign, ...options
-  }?: CookieValidatorOptions<T> | undefined) => TObject<T>;
-  UnionEnum: <Readonly<NonEmptyArray<TEnumValue>> | const T extends NonEmptyArray<TEnumValue>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
-  NoValidate: <T extends TAnySchema>(v: T, enabled?: boolean | undefined) => T;
-  Form: <T extends TProperties>(v: T, options?: ObjectOptions | undefined) => TForm<T>;
-  ArrayBuffer(options?: TArrayBuffer | undefined): TUnsafe<ArrayBuffer>;
-  Uint8Array: (options: Uint8ArrayOptions) => TUnsafe<Uint8Array<ArrayBufferLike>>;
-} & {
-  Transform<Type extends TSchema>(type: Type): ElysiaTransformDecodeBuilder<Type>;
-}, "File" | "Files" | "Secret" | "UnionEnum"> & {
-  UnionEnum: <Readonly<NonEmptyArray<TEnumValue>> | const T extends NonEmptyArray<TEnumValue>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
-  UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;
-  File: (options?: OldFileOptions | undefined) => TUnsafe<File>;
-  Files: (options?: OldFilesOptions | undefined) => TUnsafe<File[]>;
-  Secret: (options?: ElysiaStringOptions | undefined) => TString;
-  Public: <Field extends Schema>(field: Field) => Field & {
-    public: true;
-  };
-  string: <const Options extends StringOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
-  email: <const Options extends FormatOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
-  url: <const Options extends FormatOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
-  slug: <const Options extends FormatOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
-  int: <const Options extends NumberOptions>(options?: Options | undefined) => Wrapped<TInteger, Options>;
-  number: <const Options extends NumberOptions>(options?: Options | undefined) => Wrapped<TNumber, Options>;
-  boolean: <const Options extends FieldOptions<boolean>>(options?: Options | undefined) => Wrapped<TBoolean, Options>;
-  date: <const Options extends FieldOptions<Date>>(options?: Options | undefined) => Wrapped<TDate, Options>;
-  enum: {
-    <const Values extends EnumValues, const Options extends FieldOptions<Values[number]> = FieldOptions<Values[number]>>(values: Values, options?: Options | undefined): Wrapped<TUnionEnum<Values>, Options>;
-    <const Keyed extends object, const Options extends FieldOptions<keyof Keyed & string> = FieldOptions<keyof Keyed & string>>(record: Keyed, options?: Options | undefined): Wrapped<TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>, Options>;
-  };
-  literal: <boolean | const Value extends string | number, const Options extends FieldOptions<Value>>(value: Value, options?: Options | undefined) => Wrapped<TLiteral<Value>, Options>;
-  union: <const Members extends readonly [Schema, Schema, ...Schema[]], const Options extends FieldOptions>(members: Members, options?: Options | undefined) => Wrapped<Union<[...Members]>, Options>;
-  object: <Shape extends Record<string, Schema>, const Options extends ObjectOptions>(shape: Shape, options?: Options | undefined) => Wrapped<TObject<Shape>, Options>;
-  record: <Value extends Schema, const Options extends FieldOptions>(value: Value, options?: Options | undefined) => Wrapped<TRecord<TString, Value>, Options>;
-  list: <Item extends Schema, const Options extends ListOptions>(item: Item, options?: Options | undefined) => Wrapped<TArray<Item>, Options>;
-  file: <const Options extends FileOptions>(options?: Options | undefined) => Wrapped<TUnsafe<File>, Options>;
-  files: <const Options extends FilesOptions>(options?: Options | undefined) => Wrapped<TUnsafe<File[]>, Options>;
-  secret: <const Options extends StringOptions>(options?: Options | undefined) => Wrapped<TString, Options>;
-  public: <Field extends Schema>(field: Field) => Field & {
-    public: true;
-  };
-}
 
 [./server] s3Files
 function s3Files(options?: S3Options & { publicUrl?: string | undefined; } & FileHooks): FileStore
@@ -4153,10 +4077,6 @@ const SNIFFED_BYTES: 4096
 
 [./server] Source
 type Source = 'form' | 'query' | 'params' | 'env' | 'json'
-
-[./server] sqliteCache
-/** @deprecated Import `sqliteCache` from `kay/cache`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it. */
-function sqliteCache(path: string): SyncCacheStore
 
 [./server] sqliteData
 function sqliteData(path: string): {

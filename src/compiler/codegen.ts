@@ -18,7 +18,7 @@ import { emitHeadTag, emitHeadText } from './head-tags'
 import { awaitAlertTail, htmlHelperImport, HtmlTemplate } from './html'
 import { withoutComma } from './import-edits'
 import { sourceLocator } from './inspect'
-import { asksOf, exportsIslandOptions, islandMessages, withAlertKeys } from './island-arguments'
+import { islandMessages, withAlertKeys } from './island-arguments'
 import { ambientHelpers, constDeclaration } from './items'
 import { JsxTemplate } from './jsx'
 import { lazyDomImport, lazyEdits, lazyNoteImport } from './lazy-imports'
@@ -51,7 +51,7 @@ export interface GenerateOptions {
   island?: string | undefined
   // Under `kay dev`, why the component is an island or may become one, written on its slot as `data-why`.
   cause?: string | undefined
-  // The island renders in the browser only: `--- client`, or a package it imports cannot load on the server.
+  // The island renders in the browser only: `island({ render: 'client' })`, or a package it imports cannot load on the server.
   client?: boolean | undefined
   // The live values the island imports, which its server render notes to prove the page may follow them even when the render reads none, as a handler does not run there.
   lives?: string[] | undefined
@@ -624,11 +624,11 @@ class ModuleShell {
       b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${this.islandTail(src)})${this.genericIslandType()}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
   }
 
-  // The arguments after the component that `island()` takes: its message keys, the live values and cause of a server render, and the `island` the module fence exports, the hydrate and persist the component asks for wherever it is used.
+  // The arguments after the component that `island()` takes: its message keys, the live values and cause of a server render, and what its `island()` call asks, the hydrate and persist the component asks for wherever it is used.
   private islandTail(src: string): string {
     const html = this.options.output === 'html'
 
-    return islandMessages(withAlertKeys(src, this.options.awaitAlert), this.options.client, html ? this.options.lives : undefined, html ? this.options.cause : undefined, false, html && exportsIslandOptions(this.script) && asksOf(this.script), this.file.wrapsButtons === true)
+    return islandMessages(withAlertKeys(src, this.options.awaitAlert), this.options.client, html ? this.options.lives : undefined, html ? this.options.cause : undefined, false, html && (this.script.island?.asks ?? false), this.file.wrapsButtons === true)
   }
 
   private get wrapped(): boolean {
@@ -1006,13 +1006,13 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return script.reactive || templateFacts(file).interactive
 }
 
-// The first thing that makes a component interactive, so an island: an `on*`, `bind:` or `ref` attribute, a `kay` value of the script, a `--- client` fence or a `--- island` one.
+// The first thing that makes a component interactive, so an island: an `on*`, `bind:` or `ref` attribute, a `kay` value of the script, or an `island()` declaration.
 export function islandCause(file: KayFile, script: ScriptAnalysis): IslandCause | undefined {
   if (file.client !== undefined)
-    return { kind: 'client', name: file.island === undefined ? '--- client' : 'island()', span: file.client, line: lineOf(file.source, file.client.start) }
+    return { kind: 'client', name: 'island()', span: file.client, line: lineOf(file.source, file.client.start) }
 
   if (file.pin?.kind === 'island')
-    return { kind: 'island', name: file.island === undefined ? '--- island' : 'island()', span: file.pin, line: lineOf(file.source, file.pin.start) }
+    return { kind: 'island', name: 'island()', span: file.pin, line: lineOf(file.source, file.pin.start) }
 
   let cause: IslandCause | undefined
 

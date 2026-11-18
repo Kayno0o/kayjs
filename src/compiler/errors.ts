@@ -138,7 +138,7 @@ export const ERRORS = {
   },
   'client-route-fence': {
     group: 'compile',
-    summary: 'A page, layout or special page declaring `island({ render: \'client\' })` or with a `--- client` fence: they render on the server.',
+    summary: 'A page, layout or special page declaring `island({ render: \'client\' })`: they render on the server.',
     fix: { file: 'llms/islands.md', heading: 'Islands' },
   },
   'server-import-in-island': {

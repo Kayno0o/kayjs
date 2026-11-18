@@ -1404,13 +1404,13 @@ describe('prefetch', () => {
 
     const selector = (rules as { prefetch: { where: { and: { not?: { selector_matches?: string } }[] } }[] }).prefetch[0]!.where.and.at(-1)!.not!.selector_matches!
 
-    expect(selector).toMatch(/^\[data-no-prefetch\], .*, \[download\], \[rel~=nofollow\]$/)
+    expect(selector).toMatch(/^.*, \[download\], \[rel~=nofollow\]$/)
     expect(rules).toEqual({ prefetch: [{
       source: 'document',
       where: { and: [{ href_matches: '/*' }, { not: { href_matches: '/_kay/*' } }, { not: { href_matches: '/api/*' } }, { not: { href_matches: '/api' } }, { not: { selector_matches: selector } }] },
       eagerness: 'moderate',
     }] })
-    expect(speculationRules('moderate', '', '/api', false)).toContain('"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"')
+    expect(speculationRules('moderate', '', '/api', false)).toContain('"selector_matches":"[download], [rel~=nofollow]"')
     expect(speculationRules('eager')).toContain('"eagerness":"eager"')
     expect(speculationRules(false)).toBe('')
 

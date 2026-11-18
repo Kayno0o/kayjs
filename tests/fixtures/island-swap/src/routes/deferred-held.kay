@@ -9,4 +9,4 @@ import Held from '../components/held.kay'
 head
   title Deferred held
 h1 Deferred held
-Held(server="defer" to={stay})
+Held(server defer to={stay})
