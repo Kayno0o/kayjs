@@ -16,7 +16,7 @@ async function tally(): Promise<number> {
 
 describe('site.call and site.submit with an action fixing fields', () => {
   it('posts them under a base, from a path and from a call', async () => {
-    const mounted = await testSite({ root: 'tests/fixtures/form-fields', islands: false, base: '/blog' })
+    const mounted = await testSite({ root: 'tests/fixtures/form-fields', islands: false, config: { base: '/blog' } })
     const read = async () => Number((await mounted.visit('/lone')).find('p.tally')[0]?.text)
     const before = await read()
 

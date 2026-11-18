@@ -235,11 +235,11 @@ describe('a production server started from disk', () => {
     const root = resolve(await fixtureCopy('request-values'))
     const mapped = extensions.map(extension => extension.context === undefined ? extension : { ...extension, context: resolve(root, 'lib/context.ts') })
 
-    return { root, options: JSON.stringify({ root, extensions: mapped, prebuilt: true, security: false, client: { inlineStyles: false }, site: 'https://site.example', ...base !== undefined && { base } }) }
+    return { root, options: JSON.stringify({ root, prebuilt: true, config: { extensions: mapped, security: false, client: { inlineStyles: false }, site: 'https://site.example', ...base !== undefined && { base } } }) }
   }
 
   async function build(options: string): Promise<void> {
-    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { extensions: options.extensions, security: false, client: { inlineStyles: false }, site: options.site, base: options.base, i18n: options.i18n, librarySettings: options.librarySettings }, { check: false })\nif (built.failed) throw built.failed.error\n`)
+    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, options.config, { check: false })\nif (built.failed) throw built.failed.error\n`)
   }
 
   // The status and body of a page of the server, as a proxy stripping the base forwards it, started from the build in `options`.
@@ -258,7 +258,7 @@ describe('a production server started from disk', () => {
 
   // The routes a scan finds and the packages of the compiler it loaded, with the record of the build or without.
   async function scan(root: string, options: string, recorded: boolean) {
-    const script = `const { routeMounts, scanRoutes } = await import(${JSON.stringify(resolve('src/server/routes'))})\nconst { readContextRecord } = await import(${JSON.stringify(resolve('src/server/context-record'))})\nconst root = ${JSON.stringify(root)}\nconst record = ${recorded} ? await readContextRecord(${JSON.stringify(outputDir(root))}, root) : undefined\nconst routes = await scanRoutes(root + '/src/routes', routeMounts(root, (${options}).extensions), record)\nconst loaded = Object.keys(require.cache).filter(key => key.includes('oxc-parser') || key.includes('context-reads'))\nconsole.log(JSON.stringify({ routes: routes.map(route => [route.pattern, route.layouts]), loaded: loaded.length }))\n`
+    const script = `const { routeMounts, scanRoutes } = await import(${JSON.stringify(resolve('src/server/routes'))})\nconst { readContextRecord } = await import(${JSON.stringify(resolve('src/server/context-record'))})\nconst root = ${JSON.stringify(root)}\nconst record = ${recorded} ? await readContextRecord(${JSON.stringify(outputDir(root))}, root) : undefined\nconst routes = await scanRoutes(root + '/src/routes', routeMounts(root, (${options}).config.extensions), record)\nconst loaded = Object.keys(require.cache).filter(key => key.includes('oxc-parser') || key.includes('context-reads'))\nconsole.log(JSON.stringify({ routes: routes.map(route => [route.pattern, route.layouts]), loaded: loaded.length }))\n`
 
     return JSON.parse(await run(script)) as { routes: [string, string[]][], loaded: number }
   }
@@ -390,7 +390,8 @@ describe('a production server started from disk', () => {
 
     await Bun.write(resolve(root, 'src/routes/[slug].kay'), '--- server\nconst slug: string = ctx.params.slug\n---\np#slug {slug}\n')
 
-    const i18n = JSON.stringify({ ...JSON.parse(options), i18n: I18N })
+    const parsed = JSON.parse(options) as { config: object }
+    const i18n = JSON.stringify({ ...parsed, config: { ...parsed.config, i18n: I18N } })
 
     await build(i18n)
 
@@ -629,7 +630,8 @@ describe('a production server started from disk', () => {
 
   it('serves a library with the settings the app replaces from the record', async () => {
     const { root, options: plain } = await project([EXTENSION])
-    const options = JSON.stringify({ ...JSON.parse(plain), librarySettings: { 'kay-lib': './src/ui-settings.ts' } })
+    const parsed = JSON.parse(plain) as { config: object }
+    const options = JSON.stringify({ ...parsed, config: { ...parsed.config, librarySettings: { 'kay-lib': './src/ui-settings.ts' } } })
     const library = resolve(root, 'node_modules/kay-lib')
 
     await Bun.write(resolve(root, 'package.json'), JSON.stringify({ name: 'app', private: true, dependencies: { 'kay-lib': '*' } }))
