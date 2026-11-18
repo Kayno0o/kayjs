@@ -4,7 +4,7 @@
 
 ### Setup
 
-`kay add mail` does the install and lists `mail()` in `kay.config.ts` (SMTP from the environment, outbox in development and under `bun test`); `mail({ from, locale, ... })` takes the options of `mailer()` below and builds the mailer as `pages()` does, with no module. The mailer is the request's own: a page, an action or a guard reads it as `ctx.locals.mail` (`send`, `enqueue`, `list`, `drain`, `suppress`...), whichever site answers, so two sites in one process, as test sites are, never share one; a job or a script uses the mailer `src/mail.ts` exports. `kayjs-auth` sends through the mailer `mail()` built when the app has no `src/mail.ts`. `send` and `enqueue` imported from `@kayjs/mail`, which sent through the latest site started, work until 1.108 and `registeredMailer()` is gone (`deprecated-mail-send`).
+`kay add mail` does the install and lists `mail()` in `kay.config.ts` (SMTP from the environment, outbox in development and under `bun test`); `mail({ from, locale, ... })` takes the options of `mailer()` below and builds the mailer as `pages()` does, with no module. The mailer is the request's own: a page, an action or a guard reads it as `ctx.locals.mail` (`send`, `enqueue`, `list`, `drain`, `suppress`...), whichever site answers, so two sites in one process, as test sites are, never share one; a job or a script uses the mailer `src/mail.ts` exports. `kayjs-auth` sends through the mailer `mail()` built when the app has no `src/mail.ts`. `send` and `enqueue` are not exported from `@kayjs/mail`: send through `ctx.locals.mail`.
 
 kayjs-mail is published as `@kayjs/mail` to npm, beside kay. kay and Elysia (an implementation detail of kay: an app names `KayPlugin` and `Schema`, never Elysia's types) are peer dependencies.
 

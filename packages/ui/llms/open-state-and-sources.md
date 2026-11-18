@@ -14,7 +14,7 @@
 
 ### VirtualList, Masonry, MediaGallery, Carousel
 
-- `items={feed}` (an `infiniteList`) is the array of `items` on VirtualList, Masonry, MediaGallery and Carousel, and replaces `rows` on Table (`list` and Carousel's `slides` before 1.105, working until 1.108). VirtualList and Masonry draw `LoadMore` after their rows, so the next page loads when the end nears and a failed page shows its alert with the retry; MediaGallery and Carousel load the next page when the reader is on one of the last two items and show LoadMore's alert under the strip or the controls when a page failed. MediaGallery and Carousel are generic over the item type: a list of your own rows that carry the fields they read passes as is.
+- `items={feed}` (an `infiniteList`) is the array of `items` on VirtualList, Masonry, MediaGallery and Carousel, and replaces `rows` on Table. VirtualList and Masonry draw `LoadMore` after their rows, so the next page loads when the end nears and a failed page shows its alert with the retry; MediaGallery and Carousel load the next page when the reader is on one of the last two items and show LoadMore's alert under the strip or the controls when a page failed. MediaGallery and Carousel are generic over the item type: a list of your own rows that carry the fields they read passes as is.
 
 ### Menu
 
