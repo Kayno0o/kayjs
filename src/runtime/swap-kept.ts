@@ -186,6 +186,12 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
   if (focused && document.activeElement !== focused.element && [...kept].some(island => island.contains(focused.element)))
     focused.restore()
 
+  // What each `details` shows now is what the server served: the visitor's toggle, which a refresh compares with it, comes after, and a toggle event the markup's own opening fires is not one.
+  for (const details of document.querySelectorAll('details')) {
+    if (!navigation.opened.has(details))
+      navigation.opened.set(details, details.open)
+  }
+
   // A drawer or a menu left open closes as the page changes, as it would on a page loaded afresh.
   for (const popover of opened) {
     if (popover.isConnected && popover instanceof HTMLElement && popover.matches(':popover-open'))
@@ -235,9 +241,9 @@ function keepMatched(old: Element, body: Element, matching: string, standIns: Re
   }
 }
 
-// Where an island stands among the others, which the next page's copy of it is paired by: its layout and component, in order.
+// Where an island stands among the others, which the next page's copy of it is paired by: its layout, component and `key` or `id`, then in order.
 function placeOf(island: HTMLElement): string {
-  return `${island.dataset.layout ?? ''}\0${island.dataset.component}`
+  return `${island.dataset.layout ?? ''}\0${island.dataset.component}\0${island.dataset.key ?? ''}`
 }
 
 // What the next page gives a kept island, which it reads from now on, or once it hydrates.

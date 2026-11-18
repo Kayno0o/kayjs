@@ -1557,6 +1557,22 @@ describe('signal-from-prop', () => {
     expect(found(island('function make(light: string) { return signal(light) }\nconst picked = signal(0)'))).toEqual([])
   })
 
+  it('leaves no unused signal import when every seed is fixed, and keeps it for another use', () => {
+    const both = applied(island('const a = signal(light)\nconst b = signal(todo.title)'))
+
+    expect(both).toContain('import { linked } from \'kay\'')
+    expect(both).not.toContain('signal(')
+    expect(applied(island('const a = signal(light)\nconst b = signal(0)\nb = 1'))).toContain('import { linked, signal } from \'kay\'')
+  })
+
+  it('marks the fix unsafe for a seed the island writes itself, a draft, and skips a seed with type arguments or a parameter\'s', () => {
+    expect(found(island('const draft = signal(light)\nconst edit = () => { draft = \'x\' }'))[0]!.fixes![0]!.safe).toBe(false)
+    expect(found(island('const draft = signal(light)\nconst edit = () => draft.set(\'x\')'))[0]!.fixes![0]!.safe).toBe(false)
+    expect(found(island('const shown = signal(light)'))[0]!.fixes![0]!.safe).toBe(true)
+    expect(found(island('const picked = signal<string>(light)'))).toEqual([])
+    expect(found(island('const make = (light: string) => signal(light)\nconst other = signal(0)'))).toEqual([])
+  })
+
   it('is a warning in the islands group, listed with the island lints', () => {
     expect(LINTS['signal-from-prop']).toMatchObject({ level: 'warn', group: 'islands' })
   })

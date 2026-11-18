@@ -1,0 +1,7 @@
+---
+import { signal } from 'kay'
+
+const { name } = props<{ name: string }>()
+const on = signal(false)
+---
+button.badge(type="button" onClick={() => on.set(value => !value)}) {name} {on() ? 'on' : 'off'}

@@ -183,6 +183,18 @@ function persistKey(wanted: IslandOptions['persist'], id: string): string | unde
   return wanted === false || wanted === '' ? undefined : wanted
 }
 
+// What tells an island from the others of its component when no `persist` does: the `key` or `id` its use gives, a string or a number, so a swap pairs it with its own copy when a sibling goes away.
+function identityOf(persist: string | undefined, props: object): string | undefined {
+  for (const name of persist === undefined ? ['key', 'id'] as const : []) {
+    const value = (props as Record<string, unknown>)[name]
+
+    if (typeof value === 'string' || typeof value === 'number')
+      return String(value)
+  }
+
+  return undefined
+}
+
 // Whether a `hydrate` makes the island wait, `media(...)` needing a query to wait for.
 function isWaiting(when: string | undefined, id: string): boolean {
   if (when?.startsWith('media(') === true && (!when.endsWith(')') || when.slice(6, -1).trim() === ''))
@@ -235,7 +247,8 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     // Rendered here, in the parent, so an island among them is one of its own; unmarked in edit mode, as the island's own markup is.
     // Any island may stay in the DOM across a swap, so its ids and those of its slots come from its key, a `persist` one's own else its component's (and its layout's) with its index among them, not from its place in the page, which a render adding another island would shift under the one kept.
-    const ids = islandPrefix(persist ?? (layout === undefined ? id : `${layout}\0${id}`))
+    const identity = identityOf(persist, own)
+    const ids = islandPrefix(persist ?? [layout, id, identity].filter(part => part !== undefined).join('\0'))
     const slots = withFieldMarks(undefined, () => withIds(`${ids}s-`, () => withSlotIslands(`${ids}i`, () => staticSlots(own))))
     const given = slots.length === 0 ? own : withSlots(own, slots)
     const serialized = withFieldMarks(undefined, () => serializeProps(`${id} ${why}`, own, slots))
@@ -283,7 +296,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       const lazies = lazyAttribute(keys, waits)
       // A page rendered once is shown at every query: the browser draws this island afresh from the address it is opened at, rather than claiming markup made for the default one.
       const byQuery = queried && prerendering() && !browserOnly ? ' data-query' : ''
-      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazies}${cause === undefined ? '' : ` data-why=${quotedAttribute(cause)}`}${marked}${titled}${shipped}${browserOnly ? ' data-client' : ''}${byQuery}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${layout === undefined ? '' : ` data-layout="${escapeAttribute(layout)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
+      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazies}${cause === undefined ? '' : ` data-why=${quotedAttribute(cause)}`}${marked}${titled}${shipped}${browserOnly ? ' data-client' : ''}${byQuery}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${layout === undefined ? '' : ` data-layout="${escapeAttribute(layout)}"`}${identity === undefined ? '' : ` data-key="${escapeAttribute(identity)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
 
       return markup as unknown as JSX.Element
     }

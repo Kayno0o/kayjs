@@ -19,6 +19,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a swap k
   beforeEach(() => {
     state.count = 0
     state.hideFirst = false
+    state.rows = ['a', 'b', 'c']
   })
 
   const labelOf = async (page: TestPage, label: string) => page.evaluate((text: string) => [...document.querySelectorAll('.card')].find(each => each.querySelector('.label')?.textContent === text)?.querySelector('.open')?.textContent ?? null, label)
@@ -26,7 +27,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a swap k
   async function ready(path = '/'): Promise<TestPage> {
     const page = await site.open(path)
 
-    await page.waitFor('button.tally')
+    await page.waitFor('button.menu-toggle')
 
     return page
   }
@@ -78,6 +79,53 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a swap k
     await page.fill('input.q', 'typed')
     await bumped(page, 1)
     expect(await page.value('input.q')).toBe('typed')
+  })
+
+  it('pairs islands of one component by their id when the first one goes', async () => {
+    await using page = await ready('/rows')
+
+    await page.evaluate(() => (document.querySelectorAll('.row .toggle')[1] as HTMLButtonElement).click())
+    await page.evaluate(() => (document.querySelector('.row .drop') as HTMLButtonElement).click())
+    await page.waitUntil(() => document.querySelectorAll('.row').length === 2, { timeout: '10s' })
+    expect(await page.evaluate(() => [...document.querySelectorAll('.row')].map(row => `${row.querySelector('.id')?.textContent} ${row.querySelector('.open')?.textContent}`))).toEqual(['b open', 'c closed'])
+    expect(page.errors).toEqual([])
+  })
+
+  it('keeps a nested island in its parent and gives a standalone one its own state on a refresh', async () => {
+    await using page = await ready('/nest')
+
+    await page.evaluate(() => (document.querySelectorAll('.badge')[1] as HTMLButtonElement).click())
+    await page.evaluate(() => (document.querySelector('.frame-toggle') as HTMLButtonElement).click())
+    await page.evaluate(() => (document.querySelector('.card button.bump') as HTMLButtonElement).click())
+    await page.waitUntil(() => [...document.querySelectorAll('.label')].some(each => each.textContent === 'nest 1'), { timeout: '10s' })
+    expect(await page.evaluate(() => [...document.querySelectorAll('.badge')].map(badge => `${badge.closest('.frame') ? 'in' : 'out'} ${badge.textContent}`))).toEqual(['in inner off', 'out outer on'])
+    expect(await page.text('.frame-open')).toBe('open')
+    expect(page.errors).toEqual([])
+  })
+
+  it('keeps a details the person closed after a visit put it in, while the server still opens it', async () => {
+    await using page = await ready()
+
+    await page.click('a.rows')
+    await page.waitFor('details.always')
+    expect(await page.evaluate(() => (document.querySelector('details.always') as HTMLDetailsElement).open)).toBe(true)
+    await page.evaluate(() => ((document.querySelector('details.always summary')) as HTMLElement).click())
+    await page.waitUntil(() => !(document.querySelector('details.always') as HTMLDetailsElement).open)
+    await page.evaluate(() => (document.querySelector('.card button.bump') as HTMLButtonElement).click())
+    await page.waitUntil(() => [...document.querySelectorAll('.label')].some(each => each.textContent === 'rows 1'), { timeout: '10s' })
+    expect(await page.evaluate(() => (document.querySelector('details.always') as HTMLDetailsElement).open)).toBe(false)
+  })
+
+  it('keeps an island of the layout going back, with the page\'s own props', async () => {
+    await using page = await ready()
+
+    await page.click('button.menu-toggle')
+    await page.click('a.two')
+    await page.waitUntil(() => document.querySelector('.menu-path')?.textContent === '/two')
+    await page.evaluate(() => history.back())
+    await page.waitUntil(() => document.querySelector('h1')?.textContent === 'One' && document.querySelector('.menu-path')?.textContent === '/')
+    expect(await page.text('.menu-open')).toBe('open')
+    expect(page.errors).toEqual([])
   })
 
   it('keeps an island of the layout across a visit, with the new props, and ends the page\'s own', async () => {

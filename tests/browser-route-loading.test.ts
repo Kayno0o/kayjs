@@ -76,6 +76,20 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a page f
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('keeps an island of the layout through the loading page and the page', async () => {
+    await using page = await open()
+
+    await page.click('button.counter')
+    await page.waitFor('button.counter', { text: 'Count 1' })
+    await page.click('a.slow')
+    await page.waitFor('p.loading')
+    expect(await page.text('button.counter')).toBe('Count 1')
+    release('slow', 'X')
+    await page.waitFor('h1', { text: 'Slow X' })
+    expect(await page.text('button.counter')).toBe('Count 1')
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
   it('never shows it for a page that answers before the delay', async () => {
     await using page = await open()
 

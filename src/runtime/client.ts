@@ -3,6 +3,7 @@ import { reviveActionsIn } from './action-revive'
 import { withBase } from './base'
 import { skew } from './build'
 import { dispatch, hydrate, render } from './dom'
+import { liveProps } from './live-props'
 import { HYDRATED, ISLAND } from './markers'
 import { flush, recordSignals, reportError, root, setErrorReporter } from './reactive'
 import { savesDataInBrowser } from './save-data'
@@ -225,10 +226,10 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     return
   }
 
-  let loaded: [Awaited<ReturnType<IslandRegistry[string]>>, Awaited<ReturnType<typeof staticSlots>>, Awaited<ReturnType<typeof livePropsOf>>, void | undefined]
+  let loaded: [Awaited<ReturnType<IslandRegistry[string]>>, Awaited<ReturnType<typeof staticSlots>>, void | undefined]
 
   try {
-    loaded = await Promise.all([load(), staticSlots(registry, element), livePropsOf(), reviveActionsIn(element.dataset.props)])
+    loaded = await Promise.all([load(), staticSlots(registry, element), reviveActionsIn(element.dataset.props)])
 
     // What the server drew of its lazy components loads first, so the markup is claimed as it stands.
     const drawn = (globalThis as { $kayLoadDrawn?: (island: HTMLElement) => Promise<void> }).$kayLoadDrawn
@@ -246,7 +247,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     throw error
   }
 
-  const [{ default: component }, slots, live] = loaded
+  const [{ default: component }, slots] = loaded
 
   // A page swap took it away while its chunk loaded: hydrated now, its effects would outlive it. One in a static slot its island hid hydrates as it shows it again.
   if (!element.isConnected) {
@@ -256,7 +257,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   }
 
   const given = element.dataset.props === undefined ? {} : decodeServerValue(element.dataset.props) as Record<string, unknown>
-  const [props, update] = live(given)
+  const [props, update] = liveProps(given)
 
   for (const [key, slot] of Object.entries(slots))
     Object.defineProperty(props, key, { value: slot, enumerable: true, configurable: true })
@@ -314,11 +315,6 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
 
   // Heard by a swap waiting to put keys back (swap-focus.ts).
   element.dispatchEvent(new Event(HYDRATED))
-}
-
-// Its own chunk, loaded with every island's: a swap keeps an island and gives it the next page's props.
-async function livePropsOf(): Promise<typeof import('./live-props').liveProps> {
-  return (await import('./live-props')).liveProps
 }
 
 // The static slots a static parent gave the island, whose code only a page holding such an island loads.

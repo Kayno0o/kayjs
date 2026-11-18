@@ -7,5 +7,7 @@ Menu(path={path})
 nav
   a.one(href="/") One
   a.two(href="/two") Two
+  a.rows(href="/rows") Rows
+  a.nest(href="/nest") Nest
 main
   slot

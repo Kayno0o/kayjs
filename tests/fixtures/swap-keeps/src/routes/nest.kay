@@ -1,0 +1,21 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import Badge from '../components/badge.kay'
+import Card from '../components/card.kay'
+import Frame from '../components/frame.kay'
+import { state } from '../state'
+
+export const bump = action(t.Object({}), () => {
+  state.count++
+
+  return 'done'
+})
+---
+head
+  title Nest
+h1 Nest
+Frame
+  Badge(name="inner")
+Badge(name="outer")
+Card(persist="c" label={`nest ${state.count}`} bump={bump} drop={bump})

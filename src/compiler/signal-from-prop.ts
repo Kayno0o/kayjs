@@ -43,6 +43,21 @@ function followedByEffects(ast: Node): Set<string> {
   return names
 }
 
+// The names the script writes outside an `effect`: `name = value`, `name += 1` or `name.set(...)`, `.update(...)`.
+function writtenNames(ast: Node): Set<string> {
+  const names = new Set<string>()
+
+  eachNode(ast, (node) => {
+    if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier')
+      names.add(node.left.name)
+
+    if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && node.callee.object.type === 'Identifier' && node.callee.property.type === 'Identifier' && (node.callee.property.name === 'set' || node.callee.property.name === 'update'))
+      names.add(node.callee.object.name)
+  })
+
+  return names
+}
+
 // A `signal(prop)` at the top of an island's script: the signal takes the prop's value when the component is created, so it keeps the first one when the page gives the island another, as a refresh does while the island stays. `linked(() => prop)` is the signal that follows its source and can still be written.
 // A prop named as a seed (`initial...`, `default...`) is meant to be read once, and a name declared again in the script is left alone.
 export function signalFromProps(fence: ParsedFence, props: PropsDeclaration | undefined): Diagnostic[] {
@@ -65,6 +80,14 @@ export function signalFromProps(fence: ParsedFence, props: PropsDeclaration | un
     if (node.type === 'ImportDeclaration' || (node.type === 'VariableDeclaration' && fence.shift(node).start === props.statement.start))
       return false
 
+    // A parameter of a function in the script is its own value, not the prop.
+    if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
+      for (const param of node.params) {
+        for (const name of patternNames(param))
+          watched.delete(name)
+      }
+    }
+
     if (node.type === 'VariableDeclarator') {
       for (const name of patternNames(node.id)) {
         watched.delete(name)
@@ -85,24 +108,20 @@ export function signalFromProps(fence: ParsedFence, props: PropsDeclaration | un
 
   const diagnostics: Diagnostic[] = []
   const followed = followedByEffects(fence.ast)
+  const written = writtenNames(fence.ast)
+  const found = seeds.filter(({ call, name }) => {
+    const root = call.typeArguments || (name !== undefined && followed.has(name)) ? undefined : propRoot(call.arguments[0]!)
 
-  for (const { call, name } of seeds) {
-    if (name !== undefined && followed.has(name))
-      continue
+    return root !== undefined && watched.has(root)
+  })
 
-    // A call with type arguments would lose them in the fix, and `linked` would take the prop's narrower type.
-    if (call.typeArguments)
-      continue
-
+  for (const { call, name } of found) {
     const seed = call.arguments[0]!
-    const root = propRoot(seed)
-
-    if (root === undefined || !watched.has(root))
-      continue
-
+    const root = propRoot(seed)!
     const text = fence.code.slice(seed.start, seed.end)
-    const imports: Fix['edits'] = linked || taken ? [] : [{ ...fence.shift(specifier), text: others > 1 ? 'linked, signal' : 'linked' }]
-    const fix: Fix = { title: `Write \`linked(() => ${text})\``, safe: !taken, edits: [{ ...fence.shift(call), text: `linked(() => ${text})` }, ...imports] }
+    const imports: Fix['edits'] = linked || taken ? [] : [{ ...fence.shift(specifier), text: others > found.length ? 'linked, signal' : 'linked' }]
+    // A seed the island writes itself is a draft, which following the prop would reset whenever the server changes it.
+    const fix: Fix = { title: `Write \`linked(() => ${text})\``, safe: !taken && !(name !== undefined && written.has(name)), edits: [{ ...fence.shift(call), text: `linked(() => ${text})` }, ...imports] }
 
     diagnostics.push({
       ...fence.shift(call),

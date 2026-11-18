@@ -1,0 +1,9 @@
+---
+import { signal } from 'kay'
+
+const open = signal(false)
+---
+div.frame
+  button.frame-toggle(type="button" onClick={() => open.set(value => !value)}) Frame
+  p.frame-open {open() ? 'open' : 'closed'}
+  slot

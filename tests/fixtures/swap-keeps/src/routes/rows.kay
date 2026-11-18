@@ -1,0 +1,27 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import Card from '../components/card.kay'
+import Row from '../components/row.kay'
+import { state } from '../state'
+
+export const drop = action(t.Object({ id: t.String() }), ({ id }) => {
+  state.rows = state.rows.filter(row => row !== id)
+
+  return 'done'
+})
+export const bump = action(t.Object({}), () => {
+  state.count++
+
+  return 'done'
+})
+---
+head
+  title Rows
+h1 Rows
+details.always(open)
+  summary Always
+  p Open on every render
+for id of state.rows
+  Row(id={id} drop={drop})
+Card(persist="c" label={`rows ${state.count}`} bump={bump} drop={bump})
