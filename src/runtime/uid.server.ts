@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { textHash } from './text-hash'
 import { freshPrefix, withIds } from './uid'
 
 // The page the server is rendering: its token keeps ids apart from those of a page swapped out around a persistent island.
@@ -61,7 +62,7 @@ export function islandPrefix(persist?: string): string {
   if (persist === undefined)
     return `${page.token}-${page.islands++}-`
 
-  const hash = Bun.hash(persist).toString(36).slice(-6)
+  const hash = textHash(persist).slice(-6)
   const seen = page.kept.get(hash) ?? 0
 
   page.kept.set(hash, seen + 1)

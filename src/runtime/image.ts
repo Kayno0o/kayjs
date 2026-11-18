@@ -1,5 +1,6 @@
 import { KayError } from './kay-error'
 import { kayLog } from './log'
+import { textHash } from './text-hash'
 
 declare const KAY_BROWSER: true | undefined
 
@@ -265,25 +266,7 @@ export function requestedRemoteVariants(): { src: string, name: string, variant:
 
 // Named after a hash of the URL.
 export function remoteVariantName(src: string, variant: ImageVariant): string {
-  return `remote-${urlHash(src)}${variantSuffix(variant)}`
-}
-
-// cyrb53, 53 bits of a string's hash in base 36.
-function urlHash(text: string): string {
-  let h1 = 0xDEADBEEF
-  let h2 = 0x41C6CE57
-
-  for (let index = 0; index < text.length; index++) {
-    const code = text.charCodeAt(index)
-
-    h1 = Math.imul(h1 ^ code, 2654435761)
-    h2 = Math.imul(h2 ^ code, 1597334677)
-  }
-
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
-
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)
+  return `remote-${textHash(src)}${variantSuffix(variant)}`
 }
 
 function currentMaxDensity(): number {
