@@ -10,7 +10,7 @@ import { decodeServerValue } from './wire'
 const PERSISTENT = 'slot[data-persist]'
 const SERVER_ISLAND = 'slot[data-kay-server]'
 // The islands a layout rendered, which a navigation keeping the layout keeps.
-const LAYOUT_ISLAND = 'slot[data-component][data-layout]'
+const LAYOUT_ISLAND = `${ISLAND}[data-layout]`
 // What a script put in the body to outlive every page, a live region an announcer fills for one: the next body never holds it, so the morph leaves it where it is, never moved, as a live region taken out and put back may go unread.
 const LASTING = ':scope > [data-kay-keep]'
 
