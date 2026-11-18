@@ -109,14 +109,16 @@ const axisTexts = uses('xLabels') ? memo(() => tickTexts(labels, times(), format
 const headingTexts = memo(() => headings(labels, times(), formatLabel))
 const gaps = () => `--bar-gaps: ${Math.max(labels.length - 1, 1)}`
 // A label's place on the axis: the centre of its column, which the gap between columns (`--axis-gap`, as `columns` takes it) moves by half a gap from an even split.
-const axisAt = uses('xLabels') ? (at: number) => {
-  const total = labels.length
+const axisAt = uses('xLabels')
+  ? (at: number) => {
+    const total = labels.length
 
-  if (total > 1 && at === 0)
-    return 'left: 0'
+    if (total > 1 && at === 0)
+      return 'left: 0'
 
-  return total > 1 && at === total - 1 ? 'right: 0' : `left: calc((100% + var(--axis-gap)) * ${(at + 0.5) / total} - var(--axis-gap) / 2)`
-} : undefined
+    return total > 1 && at === total - 1 ? 'right: 0' : `left: calc((100% + var(--axis-gap)) * ${(at + 0.5) / total} - var(--axis-gap) / 2)`
+  }
+  : undefined
 const edge = uses('xLabels') ? (at: number) => labels.length < 2 ? undefined : at === 0 ? 'start' : at === labels.length - 1 ? 'end' : undefined : undefined
 const colors = (item: BarSeries, index: number, at: number) => item.colors?.[at] ?? item.color ?? PALETTE[index % PALETTE.length]!
 // With several series each is also hatched by its place, so the bars and the legend are told apart without their colours.

@@ -18,11 +18,11 @@ describe('controls in a container narrower than their text', () => {
         return box.left >= container.left - 0.5 && box.right <= container.right + 0.5
       }
       // A label broken inside a word is taller than one line of its text.
-      const oneLine = (selector: string) => [...document.querySelectorAll<HTMLElement>(selector)].every(label => label.getBoundingClientRect().height < 2 * parseFloat(getComputedStyle(label).lineHeight))
+      const oneLine = (selector: string) => [...document.querySelectorAll<HTMLElement>(selector)].every(label => label.getBoundingClientRect().height < 2 * Number.parseFloat(getComputedStyle(label).lineHeight))
       const wraps = (selector: string) => {
         const badge = document.querySelector<HTMLElement>(selector)!
 
-        return badge.getBoundingClientRect().height > parseFloat(getComputedStyle(badge).lineHeight) * 1.5
+        return badge.getBoundingClientRect().height > Number.parseFloat(getComputedStyle(badge).lineHeight) * 1.5
       }
 
       return {
