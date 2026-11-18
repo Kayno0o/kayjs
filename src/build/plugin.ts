@@ -16,7 +16,7 @@ import { cacheIds } from './cache-ids'
 import { directImports } from './direct-imports'
 import { KAY_MODULE, SCRIPT_FILE, scriptLoader } from './files'
 import { expandGlobs } from './glob'
-import { REGISTRY_FILE, registryWith } from './icon-slots'
+import { isUiRegistry, REGISTRY_FILE, registryWith } from './icon-slots'
 import { iconModule, iconNames, installedIconSets } from './icons'
 import { linkedKayCopies, settingsReplacements } from './libraries'
 import { liveIds } from './live-ids'
@@ -309,7 +309,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       if (target === 'dom' && options.iconSlots !== undefined) {
         const slots = options.iconSlots
 
-        build.onLoad({ filter: REGISTRY_FILE }, async ({ path }) => ({ contents: registryWith(await Bun.file(path).text(), slots), loader: 'ts' }))
+        build.onLoad({ filter: REGISTRY_FILE }, async ({ path }) => isUiRegistry(path) ? { contents: registryWith(await Bun.file(path).text(), slots), loader: 'ts' } : undefined)
       }
 
       // A linked library's own copy of kay loads as the app's: each of its modules re-exports the app's module at the same place, so the library and the app share one kay. A module the app's copy lacks, as another version may, stays the library's.

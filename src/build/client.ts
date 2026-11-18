@@ -227,7 +227,7 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
     if (previous && islandsAgain)
       await increments!.stopMaps(false)
 
-    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, sources.files, sources.actionForms, sources.actionProps, options, classTable, islandTable, await iconSlotsOf(root, sources.islands.values(), sources.libraries, graph)) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
+    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, sources.files, sources.actionForms, sources.actionProps, options, classTable, islandTable, await iconSlotsOf(root, [...sources.files, ...sources.islands.values()], sources.libraries, graph)) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
     const styleUses = styles ? styles.uses : previous!.styleUses
     const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, ...classTable && { classTable }, ...styleUses && { styleUses }, ...options.hot && { problems: sources.problems }, ...key !== undefined && { options: key } }
 

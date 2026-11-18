@@ -1,21 +1,44 @@
 import type { ImportGraph, KayLibrary } from './libraries'
-import { realpathSync } from 'node:fs'
-import { sep } from 'node:path'
+import { readFileSync, realpathSync } from 'node:fs'
+import { dirname, join, sep } from 'node:path'
 import { importEdges, reachedFrom } from './libraries'
 
-// kayjs-ui draws its icons from a registry keyed by slot, `settings.icons[slot]`, which a bundler cannot shrink: an island would carry every icon of it. The build instead reads the slots the modules an island reaches can name, and loads the registry holding those alone.
-// A slot is named where the code writes it as a string, `icon="close"` or `icon: 'close'`. One taken from a variable, in the project's own code, may be any slot, so the whole registry stays.
-const WORD = /(["'])(\w+)\1/g
-const ICON_PROP = /\bicon=\{([^{}]*)\}/g
+// kayjs-ui draws its icons from a registry keyed by slot, `settings.icons[slot]`, which a bundler cannot shrink: an island would carry every icon of it. The build instead reads the slots the project and the modules it reaches write, and loads the registry holding those alone.
+// A slot is named where the code writes it as a string, `icon="close"` or `icon: 'close'`; pages hand them to islands as props, so every `.kay` file of the build is read, not only what an island imports. One taken from a variable in the project's own code may be any slot, so the whole registry stays.
+const WORD = /(["'`])(\w+)\1/g
+const ICON_PROP = /\b\w*[iI]con\w*=\{((?:[^{}]|\{[^{}]*\})*)\}/g
+const ICON_KEY = /\b\w*[iI]con\w*\s*:\s*([^,}\n]+)/g
 const ICON_IMPORT = /^import\s+(\w+)\s+from\s+(["'])~icons\/[^"'\n]+\2/gm
+const LITERAL = /^(["'])\w+\1$/
+const CHOICE = /^[^'"`?]+\?\s*(["'])\w+\1\s*:\s*(["'])\w+\2$/
 const IDENTIFIER = /^[\w$]+$/
+const TYPE_WORD = /^(?:string|undefined|null|true|false|any|unknown|number|boolean)\b/
+const LOWERCASE = /^[a-z]/
 const SLOT_NAME = /^\w+/
 const IN_PACKAGES = /[\\/]node_modules[\\/]/
+const SCANNED = /\.(?:kay|[cm]?[jt]sx?)$/
 
 // The registry modules of kayjs-ui, by where the project reaches it: in a checkout or under `node_modules`.
 export const REGISTRY_FILE = /[\\/](?:packages[\\/]ui|node_modules[\\/]@kayjs[\\/]ui)[\\/]src[\\/](?:defaults|added-icons)\.ts$/
 
-// The words written as strings in the modules the islands reach, or undefined when a slot may come from a variable.
+// Whether a registry module belongs to kayjs-ui itself, not to an app's own `packages/ui`.
+export function isUiRegistry(file: string): boolean {
+  try {
+    return (JSON.parse(readFileSync(join(dirname(file), '../package.json'), 'utf8')) as { name?: string }).name === '@kayjs/ui'
+  }
+  catch {
+    return false
+  }
+}
+
+// Whether the value written for an icon is a slot or an icon of a set, and not something computed.
+function isStatic(value: string, imported: ReadonlySet<string>): boolean {
+  const written = value.trim()
+
+  return LITERAL.test(written) || CHOICE.test(written) || (IDENTIFIER.test(written) && imported.has(written))
+}
+
+// The words written as strings in the files of the build and what they import, or undefined when a slot may come from a variable.
 export async function iconSlotsOf(root: string, entries: Iterable<string>, libraries: KayLibrary[], graph?: ImportGraph): Promise<ReadonlySet<string> | undefined> {
   const project = realpathSync(root) + sep
   const reached = await reachedFrom([...entries], importEdges(root, libraries, graph))
@@ -23,7 +46,7 @@ export async function iconSlotsOf(root: string, entries: Iterable<string>, libra
   let dynamic = false
 
   await Promise.all([...reached].map(async (file) => {
-    if (REGISTRY_FILE.test(file) || !(file.endsWith('.kay') || file.endsWith('.ts') || file.endsWith('.tsx')))
+    if (REGISTRY_FILE.test(file) || !SCANNED.test(file))
       return
 
     const text = await Bun.file(file).text()
@@ -36,10 +59,16 @@ export async function iconSlotsOf(root: string, entries: Iterable<string>, libra
 
     const imported = new Set([...text.matchAll(ICON_IMPORT)].map(hit => hit[1]!))
 
-    for (const [, expression] of text.matchAll(ICON_PROP)) {
-      const written = expression!.trim()
+    for (const [, value] of text.matchAll(ICON_PROP)) {
+      if (!isStatic(value!, imported))
+        dynamic = true
+    }
 
-      if (!written.includes('\'') && !written.includes('"') && !written.includes('`') && !(IDENTIFIER.test(written) && imported.has(written)))
+    for (const [, value] of text.matchAll(ICON_KEY)) {
+      const written = value!.trim()
+
+      // A type annotation, `icon: IconSlot`, writes no value.
+      if (!isStatic(written, imported) && (written.includes('.') || written.includes('(') || written.includes('[') || (LOWERCASE.test(written) && !TYPE_WORD.test(written))))
         dynamic = true
     }
   }))
@@ -66,5 +95,5 @@ export function registryWith(source: string, slots: ReadonlySet<string>): string
 
 // What a cache keyed on the slots holds of them.
 export function slotsKey(slots: ReadonlySet<string> | undefined): string {
-  return slots === undefined ? '' : [...slots].sort().join(',')
+  return slots === undefined ? '*' : [...slots].sort().join(',')
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { iconSlotsOf, registryWith } from '../src/build/icon-slots'
+import { iconSlotsOf, isUiRegistry, registryWith, slotsKey } from '../src/build/icon-slots'
 import { scratchDir } from './scratch'
 
 const UI = join(import.meta.dir, '../packages/ui/src')
@@ -56,5 +56,46 @@ describe('iconSlotsOf', () => {
     const [root, island] = await project({ 'island.kay': '---\nimport Home from \'~icons/tabler/home\'\n---\nIcon(icon={Home})\n' })
 
     expect(await iconSlotsOf(root!, [island!], [])).toBeDefined()
+  })
+
+  it.each([
+    ['a template literal', 'Icon(icon={`trend${d}`})'],
+    ['a choice with a variable', 'Icon(icon={d ? \'search\' : name})'],
+    ['a prop of a sibling', 'Menu(items={[{ label: x, icon: item.icon }]})'],
+    ['a prop of another name', 'Stat(openIcon={name})'],
+  ])('answers undefined for %s', async (_name, template) => {
+    const [root, island] = await project({ 'island.kay': `${template}\n` })
+
+    expect(await iconSlotsOf(root!, [island!], [])).toBeUndefined()
+  })
+
+  it('reads a choice of two slots, and a page the island does not import', async () => {
+    const [root, island, page] = await project({ 'island.kay': 'Icon(icon={open ? \'close\' : \'menu\'})\n', 'page.kay': 'Menu(items={[{ label: \'x\', icon: \'edit\' }]})\n' })
+    const slots = await iconSlotsOf(root!, [island!, page!], [])
+
+    expect(slots?.has('edit')).toBe(true)
+    expect(slots?.has('menu')).toBe(true)
+  })
+
+  it('takes a type annotation for no variable', async () => {
+    const [root, island] = await project({ 'island.ts': 'export interface Item { icon: IconSlot, other?: string }\nexport const a = { icon: \'close\' }\n' })
+
+    expect(await iconSlotsOf(root!, [island!], [])).toBeDefined()
+  })
+})
+
+describe('the registry of kayjs-ui', () => {
+  it('is recognised by the package that holds it, and an app\'s own packages/ui is not', async () => {
+    const root = await scratchDir('icon-registry-')
+
+    await Bun.write(join(root, 'packages/ui/package.json'), '{"name":"app-ui"}')
+    await Bun.write(join(root, 'packages/ui/src/defaults.ts'), '')
+
+    expect(isUiRegistry(join(UI, 'defaults.ts'))).toBe(true)
+    expect(isUiRegistry(join(root, 'packages/ui/src/defaults.ts'))).toBe(false)
+  })
+
+  it('keys no slots apart from the whole registry', () => {
+    expect(slotsKey(new Set())).not.toBe(slotsKey(undefined))
   })
 })

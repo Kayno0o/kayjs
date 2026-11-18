@@ -297,7 +297,7 @@ const settings: UiSettings = { ...uiDefaults, icons: { ...uiDefaults.icons, clos
 export default settings
 ```
 
-The browser gets only the default icons an island can draw, read from the slots your code writes as strings. If a slot only ever arrives as data fetched at run time, write its name somewhere in the project, or use your own settings, which ship whole.
+The browser gets only the default icons your code can draw, read from the slots it writes as strings; a slot taken from a variable (`icon={name}`) gives the whole set. If a slot only ever arrives as data fetched at run time, write its name somewhere in the project, or use your own settings, which ship whole.
 
 ## Languages
 
