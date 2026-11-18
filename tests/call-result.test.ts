@@ -153,7 +153,10 @@ describe('what an island call of an action answers', () => {
   it('still rejects for an abort and a redirect, which are no failure of the call', async () => {
     const controller = new AbortController()
 
-    answer(async () => new Promise<Response>(() => undefined))
+    // A call already loaded posts in the call's own task, so the abort comes after the request began and has to end it.
+    mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async (_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true })
+    })) as unknown as typeof fetch))
 
     const running = stub()({}, { signal: controller.signal })
 
@@ -192,7 +195,9 @@ describe('what an island call of an action answers', () => {
   it('leaves no unhandled rejection when only .orThrow() is awaited for an abort', async () => {
     const controller = new AbortController()
 
-    answer(async () => new Promise<Response>(() => undefined))
+    mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async (_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true })
+    })) as unknown as typeof fetch))
 
     const running = stub()({}, { signal: controller.signal }).orThrow()
 
