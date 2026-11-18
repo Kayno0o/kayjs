@@ -107,9 +107,12 @@ export class DomTemplate extends TemplateWriter {
         this.element(item.node)
         b.add('); ')
       }
+      else if (item.kind === 'if' && neverShown(this.src, item.node)) {
+        b.add(`KayMarkers(${parent}); `)
+      }
       else {
         b.add(`{ const [KayS, KayE] = KayMarkers(${parent}); `)
-        this.slot(item, 'null', 'KayS', 'KayE')
+        this.dynamic(item, 'null', 'KayS', 'KayE')
         b.add(' } ')
       }
     }

@@ -331,6 +331,34 @@ function topLevel(text: string, char: '?' | ':'): number[] {
   return found
 }
 
+// Where the brace opened just before `from` closes, past the strings in between; -1 when it never does.
+function closingBrace(text: string, from: number): number {
+  let depth = 1
+  let quote = ''
+
+  for (let at = from; at < text.length; at++) {
+    const char = text[at]!
+
+    if (quote !== '') {
+      if (char === '\\')
+        at++
+      else if (char === quote)
+        quote = ''
+    }
+    else if (char === '\'' || char === '"' || char === '`') {
+      quote = char
+    }
+    else if (char === '{') {
+      depth++
+    }
+    else if (char === '}' && --depth === 0) {
+      return at
+    }
+  }
+
+  return -1
+}
+
 // An arrow, an assignment or a comma in a condition binds looser than the ternary, so what comes before the `?` is not the whole test.
 const LOWER_THAN_TERNARY = /=>|,|(?<![=!<>])=(?!=)/
 
@@ -346,24 +374,15 @@ function foldAbsentAttributes(line: string): string {
       return result
 
     const start = open + 2
-    let depth = 1
-    let end = start
-
-    for (; end < result.length && depth > 0; end++) {
-      if (result[end] === '{')
-        depth++
-      else if (result[end] === '}')
-        depth--
-    }
-
-    const inner = result.slice(start, end - 1)
+    const end = closingBrace(result, start)
+    const inner = result.slice(start, end)
     const question = topLevel(inner, '?')[0]
     const colons = topLevel(inner, ':')
 
     from = start
 
-    if (depth === 0 && question !== undefined && colons.length === 1 && inner.slice(colons[0]! + 1).trim() === 'undefined' && !LOWER_THAN_TERNARY.test(inner.slice(0, question)) && alwaysFalse(inner.slice(0, question)))
-      result = `${result.slice(0, start)}undefined${result.slice(end - 1)}`
+    if (end !== -1 && question !== undefined && colons.length === 1 && inner.slice(colons[0]! + 1).trim() === 'undefined' && !LOWER_THAN_TERNARY.test(inner.slice(0, question)) && alwaysFalse(inner.slice(0, question)))
+      result = `${result.slice(0, start)}undefined${result.slice(end)}`
   }
 }
 

@@ -64,6 +64,12 @@ describe('specializedSource on an attribute with a false condition', () => {
     expect(absent(arrow)).toBe(arrow.replaceAll('uses(\'x\')', 'false'))
   })
 
+  it('reads a ? or a : or a brace inside a string as text', () => {
+    expect(absent('td(a={uses(\'x\') && y ? \'a:b}\' : undefined} b={uses(\'x\') && y ? 1 : undefined})')).toBe('td(a={undefined} b={undefined})')
+    expect(absent('td(a={uses(\'x\') && y === \'?\' ? 1 : undefined} b={uses(\'x\') && y ? \'?:\' : undefined})')).toBe('td(a={undefined} b={undefined})')
+    expect(absent('td(a={uses(\'x\') && y ? 1 : \'}\'} b={z})')).toBe('td(a={false && y ? 1 : \'}\'} b={z})')
+  })
+
   it('keeps the true branch when the feature is on', () => {
     expect(specializedSource('---\n---\ntd(a={uses(\'x\') && y ? 1 : undefined})', new Set(['x'])).split('\n')[2]).toBe('td(a={true && y ? 1 : undefined})')
   })
