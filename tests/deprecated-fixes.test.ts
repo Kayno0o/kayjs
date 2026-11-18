@@ -60,8 +60,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
 }
 
 // Every deprecated lint has a `safe` fix, which `kay upgrade` applies, that turns its `wrong` example into its `right` one (#2843). A lint whose old form no fix can rewrite without risk goes here with the reason, and `kay upgrade` leaves it to `llms/upgrading.md`: moving code into a new file is the one today.
-const NO_SAFE_FIX: Partial<Record<Name, string>> = {,
-}
+const NO_SAFE_FIX: Partial<Record<Name, string>> = {}
 
 // Where a lint's `wrong` example lives: the file its first comment names, a `.kay` file when it opens with a fence, a module otherwise.
 function placed(source: string): { path: string, text: string } {

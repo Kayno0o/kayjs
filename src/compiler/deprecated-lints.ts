@@ -1,5 +1,5 @@
 import type { Lint } from './lints'
-import { SOURCE_READERS } from './deprecated-lints-1-105'
+
 import { SCHEMA_BUILDERS } from './deprecated-lints-1-106'
 import { ACTION_OPTIONS } from './deprecated-lints-1-107'
 
@@ -7,7 +7,7 @@ import { ACTION_OPTIONS } from './deprecated-lints-1-107'
 export const DEPRECATED_LINTS = {
   ...SCHEMA_BUILDERS,
   ...ACTION_OPTIONS,
-  ...SOURCE_READERS,
+
   'deprecated-ui-props': {
     level: 'warn',
     group: 'deprecated',

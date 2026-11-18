@@ -179,10 +179,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
 
-
   async ({ root, options }) => socketFrames(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
-
 
   async ({ root, options }) => schemaBuilders(root, options),
   async ({ root, options }) => schemaJson(root, options),

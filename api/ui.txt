@@ -758,11 +758,9 @@ function announce(text: string, within?: Element | null): void
 
 [./app-header.kay] default
 component default
-  | { actions?: Element; brand?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: URL | string; expandLabel?: string | undefined; items: readonly NavLink[]; label: string; link?: ((link: NavLink) => Element) | undefined; links?: undefined; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
   actions?: Element
   brand?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   current: URL | string
   expandLabel?: string | undefined
   items: readonly NavLink[]
@@ -797,7 +795,6 @@ component default
     children?: string | undefined;
   };
   end?: string | undefined;
-  | { actions?: Element; brand?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: URL | string; expandLabel?: string | undefined; items?: undefined; label: string; link?: ((link: NavLink) => Element) | undefined; links: readonly NavLink[]; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
 }
   sticky?: boolean | undefined
 
@@ -908,10 +905,8 @@ component default
 
 [./avatar-group.kay] default
 component default
-  | { avatar?: ((person: GroupedAvatar) => Element) | undefined; avatars?: undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; failureLabel?: string | undefined; items: OptionsSource<GroupedAvatar>; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
   avatar?: ((person: GroupedAvatar) => Element) | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   failureLabel?: string | undefined
   items: OptionsSource<GroupedAvatar>
   label?: string | undefined
@@ -938,7 +933,6 @@ component default
   item?: string | undefined;
   row?: string | undefined;
   name?: string | undefined;
-  | { avatar?: ((person: GroupedAvatar) => Element) | undefined; avatars: OptionsSource<GroupedAvatar>; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; failureLabel?: string | undefined; items?: undefined; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
 }
   placement?: Placement | undefined
   rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined
@@ -1152,10 +1146,8 @@ component default
 
 [./carousel.kay] default
 component default
-  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; items: (InfiniteList<Slide> | readonly Slide[] | undefined) & (InfiniteList<Slide> | readonly Slide[]); label?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; parts?: undefined | {
   autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   dotLabel?: string | undefined
   empty?: Element
   emptyLabel?: string | undefined
@@ -1184,8 +1176,6 @@ component default
       root?: string | undefined;
     };
   };
-  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; items?: undefined; label?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; parts?: undefined | {
-  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; items?: undefined; label?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Slide>; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; parts?: undefined | {
 }
   pauseLabel?: string | undefined
   perView?: number | undefined
@@ -1353,9 +1343,7 @@ component default
 
 [./command-palette.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; entries?: undefined; groups?: string[] | undefined; items: PaletteEntry[]; label?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; onRecentChange?: ((event: { recent: string[]; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   groups?: string[] | undefined
@@ -1384,7 +1372,6 @@ component default
   shortcut?: string | undefined;
   empty?: string | undefined;
   count?: string | undefined;
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; entries: PaletteEntry[]; groups?: string[] | undefined; items?: undefined; label?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; onRecentChange?: ((event: { recent: string[]; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
 }
   placeholder?: string | undefined
   recent?: string[] | undefined
@@ -2049,10 +2036,8 @@ component default
 
 [./load-more.kay] default
 component default
-  | { button?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; failureLabel?: string | undefined; items: LoadMoreSource; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadedLabel?: ((count: number) => string) | string | undefined; loadingLabel?: string | undefined; margin?: number | undefined; moreLabel?: string | undefined; parts?: undefined | {
   button?: boolean | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   failureLabel?: string | undefined
   items: LoadMoreSource
   loadedLabel?: ((count: number) => string) | string | undefined
@@ -2066,7 +2051,6 @@ component default
   loading?: string | undefined;
   text?: string | undefined;
   announced?: string | undefined;
-  | { button?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; failureLabel?: string | undefined; items?: undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: LoadMoreSource; loadedLabel?: ((count: number) => string) | string | undefined; loadingLabel?: string | undefined; margin?: number | undefined; moreLabel?: string | undefined; parts?: undefined | {
 }
   retryLabel?: string | undefined
 
@@ -2131,10 +2115,7 @@ component default
 
 [./masonry.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; gap?: number | undefined; items: (InfiniteList<Item> | readonly Item[] | undefined) & (InfiniteList<Item> | readonly Item[]); key: (item: Item) => Key; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; minWidth?: number | undefined; parts?: undefined | { root?: string | undefined; tile?: string | undefined; }; style?: string | undefined; tile: (item: Item) => Element }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; gap?: number | undefined; items?: undefined; key: (item: Item) => Key; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Item>; minWidth?: number | undefined; parts?: undefined | { root?: string | undefined; tile?: string | undefined; }; style?: string | undefined; tile: (item: Item) => Element }
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   gap?: number | undefined
   items: InfiniteList<Item> | readonly Item[]
   key: (item: Item) => Key
@@ -2145,10 +2126,8 @@ component default
 
 [./media-gallery.kay] default
 component default
-  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; closeLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items: (InfiniteList<Item> | Item[] | undefined) & (InfiniteList<Item> | Item[]); /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; index: number; }) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; parts?: undefined | {
   caption?: ((item: Item, index: number) => Element) | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   closeLabel?: string | undefined
   empty?: Element
   emptyLabel?: string | undefined
@@ -2185,7 +2164,6 @@ component default
       root?: string | undefined;
     };
   };
-  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; closeLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items?: undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Item>; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; index: number; }) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; parts?: undefined | {
 }
   previousLabel?: string | undefined
   ratio?: string | undefined
@@ -3017,9 +2995,7 @@ component default
 
 [./site-nav.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: URL | string; expandLabel?: string | undefined; id?: string | undefined; items: readonly NavLink[]; label: string; link?: ((link: NavLink) => Element) | undefined; links?: undefined; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   current: URL | string
   expandLabel?: string | undefined
   id?: string | undefined
@@ -3050,7 +3026,6 @@ component default
     root?: string | undefined;
   };
   children?: string | undefined;
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: URL | string; expandLabel?: string | undefined; id?: string | undefined; items?: undefined; label: string; link?: ((link: NavLink) => Element) | undefined; links: readonly NavLink[]; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
 }
 
 [./skeleton.kay] default
@@ -3186,9 +3161,7 @@ component default
 
 [./steps.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: string; done?: readonly string[] | undefined; doneLabel?: string | undefined; errorLabel?: string | undefined; failureLabel?: string | undefined; items: OptionsSource<StepItem<string>>; label: string; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly StepItem<string>[]; query: string; }) => unknown) | undefined; onSelect?: ((event: { key: string; }) => unknown) | undefined; param?: string | undefined; parts?: undefined | {
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   current: string
   done?: readonly string[] | undefined
   doneLabel?: string | undefined
@@ -3214,7 +3187,6 @@ component default
   link?: string | undefined;
   status?: string | undefined;
   retry?: string | undefined;
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: string; done?: readonly string[] | undefined; doneLabel?: string | undefined; errorLabel?: string | undefined; failureLabel?: string | undefined; items?: undefined; label: string; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly StepItem<string>[]; query: string; }) => unknown) | undefined; onSelect?: ((event: { key: string; }) => unknown) | undefined; param?: string | undefined; parts?: undefined | {
 }
   retryLabel?: string | undefined
   skippedLabel?: string | undefined
@@ -3260,8 +3232,7 @@ component default
 
 [./table.kay] default
 component default
-  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items?: undefined; label?: string | undefined; limitParam?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
-}; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items?: undefined; label?: string | undefined; limitParam?: string | undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
+  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items?: undefined; label?: string | undefined; limitParam?: string | undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
   root?: string | undefined;
   filter?: string | undefined;
   field?: string | undefined;
@@ -3325,9 +3296,7 @@ component default
     size?: string | undefined;
   };
 }; plain?: boolean | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows: (RowsSource<Row> | undefined) & RowsSource<Row>; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; triggerProps?: PopoverLookButtonProps | undefined; virtual?: boolean | undefined }
-  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items: InfiniteList<Row>; label?: string | undefined; limitParam?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
-  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items?: undefined; label?: string | undefined; limitParam?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Row>; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
-}; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items: InfiniteList<Row>; label?: string | undefined; limitParam?: string | undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
+  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items: InfiniteList<Row>; label?: string | undefined; limitParam?: string | undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
   root?: string | undefined;
   filter?: string | undefined;
   field?: string | undefined;
@@ -3394,8 +3363,7 @@ component default
 
 [./tabs.kay] default
 component default
-  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; disabled?: boolean | undefined; failureLabel?: string | undefined; items: OptionsSource<{ value: Value; } & NavItem>; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; parts?: undefined | {
-}; disabled?: boolean | undefined; failureLabel?: string | undefined; items: OptionsSource<{ value: Value; } & NavItem>; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; parts?: undefined | {
+  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; disabled?: boolean | undefined; failureLabel?: string | undefined; items: OptionsSource<{ value: Value; } & NavItem>; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; parts?: undefined | {
   root?: string | undefined;
   list?: string | undefined;
   tab?: string | undefined;
@@ -3406,9 +3374,8 @@ component default
   status?: string | undefined;
   retry?: string | undefined;
   panel?: string | undefined;
-  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; disabled?: boolean | undefined; failureLabel?: string | undefined; items: OptionsSource<{ value: Value; } & NavItem>; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; parts?: undefined | {
 }; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; value: Value }
-}; disabled?: boolean | undefined; failureLabel?: string | undefined; items: OptionsSource<{ value: Value; } & NavItem>; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; parts?: undefined | {
+  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; disabled?: boolean | undefined; failureLabel?: string | undefined; items: OptionsSource<{ value: Value; } & NavItem>; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; parts?: undefined | {
   root?: string | undefined;
   list?: string | undefined;
   tab?: string | undefined;
@@ -3419,8 +3386,6 @@ component default
   status?: string | undefined;
   retry?: string | undefined;
   panel?: string | undefined;
-  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; disabled?: boolean | undefined; failureLabel?: string | undefined; items?: undefined; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; parts?: undefined | {
-  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; disabled?: boolean | undefined; failureLabel?: string | undefined; items?: undefined; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; parts?: undefined | {
 }; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; value?: undefined }
 
 [./text-input.kay] default
@@ -3488,9 +3453,7 @@ component default
 
 [./timeline.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; entries?: undefined; items: readonly TimelineEntry<Key>[]; label: string; onSelectedChange?: ((event: { key: Key | undefined; entry: TimelineEntry<Key>; }) => unknown) | undefined; parts?: undefined | {
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   items: readonly TimelineEntry<Key>[]
@@ -3505,7 +3468,6 @@ component default
     root?: string | undefined;
   };
   text?: string | undefined;
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; entries: readonly TimelineEntry<Key>[]; items?: undefined; label: string; onSelectedChange?: ((event: { key: Key | undefined; entry: TimelineEntry<Key>; }) => unknown) | undefined; parts?: undefined | {
 }
   selected?: Key | undefined
 
@@ -3634,10 +3596,8 @@ component default
 
 [./virtual-list.kay] default
 component default
-  | { busy?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items: (InfiniteList<Item> | RowsSource<Item> | undefined) & (InfiniteList<Item> | RowsSource<Item>); label: string; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onItemClick?: ((event: { item: Item; index: number; event: MouseEvent; }) => unknown) | undefined; onLoad?: ((event: { items: Item[]; }) => unknown) | undefined; overscan?: number | undefined; parts?: undefined | {
   busy?: boolean | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   estimate?: number | undefined
@@ -3667,7 +3627,6 @@ component default
   item?: string | undefined;
   itemLink?: string | undefined;
   itemButton?: string | undefined;
-  | { busy?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items?: undefined; label: string; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Item>; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onItemClick?: ((event: { item: Item; index: number; event: MouseEvent; }) => unknown) | undefined; onLoad?: ((event: { items: Item[]; }) => unknown) | undefined; overscan?: number | undefined; parts?: undefined | {
 }
   retryLabel?: string | undefined
   skeletonItems?: number | undefined
