@@ -7,15 +7,19 @@ import { appEnv, fixtureCopy } from './helpers/fixtureCopy'
 
 const CLI = join(import.meta.dir, '../../../src/cli.ts')
 const SERVER = '--- server\nimport { ask } from \'@kayjs/ai\'\n\nconst answer = ask(\'hi\')\n---\nawait answer\n  p Thinking\nthen text\n  p {text}\ncatch\n  p No answer\n'
+const ASKER = '---\nimport Asker from \'../asker.kay\'\n---\nAsker\n'
 const ISLAND = '---\nimport { ask } from \'@kayjs/ai\'\n\nlet text = \'\'\n\nasync function go() {\n  text = await ask(\'hi\')\n}\n---\nbutton(onClick={go}) Ask\np {text}\n'
 
-async function build(page: string): Promise<{ code: number, output: string }> {
+async function build(page: string, component?: string): Promise<{ code: number, output: string }> {
   const dir = await scratchDir('ai-island-')
 
   await mkdir(join(dir, 'src/routes'), { recursive: true })
   await cp(join(import.meta.dir, 'fixture/tsconfig.json'), join(dir, 'tsconfig.json'))
   await Bun.write(join(dir, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({})\n')
   await Bun.write(join(dir, 'src/routes/index.kay'), page)
+
+  if (component !== undefined)
+    await Bun.write(join(dir, 'src/asker.kay'), component)
 
   const run = Bun.spawn([process.execPath, CLI, 'build'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
   const output = await new Response(run.stdout).text() + await new Response(run.stderr).text()
@@ -30,7 +34,7 @@ test('a page asking in its server fence builds, and an island importing ask does
   expect(server.output).not.toContain('Browser build cannot import')
   expect(server.code).toBe(0)
 
-  const island = await build(ISLAND)
+  const island = await build(ASKER, ISLAND)
 
   expect(island.code).not.toBe(0)
   expect(island.output).toContain('Browser build cannot import')
