@@ -2,7 +2,9 @@
 
 Mounting a component in `bun test` and the helpers for a test of its own, for the tests in [Testing](testing.md).
 
-## Mounting a component
+## Common tasks
+
+### Mount a component
 
 - `mountComponent(Component, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount, setProps }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click.
 - `Component` is the one the test imports, whose props are typed; the browser build is made from its file.
@@ -24,7 +26,9 @@ Mounting a component in `bun test` and the helpers for a test of its own, for th
 - A `persisted.local(key, initial)` signal keeps its value encoded as island props are, not as JSON: `writePersisted(key, value)` and `readPersisted(key)` from `kay/test` set one before a mount and read one back, `undefined` when none was kept; `'session'` as their last argument does the same for a `persisted.session` signal's sessionStorage.
 - After an interaction, `await settle()` lets effects land before the DOM is read.
 
-## Helpers for a test of its own
+## Reference
+
+### Helpers for a test of its own
 
 - `cookieJar()` from `kay/test` keeps a browser's cookies for a test driving an Elysia app or a handler of its own rather than `testSite`, which keeps its own as `site.cookies`.
 - `jar.send(handle, request)` sends the cookies kept so far through `handle`, such as `app.handle`, keeps those the response sets and drops those it expires; `jar.header()` is the `cookie` header it sends, `''` when it holds none, and `jar.cookies` the `Bun.CookieMap`.
