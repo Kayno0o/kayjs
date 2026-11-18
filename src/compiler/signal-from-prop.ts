@@ -51,6 +51,9 @@ function writtenNames(ast: Node): Set<string> {
     if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier')
       names.add(node.left.name)
 
+    if (node.type === 'UpdateExpression' && node.argument.type === 'Identifier')
+      names.add(node.argument.name)
+
     if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && node.callee.object.type === 'Identifier' && node.callee.property.type === 'Identifier' && (node.callee.property.name === 'set' || node.callee.property.name === 'update'))
       names.add(node.callee.object.name)
   })

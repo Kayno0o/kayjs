@@ -1568,6 +1568,7 @@ describe('signal-from-prop', () => {
   it('marks the fix unsafe for a seed the island writes itself, a draft, and skips a seed with type arguments or a parameter\'s', () => {
     expect(found(island('const draft = signal(light)\nconst edit = () => { draft = \'x\' }'))[0]!.fixes![0]!.safe).toBe(false)
     expect(found(island('const draft = signal(light)\nconst edit = () => draft.set(\'x\')'))[0]!.fixes![0]!.safe).toBe(false)
+    expect(found(island('const draft = signal(light)\nconst edit = () => { draft += \'x\' }'))[0]!.fixes![0]!.safe).toBe(false)
     expect(found(island('const shown = signal(light)'))[0]!.fixes![0]!.safe).toBe(true)
     expect(found(island('const picked = signal<string>(light)'))).toEqual([])
     expect(found(island('const make = (light: string) => signal(light)\nconst other = signal(0)'))).toEqual([])

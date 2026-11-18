@@ -2,6 +2,7 @@ import type { Policy } from './swap-flight'
 import { ISLAND } from './markers'
 import { moves, place } from './move'
 import { navigation } from './navigation'
+import { inFlight } from './swap-flight'
 import { runnable, scriptMarkup } from './swap-head'
 import { KEPT, MISSING, morphChildren, scoped, UNIT } from './swap-morph'
 import { decodeServerValue } from './wire'
@@ -188,7 +189,7 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
 
   // What each `details` shows now is what the server served: the visitor's toggle, which a refresh compares with it, comes after, and a toggle event the markup's own opening fires is not one.
   for (const details of document.querySelectorAll('details')) {
-    if (!navigation.opened.has(details))
+    if (!inFlight.typing || !navigation.opened.has(details))
       navigation.opened.set(details, details.open)
   }
 
