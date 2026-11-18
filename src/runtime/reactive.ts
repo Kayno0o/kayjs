@@ -38,6 +38,8 @@ export interface ServerScope {
   cookie: (name: string) => string | undefined
   // A query param as the page's `query` schema reads it, for `queryParam` and a persisted signal kept in the query.
   param: (name: string) => unknown
+  // Told each time a signal kept in the request reads it, which a render answering for a page built once notes as the island's dependence on the address.
+  read?: () => void
   report: (error: unknown) => void
   // The path of the page being rendered, percent-encoded as requested.
   path: string
@@ -365,7 +367,7 @@ export function currentServerScope(): ServerScope | undefined {
 }
 
 // What a page's server fence reads of its request while it loads: its cookies, which a persisted signal answers with; a query param is the render's alone.
-export type LoadScope = Pick<ServerScope, 'cookie'> & Partial<Pick<ServerScope, 'param'>>
+export type LoadScope = Pick<ServerScope, 'cookie'> & Partial<Pick<ServerScope, 'param' | 'read'>>
 
 let requestCookieScope: (() => LoadScope | undefined) | undefined
 

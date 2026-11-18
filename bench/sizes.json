@@ -40,7 +40,7 @@
     }
   },
   "form-only": {
-    "gzip": 2836,
+    "gzip": 2840,
     "files": 1,
     "packages": {
       "app": 51,
@@ -48,12 +48,12 @@
     }
   },
   "ui-list": {
-    "gzip": 67560,
+    "gzip": 67597,
     "files": 43,
     "packages": {
       "app": 6062,
       "icons": 2608,
-      "kay": 56787,
+      "kay": 56906,
       "kayjs-ui": 92225
     }
   }

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { queryParam } from '../src/runtime'
 import { startNavigation } from '../src/runtime/navigate'
 import { leaveGuards, navigation } from '../src/runtime/navigation'
+import { followAddress } from '../src/runtime/with-query'
 
 const setURL = (url: string) => (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
 
@@ -62,5 +63,30 @@ describe('a traversal between the entries a pushing query param wrote', () => {
       leaveGuards.delete(dirty)
       go.mockRestore()
     }
+  })
+})
+
+describe('a swap of the page shown', () => {
+  beforeAll(() => {
+    GlobalRegistrator.register()
+    setURL('http://localhost/search?q=a')
+    startNavigation({ hydrate: () => undefined, dispose: () => undefined })
+  })
+  afterAll(async () => GlobalRegistrator.unregister())
+
+  it('reads the address again, and leaves a write still waiting for it alone', () => {
+    const q = queryParam('q', { default: '' })
+    const r = queryParam('r', { default: '' })
+
+    expect(q()).toBe('a')
+
+    // Every param shares one gap: past the first write of a burst, the rest wait for it.
+    q.set('b')
+    q.set('typed')
+    setURL('http://localhost/search?q=a&r=y')
+    followAddress()
+
+    expect(q()).toBe('typed')
+    expect(r()).toBe('y')
   })
 })

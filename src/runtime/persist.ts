@@ -183,7 +183,12 @@ function serverSide<T>(request: Store<T>['request'], read: () => T): Persisted<T
     read: () => {
       const scope = currentRequestScope()
 
-      if (!scope || !request || written.has(scope))
+      if (!scope || !request)
+        return read()
+
+      scope.read?.()
+
+      if (written.has(scope))
         return read()
 
       let stored = fromRequest.get(scope)

@@ -52,14 +52,7 @@ export function inServerScope<T>(request: Request, report: (error: unknown) => v
 
   const url = requestUrl(request)
 
-  // A render of an island notes that it read the query, which a page rendered once cannot show.
-  const param = (name: string) => {
-    noteQuery()
-
-    return readParam(rules, name, url.searchParams)
-  }
-
-  return store.run({ request, values: new WeakMap(), cookie, param, report, path: url.pathname }, run)
+  return store.run({ request, values: new WeakMap(), cookie, param: name => readParam(rules, name, url.searchParams), read: noteQuery, report, path: url.pathname }, run)
 }
 
 // The request the render being run answers.

@@ -1,0 +1,7 @@
+---
+import { signal } from 'kay'
+import { shared } from '../state'
+
+const open = signal(false)
+---
+button.again(onClick={() => open = !open()}) Again {shared()}

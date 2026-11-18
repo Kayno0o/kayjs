@@ -47,6 +47,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a client-r
     const built = await kayBuild([ROOT, '--no-check', '--static', '--outdir', outdir], { NODE_ENV: 'production' })
 
     expect(built.code).toBe(0)
+    expect(built.output).toContain('/tabs holds 2 islands reading a query param')
     files = serveDirectory(outdir)
     site = await testSite({ root: ROOT, browser: { path } })
   }, 120_000)
@@ -80,6 +81,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a client-r
         const view = await open('/tabs?x=b')
 
         await view.waitFor('p.tab', { text: 'Tab b' })
+        // A second island reading the signal the first one and the page read before it.
+        await view.waitFor('button.again', { text: 'Again b' })
         await view.click('button.count')
         await view.waitFor('button.count', { text: 'Clicked 1' })
 

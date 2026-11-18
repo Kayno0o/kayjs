@@ -1,6 +1,10 @@
 ---
+import Again from '../components/tabs-again.kay'
 import Tabs from '../components/tabs.kay'
+import { shared } from '../state'
 ---
 h1 Tabs
 a.b(href="?x=b") B
+p.page Page reads {shared()}
 Tabs
+Again

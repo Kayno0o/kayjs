@@ -47,7 +47,7 @@ import { STAMP_HOLE } from './stamp'
 
 const PARTS = new Intl.ListFormat('en-GB')
 // An island the render marked as reading the query, whose markup is the default query's.
-const QUERY_ISLAND = /<slot data-component="[^"]*"[^>]*? data-query[ >]/g
+const QUERY_ISLAND = /<slot data-component="[^"]*" data-props=(?:"[^"]*"|'[^']*')[^>]*? data-query[ >]/g
 
 // What the page reads with `live: true` in its own render, which the build runs once.
 function warnUnfollowed(path: string, keys: string[] | undefined): void {

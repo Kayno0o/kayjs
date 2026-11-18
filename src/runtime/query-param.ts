@@ -80,6 +80,9 @@ function fromText(rule: ParamRule, text: string): unknown {
   return rule.enum === undefined || rule.enum.includes(value) ? value : REFUSED
 }
 
+// The values set and not yet written to the address, by param, with the fallback each leaves out of it.
+const pending = new Map<string, [value: unknown, fallback: unknown]>()
+
 // What `queryParam` reads and keeps, around the signal's own `read`: the server reads the request's param, the browser the page's address once, then each write takes the current history entry's place.
 // A param left out reads as the signal's own value, `fallback` for `persisted.query(name, fallback)`, which writing it leaves out too.
 // A value outside `values` reads as the param left out.
@@ -90,9 +93,19 @@ export function keepParam<T>(name: string, read: () => T, write: (value: T) => v
 
   if (typeof document !== 'undefined') {
     const reread = () => {
+      // A write still waiting is the signal's own, ahead of the address: it lands on it, and a refresh of the page leaves it be.
+      if (pending.has(name))
+        return
+
       const now = stored()
 
-      write(now.found ? now.value : fallback as T)
+      const next = now.found ? now.value : fallback as T
+
+      // A list is read afresh from the address: left alone when it holds the same items, so its effects are not told again.
+      if (Array.isArray(next) && JSON.stringify(next) === JSON.stringify(read()))
+        return
+
+      write(next)
     }
 
     followers.add(reread)
@@ -128,7 +141,6 @@ function pageRules(): QueryRules | undefined {
 // Every param shares one gap, a throttle with a leading write: one goes through at once, then at most one per 200 ms while values keep coming, the latest ones landing in a single `replaceState`.
 // The page flushes them before it is left or navigated, one found on another page than it was set on is dropped, and a refused write never throws out of `set()`.
 const WRITE_GAP = 200
-const pending = new Map<string, [value: unknown, fallback: unknown]>()
 let timer: ReturnType<typeof setTimeout> | undefined
 let lastWrite = 0
 let retrying = false
