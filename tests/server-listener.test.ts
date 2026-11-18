@@ -28,7 +28,7 @@ describe.each(VARIANTS)('a site served %s', (_name, options) => {
     await Bun.write(`${dir}/src/routes/blog/[slug].kay`, '--- server\nconst { slug } = ctx.params\n---\nh1 post {slug}\n')
     await Bun.write(`${dir}/src/routes/big.kay`, `--- server\nconst x = 1\n---\nh1 big\n${Array.from({ length: 200 }, (_, index) => `p lorem ipsum dolor sit amet ${index}`).join('\n')}\n`)
 
-    const config = { requireGuards: false, root, prebuilt: false, security: false as const, site: 'https://x.example', serve: { compress: true }, ...options }
+    const config = { guards: { default: 'open' as const }, root, prebuilt: false, security: false as const, site: 'https://x.example', serve: { compress: true }, ...options }
 
     app = new Elysia().use(await pages(config)).listen({ port: 0, hostname: '127.0.0.1' })
     served = new Elysia().use(await pages(config))

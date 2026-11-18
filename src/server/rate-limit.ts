@@ -16,8 +16,6 @@ export interface RateLimiter extends RateLimit {
   count: (from: Request | string, server?: Server<unknown> | null, weight?: number) => Promise<RateWindow & { wait: number | undefined }>
   // For a guard: takes its `ctx`, counts the request under the limit's `key` or the client's address and, once over the limit, sets `Retry-After` and denies with 429, `message` (a text or a function of the seconds to wait) in place of kay's.
   check: (ctx: Pick<GuardContext, 'request' | 'headers' | 'deny' | 'locale' | 'cookies' | 'locals'>, message?: string | ((wait: number) => string)) => Promise<void>
-  /** @deprecated `check(ctx, message?)`, as `limiter().enforce(key)` counts under a key and refuses nothing. Removed in 1.108; `deprecated-rate-enforce` rewrites it. */
-  enforce: (ctx: Pick<GuardContext, 'request' | 'headers' | 'deny' | 'locale' | 'cookies' | 'locals'>, message?: string | ((wait: number) => string)) => Promise<void>
 }
 
 // A limit for a guard, an API route or a library, counted as an action's `rateLimit` is: `max` attempts from one client every `window`, under `name`, which limits sharing it count together.
@@ -53,7 +51,6 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
     ...limit,
     count,
     hit: async (from, server, weight) => (await count(from, server, weight)).wait,
-    enforce: async (ctx, message) => limiter.check(ctx, message),
     check: async (ctx, message) => {
       const { request } = ctx
       const key = await actionKey(name, limiter, request, clientAddress(request, undefined), () => ({ request, locale: ctx.locale, cookies: ctx.cookies, locals: ctx.locals }))

@@ -675,7 +675,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     const answer = await decide('mail.beforeSend', [options.beforeSend], { mail })
 
     if ('refused' in answer)
-      refuse(answer.refused.message, answer.refused)
+      refuse(answer.refused.status, { message: answer.refused.message, errors: answer.refused.errors, data: answer.refused.data })
 
     return { ...mail, ...answer.change }
   }

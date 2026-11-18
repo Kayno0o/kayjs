@@ -538,7 +538,7 @@ describe('kay lsp', () => {
     await Bun.write(join(workspace, page), source)
 
     const published = (await editor.open(page)).map(({ range, severity, code, message }) => [range.start.line, severity, code, message])
-    const checked = (await check(join(workspace, 'site'), { requireGuards: false })).filter(diagnostic => diagnostic.file === join(workspace, page)).map(asPublished)
+    const checked = (await check(join(workspace, 'site'), { guards: { default: 'open' } })).filter(diagnostic => diagnostic.file === join(workspace, page)).map(asPublished)
 
     // The index of a positionally keyed for whose rows do not read it is no unread name.
     expect(published.map(([line, severity, code]) => [line, severity, code])).toEqual([[8, 1, 'positional-key'], [10, 1, 'positional-key'], [12, 1, 'unkeyed-rows'], [14, 1, 2774]])

@@ -370,7 +370,7 @@ export interface ErrorMessages {
   describing: Map<string, string>
 }
 
-const ERROR_READ = /^([\w$.]+?)(?:\.form)?\.error\((?:(['"])([^'"]*)\2)?\)$/
+const ERROR_READ = /^([\w$.]+?)\.form\.error\((?:(['"])([^'"]*)\2)?\)$/
 const WHITESPACE = /\s+/g
 const ID_UNSAFE = /[^\w-]+/g
 
@@ -382,7 +382,7 @@ function errorId(action: string, field: string): string {
   return `${action.replaceAll('.', '-')}-${field ? `${field.replace(ID_UNSAFE, '-')}-` : ''}error`
 }
 
-// An `error` line names the message its field is described by; failing one, as before it, the element `if add.form.error('title') then message` and `p {add.form.error('title')}`, and `add.error('title')` until 1.108: the element shown holds the message, outside a `for`, which would repeat its id, for an action a form of the file posts to.
+// An `error` line names the message its field is described by; failing one, as before it, the element `if add.form.error('title') then message` and `p {add.form.error('title')}`: the element shown holds the message, outside a `for`, which would repeat its id, for an action a form of the file posts to.
 export function errorMessages(nodes: Node[], source: string): ErrorMessages {
   const found: ErrorMessages = { ids: new Map(), lines: new Map(), describing: new Map() }
   const posted = new Set<string>()

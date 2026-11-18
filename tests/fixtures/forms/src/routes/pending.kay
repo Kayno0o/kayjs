@@ -11,7 +11,7 @@ export const slow = action(t.Object({}), async () => {
 export const refused = action(t.Object({}), async (_input, ctx) => {
   await Bun.sleep(500)
 
-  return ctx.fail(409, 'Taken')
+  return ctx.deny(409, { message: 'Taken' })
 })
 
 export const leaves = action(t.Object({}), async (_input, ctx) => {

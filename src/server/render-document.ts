@@ -163,7 +163,7 @@ function outcomeScript(outcome: Outcome | null): string {
     text = encodeValue(outcome.succeeded ? outcome : { ...outcome, values: {} })
   }
   catch (error) {
-    kayLog('warn', `what ${outcome.action} ${outcome.succeeded ? 'returned' : 'passed to ctx.fail'} cannot reach the page's islands: ${unsendable(error) ?? String(error)}`)
+    kayLog('warn', `what ${outcome.action} ${outcome.succeeded ? 'returned' : 'passed to ctx.deny'} cannot reach the page's islands: ${unsendable(error) ?? String(error)}`)
 
     return ''
   }

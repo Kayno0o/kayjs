@@ -3,7 +3,7 @@ import { t } from 'elysia'
 import { action } from 'kay'
 
 export const stay = action(t.Object({}), (_, ctx) => ctx.redirect(ctx.url.pathname))
-export const refuse = action(t.Object({}), (_, ctx) => ctx.fail(409, 'Refused'))
+export const refuse = action(t.Object({}), (_, ctx) => ctx.deny(409, { message: 'Refused' }))
 export const over = action(t.Object({}), (_, ctx) => ctx.redirect('/deferred-two'))
 
 const refused = refuse.form.failed()

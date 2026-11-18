@@ -52,10 +52,10 @@ describe('the request context', () => {
       Bun.write(join(dir, 'routes/peek.txt.ts'), PEEK),
       Bun.write(join(dir, 'routes/calm.txt.ts'), CALM),
     ])
-    app = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, security: false })
-    mounted = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, base: '/app' })
-    translated = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: join(dir, 'messages') } })
-    french = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, lang: 'fr' })
+    app = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, security: false })
+    mounted = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, base: '/app' })
+    translated = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: join(dir, 'messages') } })
+    french = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, lang: 'fr' })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

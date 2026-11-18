@@ -4,7 +4,6 @@ import type { Fix, Span } from '../compiler/ast'
 import type { LintLevel, LintName } from '../compiler/lints'
 import type { I18nConfig } from '../config'
 import type { RouteMount } from '../server/routes'
-import type { OldFormLint } from './handler-events'
 import type { ShadowFile } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, relative, resolve, sep } from 'node:path'
@@ -18,9 +17,7 @@ import { WRITABLE } from '../compiler/names'
 import { parseKay } from '../compiler/parser'
 import { UNSERVED_MESSAGE } from '../runtime/checks'
 import { localePrefixes, localeSettings } from '../server/i18n'
-import { callResultLint } from './call-result'
 import { unknownNameHelp } from './export-homes'
-import { handlerEventLint } from './handler-events'
 import { loopIndexFix, positionalKeyFix } from './loop-index-fix'
 import { sourceSpan } from './shadow'
 import { lastOverload, richCallHint, templateHint } from './template-hints'
@@ -131,18 +128,6 @@ function blockWithoutParameters(diagnostic: TsgoDiagnostic, source: string, span
   return `the component calls \`@${name}\` with (${parameters}): write it with them, as \`@${name}(${[...parameters.matchAll(PARAMETER_NAME)].map(match => `${match[1] ?? ''}${match[2]}`).join(', ')})\``
 }
 
-// What the types say of a callback given a function written for its arguments before 1.105, or of an island's call read as data: the deprecated lint that names it, with its fix.
-function oldForm(message: string, source: string, span: Span | undefined): (OldFormLint & { code: LintName }) | undefined {
-  const handler = handlerEventLint(message, source, span)
-
-  if (handler !== undefined)
-    return { code: 'deprecated-callback-handler', ...handler }
-
-  const result = callResultLint(message, source, span, true)
-
-  return result && { code: 'deprecated-call-result', ...result }
-}
-
 // A diagnostic in a .kay file's shadow TSX, read at the levels its source gives the lints.
 export function diagnoseShadow(shadow: ShadowFile, reported: TsgoDiagnostic, levelAt: (lint: LintName, offset: number) => LintLevel, messageKeys: readonly string[] = []): Diagnosed | undefined {
   const span = sourceSpan(shadow, reported.start, reported.end, 'loose')
@@ -163,13 +148,6 @@ export function diagnoseShadow(shadow: ShadowFile, reported: TsgoDiagnostic, lev
 
     return level === 'allow' ? undefined : { ...lint, severity: severityOf(level), span, ...offered }
   }
-
-  // A type error that is an old form of before 1.105, with the fix that writes the new one.
-  const old = oldForm(diagnostic.message, shadow.source, span)
-  const oldLevel = old === undefined ? 'allow' : levelAt(old.code, offset)
-
-  if (old !== undefined && oldLevel !== 'allow')
-    return { ...old, severity: severityOf(oldLevel) }
 
   // Unread code is the `unread-name` lint; a name kay generated, which the template reads in a way it does not spell out, is no code of the user's.
   if (diagnostic.code !== undefined && UNUSED_CODES.has(diagnostic.code)) {

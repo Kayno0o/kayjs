@@ -107,7 +107,7 @@ describe('beforeSend', () => {
 
   it('refuses with a message and status when it throws refuse()', async () => {
     const { refuse } = await import('kay')
-    const app = mailer({ from: 'a@example.com', beforeSend: () => refuse('No mail to a test address', { status: 422 }) })
+    const app = mailer({ from: 'a@example.com', beforeSend: () => refuse(422, { message: 'No mail to a test address' }) })
     const error = await caught(app.send({ to: 'a@example.com', subject: 'x', text: 'x' }))
 
     expect((error as Error).message).toBe('No mail to a test address')

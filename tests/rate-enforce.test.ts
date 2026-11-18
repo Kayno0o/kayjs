@@ -10,7 +10,7 @@ import { testSite } from '../src/test'
 import { eventually } from './helpers/eventually'
 
 const root = 'tests/fixtures/rate-shared'
-const site = await testSite({ root, islands: false, requireGuards: false })
+const site = await testSite({ root, islands: false, guards: { default: 'open' } })
 const { seen } = await import(join(import.meta.dir, 'fixtures/rate-shared/src/limits.ts')) as typeof import('./fixtures/rate-shared/src/limits')
 const { post } = await import(join(import.meta.dir, 'fixtures/rate-shared/src/routes/index.kay')) as { post: Action<Record<never, never>, string> }
 
@@ -19,7 +19,7 @@ afterAll(async () => site.close())
 const refusalOptions = { body: {}, form: false, server: null, plain: false }
 const request = (headers: Record<string, string> = {}) => new Request('http://localhost/', { method: 'POST', headers })
 
-// A guard's context as far as `enforce` reads it: `deny` throws as kay's does.
+// A guard's context as far as `check` reads it: `deny` throws as kay's does.
 function guardContext(from: Request) {
   const headers = new Headers()
   const denied: { status?: number, message?: string } = {}
@@ -43,7 +43,7 @@ function guardContext(from: Request) {
 }
 
 describe('check and count', () => {
-  it('check denies with 429 and Retry-After past the limit, as enforce, which stays as its alias', async () => {
+  it('check denies with 429 and Retry-After past the limit', async () => {
     const limit = rateLimit('check-basic', { max: 1, window: '1m', store: memoryRates() })
 
     await limit.check(guardContext(request()).ctx)
@@ -53,11 +53,6 @@ describe('check and count', () => {
     await expect(limit.check(over.ctx)).rejects.toThrow('denied')
     expect(over.denied.status).toBe(429)
     expect(Number(over.headers.get('retry-after'))).toBeGreaterThan(0)
-
-    const alias = guardContext(request())
-
-    await expect(limit.enforce(alias.ctx)).rejects.toThrow('denied')
-    expect(alias.denied.status).toBe(429)
   })
 
   it('count gives the window and the wait, which hit gives alone', async () => {
@@ -75,17 +70,17 @@ describe('check and count', () => {
   })
 })
 
-describe('enforce', () => {
+describe('check with a message and a key', () => {
   it('lets a request under the limit through and denies the one past it with 429 and Retry-After', async () => {
     const limit = rateLimit('enforce-basic', { max: 1, window: '1m', store: memoryRates() })
     const first = guardContext(request())
 
-    await limit.enforce(first.ctx)
+    await limit.check(first.ctx)
     expect(first.headers.get('retry-after')).toBeNull()
 
     const second = guardContext(request())
 
-    await expect(limit.enforce(second.ctx)).rejects.toThrow('denied')
+    await expect(limit.check(second.ctx)).rejects.toThrow('denied')
     expect(second.denied.status).toBe(429)
     expect(second.denied.message).toContain('try again')
     expect(Number(second.headers.get('retry-after'))).toBeGreaterThan(0)
@@ -94,25 +89,25 @@ describe('enforce', () => {
   it('takes the message as a text or a function of the wait', async () => {
     const limit = rateLimit('enforce-message', { max: 1, window: '1m', store: memoryRates() })
 
-    await limit.enforce(guardContext(request()).ctx)
+    await limit.check(guardContext(request()).ctx)
 
     const slow = guardContext(request())
 
-    await expect(limit.enforce(slow.ctx, wait => `wait ${wait > 0}`)).rejects.toThrow('denied')
+    await expect(limit.check(slow.ctx, wait => `wait ${wait > 0}`)).rejects.toThrow('denied')
     expect(slow.denied.message).toBe('wait true')
 
     const text = guardContext(request())
 
-    await expect(limit.enforce(text.ctx, 'Slow down')).rejects.toThrow('denied')
+    await expect(limit.check(text.ctx, 'Slow down')).rejects.toThrow('denied')
     expect(text.denied.message).toBe('Slow down')
   })
 
   it('counts under the limit key when it has one', async () => {
     const limit = rateLimit('enforce-key', { max: 1, window: '1m', store: memoryRates(), key: ctx => ctx.request.headers.get('x-user') ?? undefined })
 
-    await limit.enforce(guardContext(request({ 'x-user': 'ada' })).ctx)
-    await limit.enforce(guardContext(request({ 'x-user': 'grace' })).ctx)
-    await expect(limit.enforce(guardContext(request({ 'x-user': 'ada' })).ctx)).rejects.toThrow('denied')
+    await limit.check(guardContext(request({ 'x-user': 'ada' })).ctx)
+    await limit.check(guardContext(request({ 'x-user': 'grace' })).ctx)
+    await expect(limit.check(guardContext(request({ 'x-user': 'ada' })).ctx)).rejects.toThrow('denied')
   })
 })
 
@@ -121,10 +116,10 @@ describe('a limit object shared with an action', () => {
     const limit = rateLimit('shared-guard', { max: 2, window: '1m', store: memoryRates() })
     const action = { url: '/_kay/action/shared', protection: { rateLimit: limit } } as never
 
-    await limit.enforce(guardContext(request()).ctx)
+    await limit.check(guardContext(request()).ctx)
     expect(await protectionRefusal(action, request(), refusalOptions)).toBeUndefined()
     expect(await protectionRefusal(action, request(), refusalOptions)).toMatchObject({ status: 429 })
-    await expect(limit.enforce(guardContext(request()).ctx)).rejects.toThrow('denied')
+    await expect(limit.check(guardContext(request()).ctx)).rejects.toThrow('denied')
   })
 
   it('counts an API route using the same object with them', async () => {
@@ -144,8 +139,8 @@ describe('a limit object shared with an action', () => {
     const copy = { ...limit, max: 5 }
     const action = { url: '/_kay/action/copy', protection: { rateLimit: copy } } as never
 
-    await limit.enforce(guardContext(request()).ctx)
-    await expect(limit.enforce(guardContext(request()).ctx)).rejects.toThrow('denied')
+    await limit.check(guardContext(request()).ctx)
+    await expect(limit.check(guardContext(request()).ctx)).rejects.toThrow('denied')
 
     // The guard's counter is over its max of 1, yet the copy has a window and max of its own.
     for (let posts = 0; posts < 5; posts++)
@@ -154,7 +149,7 @@ describe('a limit object shared with an action', () => {
     expect(await protectionRefusal(action, request(), refusalOptions)).toMatchObject({ status: 429 })
   })
 
-  it('leaves a copy\'s hit and enforce counting in the original', async () => {
+  it('leaves a copy\'s hit and check counting in the original', async () => {
     const limit = rateLimit('shared-methods', { max: 1, window: '1m', store: memoryRates() })
     const copy = { ...limit, max: 5 }
 
@@ -169,7 +164,7 @@ describe('a limit object shared with an action', () => {
     const context = () => ({ request: request(), locale: 'en', cookies: {}, locals: {} }) as never
 
     expect(await apiLimitWait(pageLimits, request(), null, context)).toBeUndefined()
-    await expect(limit.enforce(guardContext(request()).ctx)).rejects.toThrow('denied')
+    await expect(limit.check(guardContext(request()).ctx)).rejects.toThrow('denied')
     expect(seenHere).toHaveLength(1)
     expect(await apiLimitWait(pageLimits, request(), null, context)).toBeGreaterThan(0)
     expect(seenHere).toHaveLength(2)
@@ -179,7 +174,7 @@ describe('a limit object shared with an action', () => {
     const limit = rateLimit('shared-apart', { max: 1, window: '1m', store: memoryRates() })
     const plain = { url: '/_kay/action/plain', protection: { rateLimit: { max: 1, window: '1m' } } } as never
 
-    await limit.enforce(guardContext(request()).ctx)
+    await limit.check(guardContext(request()).ctx)
     expect(await protectionRefusal(plain, request(), refusalOptions)).toBeUndefined()
     expect(await protectionRefusal(plain, request(), refusalOptions)).toMatchObject({ status: 429 })
   })
@@ -224,7 +219,7 @@ describe('onLimit', () => {
     expect(seen.at(-1)).toMatchObject({ name: '/_kay/action/on-limit', wait: expect.any(Number) as number })
     expect(seen.at(-1)?.request).toBeInstanceOf(Request)
 
-    await expect(limit.enforce(guardContext(request()).ctx)).rejects.toThrow('denied')
+    await expect(limit.check(guardContext(request()).ctx)).rejects.toThrow('denied')
     expect(seen).toHaveLength(2)
 
     await apiLimitWait(route, request(), null, context)

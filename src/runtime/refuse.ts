@@ -10,16 +10,6 @@ export interface DenyOptions<Data = unknown, Field extends string = string> {
   data?: Data | undefined
 }
 
-// The options of `refuse(message, options)` before 1.105, `refuse(status, { message, errors, data })` since.
-export interface RefuseOptions {
-  // An error status, from 400 to 599: 422 when `errors` names fields, else 403.
-  status?: number | undefined
-  // A message per field, as a schema's.
-  errors?: Record<string, string> | undefined
-  // What the app reads from the answer.
-  data?: unknown
-}
-
 // An error carrying this is answered as a refusal rather than a server error: `{ status, message, errors?, data?, retryAfter? }`.
 const REFUSED = Symbol.for('kay.refused')
 
@@ -36,14 +26,10 @@ export class RefusedError extends Error {
 
 // Throws to stop what a `before` hook guards, with that status (an error one, from 400 to 599) and the `{ message, errors, data }` of `ctx.deny`: an action and every other place answering `Symbol.for('kay.refused')` answers it as it answers `ctx.deny` in an action.
 // kept: free
-export function refuse(status?: number, options?: DenyOptions): never
-/** @deprecated `refuse(status, { message, errors, data })`. Removed in 1.108; `deprecated-refuse-call` rewrites it. */
-export function refuse(message?: string, options?: RefuseOptions): never
-export function refuse(first?: number | string, options: { message?: string | undefined, status?: number | undefined, errors?: Partial<Record<string, string>> | undefined, data?: unknown } = {}): never {
-  const named = typeof first === 'string'
+export function refuse(status?: number, options: DenyOptions = {}): never {
   const { errors = {}, data } = options
-  const code = (named ? options.status : first) ?? (Object.keys(errors).length > 0 ? 422 : 403)
-  const message = (named ? first : options.message) ?? 'Refused'
+  const code = status ?? (Object.keys(errors).length > 0 ? 422 : 403)
+  const message = options.message ?? 'Refused'
 
   if (!Number.isInteger(code) || code < 400 || code > 599)
     throw new KayError('argument-invalid', `kay: refuse() takes an error status, from 400 to 599, not ${code}`)

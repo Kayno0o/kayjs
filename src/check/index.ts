@@ -14,7 +14,6 @@ import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { nativeExe } from '../compiler/native-typescript'
 import { pickConfig } from '../config'
-import { moduleCallResult } from './call-result'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
 import { generatedProblem } from './generated'
@@ -69,7 +68,6 @@ export const CHECK_CONFIG = [
   'seo',
   'assets',
   // Reports each route of the app no guard covers, which the server refuses.
-  'requireGuards',
   'guards',
   // Reports the actions offered as tools that bot protection alone stands before.
   'mcp',
@@ -211,7 +209,7 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
 
     const mapped: CheckDiagnostic = shadow && diagnosed
       ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help ?? (shadow.route === true ? helped(diagnostic).help : undefined), ...diagnosed.fixes && { fixes: diagnosed.fixes } }
-      : { ...diagnostic, ...helped(diagnostic), ...await moduleCallResult(diagnostic, options.lints) }
+      : { ...diagnostic, ...helped(diagnostic) }
     const generated = generatedProblem(root, mapped, types, content)
 
     // A guard file imported for two lines of the exports check is reported once.

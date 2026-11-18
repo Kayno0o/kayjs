@@ -126,7 +126,7 @@ Every failure is a result with `ok` false, in words the model can correct from, 
 | unknown name | `There is no tool named "x"; the tools are add_note, ...` (name cut at 64 characters; a tool name streamed past 256 characters stops growing and names no tool) |
 | more than 16 calls in one step | the 17th gets `Too many tool calls in one step` and none after it run |
 | schema refused | the action's `{"status":422,"errors":{...}}`, so the model can fix the field |
-| guard refused, rate limited, `ctx.fail`, redirect | the action's answer (`Sign in`, a 429, a redirect sentence) |
+| guard refused, rate limited, `ctx.deny`, redirect | the action's answer (`Sign in`, a 429, a redirect sentence) |
 | the action threw | kay's own 500 answer (`Something went wrong on our side...`), never what it threw, which kay logs as for any action |
 | the call itself threw | `The tool could not run`, logged by the app's logger (`kayjs-ai`) |
 

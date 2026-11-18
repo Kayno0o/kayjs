@@ -1,12 +1,9 @@
 import type { CheckDiagnostic, CheckOptions } from '../src/check'
-import { mkdir, rm, symlink } from 'node:fs/promises'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 
-import { check } from '../src/check'
 import { actionOptions } from '../src/check/action-options'
-import { actionReaders } from '../src/check/action-readers'
-import { actionType } from '../src/check/action-type'
 import { aiLanguage } from '../src/check/ai-language'
 import { appHooks } from '../src/check/app-hooks'
 import { authMethods } from '../src/check/auth-methods'
@@ -20,7 +17,6 @@ import { envFiles } from '../src/check/env-files'
 import { applySafeFixes } from '../src/check/fixes'
 
 import { formatDurationNumbers } from '../src/check/format-duration'
-import { guardOptions } from '../src/check/guard-options'
 
 import { hookContext } from '../src/check/hook-context'
 import { hookNames } from '../src/check/hook-names'
@@ -31,8 +27,6 @@ import { liveApi } from '../src/check/live-api'
 import { mailApi } from '../src/check/mail-api'
 import { navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
 import { pagesOptions } from '../src/check/pages-options'
-import { rateEnforce } from '../src/check/rate-enforce'
-import { refusalCalls } from '../src/check/refusal-calls'
 
 import { routeKeys } from '../src/check/route-keys'
 import { schemaBuilders } from '../src/check/schema-builders'
@@ -50,30 +44,9 @@ import { scratchDir } from './scratch'
 
 type Name = keyof typeof DEPRECATED_LINTS
 
-// The lints the type check finds, which a project holding kay and kayjs-ui and the api the example calls lets it run.
-async function typed(root: string, code: string): Promise<CheckDiagnostic[]> {
-  const ROOT = join(import.meta.dir, '..')
-
-  await mkdir(join(root, 'node_modules/@kayjs'), { recursive: true })
-  await symlink(ROOT, join(root, 'node_modules/kay'))
-  await symlink(join(ROOT, 'packages/ui'), join(root, 'node_modules/@kayjs/ui'))
-  await Promise.all(Object.entries({
-    '.git': '',
-    'package.json': '{ "name": "app", "dependencies": { "@kayjs/ui": "*" } }',
-    'tsconfig.json': await Bun.file(join(import.meta.dir, 'fixtures/ui-list/tsconfig.json')).text(),
-    'src/api/notes.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ items: [\'a\'], total: 1 }))\n',
-  }).map(async ([path, content]) => Bun.write(join(root, path), content)))
-
-  return (await check(root)).filter(found => found.code === code)
-}
-
 // The project-wide lints, each by the check that finds it; a deprecated lint of the compiler is found by `compileKay`, so it needs no entry.
 const SITE: Record<string, (root: string, options: CheckOptions) => Promise<CheckDiagnostic[]>> = {
   'deprecated-ai-language': aiLanguage,
-  'deprecated-rate-enforce': rateEnforce,
-  'deprecated-deny-call': refusalCalls,
-  'deprecated-ctx-fail': refusalCalls,
-  'deprecated-refuse-call': refusalCalls,
   'deprecated-auth-rate-limits': authRateLimits,
   'deprecated-auth-methods': authMethods,
   'deprecated-job-handler': jobHandlers,
@@ -82,8 +55,6 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-disk-files': diskFilesCalls,
   'deprecated-source-readers': sourceReaders,
   'deprecated-live-api': liveApi,
-  'deprecated-action-type': actionType,
-  'deprecated-action-readers': actionReaders,
   'deprecated-socket-frames': socketFrames,
 
   'deprecated-persisted-call': persistedCall,
@@ -97,15 +68,12 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-hook-names': hookNames,
   'deprecated-store-names': storeNames,
   'deprecated-format-duration': formatDurationNumbers,
-  'deprecated-guard-option': guardOptions,
   'deprecated-config-switch': configSwitches,
   'deprecated-images-keys': imagesKeys,
   'deprecated-client-keys': clientKeys,
   'deprecated-config-groups': configGroups,
   'deprecated-i18n-keys': i18nKeys,
   'deprecated-secret-keys': secretKeys,
-  'deprecated-callback-handler': async root => typed(root, 'deprecated-callback-handler'),
-  'deprecated-call-result': async root => typed(root, 'deprecated-call-result'),
   'deprecated-route-keys': routeKeys,
   'deprecated-app-hooks': appHooks,
   'deprecated-hook-context': hookContext,

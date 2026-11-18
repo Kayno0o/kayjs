@@ -393,7 +393,7 @@ describe('kay installed under node_modules', () => {
   const checkout = resolve(import.meta.dir, '..')
   const files: Record<string, string> = {
     'bunfig.toml': '[test]\npreload = ["kay/test/preload"]\n',
-    'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nexport default defineConfig({ requireGuards: false })\n',
+    'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nexport default defineConfig({ guards: { default: \'open\' } })\n',
     'src/store.ts': 'import { signal } from \'kay\'\nexport function session() {\n  const filed = signal({ done: false })\n\n  return { done: () => filed().done, submit() { filed.set({ done: true }) } }\n}\n',
     'src/probe.kay': '---\nimport { session } from \'./store\'\nconst s = session()\n---\nbutton(onClick={() => s.submit()}) go\nif s.done()\n  p.yes done\nelse\n  p.no waiting\n',
     'src/probe.test.ts': 'import { GlobalRegistrator } from \'@happy-dom/global-registrator\'\nimport { afterAll, beforeAll, expect, it } from \'bun:test\'\nimport { mountComponent, settle } from \'kay/test\'\nimport Probe from \'./probe.kay\'\n\nbeforeAll(() => GlobalRegistrator.register())\nafterAll(() => GlobalRegistrator.unregister())\n\nit(\'re-renders after a store signal changes\', async () => {\n  const { root } = await mountComponent(Probe)\n\n  expect(root.querySelector(\'.no\')).not.toBeNull()\n  root.querySelector(\'button\')!.click()\n  await settle()\n  expect(root.querySelector(\'.yes\')).not.toBeNull()\n})\n',

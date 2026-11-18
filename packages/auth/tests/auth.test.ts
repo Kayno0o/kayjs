@@ -574,8 +574,8 @@ function guardContext({ locals, path = '/', method = 'GET', headers = {} }: { lo
     redirect: (location: string) => {
       throw new Error(`redirect ${location}`)
     },
-    deny: (status = 403) => {
-      throw new Error(`deny ${status}`)
+    deny: (status?: number) => {
+      throw new Error(`deny ${status ?? 403}`)
     },
   } as GuardContext
 }

@@ -13,7 +13,7 @@ export const named = action({ tool: { name: 'Say-Hello', description: 'Says hell
 
 export const bare = action({ tool: true }, () => 'bare')
 
-export const refuses = action({ input: t.Object({}), tool: true }, (_input, ctx) => ctx.fail(409, { reason: 'full' }))
+export const refuses = action({ input: t.Object({}), tool: true }, (_input, ctx) => ctx.deny(409, { data: { reason: 'full' } }))
 
 export const sendsAway = action({ input: t.Object({}), tool: true }, (_input, ctx) => ctx.redirect('/done'))
 

@@ -7,10 +7,10 @@ export const add = action(t.Object({ title: t.String({ maxLength: 200, minLength
   await Bun.sleep(200)
 
   if (title === 'taken')
-    return ctx.fail(409, { message: 'Already taken' })
+    return ctx.deny(409, { data: { message: 'Already taken' } })
 
   if (title === 'busy')
-    return ctx.fail(503, 'Try later')
+    return ctx.deny(503, { message: 'Try later' })
 
   store.titles.push(title)
 

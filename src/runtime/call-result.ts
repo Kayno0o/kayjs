@@ -7,7 +7,7 @@ import { ownSignal, untrack } from './reactive'
 // The mark a call's result carries (not enumerable), so a reader tells it from an answer shaped like one, such as an entry write's `{ ok: false, error, issues }`: `unwrapped` of kayjs-ui looks for it by name, and `CallResult` names it as an optional key, which is how a type tells a result from such an answer.
 const RESULT: unique symbol = Symbol.for('kay.call-result')
 
-// How a tracked call went, for an action and for a route alike: what it answered, or the refusal. `message` is the text to show; `errors` holds a message per field, the form-wide one under ''; `data` is what the handler passed to `ctx.fail` for an action, the answer a route refused with for a route.
+// How a tracked call went, for an action and for a route alike: what it answered, or the refusal. `message` is the text to show; `errors` holds a message per field, the form-wide one under ''; `data` is what the handler passed to `ctx.deny` for an action, the answer a route refused with for a route.
 // A refusal carries them twice, flat on the result and as its `error`, the one place every other result keeps its failure: the `ApiError` itself (an `ActionError` for an action), so `orThrow()` and a `throw result.error` throw what the call threw.
 export type CallResult<Data, Failed>
   = | { ok: true, data: Data, error?: undefined, readonly [RESULT]?: true }

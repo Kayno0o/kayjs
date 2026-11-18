@@ -16,7 +16,7 @@ async function site(files: Record<string, string>) {
 
   await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(dir, path), content)))
 
-  const app = await pages({ dirs: { routes: dir }, prebuilt: false, security: false, requireGuards: false })
+  const app = await pages({ dirs: { routes: dir }, prebuilt: false, security: false, guards: { default: 'open' } })
 
   return async (path: string) => {
     const response = await app.handle(new Request(`http://localhost${path}`))

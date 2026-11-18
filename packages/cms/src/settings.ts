@@ -197,7 +197,7 @@ export interface CmsOptions {
   afterSave?: Hook<SaveEvent> | undefined
   /** @deprecated Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
   onSave?: Hook<SaveEvent> | undefined
-  // Runs before every save, publish, unpublish, duplicate, restore, deletion and rename, after the role and `can` checks (and `fourEyes` for an approval) and before the entry is checked against its schema, so what it changes is checked. Returns nothing, `{ data, body }` to write instead, `false` or throws `refuse(message, { errors })` to refuse: the entry form shows it as it shows a schema refusal, the API answers `error.status` 403 or 422. A throw of any other kind refuses with 500 and is reported with source `cms.beforeSave`.
+  // Runs before every save, publish, unpublish, duplicate, restore, deletion and rename, after the role and `can` checks (and `fourEyes` for an approval) and before the entry is checked against its schema, so what it changes is checked. Returns nothing, `{ data, body }` to write instead, `false` or throws `refuse(422, { message, errors })` to refuse: the entry form shows it as it shows a schema refusal, the API answers `error.status` 403 or 422. A throw of any other kind refuses with 500 and is reported with source `cms.beforeSave`.
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
   // Runs on each file an editor sends, once its size and type are accepted, to scan it, resize it or rename it: returns nothing, `{ bytes, name, type }` to store that instead (checked against `uploads` and `maxSize` again), or refuses as `beforeSave` does, with the status as the answer.
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined

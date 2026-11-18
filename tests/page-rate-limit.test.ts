@@ -49,7 +49,7 @@ beforeAll(async () => {
   dir = await scratchDir('page-rate-limit-')
   await Promise.all(Object.entries(FILES).map(async ([name, text]) => Bun.write(join(dir, name), text)))
 
-  const base = { root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, requireGuards: false, observe: { log: false } } as const
+  const base = { root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, guards: { default: 'open' }, observe: { log: false } } as const
 
   apps.plain = await pages(base)
   apps.mounted = await pages({ ...base, base: '/blog', trailingSlash: 'always' })
@@ -181,7 +181,7 @@ describe('the counter of a page', () => {
     await Bun.write(join(root, 'routes/index.kay'), 'h1 Home\n')
     await Bun.write(join(root, 'routes/bad/_layout.kay'), FENCE(LIMIT(0), 'slot'))
     await Bun.write(join(root, 'routes/bad/page.kay'), 'h1 Page\n')
-    await expect(pages({ root, dirs: { routes: 'routes' }, prebuilt: false, security: false, requireGuards: false, observe: { log: false } })).rejects.toThrow('max')
+    await expect(pages({ root, dirs: { routes: 'routes' }, prebuilt: false, security: false, guards: { default: 'open' }, observe: { log: false } })).rejects.toThrow('max')
     await rm(root, { recursive: true, force: true })
   })
 
@@ -210,7 +210,7 @@ describe('a prerendered page with a rateLimit', () => {
     root = await scratchDir('page-rate-prerendered-')
     await Promise.all(Object.entries({
       'tsconfig.json': '{}',
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, requireGuards: false })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, guards: { default: \'open\' } })\n',
       'src/routes/index.kay': 'h1 Home\n',
       'src/routes/fixed.kay': FENCE(`{ prerender: true, rateLimit: { max: 1, window: '1m' } }`, 'h1 Fixed'),
     }).map(async ([name, text]) => Bun.write(join(root, name), text)))
@@ -225,7 +225,7 @@ describe('a prerendered page with a rateLimit', () => {
     expect(`${report}${output}`).toContain('sets `rateLimit` and is prerendered')
     expect(await Bun.file(join(outputDir(root), 'manifest.json')).text()).toContain('/fixed')
 
-    const app = await pages({ root, prebuilt: true, security: false, requireGuards: false, observe: { log: false } })
+    const app = await pages({ root, prebuilt: true, security: false, guards: { default: 'open' }, observe: { log: false } })
     const ip = { 'x-forwarded-for': '10.7.7.7' }
     const first = await get(app, '/fixed', ip)
     const second = await get(app, '/fixed', ip)
@@ -263,7 +263,7 @@ describe('the store of a page\'s limit', () => {
         return { count: weight, resetAt: Date.now() + windowMs }
       },
     }
-    const app = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, requireGuards: false, observe: { log: false }, store: { rates } })
+    const app = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, guards: { default: 'open' }, observe: { log: false }, store: { rates } })
 
     expect((await get(app, '/plain/search')).status).toBe(200)
     expect(keys.some(key => key.startsWith('/plain/search\n'))).toBe(true)

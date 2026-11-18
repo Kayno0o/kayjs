@@ -28,7 +28,7 @@
 
 ### Refused posts
 
-- `ctx.deny(status, { message, errors, data })` is the one refusal of a guard, a page, an action and an endpoint, `refuse(status, { ... })` throws it from anywhere; `return` it so `form.failed()` types `data`. `ctx.fail` is its old spelling until 1.108 (`unreturned-fail`).
+- `ctx.deny(status, { message, errors, data })` is the one refusal of a guard, a page, an action and an endpoint, `refuse(status, { ... })` throws it from anywhere; `return` it so `form.failed()` types `data`.
 - A post the schema refuses, or whose handler denies with `ctx.deny(status, { data })`, is answered with the page it came from, rendered with the failure's status, rather than with a redirect.
 - There `add.form.failed()` returns `{ status, message, values, errors, data }`, typed from the action, or `undefined`.
 - `values` is what the form posted (fields named like a password left out).
@@ -50,7 +50,7 @@
 
 ### Reading the outcome
 
-- `add.form.failed()`, `add.data()`, `add.status()` and `add.form.error('title')` read the outcome from any template, layout, component or island, and from the server fence. What a form shows is read from `add.form` (`failed()`, `error(field)`, `validate(form, field)`), apart from the call state on `add` itself (`pending()`, `status()`, `data()`, `progress()`, `settled()`, `track()`); `failed()`, `error()` and `validate()` on `add` work until 1.108 and `deprecated-action-readers` rewrites them.
+- `add.form.failed()`, `add.data()`, `add.status()` and `add.form.error('title')` read the outcome from any template, layout, component or island, and from the server fence. What a form shows is read from `add.form` (`failed()`, `error(field)`, `validate(form, field)`), apart from the call state on `add` itself (`pending()`, `status()`, `data()`, `progress()`, `settled()`, `track()`); `failed()`, `error()` and `validate()` on `add` itself are gone since 1.109.
 - `form.error()` without a field is the form-wide message, `errors['']`.
 - The field name is typed from the schema.
 - An island reads them in the browser too, as its server render did, but for `values`, which stay on the server, so no field the server cannot tell is a secret reaches the page's source: the fields hold what was sent.

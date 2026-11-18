@@ -11,7 +11,7 @@ export const save = action({ input: t.Object({
   news: t.Boolean(),
   terms: t.Optional(t.Boolean()),
   website: t.Optional(t.String({ maxLength: 200 })),
-}), protect: { honeypot: 'website' } }, (_input, ctx) => ctx.fail(409, { message: 'Taken' }))
+}), protect: { honeypot: 'website' } }, (_input, ctx) => ctx.deny(409, { data: { message: 'Taken' } }))
 
 export const ping = action(t.Object({}), () => 'Saved')
 
@@ -26,16 +26,16 @@ export const bump = action(t.Object({}), () => ++tally.count)
 export const busy = action(t.Object({
   topic: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
   note: t.Optional(t.String({ maxLength: 3, error: 'Too long' })),
-}), (_input, ctx) => ctx.fail(503, 'Try later'))
+}), (_input, ctx) => ctx.deny(503, { message: 'Try later' }))
 
 export const enrol = action(t.Object({
   title: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
   email: t.String({ format: 'email', maxLength: 200 }),
   age: t.Optional(t.Numeric({ minimum: 1, maximum: 120 })),
   agree: t.Boolean(),
-}), (_input, ctx) => ctx.fail(409, 'Full'))
+}), (_input, ctx) => ctx.deny(409, { message: 'Full' }))
 
-export const odd = action(t.Object({}), (_input, ctx) => ctx.fail(409, { retry: () => 'later' }))
+export const odd = action(t.Object({}), (_input, ctx) => ctx.deny(409, { data: { retry: () => 'later' } }))
 
 const tally = { count: 0 }
 const refusedWith = save.form.failed()?.status

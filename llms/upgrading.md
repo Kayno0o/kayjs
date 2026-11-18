@@ -17,6 +17,33 @@ The `deprecated-page-island`, `deprecated-island-fence`, `deprecated-island-attr
 - Import `mount`, `Mounted`, `s`, `RateLimit` and `RateLimitRefusal` from `kay` and `sqliteCache` from `kay/cache`: `kay/mount` is no entry any more and `kay/server` no longer exports them.
 - `defineContext` is imported from `kay/server`: `kay/library` no longer exports it.
 - `children?: Snippet` beside a bare `slot` and `listen(() => document, 'kay:navigate', ...)` in an island are reported no more: both still work, and the function hook is the form to write.
+### An action's form readers are only under `form`
+
+`add.failed()`, `add.error(field)` and `add.validate(form, field)` are gone from an action: write `add.form.failed()`, `add.form.error(field)` and `add.form.validate(form, field)`, which the 1.105 upgrade had already moved to. The `deprecated-action-readers` lint is gone with them, and `.error('field')` on an action in a template no longer describes its field.
+
+### `Action<never, unknown>` is `Action`
+
+Write `Action` for a prop that takes any action: both parameters default to it. The `deprecated-action-type` lint is gone.
+
+### An island's call answers only a result
+
+A call read as its data (`const list = await call(notes, '/')` then `list.items`) is a type error, as the 1.105 call result made it; write `.orThrow()` after the call, or read `ok` and `data`. The `deprecated-call-result` lint that found it is gone.
+
+### A callback of a library component takes only the event object
+
+`onChange={toggle}` with `toggle(on: boolean)` is a type error on a kayjs component: write `onChange={event => toggle(event.checked)}`, `{ value }` or `{ files }` for the others. The `deprecated-callback-handler` lint is gone.
+
+### A refusal is only `ctx.deny(status, { message, errors, data })`
+
+`deny(403, 'text')` and `deny(403, 'text', data)` take a status and options only, `ctx.fail(...)` is gone, and `refuse('text', { status })` is `refuse(status, { message })`: write `ctx.deny(status, { message, errors, data })`. `RefuseOptions` is no longer exported from `kay/library`. The `deprecated-deny-call`, `deprecated-ctx-fail` and `deprecated-refuse-call` lints are gone, and with them the `unreturned-fail` lint of a `ctx.fail` left unreturned.
+
+### `guard` and `requireGuards` are `guards`
+
+`vitals({ guard })`, `jobs: { guard }` and `images: { guard }` are `guards`, and `requireGuards: true` (in kay.config.ts, `pages()` and `testSite`) is `guards: { default: 'closed' }`, `false` `guards: { default: 'open' }`. `VitalsOptions.guard`, `KayConfig.requireGuards` and `PagesOptions.requireGuards` are gone, and so is the `deprecated-guard-option` lint.
+
+### `limit.enforce(ctx)` is `limit.check(ctx)`
+
+`rateLimit()`'s `enforce(ctx, message?)` is gone: write `check(ctx, message?)`; `limiter().enforce(key)` keeps its name. The `deprecated-rate-enforce` lint is gone.
 
 ## 1.108.0
 
@@ -71,15 +98,15 @@ Every group lists with `list`, reads with `get`, writes with `create` and `updat
 
 ### An island's call answers a result
 
-`await add(input)` and `await call(api, '/path')` from an island resolved with the data and threw `ActionError` or `ApiError` for a refusal. They resolve `{ ok: true, data }` or `{ ok: false, status, message, errors, data, error }` now, and throw for no visitor's mistake: a refusal, a handler that threw, a network failure and a timeout (status 0) are results; an abort and a redirect still reject. `kay check` reports where the old result is used as the data (`deprecated-call-result`, `deny`): `kay check --fix` writes `.orThrow()` after a call written on an imported name whose answer nothing reads `ok`, `data` or `error` of, and offers it otherwise. Write `const { ok, data } = await add(input)`, or append `.orThrow()` to keep the throwing style: `const id = await add(input).orThrow()` resolves the data and throws what the call threw (an `ActionError`, or an `ApiError` of status 0 for a call with no answer). A `try` around a call whose `catch` shows the refusal now never runs: read `result.error`, `result.message` or `add.form.error('field')`. A call awaited with its result left out (`await add(input)` in a `try` to know it failed) needs `.orThrow()` or a look at `result.ok`. `track()` handles answer the same, a call with no answer included. A call awaited with its result left out has no read to find and stays by hand. kayjs-ui's `attempt` and `toast.promise` take a call's result as they took what it threw, and `site.call` of a test site is unchanged.
+`await add(input)` and `await call(api, '/path')` from an island resolved with the data and threw `ActionError` or `ApiError` for a refusal. They resolve `{ ok: true, data }` or `{ ok: false, status, message, errors, data, error }` now, and throw for no visitor's mistake: a refusal, a handler that threw, a network failure and a timeout (status 0) are results; an abort and a redirect still reject. The `deprecated-call-result` lint that reported the old use went in 1.109, so the type error on the result's field is what shows it. Write `const { ok, data } = await add(input)`, or append `.orThrow()` to keep the throwing style: `const id = await add(input).orThrow()` resolves the data and throws what the call threw (an `ActionError`, or an `ApiError` of status 0 for a call with no answer). A `try` around a call whose `catch` shows the refusal now never runs: read `result.error`, `result.message` or `add.form.error('field')`. A call awaited with its result left out (`await add(input)` in a `try` to know it failed) needs `.orThrow()` or a look at `result.ok`. `track()` handles answer the same, a call with no answer included. A call awaited with its result left out has no read to find and stays by hand. kayjs-ui's `attempt` and `toast.promise` take a call's result as they took what it threw, and `site.call` of a test site is unchanged.
 
 ### A callback of a library component takes one event object
 
-A function handed by name to a callback of a kayjs-ui, kayjs-ai or kayjs-cms component (`onValueChange={query.set}`, `onChange={toggle}` with `toggle(on: boolean)`, `onFiles={upload}`) was called with the value and now gets `{ value }`, `{ checked }` or `{ files }`, so it fails the type check, and would be handed the event where it took the value. `deprecated-callback-handler` (`deny`) names it: `kay check --fix` writes `onChange={event => toggle(event.checked)}`, passing the fields the handler took, first ones first. A handler whose parameter is typed as an object is rewritten by an unsafe fix, which `kay upgrade` leaves to you, as it may take the event already; an arrow function is reported with no fix.
+A function handed by name to a callback of a kayjs-ui, kayjs-ai or kayjs-cms component (`onValueChange={query.set}`, `onChange={toggle}` with `toggle(on: boolean)`, `onFiles={upload}`) was called with the value and now gets `{ value }`, `{ checked }` or `{ files }`, so it fails the type check, and would be handed the event where it took the value. The `deprecated-callback-handler` lint that named it went in 1.109: write `onChange={event => toggle(event.checked)}` yourself, passing the fields the handler took.
 
 ### An action's form readers sit under `form`
 
-`add.failed()`, `add.error(field)` and `add.validate(form, field)` are `add.form.failed()`, `add.form.error(field)` and `add.form.validate(form, field)`: what a form shows is read apart from the call state (`pending()`, `status()`, `data()`, `track()`) the action keeps, and a `track()` handle's own `error()` (an `ApiError`) no longer shares a name with the field message. The old names work until 1.108, `deprecated-action-readers` warns and `kay upgrade` rewrites them on an action the file declares with `action()` or imports in lowercase from a `.kay` file; an action reached through a prop (`props<{ action: Action }>()`) is written by hand.
+`add.failed()`, `add.error(field)` and `add.validate(form, field)` are `add.form.failed()`, `add.form.error(field)` and `add.form.validate(form, field)`: what a form shows is read apart from the call state (`pending()`, `status()`, `data()`, `track()`) the action keeps, and a `track()` handle's own `error()` (an `ApiError`) no longer shares a name with the field message. The old names went in 1.109 with the `deprecated-action-readers` lint.
 
 ### An auth call answers one `Result`, and a rejection's `errors` are strings
 
@@ -87,7 +114,7 @@ kayjs-auth's sixty `*Result` aliases (`PasswordSignInResult`, `RevokeTokenResult
 
 ### A refusal is one call
 
-`ctx.deny(status, { message, errors, data })` refuses in a guard, a page, an action and an endpoint, and `refuse(status, { message, errors, data })` throws the same from anywhere; `deprecated-deny-call`, `deprecated-ctx-fail` and `deprecated-refuse-call` (`kay check --fix`) rewrite `deny(403, 'text', data)`, `return ctx.fail(status, data, errors)` and `refuse('text', { status, errors, data })`, which work until 1.108. In an action, `ctx.deny(status, { message, data, errors })` fails the post as `ctx.fail` did (the page again with the message and the fields, an `ActionError` for a call), while a deny with no options stops with plain text as `deny(status, 'text')` did; a helper called in a handler with its `ctx`, such as a guard's or `limit.check(ctx)`, therefore fails the form with its message now; the fixer writes a `ctx.fail('text')` text as `message`. The argument checks of `webPush.send`, `rooms`, `signed` and notifications throw a `KayError` with code `argument-invalid`, not a `RangeError` or `TypeError`.
+`ctx.deny(status, { message, errors, data })` refuses in a guard, a page, an action and an endpoint, and `refuse(status, { message, errors, data })` throws the same from anywhere; `deny(403, 'text', data)`, `return ctx.fail(status, data, errors)` and `refuse('text', { status, errors, data })` went in 1.109 with the `deprecated-deny-call`, `deprecated-ctx-fail` and `deprecated-refuse-call` lints. In an action, `ctx.deny(status, { message, data, errors })` fails the post as `ctx.fail` did (the page again with the message and the fields, an `ActionError` for a call), while a deny with no options stops with plain text as `deny(status, 'text')` did; a helper called in a handler with its `ctx`, such as a guard's or `limit.check(ctx)`, therefore fails the form with its message now; a `ctx.fail('text')` text is the `message`. The argument checks of `webPush.send`, `rooms`, `signed` and notifications throw a `KayError` with code `argument-invalid`, not a `RangeError` or `TypeError`.
 
 ### A top-level `const` follows the prop or signal it reads
 

@@ -50,7 +50,7 @@ describe('KayPlugin', () => {
   })
 
   it('hands the Elysia instance behind pages()', async () => {
-    const served = await pages({ requireGuards: false, dirs: { routes: 'tests/fixtures/bare/src/routes' }, prebuilt: true, dev: true })
+    const served = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes' }, prebuilt: true, dev: true })
 
     expect(served.elysia).toBe(served)
     expect(Object.keys(served)).not.toContain('elysia')

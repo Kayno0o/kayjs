@@ -38,7 +38,7 @@ const app = await pages({
   prebuilt: false,
   images: {
     dirs: { '/uploads/': uploads },
-    guard: (ctx) => {
+    guards: (ctx) => {
       if (ctx.cookies.get('user') === null)
         ctx.deny(401, { message: 'Sign in' })
 
@@ -250,7 +250,7 @@ describe('images.resolve and images.guard', () => {
       root: 'tests/fixtures/images',
       prebuilt: false,
       images: {
-        guard: (ctx) => {
+        guards: (ctx) => {
           if ((ctx.locals as { user?: string }).user !== 'ada' || ctx.cookies.get('theme') !== 'dark')
             ctx.deny(401)
 
@@ -278,7 +278,7 @@ describe('images.resolve and images.guard', () => {
   })
 
   it('runs a list of image guards in order', async () => {
-    const listed = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { resolve: () => HERO, guard: [(ctx) => {
+    const listed = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { resolve: () => HERO, guards: [(ctx) => {
       ctx.headers.set('x-first', 'yes')
     }, (ctx) => {
       if (ctx.cookies.get('user') === null)
@@ -327,7 +327,7 @@ describe('images.resolve and images.guard', () => {
   })
 
   it('refuses a guard with no resolve, and a static export, which has no route to resolve on', async () => {
-    await expect(applyImageConfig({ guard: () => undefined })).rejects.toThrow('images.resolve is not set')
+    await expect(applyImageConfig({ guards: () => undefined })).rejects.toThrow('images.resolve is not set')
     expect(() => refuseStaticConfig({ assets: { images: { resolve: () => undefined } } })).toThrow('no image route')
   })
 

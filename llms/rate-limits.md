@@ -67,7 +67,7 @@ The object `rateLimit()` returns is a limit: give it to `protect: { rateLimit: v
 ### On an action
 
 - `rateLimit` lets one client post `max` times every `window`, then answers 429 with `Retry-After` and `errors['']` saying when to retry.
-- It counts every attempt, valid or not, unless it says `count: 'succeeded'`: then only the posts whose handler returned without `ctx.fail`, an error or a refusal count, so typos and a mail server failing lock no one out, a redirect from the handler counting as gone through.
+- It counts every attempt, valid or not, unless it says `count: 'succeeded'`: then only the posts whose handler returned without `ctx.deny`, an error or a refusal count, so typos and a mail server failing lock no one out, a redirect from the handler counting as gone through.
 - Posts arriving together all read the count before any adds to it, so a burst may pass `max` by a few.
 - Several limits all apply, each counting every attempt it is meant to count whichever refuses it, the longest wait the one told: `rateLimit: [{ max: 30, window: '10m' }, { max: 5, window: '10m', count: 'succeeded' }]` slows a script hammering the form and lets five messages through, each limit counting under its place in the list.
 - The client is the address the request came from, or the one the proxies in front passed on once `proxy` says how to read it (see [Behind a proxy](proxy-and-security.md#behind-a-proxy)).
@@ -91,7 +91,7 @@ The object `rateLimit()` returns is a limit: give it to `protect: { rateLimit: v
 ### Outside an action
 
 - A guard, an API route or a library limits attempts the same way with `rateLimit(name, { max, window, store })` from `kay/server`: `await limit.hit(request)` counts one from the request's client and gives the seconds to wait once over the limit, else `undefined`.
-- `limiter().enforce(key, weight?)` counts under a key and answers the seconds to wait, refusing nothing; `rateLimit().check(ctx, message?)` is the guard's call, which refuses (`rateLimit().enforce(ctx)` was its name until 1.105, `deprecated-rate-enforce`).
+- `limiter().enforce(key, weight?)` counts under a key and answers the seconds to wait, refusing nothing; `rateLimit().check(ctx, message?)` is the guard's call, which refuses.
 - `await limit.check(ctx, message?)` takes a guard's `ctx`, counts under the limit's `key` or the client's address, and past the limit sets `Retry-After` and calls `ctx.deny(429, message)`, `message` a text or a function of the seconds to wait.
 - `onLimit(refusal)` on a limit (`RateLimitRefusal`: `name`, the key counted, `wait` in seconds, `request` when there is one) runs for each request an action, a page, an API route, `check` or `hit` refused, beside the answer, which never waits for it; one that throws or rejects is logged. A limit object from `rateLimit()` shared with an action reports the action's URL as `name`.
 - `await limit.count(request)` counts as `hit` does and gives the window, `{ count, resetAt, wait }`, `wait` the seconds to wait once over `max`, else `undefined`: for an app that shows the count or decides itself.

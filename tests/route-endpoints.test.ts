@@ -47,7 +47,7 @@ describe('endpoints in the config', () => {
 
 describe('the MCP path', () => {
   it('is /_kay/mcp, and /mcp answers in place with the query', async () => {
-    const site = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false })
+    const site = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, mcp: true, islands: false })
     const ok = await site.fetch('/_kay/mcp', post)
     const old = await site.fetch('/mcp?x=1', { ...post, redirect: 'manual' })
 
@@ -58,7 +58,7 @@ describe('the MCP path', () => {
   })
 
   it('answers /mcp in place under a base', async () => {
-    const site = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, base: '/shop' })
+    const site = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, mcp: true, islands: false, base: '/shop' })
     const old = await site.fetch('/mcp', { ...post, redirect: 'manual' })
 
     expect(old.status).toBe(200)
@@ -66,11 +66,11 @@ describe('the MCP path', () => {
   })
 
   it('refuses endpoints.mcp set to the default path, so no app pins it and keeps /mcp', async () => {
-    await expect(testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, endpoints: { mcp: '/_kay/mcp' } })).rejects.toThrow('under /_kay')
+    await expect(testSite({ guards: { default: 'open' }, dirs: { routes, api }, mcp: true, islands: false, endpoints: { mcp: '/_kay/mcp' } })).rejects.toThrow('under /_kay')
   })
 
   it('moves to endpoints.mcp, leaving /mcp unserved', async () => {
-    const site = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, endpoints: { mcp: '/tools' } })
+    const site = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, mcp: true, islands: false, endpoints: { mcp: '/tools' } })
 
     expect((await site.fetch('/mcp', { method: 'POST', body: '{}' })).status).toBe(404)
     expect((await site.fetch('/tools', { method: 'GET' })).status).toBe(405)

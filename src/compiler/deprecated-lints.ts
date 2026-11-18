@@ -3,7 +3,6 @@ import { AUTH_LINTS } from './deprecated-auth-lints'
 import { SOURCE_READERS } from './deprecated-lints-1-105'
 import { SCHEMA_BUILDERS } from './deprecated-lints-1-106'
 import { ACTION_OPTIONS } from './deprecated-lints-1-107'
-import { TYPED_DEPRECATIONS } from './deprecated-typed-lints'
 
 // The lints of the `deprecated` group, with the other lints in `LINTS`; each stays three minors from its `since`.
 export const DEPRECATED_LINTS = {
@@ -78,7 +77,6 @@ export const DEPRECATED_LINTS = {
     right: '---\nimport SignedIn from \'@kayjs/auth/components/signed-in.kay\'\n---\nSignedIn(require="admin")\n  a(href="/admin") Admin',
   },
   ...AUTH_LINTS,
-  ...TYPED_DEPRECATIONS,
   'deprecated-ui-callbacks': {
     level: 'warn',
     group: 'deprecated',
@@ -342,51 +340,6 @@ export const DEPRECATED_LINTS = {
     summary: 'A ttl of `kv(namespace).set(key, value, ttl)` and `.once(key, ttl)` written as milliseconds, a `Duration` since 1.105 as every length a store takes: a `RateStore`\'s window, a `KvStore`\'s ttl, a `SessionStore`\'s max age and a `LiveStore`\'s `endAll` ttl, which a store declares with `durations: true` (one without it keeps receiving milliseconds until 1.108). Found on a call chained to `kv(...)` from `kay/server` or `kay/library`, or on a name bound to it in the same file, with a number written as a literal or as arithmetic of literals; a number held in a variable is a type error in the editor, and a store of your own is changed by hand. The fix writes the value in milliseconds, `\'60000ms\'`.',
     wrong: '---\nimport { kv } from \'kay/server\'\n\nconst first = await kv(\'sweep\').once(\'nightly\', 60_000)\n---\np {String(first)}',
     right: '---\nimport { kv } from \'kay/server\'\n\nconst first = await kv(\'sweep\').once(\'nightly\', \'60000ms\')\n---\np {String(first)}',
-  },
-  'deprecated-guard-option': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.105',
-    site: true,
-    summary: '`guard` in the options of `vitals()` and in the `jobs` and `images` of kay.config.ts, `guards` since 1.105: every guard option is named `guards` and takes a guard, a list of guards, `{ load }` returning one, or `false`, as a page\'s and an API module\'s do; and `requireGuards` of kay.config.ts, `guards: { default: \'closed\' }` for `true` and `\'open\'` for `false`. The old forms work until 1.108. Found in the options written in the call of `vitals` imported from `kay/server` and in the object kay.config.ts exports, in the TypeScript files and `.kay` files of the project. The fix renames the key; one beside a `guards` is reported with no fix.',
-    wrong: '// kay.config.ts\nexport default { jobs: { guard: ctx => ctx.deny(401) } }',
-    right: '// kay.config.ts\nexport default { jobs: { guards: ctx => ctx.deny(401) } }',
-  },
-  'deprecated-rate-enforce': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.105',
-    site: true,
-    summary: '`enforce(ctx)` on what `rateLimit()` returns, `check(ctx)` since 1.105: `limiter().enforce(key)` counts under a key and refuses nothing, so one name held two jobs, and `check` is the guard\'s call that refuses with a 429. `count(from)` now gives the window, `{ count, resetAt, wait }`, beside `hit`. The old name works until 1.108. Found on a name bound once to a call of `rateLimit` imported from `kay/server`, in the TypeScript files and `.kay` files of the project, as `kay check` reads no types: a limit reached through a property, a parameter or another file is not found. The fix renames the method.',
-    wrong: 'import { guard } from \'kay\'\nimport { rateLimit } from \'kay/server\'\n\nconst visits = rateLimit(\'account\', { max: 60, window: \'1m\' })\n\nexport default guard(async (ctx) => {\n  await visits.enforce(ctx)\n})',
-    right: 'import { guard } from \'kay\'\nimport { rateLimit } from \'kay/server\'\n\nconst visits = rateLimit(\'account\', { max: 60, window: \'1m\' })\n\nexport default guard(async (ctx) => {\n  await visits.check(ctx)\n})',
-  },
-  'deprecated-deny-call': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.105',
-    site: true,
-    summary: '`deny(status, \'message\', data)` of a guard, a page, an action and an endpoint, `deny(status, { message, errors, data })` since 1.105: a refusal takes one object in every place, as `refuse(status, { message, errors, data })` does, so `errors` puts a message on a field and the text is no longer an argument beside the data. An action answers `deny(status, { message, data, errors })` as `ctx.fail` did, the page again or an `ActionError`, so its text form, which stopped with plain text, becomes the form\'s message after the fix. The text form works until 1.108. Found on a call of `deny`, bare or read off a name, with a literal status from 400 to 599 and a text second argument, in the TypeScript files and `.kay` files of the project. The fix writes the object, unless a comment sits between the arguments or a `data` is given, which an action answers as a failure, not plain text.',
-    wrong: '// src/routes/_guard.ts\nimport { guard } from \'kay\'\n\nexport default guard(({ deny }) => {\n  deny(403, \'Members only\')\n})',
-    right: '// src/routes/_guard.ts\nimport { guard } from \'kay\'\n\nexport default guard(({ deny }) => {\n  deny(403, { message: \'Members only\' })\n})',
-  },
-  'deprecated-ctx-fail': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.105',
-    site: true,
-    summary: '`ctx.fail(status, data, errors)` of an action, `ctx.deny(status, { data, errors })` since 1.105: an action refuses as a guard and a page do, with one call and one shape, and `deny` throws, so a statement ends the handler as well and `unreturned-fail` has nothing left to report. A text `data` is the `message`: `ctx.fail(409, \'Taken\')` is `ctx.deny(409, { message: \'Taken\' })`, and `failed()?.data` no longer holds it. `ctx.fail` works until 1.108. Found on `ctx.fail` of an action handler\'s `ctx`, in the TypeScript files and `.kay` files of the project. The fix is made where the call is returned (`return ctx.fail(...)`, a branch of a conditional or an arrow\'s body), since a call that was not returned did nothing and `deny` would now stop; the others are reported with no fix.',
-    wrong: '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({ name: s.String() }), (input, ctx) => {\n  return ctx.fail(409, { taken: true }, { name: \'Already taken\' })\n})\n---\np x',
-    right: '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({ name: s.String() }), (input, ctx) => {\n  return ctx.deny(409, { data: { taken: true }, errors: { name: \'Already taken\' } })\n})\n---\np x',
-  },
-  'deprecated-refuse-call': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.105',
-    site: true,
-    summary: '`refuse(message, { status, errors, data })`, `refuse(status, { message, errors, data })` since 1.105: the status leads and the rest is the one object `ctx.deny` takes. The old form works until 1.108. Found on a call of `refuse` imported from `kay` or `kay/library` whose first argument is a text, in the TypeScript files and `.kay` files of the project. The fix writes the status (the 403 or 422 the old call chose, when `errors` names fields written in the call) and the object; options that are not an object written in the call, or an `errors` that is not, are reported with no fix.',
-    wrong: '// src/hooks.ts\nimport { refuse } from \'kay\'\n\nexport function beforeSave(): never {\n  refuse(\'A summary is needed\', { errors: { summary: \'required\' } })\n}',
-    right: '// src/hooks.ts\nimport { refuse } from \'kay\'\n\nexport function beforeSave(): never {\n  refuse(422, { message: \'A summary is needed\', errors: { summary: \'required\' } })\n}',
   },
   'deprecated-auth-rate-limits': {
     level: 'warn',

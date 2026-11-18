@@ -50,7 +50,7 @@ const { message, details, onConfirm, open, onOpenChange, failureLabel, success, 
 
   // Toasted once `onConfirm` went through.
   success?: string | undefined
-  // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: toasted in place of `failureLabel`, which stays for an answer of undefined or another error.
+  // What a refusal of the action's handler says, from the data it passed to `ctx.deny`: toasted in place of `failureLabel`, which stays for an answer of undefined or another error.
   refused?: ((data: Data) => string | undefined) | undefined
   // `neutral` for a confirm that is not a deletion, such as a save with a consequence: accent buttons, a check icon, and every word taken from `label` unless given.
   tone?: Tone | undefined

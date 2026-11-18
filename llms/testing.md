@@ -212,7 +212,7 @@ it('shows why a todo was refused', async () => {
 - `{ from: '/orgs/acme' }` names the page a call is made on, for an action reading its params.
 - `site.call` resolves with the action's result, throws `ActionError` when it fails and `ActionRedirectError` with `location` when it redirects, the path under the site's `base` when it has one.
 - A handler returning an async iterable gives every value once its stream ended, `[1, 2, 3]`, and throws when the stream failed.
-- `site.expectRefused(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler and `message` the `ctx.fail` text or the schema's messages, and fails the test when the call went through.
+- `site.expectRefused(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler and `message` the refusal's text or the schema's messages, and fails the test when the call went through.
 - `await site.expectRefused(add, { title: '' })` reads `{ status: 422, errors: { title: 'Write a title' } }`.
 - `site.mcp.initialize()`, `site.mcp.tools()` and `site.mcp.call(name, args)` test an app's MCP endpoint: [MCP endpoint](mcp.md).
 

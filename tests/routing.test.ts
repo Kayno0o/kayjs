@@ -19,7 +19,7 @@ import { pages } from './shared-pages'
 const FIXTURE = 'tests/fixtures/routing'
 const routes = `${FIXTURE}/src/routes`
 const redirects: Redirects = { '/old/:slug': '/items/:slug', '/legacy/*': '/blog/*', '/temp': { to: '/about', status: 307 }, '/go/*': '/*', '/retired': { status: 410 }, '/retired-docs/*': { status: 410 } }
-const app = new Elysia().use(await pages({ requireGuards: false, dirs: { routes }, prebuilt: false, security: false, redirects }))
+const app = new Elysia().use(await pages({ guards: { default: 'open' }, dirs: { routes }, prebuilt: false, security: false, redirects }))
 
 async function get(path: string, served = app): Promise<{ status: number, html: string, location: string | null }> {
   const response = await served.handle(new Request(`http://localhost${path}`))
@@ -160,7 +160,7 @@ describe('redirects', () => {
     await expect(pages({ dirs: { routes }, prebuilt: false, redirects: { '/about': '/bare' } })).rejects.toThrow('the redirect from /about takes a path a page serves')
     await expect(pages({ dirs: { routes }, prebuilt: false, redirects: { '/docs/*': '/about' } })).rejects.toThrow('the redirect from /docs/* takes a path a page serves')
     // A param and a catch-all are two router paths, the param tried first.
-    const beside = new Elysia().use(await pages({ requireGuards: false, dirs: { routes }, prebuilt: false, security: false, redirects: { '/docs/:page': '/about' } }))
+    const beside = new Elysia().use(await pages({ guards: { default: 'open' }, dirs: { routes }, prebuilt: false, security: false, redirects: { '/docs/:page': '/about' } }))
 
     expect((await get('/docs/a', beside)).location).toBe('/about')
     expect((await get('/docs/a/b', beside)).html).toContain('Docs at a/b')
@@ -230,8 +230,8 @@ describe('localPath', () => {
 
 describe('trailing slashes', () => {
   it('redirect to the URL without one by default, to the one with always, and serve both with ignore', async () => {
-    const always = new Elysia().use(await pages({ requireGuards: false, dirs: { routes }, prebuilt: false, security: false, trailingSlash: 'always' }))
-    const ignore = new Elysia().use(await pages({ requireGuards: false, dirs: { routes }, prebuilt: false, security: false, trailingSlash: 'ignore' }))
+    const always = new Elysia().use(await pages({ guards: { default: 'open' }, dirs: { routes }, prebuilt: false, security: false, trailingSlash: 'always' }))
+    const ignore = new Elysia().use(await pages({ guards: { default: 'open' }, dirs: { routes }, prebuilt: false, security: false, trailingSlash: 'ignore' }))
 
     expect(await get('/about/?x=1')).toMatchObject({ status: 308, location: '/about?x=1' })
     expect(await get('/about', always)).toMatchObject({ status: 308, location: '/about/' })
@@ -243,7 +243,7 @@ describe('trailing slashes', () => {
   })
 
   it('write sitemap and canonical URLs as the setting has them', async () => {
-    const always = new Elysia().use(await pages({ requireGuards: false, dirs: { routes }, prebuilt: false, security: false, trailingSlash: 'always', site: 'https://x.example' }))
+    const always = new Elysia().use(await pages({ guards: { default: 'open' }, dirs: { routes }, prebuilt: false, security: false, trailingSlash: 'always', site: 'https://x.example' }))
 
     expect((await get('/sitemap.xml', always)).html).toContain('<loc>https://x.example/about/</loc>')
     expect((await get('/about/', always)).html).toContain('<link rel="canonical" href="https://x.example/about/">')
@@ -266,7 +266,7 @@ describe('prerendering', () => {
 describe('kay check', () => {
   it('types each param as its matcher returns, optional ones as possibly missing, and reports a redirect to nowhere', async () => {
     // The sitemap kay serves counts as served; nothing else on the fixture is reported.
-    const diagnostics = await check(FIXTURE, { requireGuards: false, redirects: { '/x': '/sitemap.xml', '/y': '/nowhere' } })
+    const diagnostics = await check(FIXTURE, { guards: { default: 'open' }, redirects: { '/x': '/sitemap.xml', '/y': '/nowhere' } })
 
     expect(diagnostics.map(diagnostic => diagnostic.message)).toEqual(['the redirect from /y goes to /nowhere, which nothing on the site serves'])
   })
@@ -279,7 +279,7 @@ describe('kay check', () => {
     redirectSet(db).add('/old-b', '/nowhere', undefined, { hosts: [], configured: {} })
     db.close()
 
-    const messages = (await check(copy, { requireGuards: false, redirects: { '/x': '/sitemap.xml' } })).map(diagnostic => diagnostic.message)
+    const messages = (await check(copy, { guards: { default: 'open' }, redirects: { '/x': '/sitemap.xml' } })).map(diagnostic => diagnostic.message)
 
     expect(messages).toEqual(['the redirect added while the site runs from /old-b goes to /nowhere, which nothing on the site serves'])
   })
@@ -291,7 +291,7 @@ describe('kay check', () => {
     try {
       await Bun.write(page, 'p x\n')
 
-      expect((await check(copy, { requireGuards: false })).map(({ file, message }) => ({ file: file.slice(file.indexOf(copy)), message }))).toEqual([{ file: page, message: 'names the matcher nothing, which is neither src/params/nothing.ts nor one kay ships: integer, slug, uuid' }])
+      expect((await check(copy, { guards: { default: 'open' } })).map(({ file, message }) => ({ file: file.slice(file.indexOf(copy)), message }))).toEqual([{ file: page, message: 'names the matcher nothing, which is neither src/params/nothing.ts nor one kay ships: integer, slug, uuid' }])
     }
     finally {
       await rm(copy, { recursive: true, force: true })

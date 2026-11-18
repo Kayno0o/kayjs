@@ -184,13 +184,6 @@ describe('the messages a refused form is described by', () => {
     expect(tsx).toContain('KayAttribute("aria-describedby", KayFormInvalid((add), "") ? "own-form" : undefined)')
   })
 
-  it('describes a field by the old spelling of the reader too, until 1.108', () => {
-    const { tsx } = compileKay('form(action={add})\n  input(name="title")\n  if add.error(\'title\') then message\n    p {message}\n', 'page.kay', { output: 'html' })
-
-    expect(tsx).toContain('KayFieldDescribed(KayFormInvalid((add), "title") ? "add-title-error" : undefined')
-    expect(tsx).toContain('<p id=\\"add-title-error\\">')
-  })
-
   it('tells a field whose message no element names that its template marks it refused, so a component around it writes no second aria-invalid', () => {
     const { tsx } = compileKay('form(action={add})\n  input(name="tag")\n', 'page.kay', { output: 'html' })
 

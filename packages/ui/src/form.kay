@@ -14,7 +14,7 @@ const { action, refused, saved, onSave, onError, onFocusOut, failureLabel, valid
   action: Action<never, Output>
   // Toasted when the call fails other than on a field.
   failureLabel?: string | undefined
-  // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failureLabel` is toasted.
+  // What a refusal of the action's handler says, from the data it passed to `ctx.deny`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failureLabel` is toasted.
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   // Checks the fields against the action's schema in the browser, as the server would, with the same messages shown on their FormField: `'submit'` when the form is sent, with nothing called while a field is refused, `'blur'` also each field as it loses focus; `false` (the default) leaves it to the server. Files and missing required fields are the server's.
   validate?: FormValidation

@@ -29,7 +29,7 @@ const components = {
 
 await Promise.all(Object.entries(components).map(async ([path, source]) => Bun.write(join(fixture, path), source)))
 const reported: unknown[] = []
-const site = await testSite({ requireGuards: false, root: fixture, locals: request => ({ user: request.headers.get('x-user') ?? undefined }), observe: { onError: ({ error }) => void reported.push(error) } })
+const site = await testSite({ guards: { default: 'open' }, root: fixture, locals: request => ({ user: request.headers.get('x-user') ?? undefined }), observe: { onError: ({ error }) => void reported.push(error) } })
 // Imported once the site is up: the modules it mounted, where their routes are served.
 const { default: chat } = await import(join(apiDir, 'chat.ts')) as typeof import('./fixtures/live/src/api/chat')
 const { default: secret } = await import(join(apiDir, 'private/index.ts')) as typeof import('./fixtures/live/src/api/private/index')
@@ -1218,7 +1218,7 @@ class UploadRequest {
 
 describe('kay check, API modules', () => {
   it('types an island\'s sockets and streams from the modules it imports', async () => {
-    expect(await check(fixture, { requireGuards: false })).toEqual([])
+    expect(await check(fixture, { guards: { default: 'open' } })).toEqual([])
   }, 60_000)
 
   it('checks links and redirects against the GET routes of the modules, under their mounts', async () => {
@@ -1237,7 +1237,7 @@ describe('kay check, API modules', () => {
     await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(project, path), content)))
 
     try {
-      expect((await check(project, { requireGuards: false })).map(d => [d.line, d.message.match(/serves ([^\s;"`]+)/)?.[1]])).toEqual([[7, '/api/files'], [8, '/api/nope/deeper']])
+      expect((await check(project, { guards: { default: 'open' } })).map(d => [d.line, d.message.match(/serves ([^\s;"`]+)/)?.[1]])).toEqual([[7, '/api/files'], [8, '/api/nope/deeper']])
     }
     finally {
       await rm(project, { recursive: true, force: true })
@@ -1884,7 +1884,7 @@ describe('site.api, default headers and socket.refused', () => {
   })
 
   it('sends default headers with every method, a call\'s own header winning in any case', async () => {
-    const named = await testSite({ requireGuards: false, root: fixture, locals: request => ({ user: request.headers.get('x-user') ?? undefined }), headers: { 'x-user': 'ada' }, observe: { onError: ({ error }) => void reported.push(error) } })
+    const named = await testSite({ guards: { default: 'open' }, root: fixture, locals: request => ({ user: request.headers.get('x-user') ?? undefined }), headers: { 'x-user': 'ada' }, observe: { onError: ({ error }) => void reported.push(error) } })
 
     try {
       expect(await (await named.fetch('/api/private/me')).json()).toEqual({ user: 'ada' })

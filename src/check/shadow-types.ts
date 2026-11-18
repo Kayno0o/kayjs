@@ -34,8 +34,6 @@ import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes,
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
 import { actionOptions } from './action-options'
-import { actionReaders } from './action-readers'
-import { actionType } from './action-type'
 import { aiLanguage } from './ai-language'
 import { appHooks } from './app-hooks'
 import { authMethods } from './auth-methods'
@@ -54,7 +52,6 @@ import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-typ
 import { formatDurationNumbers } from './format-duration'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 
-import { guardOptions } from './guard-options'
 import { unguardedRoutes, unguardedTools } from './guards'
 import { hookContext } from './hook-context'
 import { hookNames } from './hook-names'
@@ -74,8 +71,6 @@ import { navigateQuery, navigationHooks, persistedCall, persistedQuery } from '.
 import { unreadOpenSettings } from './open-settings'
 import { pagesOptions } from './pages-options'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
-import { rateEnforce } from './rate-enforce'
-import { refusalCalls } from './refusal-calls'
 import { removedUiTokens } from './removed-ui-tokens'
 import { routeKeys } from './route-keys'
 import { routeShadow, routeShadowPath } from './route-shadow'
@@ -193,9 +188,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
   async ({ root, options }) => sourceReaders(root, options),
-  async ({ root, options }) => actionReaders(root, options),
   async ({ root, options }) => liveApi(root, options),
-  async ({ root, options }) => actionType(root, options),
   async ({ root, options }) => socketFrames(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
 
@@ -218,7 +211,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => diskFilesCalls(root, options),
   async ({ root, options }) => storeNames(root, options),
   async ({ root, options }) => formatDurationNumbers(root, options),
-  async ({ root, options }) => guardOptions(root, options),
   async ({ root, options }) => configSwitches(root, options),
   async ({ root, options }) => imagesKeys(root, options),
   async ({ root, options }) => clientKeys(root, options),
@@ -231,8 +223,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => pagesOptions(root, options),
   async ({ root, options }) => ttlNames(root, options),
   async ({ root, options }) => storeMs(root, options),
-  async ({ root, options }) => rateEnforce(root, options),
-  async ({ root, options }) => refusalCalls(root, options),
   async ({ root, options }) => authRateLimits(root, options),
   async ({ root, options }) => authMethods(root, options),
   async ({ root, options }) => envFiles(root, options),

@@ -977,11 +977,11 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
     const typo = join(copy, 'src/routes/typo.kay')
 
     try {
-      expect(await check(copy, { requireGuards: false })).toEqual([])
+      expect(await check(copy, { guards: { default: 'open' } })).toEqual([])
 
       await Bun.write(typo, '---\nimport { send } from \'./contact.kay\'\nimport { enquire } from \'./enquiry.kay\'\n---\nform(action={send})\n  input(name="websit" aria-label="Website")\nform(action={enquire})\n  input(name="nectar" aria-label="Nectar")\n')
 
-      expect((await check(copy, { requireGuards: false })).map(diagnostic => diagnostic.line)).toEqual([6])
+      expect((await check(copy, { guards: { default: 'open' } })).map(diagnostic => diagnostic.line)).toEqual([6])
     }
     finally {
       await rm(copy, { recursive: true, force: true })

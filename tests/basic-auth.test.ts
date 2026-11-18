@@ -146,9 +146,9 @@ describe('basicAuth as a guard of a directory', () => {
       Bun.write(join(dir, 'api/track/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().post(\'/\', () => \'stored\')\n'),
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'open\')\n'),
     ])
-    plain = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
-    mounted = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, base: '/blog', trailingSlash: 'always' })
-    localized = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+    plain = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
+    mounted = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, base: '/blog', trailingSlash: 'always' })
+    localized = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -226,7 +226,7 @@ describe('basicAuth failures', () => {
       Bun.write(join(dir, 'routes/free/_guard.ts'), guard('free', ', rateLimit: false')),
       Bun.write(join(dir, 'routes/free/index.kay'), 'h1 Free\n'),
     ])
-    app = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, proxy: { hops: 1 } })
+    app = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, proxy: { hops: 1 } })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

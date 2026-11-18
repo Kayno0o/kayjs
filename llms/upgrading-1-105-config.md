@@ -63,7 +63,7 @@ An app with no `store` now keeps sessions, jobs and every library in one SQLite 
 
 ### Every guard option is `guards`, and a feature with none is closed
 
-`deprecated-guard-option` (`kay check --fix`) renames `guard` to `guards` in `vitals()` and in the `jobs` and `images` of kay.config.ts, and writes `requireGuards` as `guards: { default }`; the old forms work until 1.108.
+`guard` is `guards` in `vitals()` and in the `jobs` and `images` of kay.config.ts, and `requireGuards` is `guards: { default }`; the old forms and the `deprecated-guard-option` lint that rewrote them went in 1.109.
 
 - `vitals({ guard })`, `jobs: { guard }` and `images: { guard }` are `guards`, taking a guard, a list, `{ load }` or `false`, as a page's and an API module's `guards` do. `cms()` keeps `access`, which also takes a role.
 - `jobs` with no `guards` mounts the page and answers 403 instead of stopping the boot, and `jobs: { guards: false }` opens it.

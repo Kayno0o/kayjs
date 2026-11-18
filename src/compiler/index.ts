@@ -17,7 +17,7 @@ import { wrapActionButtons } from './button-forms'
 import { generate, isInteractive, islandCause, lineOf } from './codegen'
 import { deprecatedPageSettings } from './deprecated-page'
 import { deprecatedPartsClass } from './deprecated-parts'
-import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
+import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
 import { openRedirects } from './fence-redirects'
 import { cwd, scopeStorage } from './host'
 import { ignoredIslandExport, islandMessages, withAlertKeys } from './island-arguments'
@@ -380,7 +380,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
   if (checked) {
-    const fenceLints = [script.fence, script.moduleFence, server?.fence].flatMap(fence => fence ? [...cssImportsWithoutText(fence), ...asyncReplies(fence), ...openRedirects(fence), ...missingCaptchas(fence), ...unreturnedFails(fence)] : [])
+    const fenceLints = [script.fence, script.moduleFence, server?.fence].flatMap(fence => fence ? [...cssImportsWithoutText(fence), ...asyncReplies(fence), ...openRedirects(fence), ...missingCaptchas(fence)] : [])
     // The script runs in the browser as an island's and in a component only islands render.
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]

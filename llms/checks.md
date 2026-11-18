@@ -53,7 +53,7 @@ kay lint --cache
 - A name starting with `_` is unused on purpose, and so is a prop destructured beside `...rest`, which it leaves out.
 - The editor reports them too, greyed out, and offers to remove an unread prop.
 - A file with a compile error is not searched for them until it compiles, as the code the error stopped may read them.
-- Literal values the server would refuse when it runs: a `ctx.fail` status outside 400 to 599, a redirect target with a scheme other than http(s), such as `javascript:`, or with a line break, and a `cached()` ttl that is not positive. A computed one is checked when it runs.
+- Literal values the server would refuse when it runs: a `ctx.deny` status outside 400 to 599, a redirect target with a scheme other than http(s), such as `javascript:`, or with a line break, and a `cached()` ttl that is not positive. A computed one is checked when it runs.
 - Island props a layout or a page with a `--- server` fence passes can be serialized, those of a `{...spread}` included: no functions (an action excepted, which goes as its URL), blocks with parameters or class instances.
 - `secret-prop` reads the same props for fields named like a secret (`password`, `token`, `apiKey`, `email`...): an island's props are in the page source, so hand it the fields it shows, `user={{ name: user.name }}`, or allow a public one with `// kay-allow secret-prop`.
 - A static component passing one is the `island-prop` error: it declares `island()` or passes the island data (see [Islands](islands.md#islands)), and children pass from anywhere.

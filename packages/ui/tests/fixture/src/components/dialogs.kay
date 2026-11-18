@@ -20,7 +20,7 @@ async function removeByApi() {
   await onDelete()
 }
 
-// An archive the action's handler refuses, as `ctx.fail(409, { error })` reaches an island.
+// An archive the action's handler refuses, as `ctx.deny(409, { data: { error } })` reaches an island.
 async function archive() {
   throw new ActionError(409, '', {}, { error: 'Still referenced' })
 }

@@ -41,7 +41,7 @@ const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: durati
 // The limit of kay's own routes: `RateLimit` but for `key`, as they count the client's address.
 const KAY_ROUTE_LIMIT: Record<string, Rule> = { max: num, window: duration, store: obj, onLimit: fn }
 const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)) }
-const JOBS: Record<keyof (JobsConfig & DeprecatedPath), Rule> = { guards: guardOption, guard: guardOption, path: str }
+const JOBS: Record<keyof (JobsConfig & DeprecatedPath), Rule> = { guards: guardOption, path: str }
 const METRICS: Record<keyof (MetricsConfig & DeprecatedPath), Rule> = { path: str, token: either(lit(true), SECRET) }
 const BUDGET: Record<keyof BudgetConfig, Rule> = { js: bytes, css: bytes, weight: bytes, grade: oneOf('A', 'B', 'C', 'D', 'E', 'F', 'G') }
 const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
@@ -52,7 +52,7 @@ const AVIF = either(bool, bag({ quality: num }))
 const REMOTE_IMAGES: Record<keyof RemoteImages, Rule> = { hosts: either(fn, list(str)), maxSize: bytes, timeout: duration }
 const IMAGE_FORMATS: Record<keyof ImageFormats, Rule> = { quality: num, webp: bag({ quality: num }), avif: AVIF }
 const IMAGE_LIMITS: Record<keyof ImageLimits, Rule> = { variants: either(num, lit(false)), queue: either(num, lit(false)) }
-const IMAGES: Record<keyof ImagesInput, Rule> = { ttl: duration, dirs: map(str), remote: either(fn, list(str), bag(REMOTE_IMAGES)), formats: bag(IMAGE_FORMATS), limits: bag(IMAGE_LIMITS), remoteMaxSize: bytes, remoteTimeout: duration, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: AVIF, maxDensity: numOrInfinity, placeholder: bool, aspects: list(str), card: bag(CARD), resolve: fn, guards: guardOption, guard: guardOption }
+const IMAGES: Record<keyof ImagesInput, Rule> = { ttl: duration, dirs: map(str), remote: either(fn, list(str), bag(REMOTE_IMAGES)), formats: bag(IMAGE_FORMATS), limits: bag(IMAGE_LIMITS), remoteMaxSize: bytes, remoteTimeout: duration, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: AVIF, maxDensity: numOrInfinity, placeholder: bool, aspects: list(str), card: bag(CARD), resolve: fn, guards: guardOption }
 const ASSETS: Record<keyof AssetsConfig, Rule> = { images: bag(IMAGES), fonts: list(obj), favicon: either(str, bool, bag(FAVICON)), manifest: bag(MANIFEST), publicCache: map(duration) }
 const OPS: Record<keyof OpsConfig, Rule> = { observe: bag(OBSERVE), health: either(bool, bag(HEALTH)), metrics: either(bool, bag(METRICS)), jobs: bag(JOBS) }
 const CORS = bag({ origins: either(oneOf('*'), list(str), fn), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
@@ -92,7 +92,6 @@ const CONFIG: Record<keyof ConfigInput, Rule> = {
   fonts: list(obj),
   security: either(bool, bag(SECURITY_KEYS)),
   proxy: either(bool, num, bag(PROXY)),
-  requireGuards: bool,
   guards: bag({ default: oneOf('open', 'closed') }),
   cors: CORS,
   openapi: either(bool, bag(OPENAPI)),

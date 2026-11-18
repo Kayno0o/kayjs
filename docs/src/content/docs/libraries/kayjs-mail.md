@@ -261,7 +261,7 @@ export const mail = mailer({
 })
 ```
 
-`beforeSend` runs once per mail before it is sent, queued or mailed to a list subscriber. It returns the fields to change, `false` to refuse the mail, or throws `refuse()`. A refused `send` or `enqueue` throws that refusal, which an action answers as it answers `ctx.fail`, and nothing goes out.
+`beforeSend` runs once per mail before it is sent, queued or mailed to a list subscriber. It returns the fields to change, `false` to refuse the mail, or throws `refuse()`. A refused `send` or `enqueue` throws that refusal, which an action answers as it answers `ctx.deny`, and nothing goes out.
 
 `afterSend` runs once after the server took the mail, from `send`, the queue and a list alike, and `onError` once when a send fails or the queue gives a mail up. Neither is told for a mail whose recipients were all suppressed or for a queued retry, and a hook that throws is logged and never fails the send. A queued mail has no request, so `context.request` is undefined.
 

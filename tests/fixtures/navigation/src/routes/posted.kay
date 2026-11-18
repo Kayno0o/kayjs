@@ -4,7 +4,7 @@ import { action } from 'kay'
 import { store } from '../state'
 
 export const away = action(t.Object({}), (_, ctx) => ctx.redirect('/plain'))
-export const crash = action(t.Object({}), (_, ctx) => ctx.fail(400, 'Refused'))
+export const crash = action(t.Object({}), (_, ctx) => ctx.deny(400, { message: 'Refused' }))
 export const upload = action({ input: t.Object({ file: t.File() }), maxSize: 8 * 1024 * 1024 }, async ({ file }) => file.size)
 export const count = action(t.Object({}), () => ++store.posts)
 

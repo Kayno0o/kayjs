@@ -307,7 +307,7 @@ export interface AttemptOptions<Data = unknown> {
   refused?: ((data: Data) => string | undefined) | undefined
   // The button of a refusal's toast, read from the same data as `refused`, and not used with `onRefused`, which shows no toast: `data => data.diverged ? { label: 'Rebase', run: rebase } : undefined`. Only a refusal gets it, not `failure`.
   refusedAction?: ((data: Data) => ToastAction | undefined) | undefined
-  // Handed what a refusal carries, an action's `ctx.fail` data or a route's JSON answer, instead of toasting anything, for a page that shows the refusal where it is. A failure that is no refusal still toasts `failure`.
+  // Handed what a refusal carries, an action's `ctx.deny` data or a route's JSON answer, instead of toasting anything, for a page that shows the refusal where it is. A failure that is no refusal still toasts `failure`.
   onRefused?: ((event: { data: Data }) => unknown) | undefined
 }
 
@@ -315,7 +315,7 @@ export interface AttemptOptions<Data = unknown> {
 export type Attempted<T> = T extends void ? true : T
 
 // Runs a change the page waits on, resolving to what `run` returned, or to `undefined` once a refused call has toasted instead of throwing.
-// What is toasted: the message `refused` reads from the data the action's handler passed to `ctx.fail`, else a refusal of the whole call such as a limit, else `failure`.
+// What is toasted: the message `refused` reads from the data the action's handler passed to `ctx.deny`, else a refusal of the whole call such as a limit, else `failure`.
 // A call made with `call()` and `.orThrow()` throws `ApiError`, read the same way: `refused` gets the route's JSON answer, else the words of a 4xx that read as a message, else `failure`, which status 0 and a 5xx always get.
 export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: (data: Data) => string | undefined): Promise<Attempted<Unwrapped<T>> | undefined> {
   const options = typeof failure === 'string' ? { failure, refused } : failure
@@ -368,7 +368,7 @@ function readAction<Data>(refusedAction: (data: Data) => ToastAction | undefined
   }
 }
 
-// What a refusal carries for `onRefused`, boxed so a falsy answer still counts: the data an action's handler passed to `ctx.fail`, or the JSON object a route answered with. A schema refusal, a status 0, a 5xx answer and any other error carry none.
+// What a refusal carries for `onRefused`, boxed so a falsy answer still counts: the data an action's handler passed to `ctx.deny`, or the JSON object a route answered with. A schema refusal, a status 0, a 5xx answer and any other error carry none.
 function refusalData<Data>(error: unknown): { value: Data } | undefined {
   if (error instanceof ActionError)
     return error.data === undefined ? undefined : { value: error.data as Data }

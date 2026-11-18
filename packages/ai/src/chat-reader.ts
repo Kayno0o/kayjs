@@ -35,7 +35,7 @@ export function spokenText(markdown: string): string {
     .trim()
 }
 
-// What a refused action says (its `ctx.fail` message under 500), else the label; undefined for a redirect, which leaves the page.
+// What a refused action says (its `ctx.deny` message under 500), else the label; undefined for a redirect, which leaves the page.
 function messageOf(error: unknown, fallback: string): string | undefined {
   if (error instanceof ActionRedirectError)
     return undefined

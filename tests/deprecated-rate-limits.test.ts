@@ -2,7 +2,6 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { authRateLimits } from '../src/check/auth-rate-limits'
 import { applySafeFixes } from '../src/check/fixes'
-import { rateEnforce } from '../src/check/rate-enforce'
 import { scratchDir } from './scratch'
 
 async function project(files: Record<string, string>): Promise<string> {
@@ -12,40 +11,6 @@ async function project(files: Record<string, string>): Promise<string> {
 
   return root
 }
-
-describe('deprecated-rate-enforce', () => {
-  it('renames enforce on a name bound once to rateLimit() of kay/server, in a module and a fence', async () => {
-    const script = [
-      'import { rateLimit } from \'kay/server\'',
-      'import * as server from \'kay/server\'',
-      '',
-      'const visits = rateLimit(\'a\', { max: 1, window: \'1m\' })',
-      'const other = server.rateLimit(\'b\', { max: 1, window: \'1m\' })',
-      'export const run = async (ctx: never) => { await visits.enforce(ctx); await other.enforce(ctx) }',
-      'export const own = (limit: { enforce: (c: never) => void }) => limit.enforce(1 as never)',
-      '',
-    ].join('\n')
-
-    const page = '--- server\nimport { rateLimit } from \'kay/server\'\n\nconst limit = rateLimit(\'p\', { max: 2, window: \'1m\' })\nexport const go = (ctx: never) => limit.enforce(ctx)\n---\np x\n'
-    const root = await project({ 'src/guard.ts': script, 'src/routes/page.kay': page, 'src/key.ts': 'import { limiter } from \'kay/server\'\nconst l = limiter({ max: 1, window: \'1m\' })\nexport const x = () => l.enforce(\'k\')\n' })
-    const found = await rateEnforce(root, {})
-
-    expect(found).toHaveLength(3)
-    expect(found.every(one => one.code === 'deprecated-rate-enforce' && one.fixes?.[0]?.safe === true)).toBe(true)
-    await applySafeFixes(root, found)
-    expect(await Bun.file(join(root, 'src/guard.ts')).text()).toBe(script.replace('visits.enforce', 'visits.check').replace('other.enforce', 'other.check'))
-    expect(await Bun.file(join(root, 'src/routes/page.kay')).text()).toBe(page.replace('limit.enforce', 'limit.check'))
-    expect(await Bun.file(join(root, 'src/key.ts')).text()).toContain('l.enforce(\'k\')')
-  })
-
-  it('is silent when the lint is allowed or the name is bound twice', async () => {
-    const twice = 'import { rateLimit } from \'kay/server\'\nlet a = rateLimit(\'a\', { max: 1, window: \'1m\' })\nexport const f = (c: never) => a.enforce(c)\n{ const a = 1 }\n'
-    const root = await project({ 'src/a.ts': twice })
-
-    expect(await rateEnforce(root, { lints: { 'deprecated-rate-enforce': 'allow' } })).toEqual([])
-    expect(await rateEnforce(root, {})).toEqual([])
-  })
-})
 
 describe('deprecated-auth-rate-limits', () => {
   const call = (limits: string) => `import { authCore } from '@kayjs/auth'\n\nexport const auth = authCore({ rateLimit: ${limits} } as never)\n`

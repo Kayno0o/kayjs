@@ -37,9 +37,5 @@ export const computedStatus = action(s.Object({ status: s.String() }), ({ status
 export const emptyMessage = action(s.Object({}), (input, ctx) => ctx.deny(403, { message: '' }))
 
 export const thrown = action(s.Object({}), () => refuse(409, { message: 'Over', data: 'over' }))
-
-export const legacy = action(s.Object({}), (input, ctx) => ctx.deny(403, 'Members only'))
-
-export const old = action(s.Object({}), (input, ctx) => ctx.fail(409, { row: 7 }, { name: 'Already taken' }))
 ---
 p Refusals

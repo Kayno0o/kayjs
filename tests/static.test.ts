@@ -317,7 +317,7 @@ describe('kay build --static', () => {
     const config = join(fixture, 'kay.config.ts')
 
     try {
-      await Bun.write(config, (await Bun.file(config).text()).replace('extensions: [{', 'extensions: [vitals({ guard: () => undefined }), {').replace('import { defineConfig }', 'import { vitals } from \'kay/analytics\'\nimport { defineConfig }'))
+      await Bun.write(config, (await Bun.file(config).text()).replace('extensions: [{', 'extensions: [vitals({ guards: () => undefined }), {').replace('import { defineConfig }', 'import { vitals } from \'kay/analytics\'\nimport { defineConfig }'))
 
       const { code, errors } = await exportSite(elsewhere, fixture)
 
@@ -602,7 +602,7 @@ describe('kay build --static', () => {
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
 
     try {
-      await Bun.write(join(fixture, 'kay.config.ts'), (await Bun.file(join(fixture, 'kay.config.ts')).text()).replace('  site: ', '  requireGuards: false,\n  site: '))
+      await Bun.write(join(fixture, 'kay.config.ts'), (await Bun.file(join(fixture, 'kay.config.ts')).text()).replace('  site: ', '  guards: { default: \'open\' },\n  site: '))
       await Bun.write(join(guarded, '_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n')
       await Bun.write(join(guarded, 'index.kay'), 'h1 Members\n')
       await Bun.write(join(tags, '[tag].kay'), 'h1 Tag\n')
@@ -632,7 +632,7 @@ describe('kay build --static', () => {
     const config = join(fixture, 'kay.config.ts')
 
     try {
-      await Bun.write(config, (await Bun.file(config).text()).replace('  site: ', '  requireGuards: true,\n  site: '))
+      await Bun.write(config, (await Bun.file(config).text()).replace('  site: ', '  guards: { default: \'closed\' },\n  site: '))
       await Bun.write(join(fixture, 'src/routes/about.kay'), `--- server\nexport const page = { guards: false }\n---\n${await Bun.file(join(fixture, 'src/routes/about.kay')).text()}`)
 
       const { code, errors } = await exportSite(elsewhere, fixture)

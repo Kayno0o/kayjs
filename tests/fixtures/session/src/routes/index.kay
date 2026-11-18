@@ -7,7 +7,7 @@ export const signIn = action(t.Object({ name: t.String({ maxLength: 200 }) }), a
   const session = ctx.locals.session as Session<{ name: string }>
 
   if (name === '')
-    return ctx.fail(400, { error: 'Who are you?' })
+    return ctx.deny(400, { data: { error: 'Who are you?' } })
 
   await session.regenerate()
   await session.set('name', name)

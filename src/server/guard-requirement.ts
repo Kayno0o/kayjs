@@ -1,11 +1,11 @@
 // What a start does with a route no guard covers: `true` refuses every page, layout with actions, endpoint and API module of the app, `'routes'` only its pages, endpoints and API modules, `false` none.
 export type GuardRequirement = boolean | 'routes'
 
-// What `guards: { default }` says of the app's routes, `'closed'` being `requireGuards: true` and `'open'` `requireGuards: false`; `requireGuards` stays until 1.108, and `guards.default` wins when both are set. Undefined leaves it to what the routes guard.
-export function requiredBy(config: { guards?: { default?: 'open' | 'closed' | undefined } | undefined, requireGuards?: boolean | undefined }): boolean | undefined {
+// What `guards: { default }` says of the app's routes, `'closed'` refusing every route no guard covers and `'open'` none. Undefined leaves it to what the routes guard.
+export function requiredBy(config: { guards?: { default?: 'open' | 'closed' | undefined } | undefined }): boolean | undefined {
   const given = config.guards?.default
 
-  return given === undefined ? config.requireGuards : given === 'closed'
+  return given === undefined ? undefined : given === 'closed'
 }
 
 interface Access {
@@ -13,7 +13,7 @@ interface Access {
   guards: readonly unknown[]
 }
 
-// What `requireGuards` comes to once the routes are scanned: a setting is taken as it is, and an unset one refuses the routes no guard covers on a site that guards some of its own, which a site with no guard at all (a brochure) leaves open.
+// What `guards.default` comes to once the routes are scanned: a setting is taken as it is, and an unset one refuses the routes no guard covers on a site that guards some of its own, which a site with no guard at all (a brochure) leaves open.
 // Guards a library mounts on its own routes say nothing of the app's: those routes are `open`, and only the app's own guarded routes mark a site that has started to guard.
 export function guardRequirement(configured: boolean | undefined, ...routes: Iterable<Access>[]): GuardRequirement {
   if (configured !== undefined)

@@ -55,16 +55,16 @@ describe('refuse', () => {
     expect(() => refuse()).toThrow(RefusedError)
 
     expect(await decide('t.plain', [() => refuse()], {})).toEqual({ refused: { status: 403, message: 'Refused', errors: {}, data: undefined } })
-    expect(await decide('t.fields', [() => refuse('Fix it', { errors: { name: 'required' }, data: 1 })], {})).toEqual({ refused: { status: 422, message: 'Fix it', errors: { name: 'required' }, data: 1 } })
+    expect(await decide('t.fields', [() => refuse(422, { message: 'Fix it', errors: { name: 'required' }, data: 1 })], {})).toEqual({ refused: { status: 422, message: 'Fix it', errors: { name: 'required' }, data: 1 } })
   })
 
   it('refuses a status outside 400 to 599', () => {
-    expect(() => refuse('x', { status: 200 })).toThrow(expect.objectContaining({ code: 'argument-invalid' }))
+    expect(() => refuse(200)).toThrow(expect.objectContaining({ code: 'argument-invalid' }))
   })
 
   it('carries its refusal under Symbol.for(kay.refused)', () => {
     try {
-      refuse('x', { status: 409, data: 3 })
+      refuse(409, { message: 'x', data: 3 })
     }
     catch (error) {
       expect((error as Record<symbol, unknown>)[Symbol.for('kay.refused')]).toEqual({ status: 409, message: 'x', errors: {}, data: 3 })
@@ -296,7 +296,7 @@ describe('decide', () => {
       ran.push(2)
     }], { name: 'a', tags: [] })
 
-    const byRefuse = await decide<Input, Input>('t.refuse', [() => refuse('No', { status: 409 }), () => {
+    const byRefuse = await decide<Input, Input>('t.refuse', [() => refuse(409, { message: 'No' }), () => {
       ran.push(3)
     }], { name: 'a', tags: [] })
 

@@ -62,19 +62,18 @@ describe('the production jobs page', () => {
     await expect(app({ jobs: { guards: 'admin' } })).rejects.toThrow('guards')
   })
 
-  it('takes `guards`, and `guard` until 1.108, and opens with `guards: false`', async () => {
+  it('takes `guards`, and opens with `guards: false`', async () => {
     expect((await get(await app({ jobs: { guards: admin } }), '/_kay/jobs')).status).toBe(403)
     expect((await get(await app({ jobs: { guards: admin } }), '/_kay/jobs', { 'x-admin': 'yes' })).status).toBe(200)
-    expect((await get(await app({ jobs: { guard: admin } }), '/_kay/jobs')).status).toBe(403)
     expect((await get(await app({ jobs: { guards: false } }), '/_kay/jobs')).status).toBe(200)
   })
 
   it('is not mounted under kay dev', async () => {
-    expect((await get(await app({ dev: true, jobs: { guard: allow } }), '/_kay/jobs')).status).toBe(404)
+    expect((await get(await app({ dev: true, jobs: { guards: allow } }), '/_kay/jobs')).status).toBe(404)
   })
 
   it('answers what the guard answers, for the page and both actions', async () => {
-    const site = await app({ jobs: { guard: admin } })
+    const site = await app({ jobs: { guards: admin } })
     const { name, id } = await failedJob('guarded')
 
     expect(await (await get(site, '/_kay/jobs')).text()).toBe('admins only')
@@ -84,14 +83,14 @@ describe('the production jobs page', () => {
   })
 
   it('follows a guard that redirects', async () => {
-    const response = await get(await app({ jobs: { guard: toLogin } }), '/_kay/jobs')
+    const response = await get(await app({ jobs: { guards: toLogin } }), '/_kay/jobs')
 
     expect(response.status).toBe(302)
     expect(response.headers.get('location')).toBe('/login')
   })
 
   it('runs every guard of a list, the first refusal answering', async () => {
-    const site = await app({ jobs: { guard: [allow, admin] } })
+    const site = await app({ jobs: { guards: [allow, admin] } })
 
     expect((await get(site, '/_kay/jobs')).status).toBe(403)
     expect((await get(site, '/_kay/jobs', { 'x-admin': 'yes' })).status).toBe(200)
@@ -104,16 +103,16 @@ describe('the production jobs page', () => {
 
       return admin
     } }
-    const site = await app({ jobs: { guard: lazy } })
+    const site = await app({ jobs: { guards: lazy } })
 
     expect(built).toBe(0)
     expect((await get(site, '/_kay/jobs')).status).toBe(403)
-    expect((await get(await app({ jobs: { guard: lazy } }), '/_kay/jobs', { 'x-admin': 'yes' })).status).toBe(200)
+    expect((await get(await app({ jobs: { guards: lazy } }), '/_kay/jobs', { 'x-admin': 'yes' })).status).toBe(200)
     expect(built).toBe(2)
   })
 
   it('lists a failed job with its escaped error, uncached and not indexed', async () => {
-    const site = await app({ jobs: { guard: allow } })
+    const site = await app({ jobs: { guards: allow } })
     const { name, id } = await failedJob('list')
     const response = await get(site, '/_kay/jobs')
     const html = await response.text()
@@ -130,7 +129,7 @@ describe('the production jobs page', () => {
   })
 
   it('shows a due time outside the range of a date as it is', async () => {
-    const site = await app({ jobs: { guard: allow } })
+    const site = await app({ jobs: { guards: allow } })
     const store = memoryJobs()
     const jobs = queue<{ n: number }>(`page-range-${++counter}`, () => undefined, { store })
 
@@ -144,7 +143,7 @@ describe('the production jobs page', () => {
   })
 
   it('retries and deletes a job, then goes back to the page', async () => {
-    const site = await app({ jobs: { guard: allow }, base: '/shop' })
+    const site = await app({ jobs: { guards: allow }, base: '/shop' })
     const { name, id, state, jobs } = await failedJob('act')
 
     state.broken = false
@@ -166,14 +165,14 @@ describe('the production jobs page', () => {
   })
 
   it('names the form actions under the base', async () => {
-    const site = await app({ jobs: { guard: allow }, base: '/shop' })
+    const site = await app({ jobs: { guards: allow }, base: '/shop' })
 
     await failedJob('base')
     expect(await (await get(site, '/_kay/jobs')).text()).toContain('action="/shop/_kay/jobs/retry"')
   })
 
   it('refuses a post from another site and one that names no job', async () => {
-    const site = await app({ jobs: { guard: allow } })
+    const site = await app({ jobs: { guards: allow } })
     const { name, id } = await failedJob('cross')
 
     expect((await post(site, '/_kay/jobs/delete', { queue: name, id }, { 'sec-fetch-site': 'cross-site' })).status).toBe(403)
@@ -184,7 +183,7 @@ describe('the production jobs page', () => {
   })
 
   it('moves with path', async () => {
-    const site = await app({ jobs: { guard: allow, path: '/ops/jobs' } })
+    const site = await app({ jobs: { guards: allow, path: '/ops/jobs' } })
 
     expect((await get(site, '/ops/jobs')).status).toBe(200)
     expect((await get(site, '/_kay/jobs')).status).toBe(404)
@@ -200,7 +199,7 @@ describe('the production jobs page', () => {
       await good.run()
       await bad.run()
 
-      const html = await (await get(await app({ jobs: { guard: allow } }), '/_kay/jobs')).text()
+      const html = await (await get(await app({ jobs: { guards: allow } }), '/_kay/jobs')).text()
 
       expect(html).toContain('<h2>Maintenance</h2>')
       expect(html).toContain('<code>page-good</code> every 3600 s, ran at')
@@ -214,7 +213,7 @@ describe('the production jobs page', () => {
   })
 
   it('says so when the app has no queue', async () => {
-    const site = await app({ jobs: { guard: allow } })
+    const site = await app({ jobs: { guards: allow } })
 
     expect((await get(site, '/_kay/jobs')).status).toBe(200)
   })
@@ -229,7 +228,7 @@ async function runOf(name: string) {
 
 describe('the production jobs page for a workflow run', () => {
   it('shows its state and steps without script, sends its event and cancels it', async () => {
-    const site = await app({ jobs: { guard: allow } })
+    const site = await app({ jobs: { guards: allow } })
     const name = `page-flow-${++counter}`
     const flow = workflow<undefined, { paid: number }>(name, async (_, { step }) => {
       await step.run('charge <b>', () => 1)
@@ -273,7 +272,7 @@ describe('the production jobs page for a workflow run', () => {
 
 describe('the production jobs page when the store fails', () => {
   it('answers a post with 502 and the store\'s message, as the dev tool does', async () => {
-    const site = await app({ jobs: { guard: allow } })
+    const site = await app({ jobs: { guards: allow } })
     const name = `page-down-${++counter}`
     const store = { ...memoryJobs(), state: () => {
       throw new Error('store down')

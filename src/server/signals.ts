@@ -82,24 +82,24 @@ export function stoppers(request: Request): Pick<RequestContext, 'redirect' | 'n
     notFound: () => {
       throw new NotFound()
     },
-    deny: (code = 403, second?: string | DenyOptions<ErrorData>, data?: ErrorData) => {
-      throw typeof second === 'string' ? new Denied(code, second, data) : new Denied(code, second?.message, second?.data, second?.errors as Record<string, string> | undefined)
+    deny: (code?: number, options?: DenyOptions<ErrorData>) => {
+      throw new Denied(code ?? 403, options?.message, options?.data, options?.errors as Record<string, string> | undefined)
     },
   }
 }
 
-// `ctx.deny(status, { message, errors, data })` in an action fails the post as `ctx.fail` does, a form re-rendered with the message, the fields and `data`, a call throwing an `ActionError`. A deny with no options, or the old text form, stops as a guard's does.
+// `ctx.deny(status, { message, errors, data })` in an action fails the post, a form re-rendered with the message, the fields and `data`, a call throwing an `ActionError`. A deny with no options stops as a guard's does.
 export function actionStoppers(request: Request): Pick<RequestContext, 'redirect' | 'notFound' | 'deny'> {
   const { deny: stop, ...rest } = stoppers(request)
 
-  const deny = (status = 403, second?: string | DenyOptions<ErrorData>, data?: ErrorData): never => {
-    if (typeof second === 'string' || !Number.isInteger(status) || status < 400 || status > 599)
-      return stop(status, second as string, data)
-
+  const deny = (status = 403, second?: DenyOptions<ErrorData>): never => {
     if (second === undefined || ((second.message === undefined || second.message === '') && second.data === undefined && Object.keys(second.errors ?? {}).length === 0))
       return stop(status)
 
-    // A text `data` with no `message` is the form's message, as `ctx.fail` made it; one with only data or fields has no form message, as `ctx.fail` had none.
+    if (!Number.isInteger(status) || status < 400 || status > 599)
+      throw new KayError('argument-invalid', `kay: ctx.deny takes an error status, from 400 to 599, not ${status}`)
+
+    // A text `data` with no `message` is the form's message; one with only data or fields has none.
     throw new RefusedError({ status, message: second.message ?? (typeof second.data === 'string' ? second.data : ''), errors: (second.errors ?? {}) as Record<string, string>, data: second.data })
   }
 

@@ -10,7 +10,7 @@ export const worded = action({ input: t.Object({}), tool: { text: ({ count }) =>
 
 export const plain = action({ tool: true }, () => 'plain')
 
-export const refuses = action({ input: t.Object({}), tool: true }, (_input, ctx) => ctx.fail(409, { reason: 'full' }))
+export const refuses = action({ input: t.Object({}), tool: true }, (_input, ctx) => ctx.deny(409, { data: { reason: 'full' } }))
 
 export const hidden = action(t.Object({}), () => ({ secret: true }))
 

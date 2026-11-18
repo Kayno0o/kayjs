@@ -7,7 +7,7 @@ export const edit = action(t.Object({
   done: t.Optional(t.Boolean()),
   size: t.String({ maxLength: 10 }),
   note: t.Optional(t.String({ maxLength: 200 })),
-}), (_input, ctx) => ctx.fail(409, 'Taken'))
+}), (_input, ctx) => ctx.deny(409, { message: 'Taken' }))
 
 const todo = { title: 'Buy milk', done: true, size: 'm', note: 'hello' }
 --- script

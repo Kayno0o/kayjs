@@ -860,7 +860,7 @@ describe('kay env against compose and .env.example', () => {
 
     expect((await bad('export default { lang: \'en\', trailingslash: \'always\', compress: false }\n')).stderr).toContain('`trailingslash`, did you mean `trailingSlash`?; `compress`, moved to `serve.compress`')
     expect((await bad('export default { security: { reprots: true }, i18n: { locales: [\'en\'], default: \'en\', mesages: \'m\' } }\n')).stderr).toContain('`security.reprots`, did you mean `security.reports`?; `i18n.mesages`, did you mean `i18n.messages`?')
-    expect((await bad('export default { extensions: [{ name: \'lib\', config: { requireGuard: true } }] }\n')).stderr).toContain('the config of the extension lib has an option kay does not know: `requireGuard`, did you mean `requireGuards`?')
+    expect((await bad('export default { extensions: [{ name: \'lib\', config: { gaurds: true } }] }\n')).stderr).toContain('the config of the extension lib has an option kay does not know: `gaurds`, did you mean `guards`?')
     expect((await bad('export default { nothing: 1 }\n')).stderr).toContain('`nothing`')
     expect((await bad('export default { limits: \'4mb\' }\n')).stderr).toContain('`limits` in kay.config.ts is an object of options, `limits: { ... }`, not "4mb"')
     expect((await bad('export default { serve: false, limits: { body: \'4mb\' } }\n')).stderr).toContain('`serve` in kay.config.ts is an object of options')

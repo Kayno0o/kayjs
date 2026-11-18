@@ -246,7 +246,7 @@ describe('guards the scan cannot see in the source', () => {
     const build = await scratchBuild({ dirs: { routes } })
 
     try {
-      await expect(build.prerender({ dirs: { routes }, requireGuards: false }, { exportAll: true })).rejects.toThrow('a guard covers it')
+      await expect(build.prerender({ dirs: { routes }, guards: { default: 'open' } }, { exportAll: true })).rejects.toThrow('a guard covers it')
     }
     finally {
       await build.remove()

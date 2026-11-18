@@ -154,7 +154,7 @@ form(action={add})
   button Add
 ```
 
-A post the schema refuses comes back to the page with the fields as they were typed. `add.form.error('title')` holds the schema's `error` message. `ctx.fail` sends its data back the same way, and you read it with `add.form.failed()`.
+A post the schema refuses comes back to the page with the fields as they were typed. `add.form.error('title')` holds the schema's `error` message. `ctx.deny` sends its data back the same way, and you read it with `add.form.failed()`.
 
 Every string field needs a `maxLength`, so what a visitor posts is bounded. `kay check` reports one without it.
 

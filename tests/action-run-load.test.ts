@@ -16,7 +16,7 @@ plugin({
   },
 })
 
-type Stub = ((input: object, options?: object) => Promise<unknown>) & { pending: () => boolean, data: () => unknown, status: () => string, failed: () => unknown, succeeded: () => unknown, progress: () => unknown }
+type Stub = ((input: object, options?: object) => Promise<unknown>) & { pending: () => boolean, data: () => unknown, status: () => string, form: { failed: () => unknown }, succeeded: () => unknown, progress: () => unknown }
 
 interface Post {
   name: string
@@ -45,7 +45,7 @@ it('reads its state at first paint without the code that runs a call, counts a c
   const queued = stub('queued')
   const newest = stub('newest')
 
-  expect([greet.pending(), greet.data(), greet.status(), greet.failed(), greet.succeeded(), greet.progress()]).toEqual([false, undefined, 'idle', undefined, undefined, undefined])
+  expect([greet.pending(), greet.data(), greet.status(), greet.form.failed(), greet.succeeded(), greet.progress()]).toEqual([false, undefined, 'idle', undefined, undefined, undefined])
   expect(loads).toBe(0)
 
   const started: string[] = []

@@ -7,8 +7,8 @@ import { guardRequirement, requiredBy } from '../server/guard-requirement'
 
 const HELP = 'add a `_guard.ts` to its directory or one above it, or, if anyone may reach it, set `guards: false`'
 
-// On a site with `requireGuards`, what the server answers 403 for: each page, layout with actions, endpoint and API module of the app no guard covers that does not set `guards: false`.
-// A site that leaves `requireGuards` unset but guards some route of its own is held to it for its routes alone (not layouts or action modules), as its start refuses them; `requireGuards: false` keeps it open.
+// On a site with `guards: { default: 'closed' }`, what the server answers 403 for: each page, layout with actions, endpoint and API module of the app no guard covers that does not set `guards: false`.
+// A site that leaves `guards.default` unset but guards some route of its own is held to it for its routes alone (not layouts or action modules), as its start refuses them; `guards: { default: 'open' }` keeps it open.
 export async function unguardedRoutes(options: CheckOptions, { routes, endpoints, apiModules }: ServedProject): Promise<CheckDiagnostic[]> {
   const level = lintLevel('unguarded-route', options.lints)
 
@@ -50,7 +50,7 @@ export async function unguardedRoutes(options: CheckOptions, { routes, endpoints
     }
   }
 
-  // Layouts and action modules are not routes: a site that leaves `requireGuards` unset is told of its routes alone.
+  // Layouts and action modules are not routes: a site that leaves `guards.default` unset is told of its routes alone.
   for (const [layout, guarded] of required === 'routes' ? [] : layouts) {
     const source = guarded ? '' : await Bun.file(layout).text()
     const actions = guarded ? [] : analyzeServer(source, parseKay(source).server)?.actionNames ?? []

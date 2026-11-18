@@ -48,14 +48,13 @@ describe('the readers a form shows, under form, in an island', () => {
     expect([add.pending(), add.status(), add.data()]).toEqual([false, 'idle', undefined])
   })
 
-  it('shows a refusal with field errors through form, the old names answering the same', async () => {
+  it('shows a refusal with field errors through form', async () => {
     answer(() => refusal(422, { 'title': 'Three letters at least', '': 'Not saved' }))
 
     const add = stub()
 
     expect((await add({})).ok).toBe(false)
     expect([add.form.error('title'), add.form.error(), add.form.failed()?.status, add.pending(), add.status()]).toEqual(['Three letters at least', 'Not saved', 422, false, 'failed'])
-    expect([add.error('title'), add.failed()]).toEqual([add.form.error('title'), add.form.failed()])
   })
 
   it('clears the refusal while the next call is pending, and reads it through a with() action too', async () => {

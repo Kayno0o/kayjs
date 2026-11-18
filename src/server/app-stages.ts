@@ -178,7 +178,7 @@ interface BootInput {
   late: LateApp
   mcpAt: string | undefined
   mcpKey: string | false | undefined
-  // What `requireGuards` came to once the routes were scanned.
+  // What `guards.default` came to once the routes were scanned.
   required: GuardRequirement
 }
 
@@ -665,7 +665,7 @@ export function reports({ app, options, setup: { i18n, site, collections }, hasP
 // The paths the config names resolve where the server runs, and development serves WebP, so a page's first load does not wait on AVIF encoding.
 // What `images.resolve` runs behind: the `guards` given, none when they are `false`, and a refusal when the app gave none, as every feature reading private files closes.
 function imageGuard(images: NonNullable<KayConfig['assets']>['images']): Guard | undefined {
-  const given = images?.guards ?? images?.guard
+  const given = images?.guards
 
   if (given === false)
     return undefined

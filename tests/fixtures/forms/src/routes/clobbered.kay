@@ -4,7 +4,7 @@ import { action } from 'kay'
 
 export const sign = action(t.Object({
   title: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
-}), (_input, ctx) => ctx.fail(409, 'Full'))
+}), (_input, ctx) => ctx.deny(409, { message: 'Full' }))
 ---
 form.sign(action={sign})
   error

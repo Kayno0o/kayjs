@@ -1395,15 +1395,7 @@ class RedirectRefusedError
 function refundRateLimit(request: Request | undefined): Promise<void>
 
 [./library] refuse
-/** @deprecated `refuse(status, { message, errors, data })`. Removed in 1.108; `deprecated-refuse-call` rewrites it. */
-function refuse(status?: number | undefined, options?: DenyOptions<unknown, string> | undefined): never
-function refuse(message?: string | undefined, options?: RefuseOptions | undefined): never
-
-[./library] RefuseOptions
-interface RefuseOptions
-  data?: unknown
-  errors?: Record<string, string> | undefined
-  status?: number | undefined
+function refuse(status?: number | undefined, options?: DenyOptions<unknown, string>): never
 
 [./library] relationsMissing
 function relationsMissing(db: SQL, names: readonly string[]): Promise<boolean>

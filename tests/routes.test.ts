@@ -20,7 +20,7 @@ describe('kay routes', () => {
       'import { Elysia } from \'elysia\'\n',
       'const lib = { name: \'lib\', appFiles: { words: \'src/words.ts\' }, api: { dir: \'lib/api\', prefix: \'lib\' }, server: new Elysia().get(\'/hooked\', () => 1) }',
       'const built = { name: \'built\', server: () => new Elysia() }\n',
-      'export default { requireGuards: true, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], default: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', status: 307 }, \'/gone\': { to: \'/\', status: 301 }, \'/retired\': { status: 410 } } }\n',
+      'export default { guards: { default: \'closed\' }, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], default: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', status: 307 }, \'/gone\': { to: \'/\', status: 301 }, \'/retired\': { status: 410 } } }\n',
     ]
 
     await Promise.all([
@@ -326,7 +326,7 @@ describe('the dev tool\'s routes served by kay', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const dev = await pages({ root, dirs: { routes }, dev: true, requireGuards: false, redirects: { '/old': '/static', '/away': 'https://other.example/static' } })
+      const dev = await pages({ root, dirs: { routes }, dev: true, guards: { default: 'open' }, redirects: { '/old': '/static', '/away': 'https://other.example/static' } })
       const visit = async (path: string, headers: Record<string, string> = {}) => {
         const response = await dev.handle(new Request(`http://localhost${path}`, { headers, redirect: 'manual' }))
         const block = REQUEST_BLOCK.exec(await response.text())

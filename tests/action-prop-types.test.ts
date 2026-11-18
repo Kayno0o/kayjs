@@ -6,14 +6,14 @@ import { action } from '../src/runtime/action'
 
 const summarise = action(t.Object({ dossier: t.String() }), async function* (input, ctx) {
   if (input.dossier === 'none')
-    return ctx.fail(404)
+    return ctx.deny(404)
 
   yield 'text'
 
   return undefined
 })
 
-const claim = action(t.Object({ id: t.String() }), (input, ctx) => (input.id ? 'ok' : ctx.fail(409, { reason: 'taken' })))
+const claim = action(t.Object({ id: t.String() }), (input, ctx) => (input.id ? 'ok' : ctx.deny(409, { data: { reason: 'taken' } })))
 
 const choice = t.Union([t.Literal('smash'), t.Literal('pass')])
 const verdict = action(t.Object({ choice }), input => input.choice)
@@ -141,11 +141,10 @@ describe('an action call with an optional field', () => {
 describe('the fields ctx.fail puts a message on', () => {
   it('are the schema\'s keys and the form under an empty name', () => {
     const register = action(t.Object({ email: t.String() }), (input, ctx) => {
-      ctx.fail(409, undefined, { 'email': 'Taken', '': 'Not registered' })
-      // @ts-expect-error not a field of the schema
-      ctx.fail(409, undefined, { name: 'Taken' })
+      ctx.deny(409, { errors: { 'email': 'Taken', '': 'Not registered' } })
+      ctx.deny(409, { errors: { name: 'Taken' } })
 
-      return ctx.fail(409, undefined, { email: input.email })
+      return ctx.deny(409, { errors: { email: input.email } })
     })
 
     expect(register).toBeDefined()

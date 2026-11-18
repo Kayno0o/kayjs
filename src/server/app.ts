@@ -182,7 +182,7 @@ export async function pagesApp(project: Project<ServedOptions>, loadClient: () =
   const setup = await setupPages(project, loadClient, false, late.spell, scanned => refuseScanned(project, scanned), exported)
   const { served, table, publicServed, redirects, mcpAt } = setup.claimed
 
-  // The API modules are read here, as an unset `requireGuards` comes to what the app's own routes, endpoints and API modules guard.
+  // The API modules are read here, as an unset `guards.default` comes to what the app's own routes, endpoints and API modules guard.
   const required = guardRequirement(requiredBy(options), setup.routes, setup.endpoints, await setup.api)
   const routes = await servedRoutes(setup.routes, setup.claimed.routes, required)
   const app = new Elysia({ name: 'kay/pages', seed: root })

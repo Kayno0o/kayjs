@@ -2,7 +2,7 @@ const MAX_WORDS = 200
 // A code is one word with an underscore, or digits: `NOT_FOUND`, `404`. A short all-caps message such as `ACCESS DENIED` or `FULL` is still a message.
 const CODE = /^[A-Z0-9]+(?:_[A-Z0-9]+)+$|^\d+$/
 
-// The words of a route's answer or an action's `ctx.fail` data, as `refusal()` in kay's runtime reads them, kept only when they read as a message: not markup from a proxy, a status code, several lines or a page.
+// The words of a route's answer or an action's `ctx.deny` data, as `refusal()` in kay's runtime reads them, kept only when they read as a message: not markup from a proxy, a status code, several lines or a page.
 export function answerMessage(answer: unknown): string | undefined {
   const text = typeof answer === 'object' && answer !== null && !(answer instanceof Blob) ? fieldMessage(answer) : answer
 

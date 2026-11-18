@@ -4,7 +4,7 @@ import { action } from 'kay'
 
 export const edit = action(t.Object({
   title: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
-}), (_input, ctx) => ctx.fail(409, 'Taken'))
+}), (_input, ctx) => ctx.deny(409, { message: 'Taken' }))
 
 const first = { title: 'First' }
 const second = { title: 'Second' }

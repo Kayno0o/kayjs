@@ -20,22 +20,4 @@ export const SOURCE_READERS = {
     wrong: '// src/live.ts\nimport { live } from \'kay\'\n\nexport const room = live((id: string) => ({ id, users: 0 }))\n\nroom.set(\'lobby\', { id: \'lobby\', users: 3 })',
     right: '// src/live.ts\nimport { live } from \'kay\'\n\nexport const room = live((id: string) => ({ id, users: 0 }))\n\nroom.set({ id: \'lobby\', users: 3 }, { key: \'lobby\' })',
   },
-  'deprecated-action-type': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.105',
-    site: true,
-    summary: '`Action<never, unknown>` before 1.105, the type a prop takes to accept any action: `Action` since, whose two parameters default to it. `Action<{ name: string }, string>` keeps its input and output types, and a `.with()` action crosses into an island as any other does. The old form works until 1.108. Found on the `Action` a file imports from `kay`, under any local name, in the TypeScript files and the fences of `.kay` files. The fix drops the type arguments.',
-    wrong: '---\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action<never, unknown> }>()\n---\nform(action={run})\n  button Go',
-    right: '---\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action }>()\n---\nform(action={run})\n  button Go',
-  },
-  'deprecated-action-readers': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.105',
-    site: true,
-    summary: 'An action\'s `failed()`, `error(field)` and `validate(form, field)` before 1.105, which a form shows and now reads from `form`: `form.failed()`, `form.error(field)` and `form.validate(form, field)`, the call state (`pending()`, `status()`, `data()`) staying on the action. The old names work until 1.108. Found in the TypeScript files and `.kay` files of the project, templates included, on a name bound once to a call of `action` from `kay`, to the `.with()` of one, or imported in lowercase from a `.kay` file, as `kay check` reads no types: an action reached through a property or a prop is not found. The fix writes `form.` before the name.',
-    wrong: '---\nimport { add } from \'./notes.kay\'\n---\nform(action={add})\n  input(name="title" aria-invalid={add.error(\'title\') ? \'true\' : undefined})\n  if add.failed()\n    p Not saved',
-    right: '---\nimport { add } from \'./notes.kay\'\n---\nform(action={add})\n  input(name="title" aria-invalid={add.form.error(\'title\') ? \'true\' : undefined})\n  if add.form.failed()\n    p Not saved',
-  },
 } as const satisfies Record<string, Lint>

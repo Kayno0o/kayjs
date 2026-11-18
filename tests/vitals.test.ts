@@ -64,7 +64,7 @@ async function build(...args: Parameters<typeof pages>): Promise<Site> {
   process.env.NODE_ENV = 'test'
 
   try {
-    return await pages({ requireGuards: false, ...args[0] })
+    return await pages({ guards: { default: 'open' }, ...args[0] })
   }
   finally {
     restoreEnvironment(kept)
@@ -573,18 +573,18 @@ describe('the screen', () => {
   })
 
   it('is refused to whom the guard refuses, and opened to whom it admits', async () => {
-    const refused = await screen({ guard: ctx => ctx.deny(403, { message: 'not you' }) })
-    const admitted = await screen({ guard: () => undefined })
+    const refused = await screen({ guards: ctx => ctx.deny(403, { message: 'not you' }) })
+    const admitted = await screen({ guards: () => undefined })
 
     expect(refused.status).toBe(403)
     expect(admitted.status).toBe(200)
   })
 
   it('takes a list of guards run in order, and false to open the screen', async () => {
-    expect((await screen({ guard: [() => undefined, ctx => ctx.deny(403, { message: 'not you' })] })).status).toBe(403)
-    expect((await screen({ guard: [() => undefined, () => undefined] })).status).toBe(200)
-    expect((await screen({ guard: false })).status).toBe(200)
-    expect(() => vitals({ guard: [] })).toThrow('takes `guards`')
+    expect((await screen({ guards: [() => undefined, ctx => ctx.deny(403, { message: 'not you' })] })).status).toBe(403)
+    expect((await screen({ guards: [() => undefined, () => undefined] })).status).toBe(200)
+    expect((await screen({ guards: false })).status).toBe(200)
+    expect(() => vitals({ guards: [] })).toThrow('takes `guards`')
     expect(() => vitals({ guards: true as never })).toThrow('takes `guards`')
   })
 
@@ -596,7 +596,7 @@ describe('the screen', () => {
 
   it('takes a guard built when the first request reaches it', async () => {
     let built = 0
-    const app = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [vitals({ guard: { load: () => {
+    const app = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [vitals({ guards: { load: () => {
       built++
 
       return () => undefined
@@ -609,7 +609,7 @@ describe('the screen', () => {
   })
 
   it('renders with no data, saying so', async () => {
-    const answer = await screen({ guard: () => undefined })
+    const answer = await screen({ guards: () => undefined })
     const html = await answer.text()
 
     expect(answer.status).toBe(200)
@@ -618,7 +618,7 @@ describe('the screen', () => {
   })
 
   it('lists each route with its three numbers, their ratings and the number of views', async () => {
-    const app = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [vitals({ guard: () => undefined })], proxy: { hops: 1 }, store: { vitals: store } })
+    const app = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [vitals({ guards: () => undefined })], proxy: { hops: 1 }, store: { vitals: store } })
 
     for (let at = 0; at < 4; at++)
       await report(app, { p: '/blog/x', l: 3000, c: 0.03, i: 600 })
@@ -636,15 +636,15 @@ describe('the screen', () => {
   })
 
   it('lives under the prefix it is given, and the account of a guarded page is not its guard', async () => {
-    const answer = await screen({ prefix: '/stats/web', guard: () => undefined }, {}, '/stats/web')
-    const moved = await screen({ prefix: '/stats/web', guard: () => undefined }, {}, '/vitals')
+    const answer = await screen({ prefix: '/stats/web', guards: () => undefined }, {}, '/stats/web')
+    const moved = await screen({ prefix: '/stats/web', guards: () => undefined }, {}, '/vitals')
 
     expect(answer.status).toBe(200)
     expect(moved.status).toBe(404)
   })
 
   it('does not tell the page of a visitor from its title or address: nothing but route names are shown', async () => {
-    const app = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [vitals({ guard: () => undefined })], proxy: { hops: 1 }, store: { vitals: store } })
+    const app = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [vitals({ guards: () => undefined })], proxy: { hops: 1 }, store: { vitals: store } })
 
     await report(app, { p: '/blog/secret-slug', l: 1000 })
 
@@ -656,7 +656,7 @@ describe('the screen', () => {
 
 describe('under a base', () => {
   it('serves the script and takes the reports under the base, with or without the proxy keeping it', async () => {
-    const mounted = await testSite({ requireGuards: false, root: dir, dirs: { routes: 'routes' }, islands: false, base: '/shop', extensions: [vitals()], proxy: { hops: 1 }, store: { vitals: store } })
+    const mounted = await testSite({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes' }, islands: false, base: '/shop', extensions: [vitals()], proxy: { hops: 1 }, store: { vitals: store } })
 
     try {
       const home = await (await mounted.fetch('/shop/')).text()

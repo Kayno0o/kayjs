@@ -14,7 +14,7 @@ export const save = action(t.Object({
   at: t.Optional(t.String()),
   from: t.Optional(t.String()),
   nick: t.Optional(t.String({ maxLength: 20 })),
-}), (_input, ctx) => ctx.fail(409, 'Taken'))
+}), (_input, ctx) => ctx.deny(409, { message: 'Taken' }))
 
 const todo = { title: 'Buy milk', done: true, note: 'two\nlines <b>', size: 'm', kind: 2, tags: ['a', 'c'], count: 3, due: new Date(2026, 2, 4, 23, 30), at: new Date(2026, 2, 4, 23, 30), from: new Date(2026, 2, 4, 23, 30), nick: null }
 ---

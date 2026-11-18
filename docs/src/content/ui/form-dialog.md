@@ -77,7 +77,7 @@ When the action is refused or fails, `onError` is called with `{ error }` before
 
 ## Refusals of the handler
 
-A handler refusing with `ctx.fail(400, { error: 'Slug taken' })` reaches the dialog through `refused`, which answers a message per field, or one message that is toasted. Without it, `failureLabel` is toasted. It defaults to `Could not save.`.
+A handler refusing with `ctx.deny(400, { data: { error: 'Slug taken' } })` reaches the dialog through `refused`, which answers a message per field, or one message that is toasted. Without it, `failureLabel` is toasted. It defaults to `Could not save.`.
 
 ```kay
 FormDialog(

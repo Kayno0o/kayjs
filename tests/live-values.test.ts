@@ -948,7 +948,7 @@ describe('live values in a production build', () => {
       `import { pages } from ${server}`,
       `import { decodeServerValue } from ${wire}`,
       '',
-      `const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, requireGuards: false, observe: { log: false }, serve: { compress: false } }))`,
+      `const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, guards: { default: 'open' }, observe: { log: false }, serve: { compress: false } }))`,
       'const page = async path => (await app.handle(new Request(`http://localhost${path}`))).text()',
       'const home = await page(\'/\')',
       'const about = await page(\'/about\')',

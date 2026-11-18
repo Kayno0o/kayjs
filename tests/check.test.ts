@@ -152,7 +152,7 @@ describe('kay check', () => {
   })
 
   it('passes a site of pages, layouts and islands, with route params and server data typed', async () => {
-    expect(await check(join(fixtures, 'site'), { requireGuards: false })).toEqual([])
+    expect(await check(join(fixtures, 'site'), { guards: { default: 'open' } })).toEqual([])
   })
 
   it('reports type errors at the line and column of the .kay source', async () => {

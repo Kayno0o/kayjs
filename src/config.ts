@@ -69,8 +69,6 @@ export interface KayConfig extends AppHooks {
   proxy?: ProxyConfig | number | boolean | undefined
   // What a route no guard covers comes to. Left out, a site with a guard of its own answers 403 on each page, endpoint and API module no `_guard.ts` covers unless it sets `guards: false`, in its `page` or its `api()` options, and a site with no guard stays open. `default: 'closed'` asks it of every site and of the actions of layouts and `_actions.kay` files too, `default: 'open'` turns it off; `kay check` reports each such route. A library's routes keep the guards it gives them, and a feature that lists or changes private data (`jobs`, `vitals()`, `images.resolve`, `cms()`) is closed with no `guards` whatever the default, opened only by its own `guards: false`.
   guards?: GuardsConfig | undefined
-  // Replaced by `guards: { default }` in 1.105: `true` is `'closed'` and `false` is `'open'`. Works until 1.108.
-  requireGuards?: boolean | undefined
   // Lets other sites' pages call every API module's routes from the browser, as `api({ cors })` does for one, an endpoint file setting its own in `page.cors`: `cors: { origins: ['https://app.example.com'], credentials: true }`. A module setting its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
   cors?: CorsOptions | undefined
   // Serves an OpenAPI 3.1 document of the API modules' routes at `/api/openapi.json`, or at `endpoints.openapi`, read from their schemas, behind the API directory's own `_guard.ts`; `{ reference: true }` adds a page listing them at `/api/reference`, or at `reference: { path }`, `{ dev: true }` keeps both to `kay dev`.
@@ -323,8 +321,6 @@ export interface EndpointsConfig {
 export interface JobsConfig {
   // Who may open the page: a guard, a list of them run in order, or `{ load }` returning one. Left out the page answers 403, as every feature that lists or changes private data does; `false` opens it to everyone.
   guards?: GuardOption | false | undefined
-  // Replaced by `guards` in 1.105, and works until 1.108.
-  guard?: GuardOption | false | undefined
 }
 
 export interface MetricsConfig {
@@ -518,8 +514,6 @@ export interface ImagesConfig {
   resolve?: ((src: string, ctx: GuardContext) => string | undefined | Promise<string | undefined>) | undefined
   // Run before `resolve`, as a page guard: `guards: ctx => { if (!ctx.locals.session.get('user')) ctx.deny(401) }` resizes those images for signed-in users alone. A list or `{ load }` is taken too. Left out, a `resolve` answers 403 for every image, since it reads files the app chooses; `false` opens them to everyone.
   guards?: GuardOption | false | undefined
-  // Replaced by `guards` in 1.105, and works until 1.108.
-  guard?: GuardOption | false | undefined
 }
 
 export interface RemoteImages {

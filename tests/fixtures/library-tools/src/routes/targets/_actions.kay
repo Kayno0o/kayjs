@@ -12,7 +12,7 @@ export const described = action({ input: s.Object({}), tool: 'Says it was descri
 
 export const named = action({ tool: { name: 'Say-Hello', description: 'Says hello' } }, () => 'named')
 
-export const refuses = action(s.Object({}), (_input, ctx) => ctx.fail(409, { reason: 'full' }))
+export const refuses = action(s.Object({}), (_input, ctx) => ctx.deny(409, { data: { reason: 'full' } }))
 
 export const sendsAway = action(s.Object({}), (_input, ctx) => ctx.redirect('/done'))
 

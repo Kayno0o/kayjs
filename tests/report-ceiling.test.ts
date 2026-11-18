@@ -5,7 +5,7 @@ const SEO = 'tests/fixtures/seo'
 
 describe('the anonymous report sinks', () => {
   it('answer 429 once all clients together pass 600 CSP reports a minute, each client being far under its own limit', async () => {
-    const app = await pages({ requireGuards: false, root: SEO, prebuilt: false, security: { reports: true }, proxy: { header: 'x-real-ip' } })
+    const app = await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false, security: { reports: true }, proxy: { header: 'x-real-ip' } })
     const post = async (address: string) => (await app.handle(new Request('http://localhost/_kay/csp', { method: 'POST', headers: { 'content-type': 'application/reports+json', 'x-real-ip': address }, body: '[]' }))).status
 
     for (let client = 0; client < 600; client++)
@@ -15,7 +15,7 @@ describe('the anonymous report sinks', () => {
   })
 
   it('answer 429 once all clients together pass 600 error reports a minute', async () => {
-    const app = await pages({ requireGuards: false, root: SEO, prebuilt: false, observe: { onError: () => undefined }, proxy: { header: 'x-real-ip' } })
+    const app = await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false, observe: { onError: () => undefined }, proxy: { header: 'x-real-ip' } })
     const post = async (address: string) => (await app.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', 'x-real-ip': address }, body: '{}' }))).status
 
     for (let client = 0; client < 600; client++)

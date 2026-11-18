@@ -1,7 +1,6 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { actionType } from '../src/check/action-type'
 import { applySafeFixes } from '../src/check/fixes'
 import { liveApi } from '../src/check/live-api'
 import { scratchDir } from './scratch'
@@ -93,25 +92,6 @@ describe('deprecated-live-api', () => {
       expect(found.filter(one => one.fixes === undefined)).toHaveLength(1)
       expect(await read('src/script.ts')).toBe('import { presence } from \'kay\'\n\nconst a = presence({ room: \'lobby\' })\nconst b = presence({ room, member })\nconst c = presence({ room: `entry:${id}`, member: { name }, signal })\nconst d = presence(\'x\', null, options)\nconst e = presence({ room: \'y\' })\nconst f = presence()\n')
       expect(await read('src/c.kay')).toContain('presence({ room, member: me })')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('deprecated-action-type', () => {
-  it('drops the parameters of Action<never, unknown>, under any local name, in a script and a fence', async () => {
-    const script = 'import type { Action as Any, Action as Plain } from \'kay\'\n\nexport type A = Any<never, unknown>\nexport type B = Plain<{ name: string }, string>\nexport type C = Any<never, unknown, \'hp\'>\n'
-    const page = '---\nimport type { Action } from \'kay\'\n\nconst { run } = props<{ run: Action<never, unknown> }>()\n---\nform(action={run})\n  button Go\n'
-    const { root, found, read } = await fixed(actionType, { 'src/types.ts': script, 'src/go.kay': page, 'src/other.ts': 'type Action<A, B> = A | B\nexport type X = Action<never, unknown>\n' })
-
-    try {
-      expect(found).toHaveLength(2)
-      expect(found.every(one => one.code === 'deprecated-action-type' && one.fixes?.[0]?.safe === true)).toBe(true)
-      expect(await read('src/types.ts')).toBe(script.replace('Any<never, unknown>;', 'Any;').replace('type A = Any<never, unknown>', 'type A = Any'))
-      expect(await read('src/go.kay')).toContain('run: Action }>()')
-      expect(await read('src/other.ts')).toContain('Action<never, unknown>')
     }
     finally {
       await rm(root, { recursive: true, force: true })

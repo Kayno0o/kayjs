@@ -18,7 +18,7 @@ export const typed = action(s.object({
   plan: s.union([s.literal('basic'), s.literal('plus')]),
   firstName: s.string({ optional: true }),
   code: s.string({ optional: true, autocomplete: 'one-time-code' }),
-}), (_input, ctx) => ctx.fail(409, 'Taken'))
+}), (_input, ctx) => ctx.deny(409, { message: 'Taken' }))
 
 const record = { born: new Date(Date.UTC(2020, 0, 5, 12)) }
 --- script

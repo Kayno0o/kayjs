@@ -16,9 +16,9 @@ export type { CallResult }
 
 export const ACTION = Symbol.for('kay.action')
 
-// Type only: what the handler returns on success, so a prop typed with it takes a handler that can also `ctx.fail`.
+// Type only: what the handler returns on success, so a prop typed with it takes a handler that can also `ctx.deny`.
 declare const RESULT: unique symbol
-// Type only: what the handler passes to `ctx.fail`, so a page can type `action.form.failed()`.
+// Type only: what the handler passes to `ctx.deny`, so a page can type `action.form.failed()`.
 declare const FAILED: unique symbol
 // Type only: the honeypot field an action's forms render, which `kay check` then takes as one of their fields.
 declare const HONEYPOT: unique symbol
@@ -70,7 +70,7 @@ export type RateKeyContext = Pick<RequestContext, 'request' | 'locale' | 'cookie
 export type RateKey = (ctx: RateKeyContext) => string | undefined | Promise<string | undefined>
 
 export interface ActionRateLimit extends RateLimit {
-  // `'succeeded'` counts only the posts whose handler returned without `ctx.fail` or an error, so typos and a failing mail server lock no one out; every attempt counts unless given. Posts arriving together all read the count before any adds to it, so a burst may pass `max` by a few: pair it with a limit on every attempt.
+  // `'succeeded'` counts only the posts whose handler returned without `ctx.deny` or an error, so typos and a failing mail server lock no one out; every attempt counts unless given. Posts arriving together all read the count before any adds to it, so a burst may pass `max` by a few: pair it with a limit on every attempt.
   count?: 'succeeded' | undefined
 }
 
@@ -165,7 +165,7 @@ export interface ActionDone extends ActionRun {
   result: unknown
 }
 
-// A run that did not go through, as the visitor is told: `status`, `message`, field `errors` and `data` are the failure shape (`ctx.fail`, `refuse()`, `ctx.deny`, a server error); `error` is what was thrown, undefined for `ctx.fail`.
+// A run that did not go through, as the visitor is told: `status`, `message`, field `errors` and `data` are the failure shape (`refuse()`, `ctx.deny`, a server error); `error` is what was thrown.
 export interface ActionFailed extends ActionRun {
   status: number
   message: string
@@ -180,7 +180,7 @@ export interface ActionHooks {
   beforeRun?: BeforeHook<ActionRun, never, ActionHookContext> | undefined
   // Told after the handler returned, a redirect it threw included. A throw is reported and never fails the action.
   onSuccess?: Hook<ActionDone, ActionHookContext> | undefined
-  // Told after the handler failed with `ctx.fail`, `refuse()`, `ctx.deny()`, `ctx.notFound()` or an error. A redirect is no failure.
+  // Told after the handler failed with `refuse()`, `ctx.deny()`, `ctx.notFound()` or an error. A redirect is no failure.
   onError?: Hook<ActionFailed, ActionHookContext> | undefined
 }
 
@@ -238,8 +238,6 @@ export interface ActionContext<Params extends Readonly<Record<string, unknown>> 
   // `errors` puts a message on a field of the schema, or on the form under `''`: `return ctx.deny(409, { errors: { email: 'Already taken' } })`, which `error email`, `aria-invalid`, `add.form.error('email')` and an `ActionError`'s `errors` follow as for a field the schema refused.
   // It throws, so a statement ends the handler too; `return` types what `data` is for `action.form.failed()`.
   deny: ActionDeny<Field>
-  /** @deprecated `return ctx.deny(status, { data, errors })`. Removed in 1.108; `deprecated-ctx-fail` rewrites it. */
-  fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data, errors?: FieldErrors<Field>) => Failure<Data>
 }
 
 // `ctx.deny` of an action: a refusal with a `message`, `data` or `errors` is typed as a `Failure`, one with no options is `never`, so it narrows what follows as a guard's does.
@@ -248,8 +246,6 @@ export interface ActionDeny<Field extends string = string> {
   <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, options: DenyOptions<Data, Field>): Failure<Data>
   // What a helper taking the guard's `deny` sees: an action's context passes as one.
   <const Status extends number = number>(status?: Status & ErrorStatus<Status>, options?: DenyOptions<ErrorData>): never
-  /** @deprecated `deny(status, { message, data })`. Removed in 1.108; `deprecated-deny-call` rewrites it. */
-  (status: number, message: string, data?: unknown): never
 }
 
 // A message per field of the action's schema, and under `''` one for the whole form.
@@ -277,7 +273,7 @@ export type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionS
 // What a plain form post reads back: the last value of an async iterable, which is undefined when it gave none.
 export type Final<Output> = Output extends AsyncIterable<infer Value> ? Value | undefined : Output
 
-// Unknown for an action of any output, so any action passes where `Action` is expected, and for one whose output names no `Failure`, so a handler that can `ctx.fail` passes where only its success output is typed.
+// Unknown for an action of any output, so any action passes where `Action` is expected, and for one whose output names no `Failure`, so a handler that can `ctx.deny` passes where only its success output is typed.
 export type FailureData<Output> = unknown extends Output ? unknown : [Extract<Output, Failure<unknown>>] extends [never] ? unknown : Output extends Failure<infer Data> ? Data : never
 
 // What a page reads back through `action.form.failed()` after a plain form post failed.
@@ -289,14 +285,14 @@ export interface FormFailure<Input, Data, Honeypot extends string = never> {
   values: Partial<Record<Extract<keyof Input, string>, string>>
   // A message per field the schema refused or the honeypot caught, and under '' one for the whole form, as a rate limit's refusal.
   errors: Partial<Record<Extract<keyof Input, string> | Honeypot | '', string>>
-  // What the handler passed to `ctx.fail`; undefined when the schema refused the input.
+  // What the handler passed to `ctx.deny`; undefined when the schema refused the input.
   data?: Data
 }
 
 // Read off the phantom directly: `infer Output` through `Action` drops the `undefined` of a handler ending without a return.
 export type ResultOf<Target> = Target extends { readonly [RESULT]?: infer Output } ? Output : never
 
-// What the handler passes to `ctx.fail`, read off its phantom for the same reason.
+// What the handler passes to `ctx.deny`, read off its phantom for the same reason.
 export type FailuresOf<Target> = Target extends { readonly [FAILED]?: infer Data } ? Data : never
 
 // The input an action's schema describes, as a form posts it or a call takes it.
@@ -451,8 +447,6 @@ export interface Action<Input = never, Output = unknown, Honeypot extends string
   readonly progress: () => number | undefined
   // What a form posting to this action shows: how the post the page renders for went, refused, and the message of each field. Apart from the call state above, which is the island's own calls.
   readonly form: ActionForm<Input, Output, Honeypot>
-  /** @deprecated Write `form.failed()`, the readers a form shows are grouped under `form`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */
-  readonly failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
   /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
   readonly succeeded: () => FormSuccess<Final<Success<Output>>> | undefined
   // What the last call, or the form post the page rendered for, returned; undefined before one succeeded and after a later one failed.
@@ -462,13 +456,7 @@ export interface Action<Input = never, Output = unknown, Honeypot extends string
   // This action for a form to post with fixed fields, as hidden inputs would carry them: `form(action={move.with({ id, to: 2 })})`. They travel in the form's action URL, so the form needs no inputs for them and posts them with or without JavaScript.
   // eslint-disable-next-line ts/method-signature-style
   with(fields: Partial<Input>): Action<Input, Output, Honeypot>
-  /** @deprecated Write `form.error(field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */
-  // eslint-disable-next-line ts/method-signature-style
-  error(field?: Extract<keyof Input, string> | Honeypot | ''): string | undefined
-  /** @deprecated Write `form.validate(form, field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */
-  // eslint-disable-next-line ts/method-signature-style
-  validate(form: HTMLFormElement, field?: Extract<keyof Input, string>): Promise<boolean>
-  // Whether `error` is a call to this action the server refused, its `data` typed as the handler passes it to `ctx.fail`.
+  // Whether `error` is a call to this action the server refused, its `data` typed as the handler passes it to `ctx.deny`.
   // eslint-disable-next-line ts/method-signature-style
   refused(error: unknown): error is ActionError<FailureData<Output>>
   readonly url: string

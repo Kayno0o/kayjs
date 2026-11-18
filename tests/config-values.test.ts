@@ -22,9 +22,9 @@ describe('config values checked once at load', () => {
   it('accepts a guard, a list or { load } for each guard option', () => {
     const guard = () => undefined
 
-    expect(invalidConfigValues({ jobs: { guard: { load: () => guard } }, images: { guard: [guard, guard] } })).toEqual([])
-    expect(invalidConfigValues({ images: { guard: { load: () => guard } }, jobs: { guard: [guard] }, manifest: { themeColor: { light: '#fff', dark: '#000' } }, live: { rate: { max: 1, window: '1m' } } })).toEqual([])
-    expect(invalidConfigValues({ images: { guard: 'no' } })).toHaveLength(1)
+    expect(invalidConfigValues({ jobs: { guards: { load: () => guard } }, images: { guards: [guard, guard] } })).toEqual([])
+    expect(invalidConfigValues({ images: { guards: { load: () => guard } }, jobs: { guards: [guard] }, manifest: { themeColor: { light: '#fff', dark: '#000' } }, live: { rate: { max: 1, window: '1m' } } })).toEqual([])
+    expect(invalidConfigValues({ images: { guards: 'no' } })).toHaveLength(1)
   })
 
   it('accepts Infinity where it is documented, reads it back in a message, and shortens or hides what it prints', () => {
@@ -82,7 +82,7 @@ describe('config values checked once at load', () => {
       '`images.qualty`, did you mean `images.quality`?',
       '`images.webp.qualty`, did you mean `images.webp.quality`?',
       '`markdown.headinLinks`, did you mean `markdown.headingLinks`?',
-      '`jobs.gard`, did you mean `jobs.guard`?',
+      '`jobs.gard`, did you mean `jobs.guards`?',
       '`live.connection`, did you mean `live.connections`?',
       '`links.outsde`, did you mean `links.outside`?',
       '`cors.origin`, did you mean `cors.origins`?',

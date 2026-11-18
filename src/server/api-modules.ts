@@ -22,7 +22,7 @@ export interface ApiModule {
   mount: string
   // The `_guard.ts` files of its directory and above, outermost first.
   guards: ApiGuard[]
-  // No guard is asked of it on a site with `requireGuards`: it sets `api({ guards: false })`, or a library serves it.
+  // No guard is asked of it on a site with `guards.default` closed: it sets `api({ guards: false })`, or a library serves it.
   open?: true | undefined
   // The extension whose `api` directory holds it, whose `ExtensionApp` a module exporting a function is called with.
   extension?: string | undefined

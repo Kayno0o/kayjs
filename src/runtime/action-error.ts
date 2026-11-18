@@ -1,6 +1,4 @@
-import type { Failure, FieldErrors } from './action-shared'
 import { actionFailed, ApiError, messageOf } from './api-error'
-import { KayError } from './kay-error'
 
 export const FAILURE = Symbol.for('kay.failure')
 
@@ -8,7 +6,7 @@ export const FAILURE = Symbol.for('kay.failure')
 export class ActionError<Data = unknown> extends ApiError<Data> {
   override name = 'ActionError'
 
-  // `errors` holds a message per field the schema refused, `data` what the handler passed to `ctx.fail`, undefined when the call was refused before it ran; `message` reads them, else the status and body.
+  // `errors` holds a message per field the schema refused, `data` what the handler passed to `ctx.deny`, undefined when the call was refused before it ran; `message` reads them, else the status and body.
   constructor(status: number, readonly body: string, errors: Record<string, string> = {}, data?: Data, message = messageOf({ status, errors, data }, actionFailed(status))) {
     super(status, message, data, errors)
   }
@@ -22,16 +20,4 @@ export class ActionRedirectError extends ActionError {
   constructor(status: number, readonly location: string) {
     super(status, `Redirected to ${location}`, {}, undefined, `Action redirected with ${status} to ${location}`)
   }
-}
-
-export function failure<Data>(status: number, data: Data, errors?: FieldErrors): Failure<Data> {
-  // A call reads a success status as the handler's result, so a failure must not carry one.
-  if (!Number.isInteger(status) || status < 400 || status > 599)
-    throw new KayError('argument-invalid', `kay: ctx.deny takes an error status, from 400 to 599, not ${status}`)
-
-  return { [FAILURE]: true, status, data, errors }
-}
-
-export function isFailure(value: unknown): value is Failure<unknown> {
-  return typeof value === 'object' && value !== null && FAILURE in value
 }

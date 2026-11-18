@@ -74,7 +74,7 @@ export interface Route {
   special: SpecialPages
   // `_guard.ts` files covering the page and its actions, outermost first.
   guards: GuardFile[]
-  // No guard is asked of it on a site with `requireGuards`: it sets `guards: false`, or a library serves it.
+  // No guard is asked of it on a site with `guards.default` closed: it sets `guards: false`, or a library serves it.
   open?: true | undefined
   // The extension giving the editor serves it: one of its own screens, which renders no editor over it in edit mode.
   editorOwn?: true | undefined

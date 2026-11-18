@@ -50,7 +50,7 @@ describe('the app-wide request hooks', () => {
           return false
 
         if (request.headers.has('x-throttle'))
-          refuse('Slow down', { status: 429 })
+          refuse(429, { message: 'Slow down' })
 
         if (request.headers.has('x-maintenance'))
           return new Response('Back soon', { status: 503 })
@@ -180,7 +180,7 @@ import { t } from 'elysia'
 import { action } from 'kay'
 
 export const ok = action(t.Object({ n: t.Number() }), ({ n }) => n * 2)
-export const failing = action(t.Object({}), (_input, ctx) => ctx.fail(409, 'Taken', { '': 'Taken' }))
+export const failing = action(t.Object({}), (_input, ctx) => ctx.deny(409, { message: 'Taken', errors: { '': 'Taken' } }))
 export const crashing = action(t.Object({}), () => { throw new Error('boom') })
 export const sendOn = action(t.Object({}), (_input, ctx) => ctx.redirect('/thanks'))
 export const mine = action(t.Object({}), () => 'mine', { onSuccess: ({ action }) => { (globalThis as any).ownTold = action } })
@@ -201,7 +201,7 @@ h1 Home
           events.push(`before ${action} ${JSON.stringify(input)} ${context.request === undefined ? 'no request' : 'request'}`)
 
           if ((input as { n?: number }).n === 13)
-            refuse('Unlucky')
+            refuse(403, { message: 'Unlucky' })
         },
         onSuccess: ({ action, result, file }) => void events.push(`success ${action} ${JSON.stringify(result)} ${file.endsWith('index.kay')}`),
         onError: ({ action, status, message, error }) => void events.push(`error ${action} ${status} ${message} ${error === undefined ? 'fail' : 'thrown'}`),
@@ -229,12 +229,12 @@ h1 Home
     expect(events).toEqual(['before ok {"n":13} request'])
   })
 
-  it('tells onError for ctx.fail, a thrown error and nothing for a redirect, which is a success', async () => {
+  it('tells onError for ctx.deny, a thrown error and nothing for a redirect, which is a success', async () => {
     events.length = 0
     expect((await post('failing', {}, { 'x-forwarded-for': '3.3.3.3' })).status).toBe(409)
     expect((await post('crashing', {}, { 'x-forwarded-for': '3.3.3.4' })).status).toBe(500)
     expect([200, 303]).toContain((await post('sendOn', {}, { 'x-forwarded-for': '3.3.3.5' })).status)
-    expect(events.filter(event => !event.startsWith('before'))).toEqual(['error failing 409 Taken fail', 'error crashing 500 Internal server error thrown', 'success sendOn undefined true'])
+    expect(events.filter(event => !event.startsWith('before'))).toEqual(['error failing 409 Taken thrown', 'error crashing 500 Internal server error thrown', 'success sendOn undefined true'])
   })
 
   it('runs the action\'s own hook after the app\'s', async () => {
@@ -358,7 +358,7 @@ const n = await ctx.once('n', bump)
 export const fail = action(t.Object({}), async (_input, ctx) => {
   await ctx.once('n', bump)
 
-  return ctx.fail(422, 'No')
+  return ctx.deny(422, { message: 'No' })
 })
 export const touch = action(async (ctx) => {
   await ctx.once('t', () => ++runs.touched!)

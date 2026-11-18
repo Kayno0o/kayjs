@@ -30,7 +30,7 @@ export function jobsPageOf(setting: JobsConfig | undefined, at?: string): JobsPa
     return undefined
 
   const object = typeof setting === 'object' && setting !== null
-  const given = object ? (setting.guards ?? setting.guard) as unknown : undefined
+  const given = object ? setting.guards as unknown : undefined
 
   if (given !== undefined && given !== false && !isGuardOption(given))
     throw new KayError('config-invalid', 'kay: `jobs.guards` takes a guard function, a list of them, `{ load }` returning one, or `false`, such as `jobs: { guards: ctx => ctx.locals.auth.admin.require() }`')

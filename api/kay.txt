@@ -82,8 +82,6 @@ function action<const Fields extends SchemaShape, Output, const Honeypot extends
 [.] Action
 interface Action<Input = never, Output = unknown, Honeypot extends string = never>
   data: () => Final<Exclude<Output, Failure<unknown>>> | undefined
-  /** @deprecated Write `form.error(field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ error: (field?: "" | Extract<keyof Input, string> | Honeypot | undefined) => string | undefined
-  /** @deprecated Write `form.failed()`, the readers a form shows are grouped under `form`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
   form: ActionForm<Input, Output, Honeypot>
   onData: (listener: (event: { input: FormData; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; input: FormData; }) => void) => () => void
@@ -98,14 +96,12 @@ interface Action<Input = never, Output = unknown, Honeypot extends string = neve
   queue?: CallQueue | undefined;
 } & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Input, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
-  /** @deprecated Write `form.validate(form, field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ validate: (form: HTMLFormElement, field?: Extract<keyof Input, string> | undefined) => Promise<boolean>
   with: (fields: Partial<Input>) => Action<Input, Output, Honeypot>
 
 [.] ActionContext
 interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string, Guarded extends object = object> extends Omit<RequestContext<Params, Guarded>, 'deny'>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: ActionDeny<Field>
-  /** @deprecated `return ctx.deny(status, { data, errors })`. Removed in 1.108; `deprecated-ctx-fail` rewrites it. */ fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data | undefined, errors?: Partial<Record<"" | Field, string>> | undefined) => Failure<Data>
   guard: Guarded
   headers: Headers
   locale: string
@@ -405,7 +401,7 @@ type Deferred<T> = Promise<T>
 function defineUi(config: Readonly<Record<string, UiEntry>>): Readonly<Record<string, UiEntry>>
 
 [.] Deny
-interface Deny
+type Deny = <const Status extends number = number>(status?: Status & ErrorStatus<Status>, options?: DenyOptions<ErrorData>) => never
 
 [.] DenyOptions
 interface DenyOptions<Data = unknown, Field extends string = string>
@@ -1256,15 +1252,7 @@ interface Refusal
   status: 422
 
 [.] refuse
-/** @deprecated `refuse(status, { message, errors, data })`. Removed in 1.108; `deprecated-refuse-call` rewrites it. */
-function refuse(status?: number | undefined, options?: DenyOptions<unknown, string> | undefined): never
-function refuse(message?: string | undefined, options?: RefuseOptions | undefined): never
-
-[.] RefuseOptions
-interface RefuseOptions
-  data?: unknown
-  errors?: Record<string, string> | undefined
-  status?: number | undefined
+function refuse(status?: number | undefined, options?: DenyOptions<unknown, string>): never
 
 [.] Register
 interface Register
@@ -1473,8 +1461,6 @@ interface Selection<Key>
 [.] ServerAction
 interface ServerAction<Spec extends Schema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Spec>>, Output, Honeypot>
   data: () => Final<Exclude<Output, Failure<unknown>>> | undefined
-  /** @deprecated Write `form.error(field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ error: (field?: "" | Extract<keyof Sendable<Static<Spec>>, string> | Honeypot | undefined) => string | undefined
-  /** @deprecated Write `form.failed()`, the readers a form shows are grouped under `form`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ failed: () => FormFailure<Sendable<Static<Spec>>, FailureData<Output>, Honeypot> | undefined
   form: ActionForm<Sendable<Static<Spec>>, Output, Honeypot>
   handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>
   onData: (listener: (event: { input: FormData; }) => void) => () => void
@@ -1492,7 +1478,6 @@ interface ServerAction<Spec extends Schema, Output, Honeypot extends string = ne
   queue?: CallQueue | undefined;
 } & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Sendable<Static<Spec>>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
-  /** @deprecated Write `form.validate(form, field)`. Removed in 1.108.0; `deprecated-action-readers` rewrites it. */ validate: (form: HTMLFormElement, field?: Extract<keyof Sendable<Static<Spec>>, string> | undefined) => Promise<boolean>
   with: (fields: Partial<Sendable<Static<Spec>>>) => Action<Sendable<Static<Spec>>, Output, Honeypot>
 
 [.] ServerOfModule
@@ -1875,7 +1860,6 @@ function vitals(options?: VitalsOptions): KayExtension<AnyElysia>
 [./analytics] VitalsOptions
 interface VitalsOptions
   awaitConsent?: boolean | undefined
-  guard?: GuardOption | false | undefined
   guards?: GuardOption | false | undefined
   prefix?: string | undefined
 
@@ -3039,9 +3023,9 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   sitemap?: Checked<"sitemap" extends keyof Config ? Config[keyof Config & "sitemap"] : unknown, SitemapConfig, [unknown]>;
   budget?: Checked<"budget" extends keyof Config ? Config[keyof Config & "budget"] : unknown, BudgetConfig, [unknown]>;
   entry?: unknown;
-  requireGuards?: unknown;
   rewrite?: unknown;
-  runtimeRedirects?: Checked<"runtimeRedirects" extends keyof Config ? ...#9adc5f2d (3 lines)
+  runtimeRedirects?: Checked<"runtimeRedirects" extends keyof Config ? Config[keyof Config & "runtimeRedirects"] : unknown, {
+    hosts?: string[] | undefined; ...#f9e645c1 (2 lines)
   timeZone?: unknown;
   trailingSlash?: unknown;
   plugins?: unknown;
@@ -3305,7 +3289,6 @@ interface KayConfig extends AppHooks
   preview?: PreviewConfig | boolean | undefined
   proxy?: ProxyConfig | boolean | number | undefined
   redirects?: Redirects | undefined
-  requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
   robots?: RobotsConfig | boolean | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
@@ -3575,7 +3558,6 @@ interface PagesOptions extends ConfigInput
   proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; key?: ProxyKey | string | undefined; }> | boolean | number | undefined
   /** @deprecated Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   redirects?: Loadable<Redirects> | undefined
-  requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
   robots?: Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined; allow?: Loadable<string[]> | undefined; }> | boolean | undefined
   root?: string | undefined
@@ -3768,7 +3750,6 @@ function rateLimit(name: string, limit: RateLimit): RateLimiter
 interface RateLimiter extends RateLimit
   check: (ctx: Pick<GuardContext, "cookies" | "deny" | "headers" | "locale" | "locals" | "request">, message?: ((wait: number) => string) | string | undefined) => Promise<void>
   count: (from: Request | string, server?: Server<unknown> | null | undefined, weight?: number | undefined) => Promise<RateWindow & { wait: number | undefined; }>
-  /** @deprecated `check(ctx, message?)`, as `limiter().enforce(key)` counts under a key and refuses nothing. Removed in 1.108; `deprecated-rate-enforce` rewrites it. */ enforce: (ctx: Pick<GuardContext, "cookies" | "deny" | "headers" | "locale" | "locals" | "request">, message?: ((wait: number) => string) | string | undefined) => Promise<void>
   hit: (from: Request | string, server?: Server<unknown> | null | undefined, weight?: number | undefined) => Promise<number | undefined>
   key?: RateKey | undefined
   max: number
@@ -4610,7 +4591,6 @@ interface TestOptions extends PagesOptions
   proxyKey?: string | undefined
   /** @deprecated Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   redirects?: Loadable<Redirects> | undefined
-  requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
   robots?: Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined; allow?: Loadable<string[]> | undefined; }> | boolean | undefined
   root?: string | undefined

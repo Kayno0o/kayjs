@@ -29,7 +29,7 @@ export interface LocalConflict<Row> {
   base: Row | undefined
   // The queued write's row, undefined when it was a removal.
   mine: Row | undefined
-  // The server's row now, which its action answered `ctx.fail(409, row)` with.
+  // The server's row now, which its action answered `ctx.deny(409, { data: row })` with.
   theirs: Row
 }
 

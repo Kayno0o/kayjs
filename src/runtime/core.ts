@@ -371,11 +371,7 @@ export interface RequestContext<Params extends Record<string, unknown> = Record<
 }
 
 // `ctx.deny(status, { message, errors, data })`, the one shape every refusal takes (`refuse()` throws the same).
-export interface Deny {
-  <const Status extends number = number>(status?: Status & ErrorStatus<Status>, options?: DenyOptions<ErrorData>): never
-  /** @deprecated `deny(status, { message, data })`. Removed in 1.108; `deprecated-deny-call` rewrites it. */
-  (status: number, message: string, data?: ErrorData): never
-}
+export type Deny = <const Status extends number = number>(status?: Status & ErrorStatus<Status>, options?: DenyOptions<ErrorData>) => never
 
 // What `ctx.deny` hands the error page as `ctx.error.data`: the `errorData` an app sets in `Register`, `unknown` otherwise.
 export type ErrorData = Register extends { errorData: infer Data } ? Data : unknown

@@ -44,7 +44,7 @@ If `onConfirm` throws, the dialog stays open and `failureLabel` is toasted.
 
 ## Refusals of the handler
 
-A handler refusing with `ctx.fail(400, { error: 'Still in use' })` is a failure of `onConfirm`. Give `refused` a function from that data to a message, and it is toasted in place of `failureLabel`. `failureLabel` stays for an answer of `undefined` and for any other error.
+A handler refusing with `ctx.deny(400, { data: { error: 'Still in use' } })` is a failure of `onConfirm`. Give `refused` a function from that data to a message, and it is toasted in place of `failureLabel`. `failureLabel` stays for an answer of `undefined` and for any other error.
 
 ## Refusals of an API route
 

@@ -82,7 +82,7 @@ async function site(options: AnalyticsOptions) {
   if (kept)
     return kept
 
-  const built = pages({ requireGuards: false, root: dir, dirs: { routes: join(dir, 'routes') }, prebuilt: false, extensions: [analytics(options)], proxy: { hops: 1 } })
+  const built = pages({ guards: { default: 'open' }, root: dir, dirs: { routes: join(dir, 'routes') }, prebuilt: false, extensions: [analytics(options)], proxy: { hops: 1 } })
 
   sites.set(key, built)
 
@@ -598,7 +598,7 @@ describe('hostile requests', () => {
   })
 
   it('takes the address from the proxy it trusts, never from a header the visitor wrote', async () => {
-    const app = await pages({ requireGuards: false, root: dir, dirs: { routes: join(dir, 'routes') }, prebuilt: false, extensions: [analytics(plausible())], proxy: false })
+    const app = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: join(dir, 'routes') }, prebuilt: false, extensions: [analytics(plausible())], proxy: false })
 
     await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: JSON.stringify(visit()), headers: { 'user-agent': CHROME, 'x-forwarded-for': '10.1.1.1' } }))
     await forwardsSettled()
@@ -608,7 +608,7 @@ describe('hostile requests', () => {
   })
 
   it('reads the address from the proxy kay infers in production when the app sets none', async () => {
-    const app = await pages({ requireGuards: false, root: dir, dirs: { routes: join(dir, 'routes') }, prebuilt: false, extensions: [analytics(plausible())] })
+    const app = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: join(dir, 'routes') }, prebuilt: false, extensions: [analytics(plausible())] })
 
     await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: JSON.stringify(visit()), headers: { 'user-agent': CHROME, 'x-forwarded-for': '10.1.1.1' } }))
     await forwardsSettled()
@@ -659,7 +659,7 @@ describe('pages left out', () => {
 
   it('reads the base off the request, or from the tracker when a proxy took it off', async () => {
     const app = await site(plausible({ exclude: ['/account'] }))
-    const mounted = await testSite({ requireGuards: false, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', extensions: [analytics(plausible({ exclude: ['/account'] }))], proxy: { hops: 1 } })
+    const mounted = await testSite({ guards: { default: 'open' }, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', extensions: [analytics(plausible({ exclude: ['/account'] }))], proxy: { hops: 1 } })
 
     try {
       await send(app, visit({ u: 'http://localhost/shop/account', s: '/shop' }))
@@ -698,7 +698,7 @@ describe('pages left out', () => {
 
 describe('under a base and a trailing slash', () => {
   it('serves the tracker, the page tag and the post under the base', async () => {
-    const mounted = await testSite({ requireGuards: false, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', trailingSlash: 'always', extensions: [analytics(plausible({ awaitConsent: true }))], proxy: { hops: 1 } })
+    const mounted = await testSite({ guards: { default: 'open' }, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', trailingSlash: 'always', extensions: [analytics(plausible({ awaitConsent: true }))], proxy: { hops: 1 } })
 
     try {
       const home = await (await mounted.fetch('/')).text()
@@ -992,7 +992,7 @@ describe('a custom provider', () => {
   })
 
   it('names the app\'s base in the script the line loads, and serves it there', async () => {
-    const mounted = await testSite({ requireGuards: false, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', extensions: [analytics(custom())] })
+    const mounted = await testSite({ guards: { default: 'open' }, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', extensions: [analytics(custom())] })
 
     try {
       const home = await (await mounted.fetch('/')).text()
@@ -1011,7 +1011,7 @@ describe('a custom provider', () => {
   })
 
   it('names the app\'s base in the tag of a custom tracker without the line, for a proxy that takes the base off', async () => {
-    const mounted = await testSite({ requireGuards: false, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', extensions: [analytics(custom({ info: false }))] })
+    const mounted = await testSite({ guards: { default: 'open' }, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', extensions: [analytics(custom({ info: false }))] })
 
     try {
       const home = await (await mounted.fetch('/')).text()
@@ -1029,7 +1029,7 @@ describe('a custom provider', () => {
   })
 
   it('leaves the base off an app\'s own head script that shares the custom tracker\'s path', async () => {
-    const mounted = await testSite({ requireGuards: false, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', head: [{ tag: 'script', props: { src: '/_kay/analytics/script.js', defer: true } }] })
+    const mounted = await testSite({ guards: { default: 'open' }, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', head: [{ tag: 'script', props: { src: '/_kay/analytics/script.js', defer: true } }] })
 
     try {
       const home = await (await mounted.fetch('/')).text()

@@ -22,7 +22,7 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({
   images: {
     resolve: async (src: string, ctx): Promise<string> => \`\${ctx.locals.user.name}\${ctx.locals.role}\${src}\`,
-    guard: (ctx): void => {
+    guards: (ctx): void => {
       const wrong: number = ctx.locals.role
 
       if (!wrong)

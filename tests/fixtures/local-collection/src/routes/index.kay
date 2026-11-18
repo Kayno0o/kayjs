@@ -7,7 +7,7 @@ export const save = action(s.Object({ id: s.String({ maxLength: 40 }), title: s.
   const held = notes.get(id)
 
   if (held !== undefined && held.rev !== rev)
-    return ctx.fail(409, held)
+    return ctx.deny(409, { data: held })
 
   stats.saves++
   stats.order.push(id)

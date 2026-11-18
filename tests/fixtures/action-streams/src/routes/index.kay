@@ -142,7 +142,7 @@ export const libraryWorded = action({ messages: { rateLimit: wait => `Back in ${
 
 export const refuses = action(t.Object({ full: t.Boolean() }), async ({ full }, ctx) => {
   if (full)
-    return ctx.fail(409, 'Full')
+    return ctx.deny(409, { message: 'Full' })
 
   return (async function* () {
     yield 'room'

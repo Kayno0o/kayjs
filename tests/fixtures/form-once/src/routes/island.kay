@@ -6,7 +6,7 @@ export const rename = action(t.Object({
   title: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
   done: t.Optional(t.Boolean()),
   note: t.Optional(t.String()),
-}), (_input, ctx) => ctx.fail(409, 'Taken'))
+}), (_input, ctx) => ctx.deny(409, { message: 'Taken' }))
 --- script
 import { signal } from 'kay'
 

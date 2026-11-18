@@ -246,7 +246,7 @@ markInvalid(input, 'length', input.value.length < 8)
 
 ## Failing on purpose
 
-A handler refuses a post with `ctx.deny(status, { message, errors, data })`, the call a guard, a page and an endpoint use too. The page reads `data` with `add.form.failed()?.data`. It throws, so write `return ctx.deny(...)` for TypeScript to type `data`. `ctx.fail(status, data, errors)` is the old spelling, kept until 1.108: it returns where `deny` throws, so `kay check` reports one that is not returned as `unreturned-fail`.
+A handler refuses a post with `ctx.deny(status, { message, errors, data })`, the call a guard, a page and an endpoint use too. The page reads `data` with `add.form.failed()?.data`. It throws, so write `return ctx.deny(...)` for TypeScript to type `data`.
 
 ```kay
 --- server
@@ -351,7 +351,7 @@ A page with a `server` fence can also hand an action to a component as a prop, s
 
 A production build ships the code that brings an action to life in an island only when your own files call `action(` or you use a kay library. If a page hands an island an action created only in a package outside your app, the page fails with an error saying so. Call `action(` in one of your files, such as `export const greet = action(...)` in a route, to fix it.
 
-Type the prop with `Action` from `kay`. `Action` alone takes any action, one with fields fixed by `.with()` included. `NoInputAction<unknown>` takes one declared without a schema, such as a sign-out that ends in a redirect. To keep the input and output types, write them: `Action<{ name: string }, string>`. A handler that can `ctx.fail` still fits: the prop names what it returns on success, and a stream is typed `Action<{ dossier: string }, AsyncGenerator<string>>`.
+Type the prop with `Action` from `kay`. `Action` alone takes any action, one with fields fixed by `.with()` included. `NoInputAction<unknown>` takes one declared without a schema, such as a sign-out that ends in a redirect. To keep the input and output types, write them: `Action<{ name: string }, string>`. A handler that can `ctx.deny` still fits: the prop names what it returns on success, and a stream is typed `Action<{ dossier: string }, AsyncGenerator<string>>`.
 
 ```kay
 ---
@@ -367,7 +367,7 @@ form(action={signOut})
 
 An island needs no import for the prop: typed as a plain function, `(input: { name: string }) => Promise<string>`, it is handed the action all the same, the code reviving it loading in the browser only for a page that passes an island one.
 
-In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from any other error, and types `error.data`.
+In a `catch`, `add.refused(error)` tells a refusal from `ctx.deny` apart from any other error, and types `error.data`.
 
 `focusInvalid()` from `kay` moves focus to the first field marked `aria-invalid`.
 
@@ -592,7 +592,7 @@ if problem() !== ''
   p.error {problem()}
 ```
 
-Any answer other than success gives `{ ok: false, status, message, errors, data, error }` (`error` repeats the four). `message` is the text to show, `errors` is per field, and `data` is typed as the handler passes it to `ctx.fail`. Here `data.message` is what the handler passed to `ctx.fail(409, { message })`.
+Any answer other than success gives `{ ok: false, status, message, errors, data, error }` (`error` repeats the four). `message` is the text to show, `errors` is per field, and `data` is typed as the handler passes it to `ctx.deny`. Here `data.message` is what the handler passed to `ctx.deny(409, { data: { message } })`.
 
 A success gives `{ ok: true, data }`. A failure with no answer from the server, such as a lost connection, is `{ ok: false, status: 0 }`.
 
