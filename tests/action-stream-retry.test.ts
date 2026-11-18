@@ -5,7 +5,7 @@ import { eventually } from './helpers/eventually'
 
 // What a retried action stream does to the call that made it (#2804 slice 4): a tracked handle counts it in flight again, and the call timeout does not cut the new post.
 
-interface Stream { error: () => unknown, pending: () => boolean, status: () => string, last: () => number | undefined, retry: () => void }
+interface Stream { error: () => unknown, pending: () => boolean, status: () => string, data: () => number | undefined, retry: () => void }
 type Tracked = ((input: object) => Promise<{ ok: true, data: Stream }>) & { pending: () => boolean }
 type Stub = ((input: object, options?: { timeout?: string }) => { orThrow: () => Promise<Stream> }) & { track: () => Tracked }
 
