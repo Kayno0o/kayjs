@@ -124,12 +124,16 @@ describe('a component with features', () => {
     const confirm = (props: string) => `---\nimport ConfirmDelete from '@kayjs/ui/confirm-delete.kay'\n---\nConfirmDelete(message="Delete?" onConfirm={async () => {}}${props})\n`
     const plain = await (await built({ Plain: confirm('') })).text('Plain')
     const inline = await (await built({ Inline: confirm(' ask="inline"') })).text('Inline')
+    const link = await (await built({ Link: confirm(' triggerLook="link"') })).text('Link')
 
     // The armed pair is drawn only for `ask="inline"`, and the questions' queue and the discard words belong to no ConfirmDelete.
     expect(inline).toContain('inline-flex items-center gap-1')
     expect(plain).not.toContain('inline-flex items-center gap-1')
+    // A call site writing `triggerLook` keeps the link trigger.
+    expect(link).toContain('kui-confirm-delete-link')
+    expect(plain).not.toContain('kui-confirm-delete-link')
     expect(plain).not.toContain('ui.confirm.discardTitle')
-    expect(plain).not.toContain('questions')
+    expect(plain).not.toContain('.settle(')
   }, 120_000)
 
   it('loads the discard question of a Dialog when it is first asked, not with the island', async () => {
