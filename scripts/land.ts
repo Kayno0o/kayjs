@@ -37,6 +37,9 @@ const MANIFEST = /(?:^|\/)(?:package\.json|bun\.lock)$/
 const SIZED = sizeForScope(scopeLimit())
 // Half the host's cores, as CI runs them, so a landing leaves the machine to the rest; fewer with KAY_LAND_WORKERS, for a session short of memory beside other test runs.
 const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || (SIZED?.workers ?? 6)}`
+
+// A library's test scripts read it for their own --parallel, 6 when unset as CI runs them.
+process.env.KAY_TEST_WORKERS ??= WORKERS.slice('--parallel='.length)
 // The whole suite as that many runs one after another, each balanced by the timings: a worker keeps the global of every file that loaded a native addon (oven-sh/bun#46561), so a run in a few GB of memory ends each run before its workers outgrow it.
 const SHARDS = Number(process.env.KAY_LAND_SHARDS) || (SIZED?.shards ?? 1)
 // How long a step may run before it counts as hung and is killed with every process it started: the whole suite takes minutes, a test stuck on a killed browser or child took hours.
