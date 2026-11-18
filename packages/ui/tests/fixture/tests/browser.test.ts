@@ -1503,7 +1503,7 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
       return { tag: link.tagName, classes: link.className, part: link.getAttribute('data-part'), tooltip: link.getAttribute('data-tooltip'), href: link.getAttribute('href'), panelZ: styles('#beside'), headerZ: styles('header.kui-app-header'), headerPosition: getComputedStyle(document.querySelector('header.kui-app-header')!).position }
     })
 
-    expect(close).toMatchObject({ tag: 'A', part: 'root', tooltip: 'Close', href: '/list' })
+    expect(close).toMatchObject({ tag: 'A', part: 'close', tooltip: 'Close', href: '/list' })
     expect(close.classes).toContain('kui-icon-btn')
     expect(close.headerPosition).toBe('sticky')
     expect(close.panelZ).toBeGreaterThan(close.headerZ)
