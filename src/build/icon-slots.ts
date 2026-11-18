@@ -1,7 +1,7 @@
 import type { ImportGraph, KayLibrary } from './libraries'
-import { readFileSync, realpathSync } from 'node:fs'
-import { dirname, join, sep } from 'node:path'
-import { importEdges, reachedFrom } from './libraries'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { dirname, join, resolve, sep } from 'node:path'
+import { importEdges, importsOf, reachedFrom } from './libraries'
 
 // kayjs-ui draws its icons from a registry keyed by slot, `settings.icons[slot]`, which a bundler cannot shrink: an island would carry every icon of it. The build instead reads the slots the project and the modules it reaches write, and loads the registry holding those alone.
 // A slot is named where the code writes it as a string, `icon="close"` or `icon: 'close'`; pages hand them to islands as props, so every `.kay` file of the build is read, not only what an island imports. One taken from a variable in the project's own code may be any slot, so the whole registry stays.
@@ -17,6 +17,9 @@ const LOWERCASE = /^[a-z]/
 const SLOT_NAME = /^\w+/
 const IN_PACKAGES = /[\\/]node_modules[\\/]/
 const UI_ICON = /[\\/](?:packages[\\/]ui|node_modules[\\/]@kayjs[\\/]ui)[\\/]src[\\/]icon\.kay$/
+// A component called with a spread, `Button({...opts})`: the props it takes, an icon among them, are not written here.
+const SPREAD_CALL = /\b[A-Z]\w*\([^)\n]*\.\.\./
+const JSON_IMPORT = /(?:from\s*|import\(\s*)((["'])\.[^"'\n]*\.json\2)/g
 const SCANNED = /\.(?:kay|[cm]?[jt]sx?)$/
 
 // The registry modules of kayjs-ui, by where the project reaches it: in a checkout or under `node_modules`.
@@ -39,6 +42,16 @@ function isStatic(value: string, imported: ReadonlySet<string>): boolean {
   return LITERAL.test(written) || CHOICE.test(written) || (IDENTIFIER.test(written) && imported.has(written))
 }
 
+// Whether a file belongs to kayjs-ui, by the package.json above it.
+function inUi(file: string): boolean {
+  for (let dir = dirname(file); dir !== dirname(dir); dir = dirname(dir)) {
+    if (existsSync(join(dir, 'package.json')))
+      return isUiRegistry(join(dir, 'src/x'))
+  }
+
+  return false
+}
+
 // The words written as strings in the files of the build and what they import, or undefined when a slot may come from a variable.
 export async function iconSlotsOf(root: string, entries: Iterable<string>, libraries: KayLibrary[], graph?: ImportGraph): Promise<ReadonlySet<string> | undefined> {
   const project = realpathSync(root) + sep
@@ -55,8 +68,34 @@ export async function iconSlotsOf(root: string, entries: Iterable<string>, libra
     for (const [, , word] of text.matchAll(WORD))
       slots.add(word!)
 
+    // Data a file imports hands icons to components as props, which no component writes.
+    for (const [, written] of text.matchAll(JSON_IMPORT)) {
+      const data = resolve(dirname(file), JSON.parse(written!.replaceAll('\'', '"')) as string)
+
+      if (existsSync(data)) {
+        for (const [, , word] of readFileSync(data, 'utf8').matchAll(WORD))
+          slots.add(word!)
+      }
+    }
+
+    // A kayjs-ui file the file imports and the walk did not follow, which its slots would be missing from.
+    for (const specifier of await importsOf(file, text)) {
+      try {
+        const path = realpathSync(Bun.resolveSync(specifier, dirname(file)))
+
+        if (SCANNED.test(path) && !reached.has(path) && inUi(path))
+          dynamic = true
+      }
+      catch {
+        // Not a file of the project's: a builtin or a package.
+      }
+    }
+
     if (!file.startsWith(project) || IN_PACKAGES.test(file.slice(project.length)))
       return
+
+    if (SPREAD_CALL.test(text))
+      dynamic = true
 
     const imported = new Set([...text.matchAll(ICON_IMPORT)].map(hit => hit[1]!))
 

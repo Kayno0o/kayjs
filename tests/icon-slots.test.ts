@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
+import { mkdir, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { iconSlotsOf, isUiRegistry, registryWith, slotsKey } from '../src/build/icon-slots'
+import { findKayLibraries } from '../src/build/libraries'
 import { scratchDir } from './scratch'
 
 const UI = join(import.meta.dir, '../packages/ui/src')
@@ -67,6 +69,11 @@ describe('iconSlotsOf', () => {
     ['a choice with a variable', 'Icon(icon={d ? \'search\' : name})'],
     ['a prop of a sibling', 'Menu(items={[{ label: x, icon: item.icon }]})'],
     ['a prop of another name', 'Stat(openIcon={name})'],
+    ['a value of a row', 'Menu(items={rows.map(row => ({ icon: row.icon }))})'],
+    ['a call', 'Menu(items={[{ icon: pick() }]})'],
+    ['a lookup', 'Menu(items={[{ icon: map[key] }]})'],
+    ['a spread onto a component', 'Button({...opts}) Go'],
+    ['a props pass-through', 'Dialog({...props})'],
   ])('answers undefined for %s', async (_name, template) => {
     const [root, island] = await project({ 'island.kay': `${template}\n` })
 
@@ -85,6 +92,39 @@ describe('iconSlotsOf', () => {
     const [root, island] = await project({ 'island.kay': 'Button(icon="close")\n' })
 
     expect(await iconSlotsOf(root!, [island!], [])).toBeUndefined()
+  })
+
+  it('reads the slots of a data file an island imports', async () => {
+    const [root, island] = await project({ 'island.kay': '---\nimport nav from \'./nav.json\'\n---\nMenu(items={nav})\n', 'nav.json': '[{ "icon": "microphone" }]' })
+    const slots = await iconSlotsOf(root!, [uiIcon(root!), island!], [])
+
+    expect(slots?.has('microphone')).toBe(true)
+  })
+
+  it('answers undefined when an island imports a kayjs-ui file the walk did not follow', async () => {
+    const [root, island] = await project({ 'island.kay': '---\nimport Dialog from \'@kayjs/ui/src/dialog.kay\'\n---\nDialog\n', 'node_modules/@kayjs/ui/package.json': '{"name":"@kayjs/ui"}', 'node_modules/@kayjs/ui/src/dialog.kay': 'IconButton(icon="close")\n' })
+
+    expect(await iconSlotsOf(root!, [uiIcon(root!), island!], [])).toBeUndefined()
+  })
+
+  it('keeps the whole registry for a kayjs-ui linked from another folder, whose files are not where the cut looks for them', async () => {
+    const [root, island] = await project({
+      'app/package.json': '{"name":"app","dependencies":{"kay":"*","@kayjs/ui":"*"}}',
+      'app/island.kay': '---\nimport Dialog from \'@kayjs/ui/dialog.kay\'\n---\nDialog\n',
+      'elsewhere/ui/package.json': '{"name":"@kayjs/ui","peerDependencies":{"kay":"*"}}',
+      'elsewhere/ui/dialog.kay': 'IconButton(icon="close")\n',
+      'elsewhere/ui/icon.kay': 'svg\n',
+    })
+
+    await mkdir(join(root!, 'app/node_modules/@kayjs'), { recursive: true })
+    await symlink(join(root!, 'elsewhere/ui'), join(root!, 'app/node_modules/@kayjs/ui'))
+    await Bun.write(join(root!, 'app/node_modules/kay/package.json'), '{"name":"kay"}')
+
+    const app = join(root!, 'app')
+    const slots = await iconSlotsOf(app, [join(app, 'island.kay')], await findKayLibraries(app))
+
+    expect(island).toBeDefined()
+    expect(slots).toBeUndefined()
   })
 
   it('takes a type annotation for no variable', async () => {
