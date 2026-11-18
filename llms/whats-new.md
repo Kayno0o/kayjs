@@ -5,7 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - An island ships only the kayjs-ui icons it can draw: with kayjs-ui in the app's dependencies the default registry is cut to the slots the project writes as strings, about 8 KB minified off an island drawing a Dialog, and a slot named from a variable in the app keeps it whole; the app's own icon settings stay whole ([kayjs-ui setup](../packages/ui/llms/setup.md))
-- The code that runs an action call (queue, timeout, retries, the post and what follows its answer) loads with the first call instead of with the first island holding an action: a page of hubble's with a table of rows and dialogs loads 2.2 KB gzip less ([islands](islands.md#the-action-caller))
+- The code that runs an action call (queue, timeout, retries, the post and what follows its answer) loads with the first call instead of with the first island holding an action: a page of hubble's with a table of rows and dialogs loads 1.8 KB gzip less ([islands](islands.md#the-action-caller))
 - A component of an island that leaves a feature out (kayjs-ui's `Table` with no filter, selection, paging or detail rows) no longer ships the markers and the effects of the blocks it never draws, and an `aria-` or `data-` attribute of such a feature is not bound: a plain `Table` island carries 1.7 KB less of kayjs-ui's code, 9.9 KB in all, as any component declaring `uses()` features carries less.
 - An extension's own islands, as kayjs-ui's toaster, tooltip host and confirm host, hydrate when the library resolves outside the project root (a workspace link, or a folder above it) and the app lists no dependency on it ([component libraries](component-libraries.md)).
 
