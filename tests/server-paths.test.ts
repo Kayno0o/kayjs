@@ -6,11 +6,11 @@ const routes = 'tests/fixtures/mcp/src/routes'
 const api = 'tests/fixtures/mcp/src/api'
 const KEY = { 'x-key': 'open' }
 const locals = (request: Request) => ({ key: request.headers.get('x-key') ?? undefined })
-const settings = { guards: { default: 'open' as const }, dirs: { routes, api }, islands: false, locals, mcp: { path: '/tools' }, openapi: { path: '/spec.json', reference: true, referencePath: '/docs/api' } }
+const config = { guards: { default: 'open' as const }, dirs: { routes, api }, mcp: true, endpoints: { mcp: '/tools', openapi: '/spec.json' }, openapi: { reference: { path: '/docs/api' } } }
 
-const root = await testSite(settings)
-const mounted = await testSite({ ...settings, base: '/shop', trailingSlash: 'always' })
-const defaults = await testSite({ guards: { default: 'open' as const }, dirs: { routes, api }, islands: false, locals, mcp: true, openapi: { reference: true } })
+const root = await testSite({ config, islands: false, locals })
+const mounted = await testSite({ config: { ...config, base: '/shop', trailingSlash: 'always' }, islands: false, locals })
+const defaults = await testSite({ config: { guards: { default: 'open' }, dirs: { routes, api }, mcp: true, openapi: { reference: true } }, islands: false, locals })
 
 afterAll(async () => {
   await Promise.all([root.close(), mounted.close(), defaults.close()])
@@ -53,43 +53,43 @@ describe('the default paths', () => {
 })
 
 describe('a path that cannot be served', () => {
-  const boot = async (extra: object) => pages({ guards: { default: 'open' as const }, dirs: { routes, api }, prebuilt: false, security: false, ...extra })
+  const boot = async (extra: object) => pages({ config: { guards: { default: 'open' }, dirs: { routes, api }, security: false, ...extra }, prebuilt: false })
 
   it.each([
-    ['mcp', { mcp: { path: 'tools' } }, 'endpoints.mcp'],
-    ['mcp', { mcp: { path: '' } }, 'endpoints.mcp'],
-    ['mcp', { mcp: { path: '/' } }, 'endpoints.mcp'],
-    ['mcp', { mcp: { path: '/tools/' } }, 'endpoints.mcp'],
-    ['mcp', { mcp: { path: '/a/:id' } }, 'endpoints.mcp'],
-    ['mcp', { mcp: { path: '/a/*' } }, 'endpoints.mcp'],
-    ['mcp', { mcp: { path: '/a//b' } }, 'endpoints.mcp'],
-    ['mcp', { mcp: { path: '/a/../b' } }, 'endpoints.mcp'],
-    ['mcp', { mcp: { path: '/a?x=1' } }, 'endpoints.mcp'],
-    ['mcp', { mcp: { path: 42 } }, 'endpoints.mcp'],
-    ['openapi', { openapi: { path: 'spec.json' } }, 'endpoints.openapi'],
-    ['openapi', { openapi: { path: '/spec.json', reference: true, referencePath: '/spec.json' } }, 'both'],
-    ['openapi', { openapi: { path: '/api/openapi.json', reference: true, referencePath: '/api/openapi.json' } }, 'both'],
+    ['mcp', { mcp: true, endpoints: { mcp: 'tools' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: true, endpoints: { mcp: '' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: true, endpoints: { mcp: '/' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: true, endpoints: { mcp: '/tools/' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: true, endpoints: { mcp: '/a/:id' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: true, endpoints: { mcp: '/a/*' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: true, endpoints: { mcp: '/a//b' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: true, endpoints: { mcp: '/a/../b' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: true, endpoints: { mcp: '/a?x=1' } }, 'endpoints.mcp'],
+    ['mcp', { mcp: true, endpoints: { mcp: 42 } }, 'endpoints.mcp'],
+    ['openapi', { endpoints: { openapi: 'spec.json' } }, 'endpoints.openapi'],
+    ['openapi', { endpoints: { openapi: '/spec.json' }, openapi: { reference: { path: '/spec.json' } } }, 'both'],
+    ['openapi', { endpoints: { openapi: '/api/openapi.json' }, openapi: { reference: { path: '/api/openapi.json' } } }, 'both'],
   ])('refuses %s %j', async (_kind, extra, message) => {
     await expect(boot(extra)).rejects.toThrow(message)
   })
 
   it('lets the document sit at the reference page\'s default path while the page is off', async () => {
-    await expect(boot({ openapi: { path: '/api/reference' } })).resolves.toBeDefined()
+    await expect(boot({ endpoints: { openapi: '/api/reference' } })).resolves.toBeDefined()
   })
 
   it('refuses a path under /_kay', async () => {
-    await expect(boot({ mcp: { path: '/_kay/mcp' } })).rejects.toThrow('/_kay')
-    await expect(boot({ openapi: { path: '/_kay' } })).rejects.toThrow('/_kay')
+    await expect(boot({ mcp: true, endpoints: { mcp: '/_kay/mcp' } })).rejects.toThrow('/_kay')
+    await expect(boot({ endpoints: { openapi: '/_kay' } })).rejects.toThrow('/_kay')
   })
 
   it('refuses an MCP path a page, an API route or the OpenAPI document already serves', async () => {
-    await expect(boot({ mcp: { path: '/more' } })).rejects.toThrow('/more')
-    await expect(boot({ mcp: { path: '/api/notes/hidden' } })).rejects.toThrow('/api/notes/hidden')
-    await expect(boot({ mcp: { path: '/spec.json' }, openapi: { path: '/spec.json' } })).rejects.toThrow('/spec.json')
+    await expect(boot({ mcp: true, endpoints: { mcp: '/more' } })).rejects.toThrow('/more')
+    await expect(boot({ mcp: true, endpoints: { mcp: '/api/notes/hidden' } })).rejects.toThrow('/api/notes/hidden')
+    await expect(boot({ mcp: true, openapi: true, endpoints: { mcp: '/spec.json', openapi: '/spec.json' } })).rejects.toThrow('/spec.json')
   })
 
   it('refuses an OpenAPI path an API route or a page already serves', async () => {
-    await expect(boot({ openapi: { path: '/api/notes/hidden' } })).rejects.toThrow('/api/notes/hidden')
-    await expect(boot({ openapi: { path: '/more' } })).rejects.toThrow('/more')
+    await expect(boot({ openapi: true, endpoints: { openapi: '/api/notes/hidden' } })).rejects.toThrow('/api/notes/hidden')
+    await expect(boot({ openapi: true, endpoints: { openapi: '/more' } })).rejects.toThrow('/more')
   })
 })

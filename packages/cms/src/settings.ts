@@ -40,7 +40,7 @@ export interface EntryState {
   body?: string | undefined
 }
 
-// What a save, a deletion or a move of an editor changed, once it is written. `cms({ onSave })` is told it with the `context` of kay's hooks.
+// What a save, a deletion or a move of an editor changed, once it is written. `cms({ afterSave })` is told it with the `context` of kay's hooks.
 export interface SaveEvent {
   collection: string
   slug: string
@@ -59,7 +59,7 @@ export interface SaveEvent {
   previous?: EntryState | undefined
 }
 
-// What the activity log keeps: what an `onSave` is told, an upload, a share link made for an entry, and the revocation of an entry's links.
+// What the activity log keeps: what an `afterSave` is told, an upload, a share link made for an entry, and the revocation of an entry's links.
 export type ActivityVerb = SaveEvent['verb'] | 'upload' | 'share' | 'unshare'
 
 // What `cms({ beforeSave })` is asked, before the entry is checked against its schema and written: the verbs that write it (`add`, `update`, `publish`, `unpublish`, `duplicate`, `restore`), a `delete`, and a `rename`, whose `slug` is the new one and `from` the old. A reorder is not asked.
@@ -101,7 +101,7 @@ export interface BeforeUploadChange {
   type: string
 }
 
-// A file that is stored, as `cms({ onUpload })` is told it.
+// A file that is stored, as `cms({ afterUpload })` is told it.
 export interface UploadEvent {
   collection: string
   // The storage key, and the path pages render it from.
@@ -145,13 +145,9 @@ export interface CollectionSettings {
   uploads?: UploadOptions | undefined
   fourEyes?: boolean | undefined
   afterSave?: Hook<SaveEvent> | undefined
-  /** @deprecated Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onSave?: Hook<SaveEvent> | undefined
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
   afterUpload?: Hook<UploadEvent> | undefined
-  /** @deprecated Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onUpload?: Hook<UploadEvent> | undefined
 }
 
 // The options of the Edit this page link: `button: false` keeps the hint and the app's own `a[data-kcms-edit-page]`, and draws no button of the cms's own.
@@ -174,7 +170,7 @@ export interface CmsOptions {
   pageSize?: number | undefined
   // Collections whose bodies may hold HTML that runs as the site, such as a `<script>` or an `onclick`, which a save is otherwise refused for.
   rawHtml?: string[] | undefined
-  // How the screens arrange a collection, and what it sets beside the cms's own (`uploads`, `fourEyes`, `onSave`, `beforeSave`, `beforeUpload`, `onUpload`: the hooks run after the global ones), by its name: `form` its entry form (`fields` shown first, a nested list being a row of columns, `exclude` left out, `body` the body's `label` and `hint`, `toolbar` the Markdown boxes' buttons, `previewClass` the classes of their preview) and `list` its list (`columns` of field keys after the title, `actions` kept among 'move', 'publish', 'unpublish', 'editOnPage' and 'delete'); `history: false` keeps neither its revisions nor its trash.
+  // How the screens arrange a collection, and what it sets beside the cms's own (`uploads`, `fourEyes`, `afterSave`, `beforeSave`, `beforeUpload`, `afterUpload`: the hooks run after the global ones), by its name: `form` its entry form (`fields` shown first, a nested list being a row of columns, `exclude` left out, `body` the body's `label` and `hint`, `toolbar` the Markdown boxes' buttons, `previewClass` the classes of their preview) and `list` its list (`columns` of field keys after the title, `actions` kept among 'move', 'publish', 'unpublish', 'editOnPage' and 'delete'); `history: false` keeps neither its revisions nor its trash.
   collections?: Record<string, GivenLayout> | undefined
   // `false` leaves out the hint cookie and the "Edit this page" link an editor's browser finds on every page, once the guard let it into the screens; a link of your own carries `data-kcms-edit-page` and is shown in its place, and `{ button: false }` draws none of ours, so only such a link shows.
   pageLink?: boolean | PageLinkOptions | undefined
@@ -191,16 +187,12 @@ export interface CmsOptions {
   fourEyes?: boolean | undefined
   // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. It is told the entry's `data` and `previous` too. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is reported with source `cms.onSave` and never undoes the save.
   afterSave?: Hook<SaveEvent> | undefined
-  /** @deprecated Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onSave?: Hook<SaveEvent> | undefined
-  // Runs before every save, publish, unpublish, duplicate, restore, deletion and rename, after the role and `can` checks (and `fourEyes` for an approval) and before the entry is checked against its schema, so what it changes is checked. Returns nothing, `{ data, body }` to write instead, `false` or throws `refuse(422, { message, errors })` to refuse: the entry form shows it as it shows a schema refusal, the API answers `error.status` 403 or 422. A throw of any other kind refuses with 500 and is reported with source `cms.beforeSave`.
+  // Runs before every save, publish, unpublish, duplicate, restore, deletion and rename, after the role and `can` checks (and `fourEyes` for an approval) and before the entry is checked against its schema, so what it changes is checked. Returns nothing, `{ data, body }` to write instead, `false` or throws `refuse(message, { errors })` to refuse: the entry form shows it as it shows a schema refusal, the API answers `error.status` 403 or 422. A throw of any other kind refuses with 500 and is reported with source `cms.beforeSave`.
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
   // Runs on each file an editor sends, once its size and type are accepted, to scan it, resize it or rename it: returns nothing, `{ bytes, name, type }` to store that instead (checked against `uploads` and `maxSize` again), or refuses as `beforeSave` does, with the status as the answer.
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
-  // Runs after a file is stored: a CDN purge, a media record. A throw is reported with source `cms.onUpload` and the upload stands.
+  // Runs after a file is stored: a CDN purge, a media record. A throw is reported with source `cms.afterUpload` and the upload stands.
   afterUpload?: Hook<UploadEvent> | undefined
-  /** @deprecated Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onUpload?: Hook<UploadEvent> | undefined
   // What a loaded collection keeps beside its entries, on by default for a loader with a `sibling` (SQLite and Postgres): the last `revisions` saves of each entry, 50 by default, which an editor lists, compares and restores, `false` for none, and the entries deleted, kept for `trash`, `'30d'` by default, `false` for none. `maxAge` is how old a revision or an activity event may get before it is dropped, `'365d'` by default, `false` for no limit. `false` turns all three off, and `collections: { name: { history: false } }` for one collection.
   history?: false | { revisions?: number | false | undefined, trash?: Duration | false | undefined, maxAge?: Duration | false | undefined } | undefined
 }
@@ -334,7 +326,7 @@ function accessOf({ access, guard, roles }: Pick<CmsOptions, 'access' | 'guard' 
   return { guard: roleGuard(access), member: undefined }
 }
 
-export function configure({ prefix = '/admin', access, guard: own, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, onSave, afterSave = onSave, beforeSave, beforeUpload, onUpload, afterUpload = onUpload, collections, pageLink, roles, can, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', access, guard: own, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, afterSave, beforeSave, beforeUpload, afterUpload, collections, pageLink, roles, can, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw configError('cms', 'pageSize', `\`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 

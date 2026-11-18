@@ -8,7 +8,7 @@ const ROOT = 'tests/fixtures/local-collection'
 
 const site = path === undefined ? undefined : await testSite({ root: ROOT, browser: { path } })
 
-const worker = path === undefined ? undefined : await testSite({ root: ROOT, browser: { path }, offline: true })
+const worker = path === undefined ? undefined : await testSite({ root: ROOT, browser: { path }, config: { client: { offline: true } } })
 
 afterAll(async () => {
   await site?.close()

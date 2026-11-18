@@ -44,9 +44,9 @@ import { prerendered, refusedPrerender, scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
-const app = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: 'tests/fixtures/site/public' } })
+const app = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: 'tests/fixtures/site/public' } } })
 // No _404.kay nor _error.kay: failures answer in plain text.
-const bare = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes' }, prebuilt: true })
+const bare = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes' } }, prebuilt: true })
 // Any page style block but the new-tab cue, which a page with islands carries whatever its stylesheets do.
 const PAGE_STYLE = /<style>(?!a\[data-new-tab\])/
 const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/
@@ -88,7 +88,7 @@ async function waitFor(done: () => boolean): Promise<void> {
 }
 
 // The stylesheets linked, as `inlineStyles: false` serves them.
-const linked = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: 'tests/fixtures/site/public' }, client: { inlineStyles: false } })
+const linked = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: 'tests/fixtures/site/public' }, client: { inlineStyles: false } } })
 
 async function get(path: string, served: typeof app = app): Promise<{ status: number, html: string, headers: Headers }> {
   const response = await served.handle(new Request(`http://localhost${path}`))
@@ -164,7 +164,7 @@ describe('pages', () => {
     expect((await get('/about')).html).not.toContain('modulepreload')
 
     const built = manifestFile.lastModified
-    const prebuilt = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: true })
+    const prebuilt = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes' } }, prebuilt: true })
 
     expect(await (await prebuilt.handle(new Request('http://localhost/'))).text()).toContain(`src="${manifest.entry}"`)
     expect(Bun.file(manifestFile.name!).lastModified).toBe(built)
@@ -185,7 +185,7 @@ describe('pages', () => {
 
   it('inlines the stylesheets by default while a page keeps them small, each let through a strict style-src by its hash, `false` linking them', async () => {
     for (const base of [undefined, '/docs']) {
-      const small = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: 'tests/fixtures/site/public' }, prebuilt: true, base, security: { csp: { 'style-src': ['\'self\''] } } })
+      const small = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: 'tests/fixtures/site/public' }, base, security: { csp: { 'style-src': ['\'self\''] } } }, prebuilt: true })
       const response = await small.handle(new Request('http://localhost/'))
       const html = await response.text()
       const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]!).filter(style => !style.startsWith('a[data-new-tab]'))
@@ -212,7 +212,7 @@ describe('pages', () => {
 
       await Bun.write(file, `${await Bun.file(file).text()}\n/* ${noise} */`)
       for (const base of [undefined, '/docs']) {
-        const served = await scratch.serve({ base, serve: { compress: true } })
+        const served = await scratch.serve({ config: { base, serve: { compress: true } } })
         const page = async (path: string) => (await served.handle(new Request(`http://localhost${path}`))).text()
         const long = await page('/')
         const short = await page('/about')
@@ -271,7 +271,7 @@ describe('pages', () => {
 
         expect(Bun.gzipSync(sheets.get(home)!).length + layout).toBe(INLINE_LIMIT + extra)
 
-        const served = await scratch.serve({ serve: { compress: false } })
+        const served = await scratch.serve({ config: { serve: { compress: false } } })
         const html = await (await served.handle(new Request('http://localhost/'))).text()
 
         expect(PAGE_STYLE.test(html), `${INLINE_LIMIT + extra} bytes together`).toBe(inlined)
@@ -317,7 +317,7 @@ describe('pages', () => {
 
   it('writes the stylesheets into the head with inlineStyles, each let through a strict style-src by its hash under the mount point', async () => {
     for (const base of [undefined, '/docs']) {
-      const inline = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: 'tests/fixtures/site/public' }, client: { inlineStyles: true }, prebuilt: true, base, security: { csp: { 'style-src': ['\'self\''] } } })
+      const inline = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: 'tests/fixtures/site/public' }, client: { inlineStyles: true }, base, security: { csp: { 'style-src': ['\'self\''] } } }, prebuilt: true })
       const response = await inline.handle(new Request('http://localhost/'))
       const html = await response.text()
       const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]!).filter(style => !style.startsWith('a[data-new-tab]'))
@@ -334,7 +334,7 @@ describe('pages', () => {
 
   it('compresses only what lies around the inlined stylesheets, as gzip even to a browser taking brotli, the page decoding as it was', async () => {
     for (const base of [undefined, '/docs']) {
-      const inline = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: 'tests/fixtures/site/public' }, client: { inlineStyles: true }, serve: { compress: true }, prebuilt: true, base })
+      const inline = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: 'tests/fixtures/site/public' }, client: { inlineStyles: true }, serve: { compress: true }, base }, prebuilt: true })
       const page = async (accept?: string) => inline.handle(new Request('http://localhost/', { headers: accept === undefined ? {} : { 'accept-encoding': accept } }))
       const plain = await (await page()).text()
       const spliced = await page('br, gzip')
@@ -488,7 +488,7 @@ describe('pages', () => {
     try {
       await Bun.write(join(dir, '[...path].kay'), '--- server\nconst path = ctx.params.path\n---\np {path}\n')
       // Prebuilt, so the shared client build the other tests read stays as it is.
-      const site = new Elysia().use(await pages({ dirs: { routes: dir, public: 'tests/fixtures/site/public' }, prebuilt: true }))
+      const site = new Elysia().use(await pages({ config: { dirs: { routes: dir, public: 'tests/fixtures/site/public' } }, prebuilt: true }))
       const response = await site.handle(new Request('http://localhost//evil.example/'))
 
       expect([response.status, response.headers.get('location')]).toEqual([308, '/evil.example'])
@@ -814,7 +814,7 @@ describe('route params in guards and actions', () => {
     await Bun.write(join(dir, 'routes/orgs/[org]/report.kay'), '--- server\nexport const page = { prerender: [{ org: \'acme\' }, { org: \'other\' }] }\n---\nh1 Report\n')
     await Bun.write(join(dir, 'api/orgs/_guard.ts'), GUARD)
     await Bun.write(join(dir, 'api/orgs/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/:org\', ({ params }) => params.org)\n')
-    served = await pages({ guards: { default: 'open' }, dirs: { routes: join(dir, 'routes'), api: join(dir, 'api') }, prebuilt: true })
+    served = await pages({ config: { guards: { default: 'open' }, dirs: { routes: join(dir, 'routes'), api: join(dir, 'api') } }, prebuilt: true })
     dir = join(dir, 'routes')
   })
 
@@ -851,7 +851,7 @@ describe('route params in guards and actions', () => {
     try {
       await build.prerender({ dirs: { routes: dir } })
       const file = await Bun.file(join(build.pages, 'orgs/acme/report.html')).text()
-      const prerendered = await build.serve({ dirs: { routes: dir } })
+      const prerendered = await build.serve({ config: { dirs: { routes: dir } } })
       const acme = await prerendered.handle(new NativeRequest('http://localhost/orgs/acme/report'))
       const other = await prerendered.handle(new NativeRequest('http://localhost/orgs/other/report'))
 
@@ -902,7 +902,7 @@ describe('route params in guards and actions', () => {
   })
 
   it('reads the page under the mount point the site is served at', async () => {
-    const mounted = await pages({ guards: { default: 'open' }, dirs: { routes: dir }, prebuilt: true, base: '/repo' })
+    const mounted = await pages({ config: { guards: { default: 'open' }, dirs: { routes: dir }, base: '/repo' }, prebuilt: true })
     const response = await mounted.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/orgs/_org_/index.kay/rename`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/repo/orgs/acme' },
@@ -974,10 +974,10 @@ describe('the url an action\'s guards see', () => {
     await Bun.write(join(dir, 'routes/blog/[slug].kay'), `${ACTION}p Post\n`)
     await Bun.write(join(dir, 'routes/[...path].kay'), `${ACTION}p Page\n`)
     await Bun.write(join(dir, 'routes/docs/[...rest].kay'), `${ACTION}p Doc\n`)
-    served = await pages({ guards: { default: 'open' }, dirs: { routes: join(dir, 'routes') }, prebuilt: true })
-    shop = await pages({ guards: { default: 'open' }, dirs: { routes: join(dir, 'routes') }, prebuilt: true, base: '/shop' })
-    slashed = await pages({ guards: { default: 'open' }, dirs: { routes: join(dir, 'routes') }, prebuilt: true, trailingSlash: 'always' })
-    ignored = await pages({ guards: { default: 'open' }, dirs: { routes: join(dir, 'routes') }, prebuilt: true, trailingSlash: 'ignore' })
+    served = await pages({ config: { guards: { default: 'open' }, dirs: { routes: join(dir, 'routes') } }, prebuilt: true })
+    shop = await pages({ config: { guards: { default: 'open' }, dirs: { routes: join(dir, 'routes') }, base: '/shop' }, prebuilt: true })
+    slashed = await pages({ config: { guards: { default: 'open' }, dirs: { routes: join(dir, 'routes') }, trailingSlash: 'always' }, prebuilt: true })
+    ignored = await pages({ config: { guards: { default: 'open' }, dirs: { routes: join(dir, 'routes') }, trailingSlash: 'ignore' }, prebuilt: true })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -1414,7 +1414,7 @@ describe('prefetch', () => {
     expect(speculationRules('eager')).toContain('"eagerness":"eager"')
     expect(speculationRules(false)).toBe('')
 
-    const quiet = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes' }, client: { prefetch: false }, prebuilt: true })
+    const quiet = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes' }, client: { prefetch: false } }, prebuilt: true })
 
     expect(await (await quiet.handle(new Request('http://localhost/about'))).text()).not.toContain('speculationrules')
   })
@@ -1438,7 +1438,7 @@ describe('without special pages', () => {
       expect(await visit('/?missing')).toMatchObject({ status: 404, text: 'Not Found', cookie: expect.stringMatching(/^visited=yes;/) })
       expect(await visit('/?deny')).toMatchObject({ status: 403, text: 'Members only', cookie: expect.stringMatching(/^visited=yes;/) })
 
-      const dev = await visit('/?fail', await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes' }, prebuilt: true, dev: true }))
+      const dev = await visit('/?fail', await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes' } }, prebuilt: true, dev: true }))
 
       expect(dev).toMatchObject({ status: 500, text: expect.stringContaining('Kaboom'), cookie: expect.stringMatching(/^visited=yes;/), type: 'text/html; charset=utf-8' })
       expect(dev.headers.get('x-page')).toBe('index')
@@ -1495,7 +1495,7 @@ describe('route scan', () => {
       await Bun.write(join(dir, 'about.kay'), '')
       await Bun.write(join(dir, 'about/index.kay'), '')
       expect(await scanRoutes(dir)).toHaveLength(2)
-      await expect(pages({ guards: { default: 'open' }, dirs: { routes: dir }, prebuilt: true })).rejects.toThrow('both serve /about')
+      await expect(pages({ config: { guards: { default: 'open' }, dirs: { routes: dir } }, prebuilt: true })).rejects.toThrow('both serve /about')
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -1622,7 +1622,7 @@ describe('failed actions', () => {
   })
 
   it('renders the page the post came from under the mount point it is served at', async () => {
-    const mounted = new Elysia().use(await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, security: false, base: '/repo' }))
+    const mounted = new Elysia().use(await pages({ config: { guards: { default: 'open' }, security: false, base: '/repo' }, root: 'tests/fixtures/site', prebuilt: false }))
     const page = await mounted.handle(new Request(ADD, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/repo/' }, body: new URLSearchParams({ title: '' }) }))
     const html = await page.text()
 
@@ -1633,7 +1633,7 @@ describe('failed actions', () => {
   })
 
   it('renders the page again for a post refused again from the page a refusal answered, and goes back to it once one goes through', async () => {
-    const mounted = new Elysia().use(await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, security: false, base: '/repo' }))
+    const mounted = new Elysia().use(await pages({ config: { guards: { default: 'open' }, security: false, base: '/repo' }, root: 'tests/fixtures/site', prebuilt: false }))
     // The browser shows the action's URL, so the next post sends it as its `Referer`, to where the page's form says, the mount point a proxy takes off.
     const post = async (url: string, referer: string, title: string) => mounted.handle(new Request(new URL(url.replace('/repo/', '/'), 'http://localhost'), { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', referer }, body: new URLSearchParams({ title }) }))
     const actionOf = (html: string) => FORM_ACTION.exec(html)![1]!.replaceAll('&amp;', '&')
@@ -1744,7 +1744,7 @@ describe('public files', () => {
       for (const name of ['logo@2x.png', 'a+b,c;d=e&f$[1]|.txt', 'it\'s.txt', 'c:d.txt', 'star*.txt', 'sp ace é%.txt'])
         await Bun.write(join(dir, name), name)
 
-      const served = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes', public: dir }, prebuilt: true })
+      const served = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes', public: dir } }, prebuilt: true })
       const visit = async (path: string) => {
         const response = await served.handle(new Request(`http://localhost${path}`))
 
@@ -1775,7 +1775,7 @@ describe('public files', () => {
       for (const [name, body] of Object.entries(files))
         await Bun.write(join(dir, name), body)
 
-      const served = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: dir }, prebuilt: true })
+      const served = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: dir } }, prebuilt: true })
       const visit = async (path: string) => (await served.handle(new Request(`http://localhost${path}`))).text()
 
       expect(await visit('/books')).toBe('books')
@@ -1801,7 +1801,7 @@ describe('public files', () => {
 
     try {
       await Bun.write(join(dir, 'about'), 'shadowed')
-      await expect(pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: dir }, prebuilt: true })).rejects.toThrow('and a page both serve /about')
+      await expect(pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes', public: dir } }, prebuilt: true })).rejects.toThrow('and a page both serve /about')
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -1812,13 +1812,13 @@ describe('public files', () => {
 describe('problems kay check reports', () => {
   it('reach the problems panel of every page in development, never in production', async () => {
     const root = 'tests/fixtures/problems'
-    const dev = new Elysia().use(await pages({ root, dev: true, security: false }))
+    const dev = new Elysia().use(await pages({ root, dev: true, config: { security: false } }))
     const block = (/<script type="application\/json" id="kay-check-problems">(.*?)<\/script>/).exec(await (await dev.handle(new Request('http://localhost/'))).text())?.[1]
 
     expect(block).not.toContain('<')
     expect(JSON.parse(block!)).toContainEqual(expect.stringMatching(/^error\[missing-alt\]: An `img` needs `alt`\n --> src\/routes\/index\.kay:1:1\n/))
 
-    const production = new Elysia().use(await pages({ root, prebuilt: false, security: false }))
+    const production = new Elysia().use(await pages({ root, prebuilt: false, config: { security: false } }))
 
     expect(await (await production.handle(new Request('http://localhost/'))).text()).not.toContain('kay-check-problems')
   })
@@ -1846,14 +1846,12 @@ describe('special pages', () => {
 
   it('hands every error it logs to onError with its request, and logs a reporter that throws', async () => {
     const reported: string[] = []
-    const watched = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes' }, observe: {
-      onError: ({ error, request }) => {
+    const watched = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/site/src/routes' }, onError: ({ error, request }) => {
         reported.push(`${new URL(request!.url).pathname}${new URL(request!.url).search}: ${(error as Error).message}`)
 
         if (reported.length === 1)
           throw new Error('Tracker down')
-      },
-    }, prebuilt: true })
+      } }, prebuilt: true })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1877,7 +1875,7 @@ describe('special pages', () => {
     try {
       await Bun.write(join(dir, 'api/items.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api()\n  .get(\'/broken\', () => { throw new Error(\'Secret detail\') })\n  .get(\'/teapot\', ({ status }) => { throw status(418, \'Short and stout\') })\n  .post(\'/\', ({ body }) => body, { body: t.Object({ name: t.String() }) })\n')
       await Bun.write(join(dir, 'api/own.ts'), 'import { api } from \'kay/server\'\n\nexport default api().onError(() => \'Answered by the module\').get(\'/\', () => { throw new Error(\'Handled\') })\n')
-      const served = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api') }, observe: { onError: ({ error, request }) => void reported.push(`${new URL(request!.url).pathname}: ${(error as Error).message}`) }, prebuilt: true })
+      const served = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api') }, onError: ({ error, request }) => void reported.push(`${new URL(request!.url).pathname}: ${(error as Error).message}`) }, prebuilt: true })
       const broken = await served.handle(new Request('http://localhost/api/items/broken'))
 
       expect(broken.status).toBe(500)
@@ -1889,7 +1887,7 @@ describe('special pages', () => {
       expect(logged).toHaveBeenCalledTimes(1)
       expect(logged).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^kay: GET /api/items/broken, request ${broken.headers.get('x-request-id')}\nError: Secret detail\n`)))
 
-      const dev = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api') }, prebuilt: true, dev: true })
+      const dev = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api') } }, prebuilt: true, dev: true })
 
       expect(await (await dev.handle(new Request('http://localhost/api/items/broken'))).text()).toBe('Secret detail')
     }
@@ -1932,7 +1930,7 @@ describe('special pages', () => {
   })
 
   it('shows the message and the stack in development, times each load and shows browser problems on the page, never in production', async () => {
-    const dev = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', dev: true })
+    const dev = await pages({ config: { guards: { default: 'open' } }, root: 'tests/fixtures/site', dev: true })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1998,7 +1996,7 @@ describe('tracing and timing in production', () => {
   afterAll(() => setTracer(undefined))
 
   it('times the guards, imports, loads and render in a Server-Timing header when the config asks', async () => {
-    const timed = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', observe: { serverTiming: true } })
+    const timed = await pages({ config: { guards: { default: 'open' }, ops: { observe: { serverTiming: true } } }, root: 'tests/fixtures/site' })
     const guarded = await new Elysia().use(auth).use(timed).handle(new Request('http://localhost/admin', { headers: { 'x-user': 'ada' } }))
 
     expect(guarded.status).toBe(200)
@@ -2009,7 +2007,7 @@ describe('tracing and timing in production', () => {
 
   it('hands a tracer a span per page request with one per load and the render in it', async () => {
     const { tracer, ended } = recordingTracer()
-    const traced = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', observe: { tracer } })
+    const traced = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer } } }, root: 'tests/fixtures/site' })
 
     const home = await traced.handle(new Request('http://localhost/'))
 
@@ -2024,7 +2022,7 @@ describe('tracing and timing in production', () => {
 
   it('marks a span whose load threw, and the request it failed', async () => {
     const { tracer, ended } = recordingTracer()
-    const traced = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', observe: { tracer } })
+    const traced = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer } } }, root: 'tests/fixtures/site' })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -2038,7 +2036,7 @@ describe('tracing and timing in production', () => {
 
   it('leaves a span ended by a redirect or a 404 unmarked, as the app meant it', async () => {
     const { tracer, ended } = recordingTracer()
-    const traced = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', observe: { tracer } })
+    const traced = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer } } }, root: 'tests/fixtures/site' })
 
     expect((await traced.handle(new Request('http://localhost/todos/abc'))).status).toBe(302)
     expect((await traced.handle(new Request('http://localhost/todos/999'))).status).toBe(404)
@@ -2058,7 +2056,7 @@ describe('tracing and timing in production', () => {
 
   it('hands it a span per action call', async () => {
     const { tracer, ended } = recordingTracer()
-    const traced = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes' }, observe: { tracer }, prebuilt: true })
+    const traced = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes' }, ops: { observe: { tracer } } }, prebuilt: true })
     const url = '/_kay/action/tests/fixtures/bare/src/routes/survey.kay/answer'
     const response = await traced.handle(new Request(`http://localhost${url}`, { method: 'POST', headers: { referer: 'http://localhost/survey' }, body: new URLSearchParams('tags=a&count=3') }))
 
@@ -2072,7 +2070,7 @@ describe('tracing and timing in production', () => {
     try {
       for (const log of [false, true]) {
         const { tracer, ended } = recordingTracer()
-        const traced = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/production', prebuilt: false, observe: { tracer, log } })
+        const traced = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer, log } } }, root: 'tests/fixtures/production', prebuilt: false })
 
         expect(await (await traced.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'hello' }))).text()).toBe('5')
         // Elysia runs the hook ending it once the response is out.
@@ -2229,7 +2227,7 @@ describe('action input', () => {
       await Bun.write(join(dir, 'inner/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, { message: \'Inner only\' }))\n')
       await Bun.write(join(dir, 'inner/index.kay'), 'p Inner\n')
 
-      const served = await pages({ guards: { default: 'open' }, dirs: { routes: dir }, prebuilt: true })
+      const served = await pages({ config: { guards: { default: 'open' }, dirs: { routes: dir } }, prebuilt: true })
       const call = async (file: string) => {
         const response = await served.handle(new Request(`http://localhost/_kay/action/${id}/${file}/leave`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({}) }))
 
@@ -2257,7 +2255,7 @@ describe('action input', () => {
       await Bun.write(join(dir, 'orgs/[org]/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ params, deny }) => params.org === \'acme\' ? undefined : deny(403, { message: \'Not yours\' }))\n')
       await Bun.write(join(dir, 'orgs/[org]/index.kay'), 'p Org\n')
 
-      const served = await pages({ guards: { default: 'open' }, dirs: { routes: dir }, prebuilt: true })
+      const served = await pages({ config: { guards: { default: 'open' }, dirs: { routes: dir } }, prebuilt: true })
       const call = async (file: string, name: string, from?: string) => {
         const response = await served.handle(new Request(`http://localhost/_kay/action/${id}/${file}/${name}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...from === undefined ? {} : { referer: `http://localhost${from}` } }, body: stringify({}) }))
 
@@ -2296,7 +2294,7 @@ describe('action input', () => {
       const query = '?kay_with=id%3D3%26to%3D2%26tags%3Da%26tags%3Db%26done%3Dfalse'
 
       for (const base of [undefined, '/shop']) {
-        const served = await pages({ guards: { default: 'open' }, dirs: { routes: dir }, prebuilt: true, base })
+        const served = await pages({ config: { guards: { default: 'open' }, dirs: { routes: dir }, base }, prebuilt: true })
         const html = await (await served.handle(new Request('http://localhost/'))).text()
         const post = async (path: string, body = new URLSearchParams(), headers: Record<string, string> = {}) => served.handle(new Request(`http://localhost${path}`, { method: 'POST', headers: { referer: `http://localhost${base ?? ''}/`, ...headers }, body }))
         const got = (response: Response) => [response.status, response.headers.get('x-got')]
@@ -2335,7 +2333,7 @@ describe('action input', () => {
     try {
       await Bun.write(join(dir, 'a b.kay'), action)
       await Bun.write(join(dir, 'a_b.kay'), action)
-      await expect(pages({ guards: { default: 'open' }, dirs: { routes: dir }, prebuilt: true })).rejects.toThrow(`kay: ${join(dir, 'a b.kay')} and ${join(dir, 'a_b.kay')} both export an action served at /_kay/action/${dir.slice(root.length + 1)}/a_b.kay/go; rename one of the files`)
+      await expect(pages({ config: { guards: { default: 'open' }, dirs: { routes: dir } }, prebuilt: true })).rejects.toThrow(`kay: ${join(dir, 'a b.kay')} and ${join(dir, 'a_b.kay')} both export an action served at /_kay/action/${dir.slice(root.length + 1)}/a_b.kay/go; rename one of the files`)
     }
     finally {
       await rm(dir, { recursive: true, force: true })

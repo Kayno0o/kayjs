@@ -86,7 +86,7 @@ pgDescribe('workers over a Postgres store', () => {
     expect(store?.kv).toBeDefined()
     expect(store?.rooms).toBeDefined()
     expect(store?.cache).toBeDefined()
-    await store?.kv?.set('workers-test', 'a', 60_000)
+    await store?.kv?.set('workers-test', 'a', '1m')
     expect(await store?.kv?.get('workers-test')).toBe('a')
 
     await store?.close?.()

@@ -1,5 +1,6 @@
 import type { AnyElysia } from 'elysia'
 import type { ClientOptions } from '../build/client'
+import type { ConfigInput } from '../config'
 import type { AppStore } from '../server/app-store'
 import type { ClientBuild } from '../server/client'
 import type { LogEntry } from '../server/log'
@@ -227,7 +228,7 @@ export async function testSite(given: TestOptions = {}): Promise<TestSite> {
   return siteOf(flatOptions(given))
 }
 
-async function siteOf(options: TestOptions): Promise<TestSite> {
+async function siteOf(options: Omit<TestOptions, 'config'> & ConfigInput): Promise<TestSite> {
   const root = testRoot(options.root)
   const serving = loaderRoot()
 

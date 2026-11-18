@@ -16,7 +16,7 @@ const root = await fixtureCopy('images')
 await Bun.write(join(uploads, 'photo.png'), Bun.file(`${import.meta.dir}/fixtures/images/src/hero.png`))
 
 const images = { dirs: { '/uploads/': uploads } }
-const site = async (limits: Record<string, unknown>, more: Record<string, unknown> = {}) => pages({ root, prebuilt: false, images: { ...images, ...limits }, ...more })
+const site = async (limits: Record<string, unknown>, more: Record<string, unknown> = {}) => pages({ root, prebuilt: false, config: { assets: { images: { ...images, ...limits } } }, ...more })
 // A variant of the one source that differs by its quality alone, so each is a new encode.
 const variant = (quality: number, headers: Record<string, string> = {}, more = '') => new Request(`http://localhost${IMAGE_ROUTE}?src=${encodeURIComponent(HERO)}&w=320&q=${quality}${more}`, { headers })
 
@@ -41,9 +41,9 @@ describe('the image route limits', () => {
 
   it('counts in the limit\'s own store and tells onLimit of the request it refused', async () => {
     const rates = memoryRates()
-    const store = { hit: (key: string, window: number, weight?: number) => rates.hit(key, window, weight) }
+    const store = { hit: (key: string, window: Parameters<typeof rates.hit>[1], weight?: number) => rates.hit(key, window, weight) }
     const counted = new Set<string>()
-    const counting = { hit: (key: string, window: number, weight?: number) => {
+    const counting = { hit: (key: string, window: Parameters<typeof rates.hit>[1], weight?: number) => {
       counted.add(key)
 
       return store.hit(key, window, weight)
@@ -59,7 +59,7 @@ describe('the image route limits', () => {
   })
 
   it('counts the client behind a trusted proxy by its forwarded address', async () => {
-    const app = await site({ rateLimit: { max: 1, window: '1m' }, limits: { variants: false } }, { proxy: 1 })
+    const app = await site({ rateLimit: { max: 1, window: '1m' }, limits: { variants: false } }, { proxy: true })
 
     expect((await app.handle(variant(35, { 'x-forwarded-for': '203.0.113.1' }))).status).toBe(200)
     expect((await app.handle(variant(40, { 'x-forwarded-for': '203.0.113.1' }))).status).toBe(429)
@@ -67,7 +67,7 @@ describe('the image route limits', () => {
   })
 
   it('limits a site under a base the same way', async () => {
-    const app = await site({ rateLimit: { max: 1, window: '1m' }, limits: { variants: false } }, { base: '/app', proxy: 1 })
+    const app = await site({ rateLimit: { max: 1, window: '1m' }, limits: { variants: false } }, { base: '/app', proxy: true })
     const from = { 'x-forwarded-for': '203.0.113.9' }
 
     expect((await app.handle(variant(50, from))).status).toBe(200)
@@ -82,7 +82,7 @@ describe('the image route limits', () => {
   })
 
   it('keeps the variants of one source to the cap by removing the oldest, so no client locks another out', async () => {
-    const app = await site({ rateLimit: false, limits: { variants: 2 } }, { proxy: 1 })
+    const app = await site({ rateLimit: false, limits: { variants: 2 } }, { proxy: true })
     const cached = (quality: number) => [...new Bun.Glob(`**/*-320-q${quality}.webp`).scanSync(join(root, '.kay'))].length
     const from = (address: string) => ({ 'x-forwarded-for': address })
 
@@ -100,7 +100,7 @@ describe('the image route limits', () => {
   })
 
   it('counts the concurrent first requests for one variant once', async () => {
-    const app = await site({ rateLimit: { max: 1, window: '1m' }, limits: { variants: false } }, { proxy: 1 })
+    const app = await site({ rateLimit: { max: 1, window: '1m' }, limits: { variants: false } }, { proxy: true })
     const from = { 'x-forwarded-for': '203.0.113.30' }
     const answers = await Promise.all([5, 5, 5].map(async quality => app.handle(variant(quality, from))))
 

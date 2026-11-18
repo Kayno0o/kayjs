@@ -11,7 +11,7 @@ const OUT = ' target="_blank" rel="noopener"'
 
 // Each link tag of the page by its class, class name apart.
 async function links(options: Record<string, unknown> = {}, path = '/'): Promise<Record<string, string>> {
-  const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, security: false, client: { inlineStyles: false }, ...options }))
+  const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, config: { security: false, client: { inlineStyles: false } }, ...options }))
   const html = await (await site.handle(new Request(`http://localhost${path}`))).text()
   const found: Record<string, string> = {}
 
@@ -82,14 +82,14 @@ describe('a link leaving the site, in templates', () => {
   })
 
   it('stays in the same tab with links.outside set to same-tab', async () => {
-    const tags = await links({ site: 'https://x.example', links: { outside: 'same-tab' } })
+    const tags = await links({ config: { site: 'https://x.example', security: false, client: { inlineStyles: false, links: { outside: 'same-tab' } } } })
 
     for (const [name, tag] of Object.entries(tags))
       expect(tag, name).not.toContain('_blank')
   })
 
   it('opens links in a new tab with links.outside set to new-tab', async () => {
-    expect((await links({ site: 'https://x.example', links: { outside: 'new-tab' } })).static).toContain(OUT)
+    expect((await links({ config: { site: 'https://x.example', security: false, client: { inlineStyles: false, links: { outside: 'new-tab' } } } })).static).toContain(OUT)
   })
 
   it('opens the page\'s own links as on a localized page too', async () => {
@@ -101,7 +101,7 @@ describe('a link leaving the site, in templates', () => {
 })
 
 async function page(options: Record<string, unknown>, path = '/'): Promise<string> {
-  const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, security: false, client: { inlineStyles: false }, ...options }))
+  const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, config: { security: false, client: { inlineStyles: false } }, ...options }))
 
   return (await site.handle(new Request(`http://localhost${path}`))).text()
 }
@@ -128,8 +128,8 @@ describe('the cue saying a link opens in a new tab', () => {
   })
 
   it('lets the rule through a strict style-src by its hash, in each locale', async () => {
-    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/outside-links/src/messages') }
-    const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, site: 'https://x.example', client: { inlineStyles: false }, i18n, security: { csp: { 'style-src': ['\'self\''] } } }))
+    const i18n = { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/outside-links/src/messages') }
+    const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, config: { site: 'https://x.example', client: { inlineStyles: false }, i18n, security: { csp: { 'style-src': ['\'self\''] } } } }))
 
     for (const path of ['/', '/en']) {
       const response = await site.handle(new Request(`http://localhost${path}`))
@@ -149,11 +149,11 @@ describe('the cue saying a link opens in a new tab', () => {
   })
 
   it('words the rule in the locale of the page, and writes none under same-tab links', async () => {
-    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/outside-links/src/messages') }
+    const i18n = { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/outside-links/src/messages') }
 
     expect(await page({ site: 'https://x.example', i18n }, '/')).toContain('content:"(s\'ouvre dans un nouvel onglet)"')
 
-    const same = await page({ site: 'https://x.example', links: { outside: 'same-tab' } })
+    const same = await page({ config: { site: 'https://x.example', security: false, client: { inlineStyles: false, links: { outside: 'same-tab' } } } })
 
     expect(same).not.toContain('data-new-tab')
   })

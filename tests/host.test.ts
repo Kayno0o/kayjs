@@ -129,7 +129,7 @@ describe('HOST', () => {
         ['127.0.0.1', OTHER, 1],
         ...binds('::1') ? [['::1', '::1', 0], ['::1', '[::1]', 0], ['::1', '127.0.0.1', 1]] as const : [],
       ] as const) {
-        const app = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { path: '/up' } })).listen({ port: 0, hostname: bound })
+        const app = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { endpoints: { health: '/up' }, ops: { health: {} } } })).listen({ port: 0, hostname: bound })
 
         try {
           expect({ bound, host, status: await probeHealth(true, String(app.server!.port), host, '/up') }).toEqual({ bound, host, status: expected })

@@ -6,12 +6,12 @@ import { testSite } from '../src/test'
 const FIXTURE = 'tests/fixtures/api-locale'
 const routes = `${FIXTURE}/src/routes`
 const api = `${FIXTURE}/src/api`
-const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: `${FIXTURE}/src/messages` }
+const i18n = { locales: ['en', 'fr'], default: 'en', messages: `${FIXTURE}/src/messages` }
 const sites = {
-  plain: await testSite({ dirs: { routes, api }, islands: false, i18n }),
-  prefixed: await testSite({ dirs: { routes, api }, islands: false, i18n: { ...i18n, prefixDefault: true } }),
-  mounted: await testSite({ dirs: { routes, api }, islands: false, i18n, base: '/blog' }),
-  single: await testSite({ dirs: { routes, api }, islands: false }),
+  plain: await testSite({ config: { dirs: { routes, api }, i18n }, islands: false }),
+  prefixed: await testSite({ config: { dirs: { routes, api }, i18n: { ...i18n, mode: 'always' } }, islands: false }),
+  mounted: await testSite({ config: { dirs: { routes, api }, i18n, base: '/blog' }, islands: false }),
+  single: await testSite({ config: { dirs: { routes, api } }, islands: false }),
 }
 const ORIGIN = 'http://localhost'
 const FRENCH = { word: 'Refusé', t: 'Bonjour' }

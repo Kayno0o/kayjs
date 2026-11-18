@@ -9,32 +9,15 @@ const api = 'tests/fixtures/mcp/src/api'
 const post = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) }
 
 describe('endpoints in the config', () => {
-  it('reads the old keys, the key written in endpoints winning', async () => {
-    const config = await resolveConfig({
-      serve: { apiPrefix: '/v1', compress: false },
-      openapi: { path: '/spec.json', reference: true, referencePath: '/docs/api', title: 'T' },
-      mcp: { path: '/tools' },
-      ops: { health: { path: '/up' }, metrics: { path: '/m' }, jobs: { path: '/j' } },
-      endpoints: { health: '/ping' },
-    })
-
-    expect(config.endpoints).toEqual({ api: '/v1', openapi: '/spec.json', mcp: '/tools', health: '/ping', metrics: '/m', jobs: '/j' })
-    expect(config.serve).toEqual({ compress: false })
-    expect(config.openapi).toEqual({ reference: { path: '/docs/api' }, title: 'T' })
-    expect(config.mcp).toEqual({})
-    expect(config.ops).toEqual({ health: {}, metrics: {}, jobs: {} })
-  })
-
   it('leaves a config with none of them alone', async () => {
     expect(await resolveConfig({ endpoints: { api: '/v1' } })).toEqual({ endpoints: { api: '/v1' } })
     expect((await resolveConfig({ lang: 'en' })).endpoints).toBeUndefined()
   })
 
-  it('is checked, and the old keys still are', () => {
+  it('is checked', () => {
     expect(unknownConfigKeys({ endpoints: { mpc: '/x' } })).toHaveLength(1)
     expect(invalidConfigValues({ endpoints: { api: 1 }, openapi: { reference: 'yes' } })).toHaveLength(2)
     expect(invalidConfigValues({ endpoints: { api: '/v1' }, openapi: { reference: { path: '/r' } } })).toEqual([])
-    expect(unknownConfigKeys({ serve: { apiPrefix: '/v1' }, ops: { health: { path: '/up' } }, openapi: { referencePath: '/r' } })).toEqual([])
   })
 
   it('names the default paths', () => {
@@ -46,31 +29,31 @@ describe('endpoints in the config', () => {
 })
 
 describe('the MCP path', () => {
-  it('is /_kay/mcp, and /mcp answers in place with the query', async () => {
-    const site = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, mcp: true, islands: false })
+  it('is /_kay/mcp, and /mcp answers 404, with or without a query', async () => {
+    const site = await testSite({ config: { guards: { default: 'open' }, dirs: { routes, api }, mcp: true }, islands: false })
     const ok = await site.fetch('/_kay/mcp', post)
     const old = await site.fetch('/mcp?x=1', { ...post, redirect: 'manual' })
 
     expect(ok.status).toBe(200)
-    expect(old.status).toBe(200)
+    expect(old.status).toBe(404)
     expect(old.headers.get('location')).toBeNull()
-    expect(await old.json()).toEqual({ jsonrpc: '2.0', id: 1, result: {} })
+    expect((await site.fetch('/mcp', { ...post, redirect: 'manual' })).status).toBe(404)
   })
 
-  it('answers /mcp in place under a base', async () => {
-    const site = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, mcp: true, islands: false, base: '/shop' })
+  it('answers 404 at /mcp under a base too', async () => {
+    const site = await testSite({ config: { guards: { default: 'open' }, dirs: { routes, api }, mcp: true, base: '/shop' }, islands: false })
     const old = await site.fetch('/mcp', { ...post, redirect: 'manual' })
 
-    expect(old.status).toBe(200)
+    expect(old.status).toBe(404)
     expect(old.headers.get('location')).toBeNull()
   })
 
-  it('refuses endpoints.mcp set to the default path, so no app pins it and keeps /mcp', async () => {
-    await expect(testSite({ guards: { default: 'open' }, dirs: { routes, api }, mcp: true, islands: false, endpoints: { mcp: '/_kay/mcp' } })).rejects.toThrow('under /_kay')
+  it('refuses endpoints.mcp set to a path under /_kay', async () => {
+    await expect(testSite({ config: { guards: { default: 'open' }, dirs: { routes, api }, mcp: true, endpoints: { mcp: '/_kay/mcp' } }, islands: false })).rejects.toThrow('under /_kay')
   })
 
   it('moves to endpoints.mcp, leaving /mcp unserved', async () => {
-    const site = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, mcp: true, islands: false, endpoints: { mcp: '/tools' } })
+    const site = await testSite({ config: { guards: { default: 'open' }, dirs: { routes, api }, mcp: true, endpoints: { mcp: '/tools' } }, islands: false })
 
     expect((await site.fetch('/mcp', { method: 'POST', body: '{}' })).status).toBe(404)
     expect((await site.fetch('/tools', { method: 'GET' })).status).toBe(405)

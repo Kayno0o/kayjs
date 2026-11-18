@@ -36,7 +36,7 @@ async function worker(app: { handle: (request: Request) => Promise<Response> }):
 
 describe('service worker', () => {
   it('stays off by default: no registration, no hash for it, and a worker at /sw.js that removes itself', async () => {
-    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example' })
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example' } })
     const page = await (await app.handle(new Request('http://localhost/about'))).text()
     const { text, settings, headers } = await worker(app)
 
@@ -49,14 +49,14 @@ describe('service worker', () => {
   })
 
   it('asks the network for the API where apiPath mounts it', async () => {
-    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', endpoints: { api: '/v1' }, offline: { pages: ['/'] } })
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', base: '/repo', endpoints: { api: '/v1' }, client: { offline: { pages: ['/'] } } } })
     const { settings } = await worker(app)
 
     expect(settings!.network).toEqual(['/repo/_kay/', '/repo/v1/'])
   })
 
   it('stays off with offline: false from a JS config', async () => {
-    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', offline: false })
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', client: { offline: false } } })
     const page = await app.handle(new Request('http://localhost/about'))
     const { text, settings, headers } = await worker(app)
 
@@ -68,7 +68,7 @@ describe('service worker', () => {
   })
 
   it('registers a worker under the base keeping the build\'s files and the pages listed, its hash in the policy', async () => {
-    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', offline: { pages: ['/', '/about'], fallback: '/about' } })
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', base: '/repo', client: { offline: { pages: ['/', '/about'], fallback: '/about' } } } })
     const page = await app.handle(new Request('http://localhost/about'))
     const { settings, headers } = await worker(app)
     const script = registerScript('/repo')
@@ -86,7 +86,7 @@ describe('service worker', () => {
     expect(settings!.precache.filter(file => file.includes('/assets/') && !file.endsWith('.js'))).toEqual([])
     expect(settings!.precache).toEqual(expect.arrayContaining(['/repo/', '/repo/about']))
 
-    const dev = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', dev: true, offline: true })
+    const dev = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', client: { offline: true } }, dev: true })
 
     expect(await (await dev.handle(new Request('http://localhost/about'))).text()).not.toContain('serviceWorker')
     expect((await worker(dev)).text).toContain('self.registration.unregister()')
@@ -382,7 +382,7 @@ describe('service worker', () => {
     })
 
     it('under a base', async () => {
-      const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', trailingSlash: 'always', offline: { pages: ['/', '/about'] } })
+      const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', base: '/repo', trailingSlash: 'always', client: { offline: { pages: ['/', '/about'] } } } })
       const { settings } = await worker(app)
 
       expect(settings!.pages).toEqual(['/repo/', '/repo/about/'])

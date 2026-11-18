@@ -4,7 +4,7 @@ import { setupStore } from '../../../src/server/app-store'
 
 // Started by tests/production.test.ts in a process of its own, to be stopped by a signal.
 const app = new Elysia()
-  .use(await pages({ root: 'tests/fixtures/production', prebuilt: false, security: false, serve: { shutdownTimeout: `${Number(process.env.SHUTDOWN_TIMEOUT ?? 10)}s` } }))
+  .use(await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { security: false, serve: { shutdownTimeout: `${Number(process.env.SHUTDOWN_TIMEOUT ?? 10)}s` } } }))
   .get('/slow', async () => {
     console.log('slow started')
     await Bun.sleep(Number(process.env.SLOW_MS ?? 300))
@@ -79,10 +79,10 @@ if (data || (process.env.JOBS_PATH && process.env.ROOMS_PATH)) {
 
 // A schedule whose boot run ignores its signal.
 if (process.env.SCHEDULE) {
-  app.use(schedule('1h', async () => {
+  app.use(schedule({ every: '1h', boot: true, lock: false }, async () => {
     console.log('schedule started')
     await new Promise(() => undefined)
-  }, { boot: true, lock: false }))
+  }))
 }
 
 app.listen(0)

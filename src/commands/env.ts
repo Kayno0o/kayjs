@@ -112,7 +112,7 @@ export const env: Command = {
 // The files kay.config.ts names, else the project's own; none when `envFiles` is `false`.
 async function configuredEnvFiles(root: string): Promise<EnvFiles | undefined> {
   const config = await loadConfigWithin(root)
-  const env = config.envFiles ?? config.env
+  const env = config.envFiles
 
   return env === false ? undefined : bagOf(env) ?? await defaultEnvFiles(root)
 }

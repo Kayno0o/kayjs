@@ -291,7 +291,7 @@ interface AuthHookContext extends HookContext
   actor: User<Record<string, unknown>> | null
 
 [.] AuthHooks
-type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onEvent' | 'beforeDelete' | 'afterSignUp' | 'onSignUp' | 'profileFields'>>
+type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onEvent' | 'beforeDelete' | 'afterSignUp' | 'profileFields'>>
 
 [.] AuthMailer
 interface AuthMailer
@@ -306,10 +306,6 @@ interface AuthMailMessage extends MailContent
   html: string
   kind: AuthMailKind
   locale: string
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: undefined | {
-  link?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
-  code?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
-}
   name: string
   subject: string
   text: string
@@ -352,7 +348,6 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   oauth?: Record<string, OAuthApp> | undefined
   oauthServer?: boolean | undefined | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; }
   onEvent?: ((info: AuthEventInfo) => unknown) | undefined
-  /** @deprecated Written `afterSignUp`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; context: AuthHookContext; }) => unknown) | undefined
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
   pages?: AuthPagesConfig | boolean | undefined
   passkeys?: false | undefined | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "discouraged" | "preferred" | "required"; }
@@ -366,7 +361,7 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
 }> | void | {
   [Field in keyof UserData]?: UserData[Field] | undefined;
 }) | undefined
-  proxy?: ProxyConfig | boolean | number | undefined
+  proxy?: ProxyConfig | boolean | undefined
   rateLimit?: LimitsOption | undefined
   remember?: undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   roles?: Record<Role, NoInfer<Role>[]> | undefined
@@ -425,7 +420,6 @@ interface AuthPagesOptions
 [.] AuthProofOfWorkOptions
 interface AuthProofOfWorkOptions
   difficulty?: number | undefined
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   on?: Partial<Record<CaptchaAction, "always" | false | number>> | undefined
   store?: RateStore | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
@@ -1237,7 +1231,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   guests?: undefined | { maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
   home?: string | undefined
   hooks?: (() => Promise<{
-  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "afterSignUp" | "allow" | "authorize" | "beforeDelete" | "exportData" | "locate" | "onEvent" | "onSignUp" | "profileFields">>;
+  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "afterSignUp" | "allow" | "authorize" | "beforeDelete" | "exportData" | "locate" | "onEvent" | "profileFields">>;
 }>) | undefined
   locate?: ((ip: string) => Promise<null | string | undefined> | null | string | undefined) | undefined
   magicLink?: false | undefined
@@ -1246,7 +1240,6 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   oauth?: Record<string, OAuthApp | PresetApp | true> | undefined
   oauthServer?: boolean | undefined | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; }
   onEvent?: ((info: AuthEventInfo) => unknown) | undefined
-  /** @deprecated Written `afterSignUp`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; context: AuthHookContext; }) => unknown) | undefined
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
   pages?: Pick<AuthPagesConfig, "main" | "profile" | "remember"> | false | undefined
   passkeys?: false | undefined | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "discouraged" | "preferred" | "required"; }
@@ -1260,7 +1253,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
 }> | void | {
   [Field in keyof UserData]?: UserData[Field] | undefined;
 }) | undefined
-  proxy?: ProxyConfig | boolean | number | undefined
+  proxy?: ProxyConfig | boolean | undefined
   rateLimit?: LimitsOption | undefined
   remember?: undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   roles?: Record<Role, NoInfer<Role>[]> | undefined

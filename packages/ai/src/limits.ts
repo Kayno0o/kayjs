@@ -43,8 +43,6 @@ export interface AiOptions extends AskHooks, Resilience, ModelsOptions {
   key?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
   // Where the conversations of a `Chat` with `keepOnServer` are kept: the app's database (`pgAi`, or the SQLite file of `sqliteData`) or `data/app.sqlite` unless given (in memory under `bun test`).
   store?: ConversationStore | undefined
-  // `store` before 1.105; both are a configuration error.
-  conversations?: ConversationStore | undefined
   // How long a conversation is kept after its last turn, a year (`'365d'`) unless set; `false` keeps them until their visitor deletes them. The conversations of an erased user go with the account whatever this says.
   conversationAge?: Duration | false | undefined
   // Drafts the `alt` of each imported image a server-rendered page shows with none, once per image content, and `kay check` lists the drafts for review. Off by default, as it sends the images to the model. `{ reviewed }` names the images (`team-abc.png`, as `kay check` prints them) whose draft was reviewed, which `kay check` stops listing.

@@ -126,7 +126,7 @@ describe('an entry-scoped preview link', () => {
 
       return entry.slug === 'roadmap' ? notBefore : undefined
     }
-    const app = await pages({ ...options, prebuilt: false, preview: { secret: SECRET, sharedNotBefore } })
+    const app = await pages({ ...options, prebuilt: false, config: { preview: { secret: SECRET, sharedNotBefore } } })
     const old = previewUrl('/news/roadmap', { entry: roadmap })
 
     expect((await visit(app, old)).status).toBe(200)
@@ -150,7 +150,7 @@ describe('an entry-scoped preview link', () => {
 
   it('refuses a link made before kay kept its time once a time is answered, and keeps it while none is', async () => {
     let answer: number | undefined
-    const app = await pages({ ...options, prebuilt: false, preview: { secret: SECRET, sharedNotBefore: () => answer } })
+    const app = await pages({ ...options, prebuilt: false, config: { preview: { secret: SECRET, sharedNotBefore: () => answer } } })
     const until = String(Math.floor(Date.now() / 1000) + 3600)
     const entry = Buffer.from(JSON.stringify(['news', 'roadmap', ''])).toString('base64url')
     const sig = createHmac('sha256', SECRET).update(`share\n${until}\n${entry}\n/news/roadmap`).digest('base64url')
@@ -172,7 +172,7 @@ describe('an entry-scoped preview link', () => {
 
   it('refuses every link when the hook answers what is no time, and takes null and undefined for none', async () => {
     let answer: unknown
-    const app = await pages({ ...options, prebuilt: false, preview: { secret: SECRET, sharedNotBefore: (() => answer) as () => undefined } })
+    const app = await pages({ ...options, prebuilt: false, config: { preview: { secret: SECRET, sharedNotBefore: (() => answer) as () => undefined } } })
     const link = previewUrl('/news/roadmap', { entry: roadmap })
 
     for (const none of [undefined, null]) {
@@ -187,7 +187,7 @@ describe('an entry-scoped preview link', () => {
   })
 
   it('refuses a link when either the app\'s hook or a library\'s revokes it, and when a hook takes too long', async () => {
-    const app = await pages({ ...options, prebuilt: false, preview: { secret: SECRET, sharedNotBefore: () => undefined } })
+    const app = await pages({ ...options, prebuilt: false, config: { preview: { secret: SECRET, sharedNotBefore: () => undefined } } })
     const link = previewUrl('/news/roadmap', { entry: roadmap })
 
     try {
@@ -211,7 +211,7 @@ describe('an entry-scoped preview link', () => {
 
     expect((await visit(plain, link)).status).toBe(200)
 
-    const failing = await pages({ ...options, prebuilt: false, preview: { secret: SECRET, sharedNotBefore: async () => Promise.reject(new Error('store down')) } })
+    const failing = await pages({ ...options, prebuilt: false, config: { preview: { secret: SECRET, sharedNotBefore: async () => Promise.reject(new Error('store down')) } } })
 
     expect((await visit(failing, link)).status).toBe(404)
   })
@@ -274,7 +274,7 @@ describe('an entry-scoped preview link', () => {
   })
 
   it('goes through the site\'s base, which a proxy strips before the request reaches the app', async () => {
-    const app = await pages({ ...options, base: '/blog', prebuilt: false })
+    const app = await pages({ ...options, config: { base: '/blog' }, prebuilt: false })
     const link = previewUrl('/news/roadmap', { entry: roadmap })
 
     expect(link).toStartWith('/blog/news/roadmap?kay_preview=')

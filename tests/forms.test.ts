@@ -804,7 +804,7 @@ describe('a pending block under a strict style-src', () => {
   let strict: Awaited<ReturnType<typeof testSite>>
 
   beforeAll(async () => {
-    strict = await testSite({ root: 'tests/fixtures/forms', browser: true, security: { csp: { 'style-src': ['\'self\''] } } })
+    strict = await testSite({ root: 'tests/fixtures/forms', browser: true, config: { security: { csp: { 'style-src': ['\'self\''] } } } })
   }, 60_000)
 
   afterAll(async () => strict?.close())

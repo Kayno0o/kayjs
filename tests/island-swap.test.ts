@@ -73,7 +73,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         build = await scratchBuild({ ...site }, false, join(process.cwd(), ROOT))
         await build.prerender({ ...site })
 
-        const app = await build.serve({ security: false, ...site })
+        const app = await build.serve({ config: { security: false }, ...site })
 
         // The front of a real deploy takes the base off, as it does for an app under one.
         server = Bun.serve({

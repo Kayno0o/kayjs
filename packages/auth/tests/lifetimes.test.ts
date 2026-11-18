@@ -64,7 +64,7 @@ describe('email.maxAge', () => {
         codes: 'both',
         maxAge: { 'verify-email': '7d', 'reset-password': '30m', 'magic-link': '2h', 'change-email': '3h', 'verify-code': '20m', 'sign-in-code': '5m' },
         templates: { 'reset-password': (data) => {
-          seen.push(data.maxAge)
+          seen.push(data.ttl)
 
           return { subject: 's', text: 't', html: 'h' }
         } },

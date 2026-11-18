@@ -10,7 +10,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
   let dev: TestSite
 
   beforeAll(async () => {
-    dev = await testSite({ root: 'tests/fixtures/dev-tool', browser: { path }, dev: true, security: { csp: { 'style-src': ['\'self\''] } } })
+    dev = await testSite({ root: 'tests/fixtures/dev-tool', browser: { path }, dev: true, config: { security: { csp: { 'style-src': ['\'self\''] } } } })
   }, 60_000)
 
   afterAll(async () => dev?.close())

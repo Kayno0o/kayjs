@@ -29,7 +29,7 @@ export function authWords(mail: AuthMail): AuthWords {
   const english = en[kind]
   const of = (line: 'subject' | 'lead' | 'ending'): string => wording(`mail.auth.${kind}.${line}`, english[line], { site: mail.name, email: mail.to, detail: mail.detail ?? '', what: mail.url === undefined ? wording('mail.auth.code', en.code) : wording('mail.auth.link', en.link) })
   // How long a link works, left unsaid when its `lasts` is empty; the figure kayjs-auth was set to when it sends one, the default wording otherwise.
-  const ttl = mail.ttl ?? mail.maxAge
+  const { ttl } = mail
   const link = ttl?.link === undefined ? undefined : durationWords(ttl.link, mail.locale) + (kind === 'magic-link' ? wording('mail.auth.once', en.once) : '')
   const lasts = isLinkKind(kind) && mail.url !== undefined ? link ?? wording(`mail.auth.${kind}.lasts`, en[kind].lasts) : ''
   const duration = ttl?.code === undefined ? wording('mail.auth.codeLasts', en.codeLasts) : durationWords(ttl.code, mail.locale)

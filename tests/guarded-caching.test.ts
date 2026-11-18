@@ -41,11 +41,11 @@ describe('a guarded route is private', () => {
     const routes = 'routes'
     const api = 'api'
 
-    servers.production = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes, api }, prebuilt: false, security: false })
-    servers.dev = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes, api }, prebuilt: false, security: false, dev: true })
-    servers.documented = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes, api: 'documented' }, prebuilt: false, security: false, openapi: { reference: true } })
-    servers.compressed = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes, api }, serve: { compress: true }, prebuilt: false, security: false })
-    servers.mounted = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes, api }, prebuilt: false, security: false, base: '/app' })
+    servers.production = await pages({ config: { guards: { default: 'open' }, dirs: { routes, api }, security: false }, root: dir, prebuilt: false })
+    servers.dev = await pages({ config: { guards: { default: 'open' }, dirs: { routes, api }, security: false }, root: dir, prebuilt: false, dev: true })
+    servers.documented = await pages({ config: { guards: { default: 'open' }, dirs: { routes, api: 'documented' }, security: false, openapi: { reference: true } }, root: dir, prebuilt: false })
+    servers.compressed = await pages({ config: { guards: { default: 'open' }, dirs: { routes, api }, serve: { compress: true }, security: false }, root: dir, prebuilt: false })
+    servers.mounted = await pages({ config: { guards: { default: 'open' }, dirs: { routes, api }, security: false, base: '/app' }, root: dir, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

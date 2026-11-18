@@ -3,7 +3,7 @@ import { testSite } from 'kay/test'
 import { ui } from '../src/extension'
 
 it('draws a leading icon inside a text box, hidden from screen readers, and the search icon for a search box', async () => {
-  const site = await testSite({ root: `${import.meta.dir}/fixture`, extensions: [ui()], islands: false })
+  const site = await testSite({ root: `${import.meta.dir}/fixture`, config: { extensions: [ui()] }, islands: false })
 
   try {
     const html = (await site.visit('/text-icon')).html

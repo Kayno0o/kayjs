@@ -30,7 +30,7 @@ function feedXml<Data>(entries: Entry<Data>[], options: ResolvedFeed<Data>, orig
 }
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
-const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], default: 'en', paths: { '/notes/:slug': { fr: '/remarques/:slug' } } } })\n`
+const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ ops: { observe: { log: false } }, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], default: 'en', paths: { '/notes/:slug': { fr: '/remarques/:slug' } } } })\n`
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
@@ -362,7 +362,7 @@ function serve(root: string, trailingSlash: string) {
   return `import { Elysia } from 'elysia'
 import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}
 
-const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, base: '/site', trailingSlash: '${trailingSlash}', observe: { log: false }, serve: { compress: false } }))
+const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, config: { base: '/site', trailingSlash: '${trailingSlash}', ops: { observe: { log: false } }, serve: { compress: false } } }))
 const slash = ${JSON.stringify(trailingSlash === 'always')} ? '/' : ''
 const text = async (path: string) => (await app.handle(new Request(\`http://localhost\${path}\`))).text()
 const feed = (xml: string) => [...xml.matchAll(/<link>(.*?)<\\/link>/g)].map(match => match[1])

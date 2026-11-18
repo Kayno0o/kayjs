@@ -4233,7 +4233,7 @@ describe.concurrent('kay check, unused code', () => {
 
   it('does not tell a page under a layout saying noindex that the sitemap lists it', async () => {
     const root = await scratchProject({
-      'src/routes/hidden/_layout.kay': '--- server\nexport const page = { noindex: true }\n---\nslot\n',
+      'src/routes/hidden/_layout.kay': '--- server\nexport const page = { seo: { noindex: true } }\n---\nslot\n',
       'src/routes/hidden/index.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Hidden\n  meta(name="description" content="Fine")\n  meta(name="robots" content="noindex")\nh1 Hi\n',
       'src/routes/shown.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Shown\n  meta(name="description" content="Fine")\n  meta(name="robots" content="noindex")\nh1 Hi\n',
     })

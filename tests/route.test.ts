@@ -105,15 +105,15 @@ describe('route() in a page', () => {
     }).map(async ([file, source]) => Bun.write(join(routes, file), source)))
 
     try {
-      const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages'), paths: { '/about': { en: '/about-us' }, '/blog/:slug': { en: '/articles/:slug' } } }
+      const i18n = { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages'), paths: { '/about': { en: '/about-us' }, '/blog/:slug': { en: '/articles/:slug' } } }
       const sites = [{}, { base: '/shop' }, { trailingSlash: 'always' as const }, { base: '/shop', trailingSlash: 'always' as const }]
 
       for (const options of sites) {
-        for (const locale of [undefined, i18n, { ...i18n, prefixDefault: true }]) {
-          const app = new Elysia().use(await pages({ root: routes, dirs: { routes: '.' }, prebuilt: false, security: false, ...options, ...locale && { i18n: locale } }))
+        for (const locale of [undefined, i18n, { ...i18n, mode: 'always' as const }]) {
+          const app = new Elysia().use(await pages({ root: routes, config: { dirs: { routes: '.' }, security: false }, prebuilt: false, ...options, ...locale && { i18n: locale } }))
 
           for (const prefix of locale === undefined ? [''] : ['', '/en']) {
-            const html = await (await app.handle(new Request(`http://localhost${prefix}${prefix === '' && (locale !== undefined && 'prefixDefault' in locale) ? '/fr' : ''}/links${options.trailingSlash === 'always' ? '/' : ''}`))).text()
+            const html = await (await app.handle(new Request(`http://localhost${prefix}${prefix === '' && (locale !== undefined && 'mode' in locale) ? '/fr' : ''}/links${options.trailingSlash === 'always' ? '/' : ''}`))).text()
             const hrefs = (name: string) => [...html.matchAll(new RegExp(`<a class="${name}" href="([^"]*)"`, 'g'))].map(match => match[1])
 
             expect(hrefs('lit')).toHaveLength(4)
@@ -122,7 +122,7 @@ describe('route() in a page', () => {
         }
       }
 
-      const plain = new Elysia().use(await pages({ root: routes, dirs: { routes: '.' }, prebuilt: false, security: false, base: '/shop', i18n }))
+      const plain = new Elysia().use(await pages({ root: routes, config: { dirs: { routes: '.' }, security: false, base: '/shop', i18n }, prebuilt: false }))
       const english = await (await plain.handle(new Request('http://localhost/en/links'))).text()
 
       expect(english).toContain('<a class="made" href="/shop/en/articles/caf%C3%A9?x=1#top">')

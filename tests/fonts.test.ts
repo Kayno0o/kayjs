@@ -19,7 +19,7 @@ afterAll(async () => {
 
 describe('fonts', () => {
   it('declares every font in the head and preloads the ones asked for', async () => {
-    const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, fonts: FONTS })
+    const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, config: { assets: { fonts: FONTS } } })
     const html = await (await app.handle(new Request('http://localhost/about'))).text()
     const preloads = [...html.matchAll(/<link rel="preload" href="([^"]+)" as="font" type="([^"]+)" crossorigin="">/g)].map(match => [match[1], match[2]])
     const css = (/<style>([^<]+)<\/style>/).exec(html)![1]!
@@ -35,7 +35,7 @@ describe('fonts', () => {
   })
 
   it('preloads no font unless one asks for it, still declaring them', async () => {
-    const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, fonts: [{ ...FONTS[0]!, preload: false }, FONTS[1]!] })
+    const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, config: { assets: { fonts: [{ ...FONTS[0]!, preload: false }, FONTS[1]!] } } })
     const html = await (await app.handle(new Request('http://localhost/about'))).text()
 
     expect(html).not.toContain('rel="preload"')
@@ -44,7 +44,7 @@ describe('fonts', () => {
 
   it('lets its rules through a style-src without unsafe-inline by their hash, leaving one with it untouched', async () => {
     const policy = async (styleSrc?: string[]) => {
-      const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, fonts: FONTS, ...styleSrc ? { security: { csp: { 'style-src': styleSrc } } } : {} })
+      const app = await pages({ root: 'tests/fixtures/seo', prebuilt: false, config: { assets: { fonts: FONTS } }, ...styleSrc ? { security: { csp: { 'style-src': styleSrc } } } : {} })
       const response = await app.handle(new Request('http://localhost/about'))
       const css = (/<style>([^<]+)<\/style>/).exec(await response.text())![1]!
 

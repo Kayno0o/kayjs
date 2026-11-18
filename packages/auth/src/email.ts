@@ -508,8 +508,7 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
 
   const ttl = lifetimesOf(mail, type, content)
 
-  // `maxAge` is the old name of `ttl`, still given to a template or a mailer written with it until 1.108.
-  await mail.mailer.send({ to: email, kind: type, name: core.name, locale, ...content, ttl, maxAge: ttl, ...templates[type]({ name: core.name, email, locale, ...content, ttl, maxAge: ttl }) })
+  await mail.mailer.send({ to: email, kind: type, name: core.name, locale, ...content, ttl, ...templates[type]({ name: core.name, email, locale, ...content, ttl }) })
 }
 
 // The code the same mail carried is spent with its link, once the link is used: a link refused leaves both.

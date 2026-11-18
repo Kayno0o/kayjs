@@ -234,7 +234,7 @@ describe('share cards', () => {
   })
 
   it('draws on an image from images.dirs, revalidated since it may change in place', async () => {
-    const uploaded = await pages({ ...config, dirs: { routes: 'src/upload-routes' }, images: { dirs: { '/uploads/': uploads } } })
+    const uploaded = await pages({ ...config, config: { dirs: { routes: 'src/upload-routes' }, assets: { images: { dirs: { '/uploads/': uploads } } } } })
     const card = await uploaded.handle(new Request(`http://localhost${await cardPath('/', uploaded)}`))
 
     expect(card.status).toBe(200)
@@ -243,7 +243,7 @@ describe('share cards', () => {
   })
 
   it('takes its face, background and colour from images.card', async () => {
-    const themed = await pages({ ...config, images: { card: { background: '#fff', color: '#000000', font: { family: 'Archivo Black', weight: 900 } } } })
+    const themed = await pages({ ...config, config: { assets: { images: { card: { background: '#fff', color: '#000000', font: { family: 'Archivo Black', weight: 900 } } } } } })
     const pixel = await pixelsOf(await (await themed.handle(new Request(`http://localhost${await cardPath('/plain', themed)}`))).bytes())
 
     expect(pixel(20, 20).every(channel => channel > 245)).toBe(true)
@@ -251,7 +251,7 @@ describe('share cards', () => {
 
   it('draws images.card.logo at the top left, an SVG or a raster image, on a card with or without an image', async () => {
     const near = (actual: number[], expected: number[]) => actual.every((channel, index) => Math.abs(channel - expected[index]!) < 24)
-    const svg = await pages({ ...config, images: { card: { logo: join(FIXTURE, 'src/logo.svg') } } })
+    const svg = await pages({ ...config, config: { assets: { images: { card: { logo: join(FIXTURE, 'src/logo.svg') } } } } })
     const plain = await pixelsOf(await (await svg.handle(new Request(`http://localhost${await cardPath('/plain', svg)}`))).bytes())
 
     expect(near(plain(100, 100), [0, 255, 0])).toBe(true)
@@ -263,7 +263,7 @@ describe('share cards', () => {
 
     expect(near(covered(160, 160), [255, 0, 0])).toBe(true)
 
-    const png = await pages({ ...config, images: { card: { logo: join(FIXTURE, 'src/logo.png') } } })
+    const png = await pages({ ...config, config: { assets: { images: { card: { logo: join(FIXTURE, 'src/logo.png') } } } } })
     const blue = await pixelsOf(await (await png.handle(new Request(`http://localhost${await cardPath('/plain', png)}`))).bytes())
 
     expect(near(blue(128, 128), [0, 0, 255])).toBe(true)
@@ -273,7 +273,7 @@ describe('share cards', () => {
     ['not square', 'hero.png', 'is 1000x600; it has to be square'],
     ['no image', 'fonts/archivo-black-latin-400-normal.woff', 'which is no SVG, PNG, JPEG or WebP kay can draw'],
   ])('refuses a logo that is %s', async (_name, file, message) => {
-    await expect(pages({ ...config, images: { card: { logo: join(FIXTURE, 'src', file) } } })).rejects.toThrow(message)
+    await expect(pages({ ...config, config: { assets: { images: { card: { logo: join(FIXTURE, 'src', file) } } } } })).rejects.toThrow(message)
   })
 
   it('reports in kay check a logo the boot refuses, and warns of one with text, which it draws as nothing', async () => {
@@ -348,7 +348,7 @@ describe('share cards', () => {
   })
 
   it('fails a page asking for a card when no font is listed, and the browser has none to draw', async () => {
-    const fontless = await pages({ ...config, fonts: [] })
+    const fontless = await pages({ ...config, config: { assets: { fonts: [] } } })
 
     expect((await fontless.handle(new Request('http://localhost/plain'))).status).toBe(500)
     expect(() => shareCard({ title: 'Hello' })).toThrow('which lists none')
@@ -470,9 +470,9 @@ describe('share cards', () => {
 })
 
 describe('share cards of a site with a name per locale', () => {
-  const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') }
-  const localized = async () => pages({ ...config, i18n, seo: { name: { fr: 'Les cartes', en: 'The cards' } } })
-  const written = async () => pages({ ...config, i18n, seo: { name: 'Cards' } })
+  const i18n = { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') }
+  const localized = async () => pages({ ...config, config: { i18n, seo: { name: { fr: 'Les cartes', en: 'The cards' } } } })
+  const written = async () => pages({ ...config, config: { i18n, seo: { name: 'Cards' } } })
   const linked = async (page: string, server: Awaited<ReturnType<typeof localized>>) => new URL(await cardPath(page, server), 'http://localhost')
 
   it('draws the name of the page\'s locale, signs it, and keeps the default locale\'s card as it was', async () => {
@@ -514,7 +514,7 @@ describe('share cards of a site with a name per locale', () => {
   })
 
   it('reads the default locale\'s name for a locale the record lacks', async () => {
-    const server = await pages({ ...config, i18n, seo: { name: { fr: 'Les cartes' } } })
+    const server = await pages({ ...config, config: { i18n, seo: { name: { fr: 'Les cartes' } } } })
 
     expect((await linked('/en/plain', server)).search).toBe((await linked('/plain', server)).search)
   })

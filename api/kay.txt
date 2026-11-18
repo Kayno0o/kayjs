@@ -117,7 +117,6 @@ interface ActionContext<Params extends Readonly<Record<string, unknown>> = Route
 [.] ActionDone
 interface ActionDone extends ActionRun
   action: string
-  /** @deprecated Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108. */ ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
   file: string
   input: unknown
   result: unknown
@@ -141,7 +140,6 @@ interface ActionErrorDetail
 [.] ActionFailed
 interface ActionFailed extends ActionRun
   action: string
-  /** @deprecated Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108. */ ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
   data: unknown
   error: unknown
   errors: Partial<Record<string, string>>
@@ -205,7 +203,6 @@ class ActionRedirectError
 [.] ActionRun
 interface ActionRun
   action: string
-  /** @deprecated Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108. */ ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
   file: string
   input: unknown
 
@@ -836,7 +833,6 @@ type Memo<T> = () => T
 [.] MinTimeOptions
 interface MinTimeOptions
   after: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   plain?: boolean | undefined
   pretend?: boolean | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
@@ -962,24 +958,17 @@ interface PageSeo
 [.] PageSettings
 interface PageSettings
   cache?: PageCache
-  /** @deprecated Write `cache: { browser, shared, swr }`, or `cache: false`. Removed in 1.108.0; `deprecated-page-cache` rewrites `false`. */ cacheControl?: false | string
-  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ feed?: false | object | readonly object[]
   guards?: GuardOption | boolean | undefined
   keep?: boolean
-  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ lastmod?: ((params: Record<string, string>) => Lastmod | Promise<Lastmod | undefined> | undefined) | Lastmod
   layouts?: boolean
   liveRefresh?: boolean
-  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ noindex?: boolean
   prerender?: boolean | object
   query?: Schema
   rateLimit?: RateLimit | RateLimit[] | false | undefined
   reload?: boolean
-  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ search?: ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined) | PageSearch
   security?: PageSecurity
   seo?: PageSeo
-  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */ sitemap?: boolean | object
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false
-  /** @deprecated Write `cache: '1h'`. Removed in 1.108.0; `deprecated-page-cache` rewrites it. */ ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] pageVisible
 function pageVisible(fallback?: boolean): () => boolean
@@ -1048,7 +1037,6 @@ function previewing(): boolean
 [.] ProofOfWorkOptions
 interface ProofOfWorkOptions
   difficulty?: number | undefined
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   pretend?: boolean | undefined
   store?: RateStore | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
@@ -1160,8 +1148,7 @@ interface RateLimitRefusal
 [.] RateStore
 interface RateStore extends StoreBase
   close?: (() => unknown) | undefined
-  durations?: true | undefined
-  hit: (key: string, window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number, weight?: number | undefined) => MaybePromise<RateWindow>
+  hit: (key: string, window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, weight?: number | undefined) => MaybePromise<RateWindow>
   peek?: (key: string) => MaybePromise<RateWindow | undefined>
   ping?: (() => unknown) | undefined
   refund?: (key: string, resetAt: number) => MaybePromise<void>
@@ -1836,7 +1823,6 @@ interface VitalsStore extends StoreBase
   add: (route: string, readings: VitalReading[], day: number) => MaybePromise<void>
   close?: (() => unknown) | undefined
   counts: (since: number) => MaybePromise<VitalCount[]>
-  durations?: true | undefined
   ping?: (() => unknown) | undefined
 
 [./analytics] VitalSummary
@@ -1889,7 +1875,6 @@ interface CacheStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (key: string) => Promise<void> | void
   dependencies?: () => Map<string, string[]> | Promise<Map<string, string[]>>
-  durations?: true | undefined
   get: (key: string) => Promise<StoredValue | undefined> | StoredValue | undefined
   keys: () => Promise<string[]> | string[]
   ping?: (() => unknown) | undefined
@@ -1926,7 +1911,6 @@ interface SyncCacheStore extends CacheStore
   close?: (() => unknown) | undefined
   delete: (key: string) => void
   dependencies: () => Map<string, string[]>
-  durations?: true | undefined
   get: (key: string) => StoredValue | undefined
   keys: () => string[]
   ping?: (() => unknown) | undefined
@@ -2548,7 +2532,6 @@ function formatDate(value: Date | number, options?: DateFormatOptions | undefine
 
 [./i18n] formatDuration
 function formatDuration(duration: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, options?: DurationFormatOptions | undefined): string
-function formatDuration(milliseconds: number, options?: DurationFormatOptions | undefined): string
 
 [./i18n] formatList
 function formatList(items: Iterable<string>, options?: ListFormatOptions | undefined): string
@@ -2809,7 +2792,6 @@ interface AppStore extends StoreBase
   cache?: CacheStore | undefined
   close?: (() => unknown) | undefined
   database?: string | undefined
-  durations?: true | undefined
   files?: FileStore | undefined
   jobs?: JobStore | undefined
   kv?: KvStore | undefined
@@ -2862,7 +2844,7 @@ interface BunWebSocketConstructor
   prototype: WebSocket
 
 [./server] clientAddress
-function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | boolean | number | undefined): string
+function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | boolean | undefined): string
 
 [./server] CoalesceOptions
 interface CoalesceOptions
@@ -2911,49 +2893,16 @@ const dataTableNames: readonly string[]
 
 [./server] defineConfig
 function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<Config, ConfigInput> & {
-  onStart?: unknown;
-  offline?: Checked<"offline" extends keyof Config ? Config[keyof Config & "offline"] : unknown, OfflineConfig, [unknown]>;
-  search?: unknown;
-  links?: Checked<"links" extends keyof Config ? Config[keyof Config & "links"] : unknown, {
-    outside?: "new-tab" | "same-tab" | undefined;
-    schemes?: string[] | undefined;
-  }, [unknown]>;
-  images?: Checked<"images" extends keyof Config ? Config[keyof Config & "images"] : unknown, Omit<ImagesConfig, "remote"> & {
-    remote?: Loadable<string[]> | Over<RemoteImages, {
-      hosts?: Loadable<string[]> | undefined;
-    }> | undefined;
-  } & DeprecatedImages, [unknown]>;
-  fonts?: unknown;
-  favicon?: Checked<"favicon" extends keyof Config ? Config[keyof Config & "favicon"] : unknown, FaviconConfig, [unknown]>;
-  manifest?: Checked<"manifest" extends keyof Config ? Config[keyof Config & "manifest"] : unknown, ManifestConfig, [unknown]>;
-  publicCache?: unknown;
-  observe?: Checked<"observe" extends keyof Config ? Config[keyof Config & "observe"] : unknown, Omit<ObserveConfig, "log"> & {
-    log?: "json" | ((entry: LogEntry) => void) | LogConfig | boolean | undefined;
-    onError?: ErrorHook | undefined;
-  }, [unknown]>;
-  health?: Checked<"health" extends keyof Config ? Config[keyof Config & "health"] : unknown, HealthConfig & DeprecatedPath, [unknown]>;
-  metrics?: Checked<"metrics" extends keyof Config ? Config[keyof Config & "metrics"] : unknown, MetricsConfig & DeprecatedPath, [unknown]>;
-  jobs?: Checked<"jobs" extends keyof Config ? Config[keyof Config & "jobs"] : unknown, JobsConfig & DeprecatedPath, [unknown]>;
   assets?: Checked<"assets" extends keyof Config ? Config[keyof Config & "assets"] : unknown, Omit<AssetsConfig, "images"> & {
     images?: ImagesInput | undefined;
   }, [unknown]>;
-  ops?: Checked<"ops" extends keyof Config ? Config[keyof Config & "ops"] : unknown, Omit<OpsConfig, "health" | "jobs" | "metrics" | "observe"> & {
-    observe?: ObserveInput | undefined;
-    health?: (HealthConfig & DeprecatedPath) | boolean | undefined;
-    metrics?: (MetricsConfig & DeprecatedPath) | boolean | undefined;
-    jobs?: (JobsConfig & DeprecatedPath) | undefined;
-  }, [unknown]>;
-  serve?: Checked<"serve" extends keyof Config ? Config[keyof Config & "serve"] : unknown, ServeConfig & DeprecatedServe, [unknown]>;
-  openapi?: Checked<"openapi" extends keyof Config ? Config[keyof Config & "openapi"] : unknown, OpenApiConfig & DeprecatedOpenApi, [unknown]>;
   cors?: Checked<"cors" extends keyof Config ? Config[keyof Config & "cors"] : unknown, NonNullable<ConfigCors | undefined>, [unknown]>;
   security?: Checked<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, Omit<SecurityConfig, "hosts"> & {
     hosts?: Loadable<string[]> | boolean | undefined;
   }, [unknown]>;
-  proxy?: Checked<"proxy" extends keyof Config ? Config[keyof Config & "proxy"] : unknown, Omit<ProxyConfig, "key" | "trusted"> & {
+  proxy?: Checked<"proxy" extends keyof Config ? Config[keyof Config & "proxy"] : unknown, Omit<ProxyConfig, "trusted"> & {
     trusted?: Loadable<string[]> | undefined;
-    key?: ProxyKey | string | undefined;
   }, [unknown]>;
-  mcp?: Checked<"mcp" extends keyof Config ? Config[keyof Config & "mcp"] : unknown, McpConfig & DeprecatedMcp, [unknown]>;
   robots?: Checked<"robots" extends keyof Config ? Config[keyof Config & "robots"] : unknown, Omit<RobotsConfig, "allow" | "disallow"> & {
     disallow?: Loadable<string[]> | undefined;
     allow?: Loadable<string[]> | undefined;
@@ -2962,14 +2911,10 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   i18n?: Checked<"i18n" extends keyof Config ? Config[keyof Config & "i18n"] : unknown, Omit<I18nConfig, "default" | "paths"> & {
     default?: string | undefined;
     paths?: Loadable<Record<string, Record<string, string>>> | undefined;
-  } & DeprecatedI18n, [unknown]>;
+  }, [unknown]>;
   head?: unknown;
   onError?: unknown;
   base?: unknown;
-  env?: Checked<"env" extends keyof Config ? Config[keyof Config & "env"] : unknown, {
-    compose?: string | string[] | undefined;
-    example?: string | undefined;
-  }, [unknown]>;
   seo?: Checked<"seo" extends keyof Config ? Config[keyof Config & "seo"] : unknown, SeoConfig, [unknown]>;
   live?: Checked<"live" extends keyof Config ? Config[keyof Config & "live"] : unknown, LiveConfig, [unknown]>;
   markdown?: Checked<"markdown" extends keyof Config ? Config[keyof Config & "markdown"] : unknown, MarkdownConfig, [unknown]>;
@@ -2979,8 +2924,10 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   store?: Checked<"store" extends keyof Config ? Config[keyof Config & "store"] : unknown, AppStore, [unknown]>;
   dirs?: Checked<"dirs" extends keyof Config ? Config[keyof Config & "dirs"] : unknown, DirsConfig, [unknown]>;
   limits?: Checked<"limits" extends keyof Config ? Config[keyof Config & "limits"] : unknown, LimitsConfig, [unknown]>;
+  serve?: Checked<"serve" extends keyof Config ? Config[keyof Config & "serve"] : unknown, ServeConfig, [unknown]>;
   endpoints?: Checked<"endpoints" extends keyof Config ? Config[keyof Config & "endpoints"] : unknown, EndpointsConfig, [unknown]>;
   client?: Checked<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig, [unknown]>;
+  ops?: Checked<"ops" extends keyof Config ? Config[keyof Config & "ops"] : unknown, OpsConfig, [unknown]>;
   actions?: Checked<"actions" extends keyof Config ? Config[keyof Config & "actions"] : unknown, ActionsConfig, [unknown]>;
   minify?: unknown;
   lang?: unknown;
@@ -2988,9 +2935,12 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   sitemap?: Checked<"sitemap" extends keyof Config ? Config[keyof Config & "sitemap"] : unknown, SitemapConfig, [unknown]>;
   budget?: Checked<"budget" extends keyof Config ? Config[keyof Config & "budget"] : unknown, BudgetConfig, [unknown]>;
   entry?: unknown;
+  openapi?: Checked<"openapi" extends keyof Config ? Config[keyof Config & "openapi"] : unknown, OpenApiConfig, [unknown]>;
+  mcp?: Checked<"mcp" extends keyof Config ? Config[keyof Config & "mcp"] : unknown, McpConfig, [unknown]>;
   rewrite?: unknown;
   runtimeRedirects?: Checked<"runtimeRedirects" extends keyof Config ? Config[keyof Config & "runtimeRedirects"] : unknown, {
-    hosts?: string[] | undefined; ...#f9e645c1 (2 lines)
+    hosts?: string[] | undefined;
+  }, [unknown]>;
   timeZone?: unknown;
   trailingSlash?: unknown;
   plugins?: unknown;
@@ -2998,12 +2948,16 @@ function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<C
   lints?: unknown;
   secret?: unknown;
   preview?: Checked<"preview" extends keyof Config ? Config[keyof Config & "preview"] : unknown, PreviewConfig, [unknown]>;
-  envFiles?: Checked<"envFiles" extends keyof Config ? Config[keyof Co ...#cda223d3 (4 lines)
+  envFiles?: Checked<"envFiles" extends keyof Config ? Config[keyof Config & "envFiles"] : unknown, {
+    compose?: string | string[] | undefined;
+    example?: string | undefined;
+  }, [unknown]>;
   checks?: unknown;
   beforeRequest?: unknown;
   onResponse?: unknown;
   onListen?: unknown;
-  onStop?: unknown; ...#16709f96 (2 lines)
+  onStop?: unknown;
+}): Config
 
 [./server] defineContext
 function defineContext<Values extends object>(load: (request: Request) => Promise<Values> | Values): ContextDefinition<Values>
@@ -3019,9 +2973,7 @@ function defineEnv<const Shape extends SchemaShape>(declared: Shape, source?: Re
 type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => MaybePromise<number> }
 
 [./server] diskFiles
-/** @deprecated `diskFiles({ dir, ...hooks })`. Removed in 1.108; `deprecated-disk-files` rewrites it. */
-function diskFiles(options?: (FileHooks & { dir?: string | undefined; }) | undefined): FileStore
-function diskFiles(dir: string, hooks?: FileHooks | undefined): FileStore
+function diskFiles(options?: FileHooks & { dir?: string | undefined; }): FileStore
 
 [./server] editedEntry
 function editedEntry(request: Request, collection: string, slug: string): boolean
@@ -3102,7 +3054,6 @@ const files: {
 interface FileStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (key: string) => Promise<boolean>
-  durations?: true | undefined
   list?: ((prefix?: string | undefined) => Promise<StoredFile[]>) | undefined
   onDelete?: Hook<{ key: string; }> | undefined
   onWrite?: Hook<{ key: string; size: number; private: boolean; }> | undefined
@@ -3183,7 +3134,6 @@ interface JobStore extends StoreBase
   claim: (queue: string, now: number, until: number) => MaybePromise<StoredJob | undefined>
   close?: (() => unknown) | undefined
   complete: (id: string, until?: number | undefined) => MaybePromise<void>
-  durations?: true | undefined
   fail: (id: string, error: string, payload?: string | undefined, until?: number | undefined) => MaybePromise<boolean | void>
   failed: (queue: string, limit?: number | undefined) => MaybePromise<StoredJob[]>
   jobs?: ((queue: string, options?: undefined | { limit?: number; failed?: boolean; }) => MaybePromise<StoredJob[]>) | undefined
@@ -3230,7 +3180,6 @@ interface KayConfig extends AppHooks
   dirs?: DirsConfig | undefined
   endpoints?: EndpointsConfig | undefined
   entry?: string | undefined
-  /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   guards?: GuardsConfig | undefined
@@ -3252,7 +3201,7 @@ interface KayConfig extends AppHooks
   ops?: OpsConfig | undefined
   plugins?: BunPlugin[] | undefined
   preview?: PreviewConfig | boolean | undefined
-  proxy?: ProxyConfig | boolean | number | undefined
+  proxy?: ProxyConfig | boolean | undefined
   redirects?: Redirects | undefined
   rewrite?: Rewrite | undefined
   robots?: RobotsConfig | boolean | undefined
@@ -3313,18 +3262,17 @@ function kv(namespace: string, store?: KvStore | undefined): Kv
 interface Kv
   delete: (key: string) => Promise<boolean>
   get: (key: string) => Promise<string | undefined>
-  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => Promise<boolean>
-  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number | undefined) => Promise<void>
+  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => Promise<boolean>
+  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined) => Promise<void>
 
 [./server] KvStore
 interface KvStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (key: string) => MaybePromise<boolean>
-  durations?: true | undefined
   get: (key: string) => MaybePromise<string | undefined>
-  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => MaybePromise<boolean>
+  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => MaybePromise<boolean>
   ping?: (() => unknown) | undefined
-  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number | undefined) => MaybePromise<void>
+  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined) => MaybePromise<void>
 
 [./server] lastEventId
 function lastEventId(request: Request): string | undefined
@@ -3357,9 +3305,8 @@ type LiveEntry = [id: string, key: string, text: string] | [id: string, key: str
 interface LiveStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (id: string, key: string) => Promise<void> | void
-  durations?: true | undefined
   end?: (id: string, key: string, expiresAt: number) => Promise<void> | void
-  endAll?: (id: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => Promise<void> | void
+  endAll?: (id: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => Promise<void> | void
   entries: () => Entries | Promise<Entries>
   hold?: (held: boolean) => void
   ping?: (() => unknown) | undefined
@@ -3444,7 +3391,6 @@ const notifications: {
 interface NotificationStore extends StoreBase
   add: (user: string, note: StoredNotification, most: number) => MaybePromise<void>
   close?: (() => unknown) | undefined
-  durations?: true | undefined
   erase: (user: string) => MaybePromise<number>
   list: (user: string, limit: number, now: number) => MaybePromise<NotificationRow[]>
   markAllRead: (user: string, now: number) => MaybePromise<number>
@@ -3471,72 +3417,11 @@ type PageHook = (page: RenderedPage) => string | Promise<string>
 function pages(given?: PagesOptions): Promise<KayPlugin>
 
 [./server] PagesOptions
-interface PagesOptions extends ConfigInput
-  actions?: ActionsConfig | undefined
-  assets?: Over<AssetsConfig, { images?: ImagesInput | undefined; }> | undefined
-  base?: string | undefined
-  beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
-  budget?: BudgetConfig | undefined
-  checks?: ProjectCheck[] | undefined
-  client?: ClientConfig | undefined
+interface PagesOptions
   config?: ConfigInput | undefined
-  contentConfig?: string | undefined
-  cors?: ConfigCors | undefined
   dev?: boolean | undefined
-  dirs?: DirsConfig | undefined
-  endpoints?: EndpointsConfig | undefined
-  entry?: string | undefined
-  /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
-  envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
-  extensions?: KayExtension<AnyElysia>[] | undefined
-  /** @deprecated Written `assets.favicon`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ favicon?: FaviconConfig | boolean | string | undefined
-  /** @deprecated Written `assets.fonts`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ fonts?: (FontConfig | FontsourceConfig)[] | undefined
-  guards?: GuardsConfig | undefined
-  head?: HeadTag[] | undefined
-  /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ health?: (HealthConfig & DeprecatedPath) | boolean | undefined
-  i18n?: I18nInput | undefined
-  /** @deprecated Written `assets.images`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ images?: ImagesInput | undefined
-  /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ jobs?: (JobsConfig & DeprecatedPath) | undefined
-  lang?: string | undefined
-  librarySettings?: Record<string, string> | undefined
-  limits?: LimitsConfig | undefined
-  /** @deprecated Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
-  lints?: LintLevels | undefined
-  live?: LiveConfig | undefined
-  /** @deprecated Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ manifest?: ManifestConfig | undefined
-  markdown?: MarkdownConfig | undefined
-  mcp?: (McpConfig & DeprecatedMcp) | boolean | undefined
-  /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ metrics?: (MetricsConfig & DeprecatedPath) | boolean | undefined
-  minify?: boolean | undefined
-  /** @deprecated Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ observe?: ObserveInput | undefined
-  /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ offline?: OfflineConfig | boolean | undefined
-  onError?: ErrorHook | undefined
-  onListen?: Hook<StartEvent> | undefined
-  onResponse?: Hook<ResponseEvent> | undefined
-  /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */ onStart?: Hook<StartEvent> | undefined
-  onStop?: Hook<Record<never, never>> | undefined
-  openapi?: (OpenApiConfig & DeprecatedOpenApi) | boolean | undefined
-  ops?: OpsInput | undefined
-  plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
-  preview?: PreviewConfig | boolean | undefined
-  proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; key?: ProxyKey | string | undefined; }> | boolean | number | undefined
-  /** @deprecated Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
-  redirects?: Loadable<Redirects> | undefined
-  rewrite?: Rewrite | undefined
-  robots?: Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined; allow?: Loadable<string[]> | undefined; }> | boolean | undefined
   root?: string | undefined
-  runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
-  /** @deprecated Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ search?: boolean | undefined
-  secret?: string | string[] | undefined
-  security?: Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined; }> | boolean | undefined
-  seo?: SeoConfig | undefined
-  serve?: (ServeConfig & DeprecatedServe) | undefined
-  site?: string | undefined
-  sitemap?: SitemapConfig | boolean | undefined
-  store?: AppStore | undefined
-  timeZone?: string | undefined
-  trailingSlash?: TrailingSlash | undefined
 
 [./server] personalData
 const personalData: {
@@ -3649,7 +3534,6 @@ interface PushStore extends StoreBase
   add: (user: string, subscription: PushSubscriptionRecord, most: number) => MaybePromise<void>
   close?: (() => unknown) | undefined
   delete: (endpoint: string, user?: string | undefined) => MaybePromise<boolean>
-  durations?: true | undefined
   erase: (user: string) => MaybePromise<number>
   list: (user: string) => MaybePromise<PushSubscriptionRecord[]>
   ping?: (() => unknown) | undefined
@@ -3696,7 +3580,6 @@ interface QueueOptions<Payload>
   idlePoll?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   lazy?: boolean | undefined
   live?: ((payload: Payload, job: LiveJob) => unknown) | boolean | undefined
-  /** @deprecated `timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it. */ lostAfter?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onError?: Hook<{ id: string; payload: Payload; attempts: number; error: unknown; }> | undefined
   onRetry?: Hook<{ id: string; payload: Payload; attempts: number; error: unknown; wait: number; }> | undefined
   onStart?: Hook<{ id: string; payload: Payload; attempts: number; }> | undefined
@@ -3829,7 +3712,6 @@ interface RoomsOptions<Message = never, State = undefined, Member = undefined>
 interface RoomStore extends StoreBase
   add: (room: string, connection: string, member: string) => void
   close: () => unknown
-  durations?: true | undefined
   members: (room: string) => string[]
   ping?: (() => unknown) | undefined
   publish: (room: string, text: string, recipients: RoomRecipients) => void
@@ -3863,14 +3745,11 @@ function s3Files(options?: S3Options & { publicUrl?: string | undefined; } & Fil
 function safePath(root: string, name: string): string | undefined
 
 [./server] schedule
-/** @deprecated `schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it. */
 function schedule<const Every extends Duration>(options: ScheduleEvery<Every>, jobs: Jobs): KayPlugin
 function schedule<const Cron extends string>(options: ScheduleCron<Cron>, jobs: Jobs): KayPlugin
 function schedule<const Table extends Record<string, Jobs>>(table: Table & {
   readonly [Key in keyof Table & string]: WhenOf<Key>;
 }, options?: ScheduleOptions | undefined): KayPlugin
-function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions | undefined): KayPlugin
-function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions | undefined): KayPlugin
 
 [./server] ScheduleCron
 type ScheduleCron<Cron extends string = string> = { cron: Cron & CronSchedule<Cron>, every?: never } & ScheduleOptions
@@ -3999,10 +3878,9 @@ interface SessionStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (id: string) => MaybePromise<void>
   deleteWhere?: ((match: (data: SessionData) => boolean) => MaybePromise<number>) | undefined
-  durations?: true | undefined
   get: (id: string) => MaybePromise<SessionData | undefined>
   ping?: (() => unknown) | undefined
-  set: (id: string, data: SessionData, maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => MaybePromise<void>
+  set: (id: string, data: SessionData, maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => MaybePromise<void>
 
 [./server] setSharedNotBefore
 function setSharedNotBefore(read: ((entry: PreviewScope) => Date | Promise<Date | number | undefined> | number | undefined) | undefined): void
@@ -4015,7 +3893,6 @@ const signed: { sign(use: string, value: string, options?: SignOptions): string;
 
 [./server] SignOptions
 interface SignOptions
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] SNIFFED_BYTES
@@ -4071,7 +3948,6 @@ interface StartOptions
 [./server] StoreBase
 interface StoreBase
   close?: (() => unknown) | undefined
-  durations?: true | undefined
   ping?: (() => unknown) | undefined
 
 [./server] StoredFile
@@ -4126,7 +4002,6 @@ function typeOfName(name: string): string
 
 [./server] UrlOptions
 interface UrlOptions
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] validate
@@ -4161,7 +4036,6 @@ function workChallenge(scope: string, options?: WorkChallengeOptions): string
 [./server] WorkChallengeOptions
 interface WorkChallengeOptions
   difficulty?: number | undefined
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] workflow
@@ -4180,14 +4054,13 @@ interface WorkflowContext<Known extends Events = Events> extends JobContext
   step: WorkflowStep<Known>
 
 [./server] WorkflowOptions
-interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'timeout' | 'lostAfter' | 'enabled' | 'idlePoll' | 'failedTtl'>
+interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'timeout' | 'enabled' | 'idlePoll' | 'failedTtl'>
   attempts?: number | undefined
   backoff?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   concurrency?: number | undefined
   enabled?: boolean | undefined
   failedTtl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   idlePoll?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  /** @deprecated `timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it. */ lostAfter?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onError?: Hook<{ id: string; input: Input; attempts: number; error: unknown; }> | undefined
   onRetry?: Hook<{ id: string; input: Input; attempts: number; error: unknown; wait: number; }> | undefined
   onStart?: Hook<{ id: string; input: Input; }> | undefined
@@ -4498,79 +4371,16 @@ function testEntry<Data>(data: Data, members?: Partial<Omit<Entry<Data>, "data">
 
 [./test] TestOptions
 interface TestOptions extends PagesOptions
-  actions?: ActionsConfig | undefined
-  assets?: Over<AssetsConfig, { images?: ImagesInput | undefined; }> | undefined
-  base?: string | undefined
-  beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
   browser?: BrowserOptions | boolean | undefined
-  budget?: BudgetConfig | undefined
-  checks?: ProjectCheck[] | undefined
-  client?: ClientConfig | undefined
   config?: ConfigInput | undefined
-  contentConfig?: string | undefined
-  cors?: ConfigCors | undefined
   dev?: boolean | undefined
-  dirs?: DirsConfig | undefined
-  endpoints?: EndpointsConfig | undefined
-  entry?: string | undefined
-  /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */ env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
-  envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
-  extensions?: KayExtension<AnyElysia>[] | undefined
-  /** @deprecated Written `assets.favicon`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ favicon?: FaviconConfig | boolean | string | undefined
-  /** @deprecated Written `assets.fonts`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ fonts?: (FontConfig | FontsourceConfig)[] | undefined
-  guards?: GuardsConfig | undefined
-  head?: HeadTag[] | undefined
   headers?: Record<string, string> | undefined
-  /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ health?: (HealthConfig & DeprecatedPath) | boolean | undefined
-  i18n?: I18nInput | undefined
-  /** @deprecated Written `assets.images`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ images?: ImagesInput | undefined
   islands?: boolean | undefined
-  /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ jobs?: (JobsConfig & DeprecatedPath) | undefined
-  lang?: string | undefined
-  librarySettings?: Record<string, string> | undefined
-  limits?: LimitsConfig | undefined
-  /** @deprecated Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
-  lints?: LintLevels | undefined
-  live?: LiveConfig | undefined
   locals?: ((request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>) | undefined
-  /** @deprecated Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ manifest?: ManifestConfig | undefined
-  markdown?: MarkdownConfig | undefined
-  mcp?: (McpConfig & DeprecatedMcp) | boolean | undefined
-  mcpKey?: string | undefined
-  /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ metrics?: (MetricsConfig & DeprecatedPath) | boolean | undefined
-  minify?: boolean | undefined
-  /** @deprecated Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ observe?: ObserveInput | undefined
-  /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ offline?: OfflineConfig | boolean | undefined
-  onError?: ErrorHook | undefined
-  onListen?: Hook<StartEvent> | undefined
-  onResponse?: Hook<ResponseEvent> | undefined
-  /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */ onStart?: Hook<StartEvent> | undefined
-  onStop?: Hook<Record<never, never>> | undefined
-  openapi?: (OpenApiConfig & DeprecatedOpenApi) | boolean | undefined
-  ops?: OpsInput | undefined
   outgoing?: "allow" | "fail" | undefined
-  plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
-  preview?: PreviewConfig | boolean | undefined
-  proxy?: Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined; key?: ProxyKey | string | undefined; }> | boolean | number | undefined
-  proxyKey?: string | undefined
-  /** @deprecated Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108. */ publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
-  redirects?: Loadable<Redirects> | undefined
-  rewrite?: Rewrite | undefined
-  robots?: Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined; allow?: Loadable<string[]> | undefined; }> | boolean | undefined
   root?: string | undefined
-  runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
-  /** @deprecated Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108. */ search?: boolean | undefined
-  secret?: string | string[] | undefined
-  security?: Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined; }> | boolean | undefined
-  seo?: SeoConfig | undefined
-  serve?: (ServeConfig & DeprecatedServe) | undefined
-  site?: string | undefined
-  sitemap?: SitemapConfig | boolean | undefined
-  store?: AppStore | undefined
   styles?: boolean | undefined
-  timeZone?: string | undefined
-  trailingSlash?: TrailingSlash | undefined
   use?: PluginInput[] | undefined
 
 [./test] TestPage

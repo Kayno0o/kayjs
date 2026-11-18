@@ -2,14 +2,12 @@ import type { BeforeHook, Hook } from 'kay/library'
 import type { EnqueueOptions, ExtensionApp, FailedJob, JobContext, KayExtension, KayPlugin, QueueOptions } from 'kay/server'
 import type { EventSecrets, Found, StoredSuppression, Suppression, SuppressionReason } from './events'
 import type { ListOptions, ListRun, ListsHandle, MailingList, Subscription } from './list'
-import type { ListStore } from './list-store'
 import type { MailStore } from './mail-store'
 import type { MailReply } from './mime'
 import type { Relayed } from './outbox'
 import type { Relay } from './preview'
 import type { HttpProvider } from './providers'
 import type { SmtpOverrides } from './smtp'
-import type { SuppressionStore } from './suppressions'
 import type { Address, Delivery, Envelope, Mail, MailMessage, Transport } from './types'
 import process from 'node:process'
 import { splitList } from '@kaynooo/utils/text'
@@ -86,10 +84,6 @@ export interface MailerOptions {
   logSubjects?: boolean | undefined
   // Where the mailing lists and the bounces live unless a list names its own `store`: `pgMail(db)` for a site on Postgres or on several servers, `sqliteMail(path)` for one SQLite file, or `{ lists, suppressions }` of stores of your own, either optional. Left out they are in the app's database (`store` of kay.config.ts) or `data/app.sqlite`. It is also where a link of a list this process has not declared yet looks, and what `mail.erase` reaches, so declare it here rather than on each list.
   store?: MailStore | undefined
-  // `store.lists` before 1.105; both are a configuration error.
-  listStore?: ListStore | undefined
-  // `store.suppressions` before 1.105; both are a configuration error.
-  suppressionStore?: SuppressionStore | undefined
   // The secrets of the routes where a provider reports bounces and complaints (`/_kay/mail/events/<provider>`) and a mail server hands over delivery reports and replies (`/_kay/mail/inbound`), `MAIL_EVENTS_<PROVIDER>` and `MAIL_EVENTS_INBOUND` in the environment unless given here. A route without its secret answers 404.
   events?: EventSecrets | undefined
   // Called with each reply handed to `/_kay/mail/inbound` (anything but a delivery report, which suppresses its failed recipients instead). A reply carries the `Message-ID` of the mail it answers as `inReplyTo`.
@@ -98,14 +92,10 @@ export interface MailerOptions {
   beforeSend?: BeforeHook<{ mail: Mail }, Mail> | undefined
   // Told once after a mail was handed to the transport, from `send`, from the queue and from a list: not for a mail whose recipients were all suppressed. A throw is reported and never fails the send. Mails of the queue are told outside any request, so `context.request` is undefined.
   afterSend?: Hook<{ mail: Mail, delivery: Delivery }> | undefined
-  /** @deprecated Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onSend?: Hook<{ mail: Mail, delivery: Delivery }> | undefined
   // Told once when `send` fails, and when the queue gives a mail up after its last attempt (`queue.onError` is told right after, with the job's own fields). A queued mail is told as the queue holds it, so a `queue.redact` that drops its body leaves it out here too.
   onError?: Hook<{ mail: Mail, error: Error }> | undefined
   // Told when an address stops being mailed: a bounce or complaint reported by a provider or a mail server (`source` names it), or `mail.suppress()` (`source` is `manual`).
   afterSuppress?: Hook<{ address: string, reason: SuppressionReason, source: string }> | undefined
-  /** @deprecated Written `afterSuppress`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onSuppress?: Hook<{ address: string, reason: SuppressionReason, source: string }> | undefined
   // Lets a server lacking `MAIL_URL` or a sender boot anyway, each send then throwing `MailNotConfiguredError`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
 }
@@ -460,7 +450,7 @@ function conventionalMailer(app: ExtensionApp | undefined): Mailer | undefined {
   return exported as Mailer
 }
 
-const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, url: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, store: true, listStore: true, suppressionStore: true, events: true, inbound: true, beforeSend: true, afterSend: true, onSend: true, onError: true, afterSuppress: true, onSuppress: true, optional: true }
+const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, url: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, store: true, events: true, inbound: true, beforeSend: true, afterSend: true, onError: true, afterSuppress: true, optional: true }
 
 // Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; its `mail.auth` and `mail.contact` messages come with the package (`kay.messages`).
 // `mail({ from, locale, ...})` takes the options of `mailer()` and builds it as `pages()` does, with no module, and `mail()` alone uses the `mail` a `src/mail.ts` exports when the app has one. `module` or `server` are for a mailer written by the app elsewhere, loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
@@ -506,18 +496,15 @@ export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
   return { name: '@kayjs/mail', server: build, ...!given && server === undefined && { appFiles: APP_FILES }, devTool, env }
 }
 
-// What `createLists` starts from: `store`, or the `listStore` and `suppressionStore` it replaced.
+// What `createLists` starts from: `store`.
 function mailStoreOf(options: MailerOptions) {
   const { lists, suppressions, file } = options.store ?? {}
 
-  return { store: lists ?? options.listStore, suppressions: suppressions ?? options.suppressionStore, file }
+  return { store: lists, suppressions, file }
 }
 
 // Throws for an option that cannot be used, where the mailer is made rather than at its first mail.
 function checkMailerOptions(options: MailerOptions): void {
-  if (options.store !== undefined && (options.listStore !== undefined || options.suppressionStore !== undefined))
-    throw configError('mail', 'store', 'mailer() takes `store`, which replaces `listStore` and `suppressionStore`: give `store: { lists, suppressions }`, not both')
-
   if (options.store?.lists !== undefined && options.store.file !== undefined)
     throw configError('mail', 'store', 'mailer({ store }) holds `lists` or a `file`, not both: `sqliteMail(path)` names one file for the lists and the bounces')
 
@@ -535,7 +522,7 @@ function checkMailerOptions(options: MailerOptions): void {
       checkKey(options.smtp.dkim.privateKey, 'mailer({ smtp: { dkim } })\'s privateKey')
   }
 
-  for (const name of ['beforeSend', 'afterSend', 'onSend', 'onError', 'afterSuppress', 'onSuppress'] as const) {
+  for (const name of ['beforeSend', 'afterSend', 'onError', 'afterSuppress'] as const) {
     if (options[name] !== undefined && typeof options[name] !== 'function')
       throw configError('mail', name, `mailer({ ${name} }) is a function`)
   }
@@ -669,7 +656,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   }
 
   const sent = async (mail: Mail, delivery: Delivery): Promise<Delivery> => {
-    await dispatch('mail.afterSend', [options.afterSend ?? options.onSend], { mail, delivery })
+    await dispatch('mail.afterSend', [options.afterSend], { mail, delivery })
 
     return delivery
   }
@@ -725,7 +712,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     if (!await lists.suppress(address, reason, source))
       return false
 
-    await dispatch('mail.afterSuppress', [options.afterSuppress ?? options.onSuppress], { address: normalizeAddress(address)!, reason, source })
+    await dispatch('mail.afterSuppress', [options.afterSuppress], { address: normalizeAddress(address)!, reason, source })
 
     return true
   }
@@ -744,7 +731,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     told: async (hook, event) => dispatch(`mail.${hook}`, [({ onStart, onSuccess, onRetry, onError } as Record<typeof hook, Hook<QueueEvent> | undefined>)[hook]], event),
   }
 
-  agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, failedTtl: queueOptions.failedTtl, lostAfter: queueOptions.timeout ?? queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
+  agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, failedTtl: queueOptions.failedTtl, timeout: queueOptions.timeout, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
   MAILERS.set(via, new WeakRef(owner))
   FORGOTTEN.register(owner, via)
 
@@ -769,7 +756,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
   })
   // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped. Its worker starts with the first `mail.list()`, so a mailer with no list runs no more queue than before lists.
-  const listJobs = queue<QueuedRun>(`${name}-list`, async ({ via: queuedBy, ...run }, { signal }) => ownerOf(queuedBy).run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, timeout: queueOptions.timeout ?? queueOptions.lostAfter, enabled: queueOptions.enabled, idlePoll: queueOptions.idlePoll }))
+  const listJobs = queue<QueuedRun>(`${name}-list`, async ({ via: queuedBy, ...run }, { signal }) => ownerOf(queuedBy).run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, timeout: queueOptions.timeout, enabled: queueOptions.enabled, idlePoll: queueOptions.idlePoll }))
   const plugin = new Elysia().use(jobs).use(listJobs)
 
   mountListRoutes(plugin, () => lists)

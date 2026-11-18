@@ -215,7 +215,7 @@ describe('a path that is gone', () => {
   })
 
   it('answers 410 from a served app, under a base, without a location', async () => {
-    const served = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false, base: '/app' }))
+    const served = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, config: { security: false, base: '/app' } }))
 
     await addRuntimeRedirect('/rt-retired', '', { status: 410 })
 
@@ -254,7 +254,7 @@ describe('what the app tells the screens', () => {
 
 describe('a served app', () => {
   async function app(options: { base?: string, trailingSlash?: 'always' | 'never' | 'ignore', redirects?: Record<string, string>, runtimeRedirects?: { hosts: string[] } } = {}) {
-    return new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false, ...options }))
+    return new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, config: { security: false }, ...options }))
   }
 
   it('answers a missing path with the redirect, the config\'s status, the query and the base', async () => {
@@ -275,7 +275,7 @@ describe('a served app', () => {
   })
 
   it('answers a missing path with the redirect to a client taking compression, whatever the 404 page weighs', async () => {
-    const served = new Elysia().use(await pages({ root: 'tests/fixtures/site', prebuilt: false, security: false, serve: { compress: true } }))
+    const served = new Elysia().use(await pages({ root: 'tests/fixtures/site', prebuilt: false, config: { security: false, serve: { compress: true } } }))
 
     await addRuntimeRedirect('/rt-zipped', '/about')
 
@@ -322,7 +322,7 @@ describe('a served app', () => {
   })
 
   it('answers a path under a locale prefix as the visitor asked for it', async () => {
-    const served = new Elysia().use(await pages({ root: 'tests/fixtures/i18n', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }))
+    const served = new Elysia().use(await pages({ root: 'tests/fixtures/i18n', prebuilt: false, config: { security: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } } }))
 
     await addRuntimeRedirect('/en/rt-loc-old', '/en')
     await addRuntimeRedirect('/rt-loc-bare', '/en')
@@ -380,7 +380,7 @@ describe('a page that answers 404 itself', () => {
     await Bun.write(join(root, 'src/routes/_404.kay'), 'main Gone\n')
     await Bun.write(join(root, 'src/routes/post/[slug].kay'), '--- server\nif (ctx.params.slug !== \'here\') ctx.notFound()\n---\nmain Here\n')
 
-    const served = new Elysia().use(await pages({ dirs: { routes: join(root, 'src/routes') }, prebuilt: false, security: false, base: '/app' }))
+    const served = new Elysia().use(await pages({ config: { dirs: { routes: join(root, 'src/routes') }, security: false, base: '/app' }, prebuilt: false }))
 
     await addRuntimeRedirect('/post/old', '/new')
     await addRuntimeRedirect('/nowhere', '/new', { status: 302 })

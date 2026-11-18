@@ -8,7 +8,7 @@ import type { ImportBinding, ParsedFence } from './script-shared'
 import { eachNode } from './each-node'
 import { isPlainProperty } from './estree'
 import { bodyFact } from './load-facts'
-import { PAGE, PAGE_SETTINGS, SEO_SETTINGS, unreadSettingReport } from './page-settings'
+import { movedSettingReport, PAGE, PAGE_SETTINGS, SEO_SETTINGS, unreadSettingReport } from './page-settings'
 import { declaredIdentifiers, keyName, LITERAL_SETTING, plainNames } from './script-shared'
 import { splitFence } from './script-split'
 import { traverse, walkScope } from './walk'
@@ -197,9 +197,14 @@ function pageSettings(ast: Program, statement: Statement, declaration: NodeOfTyp
         if ((key === 'guards' || key === 'layouts') && !LITERAL_SETTING.test(text(property)) && !(key === 'guards' && GUARD_VALUES.has(property.value.type) && !(property.value.type === 'Identifier' && property.value.name === 'undefined')))
           analysis.diagnostics.push({ ...shift(property.value), ...unreadSettingReport(key) })
 
+        const moved = movedSettingReport(key)
+
+        if (moved)
+          analysis.diagnostics.push({ ...shift(property.key), ...moved })
+
         settings.set(key, { key: shift(property.key), value: shift(property.value) })
 
-        // What `seo` holds of the settings read below, beside those written at the top level before 1.105.
+        // What `seo` holds of the settings read below, the keys of `seo` the checks and the sitemap read.
         if (key === 'seo' && property.value.type === 'ObjectExpression')
           seo = property.value
       }
@@ -210,7 +215,7 @@ function pageSettings(ast: Program, statement: Statement, declaration: NodeOfTyp
         if (inner.type !== 'Property' || innerKey === undefined)
           continue
 
-        // The top-level key of the setting, for those the sitemap and the checks read where `page` once held them; the others as `seo.title` and so on.
+        // The top-level key of the setting, for those the sitemap and the checks read; the others as `seo.title` and so on.
         const registered = SEO_SETTINGS.includes(innerKey) ? innerKey : `seo.${innerKey}`
 
         if (!settings.has(registered))

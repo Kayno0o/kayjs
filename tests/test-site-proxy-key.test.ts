@@ -9,13 +9,13 @@ const api = 'tests/fixtures/mcp/src/api'
 const HEADER = 'x-upstream-key'
 const KEY = 'secret-key'
 
-const keyed = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, mcp: true, islands: false, proxy: { key: { header: HEADER } }, proxyKey: KEY })
-const plain = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, islands: false, proxy: { key: { header: HEADER } } })
+const keyed = await testSite({ islands: false, config: { mcp: true, proxy: { key: { header: HEADER, secret: KEY } }, guards: { default: 'open' }, dirs: { routes, api } } })
+const plain = await testSite({ islands: false, config: { proxy: { key: { header: HEADER } }, guards: { default: 'open' }, dirs: { routes, api } } })
 const { addNote } = await import(resolve(import.meta.dir, 'fixtures/mcp/src/routes/index.kay')) as { addNote: Action<{ title: string }, { title: string }> }
 
 describe('testSite({ config: { proxy: { key: { secret } } } })', () => {
-  it('checks and sends a key given as a value, as proxyKey does', async () => {
-    const site = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, islands: false, config: { proxy: { key: { header: HEADER, secret: KEY } } } })
+  it('checks and sends a key given as a value', async () => {
+    const site = await testSite({ islands: false, config: { proxy: { key: { header: HEADER, secret: KEY } }, guards: { default: 'open' }, dirs: { routes, api } } })
 
     expect((await site.fetch('/')).status).toBe(200)
     expect((await site.fetch('/', { headers: { [HEADER]: 'wrong' } })).status).toBe(403)
@@ -26,18 +26,18 @@ describe('testSite({ config: { proxy: { key: { secret } } } })', () => {
     for (const extra of [{ secret: '  ' }, { secret: KEY, dev: true }, { secret: KEY, browser: true }]) {
       const { secret, ...options } = extra
 
-      await expect(testSite({ guards: { default: 'open' }, dirs: { routes, api }, islands: false, config: { proxy: { key: { header: HEADER, secret } } }, ...options })).rejects.toThrow('proxyKey')
+      await expect(testSite({ islands: false, config: { guards: { default: 'open' }, dirs: { routes, api }, proxy: { key: { header: HEADER, secret } } }, ...options })).rejects.toThrow('proxy.key')
     }
   })
 
   it('sets the MCP token the site sends as a bearer', async () => {
-    const site = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, islands: false, config: { mcp: { token: 'a-test-token-0123456789' } } })
+    const site = await testSite({ islands: false, config: { mcp: { token: 'a-test-token-0123456789' }, guards: { default: 'open' }, dirs: { routes, api } } })
 
     expect((await site.mcp.tools()).length).toBeGreaterThan(0)
   })
 })
 
-describe('testSite({ proxyKey })', () => {
+describe('a site with a proxy key', () => {
   it('checks the key for that site alone and leaves the environment alone', async () => {
     expect(process.env.KAY_PROXY_KEY).toBeUndefined()
     expect((await plain.fetch('/')).status).toBe(200)
@@ -57,44 +57,10 @@ describe('testSite({ proxyKey })', () => {
     expect((await keyed.fetch('/', { headers: { [HEADER]: KEY } })).status).toBe(200)
   })
 
-  it('trims the key it sends', async () => {
-    const padded = await testSite({ guards: { default: 'open' }, dirs: { routes, api }, islands: false, proxy: { key: { header: HEADER } }, proxyKey: ` ${KEY} ` })
-
-    expect((await padded.fetch('/')).status).toBe(200)
-  })
-
   it('boots a keyed and a plain site at once, each its own', async () => {
-    const [a, b] = await Promise.all([testSite({ guards: { default: 'open' }, dirs: { routes, api }, islands: false, proxy: { key: { header: HEADER } }, proxyKey: KEY }), testSite({ guards: { default: 'open' }, dirs: { routes, api }, islands: false, proxy: { key: { header: HEADER } } })])
+    const [a, b] = await Promise.all([testSite({ islands: false, config: { proxy: { key: { header: HEADER, secret: KEY } }, guards: { default: 'open' }, dirs: { routes, api } } }), testSite({ islands: false, config: { proxy: { key: { header: HEADER } }, guards: { default: 'open' }, dirs: { routes, api } } })])
 
     expect((await a.fetch('/', { headers: { [HEADER]: '' } })).status).toBe(403)
     expect((await b.fetch('/', { headers: { [HEADER]: '' } })).status).toBe(200)
-  })
-
-  it('refuses an empty or blank key, and a key with dev or a browser', async () => {
-    for (const options of [{ proxyKey: '' }, { proxyKey: '  ' }, { proxyKey: KEY, dev: true }, { proxyKey: KEY, browser: true }]) {
-      let message = ''
-
-      try {
-        await testSite({ guards: { default: 'open' }, dirs: { routes, api }, islands: false, proxy: { key: { header: HEADER } }, ...options })
-      }
-      catch (error) {
-        message = (error as Error).message
-      }
-
-      expect(message).toContain('proxyKey')
-    }
-  })
-
-  it('needs proxy.key in the app', async () => {
-    let message = ''
-
-    try {
-      await testSite({ guards: { default: 'open' }, dirs: { routes, api }, islands: false, proxyKey: KEY })
-    }
-    catch (error) {
-      message = (error as Error).message
-    }
-
-    expect(message).toContain('proxy.key')
   })
 })

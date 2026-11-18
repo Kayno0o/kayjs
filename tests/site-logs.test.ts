@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { testSite } from '../src/test'
 
-const site = await testSite({ dirs: { routes: 'tests/fixtures/site-logs/src/routes' }, observe: { log: false }, islands: false })
+const site = await testSite({ config: { dirs: { routes: 'tests/fixtures/site-logs/src/routes' }, ops: { observe: { log: false } } }, islands: false })
 
 afterAll(async () => site.close())
 

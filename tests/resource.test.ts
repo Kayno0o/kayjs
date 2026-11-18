@@ -197,11 +197,11 @@ await Promise.all(Object.entries(files).map(async ([path, source]) => {
 
 const dirs = { routes: relative(process.cwd(), join(dir, 'src/routes')), api: relative(process.cwd(), join(dir, 'src/api')), components: relative(process.cwd(), join(dir, 'src/components')) }
 const sites = {
-  plain: await testSite({ guards: { default: 'open' }, dirs, styles: true }),
-  dev: await testSite({ guards: { default: 'open' }, dirs, dev: true, styles: true }),
-  mounted: await testSite({ guards: { default: 'open' }, dirs, base: '/blog', trailingSlash: 'always', styles: true }),
-  compressed: await testSite({ guards: { default: 'open' }, dirs, styles: true, serve: { compress: true } }),
-  localized: await testSite({ guards: { default: 'open' }, dirs, styles: true, i18n: { locales: ['en', 'fr'], default: 'en', messages: join(dir, 'src/messages') } }),
+  plain: await testSite({ config: { guards: { default: 'open' }, dirs }, styles: true }),
+  dev: await testSite({ config: { guards: { default: 'open' }, dirs }, dev: true, styles: true }),
+  mounted: await testSite({ config: { guards: { default: 'open' }, dirs, base: '/blog', trailingSlash: 'always' }, styles: true }),
+  compressed: await testSite({ config: { guards: { default: 'open' }, dirs, serve: { compress: true } }, styles: true }),
+  localized: await testSite({ config: { guards: { default: 'open' }, dirs, i18n: { locales: ['en', 'fr'], default: 'en', messages: join(dir, 'src/messages') } }, styles: true }),
 }
 const { calls } = await import(join(dir, 'src/api/data.ts')) as { calls: { items: number, entry: number } }
 const SCRIPT = /<script type="application\/json" data-kay-resources>(.*?)<\/script>/s

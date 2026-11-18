@@ -139,10 +139,7 @@ export function formatBytes(size: ByteSize, options?: NumberFormatOptions): stri
   return formatBytesIn(translations().locale, size, options)
 }
 
-export function formatDuration(duration: Duration, options?: DurationFormatOptions): string
-// Milliseconds, until 1.108: `deprecated-format-duration` rewrites a literal.
-export function formatDuration(milliseconds: number, options?: DurationFormatOptions): string
-export function formatDuration(duration: Duration | number, options?: DurationFormatOptions): string {
+export function formatDuration(duration: Duration, options?: DurationFormatOptions): string {
   return formatDurationIn(translations().locale, duration, options)
 }
 

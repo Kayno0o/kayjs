@@ -33,7 +33,7 @@ async function app(alert: string | undefined, routes: Record<string, string>, co
     ...Object.entries(routes).map(async ([name, text]) => Bun.write(join(root, 'src/routes', name), text)),
   ])
 
-  return pages({ root, observe: { onError: ({ error }) => void reported.push(error) }, prebuilt: false, security: false })
+  return pages({ root, prebuilt: false, config: { security: false, onError: ({ error }) => void reported.push(error) } })
 }
 
 function swaps(html: string): string[] {

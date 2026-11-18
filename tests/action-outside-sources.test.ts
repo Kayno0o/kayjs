@@ -67,8 +67,8 @@ await later then value
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const built = await pages({ root, prebuilt: false, security: false })
-      const developed = await pages({ root, dev: true, security: false })
+      const built = await pages({ root, prebuilt: false, config: { security: false } })
+      const developed = await pages({ root, dev: true, config: { security: false } })
       const refused = await built.handle(new Request('http://localhost/'))
       const streamed = await (await built.handle(new Request('http://localhost/later'))).text()
 
@@ -261,7 +261,7 @@ await later then value
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const built = await pages({ root, prebuilt: false, security: false })
+      const built = await pages({ root, prebuilt: false, config: { security: false } })
       const streamed = await (await built.handle(new Request('http://localhost/parts'))).text()
 
       expect(streamed).not.toContain('Action')

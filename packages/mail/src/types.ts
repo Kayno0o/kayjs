@@ -68,7 +68,7 @@ export interface Delivery {
 }
 
 export interface Transport {
-  // `signal` aborts the send when a queued mail's run is given up on (past its `lostAfter`, or the server stopping); a transport that can stops what it is doing and rejects.
+  // `signal` aborts the send when a queued mail's run is given up on (past its `timeout`, or the server stopping); a transport that can stops what it is doing and rejects.
   send: (mail: Mail, signal?: AbortSignal) => Promise<Delivery>
   // Connects and checks the server accepts this transport's settings without sending a mail, rejecting with what a send would. Optional: the outbox has none.
   verify?: (() => Promise<void>) | undefined

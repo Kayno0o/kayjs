@@ -54,7 +54,7 @@ describe('base on a server', () => {
   })
 
   it('puts the links, assets and redirects of every page under the mount point', async () => {
-    const app = new Elysia().use(await pages({ root: 'tests/fixtures/static', prebuilt: false, security: false, site: 'https://x.example', base: '/repo/', client: { inlineStyles: false }, redirects: { '/old': '/about' } }))
+    const app = new Elysia().use(await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { security: false, site: 'https://x.example', base: '/repo/', client: { inlineStyles: false }, redirects: { '/old': '/about' } } }))
     const visit = async (path: string) => app.handle(new Request(`http://localhost${path}`))
     const about = await (await visit('/about')).text()
 
@@ -63,14 +63,14 @@ describe('base on a server', () => {
     expect((await visit('/old')).headers.get('location')).toBe('/repo/about')
     expect((await visit('/about/')).headers.get('location')).toBe('/repo/about')
 
-    const favicon = new Elysia().use(await pages({ root: 'tests/fixtures/static', prebuilt: false, security: false, base: '/repo', favicon: 'tests/fixtures/static/src/hero.png' }))
+    const favicon = new Elysia().use(await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { security: false, base: '/repo', assets: { favicon: 'tests/fixtures/static/src/hero.png' } } }))
     const manifest = await (await favicon.handle(new Request('http://localhost/manifest.webmanifest'))).json() as { start_url: string, icons: { src: string }[] }
 
     expect(manifest.start_url).toBe('/repo/')
     expect(manifest.icons[0]!.src).toBe('/repo/icon-192.png')
     // No seo.description, no description.
     expect(manifest).not.toHaveProperty('description')
-    await expect(pages({ root: 'tests/fixtures/static', prebuilt: false, base: 'repo' })).rejects.toThrow('base is repo, which is no path such as /docs')
+    await expect(pages({ root: 'tests/fixtures/static', prebuilt: false, config: { base: 'repo' } })).rejects.toThrow('base is repo, which is no path such as /docs')
   })
 })
 
@@ -112,7 +112,7 @@ describe('a redirect under a base, whoever writes it', () => {
 
 describe('a redirect under a base, in a mounted app', () => {
   it('is rebased once whether the handler sets the header, returns a Response, or both', async () => {
-    const inner = new Elysia().use(await pages({ root: 'tests/fixtures/static', prebuilt: false, security: false, site: 'https://x.example', base: '/repo' })).get('/set', ({ set }) => {
+    const inner = new Elysia().use(await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { security: false, site: 'https://x.example', base: '/repo' } })).get('/set', ({ set }) => {
       set.status = 302
       set.headers.location = '/about'
 

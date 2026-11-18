@@ -60,7 +60,7 @@ describe('schedule', () => {
   it('reads a cron in the config\'s timeZone unless it names its own, and in the system\'s with neither', async () => {
     const cron = fakeCron()
     const start = async (when: string, options: { timeZone?: string } = {}) => {
-      const app = new Elysia().use(schedule(when, () => undefined, options)).listen(0)
+      const app = new Elysia().use(schedule({ cron: when, ...options } as never, () => undefined)).listen(0)
 
       await shutdown(app)
     }
@@ -160,7 +160,7 @@ describe('schedule', () => {
   ])('refuses a computed schedule at boot: %s', (_name, cron, message) => {
     const computed = (text: string) => text
 
-    expect(() => schedule(computed(cron), () => undefined)).toThrow(message)
+    expect(() => schedule({ cron: computed(cron) } as never, () => undefined)).toThrow(message)
   })
 
   // `bun run check` fails on an `@ts-expect-error` with no error under it, so the type check is what these assert.
@@ -564,7 +564,7 @@ describe('schedule', () => {
         const copy = await import(`../src/server/jobs.ts?process=restart-${++copies}`) as { schedule: typeof scheduleOf }
 
         setSystemTime(new Date(`2026-01-01T${time}Z`))
-        await shutdown(new Elysia().use(copy.schedule(when as '15m', () => runs.push(label), { boot: true, store: sqliteJobs(path) })).listen(0))
+        await shutdown(new Elysia().use(copy.schedule({ every: when as '15m', boot: true, store: sqliteJobs(path) }, () => runs.push(label))).listen(0))
       }
 
       process.env.NODE_ENV = 'production'
@@ -625,7 +625,7 @@ describe('schedule', () => {
       process.env.NODE_ENV = 'production'
       // A copy of the module, so the once-per-process warning is not spent by another test.
       const { schedule: fresh } = await import(`../src/server/jobs.ts?process=warn-${++copies}`) as { schedule: typeof scheduleOf }
-      const app = new Elysia().use(fresh('@hourly', () => runs.push('default'), { store })).use(fresh('@daily', () => runs.push('named'), { store, lock: 'report' })).listen(0)
+      const app = new Elysia().use(fresh({ cron: '@hourly', store }, () => runs.push('default'))).use(fresh({ cron: '@daily', store, lock: 'report' }, () => runs.push('named'))).listen(0)
 
       try {
         await cron.fired[0]!.handler()
@@ -941,7 +941,7 @@ describe('schedule every so long', () => {
     const typed = (_build: () => unknown) => true
     const computed = (every: number) => every
 
-    expect(() => schedule(computed(0) as never, () => undefined)).toThrow('the schedule 0 is 0; it takes a positive duration')
+    expect(() => schedule(computed(0) as never, () => undefined)).toThrow('schedule takes')
     expect(() => schedule({ every: '30s', ...{ tz: 'UTC' } as object }, () => undefined)).toThrow('takes timeZone, not tz')
     expect(() => schedule({ cron: '@hourly', ...{ tz: 'UTC' } as object }, () => undefined)).toThrow('takes timeZone, not tz')
     expect(() => schedule({ every: '30s', ...{ timeZone: 'UTC' } as object }, () => undefined)).toThrow('the schedule 30s takes no timeZone')

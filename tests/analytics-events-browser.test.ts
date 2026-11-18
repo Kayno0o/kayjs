@@ -25,9 +25,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
     site = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      store: await scratchStore(),
-      observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, events: { outbound: true, downloads: true } })],
+      config: { store: await scratchStore(), extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, events: { outbound: true, downloads: true } })], onError: () => undefined },
     })
     page = await site.open('/')
     await visits(1)

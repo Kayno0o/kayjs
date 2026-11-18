@@ -71,7 +71,7 @@ describe('testSite builds the islands', () => {
     }
     const before = listing()
 
-    await testSite({ root, base: '/other' })
+    await testSite({ root, config: { base: '/other' } })
 
     expect(listing()).toEqual(before)
     // The server's own imports of an asset are written to `.kay/client` as before, the browser build's worker is not.
@@ -97,7 +97,7 @@ describe('testSite builds the islands', () => {
 
     // The rebuild has to be newer than the first manifest by a file time's granularity.
     await Bun.sleep(20)
-    await testSite({ root, base: '/app' })
+    await testSite({ root, config: { base: '/app' } })
 
     expect(Bun.file(manifest()).lastModified).toBeGreaterThan(first)
   })
@@ -227,7 +227,7 @@ describe('testSite keeps the islands it built', () => {
       await Promise.all([testSite({ root }), testSite({ root })])
       expect(builds).toHaveBeenCalledTimes(1)
 
-      await Promise.all([testSite({ root, base: '/one' }), testSite({ root, base: '/two' })])
+      await Promise.all([testSite({ root, config: { base: '/one' } }), testSite({ root, config: { base: '/two' } })])
       expect(builds).toHaveBeenCalledTimes(3)
       expect(most).toBe(1)
     }

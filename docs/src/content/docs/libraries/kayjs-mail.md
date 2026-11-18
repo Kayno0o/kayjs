@@ -238,7 +238,7 @@ A failed send is retried, 5 times by default, each wait twice the last. A mail g
 
 Two mailers can share a queue by using the same `name`. A mail is then sent, kept and given up to `onError` by the mailer that queued it, whichever of them picks it up.
 
-They must set `attempts`, `backoff`, `failedTtl`, `lostAfter`, `idlePoll` and `concurrency` alike, since the queue has one of each, and the server stops at boot naming the one that differs.
+They must set `attempts`, `backoff`, `failedTtl`, `timeout`, `idlePoll` and `concurrency` alike, since the queue has one of each, and the server stops at boot naming the one that differs.
 
 ```ts
 export const mail = mailer({

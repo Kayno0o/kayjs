@@ -39,7 +39,7 @@ async function listening(options: Options, env: Record<string, string> = {}) {
   process.env.NODE_ENV = 'production'
   Object.assign(process.env, env)
 
-  const app = new Elysia().use(await pages({ root: PRODUCTION, prebuilt: false, store: STORE, observe: { log: false }, ...options })).listen({ port: 0, hostname: '127.0.0.1' })
+  const app = new Elysia().use(await pages({ root: PRODUCTION, prebuilt: false, ...options, config: { store: STORE, ...options.config, ops: { observe: { log: false }, ...options.config?.ops } } })).listen({ port: 0, hostname: '127.0.0.1' })
 
   stops.push(async () => app.stop())
 
@@ -54,11 +54,11 @@ describe('metrics', () => {
   it('is off unless asked for', async () => {
     const url = await listening({})
 
-    expect(await status(`${url}/metrics`)).toBe(404)
+    expect(await status(`${url}/_kay/metrics`)).toBe(404)
   })
 
   it('serves the Prometheus text to a collector on the machine, counting requests by route and status', async () => {
-    const url = await listening({ metrics: true })
+    const url = await listening({ config: { ops: { metrics: true } } })
 
     await fetch(`${url}/contact`)
     await fetch(`${url}/contact`)
@@ -67,7 +67,7 @@ describe('metrics', () => {
     await fetch(`${url}/missing-one`)
     await fetch(`${url}/missing-two`)
 
-    const response = await fetch(`${url}/metrics`)
+    const response = await fetch(`${url}/_kay/metrics`)
     const text = await response.text()
 
     expect(response.status).toBe(200)
@@ -87,63 +87,63 @@ describe('metrics', () => {
     expect(text).toMatch(/^# TYPE kay_job_runs_total counter$/m)
     expect(text).toMatch(/^# TYPE kay_queue_runs_total counter$/m)
     // The scrape and the health probe are no traffic of the site.
-    expect(text).not.toContain('route="/metrics"')
+    expect(text).not.toContain('route="/_kay/metrics"')
     expect(text).not.toContain('/_kay/health')
   })
 
   it('refuses a request without a socket, or that a proxy forwarded', async () => {
-    const url = await listening({ metrics: true })
+    const url = await listening({ config: { ops: { metrics: true } } })
 
     for (const header of ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip', 'forwarded', 'via', 'cf-connecting-ip'])
-      expect(await status(`${url}/metrics`, { [header]: '203.0.113.9' })).toBe(403)
+      expect(await status(`${url}/_kay/metrics`, { [header]: '203.0.113.9' })).toBe(403)
 
     process.env.NODE_ENV = 'production'
 
-    const app = await pages({ root: PRODUCTION, prebuilt: false, store: STORE, metrics: true })
+    const app = await pages({ root: PRODUCTION, prebuilt: false, config: { store: STORE, ops: { metrics: true } } })
 
-    expect((await app.handle(new Request('http://localhost/metrics'))).status).toBe(403)
+    expect((await app.handle(new Request('http://localhost/_kay/metrics'))).status).toBe(403)
   })
 
   it('refuses the header a configured proxy sets', async () => {
-    const url = await listening({ metrics: true, proxy: { header: 'x-client' } })
+    const url = await listening({ config: { proxy: { header: 'x-client' }, ops: { metrics: true } } })
 
-    expect(await status(`${url}/metrics`, { 'x-client': '203.0.113.9' })).toBe(403)
-    expect(await status(`${url}/metrics`)).toBe(200)
+    expect(await status(`${url}/_kay/metrics`, { 'x-client': '203.0.113.9' })).toBe(403)
+    expect(await status(`${url}/_kay/metrics`)).toBe(200)
   })
 
   it('guards the path with a trailing slash and a query alike, and a HEAD answers no body', async () => {
-    const url = await listening({ metrics: true })
+    const url = await listening({ config: { ops: { metrics: true } } })
 
-    expect(await status(`${url}/metrics/`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
-    expect(await status(`${url}/metrics?x=1`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
-    expect(await status(`${url}/metrics/`)).toBe(200)
+    expect(await status(`${url}/_kay/metrics/`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect(await status(`${url}/_kay/metrics?x=1`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect(await status(`${url}/_kay/metrics/`)).toBe(200)
 
-    const head = await fetch(`${url}/metrics`, { method: 'HEAD' })
+    const head = await fetch(`${url}/_kay/metrics`, { method: 'HEAD' })
 
     expect(head.status).toBe(200)
     expect(await head.text()).toBe('')
   })
 
   it('answers a request with the token from anywhere, and without it only a direct one on the machine', async () => {
-    const url = await listening({ metrics: true }, { KAY_METRICS_TOKEN: TOKEN })
+    const url = await listening({ config: { ops: { metrics: true } } }, { KAY_METRICS_TOKEN: TOKEN })
 
-    expect(await status(`${url}/metrics`)).toBe(403)
-    expect(await status(`${url}/metrics`, { authorization: 'Bearer wrong' })).toBe(403)
-    expect(await status(`${url}/metrics`, { authorization: TOKEN })).toBe(403)
-    expect(await status(`${url}/metrics`, { authorization: `bearer ${TOKEN}` })).toBe(200)
-    expect(await status(`${url}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
-    expect(await status(`${url}/metrics`, { 'authorization': `Bearer ${TOKEN}`, 'x-forwarded-for': '203.0.113.9' })).toBe(200)
+    expect(await status(`${url}/_kay/metrics`)).toBe(403)
+    expect(await status(`${url}/_kay/metrics`, { authorization: 'Bearer wrong' })).toBe(403)
+    expect(await status(`${url}/_kay/metrics`, { authorization: TOKEN })).toBe(403)
+    expect(await status(`${url}/_kay/metrics`, { authorization: `bearer ${TOKEN}` })).toBe(200)
+    expect(await status(`${url}/_kay/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+    expect(await status(`${url}/_kay/metrics`, { 'authorization': `Bearer ${TOKEN}`, 'x-forwarded-for': '203.0.113.9' })).toBe(200)
   })
 
   it('takes the token from `metrics.token`: a value, a variable or a file, and refuses to boot where it gives none', async () => {
-    const byValue = await listening({ ops: { metrics: { token: TOKEN } } })
+    const byValue = await listening({ config: { ops: { metrics: { token: TOKEN } } } })
 
-    expect(await status(`${byValue}/metrics`)).toBe(403)
-    expect(await status(`${byValue}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+    expect(await status(`${byValue}/_kay/metrics`)).toBe(403)
+    expect(await status(`${byValue}/_kay/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
 
-    const byVariable = await listening({ ops: { metrics: { token: { env: 'SCRAPE_TOKEN' } } } }, { SCRAPE_TOKEN: ` ${TOKEN} ` })
+    const byVariable = await listening({ config: { ops: { metrics: { token: { env: 'SCRAPE_TOKEN' } } } } }, { SCRAPE_TOKEN: ` ${TOKEN} ` })
 
-    expect(await status(`${byVariable}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+    expect(await status(`${byVariable}/_kay/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
     delete process.env.SCRAPE_TOKEN
 
     const dir = await mkdtemp(join(tmpdir(), 'kay-metrics-'))
@@ -151,132 +151,132 @@ describe('metrics', () => {
     try {
       await writeFile(join(dir, 'token'), `${TOKEN}\n`)
 
-      const byFile = await listening({ ops: { metrics: { token: { file: join(dir, 'token') } } } })
+      const byFile = await listening({ config: { ops: { metrics: { token: { file: join(dir, 'token') } } } } })
 
-      expect(await status(`${byFile}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
-      expect(await status(`${byFile}/metrics`, { authorization: 'Bearer other' })).toBe(403)
-      await expect(listening({ ops: { metrics: { token: { file: join(dir, 'missing') } } } })).rejects.toThrow('metrics.token')
+      expect(await status(`${byFile}/_kay/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+      expect(await status(`${byFile}/_kay/metrics`, { authorization: 'Bearer other' })).toBe(403)
+      await expect(listening({ config: { ops: { metrics: { token: { file: join(dir, 'missing') } } } } })).rejects.toThrow('metrics.token')
     }
     finally {
       await rm(dir, { recursive: true, force: true })
     }
 
-    await expect(listening({ ops: { metrics: { token: { env: 'SCRAPE_TOKEN' } } } })).rejects.toThrow('SCRAPE_TOKEN')
-    await expect(listening({ ops: { metrics: { token: 5 as never } } })).rejects.toThrow('metrics.token')
+    await expect(listening({ config: { ops: { metrics: { token: { env: 'SCRAPE_TOKEN' } } } } })).rejects.toThrow('SCRAPE_TOKEN')
+    await expect(listening({ config: { ops: { metrics: { token: 5 as never } } } })).rejects.toThrow('metrics.token')
   })
 
   it('refuses to boot with `token: true` and no KAY_METRICS_TOKEN', async () => {
     delete process.env.KAY_METRICS_TOKEN
 
-    await expect(listening({ ops: { metrics: { token: true } } })).rejects.toThrow('KAY_METRICS_TOKEN')
+    await expect(listening({ config: { ops: { metrics: { token: true } } } })).rejects.toThrow('KAY_METRICS_TOKEN')
   })
 
   it('boots a build verify with `token: true` and no KAY_METRICS_TOKEN, the route refusing every request', async () => {
     delete process.env.KAY_METRICS_TOKEN
 
-    const url = await listening({ ops: { metrics: { token: true } } }, { KAY_BUILD_VERIFY: '1' })
+    const url = await listening({ config: { ops: { metrics: { token: true } } } }, { KAY_BUILD_VERIFY: '1' })
 
-    expect(await status(`${url}/metrics`)).toBe(403)
+    expect(await status(`${url}/_kay/metrics`)).toBe(403)
   })
 
   it('outside production, a `token: true` with no KAY_METRICS_TOKEN boots and refuses every request', async () => {
     delete process.env.KAY_METRICS_TOKEN
 
-    const url = await listening({ ops: { metrics: { token: true } } }, { NODE_ENV: 'test' })
+    const url = await listening({ config: { ops: { metrics: { token: true } } } }, { NODE_ENV: 'test' })
 
-    expect(await status(`${url}/metrics`)).toBe(403)
+    expect(await status(`${url}/_kay/metrics`)).toBe(403)
   })
 
   it('reads KAY_METRICS_TOKEN for `token: true`', async () => {
-    const url = await listening({ ops: { metrics: { token: true } } }, { KAY_METRICS_TOKEN: TOKEN })
+    const url = await listening({ config: { ops: { metrics: { token: true } } } }, { KAY_METRICS_TOKEN: TOKEN })
 
-    expect(await status(`${url}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
-    expect(await status(`${url}/metrics`)).toBe(403)
+    expect(await status(`${url}/_kay/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+    expect(await status(`${url}/_kay/metrics`)).toBe(403)
   })
 
-  it('moves to the path asked for and leaves /metrics to the app', async () => {
-    const url = await listening({ metrics: { path: '/_internal/stats' } })
+  it('moves to the path asked for and leaves the default to the app', async () => {
+    const url = await listening({ config: { endpoints: { metrics: '/_internal/stats' }, ops: { metrics: true } } })
 
     expect(await status(`${url}/_internal/stats`)).toBe(200)
     expect(await status(`${url}/_internal/stats`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
-    expect(await status(`${url}/metrics`)).toBe(404)
+    expect(await status(`${url}/_kay/metrics`)).toBe(404)
   })
 
   it('guards the path under a base, with or without the base kept', async () => {
-    const url = await listening({ metrics: true, base: '/docs' })
+    const url = await listening({ config: { base: '/docs', ops: { metrics: true } } })
 
-    for (const path of ['/metrics', '/docs/metrics', '/docs/metrics/']) {
+    for (const path of ['/_kay/metrics', '/docs/_kay/metrics', '/docs/_kay/metrics/']) {
       expect(await status(`${url}${path}`)).toBe(200)
       expect(await status(`${url}${path}`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
     }
   })
 
   it('serves nothing under kay dev', async () => {
-    const url = await listening({ metrics: true, dev: true })
+    const url = await listening({ config: { ops: { metrics: true } }, dev: true })
 
-    expect(await status(`${url}/metrics`)).toBe(404)
+    expect(await status(`${url}/_kay/metrics`)).toBe(404)
   })
 
   it('lets a collector past the proxy key on the metrics path alone, by its own rule', async () => {
-    const url = await listening({ metrics: true, proxy: { key: { header: 'x-upstream-key' } } }, { KAY_PROXY_KEY: KEY })
+    const url = await listening({ config: { proxy: { key: { header: 'x-upstream-key' } }, ops: { metrics: true } } }, { KAY_PROXY_KEY: KEY })
 
-    expect(await status(`${url}/metrics`)).toBe(200)
-    expect(await status(`${url}/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
-    expect(await status(`${url}/metrics`, { 'x-upstream-key': KEY })).toBe(403)
+    expect(await status(`${url}/_kay/metrics`)).toBe(200)
+    expect(await status(`${url}/_kay/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect(await status(`${url}/_kay/metrics`, { 'x-upstream-key': KEY })).toBe(403)
     expect(await status(`${url}/contact`)).toBe(403)
     expect(await status(`${url}/contact`, { 'x-upstream-key': KEY })).toBe(200)
   })
 
   it('keeps the proxy key on everything under the metrics path', async () => {
-    const url = await listening({ metrics: true, proxy: { key: { header: 'x-upstream-key' } } }, { KAY_PROXY_KEY: KEY })
+    const url = await listening({ config: { proxy: { key: { header: 'x-upstream-key' } }, ops: { metrics: true } } }, { KAY_PROXY_KEY: KEY })
 
-    expect(await status(`${url}/metrics/anything`)).toBe(403)
-    expect(await status(`${url}/metrics/`)).toBe(200)
+    expect(await status(`${url}/_kay/metrics/anything`)).toBe(403)
+    expect(await status(`${url}/_kay/metrics/`)).toBe(200)
   })
 
   it('names a path nothing serves unmatched, and counts a string status by its code', async () => {
-    const url = await listening({ metrics: true })
+    const url = await listening({ config: { ops: { metrics: true } } })
 
     await fetch(`${url}/missing-one`)
     await fetch(`${url}/missing-two`)
 
-    const text = await (await fetch(`${url}/metrics`)).text()
+    const text = await (await fetch(`${url}/_kay/metrics`)).text()
 
     expect(text).toMatch(/^kay_http_requests_total\{method="GET",route="unmatched",status="404"\} 2$/m)
     expect(statusOf(undefined, { status: 'Not Found' })).toBe(404)
   })
 
   it.each(['always', 'never'] as const)('serves and guards the path under trailingSlash %s', async (trailingSlash) => {
-    const url = await listening({ metrics: true, trailingSlash })
+    const url = await listening({ config: { trailingSlash, ops: { metrics: true } } })
 
-    expect(await status(`${url}/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
-    expect(await status(`${url}/metrics/`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
-    expect((await fetch(`${url}/metrics`, { redirect: 'manual' })).status).toBe(200)
+    expect(await status(`${url}/_kay/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect(await status(`${url}/_kay/metrics/`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect((await fetch(`${url}/_kay/metrics`, { redirect: 'manual' })).status).toBe(200)
   })
 
   it('counts no live connection while none is open', async () => {
-    const url = await listening({ metrics: true })
+    const url = await listening({ config: { ops: { metrics: true } } })
 
-    expect(await (await fetch(`${url}/metrics`)).text()).toMatch(/^kay_live_connections 0$/m)
+    expect(await (await fetch(`${url}/_kay/metrics`)).text()).toMatch(/^kay_live_connections 0$/m)
     expect(liveConnections()).toBe(0)
   })
 
   it('warns at boot of metrics without a token, and of nothing else', async () => {
     const logged = spyOn(console, 'warn').mockImplementation(() => undefined)
     const warnings = () => logged.mock.calls.flat().filter(line => String(line).includes('metrics is read by any request')).length
-    const proxy = { key: 'x-upstream-key' }
+    const proxy = { key: { header: 'x-upstream-key' } }
     const env = { KAY_PROXY_KEY: KEY }
 
     try {
-      await listening({ metrics: true }, env)
+      await listening({ config: { ops: { metrics: true } } }, env)
       expect(warnings()).toBe(1)
       // A page at the path keeps it, so kay serves no metrics there.
-      await listening({ metrics: { path: '/contact' }, proxy }, env)
+      await listening({ config: { endpoints: { metrics: '/contact' }, ops: { metrics: true }, proxy } }, env)
       expect(warnings()).toBe(1)
-      await listening({ metrics: true, proxy }, { ...env, KAY_METRICS_TOKEN: TOKEN })
+      await listening({ config: { ops: { metrics: true }, proxy } }, { ...env, KAY_METRICS_TOKEN: TOKEN })
       expect(warnings()).toBe(1)
       delete process.env.KAY_METRICS_TOKEN
-      await listening({ metrics: true, proxy }, env)
+      await listening({ config: { ops: { metrics: true }, proxy } }, env)
       expect(warnings()).toBe(2)
     }
     finally {
@@ -285,7 +285,7 @@ describe('metrics', () => {
   })
 
   it('decides by the socket address and the marks of a proxy', () => {
-    const plain = new Request('http://localhost/metrics')
+    const plain = new Request('http://localhost/_kay/metrics')
 
     expect(metricsAllowed(plain, '127.0.0.1')).toBe(true)
     expect(metricsAllowed(plain, '::1')).toBe(true)
@@ -294,8 +294,8 @@ describe('metrics', () => {
     expect(metricsAllowed(plain, '203.0.113.9')).toBe(false)
     expect(metricsAllowed(plain, '2001:db8::1')).toBe(false)
     expect(metricsAllowed(plain, undefined)).toBe(false)
-    expect(metricsAllowed(new Request('http://localhost/metrics', { headers: { 'x-upstream-key': 'k' } }), '127.0.0.1', { key: { header: 'x-upstream-key' } })).toBe(false)
-    expect(metricsAllowed(new Request('http://localhost/metrics', { headers: { 'x-forwarded-for': '203.0.113.9' } }), '127.0.0.1')).toBe(false)
+    expect(metricsAllowed(new Request('http://localhost/_kay/metrics', { headers: { 'x-upstream-key': 'k' } }), '127.0.0.1', { key: { header: 'x-upstream-key' } })).toBe(false)
+    expect(metricsAllowed(new Request('http://localhost/_kay/metrics', { headers: { 'x-forwarded-for': '203.0.113.9' } }), '127.0.0.1')).toBe(false)
   })
 })
 
@@ -322,8 +322,8 @@ describe('counters', () => {
     countQueueRun('workflow:metrics-test-flow', 'failed')
     expect(queueRuns.get('workflow:metrics-test-flow')).toEqual({ ok: 0, retried: 1, failed: 1 })
 
-    const url = await listening({ metrics: true })
-    const text = await (await fetch(`${url}/metrics`)).text()
+    const url = await listening({ config: { ops: { metrics: true } } })
+    const text = await (await fetch(`${url}/_kay/metrics`)).text()
 
     expect(text).toMatch(/^kay_queue_runs_total\{queue="metrics-test-queue",result="ok"\} 1$/m)
     expect(text).toMatch(/^kay_queue_runs_total\{queue="metrics-test-queue",result="retried"\} 0$/m)
@@ -336,8 +336,8 @@ describe('counters', () => {
     sessionEvents.created += 2
     fileEvents.deleted += 1
 
-    const url = await listening({ metrics: true })
-    const text = await (await fetch(`${url}/metrics`)).text()
+    const url = await listening({ config: { ops: { metrics: true } } })
+    const text = await (await fetch(`${url}/_kay/metrics`)).text()
 
     expect(text).toMatch(/^# TYPE kay_session_events_total counter$/m)
     expect(text).toContain(`kay_session_events_total{event="created"} ${sessionEvents.created}`)
@@ -348,54 +348,51 @@ describe('counters', () => {
 })
 
 describe('the metrics path', () => {
-  it('is /_kay/metrics, and /metrics answers as well until 1.108', async () => {
-    const url = await listening({ metrics: true })
+  it('is /_kay/metrics, and the former /metrics answers 404', async () => {
+    const url = await listening({ config: { ops: { metrics: true } } })
 
     expect(await status(`${url}/_kay/metrics`)).toBe(200)
-    expect(await status(`${url}/metrics`)).toBe(200)
     expect(await status(`${url}/_kay/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
-    expect(await status(`${url}/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+
+    for (const path of ['/metrics', '/metrics/', '/metrics?x=1']) {
+      expect(await status(`${url}${path}`)).toBe(404)
+      expect(await status(`${url}${path}`, { 'x-forwarded-for': '203.0.113.9' })).toBe(404)
+    }
   })
 
   it('moves to endpoints.metrics, which leaves /metrics and the default unserved', async () => {
-    const url = await listening({ metrics: true, endpoints: { metrics: '/stats' } })
+    const url = await listening({ config: { endpoints: { metrics: '/stats' }, ops: { metrics: true } } })
 
     expect(await status(`${url}/stats`)).toBe(200)
     expect(await status(`${url}/metrics`)).toBe(404)
     expect(await status(`${url}/_kay/metrics`)).toBe(404)
   })
 
-  it('lets a collector past the proxy key on both paths, and on neither once the app moved it', async () => {
-    const both = await listening({ metrics: true, proxy: { key: { header: 'x-upstream-key' } } }, { KAY_PROXY_KEY: KEY })
-    const moved = await listening({ metrics: true, endpoints: { metrics: '/stats' }, proxy: { key: { header: 'x-upstream-key' } } }, { KAY_PROXY_KEY: KEY })
+  it('lets a collector past the proxy key on the metrics path alone, and on none once the app moved it', async () => {
+    const both = await listening({ config: { proxy: { key: { header: 'x-upstream-key' } }, ops: { metrics: true } } }, { KAY_PROXY_KEY: KEY })
+    const moved = await listening({ config: { endpoints: { metrics: '/stats' }, proxy: { key: { header: 'x-upstream-key' } }, ops: { metrics: true } } }, { KAY_PROXY_KEY: KEY })
 
     expect(await status(`${both}/_kay/metrics`)).toBe(200)
-    expect(await status(`${both}/metrics`)).toBe(200)
-    expect(await status(`${both}/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
+    expect(await status(`${both}/metrics`)).toBe(403)
+    expect(await status(`${both}/_kay/metrics`, { 'x-forwarded-for': '203.0.113.9' })).toBe(403)
     expect(await status(`${moved}/stats`)).toBe(200)
     expect(await status(`${moved}/metrics`)).toBe(403)
   })
 
-  it('answers the token on the former path too', async () => {
-    const url = await listening({ metrics: true }, { KAY_METRICS_TOKEN: TOKEN })
+  it('answers the token on the metrics path, and a bearer is no way into the former one', async () => {
+    const url = await listening({ config: { ops: { metrics: true } } }, { KAY_METRICS_TOKEN: TOKEN })
 
-    expect(await status(`${url}/metrics`)).toBe(403)
-    expect(await status(`${url}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+    expect(await status(`${url}/_kay/metrics`)).toBe(403)
+    expect(await status(`${url}/_kay/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(200)
+    expect(await status(`${url}/metrics`, { authorization: `Bearer ${TOKEN}` })).toBe(404)
   })
 
-  it('keeps a page at /metrics, which the alias does not take, and the proxy key still guards it', async () => {
-    const url = await listening({ metrics: true, root: 'tests/fixtures/metrics-clash', proxy: { key: { header: 'x-upstream-key' } } }, { KAY_PROXY_KEY: KEY })
+  it('keeps a page at /metrics, and the proxy key still guards it', async () => {
+    const url = await listening({ config: { proxy: { key: { header: 'x-upstream-key' } }, ops: { metrics: true } }, root: 'tests/fixtures/metrics-clash' }, { KAY_PROXY_KEY: KEY })
 
     expect(await status(`${url}/metrics`)).toBe(403)
     expect(await status(`${url}/metrics`, { 'x-upstream-key': KEY })).toBe(200)
     expect(await (await fetch(`${url}/metrics`, { headers: { 'x-upstream-key': KEY } })).text()).toContain('A page where')
     expect(await status(`${url}/_kay/metrics`)).toBe(200)
-  })
-
-  it('still reads the path of the old key', async () => {
-    const url = await listening({ metrics: { path: '/old-stats' } })
-
-    expect(await status(`${url}/old-stats`)).toBe(200)
-    expect(await status(`${url}/_kay/metrics`)).toBe(404)
   })
 })

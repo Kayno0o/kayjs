@@ -401,10 +401,8 @@ export interface McpOptions {
   actions: ActionOptions
   // The sign-in metadata paths kay serves: one the app serves itself is left out.
   metadataPaths: string[]
-  // Where the endpoint is served, `/mcp` by default.
+  // Where the endpoint is served, `/_kay/mcp` by default.
   path: string
-  // The path before 1.105, answered as `path` is until 2.0, for an app that did not move the endpoint and serves nothing there.
-  former?: string | undefined
   // The requests a client may send it in a window, or undefined for no limit.
   rateLimit: RateWindowMs | undefined
   // Sent as `instructions` of `initialize`, from `mcp.instructions`.
@@ -568,7 +566,7 @@ function serveResourceMetadata(app: Elysia, name: string, paths: string[], endpo
   }
 }
 
-// Serves the tools of `document` at its path over Streamable HTTP: one JSON-RPC message per POST, answered with JSON; `former`, where it was before 1.105, answers POST in place until 2.0.
+// Serves the tools of `document` at its path over Streamable HTTP: one JSON-RPC message per POST, answered with JSON.
 export function serveMcp(app: Elysia, document: Schema, options: McpOptions): void {
   const calls = new AsyncLocalStorage<CallContext>()
   const build = () => {
@@ -645,10 +643,6 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
   app.get(options.path, notAllowed)
   app.delete(options.path, notAllowed)
 
-  // Only the POST is taken at the former path, so a catch-all or parameter route of the app keeps its GET and DELETE.
-  if (options.former !== undefined)
-    app.post(options.former, answer, { parse: 'none' })
-
   serveResourceMetadata(app, options.title, options.metadataPaths, options.path)
 }
 
@@ -662,7 +656,7 @@ export interface LibraryTool {
   // The `label` of the action's `tool`, the words a library shows a visitor for a call to it.
   label?: string | undefined
   // Runs the action as the visitor `request` came from, the one being answered unless given, through the whole app: its guards, validation and rate limits apply as on a form post, while the honeypot, minimum time and proof of work, which only a person filling in a form passes, are skipped.
-  // A request a browser sent from another site is refused, as `/mcp` refuses it, since it carries the visitor's cookies whatever its method.
+  // A request a browser sent from another site is refused, as the MCP endpoint refuses it, since it carries the visitor's cookies whatever its method.
   // A call made once the answer is sent, from a reply streaming on, passes the request it captured while it was answered.
   call: (args: Record<string, unknown>, request?: Request) => Promise<ToolResult>
 }

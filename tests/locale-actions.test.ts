@@ -16,7 +16,7 @@ interface Variant { base: string, trailingSlash: 'always' | 'never' | 'ignore', 
 async function serve({ base, trailingSlash, prefixDefault, dev }: Variant): Promise<Elysia> {
   const i18n: I18nConfig = { locales: ['fr', 'en'], default: 'fr', messages, ...prefixDefault && { mode: 'always' } }
 
-  return new Elysia().use(await pages({ root, prebuilt: false, security: false, site: 'https://x.example', i18n, base: base || undefined, trailingSlash, dev }))
+  return new Elysia().use(await pages({ root, prebuilt: false, config: { security: false, site: 'https://x.example', i18n, base: base || undefined, trailingSlash }, dev }))
 }
 
 // The action's URL as the router serves it, the proxy having taken the base off.

@@ -8,9 +8,9 @@ import { pages } from './shared-pages'
 const ROOT = 'tests/fixtures/timeouts'
 const reported: unknown[] = []
 
-const app = await pages({ root: ROOT, prebuilt: false, security: false, serve: { timeout: '100ms' }, observe: { onError: ({ error }) => void reported.push(error) } })
+const app = await pages({ root: ROOT, prebuilt: false, config: { security: false, serve: { timeout: '100ms' }, onError: ({ error }) => void reported.push(error) } })
 // No timeout of the app's: only what a page, an action and a route set for themselves holds.
-const open = await pages({ root: ROOT, prebuilt: false, security: false })
+const open = await pages({ root: ROOT, prebuilt: false, config: { security: false } })
 
 const page = async (site: typeof app, path: string, accept = 'text/html') => site.handle(new Request(`http://localhost${path}`, { headers: { accept } }))
 
@@ -106,14 +106,14 @@ describe('the 504 page', () => {
   })
 
   it('shows the real message in development only', async () => {
-    const dev = await pages({ root: ROOT, prebuilt: false, security: false, dev: true, serve: { timeout: '100ms' } })
+    const dev = await pages({ root: ROOT, prebuilt: false, config: { security: false, serve: { timeout: '100ms' } }, dev: true })
 
     expect(await (await page(dev, '/slow')).text()).toContain('the request took longer than 100 ms')
     expect(await (await page(app, '/slow')).text()).not.toContain('took longer')
   })
 
   it('is served under a base path and with a trailing slash', async () => {
-    const based = await pages({ root: ROOT, prebuilt: false, security: false, base: '/app', trailingSlash: 'always', serve: { timeout: '100ms' } })
+    const based = await pages({ root: ROOT, prebuilt: false, config: { security: false, base: '/app', trailingSlash: 'always', serve: { timeout: '100ms' } } })
     const response = await page(based, '/slow/')
 
     expect(response.status).toBe(504)

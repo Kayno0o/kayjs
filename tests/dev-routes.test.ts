@@ -24,7 +24,7 @@ async function site(files: Record<string, string> = {}) {
 }
 
 async function listed(options: Parameters<typeof pages>[0]): Promise<DevRoutes> {
-  const dev = await pages({ prebuilt: false, security: false, dev: true, ...options })
+  const dev = await pages({ prebuilt: false, config: { security: false }, dev: true, ...options })
 
   return await (await dev.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoutes
 }
@@ -139,7 +139,7 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
 
 describe('the Routes tab module', () => {
   it('is served as browser code at the path the tool fetches it from, and listed under that name', async () => {
-    const dev = await pages({ prebuilt: false, security: false, dev: true })
+    const dev = await pages({ prebuilt: false, config: { security: false }, dev: true })
     const response = await dev.handle(new Request(`http://localhost${DEV_TAB}routes.js`))
     const text = await response.text()
     const tool = await Bun.file(join(import.meta.dir, '../src/runtime/dev-tool-tabs.ts')).text()

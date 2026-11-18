@@ -29,7 +29,7 @@ afterAll(async () => {
 })
 
 async function serve(store: FileStore) {
-  const app = await pages({ root: ROOT, prebuilt: false, security: false, store: { files: store } })
+  const app = await pages({ root: ROOT, prebuilt: false, config: { security: false, store: { files: store } } })
 
   return async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
 }
@@ -413,7 +413,7 @@ describe('stored images', () => {
 
   it('drop the social card drawn on a stored image once it is deleted', async () => {
     const store = memoryFiles()
-    const app = await pages({ site: 'https://storage.example', root: ROOT, fonts: [{ family: 'Archivo Black', src: resolve('tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2') }], prebuilt: false, security: false, store: { files: store } })
+    const app = await pages({ config: { site: 'https://storage.example', security: false, store: { files: store }, assets: { fonts: [{ family: 'Archivo Black', src: resolve('tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2') }] } }, root: ROOT, prebuilt: false })
     const key = await files.put(await hero())
     const html = await (await app.handle(new Request(`http://localhost/card?key=${encodeURIComponent(key)}`))).text()
     const card = (/<meta property="og:image" content="https:\/\/storage\.example([^"]+)">/).exec(html)![1]!.replaceAll('&amp;', '&')

@@ -26,9 +26,8 @@ declare const HONEYPOT: unique symbol
 // Where rate limits count, shared by every process opening it: `sqliteRates` from `kay/server`, or one of an app's own.
 export interface RateStore extends StoreBase {
   // Counts `weight` more under `key`, one attempt unless given, opening a window of `window` when none is open: the count in it so far, this hit included, and when it closes, in ms since the epoch. A store of its own adds `weight` to the count, or a weighted limit, tokens say, refuses it.
-  // `window` is a `Duration` for a store with `durations: true`, and milliseconds for one written before 1.105, until 1.108: `lengthMs(window)` from `kay` reads either.
-  // eslint-disable-next-line ts/method-signature-style -- method syntax keeps a store written with `number` assignable (bivariance)
-  hit(key: string, window: Duration | number, weight?: number): MaybePromise<RateWindow>
+  // `window` is a `Duration`: `lengthMs(window)` from `kay` reads it.
+  hit: (key: string, window: Duration, weight?: number) => MaybePromise<RateWindow>
   // The window open under `key` without counting an attempt, undefined when none is: what a limit counting only the posts that went through reads before the handler runs. A `limiter` derives it, with a hit of weight 0, for a store without it.
   peek?: (key: string) => MaybePromise<RateWindow | undefined>
   // Takes back one attempt `hit` counted under `key` in the window closing at `resetAt`, never below zero, and does nothing once that window is gone: how kay lets a call that started no work, such as kayjs-ai's resume of a reply it keeps, not spend the limit. A store without it simply keeps the attempt counted.
@@ -87,8 +86,6 @@ export interface MinTimeOptions {
   after: Duration
   // The most, past which a post is refused as sent from a page left open too long or a copied stamp: a day by default.
   ttl?: Duration | undefined
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
-  maxAge?: Duration | undefined
   // Answers a post sent too soon as if it went through, the handler never running, rather than refusing it.
   pretend?: boolean | undefined
   // Checks only a form the browser posts itself, without kay's script, leaving a page swap's post and a call to what checks those, such as a proof of work.
@@ -100,8 +97,6 @@ export interface ProofOfWorkOptions {
   difficulty?: number | undefined
   // How long a challenge stays good: a day by default.
   ttl?: Duration | undefined
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
-  maxAge?: Duration | undefined
   // Answers a wrong or replayed solution as if it went through, the handler never running, rather than refusing it.
   pretend?: boolean | undefined
   // Where the solutions already used are kept until their challenge expires: this process's memory by default, `sqliteRates(path)` to share them between the processes of a machine.
@@ -148,13 +143,11 @@ export interface ActionProtect<Field extends string = never> {
   proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
 }
 
-// What the hooks of an action are told of a run: the action's export name and its file relative to the directory the server runs from, the input the schema accepted and the context it runs with.
+// What the hooks of an action are told of a run: the action's export name and its file relative to the directory the server runs from, and the input the schema accepted.
 export interface ActionRun {
   action: string
   file: string
   input: unknown
-  /** @deprecated Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108. */
-  ctx: ActionContext
 }
 
 // What an action's hooks are told as `context`: the action's own (`request`, `locals`, `cookies`, `params`, `locale`), with the hook's `ip`, `userAgent` and `userId`.

@@ -1,5 +1,6 @@
 import type { Duration } from 'kay'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { lengthMs } from 'kay/library'
 import { memoryAuth } from '../src/memoryStore'
 import { testApp } from './helpers/app'
 import { untilHolds } from './helpers/until'
@@ -85,8 +86,8 @@ describe('time options take a Duration', () => {
   test('a limit window takes a string, handed to the store in milliseconds, and a bad one names its limit', async () => {
     const windows: number[] = []
     const base = memoryAuth()
-    const store = { ...base, rates: { ...base.rates!, hit: async (key: string, window: number) => {
-      windows.push(window)
+    const store = { ...base, rates: { ...base.rates!, hit: async (key: string, window: Duration) => {
+      windows.push(lengthMs(window))
 
       return base.rates!.hit(key, window)
     } } }
@@ -100,8 +101,8 @@ describe('time options take a Duration', () => {
   test('rateLimit windows reach the store in milliseconds', async () => {
     const windows: number[] = []
     const base = memoryAuth()
-    const store = { ...base, rates: { ...base.rates!, hit: async (key: string, window: number) => {
-      windows.push(window)
+    const store = { ...base, rates: { ...base.rates!, hit: async (key: string, window: Duration) => {
+      windows.push(lengthMs(window))
 
       return base.rates!.hit(key, window)
     } } }

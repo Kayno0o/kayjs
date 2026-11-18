@@ -30,7 +30,7 @@ function feedXml<Data>(entries: Entry<Data>[], options: ResolvedFeed<Data>, orig
 const FIXTURE = 'tests/fixtures/content'
 const content = 'src/content.config.ts'
 const SITE = 'https://blog.example'
-const app = new Elysia().use(await pages({ root: FIXTURE, contentConfig: content, prebuilt: false, security: false, site: SITE }))
+const app = new Elysia().use(await pages({ root: FIXTURE, config: { contentConfig: content, security: false, site: SITE }, prebuilt: false }))
 
 async function get(path: string): Promise<{ status: number, html: string, type: string | null }> {
   const response = await app.handle(new Request(`http://localhost${path}`))
@@ -74,7 +74,7 @@ describe('Markdown entries', () => {
     const previous = process.env.NODE_ENV
     const draftStatus = async (env: string, dev: boolean) => {
       process.env.NODE_ENV = env
-      const served = await pages({ root: FIXTURE, contentConfig: content, prebuilt: false, dev, security: false, site: SITE })
+      const served = await pages({ root: FIXTURE, config: { contentConfig: content, security: false, site: SITE }, prebuilt: false, dev })
 
       return (await served.handle(new Request('http://localhost/blog/draft'))).status
     }
@@ -118,7 +118,7 @@ describe('the content mode', () => {
       setContentMode({ dev: false, prebuilt: true })
       expect(await authors()).toEqual(['Built'])
 
-      const served = await pages({ root: FIXTURE, contentConfig: content, prebuilt: false, dev: true, security: false, observe: { log: false }, site: SITE })
+      const served = await pages({ root: FIXTURE, config: { contentConfig: content, security: false, site: SITE, ops: { observe: { log: false } } }, prebuilt: false, dev: true })
 
       expect(contentMode().dev).toBe(true)
       served.listen(0)
@@ -488,8 +488,8 @@ describe('feeds', () => {
   })
 
   it('need the site\'s URL, and a content config kay.config.ts names must exist', async () => {
-    await expect(pages({ root: FIXTURE, contentConfig: 'src/missing.config.ts', prebuilt: false })).rejects.toThrow('names src/missing.config.ts as the content config, and there is no such file')
-    await expect(pages({ root: FIXTURE, contentConfig: content, prebuilt: false })).rejects.toThrow('has a feed, whose links need the site\'s URL')
+    await expect(pages({ root: FIXTURE, config: { contentConfig: 'src/missing.config.ts' }, prebuilt: false })).rejects.toThrow('names src/missing.config.ts as the content config, and there is no such file')
+    await expect(pages({ root: FIXTURE, config: { contentConfig: content }, prebuilt: false })).rejects.toThrow('has a feed, whose links need the site\'s URL')
   })
 })
 

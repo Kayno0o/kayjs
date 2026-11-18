@@ -116,7 +116,7 @@ describe('a page whose render reads a browser global', () => {
   const serve = async (dev: boolean, reported: unknown[]) => {
     const root = await project({ 'routes/index.kay': '---\nconst width = window.innerWidth\n---\np {width}\n' })
 
-    return new Elysia().use(await pages({ root, dirs: { routes: 'routes' }, observe: { onError: ({ error }) => void reported.push(error), log: false }, prebuilt: false, dev }))
+    return new Elysia().use(await pages({ root, config: { dirs: { routes: 'routes' }, onError: ({ error }) => void reported.push(error), ops: { observe: { log: false } } }, prebuilt: false, dev }))
   }
 
   for (const dev of [false, true]) {

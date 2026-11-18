@@ -4,27 +4,9 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 
 import { actionOptions } from '../src/check/action-options'
-import { appHooks } from '../src/check/app-hooks'
-import { clientKeys } from '../src/check/client-keys'
-import { configGroups } from '../src/check/config-groups'
-import { configSwitches } from '../src/check/config-switches'
-import { envFiles } from '../src/check/env-files'
-import { applySafeFixes } from '../src/check/fixes'
-import { formatDurationNumbers } from '../src/check/format-duration'
-import { hookContext } from '../src/check/hook-context'
-import { hookNames } from '../src/check/hook-names'
-import { i18nKeys } from '../src/check/i18n-keys'
-import { imagesKeys } from '../src/check/images-keys'
-import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
-import { pagesOptions } from '../src/check/pages-options'
 
-import { routeKeys } from '../src/check/route-keys'
+import { applySafeFixes } from '../src/check/fixes'
 import { schemaBuilders } from '../src/check/schema-builders'
-import { secretKeys } from '../src/check/secret-keys'
-import { socketFrames } from '../src/check/socket-frames'
-import { storeMs } from '../src/check/store-ms'
-import { storeNames } from '../src/check/store-names'
-import { ttlNames } from '../src/check/ttl-names'
 
 import { compileKay } from '../src/compiler'
 import { DEPRECATED_LINTS } from '../src/compiler/deprecated-lints'
@@ -34,29 +16,8 @@ type Name = keyof typeof DEPRECATED_LINTS
 
 // The project-wide lints, each by the check that finds it; a deprecated lint of the compiler is found by `compileKay`, so it needs no entry.
 const SITE: Record<string, (root: string, options: CheckOptions) => Promise<CheckDiagnostic[]>> = {
-  'deprecated-job-handler': jobHandlers,
-  'deprecated-schedule-call': scheduleCalls,
-  'deprecated-job-options': jobOptions,
-  'deprecated-disk-files': diskFilesCalls,
-  'deprecated-socket-frames': socketFrames,
   'deprecated-schema-builders': schemaBuilders,
   'deprecated-action-options': actionOptions,
-  'deprecated-hook-names': hookNames,
-  'deprecated-store-names': storeNames,
-  'deprecated-format-duration': formatDurationNumbers,
-  'deprecated-config-switch': configSwitches,
-  'deprecated-images-keys': imagesKeys,
-  'deprecated-client-keys': clientKeys,
-  'deprecated-config-groups': configGroups,
-  'deprecated-i18n-keys': i18nKeys,
-  'deprecated-secret-keys': secretKeys,
-  'deprecated-route-keys': routeKeys,
-  'deprecated-app-hooks': appHooks,
-  'deprecated-hook-context': hookContext,
-  'deprecated-pages-options': pagesOptions,
-  'deprecated-ttl-names': ttlNames,
-  'deprecated-store-ms': storeMs,
-  'deprecated-env-files': envFiles,
 }
 
 // Every deprecated lint has a `safe` fix, which `kay upgrade` applies, that turns its `wrong` example into its `right` one (#2843). A lint whose old form no fix can rewrite without risk goes here with the reason, and `kay upgrade` leaves it to `llms/upgrading.md`: moving code into a new file is the one today.
@@ -79,7 +40,7 @@ describe('every deprecated lint has a safe fix', () => {
   it('lists each lint\'s check, so a new one cannot go without', () => {
     const compiled = names.filter(name => !(name in SITE))
 
-    expect(compiled.sort()).toEqual(['deprecated-image-options', 'deprecated-page-cache', 'deprecated-page-seo', 'deprecated-ui-props'])
+    expect(compiled.sort()).toEqual(['deprecated-ui-props'])
     expect(Object.keys(NO_SAFE_FIX).filter(name => !names.includes(name as Name))).toEqual([])
   })
 

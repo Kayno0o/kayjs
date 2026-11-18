@@ -21,8 +21,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the consen
     own = await testSite({
       root: 'tests/fixtures/analytics-consent',
       browser: { path },
-      observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: { notice: false } })],
+      config: { extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: { notice: false } })], onError: () => undefined },
     })
     opened = await own.open('/')
   }, 60_000)
@@ -96,8 +95,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the consen
     own = await testSite({
       root: 'tests/fixtures/analytics-consent',
       browser: { path },
-      observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: { notice: false, maxAge: '1234s' } })],
+      config: { extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: { notice: false, maxAge: '1234s' } })], onError: () => undefined },
     })
     opened = await own.open('/')
   }, 60_000)

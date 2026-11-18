@@ -111,7 +111,7 @@
     "max-lines": 927
   },
   "src/compiler/markup.ts": {
-    "complexity": 69
+    "complexity": 68
   },
   "src/compiler/parser.ts": {
     "max-lines": 1039
@@ -220,11 +220,11 @@
     "complexity": 109
   },
   "src/server/protection.ts": {
-    "max-lines": 729,
+    "max-lines": 727,
     "complexity": 54
   },
   "src/server/queue.ts": {
-    "max-lines": 656,
+    "max-lines": 655,
     "max-lines-per-function": 321
   },
   "src/server/render-document.ts": {

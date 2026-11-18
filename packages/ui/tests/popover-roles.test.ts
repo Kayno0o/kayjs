@@ -19,7 +19,7 @@ describe('a Popover names its panel, gives it a role and announces it on the tri
   let html = ''
 
   beforeAll(async () => {
-    const site = await testSite({ root: FIXTURE, extensions: [ui()], islands: false })
+    const site = await testSite({ root: FIXTURE, config: { extensions: [ui()] }, islands: false })
 
     try {
       html = (await site.visit('/popover-roles')).html
@@ -68,7 +68,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('TooltipHos
   let site: Awaited<ReturnType<typeof testSite>>
 
   beforeAll(async () => {
-    site = await testSite({ root: FIXTURE, extensions: [ui()], browser: { path } })
+    site = await testSite({ root: FIXTURE, config: { extensions: [ui()] }, browser: { path } })
   }, 120_000)
 
   afterAll(async () => site.close())

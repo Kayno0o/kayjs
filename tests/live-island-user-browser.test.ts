@@ -58,7 +58,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     live.unread.set(3, { user: 'alice' })
     live.unread.set(5, { user: 'bob' })
 
-    const app = new Elysia().onRequest(signedIn).use(await build.serve({ security: false }))
+    const app = new Elysia().onRequest(signedIn).use(await build.serve({ config: { security: false } }))
 
     server = Bun.serve({
       port: 0,

@@ -1,7 +1,7 @@
 import { afterAll, expect, it } from 'bun:test'
 import { persistedCookie, testSite } from '../src/test'
 
-const site = await testSite({ dirs: { routes: 'tests/fixtures/persisted-load/src/routes' }, islands: false })
+const site = await testSite({ config: { dirs: { routes: 'tests/fixtures/persisted-load/src/routes' } }, islands: false })
 
 afterAll(async () => {
   await site.close()

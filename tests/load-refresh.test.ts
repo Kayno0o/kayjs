@@ -4,10 +4,10 @@ import { logSink, setLogSink } from '../src/runtime/log'
 import { testSite } from '../src/test'
 
 const routesDir = 'tests/fixtures/load-refresh/src/routes'
-const site = await testSite({ dirs: { routes: routesDir }, islands: false })
-const based = await testSite({ dirs: { routes: routesDir }, islands: false, base: '/shop', trailingSlash: 'always' })
-const developing = await testSite({ dirs: { routes: routesDir }, islands: false, dev: true })
-const localized = await testSite({ dirs: { routes: routesDir }, islands: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
+const site = await testSite({ config: { dirs: { routes: routesDir } }, islands: false })
+const based = await testSite({ config: { dirs: { routes: routesDir }, base: '/shop', trailingSlash: 'always' }, islands: false })
+const developing = await testSite({ config: { dirs: { routes: routesDir } }, islands: false, dev: true })
+const localized = await testSite({ config: { dirs: { routes: routesDir }, i18n: { locales: ['fr', 'en'], default: 'fr', messages: 'tests/fixtures/i18n/src/messages' } }, islands: false })
 const { counts, reset } = await import(join(import.meta.dir, 'fixtures/load-refresh/src/calls.ts')) as typeof import('./fixtures/load-refresh/src/calls')
 
 const LOADS = 'x-kay-loads'

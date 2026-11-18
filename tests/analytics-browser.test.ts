@@ -40,8 +40,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
     site = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: { text: 'Count?', agree: 'Yes', refuse: 'No' } })],
+      config: { extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: { text: 'Count?', agree: 'Yes', refuse: 'No' } })], onError: () => undefined },
     })
     page = await site.open('/')
   }, 60_000)
@@ -173,8 +172,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a custom p
     custom = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, awaitConsent: true })],
+      config: { extensions: [analytics({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, awaitConsent: true })], onError: () => undefined },
     })
     opened = await custom.open('/')
   }, 60_000)
@@ -229,8 +227,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a counter 
     open = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, info: { text: 'Counting', ok: 'Fine', optOut: 'Stop' } })],
+      config: { extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, info: { text: 'Counting', ok: 'Fine', optOut: 'Stop' } })], onError: () => undefined },
     })
     opened = await open.open('/')
   }, 60_000)
@@ -309,8 +306,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     own = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: true, privacy: '/privacy', exclude: ['/second', '/*/admin'] })],
+      config: { extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: true, privacy: '/privacy', exclude: ['/second', '/*/admin'] })], onError: () => undefined },
     })
     opened = await own.open('/')
   }, 60_000)
@@ -471,11 +467,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a notice t
     flaky = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      observe: { onError: () => undefined },
       use: [new Elysia().onRequest(({ request }) => {
         return request.url.endsWith('/notice.js') && failures-- > 0 ? new Response('down', { status: 503 }) : undefined
       })],
-      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: true })],
+      config: { extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: true })], onError: () => undefined },
     })
     opened = await flaky.open('/')
   }, 60_000)
@@ -529,7 +524,6 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tracker 
     nonced = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      observe: { onError: () => undefined },
       use: [new Elysia().mapResponse({ as: 'global' }, async ({ responseValue }) => {
         if (!(responseValue instanceof Response) || !(responseValue.headers.get('content-type') ?? '').includes('text/html'))
           return undefined
@@ -540,7 +534,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tracker 
 
         return new Response((await responseValue.text()).replace(/<script (?=[^>]*analytics\.js)/, '<script nonce="n0nce" '), { status: responseValue.status, headers })
       })],
-      extensions: [analytics({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, awaitConsent: true })],
+      config: { extensions: [analytics({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, awaitConsent: true })], onError: () => undefined },
     })
     opened = await nonced.open('/')
   }, 60_000)
@@ -582,7 +576,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('fathom and
     ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH' } as const, 'script[src^="https://cdn.usefathom.com"]'],
     ['cloudflare', { provider: 'cloudflare', token: 'abc123' } as const, 'script[src^="https://static.cloudflareinsights.com"]'],
   ])('%s loads nothing before a yes, and its script after one', async (_name, options, selector) => {
-    const own = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, observe: { onError: () => undefined }, extensions: [analytics(options)] })
+    const own = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, config: { extensions: [analytics(options)], onError: () => undefined } })
 
     try {
       const opened = await own.open('/')
@@ -620,7 +614,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a script p
     ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH', awaitConsent: false } as const, 'script[src^="https://cdn.usefathom.com"]'],
     ['cloudflare', { provider: 'cloudflare', token: 'abc123', awaitConsent: false } as const, 'script[src^="https://static.cloudflareinsights.com"]'],
   ])('%s loads at once with the line, and an opt-out reloads the page without it and keeps it out', async (_name, options, selector) => {
-    const own = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, observe: { onError: () => undefined }, extensions: [analytics(options)] })
+    const own = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, config: { extensions: [analytics(options)], onError: () => undefined } })
 
     try {
       const opened = await own.open('/')
@@ -648,7 +642,6 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a script p
     const nonced = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      observe: { onError: () => undefined },
       use: [new Elysia().mapResponse({ as: 'global' }, async ({ responseValue }) => {
         if (!(responseValue instanceof Response) || !(responseValue.headers.get('content-type') ?? '').includes('text/html'))
           return undefined
@@ -659,7 +652,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a script p
 
         return new Response((await responseValue.text()).replace(/<script (?=[^>]*analytics\.js)/, '<script nonce="n0nce" '), { status: responseValue.status, headers })
       })],
-      extensions: [analytics({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, awaitConsent: false })],
+      config: { extensions: [analytics({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, awaitConsent: false })], onError: () => undefined },
     })
 
     try {
@@ -719,8 +712,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     words = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: true })],
+      config: { extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, awaitConsent: true })], onError: () => undefined },
     })
     opened = await words.open('/')
   }, 60_000)
@@ -757,8 +749,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an app\'s 
     own = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, info: { optOut: 'Stop', text: { en: 'Counting {provider}' } } })],
+      config: { extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, info: { optOut: 'Stop', text: { en: 'Counting {provider}' } } })], onError: () => undefined },
     })
     opened = await own.open('/')
   }, 60_000)

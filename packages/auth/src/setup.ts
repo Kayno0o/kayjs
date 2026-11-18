@@ -71,9 +71,7 @@ function hooked<Args extends unknown[], Result>(hook: ((...args: never[]) => Res
 }
 
 // `afterSignUp` as the flows call it: told through `dispatch`, so a throw is reported and never fails the sign-up that happened.
-function signUpHook({ afterSignUp: hook = undefined, onSignUp }: Pick<AuthOptions<AuthSessionData, string>, 'afterSignUp' | 'onSignUp'>): Core['onSignUp'] {
-  hook ??= onSignUp
-
+function signUpHook({ afterSignUp: hook }: Pick<AuthOptions<AuthSessionData, string>, 'afterSignUp'>): Core['onSignUp'] {
   return hook && (async (user, profile) => dispatch('auth.afterSignUp', [hook as never], { user, profile }, { context: await authContext() }))
 }
 

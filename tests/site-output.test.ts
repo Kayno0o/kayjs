@@ -12,7 +12,7 @@ import { pages } from './shared-pages'
 const ROOT = 'tests/fixtures/site-output'
 
 async function appWith(options: Parameters<typeof pages>[0] = {}) {
-  return pages({ root: ROOT, prebuilt: false, security: false, ...options })
+  return pages({ root: ROOT, prebuilt: false, config: { security: false }, ...options })
 }
 
 async function fetchFrom(app: Awaited<ReturnType<typeof pages>>, path: string, headers: Record<string, string> = {}): Promise<Response> {
@@ -35,7 +35,7 @@ describe('publicCache', () => {
   })
 
   it('keeps the default by kind through a 304, under a base and with a setting for another path', async () => {
-    const app = await appWith({ dev: false, base: '/docs', publicCache: { '/other/**': '1d' } })
+    const app = await appWith({ dev: false, config: { base: '/docs', assets: { publicCache: { '/other/**': '1d' } } } })
     const first = await fetchFrom(app, '/fonts/a.woff2')
     const again = await fetchFrom(app, '/fonts/a.woff2', { 'if-none-match': first.headers.get('etag')! })
 
@@ -61,7 +61,7 @@ describe('publicCache', () => {
   const publicCache: NonNullable<KayConfig['assets']>['publicCache'] = { '/fonts/**': '365d', '**/*.png': '1d', '/img/*': '1h' }
 
   it('gives a public file the cache of the first pattern its path matches, and keeps revalidating the others', async () => {
-    const app = await appWith({ publicCache, dev: false })
+    const app = await appWith({ config: { assets: { publicCache } }, dev: false })
 
     expect((await fetchFrom(app, '/fonts/a.woff2')).headers.get('cache-control')).toBe('public, max-age=31536000')
     // Both `**/*.png` and `/img/*` match: the first listed wins.
@@ -70,7 +70,7 @@ describe('publicCache', () => {
   })
 
   it('keeps the etag, and a 304 carries the same cache', async () => {
-    const app = await appWith({ publicCache, dev: false })
+    const app = await appWith({ config: { assets: { publicCache } }, dev: false })
     const first = await fetchFrom(app, '/fonts/a.woff2')
     const again = await fetchFrom(app, '/fonts/a.woff2', { 'if-none-match': first.headers.get('etag')! })
 
@@ -79,32 +79,32 @@ describe('publicCache', () => {
   })
 
   it('is ignored in development, so an edit shows at once', async () => {
-    const app = await appWith({ publicCache, dev: true })
+    const app = await appWith({ config: { assets: { publicCache } }, dev: true })
 
     expect((await fetchFrom(app, '/fonts/a.woff2')).headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
   })
 
   it('keeps revalidating the files a glob gives 0, whatever their kind', async () => {
-    const app = await appWith({ publicCache: { '/fonts/**': '0s', '**/*.png': '0s' }, dev: false })
+    const app = await appWith({ config: { assets: { publicCache: { '/fonts/**': '0s', '**/*.png': '0s' } } }, dev: false })
 
     expect((await fetchFrom(app, '/fonts/a.woff2')).headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
     expect((await fetchFrom(app, '/img/logo.png')).headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
   })
 
   it('refuses a duration that is not one', async () => {
-    await expect(appWith({ publicCache: { '/x': 'forever' as '1d' }, dev: false })).rejects.toThrow('publicCache[\'/x\']')
+    await expect(appWith({ config: { assets: { publicCache: { '/x': 'forever' as '1d' } } }, dev: false })).rejects.toThrow('publicCache[\'/x\']')
   })
 
   it('refuses a duration that is none in development too', async () => {
     // A development server that fails to boot serves the reason instead.
-    const html = await (await fetchFrom(await appWith({ publicCache: { '/x': -1 as never }, dev: true }), '/')).text()
+    const html = await (await fetchFrom(await appWith({ config: { assets: { publicCache: { '/x': -1 as never } } }, dev: true }), '/')).text()
 
     expect(html).toContain('Boot failed')
     expect(html).toContain('publicCache[')
   })
 
   it('applies under a base, whose mount point the proxy takes off', async () => {
-    const app = await appWith({ publicCache, base: '/docs', dev: false })
+    const app = await appWith({ config: { base: '/docs', assets: { publicCache } }, dev: false })
 
     expect((await fetchFrom(app, '/fonts/a.woff2')).headers.get('cache-control')).toBe('public, max-age=31536000')
   })
@@ -151,7 +151,7 @@ describe('robots', () => {
   })
 
   it('lists a path in the locale of the host asking, with that host\'s sitemap', async () => {
-    const app = await appWith({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], default: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: 'src/messages' }, robots: { disallow: ['/private'] } })
+    const app = await appWith({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], default: 'fr', mode: { domains: { fr: 'x.fr', en: 'x.com' } }, messages: 'src/messages' }, robots: { disallow: ['/private'] } })
 
     expect(await text(app, 'http://x.com/robots.txt')).toBe('User-agent: *\nAllow: /\nDisallow: /private\n\nSitemap: https://x.com/sitemap.xml\n')
     expect(await text(app, 'http://x.fr/robots.txt')).toContain('Sitemap: https://x.fr/sitemap.xml\n')
@@ -193,7 +193,7 @@ describe('sitemap lastmod', () => {
     const xml = async (lastmod: string) => {
       const root = await fixtureCopy('site-output')
 
-      await Bun.write(`${root}/src/routes/posts/[slug].kay`, `--- server\nexport const page = { sitemap: [{ slug: 'a' }], lastmod: ${lastmod} }\n---\nh1 Post\n`)
+      await Bun.write(`${root}/src/routes/posts/[slug].kay`, `--- server\nexport const page = { seo: { sitemap: [{ slug: 'a' }], lastmod: ${lastmod} } }\n---\nh1 Post\n`)
 
       return (await (await appWith({ root, dirs: { routes: 'src/routes', public: `${root}/public` }, site })).handle(new Request('http://localhost/sitemap.xml'))).text()
     }
@@ -213,7 +213,7 @@ describe('sitemap lastmod', () => {
   })
 
   it('gives each host of a site by domain its own pages with the lastmod', async () => {
-    const xml = await sitemap({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], default: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: 'src/messages' } }, 'http://x.com/sitemap.xml')
+    const xml = await sitemap({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], default: 'fr', mode: { domains: { fr: 'x.fr', en: 'x.com' } }, messages: 'src/messages' } }, 'http://x.com/sitemap.xml')
 
     expect(xml).toContain('<loc>https://x.com/posts/b</loc><lastmod>2026-05-06</lastmod>')
     expect(xml).not.toContain('<loc>https://x.fr')
@@ -233,8 +233,8 @@ describe('theme color', () => {
 
   it('takes one colour, and falls back to the manifest\'s', async () => {
     expect(await themes({ seo: { themeColor: '#123456' } })).toEqual(['<meta name="theme-color" content="#123456">'])
-    expect(await themes({ manifest: { themeColor: '#654321' } })).toEqual(['<meta name="theme-color" content="#654321">'])
-    expect(await themes({ seo: { themeColor: '#123456' }, manifest: { themeColor: '#654321' } })).toEqual(['<meta name="theme-color" content="#123456">'])
+    expect(await themes({ config: { assets: { manifest: { themeColor: '#654321' } } } })).toEqual(['<meta name="theme-color" content="#654321">'])
+    expect(await themes({ config: { seo: { themeColor: '#123456' }, assets: { manifest: { themeColor: '#654321' } } } })).toEqual(['<meta name="theme-color" content="#123456">'])
   })
 
   it('writes none by default, and lets a page replace the one of its scheme', async () => {
@@ -247,7 +247,7 @@ describe('theme color', () => {
   })
 
   it('is the same under every locale', async () => {
-    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }
+    const i18n = { locales: ['fr', 'en'], default: 'fr', messages: 'src/messages' }
 
     expect(await themes({ i18n, seo: { themeColor: { light: '#fff', dark: '#111' } } }, '/en/about')).toHaveLength(2)
   })
@@ -265,7 +265,7 @@ describe('layout settings', () => {
   it('has the page undo what its layout says', async () => {
     const root = await fixtureCopy('site-output')
 
-    await Bun.write(`${root}/src/routes/private/open.kay`, '--- server\nexport const page = { noindex: false }\n---\nh1 Open\n')
+    await Bun.write(`${root}/src/routes/private/open.kay`, '--- server\nexport const page = { seo: { noindex: false } }\n---\nh1 Open\n')
 
     const app = await appWith({ root, site: 'https://x.example' })
 

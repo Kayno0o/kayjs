@@ -44,7 +44,7 @@ export interface WorkflowContext<Known extends Events = Events> extends JobConte
   step: WorkflowStep<Known>
 }
 
-export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'timeout' | 'lostAfter' | 'enabled' | 'idlePoll' | 'failedTtl'> {
+export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'timeout' | 'enabled' | 'idlePoll' | 'failedTtl'> {
   // Told once, when a worker first takes the run: not for the runs after a sleep, a wait or a retry.
   onStart?: Hook<{ id: string, input: Input }> | undefined
   // Told once the flow function ended, after its last step.

@@ -15,7 +15,7 @@ async function site(files: Record<string, string>, options: Record<string, unkno
   await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(dir, path), content)))
   Reflect.deleteProperty(globalThis, 'loaded')
 
-  const app = await pages({ dirs: { routes: dir }, prebuilt: false, security: false, guards: { default: 'open' }, ...options })
+  const app = await pages({ config: { dirs: { routes: dir }, security: false, guards: { default: 'open' } }, prebuilt: false, ...options })
 
   return {
     // What a path answers when the swap asks for its loading page, or for the page itself.

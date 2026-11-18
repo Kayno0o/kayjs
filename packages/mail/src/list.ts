@@ -67,20 +67,12 @@ export interface ListOptions {
   privacy?: string | undefined
   // Told when an address signs up through the form of this list, once its confirmation is mailed; not for one asking again while pending, nor one confirmed already. A throw is reported and the sign-up stands.
   afterSubscribe?: Hook<ListEvent> | undefined
-  /** @deprecated Written `afterSubscribe`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onSubscribe?: Hook<ListEvent> | undefined
   // Told when the address confirms, once. Needs a store with `find`, as `sqliteLists` and `pgLists` have.
   afterConfirm?: Hook<ListEvent> | undefined
-  /** @deprecated Written `afterConfirm`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onConfirm?: Hook<ListEvent> | undefined
   // Told when the address leaves the list by its unsubscribe link or `list.unsubscribe()`, once. A removal by `mail.erase()`, a bounce or a complaint tells nothing. The link needs a store with `find`.
   afterUnsubscribe?: Hook<ListEvent> | undefined
-  /** @deprecated Written `afterUnsubscribe`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onUnsubscribe?: Hook<ListEvent> | undefined
   // Told once when a broadcast has been handed to every subscriber, with how many mails went and how many were given up.
   afterBroadcast?: Hook<BroadcastEvent> | undefined
-  /** @deprecated Written `afterBroadcast`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onBroadcast?: Hook<BroadcastEvent> | undefined
 }
 
 // What the hooks of a list are told about a subscriber, the list's name and the normalised address.
@@ -95,12 +87,7 @@ export interface BroadcastEvent extends Pick<BroadcastProgress, 'sent' | 'failed
   id: string
 }
 
-// The `on` names of 1.104 still work until 1.108, beside the `after` ones.
-function afterNames(given: ListOptions): ListOptions {
-  return { ...given, afterSubscribe: given.afterSubscribe ?? given.onSubscribe, afterConfirm: given.afterConfirm ?? given.onConfirm, afterUnsubscribe: given.afterUnsubscribe ?? given.onUnsubscribe, afterBroadcast: given.afterBroadcast ?? given.onBroadcast }
-}
-
-const LIST_HOOKS = ['afterSubscribe', 'onSubscribe', 'afterConfirm', 'onConfirm', 'afterUnsubscribe', 'onUnsubscribe', 'afterBroadcast', 'onBroadcast'] as const
+const LIST_HOOKS = ['afterSubscribe', 'afterConfirm', 'afterUnsubscribe', 'afterBroadcast'] as const
 
 // The mail sent to a list: a message without recipients, which are the list's.
 export type ListMessage<P extends object = object> = MailMessage<P> extends infer M ? M extends unknown ? Omit<M, 'to' | 'cc' | 'bcc' | 'unsubscribe' | 'attachments'> : never : never
@@ -267,7 +254,7 @@ function sourcesOf(name: string, options: ListOptions): { store: ListStore | und
   return { store: lists, file: file ?? options.file }
 }
 
-// `fallback` is where a list with no store of its own lives and a link of an undeclared list looks: the mailer's `listStore`, else the default SQLite file, which a test names as `file` since the default is skipped under `bun test`. `suppressions` is the mailer's `suppressionStore`.
+// `fallback` is where a list with no store of its own lives and a link of an undeclared list looks: the mailer's `store.lists`, else the default SQLite file, which a test names as `file` since the default is skipped under `bun test`. `suppressions` is the mailer's `suppressionStore`.
 export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>, fallback: { file?: string | undefined, store?: ListStore | undefined, suppressions?: SuppressionStore | undefined, sweepAfter?: number, sweepEvery?: number } = {}) {
   // The queues are made after the lists, which they run: the mailer hands them over with `connect`.
   let queues: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'> | undefined
@@ -279,12 +266,12 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   }
 
   const entries = new Map<string, Entry>()
-  // The mailer's `listStore`, else the app's database, else the default file; none of the last two under `bun test` unless the test names a file.
+  // The mailer's `store.lists`, else the app's database, else the default file; none of the last two under `bun test` unless the test names a file.
   const fallbackHome = () => fallback.file !== undefined || fallback.store !== undefined || process.env.NODE_ENV === 'test' ? undefined : listsHome()
   const defaultFile = () => fallback.file ?? fallbackHome()?.file
   const defaultStore = (): ListStore | undefined => fallback.store ?? fallbackHome()?.store
   const stores = listRegistry({ file: defaultFile, store: defaultStore })
-  // A mailer without a `suppressionStore` keeps them where its lists do, else in the default file, in their table alone until a list opens the file.
+  // A mailer without `store.suppressions` keeps them where its lists do, else in the default file, in their table alone until a list opens the file.
   const defaultSuppressionsFor = new Map<string, SuppressionStore>()
   const defaultSuppressions = (): SuppressionStore => {
     const file = defaultFile() ?? ':memory:'
@@ -610,7 +597,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       let entry = entries.get(name)
 
       if (!entry) {
-        entries.set(name, entry = make(name, afterNames(options)))
+        entries.set(name, entry = make(name, options))
         sweeper.start()
         host.activate()
       }

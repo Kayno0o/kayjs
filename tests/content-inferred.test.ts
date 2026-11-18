@@ -6,7 +6,7 @@ import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
-const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], default: 'en' } })\n`
+const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ ops: { observe: { log: false } }, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], default: 'en' } })\n`
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
@@ -32,9 +32,9 @@ export const news = collection({ name: 'news', load: () => [{ slug: 'big', data:
   'src/content/notes/fr/a.md': '---\ntitle: premier\ndate: 2026-01-01\nupdated: 2026-03-01\n---\ncorps\n',
   'src/routes/notes/[slug].kay': PAGE.replaceAll('{{name}}', 'notes'),
   'src/routes/news/[slug].kay': PAGE.replaceAll('{{name}}', 'news'),
-  'src/routes/quiet/[slug].kay': PAGE.replaceAll('{{name}}', 'quiet').replace('---\nh1', 'export const page = { feed: false }\n---\nh1'),
-  'src/routes/about.kay': '--- server\nimport { notes } from \'../content.config\'\n\nexport const page = { feed: notes }\n---\nh1 About\n',
-  'src/routes/archive.kay': '--- server\nimport { news, notes } from \'../content.config\'\n\nexport const page = { feed: [notes, news] }\n---\nh1 Archive\n',
+  'src/routes/quiet/[slug].kay': PAGE.replaceAll('{{name}}', 'quiet').replace('---\nh1', 'export const page = { seo: { feed: false } }\n---\nh1'),
+  'src/routes/about.kay': '--- server\nimport { notes } from \'../content.config\'\n\nexport const page = { seo: { feed: notes } }\n---\nh1 About\n',
+  'src/routes/archive.kay': '--- server\nimport { news, notes } from \'../content.config\'\n\nexport const page = { seo: { feed: [notes, news] } }\n---\nh1 Archive\n',
 }
 
 type Found = Record<string, { status: number, text: string }>
@@ -44,7 +44,7 @@ function serve(root: string, trailingSlash: string, prebuilt: boolean) {
   return `import { Elysia } from 'elysia'
 import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}
 
-const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: ${prebuilt}, base: '/site', trailingSlash: '${trailingSlash}', observe: { log: false }, serve: { compress: false } }))
+const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: ${prebuilt}, config: { base: '/site', trailingSlash: '${trailingSlash}', ops: { observe: { log: false } }, serve: { compress: false } } }))
 const get = async (path: string) => { const response = await app.handle(new Request(\`http://localhost\${path}\`)); return { status: response.status, text: await response.text() } }
 const slash = ${JSON.stringify(trailingSlash === 'always')} ? '/' : ''
 

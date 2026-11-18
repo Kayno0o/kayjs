@@ -1,3 +1,4 @@
+import type { Duration } from '../src/runtime/duration'
 import { describe, expect, it } from 'bun:test'
 import { overLimitOf } from '../src/server/over-limit'
 import { memoryRates } from '../src/server/protection'
@@ -10,7 +11,7 @@ describe('live.rateLimit', () => {
     const rates = memoryRates()
     const counted = new Set<string>()
     const told: string[] = []
-    const store = { hit: (key: string, window: number, weight?: number) => {
+    const store = { hit: (key: string, window: Duration, weight?: number) => {
       counted.add(key)
 
       return rates.hit(key, window, weight)
@@ -19,7 +20,7 @@ describe('live.rateLimit', () => {
     const app = await pages({
       root: await fixtureCopy('live-cache'),
       prebuilt: false,
-      live: { rateLimit: { max: 1, window: '1m', store, onLimit: ({ name }: { name: string }) => { told.push(name) } } },
+      config: { live: { rateLimit: { max: 1, window: '1m', store, onLimit: ({ name }: { name: string }) => { told.push(name) } } } },
     })
 
     const open = async () => app.handle(new Request('http://localhost/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs: [], watch: [] }) }))
@@ -33,7 +34,7 @@ describe('live.rateLimit', () => {
 
 describe('overLimitOf', () => {
   it('counts apart in two stores with the same name, max and window', async () => {
-    const rate = (store: ReturnType<typeof memoryRates>) => ({ max: 1, windowMs: 60_000, store: { hit: (key: string, window: number, weight?: number) => store.hit(key, window, weight) } })
+    const rate = (store: ReturnType<typeof memoryRates>) => ({ max: 1, windowMs: 60_000, store: { hit: (key: string, window: Duration, weight?: number) => store.hit(key, window, weight) } })
     const first = rate(memoryRates())
     const second = rate(memoryRates())
 

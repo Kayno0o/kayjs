@@ -3,7 +3,7 @@ import { KayError } from '../src/runtime/kay-error'
 import { persistedCookie, testSite } from '../src/test'
 import { settledHtml } from '../src/test/page'
 
-const site = await testSite({ dirs: { routes: 'tests/fixtures/settled/src/routes' }, islands: false })
+const site = await testSite({ config: { dirs: { routes: 'tests/fixtures/settled/src/routes' } }, islands: false })
 
 afterAll(async () => {
   await site.close()

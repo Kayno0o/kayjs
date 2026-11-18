@@ -300,7 +300,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
   }, 60_000)
 
   it('keeps it under a trailing slash', async () => {
-    const site = await testSite({ root: 'tests/fixtures/caret-field', trailingSlash: 'always', browser: { path } })
+    const site = await testSite({ root: 'tests/fixtures/caret-field', config: { trailingSlash: 'always' }, browser: { path } })
 
     try {
       await typeAcross(await site.open('/input/'))
@@ -312,7 +312,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
 
   it('keeps it under a base', async () => {
     const base = '/repo'
-    const site = await testSite({ root: 'tests/fixtures/caret-field', trailingSlash: 'always', base, browser: { path } })
+    const site = await testSite({ root: 'tests/fixtures/caret-field', config: { trailingSlash: 'always', base }, browser: { path } })
     const front = Bun.serve({
       port: 0,
       async fetch(request) {

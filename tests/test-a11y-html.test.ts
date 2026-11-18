@@ -9,7 +9,7 @@ import { auditHtml } from '../src/test/a11y-dom'
 import { matchHtmlFile, normalizeHtml } from '../src/test/html-snapshot'
 import { scratchDir } from './scratch'
 
-const site = await testSite({ dirs: { routes: 'tests/fixtures/a11y-visit/src/routes' }, islands: false })
+const site = await testSite({ config: { dirs: { routes: 'tests/fixtures/a11y-visit/src/routes' } }, islands: false })
 
 beforeAll(() => {
   GlobalRegistrator.register()

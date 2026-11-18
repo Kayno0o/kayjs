@@ -59,9 +59,9 @@ describe('guards: { default }', () => {
       Bun.write(join(dir, 'api/admin/_guard.ts'), ADMINS),
       Bun.write(join(dir, 'api/admin/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'secret\')\n'),
     ])
-    required = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, ...defaultOf(true) })
-    optional = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, ...defaultOf(false) })
-    unset = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
+    required = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' }, ...defaultOf(true) }, prebuilt: false })
+    optional = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' }, ...defaultOf(false) }, prebuilt: false })
+    unset = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' } }, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -76,7 +76,7 @@ describe('guards: { default }', () => {
   })
 
   it('reads `guards: { default }`, an empty one leaving it to what the routes guard', async () => {
-    const config = async (extra: object) => pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, ...extra })
+    const config = async (extra: object) => pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' } }, prebuilt: false, ...extra })
 
     expect(await status(await config({ guards: { default: 'closed' } }), '/')).toBe(403)
     expect(await status(await config({ guards: { default: 'open' } }), '/')).toBe(200)
@@ -201,7 +201,7 @@ describe('guards: { default }', () => {
     try {
       await Bun.write(join(bare, 'routes/index.kay'), 'h1 Home\n')
       expect((await writeShadowTypes(bare, { dirs: { routes: 'routes', api: 'api' } })).problems.filter(found => found.code === 'unguarded-route')).toEqual([])
-      expect(await status(await pages({ root: bare, dirs: { routes: 'routes', api: 'api' }, prebuilt: false }), '/')).toBe(200)
+      expect(await status(await pages({ root: bare, config: { dirs: { routes: 'routes', api: 'api' } }, prebuilt: false }), '/')).toBe(200)
     }
     finally {
       await rm(bare, { recursive: true, force: true })
@@ -256,7 +256,7 @@ describe('input a guarded route\'s schema refuses', () => {
       Bun.write(join(dir, 'api/admin/_guard.ts'), ADMINS),
       Bun.write(join(dir, 'api/admin/index.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api().post(\'/\', ({ body }) => body.name, { body: t.Object({ name: t.String({ maxLength: 3 }) }) }).post(\'/upload\', () => \'ok\', { body: t.Object({ file: t.File({ type: \'image/png\' }) }) })\n'),
     ])
-    app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
+    app = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' } }, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -349,7 +349,7 @@ describe('the OpenAPI document on a site requiring guards', () => {
       Bun.write(join(dir, 'api/notes.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => [])\n'),
       Bun.write(join(dir, 'api/health.ts'), 'import { api } from \'kay/server\'\n\nexport default api({ guards: false }).get(\'/\', () => \'up\')\n'),
     ])
-    const app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, guards: { default: 'closed' }, openapi: true })
+    const app = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' }, guards: { default: 'closed' }, openapi: true }, prebuilt: false })
     const status = async (headers: Record<string, string> = {}) => (await app.handle(new Request('http://localhost/api/openapi.json', { headers }))).status
 
     expect(await status()).toBe(403)
@@ -365,7 +365,7 @@ describe('the OpenAPI document on a site requiring guards', () => {
       Bun.write(join(mixed, 'b/_guard.ts'), ADMINS.replace('x-admin', 'x-other')),
       Bun.write(join(mixed, 'b/m.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'b\')\n'),
     ])
-    const status = async (requireGuards?: boolean) => (await (await pages({ root: dir, dirs: { routes: 'routes', api: mixed }, prebuilt: false, openapi: true, ...defaultOf(requireGuards) })).handle(new Request('http://localhost/api/openapi.json'))).status
+    const status = async (requireGuards?: boolean) => (await (await pages({ root: dir, config: { dirs: { routes: 'routes', api: mixed }, openapi: true }, prebuilt: false, ...defaultOf(requireGuards) })).handle(new Request('http://localhost/api/openapi.json'))).status
 
     expect(await status()).toBe(200)
     expect(await status(true)).toBe(403)
@@ -378,7 +378,7 @@ describe('the OpenAPI document on a site requiring guards', () => {
       Bun.write(join(lib, '_guard.ts'), ADMINS),
       Bun.write(join(lib, 'm.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'m\')\n'),
     ])
-    const app = await pages({ root: dir, dirs: { routes: 'routes', api: join(dir, 'none') }, prebuilt: false, extensions: [{ name: 'solo', api: { dir: lib, prefix: 'solo' } }] })
+    const app = await pages({ root: dir, config: { dirs: { routes: 'routes', api: join(dir, 'none') }, extensions: [{ name: 'solo', api: { dir: lib, prefix: 'solo' } }] }, prebuilt: false })
 
     expect((await app.handle(new Request('http://localhost/'))).status).toBe(200)
     expect((await app.handle(new Request('http://localhost/api/solo/m'))).status).toBe(403)
@@ -397,13 +397,13 @@ describe('the OpenAPI document on a site requiring guards', () => {
     const status = async (app: Awaited<ReturnType<typeof pages>>, headers: Record<string, string> = {}) => (await app.handle(new Request('http://localhost/api/openapi.json', { headers }))).status
 
     for (const requireGuards of [false, true]) {
-      const app = await pages({ root: dir, dirs: { routes: 'routes', api: join(dir, 'none') }, prebuilt: false, ...defaultOf(requireGuards), openapi: true, extensions })
+      const app = await pages({ root: dir, config: { dirs: { routes: 'routes', api: join(dir, 'none') }, ...defaultOf(requireGuards), openapi: true, extensions }, prebuilt: false })
 
       expect(await status(app)).toBe(403)
       expect(await status(app, { 'x-lib': '1' })).toBe(200)
     }
 
-    expect(await status(await pages({ root: dir, dirs: { routes: 'routes', api: join(dir, 'open-api') }, prebuilt: false, guards: { default: 'closed' }, openapi: true }))).toBe(200)
+    expect(await status(await pages({ root: dir, config: { dirs: { routes: 'routes', api: join(dir, 'open-api') }, guards: { default: 'closed' }, openapi: true }, prebuilt: false }))).toBe(200)
   })
 
   it('stays refused with a library\'s modules under guards of their own beside an open module, and with no module at all', async () => {
@@ -417,7 +417,7 @@ describe('the OpenAPI document on a site requiring guards', () => {
       Bun.write(join(lib, 'b/m.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'b\')\n'),
     ])
     const extensions = [{ name: 'two', api: { dir: lib, prefix: 'two' } }]
-    const status = async (api: string, more = extensions) => (await (await pages({ root: dir, dirs: { routes: 'routes', api: join(dir, api) }, prebuilt: false, guards: { default: 'closed' }, openapi: true, extensions: more })).handle(new Request('http://localhost/api/openapi.json'))).status
+    const status = async (api: string, more = extensions) => (await (await pages({ root: dir, config: { dirs: { routes: 'routes', api: join(dir, api) }, guards: { default: 'closed' }, openapi: true, extensions: more }, prebuilt: false })).handle(new Request('http://localhost/api/openapi.json'))).status
 
     expect(await status('open-api')).toBe(403)
     expect(await status('none', [])).toBe(403)

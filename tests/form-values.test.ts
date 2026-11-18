@@ -11,7 +11,7 @@ const { save } = await import(join(import.meta.dir, 'fixtures/form-once/src/rout
 const { rename } = await import(join(import.meta.dir, 'fixtures/form-once/src/routes/island.kay')) as { rename: Action<Record<string, string | boolean>, unknown> }
 const { edit } = await import(join(import.meta.dir, 'fixtures/form-once/src/routes/many.kay')) as { edit: Action<Record<string, string>, unknown> }
 const path = browserPath()
-const mounted = await testSite({ root: 'tests/fixtures/form-once', islands: false, base: '/blog', trailingSlash: 'always' })
+const mounted = await testSite({ root: 'tests/fixtures/form-once', islands: false, config: { base: '/blog', trailingSlash: 'always' } })
 
 describe('a form given the record its fields start from', () => {
   it('fills the fields and shows a refused post under a base path', async () => {
@@ -126,7 +126,7 @@ describe('a form given the record its fields start from', () => {
   })
 
   it('fills the fields of a form under a base the same way', async () => {
-    const based = await testSite({ root: 'tests/fixtures/form-once', base: '/shop' })
+    const based = await testSite({ root: 'tests/fixtures/form-once', config: { base: '/shop' } })
     const { html } = await based.visit('/shop/')
 
     expect(html).toContain('action="/shop/_kay/action/src/routes/index.kay/save"')

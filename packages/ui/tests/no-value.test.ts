@@ -3,7 +3,7 @@ import { testSite } from 'kay/test'
 import { ui } from '../src/extension'
 
 it('draws a control without a value with no option selected and no chip ticked', async () => {
-  const site = await testSite({ root: `${import.meta.dir}/fixture`, extensions: [ui()], islands: false })
+  const site = await testSite({ root: `${import.meta.dir}/fixture`, config: { extensions: [ui()] }, islands: false })
 
   try {
     const html = (await site.visit('/no-value')).html

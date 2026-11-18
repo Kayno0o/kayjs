@@ -9,7 +9,7 @@ describe('reading a page', () => {
   let read: TestSite
 
   beforeAll(async () => {
-    read = await testSite({ root: 'tests/fixtures/seo', site: 'https://example.com/', seo })
+    read = await testSite({ root: 'tests/fixtures/seo', config: { site: 'https://example.com/', seo } })
   })
 
   it('gives its title, meta, canonical URL and JSON-LD as a crawler reads them', async () => {

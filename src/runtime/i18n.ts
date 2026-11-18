@@ -320,10 +320,10 @@ export function formatBytes(page: string, given: ByteSize, options?: NumberForma
 // Each unit of a duration with its length in milliseconds.
 const DURATION_UNITS: readonly [string, number][] = [['day', 86_400_000], ['hour', 3_600_000], ['minute', 60_000], ['second', 1000]]
 
-// A length of time, written with its unit (`'125m'`) or in milliseconds, in its largest unit and the one below, `2 hr 5 min`, the lower one left out when it is zero.
-export function formatDuration(page: string, duration: Duration | number, given?: DurationFormatOptions): string {
+// A length of time, written with its unit (`'125m'`), in its largest unit and the one below, `2 hr 5 min`, the lower one left out when it is zero.
+export function formatDuration(page: string, duration: Duration, given?: DurationFormatOptions): string {
   const [locale, options] = withLocale(page, given)
-  const milliseconds = typeof duration === 'number' ? duration : durationMs(duration)
+  const milliseconds = durationMs(duration)
   const total = Number.isFinite(milliseconds) ? Math.round(Math.max(0, milliseconds) / 1000) * 1000 : 0
   const reached = DURATION_UNITS.findIndex(([, length]) => total >= length)
   const first = reached === -1 ? DURATION_UNITS.length - 1 : reached

@@ -29,8 +29,6 @@ export interface ImageOptionAttributes {
 
 // What an `img` with an imported `src` takes beside `sizes`, `width` and `height`: the shape it is cut to, the quality of its variants, and whether it shows its color until it loads. Read by the source and never written.
 export const IMAGE_OPTIONS = new Set(['aspect', 'quality', 'placeholder'])
-// The attribute an `img` read before 1.105 for leaving out the color it shows until it loads, `placeholder={false}` since.
-export const NO_PLACEHOLDER = 'no-placeholder'
 
 // The attributes an `img` with an imported `src` takes besides `sizes`, and whether it shows its color until it loads.
 export function imageOptions(element: ElementNode, source: Source): { options: ImageOptionAttributes, colour: boolean } {
@@ -38,7 +36,7 @@ export function imageOptions(element: ElementNode, source: Source): { options: I
   const options = { aspect: find('aspect'), quality: find('quality'), placeholder: find('placeholder') }
   const written = (name: string) => element.attributes.some(attribute => attribute.kind !== 'spread' && source(attribute.name) === name)
 
-  return { options, colour: !written('style') && !written(NO_PLACEHOLDER) && !placeholderOff(options.placeholder, source) }
+  return { options, colour: !written('style') && !placeholderOff(options.placeholder, source) }
 }
 
 // Whether the attribute is `placeholder={false}`, the one form kay reads while compiling, so the server leaves the color out.

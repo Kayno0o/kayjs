@@ -13,10 +13,10 @@ const ROOT = 'tests/fixtures/layout-slots'
 const SIDE = /<aside class="side">([\s\S]*?)<\/aside>/
 const MAIN = /<main>([\s\S]*?)<\/main>/
 
-const app = await pages({ root: ROOT, prebuilt: false, security: false })
-const based = await pages({ root: ROOT, prebuilt: false, security: false, base: '/repo', trailingSlash: 'always' })
-const development = await pages({ root: ROOT, dev: true, security: false })
-const localized = await pages({ root: ROOT, prebuilt: false, security: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve(`${ROOT}/src/messages`) } })
+const app = await pages({ root: ROOT, prebuilt: false, config: { security: false } })
+const based = await pages({ root: ROOT, prebuilt: false, config: { security: false, base: '/repo', trailingSlash: 'always' } })
+const development = await pages({ root: ROOT, dev: true, config: { security: false } })
+const localized = await pages({ root: ROOT, prebuilt: false, config: { security: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve(`${ROOT}/src/messages`) } } })
 
 async function get(server: Elysia, path: string): Promise<{ status: number, html: string, side: string, main: string }> {
   const response = await server.handle(new Request(`http://localhost${path}`))
@@ -143,7 +143,7 @@ describe('a block holding a server island', () => {
       expect(written['/islanded']!.islands).toEqual(['inline'])
       expect(SIDE.exec(built)![1]).toBe('<!--kay-server:0--><!--/kay-server:0-->')
 
-      const served = await build.serve({ root: ROOT, security: false })
+      const served = await build.serve({ root: ROOT, config: { security: false } })
       const visit = async () => (await served.handle(new Request('http://localhost/islanded'))).text()
       const first = await visit()
       const second = await visit()

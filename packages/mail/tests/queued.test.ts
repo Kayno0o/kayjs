@@ -249,7 +249,7 @@ describe('a queued delivery the queue aborts', () => {
         })
       }),
     }
-    const app = mailer({ from: 'a@example.com', transport: hanging, queue: { ...shared(), lostAfter: '1s' } })
+    const app = mailer({ from: 'a@example.com', transport: hanging, queue: { ...shared(), timeout: '1s' } })
 
     await app.enqueue({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' })
     await app.drain()
@@ -298,7 +298,7 @@ describe('a queued delivery the queue aborts', () => {
     Object.assign(process.env, { MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: 'true' })
 
     try {
-      const app = mailer({ from: 'a@example.com', queue: { ...shared(), lostAfter: '3s' } })
+      const app = mailer({ from: 'a@example.com', queue: { ...shared(), timeout: '3s' } })
 
       await app.enqueue({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' })
       await app.drain()

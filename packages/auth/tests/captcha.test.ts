@@ -177,7 +177,7 @@ describe('the proof-of-work CAPTCHA', () => {
   })
 
   test('refuses a solution replayed, past its maxAge or solving another action\'s challenge', async () => {
-    const { browser } = setup({ captcha: proofOfWork({ difficulty: 20, maxAge: '10m', on: { 'sign-in': 'always' } }) })
+    const { browser } = setup({ captcha: proofOfWork({ difficulty: 20, ttl: '10m', on: { 'sign-in': 'always' } }) })
     const ada = browser()
     const solved = solveWork(await challengeOf(ada, 'sign-in'))
 

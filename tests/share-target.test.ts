@@ -4,7 +4,7 @@ import { bootProblems } from '../src/check/boot'
 import { shareActionProblem } from '../src/server/favicon'
 import { testSite } from '../src/test'
 
-const site = await testSite({ root: 'tests/fixtures/share-target', islands: false, assets: { manifest: { scope: '/', shareTarget: { action: 'src/routes/share.kay#receive', files: ['image/*', '.pdf'] } } } })
+const site = await testSite({ root: 'tests/fixtures/share-target', islands: false, config: { assets: { manifest: { scope: '/', shareTarget: { action: 'src/routes/share.kay#receive', files: ['image/*', '.pdf'] } } } } })
 
 afterAll(async () => {
   await site.close()
@@ -51,7 +51,7 @@ describe('the manifest\'s share target', () => {
 })
 
 describe('a share target naming an action that is not there', () => {
-  const booting = async (action: string) => testSite({ root: 'tests/fixtures/share-target', islands: false, assets: { manifest: { shareTarget: { action } } } })
+  const booting = async (action: string) => testSite({ root: 'tests/fixtures/share-target', islands: false, config: { assets: { manifest: { shareTarget: { action } } } } })
 
   it('stops the boot on a file that is no page of the app', async () => {
     await expect(booting('src/routes/shared.kay#receive')).rejects.toThrow('kay: the manifest\'s shareTarget.action, src/routes/shared.kay#receive, names a file that is no page or layout of the app')

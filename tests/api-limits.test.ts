@@ -8,9 +8,9 @@ const FIXTURE = 'tests/fixtures/api-limits'
 const APP = 'https://app.example.com'
 const cors = { origins: [APP], credentials: true }
 const sites = {
-  root: await testSite({ root: FIXTURE, islands: false, cors }),
-  mounted: await testSite({ root: FIXTURE, islands: false, cors, base: '/blog', trailingSlash: 'always' }),
-  dev: await testSite({ root: FIXTURE, islands: false, cors, dev: true }),
+  root: await testSite({ root: FIXTURE, islands: false, config: { cors } }),
+  mounted: await testSite({ root: FIXTURE, islands: false, config: { cors, base: '/blog', trailingSlash: 'always' } }),
+  dev: await testSite({ root: FIXTURE, islands: false, config: { cors }, dev: true }),
 }
 const bare = await testSite({ root: FIXTURE, islands: false })
 
@@ -53,8 +53,8 @@ describe('an app-wide cors', () => {
   })
 
   it('refuses an invalid origin as the module option does', async () => {
-    await expect(pages({ root: FIXTURE, prebuilt: false, security: false, cors: { origins: ['example.com'] } })).rejects.toThrow('no origin')
-    await expect(pages({ root: FIXTURE, prebuilt: false, security: false, cors: { origins: '*', credentials: true } as never })).rejects.toThrow('credentials')
+    await expect(pages({ root: FIXTURE, prebuilt: false, config: { security: false, cors: { origins: ['example.com'] } } })).rejects.toThrow('no origin')
+    await expect(pages({ root: FIXTURE, prebuilt: false, config: { security: false, cors: { origins: '*', credentials: true } as never } })).rejects.toThrow('credentials')
   })
 })
 
@@ -87,7 +87,7 @@ describe('a rate limit on an API module', () => {
   })
 
   it('leaves Elysia parsing no cookie, query or header on a route that reads none', async () => {
-    expect(parsingRoutes(await pages({ root: FIXTURE, prebuilt: false, security: false }))).toEqual([])
+    expect(parsingRoutes(await pages({ root: FIXTURE, prebuilt: false, config: { security: false } }))).toEqual([])
   })
 })
 
@@ -176,7 +176,7 @@ describe('invalid route settings', () => {
     await Bun.write(`${dir}/src/api/bad.ts`, `import { api } from 'kay/server'\n\nexport default api().get('/', () => 1, { detail: { ${settings} } })\n`)
     await Bun.write(`${dir}/src/routes/index.kay`, 'h1 x\n')
 
-    return pages({ root: dir, prebuilt: false, security: false })
+    return pages({ root: dir, prebuilt: false, config: { security: false } })
   }
 
   it('refuse a body limit that is no whole number of bytes', async () => {

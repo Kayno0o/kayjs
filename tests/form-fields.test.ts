@@ -147,7 +147,7 @@ describe('a label given a field', () => {
   })
 
   it('points the same on a page under a base path', async () => {
-    const mounted = await testSite({ root, islands: false, base: '/blog' })
+    const mounted = await testSite({ root, islands: false, config: { base: '/blog' } })
     const { html } = await mounted.visit('/blog/')
 
     expect(html).toContain('<label for="edit-title">Name</label>')
@@ -163,7 +163,7 @@ describe('a button given an action, alone', () => {
   })
 
   it('has no box of its own under a strict style-src, on a page and in an island page', async () => {
-    const strict = await testSite({ root, islands: false, security: { csp: { 'style-src': ['\'self\''] } } })
+    const strict = await testSite({ root, islands: false, config: { security: { csp: { 'style-src': ['\'self\''] } } } })
 
     for (const path of ['/lone', '/island']) {
       const { html, headers } = await strict.visit(path)
@@ -178,7 +178,7 @@ describe('a button given an action, alone', () => {
   })
 
   it('is ruled for an island page only when an island writes one, hashed under a strict style-src', async () => {
-    const strict = await testSite({ root, islands: false, security: { csp: { 'style-src': ['\'self\''] } } })
+    const strict = await testSite({ root, islands: false, config: { security: { csp: { 'style-src': ['\'self\''] } } } })
     const plain = await strict.visit('/island-plain')
     const late = await strict.visit('/island-late')
 

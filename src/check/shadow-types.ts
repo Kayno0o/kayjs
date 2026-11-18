@@ -34,52 +34,27 @@ import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes,
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
 import { actionOptions } from './action-options'
-import { appHooks } from './app-hooks'
-import { clientKeys } from './client-keys'
-import { configGroups } from './config-groups'
-import { configSwitches } from './config-switches'
 
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
-
-import { envFiles } from './env-files'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-
-import { formatDurationNumbers } from './format-duration'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
-
 import { unguardedRoutes, unguardedTools } from './guards'
-import { hookContext } from './hook-context'
-import { hookNames } from './hook-names'
-import { i18nKeys } from './i18n-keys'
-
-import { imagesKeys } from './images-keys'
 import { islandOnlyComponents } from './island-only'
-
-import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
-
 import { largePublicImages } from './large-images'
-
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
-import { pagesOptions } from './pages-options'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { routeKeys } from './route-keys'
 import { routeShadow, routeShadowPath } from './route-shadow'
 import { schemaBuilders } from './schema-builders'
 import { schemaJson } from './schema-json'
-import { secretKeys } from './secret-keys'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
-import { socketFrames } from './socket-frames'
 import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
-import { storeMs } from './store-ms'
-import { storeNames } from './store-names'
 import { textSizeColour } from './text-size-colour'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
-import { ttlNames } from './ttl-names'
 
 import { uiTypes } from './ui-types'
 import { unmountedJobs } from './unmounted-jobs'
@@ -178,33 +153,10 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
-
-  async ({ root, options }) => socketFrames(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
-
   async ({ root, options }) => schemaBuilders(root, options),
   async ({ root, options }) => schemaJson(root, options),
   async ({ root, options }) => actionOptions(root, options),
-  async ({ root, options }) => hookNames(root, options),
-  async ({ root, options }) => jobHandlers(root, options),
-  async ({ root, options }) => scheduleCalls(root, options),
-  async ({ root, options }) => jobOptions(root, options),
-  async ({ root, options }) => diskFilesCalls(root, options),
-  async ({ root, options }) => storeNames(root, options),
-  async ({ root, options }) => formatDurationNumbers(root, options),
-  async ({ root, options }) => configSwitches(root, options),
-  async ({ root, options }) => imagesKeys(root, options),
-  async ({ root, options }) => clientKeys(root, options),
-  async ({ root, options }) => configGroups(root, options),
-  async ({ root, options }) => i18nKeys(root, options),
-  async ({ root, options }) => secretKeys(root, options),
-  async ({ root, options }) => routeKeys(root, options),
-  async ({ root, options }) => appHooks(root, options),
-  async ({ root, options }) => hookContext(root, options),
-  async ({ root, options }) => pagesOptions(root, options),
-  async ({ root, options }) => ttlNames(root, options),
-  async ({ root, options }) => storeMs(root, options),
-  async ({ root, options }) => envFiles(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

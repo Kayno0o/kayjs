@@ -297,7 +297,7 @@ describe('a static page passing an island a function', () => {
         try {
           await Promise.all([Bun.write(join(root, 'routes/picker.kay'), picker), Bun.write(join(root, 'routes/index.kay'), page)])
 
-          const app = await pages({ root, dirs: { routes: 'routes' }, prebuilt: false, security: false, dev, base: base || undefined, observe: { log: false } })
+          const app = await pages({ root, config: { dirs: { routes: 'routes' }, security: false, base: base || undefined, ops: { observe: { log: false } } }, prebuilt: false, dev })
           const response = await app.handle(new Request('http://localhost/'))
 
           expect(response.status).toBe(500)

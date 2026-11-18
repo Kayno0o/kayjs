@@ -36,7 +36,7 @@ await Promise.all([Bun.write(join(uploads, 'still.gif'), still), Bun.write(join(
 const app = await pages({
   root: 'tests/fixtures/images',
   prebuilt: false,
-  images: {
+  config: { assets: { images: {
     dirs: { '/uploads/': uploads },
     guards: (ctx) => {
       if (ctx.cookies.get('user') === null)
@@ -52,7 +52,7 @@ const app = await pages({
 
       return src.startsWith('/media/') && ['7', '8', '9'].includes(src.slice('/media/'.length)) ? join(media, src.slice('/media/'.length)) : undefined
     },
-  },
+  } } },
 })
 
 afterAll(async () => {
@@ -214,7 +214,7 @@ describe('images.resolve and images.guard', () => {
     const root = await scratchDir('resolved-')
 
     try {
-      await Bun.write(join(root, 'kay.config.ts'), 'export default { images: { resolve: () => undefined } }\n')
+      await Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { images: { resolve: () => undefined } } }\n')
       await Bun.write(join(root, 'src/components/counter.kay'), '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(value => value + 1)}) {count()}\n')
       await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\n---\nimport Counter from \'../components/counter.kay\'\n---\nCounter\n')
       // This build applies the project's image config to the process, which for this project is the defaults the file's app already runs with.
@@ -249,7 +249,7 @@ describe('images.resolve and images.guard', () => {
     const withLocals = new Elysia().derive({ as: 'global' }, () => ({ user: 'ada' })).use(await pages({
       root: 'tests/fixtures/images',
       prebuilt: false,
-      images: {
+      config: { assets: { images: {
         guards: (ctx) => {
           if ((ctx.locals as { user?: string }).user !== 'ada' || ctx.cookies.get('theme') !== 'dark')
             ctx.deny(401)
@@ -258,7 +258,7 @@ describe('images.resolve and images.guard', () => {
           ctx.headers.set('x-guarded', 'yes')
         },
         resolve: src => src === '/media/7' ? join(media, '7') : undefined,
-      },
+      } } },
     }))
     const response = await withLocals.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/media/7')}&w=320`, { headers: { cookie: 'theme=dark' } }))
 
@@ -278,12 +278,12 @@ describe('images.resolve and images.guard', () => {
   })
 
   it('runs a list of image guards in order', async () => {
-    const listed = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { resolve: () => HERO, guards: [(ctx) => {
+    const listed = await pages({ root: 'tests/fixtures/images', prebuilt: false, config: { assets: { images: { resolve: () => HERO, guards: [(ctx) => {
       ctx.headers.set('x-first', 'yes')
     }, (ctx) => {
       if (ctx.cookies.get('user') === null)
         ctx.deny(401, { message: 'Sign in' })
-    }] } })
+    }] } } } })
     const ask = async (headers: Record<string, string> = {}) => listed.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/media/7')}&w=320`, { headers }))
 
     expect((await ask()).status).toBe(401)
@@ -291,7 +291,7 @@ describe('images.resolve and images.guard', () => {
   })
 
   it('takes `guards`, a list or false, and closes a resolve that has none', async () => {
-    const ask = async (images: ImagesConfig) => (await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { resolve: () => HERO, ...images } })).handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/media/7')}&w=320`))
+    const ask = async (images: ImagesConfig) => (await pages({ root: 'tests/fixtures/images', prebuilt: false, config: { assets: { images: { resolve: () => HERO, ...images } } } })).handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/media/7')}&w=320`))
 
     expect((await ask({})).status).toBe(403)
     expect((await ask({ guards: ctx => ctx.deny(401, { message: 'Sign in' }) })).status).toBe(401)

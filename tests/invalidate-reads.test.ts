@@ -6,7 +6,7 @@ import { kayBuild } from './check-helper'
 import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
-const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n'
+const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } } })\n'
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
@@ -32,7 +32,7 @@ import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}
 import { data } from './src/data'
 import { news } from './src/content.config'
 
-const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, observe: { log: false }, serve: { compress: false } }))
+const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, config: { ops: { observe: { log: false } }, serve: { compress: false } } }))
 const heading = async (path: string) => ((await (await app.handle(new Request(\`http://localhost\${path}\`))).text()).match(/<h1>(.*?)<\\/h1>/)?.[1])
 const seen: Record<string, (string | undefined)[]> = {}
 const look = async (name: string) => { (seen[name] ??= []).push(await heading('/' + name)) }

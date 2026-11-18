@@ -14,7 +14,7 @@ const SUMMARY = {
 
 // A process serves one project, and its sites read the output folder it has: the record is made once the first test asks.
 const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
-const dev = await testSite({ root: dir, mcp: true, islands: false, dev: true })
+const dev = await testSite({ root: dir, config: { mcp: true }, islands: false, dev: true })
 const opened: TestSite[] = [dev]
 
 afterAll(async () => {
@@ -24,7 +24,7 @@ afterAll(async () => {
 const schemaOf = async (site: TestSite, name: string) => ((await site.mcp.tools()).find(tool => tool.name === name) as { outputSchema?: object } | undefined)?.outputSchema
 
 async function siteAfterBuild(options: { base?: string } = {}): Promise<TestSite> {
-  const site = await testSite({ root: dir, mcp: true, islands: false, ...options })
+  const site = await testSite({ root: dir, islands: false, config: { mcp: true, ...options } })
 
   opened.push(site)
 

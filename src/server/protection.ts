@@ -239,7 +239,7 @@ export function sqliteRates(path: string): SyncRates {
 }
 
 // Answered at once, as a store reading SQLite needs no promise.
-export interface SyncRates { hit: (key: string, window: Duration | number, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined, refund: (key: string, resetAt: number) => void, reset: (key: string) => void }
+export interface SyncRates { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined, refund: (key: string, resetAt: number) => void, reset: (key: string) => void }
 type OpenRates = SyncRates & { close: () => void }
 
 function openRates(path: string): OpenRates {
@@ -349,7 +349,7 @@ export function makeLimiter({ name, max, ms, store: given, failure, memory }: { 
     return standIn.rates
   }
   const keyed = (key: string) => `${name}\n${key}`
-  const hitIn = async (used: RateStore, key: string, weight?: number) => used.hit(keyed(key), lengthFor(used, ms), weight)
+  const hitIn = async (used: RateStore, key: string, weight?: number) => used.hit(keyed(key), lengthFor(ms), weight)
 
   const peek = async (key: string): Promise<RateWindow | undefined> => {
     const used = store()
@@ -357,7 +357,7 @@ export function makeLimiter({ name, max, ms, store: given, failure, memory }: { 
     if (used.peek)
       return used.peek(keyed(key))
 
-    const window = await used.hit(keyed(key), lengthFor(used, ms), 0)
+    const window = await used.hit(keyed(key), lengthFor(ms), 0)
 
     return window.count > 0 ? window : undefined
   }
@@ -381,10 +381,10 @@ export function makeLimiter({ name, max, ms, store: given, failure, memory }: { 
         return
 
       // The window may have closed between the two calls, which a hit of minus the count would open at a negative count.
-      const left = await used.hit(keyed(key), lengthFor(used, ms), -window.count)
+      const left = await used.hit(keyed(key), lengthFor(ms), -window.count)
 
       if (left.count < 0)
-        await used.hit(keyed(key), lengthFor(used, ms), -left.count)
+        await used.hit(keyed(key), lengthFor(ms), -left.count)
     },
     enforce: async (key, weight) => waitFor(await hitIn(store(), key, weight), max),
     refund: async (key, resetAt) => {
@@ -715,7 +715,7 @@ export function ratesFor(name: string, given?: RateStore): RateStore {
 
 // What a store falls back on, answering at once.
 export interface FallbackMemory {
-  hit: (key: string, windowMs: number, weight?: number) => RateWindow
+  hit: (key: string, window: Duration, weight?: number) => RateWindow
   peek: (key: string) => RateWindow | undefined
   refund?: ((key: string, resetAt: number) => void) | undefined
   reset?: ((key: string) => void) | undefined
@@ -730,7 +730,7 @@ export function ratesFallingBack<Store extends RateStore>(name: string, store: S
 
   // Each method is read off the store on each call, so one replaced on it later, as a test spies on it, is the one called.
   return {
-    hit: async (key, window, weight) => answered(name, store, (...args: [string, Duration | number, number | undefined]): ReturnType<RateStore['hit']> => store.hit(...args), [key, lengthFor(store, lengthMs(window)), weight], () => memory.hit(key, lengthMs(window), weight)),
+    hit: async (key, window, weight) => answered(name, store, (...args: [string, Duration, number | undefined]): ReturnType<RateStore['hit']> => store.hit(...args), [key, lengthFor(lengthMs(window)), weight], () => memory.hit(key, lengthFor(lengthMs(window)), weight)),
     ...peek && { peek: async key => answered(name, store, store.peek ?? peek, [key], () => memory.peek(key)) },
     // Taken back in memory too, where the attempt was counted if the store failed then; memory only takes it off a window closing at that same `resetAt`.
     ...refund && { refund: async (key, resetAt) => {
@@ -854,15 +854,12 @@ export function rateKey(address: string): string {
   return `${groups.slice(0, 4).map(group => group.replace(LEADING_ZEROS, '')).join(':')}::/64`
 }
 
-// `true` is one proxy in front and a number that many, the short forms of `{ hops }`.
-function proxyOf(setting: ProxyConfig | number | boolean | undefined): ProxyConfig | undefined {
+// `true` is one proxy in front, the short form of `{ hops: 1 }`.
+function proxyOf(setting: ProxyConfig | boolean | undefined): ProxyConfig | undefined {
   if (setting === false)
     return undefined
 
-  if (setting === true)
-    return { hops: 1 }
-
-  return typeof setting === 'number' ? { hops: setting } : setting
+  return setting === true ? { hops: 1 } : setting
 }
 
 // The server that received `request`, once the app read it.
@@ -871,7 +868,7 @@ export function requestServer(request: Request): Server<unknown> | undefined {
 }
 
 // Refuses a `proxy` setting that names no proxy, so the boot can before any build starts.
-export function checkProxy(setting: ProxyConfig | number | boolean | undefined): ProxyConfig | undefined {
+export function checkProxy(setting: ProxyConfig | boolean | undefined): ProxyConfig | undefined {
   const proxy = proxyOf(setting)
 
   if (!proxy)
@@ -904,7 +901,7 @@ export function checkProxy(setting: ProxyConfig | number | boolean | undefined):
 
 // Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.
 // In production a `proxy` left out is one proxy in front, read from private addresses only: a server there is behind one far more often than it faces visitors, and `false` says it is not.
-export function trustProxy(setting: ProxyConfig | number | boolean | undefined): ReceiveStep {
+export function trustProxy(setting: ProxyConfig | boolean | undefined): ReceiveStep {
   const proxy = checkProxy(setting) ?? (setting === undefined && process.env.NODE_ENV === 'production' ? INFERRED_PROXY : undefined)
 
   return (request, server) => {
@@ -921,12 +918,12 @@ export function trustProxy(setting: ProxyConfig | number | boolean | undefined):
 
 // The socket's address, unless it is a proxy on this machine or network the app's `proxy` setting trusts: then the client's address as that proxy passed it on.
 // `proxy` stands in for the app's setting, for a plain Elysia app that `pages()` does not serve.
-export function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | number | boolean): string {
+export function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | boolean): string {
   return knownAddress(request, server, setting) ?? 'unknown'
 }
 
 // `clientAddress`, or undefined for a request with no socket address and none a trusted proxy forwarded, which `clientAddress` counts as the one client `unknown`.
-export function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | number | boolean): string | undefined {
+export function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | boolean): string | undefined {
   const proxy = proxyOf(setting)
   const record = recordOf(request)
   const address = rewrittenAddress(request) ?? (server ?? record?.server)?.requestIP(request)?.address

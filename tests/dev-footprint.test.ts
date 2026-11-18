@@ -30,7 +30,7 @@ describe('the dev tool\'s footprint figures', () => {
 
     const request = () => new Request(`http://localhost${DEV_FOOTPRINT}?dom=10&requests=2&bytes=5000`, { headers: { 'x-kay-dev': '1' } })
 
-    expect((await (await pages({ root, prebuilt: false, security: false, dev: true })).handle(request())).status).toBe(200)
-    expect((await (await pages({ root, prebuilt: false, security: false, dev: false })).handle(request())).status).toBe(404)
+    expect((await (await pages({ root, prebuilt: false, config: { security: false }, dev: true })).handle(request())).status).toBe(200)
+    expect((await (await pages({ root, prebuilt: false, config: { security: false }, dev: false })).handle(request())).status).toBe(404)
   })
 })

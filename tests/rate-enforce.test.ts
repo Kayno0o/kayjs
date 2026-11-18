@@ -10,7 +10,7 @@ import { testSite } from '../src/test'
 import { eventually } from './helpers/eventually'
 
 const root = 'tests/fixtures/rate-shared'
-const site = await testSite({ root, islands: false, guards: { default: 'open' } })
+const site = await testSite({ root, islands: false, config: { guards: { default: 'open' } } })
 const { seen } = await import(join(import.meta.dir, 'fixtures/rate-shared/src/limits.ts')) as typeof import('./fixtures/rate-shared/src/limits')
 const { post } = await import(join(import.meta.dir, 'fixtures/rate-shared/src/routes/index.kay')) as { post: Action<Record<never, never>, string> }
 

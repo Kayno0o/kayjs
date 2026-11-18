@@ -13,7 +13,7 @@ const ACTION = '/_kay/action/src/routes/index.kay'
 let served: Promise<Elysia> | undefined
 
 async function app(): Promise<Elysia> {
-  served ??= (async () => new Elysia().use(await pages({ root: 'tests/fixtures/refusals', prebuilt: false, security: false, guards: { default: 'open' } })))()
+  served ??= (async () => new Elysia().use(await pages({ root: 'tests/fixtures/refusals', prebuilt: false, config: { security: false, guards: { default: 'open' } } })))()
 
   return served
 }

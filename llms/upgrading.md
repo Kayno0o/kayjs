@@ -4,6 +4,23 @@ What each release breaks, and what an app changes to move to it. kay and its lib
 
 ## 1.109.0
 
+### The 1.105 config, page, server and store forms are gone
+
+The twenty-four lints that reported them are gone too. `kay upgrade` on 1.108 rewrote each one written inline; what it could not reach is a type error or a refusal at boot naming the new form. The full 1.105 rules are in [Upgrading to 1.105: kay.config.ts and library options](upgrading-1-105-config.md).
+
+- Config keys at the top of kay.config.ts: `links`, `offline` and `search` are `client.*`; `images`, `fonts`, `favicon`, `manifest` and `publicCache` are `assets.*`; `observe`, `health`, `metrics` and `jobs` are `ops.*`; `env` is `envFiles`; `onStart` is `onListen`. The config refuses them, naming where each moved.
+- `i18n`'s `defaultLocale` is `default`, `prefixDefault: true` is `mode: 'always'` and `domains` is `mode: { domains }`; the old keys are refused.
+- `serve.apiPrefix` and the `path` of `openapi`, `mcp`, `health`, `metrics` and `jobs` are `endpoints.*`; `openapi.referencePath` is `openapi: { reference: { path } }`.
+- `/mcp` and `/metrics`, where those endpoints were before 1.105, answer 404: use `/_kay/mcp` and `/_kay/metrics`, or what `endpoints` sets.
+- `mcp: { key }` is `mcp: { token }`, `proxy: { key: 'x-upstream-key' }` is `proxy: { key: { header } }`, and `proxy: 2` is `proxy: { hops: 2 }`; `observe.log: 'json'` and a bare function are `ops: { observe: { log: { format: 'json' } } }` and `{ sink }`.
+- `images` takes `remote`, `formats` and `limits` only: `remoteMaxSize`, `remoteTimeout`, `quality`, `webp`, `avif`, `maxVariants` and `queue` are refused.
+- `pages({ root, client: { ... } })` and `testSite({ root, mcp: true })` refuse a config key beside `root`: write it in `config`. `testSite({ mcpKey })` is `config: { mcp: { token } }` and `testSite({ proxyKey })` is `config: { proxy: { key: { header, secret } } }`.
+- The `onSave`, `onUpload`, `onSend`, `onSuppress`, `onSubscribe`, `onConfirm`, `onUnsubscribe`, `onBroadcast`, `onSignUp`, `onStep`, `onToolCall` and `onSuccess` of kayjs-ai, -auth, -cms and -mail are their `after` names (`afterSave`, `afterSend`, `afterSignUp`, `afterStep`, `afterToolCall`, `afterRequest`...), and an action hook event has `context` where it had `ctx`.
+- `maxAge` is `ttl` in `signed.sign`, `files.url`, workChallenge, kayjs-auth's `proofOfWork` and `captcha`, an action's `protect.minTime` and `protect.proofOfWork`, and the data of a kayjs-auth mail (`ttl: { link, code }`).
+- A store is handed a `Duration` for every length, `durations: true` is no member of a store, `lengthFor` takes milliseconds only and `kv(ns).set(key, value, 60_000)` is `'60000ms'`; `formatDuration(7_500_000)` is `formatDuration('125m')`.
+- Library stores: `ai({ conversations })` is `ai({ store })`; `pgConversations`, `sqliteConversations`, `createConversationTable` and `conversationTable` are `pgAi`, `sqliteAi`, `createAiTables` and `aiTables`; `openLists`, `createMailListTables` and `mailListTableNames` are `sqliteLists`, `createMailTables` and `mailTables`; `mailer({ listStore, suppressionStore })` is `store: { lists, suppressions }`; `pgLoader` and `sqliteLoader` of kayjs-cms are `pgCms` and `sqliteCms`.
+- Jobs: a handler is `(input, ctx)`, its signal and job being `ctx.signal` and `ctx.job` and no longer the second and third arguments, and `lostAfter` is `timeout`; `schedule('@hourly', job, options)` is `schedule({ cron: '@hourly', ...options }, job)`, `schedule('30s', job)` is `schedule({ every: '30s' }, job)`; `diskFiles(dir, hooks)` is `diskFiles({ dir, ...hooks })`; `ws.send(JSON.stringify(value))` of an `api()` socket is `ws.send(value)`.
+- A page's `noindex`, `sitemap`, `lastmod`, `search` and `feed` are written in `seo`, and `ttl` and `cacheControl` are `cache`: the build refuses a top-level key of `page`, naming the new one. An `img` takes `placeholder={false}` where it took `no-placeholder`.
 ### The island and template forms of 1.105 are gone
 
 The `deprecated-page-island`, `deprecated-island-fence`, `deprecated-island-attributes`, `deprecated-island-events`, `deprecated-link-flags`, `deprecated-children-prop`, `deprecated-uncaught-await`, `deprecated-import-path`, `deprecated-context-import` and `deprecated-listen-target` lints are gone with the forms they reported; run `kay upgrade` on 1.108 first, which rewrote each but the page island.

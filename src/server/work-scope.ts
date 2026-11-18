@@ -15,8 +15,6 @@ export interface WorkChallengeOptions {
   difficulty?: number | undefined
   // How long the challenge stays good, a day by default.
   ttl?: Duration | undefined
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
-  maxAge?: Duration | undefined
 }
 
 export interface VerifyWorkOptions {
@@ -38,7 +36,7 @@ function difficultyOf(difficulty: number | undefined): number {
 // A challenge bound to `scope` rather than to an action, for a library checking it in its own code: a form field carrying it as `data-kay-work` posts its solution, which `verifyWork` checks.
 export function workChallenge(scope: string, options: WorkChallengeOptions = {}): string {
   const difficulty = difficultyOf(options.difficulty)
-  const maxAge = durationSeconds(options.ttl ?? options.maxAge ?? DAY, 'workChallenge ttl') * 1000
+  const maxAge = durationSeconds(options.ttl ?? DAY, 'workChallenge ttl') * 1000
 
   // A prerendered page holds a mark the server signs a fresh challenge into on every visit.
   if (prerendering())
@@ -63,5 +61,5 @@ export async function verifyWork(solution: string | null | undefined, scope: str
 export function freshFieldWork(mark: string): string {
   const [scope = '', difficulty = '', maxAge = ''] = mark.split(':')
 
-  return `data-kay-work="${workChallenge(decodeURIComponent(scope), { difficulty: Number(difficulty), maxAge: `${Number(maxAge)}ms` })}"`
+  return `data-kay-work="${workChallenge(decodeURIComponent(scope), { difficulty: Number(difficulty), ttl: `${Number(maxAge)}ms` })}"`
 }

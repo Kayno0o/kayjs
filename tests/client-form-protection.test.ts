@@ -8,7 +8,7 @@ import { browserPath, testSite } from '../src/test'
 
 const ROOT = 'tests/fixtures/client-forms'
 // Created first: it is the site that makes the fixture's modules importable.
-const site = await testSite({ root: ROOT, security: false, browser: true })
+const site = await testSite({ root: ROOT, config: { security: false }, browser: true })
 const { guarded, trapped, open, limited, plainOnly, quiet } = await import(join(import.meta.dir, 'fixtures/client-forms/src/routes/index.kay')) as {
   guarded: Action<{ note: string, website?: string }, number, 'website'>
   trapped: Action<{ website?: string }, number, 'website'>
@@ -103,7 +103,7 @@ describe('the protection a form built in the browser asks its action for', () =>
     ['/shop', 'never'],
     ['/shop', 'always'],
   ] as const)('answers at the action address under base "%s" with trailingSlash %s', async (base, trailingSlash) => {
-    const site = await testSite({ root: ROOT, security: false, browser: true, ...base !== '' && { base }, ...trailingSlash && { trailingSlash } })
+    const site = await testSite({ root: ROOT, browser: true, config: { security: false, ...base !== '' && { base }, ...trailingSlash && { trailingSlash } } })
     const page = await site.visit('/')
     const url = (/<form class="server" action="([^"]*)"/).exec(page.html)![1]!
     const { html } = await fields(site, url)

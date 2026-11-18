@@ -57,14 +57,14 @@ describe('action protection', () => {
   const QUOTE = './fixtures/production/src/routes/quote.kay'
 
   it('leaves Elysia parsing no cookie, query or header on a page, action or API route that reads none', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, security: false })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { security: false } })
 
     expect(routePaths(app)).toEqual(expect.arrayContaining(['/contact', expect.stringMatching(/^\/_kay\/action\//), expect.stringMatching(/^\/api\//)]))
     expect(parsingRoutes(app)).toEqual([])
   })
 
   it('refuses a form whose honeypot is filled in, with a message on the field, the handler never running', async () => {
-    const site = await testSite({ root: FIXTURE, security: false })
+    const site = await testSite({ root: FIXTURE, config: { security: false } })
     const { send } = await import(CONTACT) as { send: Action<{ message: string }, number, 'website'> }
     const trapped = await site.submit(send, { message: 'hello', website: 'https://spam.example' }, { from: '/contact' })
     const human = await site.submit(send, { message: 'hello', website: '' }, { from: '/contact' })
@@ -80,7 +80,7 @@ describe('action protection', () => {
   })
 
   it('renders the honeypot field in a form posting to the action, out of sight, and leaves it to an island\'s template', async () => {
-    const site = await testSite({ root: FIXTURE, security: false })
+    const site = await testSite({ root: FIXTURE, config: { security: false } })
     const page = await site.visit('/contact')
 
     expect(page.html).toContain('enctype="multipart/form-data"><div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true" inert><input name="website" type="text" tabindex="-1" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore></div><input name="message"')
@@ -95,7 +95,7 @@ describe('action protection', () => {
   })
 
   it('counts only the posts that went through on a limit saying so, every attempt still counting on the others', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { proxy: { hops: 1 } } })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
     const call = async (from: string, message: string) => app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': from }, body: stringify({ message }) }))
 
@@ -141,8 +141,8 @@ describe('action protection', () => {
   })
 
   it('puts a message ctx.deny is given where a form reads its own message', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
-    const site = await testSite({ root: FIXTURE, security: false })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { proxy: { hops: 1 } } })
+    const site = await testSite({ root: FIXTURE, config: { security: false } })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
     const failed = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.30' }, body: stringify({ message: 'fail' }) }))
 
@@ -151,8 +151,8 @@ describe('action protection', () => {
   })
 
   it('puts a message ctx.deny is given for a field on that field, for a call and for a form post', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
-    const site = await testSite({ root: FIXTURE, security: false })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { proxy: { hops: 1 } } })
+    const site = await testSite({ root: FIXTURE, config: { security: false } })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
     const taken = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.32' }, body: stringify({ message: 'taken' }) }))
     const html = (await site.submit(enquire, { message: 'taken' }, { from: '/enquiry' })).html
@@ -165,8 +165,8 @@ describe('action protection', () => {
   })
 
   it('keeps hostile or unknown keys of ctx.deny errors harmless: a __proto__ key is refused plainly, a key outside the schema shown nowhere', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
-    const site = await testSite({ root: FIXTURE, security: false })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { proxy: { hops: 1 } } })
+    const site = await testSite({ root: FIXTURE, config: { security: false } })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
     const post = async (message: string, address: string) => app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': address }, body: stringify({ message }) }))
     const hostile = await post('hostile', '203.0.113.33')
@@ -184,7 +184,7 @@ describe('action protection', () => {
   })
 
   it('answers a thrown refuse() as it answers ctx.deny, with its message, field errors and data', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { proxy: { hops: 1 } } })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
     const refused = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.31' }, body: stringify({ message: 'refuse' }) }))
 
@@ -193,7 +193,7 @@ describe('action protection', () => {
   })
 
   it('answers a plain refuse() as 403, to a call and to a form post', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { proxy: { hops: 1 } } })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
     const call = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.32' }, body: stringify({ message: 'refuse-plain' }) }))
     const form = new FormData()
@@ -209,8 +209,8 @@ describe('action protection', () => {
   })
 
   it('answers a bot the honeypot caught as if its post went through, when the action says so', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
-    const site = await testSite({ root: FIXTURE, security: false })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { proxy: { hops: 1 } } })
+    const site = await testSite({ root: FIXTURE, config: { security: false } })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number, 'nectar'> }
     const form = new FormData()
 
@@ -226,7 +226,7 @@ describe('action protection', () => {
   })
 
   it('refuses a form posted sooner than `minTime` after its page rendered, then lets it through from the page that refused it once the time has passed', async () => {
-    const site = await testSite({ root: FIXTURE, security: false })
+    const site = await testSite({ root: FIXTURE, config: { security: false } })
     const { ask } = await import(QUOTE) as { ask: Action<{ message: string }, number> }
     const start = Date.now()
 
@@ -257,7 +257,7 @@ describe('action protection', () => {
   })
 
   it('refuses a plain post sent too soon, or as expired one whose stamp is missing, forged, another action\'s or too old, in the site\'s words when it has its own, and lets a call from kay\'s script through without one', async () => {
-    const site = await testSite({ root: FIXTURE, security: false })
+    const site = await testSite({ root: FIXTURE, config: { security: false } })
     const { ask, quick } = await import(QUOTE) as { ask: Action<{ message: string }, number>, quick: Action<{ message: string }, number> }
     const start = Date.now()
     const refusal = async (fields: Record<string, unknown>, plain = true) => (await refusalOf(ask as never, new Request('http://localhost/'), fields, true, null, plain))?.message
@@ -310,7 +310,7 @@ describe('action protection', () => {
   })
 
   it('answers a post sent too soon as if it went through, when `minTime` says so', async () => {
-    const site = await testSite({ root: FIXTURE, security: false })
+    const site = await testSite({ root: FIXTURE, config: { security: false } })
     const { quick } = await import(QUOTE) as { quick: Action<{ message: string }, number> }
     const page = await site.visit('/quote')
 
@@ -460,7 +460,7 @@ import { sharedKey, signStamp } from ${JSON.stringify(join(import.meta.dir, '../
 const warnings = []
 setLogSink((level, message) => warnings.push(level + ' ' + message))
 process.env.NODE_ENV = 'production'
-await pages({ root: ${JSON.stringify(join(import.meta.dir, 'fixtures/seo'))}, dirs: { routes: ${JSON.stringify(join(import.meta.dir, '../', ROUTES))} }, prebuilt: false${options} })
+await pages({ root: ${JSON.stringify(join(import.meta.dir, 'fixtures/seo'))}, config: { dirs: { routes: ${JSON.stringify(join(import.meta.dir, '../', ROUTES))} }${options} }, prebuilt: false })
 signStamp('a', 1)
 console.log(JSON.stringify({ warnings, shared: sharedKey('x')?.toString('hex') }))
 process.exit(0)
@@ -492,7 +492,7 @@ import { signStamp } from ${JSON.stringify(join(import.meta.dir, '../src/server/
 const warnings = []
 setLogSink((level, message) => warnings.push(level + ' ' + message))
 process.env.NODE_ENV = ${JSON.stringify(env)}
-await pages({ root: ${JSON.stringify(join(import.meta.dir, 'fixtures/seo'))}, dirs: { routes: ${JSON.stringify(join(import.meta.dir, '../', ROUTES))} }, prebuilt: false })
+await pages({ root: ${JSON.stringify(join(import.meta.dir, 'fixtures/seo'))}, config: { dirs: { routes: ${JSON.stringify(join(import.meta.dir, '../', ROUTES))} } }, prebuilt: false })
 signStamp('a', 1)
 console.log(JSON.stringify(warnings))
 process.exit(0)
@@ -506,7 +506,7 @@ process.exit(0)
   })
 
   it('lets a client post as often as the limit allows in a window, then answers 429 with when to retry', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { proxy: { hops: 1 } } })
     const { send } = await import(CONTACT) as { send: Action<{ message: string }, number> }
     const call = async (from: string) => app.handle(new Request(`http://localhost${send.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': from }, body: stringify({ message: 'hi' }) }))
 
@@ -523,7 +523,7 @@ process.exit(0)
   })
 
   it('takes a post from the site kay.config.ts names as its own, for a proxy that does not pass the browser\'s Host on', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, site: 'https://shop.example', proxy: { hops: 1 } })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { site: 'https://shop.example', proxy: { hops: 1 } } })
     const { send } = await import(CONTACT) as { send: Action<{ message: string }, number> }
     const call = async (origin: string) => app.handle(new Request(`http://127.0.0.1:3000${send.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.60', origin }, body: stringify({ message: 'hi' }) }))
 
@@ -532,7 +532,7 @@ process.exit(0)
   })
 
   it('refuses in the messages the action gives, in place of kay\'s English', async () => {
-    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
+    const app = await pages({ root: FIXTURE, prebuilt: false, config: { proxy: { hops: 1 } } })
     const { write } = await import(CONTACT) as { write: Action<{ message: string }, number, 'website'> }
     const call = async (message: string) => {
       const body = stringify({ message })
@@ -743,9 +743,8 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
     ['a header', behind, '100.101.1.1', { header: 'cf-connecting-ip' }, '203.0.113.7'],
     // A request that skipped the outer proxy carries what the inner one appended, who reached it.
     ['two hops over a request that skipped the outer proxy', skipped, '10.0.0.2', { hops: 2 }, '203.0.113.8'],
-    // `true` is one proxy and a number that many.
+    // `true` is one proxy.
     ['true', behind, '127.0.0.1', true as const, '172.70.1.1'],
-    ['a number', behind, '127.0.0.1', 2, '203.0.113.7'],
     // A client reaching the server itself forges nothing, whatever the setting.
     ['a client reaching the server itself', behind, '198.51.100.9', { hops: 2 }, '198.51.100.9'],
   ])('takes the address the trusted proxies passed on, never one the client wrote before them: %s', (_name, request, peer, proxy, address) => {
@@ -833,7 +832,7 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
 
   it('reads the proxy setting pages() is given for every request it serves, an app route included', async () => {
     const whoami = async (proxy?: { hops: number }) => {
-      const app = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, proxy })).get('/whoami', ({ request, server }) => clientAddress(request, server))
+      const app = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { proxy } })).get('/whoami', ({ request, server }) => clientAddress(request, server))
 
       return (await app.handle(new Request('http://localhost/whoami', { headers: { 'x-forwarded-for': '203.0.113.7' } }))).text()
     }
@@ -946,22 +945,20 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
     })
 
     it('leaves a setting that is given as it was', async () => {
-      expect(await seen(2, '10.0.0.2', forwarded)).toBe('203.0.113.7')
+      expect(await seen({ hops: 2 }, '10.0.0.2', forwarded)).toBe('203.0.113.7')
       expect(await seen({ header: 'x-real-ip' }, '10.0.0.2', new Request('http://localhost/', { headers: { 'x-real-ip': '203.0.113.9' } }))).toBe('203.0.113.9')
     })
   })
 
   it('refuses a proxy setting it cannot read, as the server boots', async () => {
     // One through `pages()`, which reads it as the server boots; the rest where it is read, as setting the routes up costs half a second each, which a busy host multiplies.
-    await expect(pages({ root: FIXTURE, prebuilt: false, proxy: {} })).rejects.toThrow('kay: proxy')
+    await expect(pages({ root: FIXTURE, prebuilt: false, config: { proxy: {} } })).rejects.toThrow('kay: proxy')
   })
 
   it.each([
     [{ hops: 1, header: 'x-real-ip' }],
     [{ hops: 0 }],
     [{ hops: 1.5 }],
-    [0],
-    [1.5],
     [{ header: ' ' }],
     [{ hops: 1, trusted: ['a CDN'] }],
     [{ hops: 1, trusted: ['10.0.0.0/33'] }],
@@ -994,7 +991,7 @@ describe('request body limits', () => {
   // Held in a variable so tsc leaves the .kay import to Bun.
   const NOTES = './fixtures/production/src/routes/notes.kay'
   const MB = 1024 * 1024
-  const serve = async (maxSize?: ByteSize) => pages({ root: FIXTURE, prebuilt: false, limits: { body: maxSize } })
+  const serve = async (maxSize?: ByteSize) => pages({ root: FIXTURE, prebuilt: false, config: { limits: { body: maxSize } } })
   // Sent in chunks, with no Content-Length to go by.
   const chunked = (size: number) => new ReadableStream<Uint8Array>({
     start(controller) {
@@ -1024,7 +1021,7 @@ describe('request body limits', () => {
   })
 
   it('sends a plain form post over the limit back to its page with the error, counting a body sent without Content-Length', async () => {
-    const site = await testSite({ root: FIXTURE, security: false, limits: { body: 64 * 1024 } })
+    const site = await testSite({ root: FIXTURE, config: { security: false, limits: { body: 64 * 1024 } } })
     const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
 
     expect((await site.submit(note, { text: 'a'.repeat(65 * 1024) }, { from: '/notes' })).html).toContain('<p class="error">413 Too large to send; 64 KB at most</p>')
@@ -1058,7 +1055,7 @@ describe('request body limits', () => {
   it('reads the limit as a size, in the config, an action and an API module', async () => {
     const app = await serve('1mb')
     const post = async (size: number) => app.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: chunked(size) }))
-    const site = await testSite({ root: FIXTURE, security: false, limits: { body: '64kb' } })
+    const site = await testSite({ root: FIXTURE, config: { security: false, limits: { body: '64kb' } } })
     const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
 
     expect((await post(2 * MB)).status).toBe(413)

@@ -30,7 +30,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
   let front: ReturnType<typeof Bun.serve>
 
   beforeAll(async () => {
-    site = await testSite({ root: ROOT, extensions: [ui(), uiMessages(), who()], plugins: [tailwind], browser: { path: chrome }, base, i18n: { locales: ['en', 'fr'], default: 'en' } })
+    site = await testSite({ root: ROOT, config: { extensions: [ui(), uiMessages(), who()], plugins: [tailwind], base, i18n: { locales: ['en', 'fr'], default: 'en' } }, browser: { path: chrome } })
     // The front of a real deploy takes the base off.
     front = Bun.serve({
       port: 0,

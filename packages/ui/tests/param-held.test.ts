@@ -5,7 +5,7 @@ import { ui } from '../src/extension'
 const options = (html: string, id: string) => html.slice(html.indexOf(`id="${id}"`), html.indexOf('</select>', html.indexOf(`id="${id}"`)))
 
 it('renders the option the request names as selected or checked, with and without a locale prefix', async () => {
-  const site = await testSite({ root: `${import.meta.dir}/fixture`, extensions: [ui()], islands: false })
+  const site = await testSite({ root: `${import.meta.dir}/fixture`, config: { extensions: [ui()] }, islands: false })
 
   try {
     for (const path of ['/param-held', '/fr/param-held']) {
@@ -23,7 +23,7 @@ it('renders the option the request names as selected or checked, with and withou
 }, 60_000)
 
 it('renders paramDefault while the param is left out or outside the options', async () => {
-  const site = await testSite({ root: `${import.meta.dir}/fixture`, extensions: [ui()], islands: false })
+  const site = await testSite({ root: `${import.meta.dir}/fixture`, config: { extensions: [ui()] }, islands: false })
 
   try {
     for (const query of ['', '?period=1y']) {

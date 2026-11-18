@@ -7,7 +7,7 @@ const path = browserPath()
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('islands imported from the chunk their markup names', () => {
   it('hydrates the islands of a page loaded at a nested URL with a trailing slash or swapped to, the persisted one imported once', async () => {
-    const site = await testSite({ root: 'tests/fixtures/island-chunks', trailingSlash: 'always', browser: { path } })
+    const site = await testSite({ root: 'tests/fixtures/island-chunks', config: { trailingSlash: 'always' }, browser: { path } })
 
     try {
       const page = await site.open('/')
@@ -36,7 +36,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('islands im
 
   it('hydrates them under a base, the front of a real deploy taking it off', async () => {
     const base = '/repo'
-    const site = await testSite({ root: 'tests/fixtures/island-chunks', trailingSlash: 'always', base, browser: { path } })
+    const site = await testSite({ root: 'tests/fixtures/island-chunks', config: { trailingSlash: 'always', base }, browser: { path } })
     const front = Bun.serve({
       port: 0,
       async fetch(request) {

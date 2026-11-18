@@ -611,7 +611,7 @@ export const LINTS = {
     group: 'seo',
     site: true,
     summary: 'A prerendered page that no other page links to and the sitemap does not list, which a crawler cannot find. Reported by `kay build` on a site with `site` set when every page of the app is prerendered, as a page of the app rendered per request may link to anything (the pages a library mounts link within the library and do not count); the home page, a locale\'s root, `noindex` pages and pages behind a guard are left out.',
-    wrong: '--- server\nexport const page = { prerender: true, sitemap: false }\n---\nh1 Spring sale',
+    wrong: '--- server\nexport const page = { prerender: true, seo: { sitemap: false } }\n---\nh1 Spring sale',
     right: '--- server\nexport const page = { prerender: true }\n---\nh1 Spring sale',
   },
   'broken-canonical': {

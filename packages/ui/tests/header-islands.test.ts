@@ -5,7 +5,7 @@ import { ui } from '../src/extension'
 const SLOT = /<slot data-component="[^"]*(?:app-header|site-nav)[^"]*"/g
 
 it('draws an AppHeader and a SiteNav as markup until the page sets the menu', async () => {
-  const site = await testSite({ root: `${import.meta.dir}/fixture`, extensions: [ui()] })
+  const site = await testSite({ root: `${import.meta.dir}/fixture`, config: { extensions: [ui()] } })
 
   try {
     const plain = (await site.visit('/header-static')).html

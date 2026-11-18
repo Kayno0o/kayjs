@@ -38,7 +38,7 @@ beforeAll(async () => {
     Bun.write(join(dir, 'routes/bare.kay'), '--- server\nconst slow = (async () => {\n  await Bun.sleep(10)\n  throw new Error(\'Bare\')\n})()\nconst plain = (async () => {\n  await Bun.sleep(10)\n  throw \'text only\'\n})()\n---\nawait slow\n  p.pending Loading\nthen text\n  p.text {text}\nawait plain then text\n  p.text {text}\n'),
     Bun.write(join(dir, 'routes/shell.kay'), '--- server\nconst slow = Promise.reject(new Error(\'Early\'))\n---\ntry\n  p.sync Shell\n  await slow\n    p.pending Loading\n  then text\n    p.text {text}\ncatch\n  p.failed Failed\n'),
   ])
-  app = await pages({ root: dir, dirs: { routes: 'routes' }, observe: { onError: ({ error }) => void reported.push(error) }, prebuilt: false, security: false })
+  app = await pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false, onError: ({ error }) => void reported.push(error) }, prebuilt: false })
 })
 
 afterAll(async () => rm(dir, { recursive: true, force: true }))

@@ -177,9 +177,3 @@ export function pgCms(options: PgCmsOptions): ContentLoader {
 
 // The default table of every collection a `pgCms` loader keeps, for `ignoreTables` of an app's own pg-orm `sync`. A loader given its own `table` is added by the app.
 export const cmsTables = [DEFAULT_TABLE] as const
-
-/** @deprecated Use `pgCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-export const pgLoader = pgCms
-
-/** @deprecated Use `PgCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-export type PgLoaderOptions = PgCmsOptions

@@ -105,7 +105,6 @@ interface ContactOptions<Extra extends Record<string, Schema> = Record<never, Sc
   labels?: Partial<Record<keyof Extra & string, string>> | undefined
   maxLength?: number | undefined
   maxLinks?: number | undefined
-  /** @deprecated Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSend?: Hook<{ input: ContactInput<Extra, Consent>; id: string; }> | undefined
   protection?: (Omit<ActionProtect<Honeypot>, "honeypot"> & Pick<ActionProtection<never, never, OutputSchema>, "maxSize" | "tool">) | undefined
   reach?: string | undefined
   subject?: ((input: ContactInput<Extra, Consent>) => string) | undefined
@@ -180,10 +179,6 @@ interface ListOptions
   afterUnsubscribe?: Hook<ListEvent> | undefined
   file?: string | undefined
   honeypot?: string | undefined
-  /** @deprecated Written `afterBroadcast`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onBroadcast?: Hook<BroadcastEvent> | undefined
-  /** @deprecated Written `afterConfirm`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onConfirm?: Hook<ListEvent> | undefined
-  /** @deprecated Written `afterSubscribe`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSubscribe?: Hook<ListEvent> | undefined
-  /** @deprecated Written `afterUnsubscribe`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onUnsubscribe?: Hook<ListEvent> | undefined
   pace?: undefined | { batch?: number | undefined; every?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   privacy?: string | undefined
   protection?: (Omit<ActionProtect<string>, "honeypot"> & Pick<ActionProtection<never, never, OutputSchema>, "maxSize" | "tool">) | undefined
@@ -276,18 +271,14 @@ interface MailerOptions
   from?: Address | undefined
   fromName?: string | undefined
   inbound?: ((reply: MailReply) => Promise<void> | void) | undefined
-  listStore?: ListStore | undefined
   locale?: string | undefined
   logRecipients?: boolean | undefined
   logSubjects?: boolean | undefined
   onError?: Hook<{ mail: Mail; error: Error; }> | undefined
-  /** @deprecated Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSend?: Hook<{ mail: Mail; delivery: Delivery; }> | undefined
-  /** @deprecated Written `afterSuppress`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuppress?: Hook<{ address: string; reason: SuppressionReason; source: string; }> | undefined
   optional?: boolean | undefined
   queue?: (QueueOptions<Mail> & { name?: string | undefined; }) | undefined
   smtp?: SmtpOverrides | undefined
   store?: MailStore | undefined
-  suppressionStore?: SuppressionStore | undefined
   to?: Address | Address[] | undefined
   transport?: Transport | undefined
   url?: string | undefined
@@ -301,20 +292,16 @@ interface MailExtensionOptions extends MailerOptions
   from?: Address | undefined
   fromName?: string | undefined
   inbound?: ((reply: MailReply) => Promise<void> | void) | undefined
-  listStore?: ListStore | undefined
   locale?: string | undefined
   logRecipients?: boolean | undefined
   logSubjects?: boolean | undefined
   module?: string | undefined
   onError?: Hook<{ mail: Mail; error: Error; }> | undefined
-  /** @deprecated Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSend?: Hook<{ mail: Mail; delivery: Delivery; }> | undefined
-  /** @deprecated Written `afterSuppress`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuppress?: Hook<{ address: string; reason: SuppressionReason; source: string; }> | undefined
   optional?: boolean | undefined
   queue?: (QueueOptions<Mail> & { name?: string | undefined; }) | undefined
   server?: (() => Promise<Mailer>) | false | undefined
   smtp?: SmtpOverrides | undefined
   store?: MailStore | undefined
-  suppressionStore?: SuppressionStore | undefined
   to?: Address | Address[] | undefined
   transport?: Transport | undefined
   url?: string | undefined
@@ -696,17 +683,11 @@ component default
   style?: string | undefined
   tone?: Tone | undefined
 
-[./pg] createMailListTables
-function createMailListTables(source: PgSource): Promise<void>
-
 [./pg] createMailSuppressionTables
 function createMailSuppressionTables(source: PgSource): Promise<void>
 
 [./pg] createMailTables
 function createMailTables(source: PgSource): Promise<void>
-
-[./pg] mailListTableNames
-const mailListTableNames: readonly ["kay_mail_subscribers", "kay_mail_broadcasts", "kay_mail_deliveries", "kay_mail_suppressions"]
 
 [./pg] MailStore
 interface MailStore
@@ -743,38 +724,6 @@ interface MailStore
   file?: string | undefined
   lists?: ListStore | undefined
   suppressions?: SuppressionStore | undefined
-
-[./sqlite] openLists
-function openLists(path: string): {
-  progress(broadcast: Broadcast): BroadcastProgress;
-  suppress(email: string, reason: SuppressionReason, source: string, now?: number): void;
-  suppressed: (emails: string[]) => StoredSuppression[];
-  lift: (email: string) => boolean;
-  close: () => void;
-  closed: boolean;
-  sweep(now?: number): void;
-  ask(list: string, email: string, id: string, locale: string, now?: number, proof?: Proof): Subscriber;
-  find(list: string, id: string): Subscriber | undefined;
-  confirm(list: string, id: string, now?: number, issuedAt?: number): boolean;
-  remove: {
-    (list: string, id: string): boolean;
-    deferred: (list: string, id: string) => boolean;
-    immediate: (list: string, id: string) => boolean;
-    exclusive: (list: string, id: string) => boolean;
-  };
-  removeEmail: (list: string, email: string) => boolean;
-  erase: (email: string) => number;
-  forEmail: (email: string) => Subscriber[];
-  subscribers: (list: string) => Subscriber[];
-  count: (list: string) => number;
-  addBroadcast(id: string, list: string, message: string, now?: number): void;
-  broadcast(id: string): Broadcast | undefined;
-  finish: (id: string, now?: number) => Changes;
-  next: (broadcast: Broadcast, limit: number) => Subscriber[];
-  claim: (broadcast: string, subscriber: string, now?: number) => boolean;
-  sent: (broadcast: string, subscriber: string, now?: number) => Changes;
-  release: (broadcast: string, subscriber: string, now?: number) => Changes;
-}
 
 [./sqlite] sqliteLists
 function sqliteLists(path: string): {

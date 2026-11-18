@@ -10,26 +10,23 @@ import { inMemory } from './memory-mark'
 import { onReload } from './reload'
 
 // What a library or an app keeps that is a value under a key and nothing else: a flag with an end, a marker, a document fetched once.
-// A key holds a string; `ttl` is how long it lives from the write, and a key written without one lives until it is deleted. It is a `Duration` for a store with `durations: true`, and milliseconds for one written before 1.105 (deprecated, kept until 1.108).
+// A key holds a string; `ttl` is how long it lives from the write, and a key written without one lives until it is deleted. It is a `Duration`.
 export interface KvStore extends StoreBase {
   get: (key: string) => MaybePromise<string | undefined>
-  // A store with `durations: true` is given a `Duration`; one written before 1.105 is given milliseconds, until 1.108, and still types as it did: `lengthMs(ttl)` from `kay` reads either.
-  // eslint-disable-next-line ts/method-signature-style -- method syntax keeps a store written with `number` assignable (bivariance)
-  set(key: string, value: string, ttl?: Duration | number): MaybePromise<void>
+  set: (key: string, value: string, ttl?: Duration) => MaybePromise<void>
   // Resolves with whether there was a live value.
   delete: (key: string) => MaybePromise<boolean>
   // Takes the key for `ttl` when no live value holds it: true for the one call that took it, however many processes ask at once.
-  // eslint-disable-next-line ts/method-signature-style -- method syntax keeps a store written with `number` assignable (bivariance)
-  once(key: string, ttl: Duration | number): MaybePromise<boolean>
+  once: (key: string, ttl: Duration) => MaybePromise<boolean>
 }
 
 // A `KvStore` under one namespace, which every key is written under so two users of the store never meet.
 export interface Kv {
   get: (key: string) => Promise<string | undefined>
-  // `ttl` is a `Duration`; milliseconds as a number still work until 1.108 (`deprecated-store-ms`).
-  set: (key: string, value: string, ttl?: Duration | number) => Promise<void>
+  // `ttl` is a `Duration`.
+  set: (key: string, value: string, ttl?: Duration) => Promise<void>
   delete: (key: string) => Promise<boolean>
-  once: (key: string, ttl: Duration | number) => Promise<boolean>
+  once: (key: string, ttl: Duration) => Promise<boolean>
 }
 
 const SWEEP_EVERY = 500
@@ -47,7 +44,7 @@ export function memoryKv(max?: number): KvStore {
 
     return entry !== undefined && (entry.until === undefined || entry.until > now) ? entry : undefined
   }
-  const write = (key: string, value: string, ttl: Duration | number | undefined, now: number) => {
+  const write = (key: string, value: string, ttl: Duration | undefined, now: number) => {
     const ttlMs = ttl === undefined ? undefined : lengthMs(ttl, 'a kv ttl')
 
     if (++writes % SWEEP_EVERY === 0) {
@@ -125,7 +122,7 @@ function openKv(path: string) {
   return {
     close: () => db.close(),
     get: (key: string) => select.get(key, Date.now())?.value,
-    set(key: string, value: string, ttl?: Duration | number) {
+    set(key: string, value: string, ttl?: Duration) {
       const now = Date.now()
 
       sweeping(now)
@@ -136,7 +133,7 @@ function openKv(path: string) {
 
       return row !== null && (row.expires_at === null || row.expires_at > Date.now())
     },
-    once(key: string, ttl: Duration | number) {
+    once(key: string, ttl: Duration) {
       const now = Date.now()
 
       sweeping(now)
@@ -205,13 +202,13 @@ export function kv(namespace: string, store?: KvStore): Kv {
     set: async (key, value, ttl) => {
       const used = kept()
 
-      return used.set(keyed(key), value, ttl === undefined ? undefined : lengthFor(used, lengthMs(ttl, 'a kv ttl')))
+      return used.set(keyed(key), value, ttl === undefined ? undefined : lengthFor(lengthMs(ttl, 'a kv ttl')))
     },
     delete: async key => kept().delete(keyed(key)),
     once: async (key, ttl) => {
       const used = kept()
 
-      return used.once(keyed(key), lengthFor(used, lengthMs(ttl, 'a kv ttl')))
+      return used.once(keyed(key), lengthFor(lengthMs(ttl, 'a kv ttl')))
     },
   }
 }

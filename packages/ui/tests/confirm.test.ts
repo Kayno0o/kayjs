@@ -4,7 +4,7 @@ import { testSite } from 'kay/test'
 import { confirmWords } from '../src/confirm'
 import { ui } from '../src/extension'
 
-const site = await testSite({ root: join(import.meta.dir, 'fixture'), extensions: [ui()], browser: true })
+const site = await testSite({ root: join(import.meta.dir, 'fixture'), config: { extensions: [ui()] }, browser: true })
 
 afterAll(async () => site.close())
 

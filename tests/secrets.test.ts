@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { resolveConfig } from '../src/config-resolve'
 import { invalidConfigValues, mergeBags, unknownConfigKeys } from '../src/config-shape'
 import { checkSecret, readSecret } from '../src/server/secret'
 
@@ -66,16 +65,6 @@ describe('the config\'s secrets', () => {
     expect(unknownConfigKeys({ proxy: { key: { header: 'h', secrets: 'x' } } })).toHaveLength(1)
     expect(invalidConfigValues({ mcp: { token: 5 } })).toHaveLength(1)
     expect(invalidConfigValues({ ops: { metrics: { token: false } } })).toHaveLength(1)
-  })
-
-  it('reads the forms of before 1.105: a header as proxy.key and mcp.key as the token', async () => {
-    expect((await resolveConfig({ proxy: { key: 'x-upstream-key', hops: 1 } })).proxy).toEqual({ key: { header: 'x-upstream-key' }, hops: 1 })
-    expect((await resolveConfig({ proxy: { key: { header: 'h', secret: 's' } } })).proxy).toEqual({ key: { header: 'h', secret: 's' } })
-    expect(await resolveConfig({ mcp: { key: true, path: '/tools' } })).toMatchObject({ mcp: { token: true }, endpoints: { mcp: '/tools' } })
-    expect((await resolveConfig({ mcp: { key: { file: 'data/key' } } })).mcp).toEqual({ token: { file: 'data/key' } })
-    expect((await resolveConfig({ mcp: { key: false } })).mcp).toEqual({})
-    expect((await resolveConfig({ mcp: { key: 'old-key-0123456789', token: 'new-key-0123456789' } })).mcp).toEqual({ token: 'new-key-0123456789' })
-    expect((await resolveConfig({ mcp: true })).mcp).toBe(true)
   })
 
   it('merges the options of a code call into mcp and proxy, a level deeper than the other keys', () => {

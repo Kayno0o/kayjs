@@ -1,4 +1,5 @@
 import type { Action } from '../src/runtime'
+import type { Duration } from '../src/runtime/duration'
 import type { AppStore } from '../src/server/app-store'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -21,7 +22,7 @@ function counting() {
   const store = memoryRates()
   const seen: string[] = []
 
-  return { seen, store: { hit: (key: string, window: number, weight?: number) => {
+  return { seen, store: { hit: (key: string, window: Duration, weight?: number) => {
     seen.push(key)
 
     return store.hit(key, window, weight)
@@ -131,7 +132,7 @@ describe('the app store of a test site', () => {
     ['behind a base and a trailing slash', { base: '/blog', trailingSlash: 'always' as const }],
   ])('counts an action\'s limit in the store the site is given %s', async (_name, options) => {
     const app = counting()
-    const site = await testSite({ dirs: { routes }, islands: false, locals, store: { rates: app.store }, ...options })
+    const site = await testSite({ islands: false, locals, config: { dirs: { routes }, store: { rates: app.store }, ...options } })
     const actions = await import(join(import.meta.dir, 'fixtures/rate-keys/src/routes/index.kay')) as Record<'perUser', Action<Record<never, never>, string>>
 
     try {
@@ -148,7 +149,7 @@ describe('the app store of a test site', () => {
 describe('the MCP endpoint', () => {
   it('counts its limit in the store the site is given, so replicas share it', async () => {
     const app = counting()
-    const site = await testSite({ dirs: { routes: 'tests/fixtures/mcp/src/routes', api: 'tests/fixtures/mcp/src/api' }, mcp: { rateLimit: { max: 2, window: '1m' } }, islands: false, store: { rates: app.store } })
+    const site = await testSite({ config: { dirs: { routes: 'tests/fixtures/mcp/src/routes', api: 'tests/fixtures/mcp/src/api' }, mcp: { rateLimit: { max: 2, window: '1m' } }, store: { rates: app.store } }, islands: false })
     const ping = async () => site.fetch('/_kay/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) })
 
     try {

@@ -8,7 +8,7 @@ import process from 'node:process'
 import { afterAll, beforeAll } from 'bun:test'
 import { withConfig } from '../src/config-loader'
 import { clientOptionsOf, modeOf, resolveProject } from '../src/project'
-import { servePages } from '../src/server/app'
+import { flatOptions, servePages } from '../src/server/app'
 import { PRERENDERED_DIR, readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
 import { projectSource } from '../src/server/source'
@@ -72,7 +72,7 @@ export async function scratchBuild(config: KayConfig = {}, manifestOnly = false,
     prerender: async (config, options, built) => prerenderPages(project(config), built ?? await client(), options),
     serve: async (options = {}) => {
       const mode = modeOf({ prebuilt: true, ...options })
-      const resolved = resolveProject(root, { ...await withConfig(root, { guards: { default: 'open' }, ...options }), dev: mode.dev, prebuilt: mode.prebuilt }, mode)
+      const resolved = resolveProject(root, { ...await withConfig(root, { guards: { default: 'open' }, ...flatOptions(options) }), dev: mode.dev, prebuilt: mode.prebuilt }, mode)
 
       return servePages({ ...resolved, paths: { ...resolved.paths, output: dir } }, client)
     },

@@ -41,9 +41,8 @@ export type DeletableSessionStore = SessionStore & { deleteWhere: (match: Sessio
 // Where sessions live when the cookie only carries their id; each method may answer synchronously or with a promise.
 export interface SessionStore extends StoreBase {
   get: (id: string) => MaybePromise<SessionData | undefined>
-  // Past `maxAge` the store may forget the session: a `Duration` for a store with `durations: true`, milliseconds for one written before 1.105 (kept until 1.108); `lengthMs(maxAge)` from `kay` reads either.
-  // eslint-disable-next-line ts/method-signature-style -- method syntax keeps a store written with `number` assignable (bivariance)
-  set(id: string, data: SessionData, maxAge: Duration | number): MaybePromise<void>
+  // Past `maxAge` the store may forget the session: a `Duration`; `lengthMs(maxAge)` from `kay` reads it.
+  set: (id: string, data: SessionData, maxAge: Duration) => MaybePromise<void>
   delete: (id: string) => MaybePromise<void>
   // Deletes every session whose data `match` returns true for, such as a person's once they asked to be erased or their password changed, resolving with how many went.
   deleteWhere?: ((match: (data: SessionData) => boolean) => MaybePromise<number>) | undefined
@@ -422,7 +421,7 @@ class RequestSession<Data extends object> implements Session<Data> {
 
     if (store) {
       this.id ??= nodeCrypto().randomBytes(32).toString('base64url')
-      await store.set(this.id, this.data, lengthFor(store, maxAge * 1000))
+      await store.set(this.id, this.data, lengthFor(maxAge * 1000))
       sealed = { id: this.id, issued: now, started, ...this.own }
     }
 
@@ -526,8 +525,8 @@ function opened(value: string, keys: Buffer[], name: string): { sealed: Sealed, 
   }
 }
 
-// The `maxAge` a store is given, a `Duration` or milliseconds: one that is neither would store a session that never expires, or none.
-function storeMs(maxAge: Duration | number): number {
+// The `maxAge` a store is given, a `Duration`: one that is not would store a session that never expires, or none.
+function storeMs(maxAge: Duration): number {
   return lengthMs(maxAge, 'a session store\'s maxAge')
 }
 

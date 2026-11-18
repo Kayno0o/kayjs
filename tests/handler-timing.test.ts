@@ -74,7 +74,7 @@ describe('the spans of an API handler', () => {
   for (const [name, options] of variants) {
     it(`nest under the request's span, through a handler that awaits (${name})`, async () => {
       const { tracer, ended } = nesting()
-      const made = await site({ ...options, observe: { tracer } })
+      const made = await site({ ...options, config: { ops: { observe: { tracer } } } })
       const response = await made.fetch('/api/probe')
 
       expect(await response.text()).toBe('worked')
@@ -96,7 +96,7 @@ describe('the spans of an API handler', () => {
 
   it('wraps a handler that starts no span of its own in one, and starts none without a tracer', async () => {
     const { tracer, ended } = nesting()
-    const made = await site({ observe: { tracer } })
+    const made = await site({ config: { ops: { observe: { tracer } } } })
 
     expect((await made.fetch('/api/members', { headers: AUTH })).status).toBe(200)
 
@@ -118,7 +118,7 @@ describe('the spans of an API handler', () => {
 describe('Server-Timing on an API route', () => {
   for (const [name, options] of variants) {
     it(`carries the guards and the handler when serverTiming is on (${name})`, async () => {
-      const made = await site({ ...options, observe: { serverTiming: true } })
+      const made = await site({ ...options, config: { ops: { observe: { serverTiming: true } } } })
 
       expect((await made.fetch('/api/members', { headers: AUTH })).headers.get('server-timing')).toMatch(BOTH)
       expect((await made.fetch('/api/probe')).headers.get('server-timing')).toMatch(HANDLER)
@@ -126,7 +126,7 @@ describe('Server-Timing on an API route', () => {
   }
 
   it('adds to a Server-Timing the handler set, and sends none for a handler that threw', async () => {
-    const made = await site({ observe: { serverTiming: true } })
+    const made = await site({ config: { ops: { observe: { serverTiming: true } } } })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -144,7 +144,7 @@ describe('Server-Timing on an API route', () => {
 
   it('is sent in development unless serverTiming is false, and never in production by default', async () => {
     expect((await (await site({ dev: true })).fetch('/api/probe')).headers.get('server-timing')).toMatch(HANDLER)
-    expect((await (await site({ dev: true, observe: { serverTiming: false } })).fetch('/api/probe')).headers.get('server-timing')).toBeNull()
+    expect((await (await site({ dev: true, config: { ops: { observe: { serverTiming: false } } } })).fetch('/api/probe')).headers.get('server-timing')).toBeNull()
     expect((await (await site()).fetch('/api/probe')).headers.get('server-timing')).toBeNull()
   })
 
@@ -162,7 +162,7 @@ describe('Server-Timing on an API route', () => {
 describe('Server-Timing on an action', () => {
   for (const [name, options] of variants) {
     it(`carries its guards and handler when serverTiming is on (${name})`, async () => {
-      const made = await site({ ...options, observe: { serverTiming: true } })
+      const made = await site({ ...options, config: { ops: { observe: { serverTiming: true } } } })
       const guarded = await call(made, 'members', AUTH)
 
       expect(guarded.status).toBe(200)
@@ -172,7 +172,7 @@ describe('Server-Timing on an action', () => {
   }
 
   it('leaves a refused call without a handler entry, and sends nothing when serverTiming is off', async () => {
-    const on = await site({ observe: { serverTiming: true } })
+    const on = await site({ config: { ops: { observe: { serverTiming: true } } } })
     const refused = await call(on, 'members')
 
     expect(refused.status).toBe(401)
@@ -186,14 +186,14 @@ describe('Server-Timing on an action', () => {
 
   it('follows development: on by default, off with serverTiming false', async () => {
     expect((await call(await site({ dev: true }), 'open')).headers.get('server-timing')).toMatch(HANDLER)
-    expect((await call(await site({ dev: true, observe: { serverTiming: false } }), 'open')).headers.get('server-timing')).toBeNull()
+    expect((await call(await site({ dev: true, config: { ops: { observe: { serverTiming: false } } } }), 'open')).headers.get('server-timing')).toBeNull()
   })
 })
 
 describe('Server-Timing on an endpoint', () => {
   for (const [name, options] of variants) {
     it(`carries its guards and handler when serverTiming is on (${name})`, async () => {
-      const made = await site({ ...options, observe: { serverTiming: true } })
+      const made = await site({ ...options, config: { ops: { observe: { serverTiming: true } } } })
 
       expect((await made.fetch('/members/export.csv', { headers: AUTH })).headers.get('server-timing')).toMatch(BOTH)
       expect((await made.fetch('/open.json')).headers.get('server-timing')).toMatch(HANDLER)
@@ -201,7 +201,7 @@ describe('Server-Timing on an endpoint', () => {
   }
 
   it('adds to a Server-Timing the endpoint returned, and copies a response whose headers are immutable', async () => {
-    const made = await site({ observe: { serverTiming: true } })
+    const made = await site({ config: { ops: { observe: { serverTiming: true } } } })
 
     expect((await made.fetch('/own.json')).headers.get('server-timing')).toMatch(/^upstream;dur=1, handler;dur=\d+\.\d$/)
 
@@ -212,7 +212,7 @@ describe('Server-Timing on an endpoint', () => {
   })
 
   it('gives a request the guards refuse their time alone, and sends nothing when serverTiming is off', async () => {
-    const on = await site({ observe: { serverTiming: true } })
+    const on = await site({ config: { ops: { observe: { serverTiming: true } } } })
     const refused = await on.fetch('/members/export.csv')
 
     expect(refused.status).toBe(401)
@@ -226,6 +226,6 @@ describe('Server-Timing on an endpoint', () => {
 
   it('follows development: on by default, off with serverTiming false', async () => {
     expect((await (await site({ dev: true })).fetch('/open.json')).headers.get('server-timing')).toMatch(HANDLER)
-    expect((await (await site({ dev: true, observe: { serverTiming: false } })).fetch('/open.json')).headers.get('server-timing')).toBeNull()
+    expect((await (await site({ dev: true, config: { ops: { observe: { serverTiming: false } } } })).fetch('/open.json')).headers.get('server-timing')).toBeNull()
   })
 })

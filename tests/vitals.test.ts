@@ -64,7 +64,7 @@ async function build(...args: Parameters<typeof pages>): Promise<Site> {
   process.env.NODE_ENV = 'test'
 
   try {
-    return await pages({ guards: { default: 'open' }, ...args[0] })
+    return await pages({ config: { guards: { default: 'open' } }, ...args[0] })
   }
   finally {
     restoreEnvironment(kept)
@@ -656,7 +656,7 @@ describe('the screen', () => {
 
 describe('under a base', () => {
   it('serves the script and takes the reports under the base, with or without the proxy keeping it', async () => {
-    const mounted = await testSite({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes' }, islands: false, base: '/shop', extensions: [vitals()], proxy: { hops: 1 }, store: { vitals: store } })
+    const mounted = await testSite({ config: { guards: { default: 'open' }, dirs: { routes: 'routes' }, base: '/shop', extensions: [vitals()], proxy: { hops: 1 }, store: { vitals: store } }, root: dir, islands: false })
 
     try {
       const home = await (await mounted.fetch('/shop/')).text()

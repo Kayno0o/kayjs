@@ -485,7 +485,7 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   return promise
 }
 
-// `export const page = { ... }` in a page's server fence; a layout takes `query` as well as `layouts`, `security`, `reload`, `noindex`, `ttl`, `rateLimit` and `search`, which apply to the pages under it, and `guards`, which opens its own actions.
+// `export const page = { ... }` in a page's server fence; a layout takes `query` as well as `layouts`, `security`, `reload`, `seo`, `cache`, `rateLimit`, which apply to the pages under it, and `guards`, which opens its own actions.
 export interface PageSettings {
   // `kay build` renders the page once: `true` for a route without params, else the params of each page to render, as a list, a function returning one, a content collection or a `paginate()` list.
   prerender?: boolean | object
@@ -494,10 +494,6 @@ export interface PageSettings {
   keep?: boolean
   // How the prerendered page is cached. `'1h'`: the server renders it again in the background once it is older, and a public page answers `cache-control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600` so a CDN keeps it that long. `{ browser, shared, swr }` sets each part of the header, `shared` also being how long the page is served before it renders again. `'private'` sends `private`, `false` the default `public, max-age=0, must-revalidate`. A page behind a guard, or rendered for one visitor, is `private` whatever this says; a layout's applies to every page under it, the innermost winning.
   cache?: PageCache
-  /** @deprecated Write `cache: '1h'`. Removed in 1.108.0; `deprecated-page-cache` rewrites it. */
-  ttl?: Duration
-  /** @deprecated Write `cache: { browser, shared, swr }`, or `cache: false`. Removed in 1.108.0; `deprecated-page-cache` rewrites `false`. */
-  cacheControl?: string | false
   // `false` renders the page, or the layouts below this one, without the layouts above; `true`, the default, says nothing.
   layouts?: boolean
   // `false` runs none of the `_guard.ts` files above the page, nor above its actions or a layout's: a sign-in page under a guard asking for a session. A guard, a list of them or `{ load }` returning one runs after those files, before the page and its actions; on a layout, before its actions alone. `true`, the default, says nothing.
@@ -510,14 +506,6 @@ export interface PageSettings {
   query?: Schema
   // What search engines, the sitemap and social networks read of the page: the `title`, `description`, `image` and `canonical` of its head, written once here instead of in a `head` block when they do not depend on the request, and `noindex`, `sitemap`, `lastmod`, `search` and `feed` beside them. A layout's applies to every page under it, the innermost setting winning.
   seo?: PageSeo
-  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
-  sitemap?: boolean | object
-  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
-  lastmod?: Lastmod | ((params: Record<string, string>) => Lastmod | undefined | Promise<Lastmod | undefined>)
-  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
-  feed?: false | object | readonly object[]
-  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
-  noindex?: boolean
   // What the page's responses send over the site's security headers; a layout's applies to every page under it, the inner one merged over the outer.
   security?: PageSecurity
   // `true` loads the page fully from any link or form of the site, past the page swap: a page whose scripts expect a fresh document.
@@ -526,8 +514,6 @@ export interface PageSettings {
   // `true` leaves the page to its live connection after a call whose handler invalidated cached keys it follows, when every key the call invalidated is followed: the call does not load the page again. For a page whose every read of what actions change is a `cached(..., { live: true })` value or a `resource()`.
   // `false`, the default, loads the page again after every call.
   liveRefresh?: boolean
-  /** @deprecated Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it. */
-  search?: PageSearch | ((params: Record<string, string>) => PageSearch | undefined | Promise<PageSearch | undefined>)
 }
 
 export type PageSearch = false | { weight?: number }

@@ -9,7 +9,7 @@ const OFFER = 'beforeinstallprompt'
 const ROOT = 'tests/fixtures/install-offer'
 
 const plain = await testSite({ root: ROOT, browser: true })
-const pushing = await testSite({ root: ROOT, browser: true, extensions: [push()], offline: true })
+const pushing = await testSite({ root: ROOT, browser: true, config: { extensions: [push()], client: { offline: true } } })
 
 afterAll(async () => {
   await plain.close()

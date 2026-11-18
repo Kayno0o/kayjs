@@ -55,7 +55,7 @@ describe('the headers of every kind of answer', () => {
   beforeAll(async () => {
     dir = await fixtureCopy('answers')
 
-    app = await pages({ root: dir, prebuilt: false, observe: { log: false }, serve: { compress: true }, store: { files: memoryFiles() } })
+    app = await pages({ root: dir, prebuilt: false, config: { serve: { compress: true }, store: { files: memoryFiles() }, ops: { observe: { log: false } } } })
     key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
 
     const first = await app.handle(new Request(`${ORIGIN}/`))
@@ -202,7 +202,7 @@ describe('the headers of every kind of answer', () => {
 
   it('hands Elysia the response the route made, with no copy of it', async () => {
     let made = Promise.withResolvers<unknown>()
-    const inner = await pages({ root: dir, prebuilt: false, observe: { log: false }, serve: { compress: false }, store: { files: memoryFiles() } })
+    const inner = await pages({ root: dir, prebuilt: false, config: { serve: { compress: false }, store: { files: memoryFiles() }, ops: { observe: { log: false } } } })
     const stored = await files.put(new File([new Uint8Array(2000)], 'b.png', { type: 'image/png' }))
     const outer = new Elysia().onAfterResponse({ as: 'global' }, ({ responseValue }) => {
       made.resolve(responseValue)
@@ -236,9 +236,9 @@ describe('the headers of every kind of answer', () => {
 
   it('keeps them on a file route whose store throws', async () => {
     const store = memoryFiles()
-    const broken = await pages({ root: await fixtureCopy('answers'), prebuilt: false, observe: { log: false }, store: { files: { ...store, read: async () => {
+    const broken = await pages({ root: await fixtureCopy('answers'), prebuilt: false, config: { store: { files: { ...store, read: async () => {
       throw new Error('store down')
-    } } } })
+    } } }, ops: { observe: { log: false } } } })
     const response = await broken.handle(new Request(`${ORIGIN}/_kay/files/0123456789abcdef0123.png`))
 
     expect(response.status).toBe(500)
@@ -248,7 +248,7 @@ describe('the headers of every kind of answer', () => {
   })
 
   it('a page that runs out of time is answered with them, as text and as the error page', async () => {
-    const slow = await pages({ root: dir, prebuilt: false, observe: { log: false }, serve: { timeout: '50ms' }, store: { files: memoryFiles() } })
+    const slow = await pages({ root: dir, prebuilt: false, config: { serve: { timeout: '50ms' }, store: { files: memoryFiles() }, ops: { observe: { log: false } } } })
 
     for (const accept of ['*/*', 'text/html']) {
       const response = await slow.handle(new Request(`${ORIGIN}/slow`, { headers: { accept } }))
@@ -273,7 +273,7 @@ describe('the headers of every kind of answer', () => {
 describe('HSTS on every kind of answer of an https site', () => {
   it('reaches the pages, build assets, stored files, their errors and the API', async () => {
     const dir = await fixtureCopy('answers')
-    const app = await pages({ root: dir, prebuilt: false, observe: { log: false }, site: 'https://shop.example', dev: false, store: { files: memoryFiles() } })
+    const app = await pages({ root: dir, prebuilt: false, config: { site: 'https://shop.example', store: { files: memoryFiles() }, ops: { observe: { log: false } } }, dev: false })
     const key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
     const html = await (await app.handle(new Request(`${ORIGIN}/`))).text()
     const asset = (/\/_kay\/nav-[^"]+\.js/).exec(html)![0]

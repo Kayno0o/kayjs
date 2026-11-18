@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { testSite } from '../src/test'
 
 // An API directory with no _guard.ts of its own: the document is open to anyone, so a route behind a guard of its own stays out of it.
-const site = await testSite({ guards: { default: 'open' }, root: 'tests/fixtures/openapi-open', openapi: { reference: true } })
+const site = await testSite({ config: { guards: { default: 'open' }, openapi: { reference: true } }, root: 'tests/fixtures/openapi-open' })
 
 afterAll(async () => {
   await site.close()

@@ -9,7 +9,6 @@ import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
 import { componentBindProblem } from './bound-props'
-import { deprecatedImage } from './deprecated-image'
 import { deprecatedLibrary } from './deprecated-library'
 import { libraryComponents } from './deprecated-ui-props'
 import { modifierProblems } from './event-modifiers'
@@ -465,9 +464,6 @@ class Validator {
     if (library !== undefined) {
       deprecatedLibrary(element, library, span => this.text(span), (span, code, message, details) => this.lint(span, code, message, details))
     }
-
-    if (this.options.check && !element.component && element.name === 'img')
-      deprecatedImage(element, span => this.text(span), (span, message, details) => this.lint(span, 'deprecated-image-options', message, details))
 
     if (this.options.check && !element.component)
       this.accessibility(element)

@@ -37,7 +37,7 @@ describe('a deferred server island following a cached value', () => {
       warn.mockRestore()
     }
 
-    app = await build.serve({ security: false })
+    app = await build.serve({ config: { security: false } })
     db.stock = 5
   }, 120_000)
 

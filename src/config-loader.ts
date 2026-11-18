@@ -8,7 +8,7 @@ import { setUiLayers } from './build/ui-layers'
 import { KayError } from './compiler/errors'
 import { APP_CONTEXT, CONFIG_FILE } from './config'
 import { resolveConfig } from './config-resolve'
-import { CONFIG_GROUPS, invalidConfigValues, isBag, mergeBags, REMOVED_KEYS, unknownConfigKeys } from './config-shape'
+import { CONFIG_GROUPS, CONFIG_KEYS, invalidConfigValues, isBag, mergeBags, REMOVED_KEYS, unknownConfigKeys } from './config-shape'
 import { NATIVE_PLUGINS } from './native-plugins'
 import { OLD_PACKAGE_NAME, RENAMED_PACKAGES } from './package-names'
 import { publicEnvFiles } from './server/env-state'
@@ -171,8 +171,7 @@ function refuseInvalidValues(config: object, where: string): void {
 // The keys `kay check` and `kay env` read in their own way, refused when they are not the shape they take.
 function checkedConfig(config: ConfigInput & InternalConfig, where = CONFIG_FILE): void {
   const { checks, publicEnv } = config
-  const env = config.envFiles ?? config.env
-  const key = config.envFiles === undefined ? 'env' : 'envFiles'
+  const env = config.envFiles
 
   if (publicEnv !== undefined)
     throw new KayError('config-invalid', `kay: \`publicEnv\` in ${where} is gone: mark the fields an island reads \`s.Public\` in \`defineEnv\` instead`)
@@ -206,7 +205,7 @@ function checkedConfig(config: ConfigInput & InternalConfig, where = CONFIG_FILE
   const files = Array.isArray(compose) ? compose : [compose]
 
   if (typeof env !== 'object' || env === null || Array.isArray(env) || files.some(file => file !== undefined && typeof file !== 'string') || (example !== undefined && typeof example !== 'string'))
-    throw new KayError('config-invalid', `kay: \`${key}\` in ${where} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them), \`true\` or \`false\``)
+    throw new KayError('config-invalid', `kay: \`envFiles\` in ${where} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them), \`true\` or \`false\``)
 }
 
 // The config with the catalogs of the libraries the app installs listed before its own extensions, so those and the app's messages win key by key; one an extension of the same name already brings is left alone.
@@ -340,7 +339,18 @@ export async function withConfig<Options extends ConfigInput>(root: string, opti
   // The options are resolved as the file is, so a code call may pass a list's function or an old key as `kay.config.ts` may.
   const given = await resolveConfig(options) as KayConfig & Omit<Options, keyof ConfigInput>
 
+  refuseOldOptions(given)
+
   return withUiLayers(root, await withTailwind(root, withPublicFields(root, withAppContext(root, mergeConfig(withLibraryMessages(root, await importConfig(root)), given)))))
+}
+
+// The config keys of the options given in code are checked as `kay.config.ts` is, so an old nested key such as `mcp.key` is refused rather than dropped.
+function refuseOldOptions(given: object): void {
+  const configPart = Object.fromEntries(Object.entries(given).filter(([key]) => CONFIG_KEYS.has(key)))
+  const unknown = unknownConfigKeys(configPart)
+
+  if (unknown.length > 0)
+    throw new KayError('config-invalid', `kay: the options have ${unknown.length === 1 ? 'an option' : 'options'} kay does not know: ${unknown.join('; ')}`)
 }
 
 // `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.

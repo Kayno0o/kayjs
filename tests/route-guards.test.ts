@@ -61,8 +61,8 @@ describe('the guards of a route', () => {
       Bun.write(join(dir, 'api/admin/lazy.ts'), API('guards: { load: () => needsKey }')),
       Bun.write(join(dir, 'api/loose.ts'), API('guards: needsKey', '..')),
     ])
-    app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
-    closed = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, guards: { default: 'closed' } })
+    app = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' } }, prebuilt: false })
+    closed = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' }, guards: { default: 'closed' } }, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -145,7 +145,7 @@ describe('reading the guards of a route from its source', () => {
     ['false', 'export const page = { guards: false }', false],
     ['true', 'export const page = { guards: true }', false],
     ['no guards', 'export const page = { layouts: false }', false],
-    ['a nested key of the same name', 'export const page = { sitemap: { guards: [a] } }', false],
+    ['a nested key of the same name', 'export const page = { seo: { sitemap: { guards: [a] } } }', false],
     ['a negation, which kay reports', 'export const page = { guards: !open }', false],
     ['a page in a comment', '// export const page = { guards: [a] }', false],
   ])('finds %s', (_name, source, own) => {
@@ -195,7 +195,7 @@ describe('pages importChecked must still serve', () => {
     }).map(async ([file, text]) => Bun.write(join(dir, file), text)))
 
     try {
-      const app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
+      const app = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' } }, prebuilt: false })
 
       for (const path of ['/open', '/typed', '/area'])
         expect((await app.handle(new Request(`http://localhost${path}`))).status).toBe(200)
@@ -219,7 +219,7 @@ describe('guards the scan cannot see in the source', () => {
     const dir = await root({ 'routes/index.kay': '--- server\nimport type { PageSettings } from \'kay\'\nimport { needsKey } from \'../lib/keys\'\n\nexport const page: PageSettings = { guards: needsKey }\n---\np secret\n' })
 
     try {
-      const app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
+      const app = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' } }, prebuilt: false })
 
       expect((await app.handle(new Request('http://localhost/'))).status).toBe(500)
     }
@@ -233,8 +233,8 @@ describe('guards the scan cannot see in the source', () => {
     const module = await root({ 'api/notes.ts': 'import { api } from \'kay/server\'\nimport { needsKey } from \'../lib/keys\'\n\nconst options = { guards: needsKey }\n\nexport default api(options).get(\'/\', () => [])\n' })
 
     try {
-      await expect(pages({ root: endpoint, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })).rejects.toThrow('are not written where kay reads them')
-      await expect(pages({ root: module, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })).rejects.toThrow('are not written where kay reads them')
+      await expect(pages({ root: endpoint, config: { dirs: { routes: 'routes', api: 'api' } }, prebuilt: false })).rejects.toThrow('are not written where kay reads them')
+      await expect(pages({ root: module, config: { dirs: { routes: 'routes', api: 'api' } }, prebuilt: false })).rejects.toThrow('are not written where kay reads them')
     }
     finally {
       await Promise.all([endpoint, module].map(async dir => rm(dir, { recursive: true, force: true })))

@@ -58,7 +58,7 @@ describe('a store that cannot erase or export', () => {
 
     void ownedBy
     void eraseOwner
-    ai({ conversations: bare })
+    ai({ store: bare })
     await expect(personalData.erase('ann')).rejects.toThrow('eraseOwner')
     await expect(personalData.export('ann')).rejects.toThrow('ownedBy')
   })

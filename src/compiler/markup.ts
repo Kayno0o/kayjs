@@ -14,7 +14,7 @@ import { joinTexts } from './class-items'
 import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
 import { closeHandParts, handsEntry, openClassList, writtenParts } from './hand-parts'
-import { IMAGE_OPTIONS, imageDefaults as imageDefaultsOf, imageOptions, NO_PLACEHOLDER, placeholderOff, writeImageArguments } from './image-attributes'
+import { IMAGE_OPTIONS, imageDefaults as imageDefaultsOf, imageOptions, placeholderOff, writeImageArguments } from './image-attributes'
 import { contentOf } from './items'
 import { controlId, fieldAttribute, inheritedAttributes, inheritedField } from './markup-fields'
 import { PROPS } from './names'
@@ -254,7 +254,7 @@ export abstract class TemplateWriter {
         continue
 
       // Read below with the image's source, and never written.
-      if (name === 'img' && (attributeName === NO_PLACEHOLDER || IMAGE_OPTIONS.has(attributeName)))
+      if (name === 'img' && IMAGE_OPTIONS.has(attributeName))
         continue
 
       // Read by `currentLink` on the server, and never written, a repeat of it included.
@@ -520,9 +520,9 @@ export abstract class TemplateWriter {
 
       const name = this.source(attribute.name)
 
-      if (element.name === 'img' && (name === NO_PLACEHOLDER || IMAGE_OPTIONS.has(name))) {
+      if (element.name === 'img' && IMAGE_OPTIONS.has(name)) {
         // Takes the color a spread brings off the image, which the attributes after it cannot unset.
-        if (name === NO_PLACEHOLDER || placeholderOff(attribute, span => this.source(span)))
+        if (placeholderOff(attribute, span => this.source(span)))
           entry('style', () => b.add('undefined'), false)
 
         continue

@@ -39,7 +39,7 @@ async function served(env: Record<string, string | undefined>, options: Options)
   }
 
   try {
-    return await pages({ root: ROOT, prebuilt: false, store: STORE, ...options })
+    return await pages({ root: ROOT, prebuilt: false, config: { store: STORE }, ...options })
   }
   finally {
     for (const [index, name] of VARIABLES.entries()) {
@@ -328,7 +328,7 @@ describe('where the key comes from', () => {
   })
 
   it('leaves the endpoint open without a key setting, and with key: false', async () => {
-    for (const mcp of [true, { key: false }, {}]) {
+    for (const mcp of [true, {}]) {
       const app = await served({ KAY_MCP_KEY: KEY }, { mcp })
 
       expect((await post(app, message('ping'))).status).toBe(200)
@@ -408,7 +408,7 @@ describe('behind proxy.key', () => {
   })
 
   it('opens the endpoint where mcp.path puts it', async () => {
-    const app = await served(production, { proxy, mcp: { token: true, path: '/tools' } })
+    const app = await served(production, { proxy, mcp: { token: true }, endpoints: { mcp: '/tools' } })
 
     expect((await post(app, message('ping'), bearer(KEY), '/tools')).status).toBe(200)
     expect((await post(app, message('ping'), bearer(KEY), '/tools/')).status).toBe(200)
@@ -417,14 +417,12 @@ describe('behind proxy.key', () => {
     await refused(await post(app, message('ping'), {}, '/tools'))
   })
 
-  it('opens the former /mcp, answered in place, until the app moves the endpoint', async () => {
+  it('does not open the former /mcp, which the proxy key refuses like any other path', async () => {
     const app = await served(production, { proxy, mcp: { token: true, rateLimit: false } })
-    const moved = await served(production, { proxy, mcp: { token: true }, endpoints: { mcp: '/tools' } })
 
-    expect((await post(app, message('ping'), bearer(KEY), '/mcp?x=1')).status).toBe(200)
-    expect((await post(app, message('ping'), bearer(KEY), '/mcp/')).status).toBe(200)
-    await refused(await post(app, message('ping'), {}, '/mcp'))
-    expect((await post(moved, message('ping'), bearer(KEY), '/mcp')).status).toBe(403)
+    expect((await post(app, message('ping'), bearer(KEY), '/mcp?x=1')).status).toBe(403)
+    expect((await post(app, message('ping'), bearer(KEY), '/mcp/')).status).toBe(403)
+    expect((await post(app, message('ping'), bearer(KEY), '/_kay/mcp')).status).toBe(200)
   })
 
   it('opens it under a base and a trailing slash', async () => {
@@ -448,7 +446,7 @@ describe('behind proxy.key', () => {
 
 describe('testSite', () => {
   it('sends the key it is given with site.mcp, and a call can send another', async () => {
-    const site = await testSite({ root: ROOT, mcp: true, mcpKey: KEY, islands: false })
+    const site = await testSite({ root: ROOT, config: { mcp: { token: KEY } }, islands: false })
 
     try {
       expect((await site.mcp.tools()).map(tool => tool.name).sort()).toEqual(['add', 'greet', 'seen'])
@@ -467,8 +465,8 @@ describe('testSite', () => {
   })
 
   it('makes a key for a config that sets mcp.token, and keeps the site headers an authorization', async () => {
-    const generated = await testSite({ root: ROOT, mcp: { token: true }, islands: false })
-    const headed = await testSite({ root: ROOT, mcp: true, mcpKey: KEY, islands: false, headers: { authorization: `Bearer ${OTHER}` } })
+    const generated = await testSite({ root: ROOT, config: { mcp: { token: true } }, islands: false })
+    const headed = await testSite({ root: ROOT, config: { mcp: { token: KEY } }, islands: false, headers: { authorization: `Bearer ${OTHER}` } })
 
     try {
       expect((await generated.mcp.tools()).length).toBe(3)
@@ -481,7 +479,7 @@ describe('testSite', () => {
   })
 
   it('serves the endpoint under a base and a trailing slash', async () => {
-    const site = await testSite({ root: ROOT, mcp: true, mcpKey: KEY, islands: false, base: '/shop', trailingSlash: 'always' })
+    const site = await testSite({ root: ROOT, config: { mcp: { token: KEY }, base: '/shop', trailingSlash: 'always' }, islands: false })
 
     try {
       expect((await site.mcp.tools()).length).toBe(3)

@@ -8,7 +8,7 @@ describe('a MarkdownEditor with previewHtml', () => {
   let site: Awaited<ReturnType<typeof testSite>>
 
   beforeAll(async () => {
-    site = await testSite({ root: `${import.meta.dir}/fixture`, extensions: [ui()], browser: path === undefined ? undefined : { path } })
+    site = await testSite({ root: `${import.meta.dir}/fixture`, config: { extensions: [ui()] }, browser: path === undefined ? undefined : { path } })
   }, 120_000)
 
   afterAll(async () => site.close())

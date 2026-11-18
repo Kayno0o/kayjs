@@ -48,10 +48,10 @@ beforeAll(async () => {
   const base = { root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, guards: { default: 'open' } } as const
 
   plain = await pages(base)
-  mounted = await pages({ ...base, base: '/blog', trailingSlash: 'always' })
-  localized = await pages({ ...base, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+  mounted = await pages({ ...base, config: { base: '/blog', trailingSlash: 'always' } })
+  localized = await pages({ ...base, config: { i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } } })
   dev = await pages({ ...base, dev: true })
-  wide = await pages({ ...base, cors: { origins: '*' } })
+  wide = await pages({ ...base, config: { cors: { origins: '*' } } })
 })
 
 afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -154,7 +154,7 @@ describe('an endpoint file exporting more than GET', () => {
 
     try {
       await Bun.write(join(root, 'routes/none.txt.ts'), 'export const post = () => \'x\'\n')
-      await expect(pages({ root, dirs: { routes: 'routes' }, prebuilt: false, security: false })).rejects.toThrow('must export a handler for a method: GET, HEAD, POST, PUT, PATCH, DELETE or OPTIONS')
+      await expect(pages({ root, config: { dirs: { routes: 'routes' }, security: false }, prebuilt: false })).rejects.toThrow('must export a handler for a method: GET, HEAD, POST, PUT, PATCH, DELETE or OPTIONS')
     }
     finally {
       await rm(root, { recursive: true, force: true })

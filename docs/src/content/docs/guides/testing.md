@@ -138,7 +138,7 @@ expect(refused.status).toBe(403)
 
 ## A site under a base
 
-A site with a `base` in kay.config.ts is tested under it with nothing more. `testSite({ base: '/blog' })` serves one that sets none.
+A site with a `base` in kay.config.ts is tested under it with nothing more. `testSite({ config: { base: '/blog' } })` serves one that sets none.
 
 `visit`, `submit` and `fetch` take a path with the base or without it, `/blog/about` or `/about`. A path starting with the base is taken as written, so a route that starts like it is `/blog/blog/hello`.
 

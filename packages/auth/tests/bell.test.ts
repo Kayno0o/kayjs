@@ -17,7 +17,7 @@ const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromiu
 let site: Awaited<ReturnType<typeof testSite>>
 
 beforeAll(async () => {
-  site = await testSite({ root: ROOT, extensions: [auth(), ui()], islands: false })
+  site = await testSite({ root: ROOT, config: { extensions: [auth(), ui()] }, islands: false })
 }, 180_000)
 
 afterAll(async () => {
@@ -69,7 +69,7 @@ describe('the Bell of kayjs-ui on kayjs-auth', () => {
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell in a browser signed in through kayjs-auth', () => {
   it('shows the unread count of notify(user.id) and none once signed out', async () => {
-    const browsing = await testSite({ root: ROOT, extensions: [auth(), ui()], plugins: [tailwind], browser: { path: chrome } })
+    const browsing = await testSite({ root: ROOT, config: { extensions: [auth(), ui()], plugins: [tailwind] }, browser: { path: chrome } })
 
     try {
       const ada = await authTest(browsing).signInAs({ email: 'ada@example.com', username: 'Ada' })

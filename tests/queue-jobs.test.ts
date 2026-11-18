@@ -478,7 +478,7 @@ describe.each(kinds)('a stopping queue on a $name store', ({ open }) => {
     const jobs = queue<number>(named(), async () => {
       started.value = true
       await new Promise(noop)
-    }, { store: await open(), lostAfter: '10m', idlePoll: '30s' })
+    }, { store: await open(), timeout: '10m', idlePoll: '30s' })
     const app = new Elysia().use(jobs).listen(0)
 
     try {

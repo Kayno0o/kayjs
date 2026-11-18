@@ -406,14 +406,3 @@ describe('the hook convention', () => {
     expect(() => ai({ beforeRequest: () => undefined, afterRequest: () => undefined })).not.toThrow()
   })
 })
-
-describe('onStep, onToolCall and onSuccess, the names before 1.105', () => {
-  it('are read as afterStep, afterToolCall and afterRequest, the new names winning', async () => {
-    const heard: string[] = []
-
-    ai({ onSuccess: () => heard.push('old global'), onStep: () => heard.push('old step') })
-    await ask('hi', { provider: echo(), onSuccess: () => heard.push('old own'), afterRequest: () => heard.push('new own') })
-    await new Promise(resolve => setTimeout(resolve, 20))
-    expect(heard.sort()).toEqual(['new own', 'old global', 'old step'])
-  })
-})

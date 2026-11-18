@@ -48,7 +48,7 @@ async function site(reports: { server?: StoredReport, exported?: StoredReport } 
 }
 
 async function ask(root: string, path: string, headers: Record<string, string> = { 'x-kay-dev': '1' }, options: Partial<Parameters<typeof pages>[0]> = {}): Promise<{ status: number, sizes?: DevSizes | undefined }> {
-  const dev = await pages({ root, prebuilt: false, security: false, dev: true, ...options })
+  const dev = await pages({ root, prebuilt: false, config: { security: false }, dev: true, ...options })
   const response = await dev.handle(new Request(`http://localhost${DEV_SIZES}?path=${encodeURIComponent(path)}`, { headers }))
 
   return { status: response.status, sizes: response.ok ? (await response.json() as { sizes?: DevSizes }).sizes : undefined }
@@ -96,13 +96,13 @@ describe('the dev tool\'s production sizes', () => {
     expect((await ask(root, '/a/b/c/d')).sizes).toBeUndefined()
     expect((await ask(root, '/%E0%A4%A')).sizes).toBeUndefined()
 
-    const dev = await pages({ root, prebuilt: false, security: false, dev: true })
+    const dev = await pages({ root, prebuilt: false, config: { security: false }, dev: true })
 
     expect((await dev.handle(new Request(`http://localhost${DEV_SIZES}`, { headers: { 'x-kay-dev': '1' } }))).status).toBe(400)
   })
 
   it('is not served in production', async () => {
-    const prod = await pages({ root: await site(), prebuilt: false, security: false, dev: false })
+    const prod = await pages({ root: await site(), prebuilt: false, config: { security: false }, dev: false })
 
     expect((await prod.handle(new Request(`http://localhost${DEV_SIZES}?path=%2Fabout`, { headers: { 'x-kay-dev': '1' } }))).status).toBe(404)
   })

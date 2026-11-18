@@ -20,7 +20,7 @@ const clientDir = resolve(outputDir(root), 'dist')
 await Bun.write(join(uploads, 'photo.png'), Bun.file(`${import.meta.dir}/fixtures/images/src/hero.png`))
 const settings = { root, prebuilt: false, images: { dirs: { '/uploads/': uploads } } } as const
 const app = await pages(settings)
-const always = await pages({ ...settings, trailingSlash: 'always' })
+const always = await pages({ ...settings, config: { trailingSlash: 'always' } })
 
 // Written once the builds are, each into an output of its own in the shared pages; a file is looked up as it is asked for.
 await Promise.all([app, always].map(async site => site.handle(new Request('http://localhost/'))))

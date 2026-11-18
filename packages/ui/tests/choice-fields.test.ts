@@ -20,7 +20,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a choice g
   let seen: Record<string, Seen>
 
   beforeAll(async () => {
-    site = await testSite({ root: `${import.meta.dir}/fixture`, extensions: [ui()], browser: { path } })
+    site = await testSite({ root: `${import.meta.dir}/fixture`, config: { extensions: [ui()] }, browser: { path } })
 
     await using page = await site.open('/choice-fields')
     const read = async () => page.evaluate(() => Object.fromEntries(['radio', 'segmented', 'chips', 'rating', 'grouped', 'quiet'].map((id) => {

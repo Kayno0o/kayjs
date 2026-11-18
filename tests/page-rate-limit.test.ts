@@ -1,7 +1,9 @@
+import type { Duration } from '../src/runtime/duration'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
+import { lengthMs } from '../src/runtime/store-base'
 import { keptStop, limitedPage, pageLimits, pageOverLimit } from '../src/server/page-limits'
 import { Denied } from '../src/server/signals'
 import { kayBuild } from './check-helper'
@@ -49,10 +51,10 @@ beforeAll(async () => {
   dir = await scratchDir('page-rate-limit-')
   await Promise.all(Object.entries(FILES).map(async ([name, text]) => Bun.write(join(dir, name), text)))
 
-  const base = { root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, guards: { default: 'open' }, observe: { log: false } } as const
+  const base = { root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, guards: { default: 'open' }, ops: { observe: { log: false } } } as const
 
   apps.plain = await pages(base)
-  apps.mounted = await pages({ ...base, base: '/blog', trailingSlash: 'always' })
+  apps.mounted = await pages({ ...base, config: { base: '/blog', trailingSlash: 'always' } })
   apps.dev = await pages({ ...base, dev: true })
 
   for (const [index, app] of Object.values(apps).entries())
@@ -160,10 +162,10 @@ describe('the counter of a page', () => {
   it('counts a request once when its render is run again for the viewer', async () => {
     const counts = new Map<string, number>()
     const store = {
-      hit: (key: string, windowMs: number, weight = 1) => {
+      hit: (key: string, window: Duration, weight = 1) => {
         counts.set(key, (counts.get(key) ?? 0) + weight)
 
-        return { count: counts.get(key)!, resetAt: Date.now() + windowMs }
+        return { count: counts.get(key)!, resetAt: Date.now() + lengthMs(window) }
       },
     }
     const modules = [{ page: { rateLimit: { max: 1, window: '1m', store } } }]
@@ -181,7 +183,7 @@ describe('the counter of a page', () => {
     await Bun.write(join(root, 'routes/index.kay'), 'h1 Home\n')
     await Bun.write(join(root, 'routes/bad/_layout.kay'), FENCE(LIMIT(0), 'slot'))
     await Bun.write(join(root, 'routes/bad/page.kay'), 'h1 Page\n')
-    await expect(pages({ root, dirs: { routes: 'routes' }, prebuilt: false, security: false, guards: { default: 'open' }, observe: { log: false } })).rejects.toThrow('max')
+    await expect(pages({ root, config: { dirs: { routes: 'routes' }, security: false, guards: { default: 'open' }, ops: { observe: { log: false } } }, prebuilt: false })).rejects.toThrow('max')
     await rm(root, { recursive: true, force: true })
   })
 
@@ -210,7 +212,7 @@ describe('a prerendered page with a rateLimit', () => {
     root = await scratchDir('page-rate-prerendered-')
     await Promise.all(Object.entries({
       'tsconfig.json': '{}',
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, guards: { default: \'open\' } })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } }, guards: { default: \'open\' } })\n',
       'src/routes/index.kay': 'h1 Home\n',
       'src/routes/fixed.kay': FENCE(`{ prerender: true, rateLimit: { max: 1, window: '1m' } }`, 'h1 Fixed'),
     }).map(async ([name, text]) => Bun.write(join(root, name), text)))
@@ -225,7 +227,7 @@ describe('a prerendered page with a rateLimit', () => {
     expect(`${report}${output}`).toContain('sets `rateLimit` and is prerendered')
     expect(await Bun.file(join(outputDir(root), 'manifest.json')).text()).toContain('/fixed')
 
-    const app = await pages({ root, prebuilt: true, security: false, guards: { default: 'open' }, observe: { log: false } })
+    const app = await pages({ root, prebuilt: true, config: { security: false, guards: { default: 'open' }, ops: { observe: { log: false } } } })
     const ip = { 'x-forwarded-for': '10.7.7.7' }
     const first = await get(app, '/fixed', ip)
     const second = await get(app, '/fixed', ip)
@@ -257,13 +259,13 @@ describe('the store of a page\'s limit', () => {
   it('is the app\'s store.rates, the count under the route\'s pattern', async () => {
     const keys: string[] = []
     const rates = {
-      hit: async (key: string, windowMs: number, weight = 1) => {
+      hit: async (key: string, window: Duration, weight = 1) => {
         keys.push(key)
 
-        return { count: weight, resetAt: Date.now() + windowMs }
+        return { count: weight, resetAt: Date.now() + lengthMs(window) }
       },
     }
-    const app = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, guards: { default: 'open' }, observe: { log: false }, store: { rates } })
+    const app = await pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false, guards: { default: 'open' }, ops: { observe: { log: false } }, store: { rates } }, prebuilt: false })
 
     expect((await get(app, '/plain/search')).status).toBe(200)
     expect(keys.some(key => key.startsWith('/plain/search\n'))).toBe(true)

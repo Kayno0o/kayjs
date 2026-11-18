@@ -7,7 +7,7 @@ const FIXTURE = 'tests/fixtures/library-chrome'
 // One library whose layout starts its own chain, mounted under a folder the app has a layout over, and one whose layout leaves the chain alone.
 const OWN = { name: 'own', routes: { dir: resolve(`${FIXTURE}/lib/own`), prefix: '/studio/admin' } }
 const SHARED = { name: 'shared', routes: { dir: resolve(`${FIXTURE}/lib/shared`), prefix: '/plain' } }
-const I18N = { locales: ['en', 'fr'], defaultLocale: 'en', messages: 'src/messages' }
+const I18N = { locales: ['en', 'fr'], default: 'en', messages: 'src/messages' }
 
 interface Variant { base: string, dev: boolean, locale: boolean }
 
@@ -21,7 +21,7 @@ async function get(variant: Variant, path: string, security = false): Promise<{ 
   let held = apps.get(key)
 
   if (!held) {
-    held = pages({ root: FIXTURE, extensions: [OWN, SHARED], prebuilt: false, security: security ? undefined : false, client: { inlineStyles: false }, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
+    held = pages({ root: FIXTURE, config: { extensions: [OWN, SHARED], security: security ? undefined : false, client: { inlineStyles: false }, site: 'https://site.example', base: variant.base || undefined, i18n: variant.locale ? I18N : undefined }, prebuilt: false, dev: variant.dev })
     apps.set(key, held)
   }
 

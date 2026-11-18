@@ -8,9 +8,9 @@ import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const READ = /<p class="read">([^<]*)<\/p>/
-const app = await pages({ root: 'tests/fixtures/layout-query', prebuilt: false, security: false })
-const slashed = await pages({ root: 'tests/fixtures/layout-query', prebuilt: false, security: false, base: '/repo', trailingSlash: 'always' })
-const localized = await pages({ root: 'tests/fixtures/layout-query', prebuilt: false, security: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/layout-query/src/messages') } })
+const app = await pages({ root: 'tests/fixtures/layout-query', prebuilt: false, config: { security: false } })
+const slashed = await pages({ root: 'tests/fixtures/layout-query', prebuilt: false, config: { security: false, base: '/repo', trailingSlash: 'always' } })
+const localized = await pages({ root: 'tests/fixtures/layout-query', prebuilt: false, config: { security: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/layout-query/src/messages') } } })
 
 async function get(server: Elysia, path: string): Promise<{ status: number, html: string }> {
   const response = await server.handle(new Request(`http://localhost${path}`))

@@ -222,6 +222,3 @@ function open(path: string) {
 
   return { list, get, write: (key: ConversationKey, revision: number, change: ConversationChange) => write.immediate(key, revision, change), rename, remove, owned, eraseOwner, older }
 }
-
-/** @deprecated Use `sqliteAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-export const sqliteConversations = sqliteAi

@@ -39,7 +39,7 @@ describe('a plain record as the schema of an action', () => {
     ;(globalThis as { schemaRecordCalls?: unknown[] }).schemaRecordCalls = calls
     dir = await scratchDir('schema-record-')
     await Bun.write(join(dir, 'routes/index.kay'), '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action({ title: s.string({ max: 5 }), note: s.string({ optional: true }) }, (input) => { ;(globalThis as { schemaRecordCalls?: unknown[] }).schemaRecordCalls?.push(input) })\n---\nform(action={add})\n  input(name="title")\n')
-    app = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, guards: { default: 'open' } })
+    app = await pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false, guards: { default: 'open' } }, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

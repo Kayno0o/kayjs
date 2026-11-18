@@ -70,7 +70,7 @@ describe('redirecting the page an entry moved from', () => {
   })
 
   it('answers the old page 404 with the redirect under a base and a trailing slash', async () => {
-    const served = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false, base: '/app', trailingSlash: 'always' }))
+    const served = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, config: { security: false, base: '/app', trailingSlash: 'always' } }))
 
     await redirectMovedPage('/app/mp-old/', '/app/bare/')
 

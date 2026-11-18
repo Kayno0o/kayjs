@@ -156,7 +156,7 @@ afterAll(async () => {
 describe('lateStyles', () => {
   it('links the whole stylesheet after the inline rules, where it is off by default', async () => {
     const off = await head(await serve(), '/data')
-    const on = await head(await serve({ client: { lateStyles: true } }), '/data')
+    const on = await head(await serve({ config: { client: { lateStyles: true } } }), '/data')
 
     expect(off.html).not.toContain('data-kay-rest')
     expect(on.html).toMatch(/<link rel="stylesheet" href="[^"]+" media="print" data-kay-rest>/)
@@ -169,7 +169,7 @@ describe('lateStyles', () => {
 
   it('has the script of the whole stylesheet allowed by the policy, and only when on', async () => {
     const policy = async (late: boolean) => {
-      const served = await serve({ client: { lateStyles: late }, security: { csp: { 'script-src': ['\'self\''] } } })
+      const served = await serve({ config: { client: { lateStyles: late }, security: { csp: { 'script-src': ['\'self\''] } } } })
 
       return (await served.handle(new Request('http://localhost/data'))).headers.get('content-security-policy') ?? ''
     }
@@ -412,7 +412,7 @@ describe('a page\'s head', () => {
     const security = { csp: { 'style-src': ['\'self\''] } }
     // A proxy strips the mount point before the request reaches the server.
     const path = '/about'
-    const plain = await (await serve({ base, security }, built)).handle(new Request(`http://localhost${path}`))
+    const plain = await (await serve({ config: { base, security } }, built)).handle(new Request(`http://localhost${path}`))
     const html = await plain.text()
     const policy = plain.headers.get('content-security-policy')!
     const styles = [...html.matchAll(STYLE)].map(match => match[1]!)
@@ -427,7 +427,7 @@ describe('a page\'s head', () => {
 
     expect(new Set(hashes).size).toBe(hashes.length)
 
-    const compressed = await (await serve({ base, security, serve: { compress: true } }, built)).handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': 'br, gzip' } }))
+    const compressed = await (await serve({ config: { base, security, serve: { compress: true } } }, built)).handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': 'br, gzip' } }))
 
     expect(compressed.headers.get('content-encoding')).toBe('gzip')
     expect(new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await compressed.arrayBuffer())))).toBe(html)
@@ -445,7 +445,7 @@ describe('a page\'s head', () => {
     expect(blocked.blocking[0]).not.toMatch(ROUTE_COPY)
     await rm(file, { recursive: true })
 
-    const offline = await head(await serve({ offline: true }), '/bulk')
+    const offline = await head(await serve({ config: { client: { offline: true } } }), '/bulk')
 
     expect(offline.blocking[0]).not.toMatch(ROUTE_COPY)
     expect((await head(await serve(), '/bulk')).blocking[0]).toBe(copy)
@@ -463,7 +463,7 @@ describe('a page\'s head', () => {
 
   it('puts the mount point on the href of a route copy, which is cut from the stylesheet as the build wrote it', async () => {
     const built = await builtUnder('/docs')
-    const bulk = await head(await serve({ base: '/docs' }, built), '/bulk')
+    const bulk = await head(await serve({ config: { base: '/docs' } }, built), '/bulk')
 
     expect(bulk.blocking).toHaveLength(1)
     expect(bulk.blocking[0]).toMatch(/^\/docs\/_kay\/[^/]+\.r-[a-z0-9]+\.css$/)
@@ -471,8 +471,8 @@ describe('a page\'s head', () => {
   })
 
   it('stays as it was for inlineStyles true and false, and in development', async () => {
-    const forced = await head(await serve({ client: { inlineStyles: true } }), '/about')
-    const linked = await head(await serve({ client: { inlineStyles: false } }), '/about')
+    const forced = await head(await serve({ config: { client: { inlineStyles: true } } }), '/about')
+    const linked = await head(await serve({ config: { client: { inlineStyles: false } } }), '/about')
     const dev = await head(await serve({ dev: true }), '/about')
 
     expect(hasRule(forced.styles, 'bg-lime-300')).toBe(true)

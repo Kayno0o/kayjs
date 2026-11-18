@@ -66,7 +66,7 @@ describe('an incoming traceparent', () => {
 
   it('puts the page span under the caller\'s trace, and answers the trace it joined', async () => {
     const { tracer: recording, started } = tracer()
-    const site = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: recording } })
+    const site = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: recording } } }, root: 'tests/fixtures/site', prebuilt: false })
     const response = await site.handle(visit({ traceparent: INCOMING }))
 
     expect(response.status).toBe(200)
@@ -76,7 +76,7 @@ describe('an incoming traceparent', () => {
 
   it('starts a trace of its own for a malformed header and sends its id', async () => {
     const { tracer: recording, started } = tracer()
-    const site = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: recording } })
+    const site = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: recording } } }, root: 'tests/fixtures/site', prebuilt: false })
     const response = await site.handle(visit({ traceparent: `00-${'0'.repeat(32)}-${PARENT}-01` }))
 
     expect(started[0]!.parent).toBeUndefined()
@@ -85,7 +85,7 @@ describe('an incoming traceparent', () => {
 
   it('keeps a hand-written tracer of three parameters working: its span is made with the parent through startSpan', async () => {
     const { tracer: recording, started } = tracer('three')
-    const site = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: recording } })
+    const site = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: recording } } }, root: 'tests/fixtures/site', prebuilt: false })
     const response = await site.handle(visit({ traceparent: INCOMING }))
 
     expect(response.status).toBe(200)
@@ -95,7 +95,7 @@ describe('an incoming traceparent', () => {
 
   it('keeps a rest-parameter wrapper around a real tracer working: it receives the parent as the context', async () => {
     const { tracer: recording, started, activated } = tracer('rest')
-    const site = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: recording } })
+    const site = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: recording } } }, root: 'tests/fixtures/site', prebuilt: false })
     const response = await site.handle(visit({ traceparent: INCOMING }))
 
     expect(response.status).toBe(200)
@@ -114,7 +114,7 @@ describe('an incoming traceparent', () => {
 
       return recording.startActiveSpan(name, options, fn!)
     }) as Tracer['startActiveSpan'] }
-    const site = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: spy } })
+    const site = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: spy } } }, root: 'tests/fixtures/site', prebuilt: false })
 
     await site.handle(visit({ traceparent: INCOMING, tracestate: 'vendor=a,other=b=c' }))
     expect(seen).toEqual(['vendor=a,other=b=c'])
@@ -125,13 +125,13 @@ describe('an incoming traceparent', () => {
 
     try {
       const { tracer: recording } = tracer()
-      const site = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: recording } })
+      const site = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: recording } } }, root: 'tests/fixtures/site', prebuilt: false })
       const failed = await site.handle(visit({ traceparent: INCOMING }, '/boom?fail'))
 
       expect(failed.status).toBe(500)
       expect(failed.headers.get('traceresponse')).toMatch(new RegExp(`^00-${TRACE}-`))
 
-      const slow = await pages({ root: 'tests/fixtures/timeouts', prebuilt: false, security: false, observe: { tracer: recording }, serve: { timeout: '50ms' } })
+      const slow = await pages({ root: 'tests/fixtures/timeouts', prebuilt: false, config: { security: false, serve: { timeout: '50ms' }, ops: { observe: { tracer: recording } } } })
       const late = await slow.handle(visit({ traceparent: INCOMING }, '/slow'))
 
       expect(late.status).toBe(504)
@@ -147,9 +147,9 @@ describe('an incoming traceparent', () => {
 
     try {
       const { tracer: recording } = tracer()
-      const site = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: recording, extract: () => {
+      const site = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: recording, extract: () => {
         throw new Error('bad')
-      } } })
+      } } } }, root: 'tests/fixtures/site', prebuilt: false })
 
       await site.handle(visit({ traceparent: INCOMING }))
       await site.handle(visit({ traceparent: INCOMING }))
@@ -172,7 +172,7 @@ describe('an incoming traceparent', () => {
   it('is read by the extractor the config gives, and ignored when it is false', async () => {
     const seen: string[] = []
     const { tracer: recording, started } = tracer()
-    const custom = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: recording, extract: (headers) => {
+    const custom = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: recording, extract: (headers) => {
       seen.push(headers.get('x-trace') ?? '')
 
       return {
@@ -180,14 +180,14 @@ describe('an incoming traceparent', () => {
         setValue: () => { throw new Error('unused') },
         deleteValue: () => { throw new Error('unused') },
       }
-    } } })
+    } } } }, root: 'tests/fixtures/site', prebuilt: false })
 
     await custom.handle(visit({ 'x-trace': 'abc' }))
     expect(seen).toEqual(['abc'])
     expect(started[0]!.parent).toMatchObject({ traceId: TRACE })
 
     const { tracer: ignoring, started: ignored } = tracer()
-    const off = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: ignoring, extract: false } })
+    const off = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: ignoring, extract: false } } }, root: 'tests/fixtures/site', prebuilt: false })
 
     await off.handle(visit({ traceparent: INCOMING }))
     expect(ignored[0]!.parent).toBeUndefined()
@@ -198,9 +198,9 @@ describe('an incoming traceparent', () => {
 
     try {
       const { tracer: recording, started } = tracer()
-      const site = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: recording, extract: () => {
+      const site = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: recording, extract: () => {
         throw new Error('bad carrier')
-      } } })
+      } } } }, root: 'tests/fixtures/site', prebuilt: false })
 
       expect((await site.handle(visit({ traceparent: INCOMING }))).status).toBe(200)
       expect(started[0]!.parent).toBeUndefined()
@@ -214,7 +214,7 @@ describe('an incoming traceparent', () => {
   it('is on the request line and the messages logged under it', async () => {
     const lines: unknown[] = []
     const { tracer: recording } = tracer()
-    const site = await pages({ guards: { default: 'open' }, root: 'tests/fixtures/site', prebuilt: false, observe: { tracer: recording, log: (entry: unknown) => void lines.push(entry) } })
+    const site = await pages({ config: { guards: { default: 'open' }, ops: { observe: { tracer: recording, log: { sink: (entry: unknown) => void lines.push(entry) } } } }, root: 'tests/fixtures/site', prebuilt: false })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -235,13 +235,13 @@ describe('an incoming traceparent', () => {
     const lines = spyOn(console, 'log').mockImplementation(() => undefined)
 
     try {
-      const api = await pages({ root: 'tests/fixtures/production', prebuilt: false, observe: { tracer: recording } })
+      const api = await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { ops: { observe: { tracer: recording } } } })
       const echoed = await api.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'traceparent': INCOMING, 'content-type': 'text/plain' }, body: 'hello' }))
 
       expect(started.find(span => span.name === 'POST /api/echo')).toMatchObject({ parent: { traceId: TRACE } })
       expect(echoed.headers.get('traceresponse')).toMatch(new RegExp(`^00-${TRACE}-\\d{16}-01$`))
 
-      const bare = await pages({ guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes' }, observe: { tracer: recording }, prebuilt: true })
+      const bare = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'tests/fixtures/bare/src/routes' }, ops: { observe: { tracer: recording } } }, prebuilt: true })
       const url = '/_kay/action/tests/fixtures/bare/src/routes/survey.kay/answer'
       const answered = await bare.handle(new Request(`http://localhost${url}`, { method: 'POST', headers: { traceparent: INCOMING, referer: 'http://localhost/survey' }, body: new URLSearchParams('tags=a&count=3') }))
 

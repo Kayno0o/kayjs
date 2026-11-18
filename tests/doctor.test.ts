@@ -169,9 +169,9 @@ describe('kay doctor', () => {
     expect(result.check('config').ok).toBe(false)
     expect(result.check('config').message).toContain('i18n.default')
 
-    const both = await doctor(await project({ 'kay.config.ts': 'export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\', prefixDefault: true, domains: { en: \'a.com\', fr: \'b.com\' } } }\n' }))
+    const old = await doctor(await project({ 'kay.config.ts': 'export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\', prefixDefault: true } }\n' }))
 
-    expect(both.check('config').message).toContain('not both')
+    expect(old.check('config').message).toContain('`i18n.prefixDefault`, moved to `i18n.mode: \'always\'`')
   })
 
   it('fails a project without typescript7, warns for one without axe-core, each naming the command that installs it', async () => {

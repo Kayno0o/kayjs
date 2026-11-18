@@ -13,7 +13,7 @@ import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/kay-words'
 const i18n = { locales: ['en', 'fr'], default: 'en', messages: 'src/messages' }
-const site = await testSite({ root: FIXTURE, i18n, limits: { body: 1024 * 1024 } })
+const site = await testSite({ root: FIXTURE, config: { i18n, limits: { body: 1024 * 1024 } } })
 const { check, listed, guarded, owned, boom, slow } = await import(join(import.meta.dir, 'fixtures/kay-words/src/routes/index.kay')) as {
   check: Action<Record<string, string>, unknown>
   listed: Action<Record<string, string | string[]>, unknown>
@@ -142,8 +142,8 @@ describe('sizeText', () => {
 describe('the offline page', () => {
   it('is worded in the default locale, in English without the keys', async () => {
     const keys = { root: FIXTURE, prebuilt: false, offline: true as const }
-    const english = await offlinePage(await pages({ ...keys, i18n }))
-    const french = await offlinePage(await pages({ ...keys, i18n: { ...i18n, default: 'fr' } }))
+    const english = await offlinePage(await pages({ ...keys, config: { i18n } }))
+    const french = await offlinePage(await pages({ ...keys, config: { i18n: { ...i18n, default: 'fr' } } }))
 
     expect(english).toContain('<html lang="en"')
     expect(english).toContain('<h1>Offline</h1><p>This page needs a connection, and none is open.</p>')

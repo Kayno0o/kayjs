@@ -26,7 +26,7 @@ describe('the security headers on the answers that are not a page', () => {
     const dir = await fixtureCopy('answers')
 
     await Promise.all([Bun.write(join(dir, 'src/api/stream.ts'), STREAM), Bun.write(join(dir, 'src/api/socket.ts'), SOCKET), Bun.write(join(dir, 'public/hello.txt'), 'hello')])
-    app = await pages({ root: dir, prebuilt: false, observe: { log: false } })
+    app = await pages({ root: dir, prebuilt: false, config: { ops: { observe: { log: false } } } })
 
     const html = await (await app.handle(new Request(`${ORIGIN}/`))).text()
 

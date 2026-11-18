@@ -47,8 +47,8 @@ A route follows the same rule. An endpoint is `/_kay/<noun>`, such as `/_kay/car
 | `/_kay/fields/` | the honeypot and stamp of a form an island builds |
 | `/_kay/live` | live values |
 | `/_kay/health` | the health check |
-| `/_kay/mcp` | the MCP endpoint, which `/mcp` answers as well until 2.0 |
-| `/_kay/metrics` | the metrics, which `/metrics` answers as well until 1.108 |
+| `/_kay/mcp` | the MCP endpoint |
+| `/_kay/metrics` | the metrics |
 | `/_kay/jobs` | the jobs page, with `jobs: { guards }` |
 | `/_kay/error`, `/_kay/csp`, `/_kay/vitals`, `/_kay/analytics`, `/_kay/push` | reports and beacons |
 | `/_kay/search.json`, `/_kay/search/` | the site search index |

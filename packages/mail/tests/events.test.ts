@@ -551,7 +551,7 @@ describe('suppressions of a mailer with no list', () => {
     expect(await lists.erase(subscribed)).toBe(1)
   })
 
-  it('writes to the mailer\'s suppressionStore alone, and keeps in force what a list store kept', async () => {
+  it('writes to the mailer\'s store.suppressions alone, and keeps in force what a list store kept', async () => {
     const own = sqliteLists(':memory:')
     const kept = sqliteSuppressions(join(await scratchDir('mail-suppression-store'), 'suppressions.sqlite'))
     const [before, after] = [fresh(), fresh()]
@@ -588,9 +588,9 @@ describe('suppressions of a mailer with no list', () => {
     }
   })
 
-  it('is given to the mailer as suppressionStore', async () => {
+  it('is given to the mailer as store.suppressions', async () => {
     const kept = sqliteSuppressions(':memory:')
-    const app = mailer({ from: 'a@fixture.test', suppressionStore: kept, queue: { store: memoryJobs(), name: 'suppression-store' } })
+    const app = mailer({ from: 'a@fixture.test', store: { suppressions: kept }, queue: { store: memoryJobs(), name: 'suppression-store' } })
     const address = fresh()
 
     expect(await app.suppress(address)).toBe(true)

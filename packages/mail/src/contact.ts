@@ -45,8 +45,6 @@ export interface ContactOptions<Extra extends Record<string, Schema> = Record<ne
   subject?: ((input: ContactInput<Extra, Consent>) => string) | undefined
   // Told once the visitor's message is queued, with the validated `input` and the queue's `id` of the mail, to save it in the app's database say. A throw is reported and the visitor still gets their answer.
   afterSend?: Hook<{ input: ContactInput<Extra, Consent>, id: string }> | undefined
-  /** @deprecated Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onSend?: Hook<{ input: ContactInput<Extra, Consent>, id: string }> | undefined
   // The mail's own `.kay` view, given `ContactMailProps`, in place of kayjs-mail's.
   view?: ((props: ContactMailProps) => JSX.Element) | undefined
   // How else to reach the site, `hello@example.com` or a phone number, which a refusal due to the mail not going out names after its own words.
@@ -153,7 +151,7 @@ export function contactForm<const Extra extends Record<string, Schema>, const Ho
       return ctx.deny(502, { data: reach === undefined ? wording('mail.contact.sendFailed', 'Your message could not be sent. Please try again later.') : wording('mail.contact.sendFailedReach', 'Your message could not be sent. Please try again later, or write to {reach}.', words) })
     }
 
-    await dispatch('mail.contact.afterSend', [options.afterSend ?? options.onSend], { input, id })
+    await dispatch('mail.contact.afterSend', [options.afterSend], { input, id })
 
     return undefined
   }

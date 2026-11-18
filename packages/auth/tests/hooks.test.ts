@@ -168,17 +168,3 @@ describe('afterSignUp', () => {
     expect((await store.users.list({ offset: 0, limit: 10 })).total).toBe(2)
   })
 })
-
-describe('onSignUp, the name before 1.105', () => {
-  test('still runs, and afterSignUp wins when both are written', async () => {
-    const heard: string[] = []
-    const { browser } = testApp({ onSignUp: () => void heard.push('old') })
-
-    await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
-
-    const both = testApp({ onSignUp: () => void heard.push('old both'), afterSignUp: () => void heard.push('new') })
-
-    await both.browser().call('password.register', { email: 'bob@example.com', password: PASSWORD })
-    expect(heard).toEqual(['old', 'new'])
-  })
-})

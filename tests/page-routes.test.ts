@@ -252,7 +252,7 @@ describe('over a listening server', () => {
 
     // kay registers a page of params as `/:p1/:p2`.
     const own = { '/:p1/:p2': { POST: new Response('posted') } }
-    const app = new Elysia({ serve: { routes: own } as never }).use(await pages({ dirs: { routes }, redirects: { '/old/*': '/new/*' }, prebuilt: false, store: { files: memoryFiles() } }))
+    const app = new Elysia({ serve: { routes: own } as never }).use(await pages({ config: { dirs: { routes }, redirects: { '/old/*': '/new/*' }, store: { files: memoryFiles() } }, prebuilt: false }))
 
     app.listen({ port: 0, hostname: 'localhost' })
 

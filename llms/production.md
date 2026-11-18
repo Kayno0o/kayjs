@@ -4,7 +4,7 @@
 
 ### Log requests as JSON for a log collector
 
-`ops: { observe: { log: { format: 'json' } } }` in kay.config.ts writes one JSON object per line, requests included, on stdout for info and on stderr for warnings and errors; `log: { sink }` hands each entry to a function instead, and `requests: false` keeps kay's messages and logs no request line (`log: 'json'` and a bare function work until 1.108, `deprecated-app-hooks` rewrites them):
+`ops: { observe: { log: { format: 'json' } } }` in kay.config.ts writes one JSON object per line, requests included, on stdout for info and on stderr for warnings and errors; `log: { sink }` hands each entry to a function instead, and `requests: false` keeps kay's messages and logs no request line (`log: 'json'` and a bare function are refused):
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -121,7 +121,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - A library logs through the same setting with `logFrom` from `kay`: `const log = logFrom('kayjs-mail')`, then `log.info(message)`, `log.warn(message)` or `log.error(message, error)`.
 - Its lines read `kayjs-mail: ` and the message, headed by the request being answered as kay's are, in a page, an action, an endpoint or a guard, though not in an API module's handler or a socket, which Elysia runs outside any call kay makes, and carry `from: 'kayjs-mail'` as JSON or in the entry a log function receives.
 - Outside a server, in the browser or a script, they go to the console as `[kayjs-mail] message`.
-- Every response carries its request's id as `X-Request-Id`, time-ordered, made by kay unless `proxy` is set and the proxy passed one on in that header; `observe: { requestIdHeader: 'x-correlation-id' }` in kay.config.ts names another header for both.
+- Every response carries its request's id as `X-Request-Id`, time-ordered, made by kay unless `proxy` is set and the proxy passed one on in that header; `ops: { observe: { requestIdHeader: 'x-correlation-id' } }` in kay.config.ts names another header for both.
 - An error logged while answering a request is headed by the request, `kay: GET /blog/hello, request AZnLe0vUe9qD0uXq9vLwZw`, then its stack, so a line from a user or a log search finds both.
 - `requestId(request)` from `kay/server` gives it, in `onError` or a route, and a server span carries it as `kay.request.id` ([Tracing](tracing.md)).
 

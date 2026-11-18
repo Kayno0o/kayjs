@@ -40,10 +40,7 @@ describe('the app-wide request hooks', () => {
     ])
     app = await pages({
       root: dir,
-      dirs: { routes: 'routes', api: 'api' },
-      prebuilt: false,
-      observe: { log: false, onError: ({ source }) => void errors.push({ source }) },
-      beforeRequest: ({ request, url, context }) => {
+      config: { dirs: { routes: 'routes', api: 'api' }, beforeRequest: ({ request, url, context }) => {
         before.push({ path: url.pathname, user: request.headers.get('x-user') ?? undefined, hasContext: context.request === request })
 
         if (request.headers.has('x-refuse'))
@@ -59,13 +56,13 @@ describe('the app-wide request hooks', () => {
           throw new Error('boom')
 
         return undefined
-      },
-      onResponse: ({ url, status, duration }) => {
+      }, onResponse: ({ url, status, duration }) => {
         after.push({ path: url.pathname, status, duration })
 
         if (url.pathname === '/api/notes')
           throw new Error('late')
-      },
+      }, onError: ({ source }) => void errors.push({ source }), ops: { observe: { log: false } } },
+      prebuilt: false,
     })
   })
 
@@ -139,15 +136,12 @@ describe('the app-wide start and stop hooks', () => {
 
     const app = await pages({
       root: dir,
-      dirs: { routes: 'routes' },
-      prebuilt: false,
-      observe: { log: false, onError: ({ source }) => void errors.push(source) },
-      onStart: ({ url }) => void told.push(`start ${url === undefined ? 'nowhere' : 'listening'}`),
-      onStop: () => {
+      config: { dirs: { routes: 'routes' }, onStop: () => {
         told.push('stop')
 
         throw new Error('stop failed')
-      },
+      }, onError: ({ source }) => void errors.push(source), onListen: ({ url }) => void told.push(`start ${url === undefined ? 'nowhere' : 'listening'}`), ops: { observe: { log: false } } },
+      prebuilt: false,
     })
 
     app.listen({ port: 0, hostname: '127.0.0.1' })
@@ -193,10 +187,7 @@ h1 Home
 `)
     app = await pages({
       root: dir,
-      dirs: { routes: 'routes' },
-      prebuilt: false,
-      observe: { log: false },
-      actions: {
+      config: { dirs: { routes: 'routes' }, actions: {
         protect: { rateLimit: { max: 2, window: '1m' } },
         beforeRun: ({ action, input, context }) => {
           events.push(`before ${action} ${JSON.stringify(input)} ${context.request === undefined ? 'no request' : 'request'}`)
@@ -206,7 +197,8 @@ h1 Home
         },
         onSuccess: ({ action, result, file }) => void events.push(`success ${action} ${JSON.stringify(result)} ${file.endsWith('index.kay')}`),
         onError: ({ action, status, message, error }) => void events.push(`error ${action} ${status} ${message} ${error === undefined ? 'fail' : 'thrown'}`),
-      },
+      }, ops: { observe: { log: false } } },
+      prebuilt: false,
     })
   })
 
@@ -281,23 +273,15 @@ describe('the request hooks in every corner', () => {
     ])
     app = await pages({
       root: dir,
-      dirs: { routes: 'routes', api: 'api' },
-      prebuilt: false,
-      base: '/shop',
-      trailingSlash: 'always',
-      redirects: { '/old': '/' },
-      observe: { log: false },
-      extensions: [{ name: 'order', server: new Elysia({ name: 'order' }).onStop(() => void order.push('extension')).get('/ext', () => 'ext') }],
-      beforeRequest: ({ request, url }) => {
+      config: { dirs: { routes: 'routes', api: 'api' }, base: '/shop', trailingSlash: 'always', redirects: { '/old': '/' }, extensions: [{ name: 'order', server: new Elysia({ name: 'order' }).onStop(() => void order.push('extension')).get('/ext', () => 'ext') }], beforeRequest: ({ request, url }) => {
         calls.push(url.pathname)
 
         if (request.headers.has('x-refuse'))
           return false
 
         return undefined
-      },
-      onResponse: ({ url, status }) => void answers.push({ path: url.pathname, status }),
-      onStop: () => void order.push('config'),
+      }, onResponse: ({ url, status }) => void answers.push({ path: url.pathname, status }), onStop: () => void order.push('config'), ops: { observe: { log: false } } },
+      prebuilt: false,
     })
   })
 
@@ -390,29 +374,22 @@ p.n {n}
     ])
     app = await pages({
       root: dir,
-      dirs: { routes: 'routes', api: 'api' },
-      prebuilt: false,
-      security: false,
-      serve: { timeout: '100ms' },
-      observe: { log: false },
-      extensions: [{ name: 'who', server: new Elysia({ name: 'who' }).derive({ as: 'global' }, ({ request }) => {
+      config: { dirs: { routes: 'routes', api: 'api' }, security: false, serve: { timeout: '100ms' }, extensions: [{ name: 'who', server: new Elysia({ name: 'who' }).derive({ as: 'global' }, ({ request }) => {
         nameUser(request, () => state.signedIn)
 
         return {}
-      }) }],
-      beforeRequest: ({ request, url }) => {
+      }) }], beforeRequest: ({ request, url }) => {
         calls.push(url.pathname)
 
         if (request.headers.has('x-limit'))
           return new Response('Slow down', { status: 429, headers: { 'retry-after': '7', 'x-reason': 'limit' } })
 
         return request.headers.has('x-refuse') ? false : undefined
-      },
-      onResponse: ({ url, status, context }) => void answers.push({ path: url.pathname, status, userId: context.userId }),
-      actions: {
-        onSuccess: async ({ action, ctx }) => void (action === 'touch' && hooked.push(await ctx.once('t', () => ++state.touched!))),
-        onError: async ({ action, ctx }) => void (action === 'touchAndCrash' && hooked.push(await ctx.once('t', () => ++state.touched!))),
-      },
+      }, onResponse: ({ url, status, context }) => void answers.push({ path: url.pathname, status, userId: context.userId }), actions: {
+        onSuccess: async ({ action, context: ctx }) => void (action === 'touch' && hooked.push(await ctx.once('t', () => ++state.touched!))),
+        onError: async ({ action, context: ctx }) => void (action === 'touchAndCrash' && hooked.push(await ctx.once('t', () => ++state.touched!))),
+      }, ops: { observe: { log: false } } },
+      prebuilt: false,
     })
   })
 
@@ -518,17 +495,12 @@ describe('the request hooks under a locale prefix and on a prerendered page', ()
 
       const app = await pages({
         root: dir,
-        dirs: { routes: 'routes' },
-        prebuilt: false,
-        security: false,
-        observe: { log: false },
-        i18n: { locales: ['en', 'fr'], default: 'en' },
-        beforeRequest: ({ request, url }) => {
+        config: { dirs: { routes: 'routes' }, security: false, i18n: { locales: ['en', 'fr'], default: 'en' }, beforeRequest: ({ request, url }) => {
           seen.push(url.pathname)
 
           return request.headers.has('x-refuse') ? false : undefined
-        },
-        onResponse: ({ url, status }) => void answered.push({ path: url.pathname, status }),
+        }, onResponse: ({ url, status }) => void answered.push({ path: url.pathname, status }), ops: { observe: { log: false } } },
+        prebuilt: false,
       })
       const get = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
 
@@ -552,11 +524,11 @@ describe('the request hooks under a locale prefix and on a prerendered page', ()
     try {
       await build.prerender({})
 
-      const app = await build.serve({ root: 'tests/fixtures/production', security: false, beforeRequest: ({ request, url }) => {
+      const app = await build.serve({ root: 'tests/fixtures/production', config: { security: false, beforeRequest: ({ request, url }) => {
         seen.push(url.pathname)
 
         return request.headers.has('x-refuse') ? false : undefined
-      }, onResponse: ({ status }) => void answered.push(status) })
+      }, onResponse: ({ status }) => void answered.push(status) } })
 
       expect((await app.handle(new Request('http://localhost/news'))).status).toBe(200)
       expect((await app.handle(new Request('http://localhost/news', { headers: { 'x-refuse': '1' } }))).status).toBe(403)

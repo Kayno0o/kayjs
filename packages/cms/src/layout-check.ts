@@ -5,9 +5,7 @@ import { configError } from 'kay/library'
 import { ROW_ACTIONS, TOOLBAR_BUTTONS } from './layout'
 
 const ACTIONS = new Set<string>(ROW_ACTIONS)
-// The `on` names of 1.104 still work until 1.108, read before the `after` names so these win.
-const HOOKS = ['onSave', 'afterSave', 'beforeSave', 'beforeUpload', 'onUpload', 'afterUpload'] as const
-const KEPT_AS = { onSave: 'afterSave', onUpload: 'afterUpload' } as const
+const HOOKS = ['afterSave', 'beforeSave', 'beforeUpload', 'afterUpload'] as const
 const SETTING_KEYS = ['uploads', 'fourEyes', ...HOOKS]
 const LAYOUT_KEYS = ['form', 'list', 'group', 'order', 'icon', 'history', ...SETTING_KEYS]
 
@@ -162,7 +160,7 @@ export function checkCollectionSettings(collections: unknown): ReadonlyMap<strin
         throw configError('cms', 'layout', `\`${where}.${hook}\` takes a function, got ${JSON.stringify(given[hook])}`)
 
       if (given[hook] !== undefined)
-        Object.assign(kept, { [hook in KEPT_AS ? KEPT_AS[hook as keyof typeof KEPT_AS] : hook]: given[hook] })
+        Object.assign(kept, { [hook]: given[hook] })
     }
 
     if (fourEyes !== undefined && typeof fourEyes !== 'boolean')

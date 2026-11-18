@@ -230,7 +230,7 @@ async function singleRefusal(entry: CmsDraftEntry, collection: CollectionInfo): 
   return entry.slug === SINGLE_SLUG ? undefined : refused(entry, wording('cms.store.singleSlug', '{collection} holds one entry, written as {slug}', { collection: collectionTitle(collection), slug: SINGLE_SLUG }))
 }
 
-// Tells the activity log and `cms({ onSave })` of a change that went through; the hook is waited for up to ten seconds, and its failure is reported, as the change is written.
+// Tells the activity log and `cms({ afterSave })` of a change that went through; the hook is waited for up to ten seconds, and its failure is reported, as the change is written.
 async function saved(event: SaveEvent): Promise<void> {
   await recordActivity(event)
   await tellOnSave(event)

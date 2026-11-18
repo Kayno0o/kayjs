@@ -10,7 +10,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   let titles: TestSite
 
   beforeAll(async () => {
-    titles = await testSite({ root: 'tests/fixtures/title', seo: { name: 'Site', titleTemplate: '%s | Site' }, browser: { path } })
+    titles = await testSite({ root: 'tests/fixtures/title', config: { seo: { name: 'Site', titleTemplate: '%s | Site' } }, browser: { path } })
   }, 60_000)
 
   afterAll(async () => titles?.close())
@@ -184,7 +184,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island setting the page title under kay dev', () => {
   it('follows what it reads, templated, and gives way to the next page', async () => {
-    const dev = await testSite({ root: 'tests/fixtures/title', seo: { name: 'Site', titleTemplate: '%s | Site' }, browser: { path }, dev: true })
+    const dev = await testSite({ root: 'tests/fixtures/title', config: { seo: { name: 'Site', titleTemplate: '%s | Site' } }, browser: { path }, dev: true })
 
     try {
       const view = await dev.open('/')

@@ -107,10 +107,10 @@ async function eager(site: TestSite): Promise<number> {
 describe('what the island spacing costs', () => {
   it('adds nothing to a site in another language and a few bytes to a French one', async () => {
     // Each site builds into the one output the sites of a process share, so it is measured before the next is made.
-    const sized = async (options: Parameters<typeof testSite>[0]) => eager(await made({ minify: true, ...options }))
-    const plain = await sized({ lang: 'en' })
-    const silent = await sized({ lang: 'fr', client: { typography: false } })
-    const spaced = await sized({ lang: 'fr' })
+    const sized = async (options: Parameters<typeof testSite>[0]) => eager(await made({ ...options, config: { minify: true, ...options?.config } }))
+    const plain = await sized({ config: { lang: 'en' } })
+    const silent = await sized({ config: { lang: 'fr', client: { typography: false } } })
+    const spaced = await sized({ config: { lang: 'fr' } })
 
     expect(Math.abs(silent - plain)).toBeLessThanOrEqual(12)
     expect(spaced - plain, `${spaced} against ${plain} bytes`).toBeGreaterThan(100)
@@ -120,7 +120,7 @@ describe('what the island spacing costs', () => {
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a French page in a browser', () => {
   it('keeps the server\'s spaces when the island hydrates, in a block\'s own text too, and writes them on every update', async () => {
-    const { page } = await open({ lang: 'fr' })
+    const { page } = await open({ config: { lang: 'fr' } })
     const start = await shown(page)
 
     expect(start).toEqual({ total: 'Total~: 0~!', label: 'Début', mixed: 'Prix~: Début~?', code: 'Début', pre: 'Ligne : Début', branch: 'Reste~: |0|~!' })
@@ -132,7 +132,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a French p
   }, 60_000)
 
   it('writes them in a block shown after load, and leaves what was typed and what is no punctuation', async () => {
-    const { page } = await open({ lang: 'fr' })
+    const { page } = await open({ config: { lang: 'fr' } })
 
     await page.click('button.toggle')
     await page.click('button.toggle')
@@ -146,7 +146,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a French p
   }, 60_000)
 
   it('writes them in the static text of an element built in the browser, a block shown later or a row, and not inside code', async () => {
-    const { page } = await open({ lang: 'fr' })
+    const { page } = await open({ config: { lang: 'fr' } })
     const late = async () => page.evaluate(() => [...document.querySelectorAll('.late > *')].map(element => `${element.className}=${element.textContent.replaceAll('\u00A0', '~')}`))
 
     expect(await late()).toEqual(['row=Ligne~: un~?'])
@@ -159,7 +159,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a French p
   }, 60_000)
 
   it('shows a value that is markup as text, spaced', async () => {
-    const { page } = await open({ lang: 'fr-CA' })
+    const { page } = await open({ config: { lang: 'fr-CA' } })
 
     await press(page, 'hostile', '.counter .label')
 
@@ -168,12 +168,12 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a French p
   }, 60_000)
 
   it('ships that code to a French site only', async () => {
-    const french = await open({ lang: 'fr' })
+    const french = await open({ config: { lang: 'fr' } })
 
     expect(await ships(french.page)).toBe(true)
 
     for (const options of [{ lang: 'en' }, {}, { lang: 'fr', client: { typography: false } }, { i18n: { locales: ['en', 'de'], default: 'en', messages } }]) {
-      const { page } = await open(options)
+      const { page } = await open({ config: options })
 
       expect(await ships(page), JSON.stringify(options)).toBe(false)
       await press(page, 'plus', '.counter .label')
@@ -183,8 +183,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a French p
 
   it('follows the locale of the page on a site with several', async () => {
     const i18n = { locales: ['en', 'fr'], default: 'en', messages }
-    const english = await open({ i18n }, '/')
-    const french = await open({ i18n }, '/fr')
+    const english = await open({ config: { i18n } }, '/')
+    const french = await open({ config: { i18n } }, '/fr')
 
     expect(await ships(english.page)).toBe(true)
     expect((await shown(english.page)).total).toBe('Total : 0 !')

@@ -147,7 +147,7 @@ describe('proof-of-work', () => {
   })
 
   it('passes the challenge from kay/test\'s submit and call, unless the test sends its own header', async () => {
-    const site = await testSite({ root: ROOT, security: false })
+    const site = await testSite({ root: ROOT, config: { security: false } })
     const { solve } = await import(PAGE) as { solve: Action<{ message: string }, number> }
 
     expect((await site.submit(solve, { message: 'hello' }, { from: '/work' })).html).toContain('<p class="solved">Solved 5</p>')

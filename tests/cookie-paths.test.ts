@@ -10,11 +10,11 @@ import { pages } from './shared-pages'
 
 const ROOT = 'tests/fixtures/cookie-paths'
 const I18N = 'tests/fixtures/i18n'
-const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') }
+const i18n = { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') }
 const sites = {
   root: await testSite({ root: ROOT, islands: false }),
-  mounted: await testSite({ root: ROOT, islands: false, base: '/blog' }),
-  strict: await testSite({ root: ROOT, islands: false, base: '/blog', trailingSlash: 'always' }),
+  mounted: await testSite({ root: ROOT, islands: false, config: { base: '/blog' } }),
+  strict: await testSite({ root: ROOT, islands: false, config: { base: '/blog', trailingSlash: 'always' } }),
 }
 const { save } = await import(join(import.meta.dir, 'fixtures/cookie-paths/src/routes/index.kay')) as { save: Action<Record<never, never>, string> }
 
@@ -71,7 +71,7 @@ describe('the flash cookie against a request for another page', () => {
 
 describe('the flash cookie under locales and from an older kay', () => {
   it('is left by a request for another page of the locale, and shown on the locale page it goes back to', async () => {
-    const app = new Elysia().use(await pages({ root: ROOT, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } }))
+    const app = new Elysia().use(await pages({ root: ROOT, prebuilt: false, config: { security: false, i18n: { ...i18n, mode: 'always' } } }))
     const post = await app.handle(new Request(`http://localhost${save.url}`, { method: 'POST', headers: { origin: 'http://localhost', referer: 'http://localhost/fr' }, body: new FormData() }))
     const header = post.headers.getSetCookie().find(line => line.startsWith('kay_flash='))!
     const cookie = header.slice(0, header.indexOf(';'))
@@ -96,7 +96,7 @@ describe('the flash cookie under locales and from an older kay', () => {
 
 describe('the flash cookie on a rewritten page', () => {
   it('is read by the page the browser asked for, whatever path the rewrite serves it from', async () => {
-    const app = new Elysia().use(await pages({ root: ROOT, prebuilt: false, security: false, rewrite: url => url.pathname === '/shop' ? '/' : undefined }))
+    const app = new Elysia().use(await pages({ root: ROOT, prebuilt: false, config: { security: false, rewrite: url => url.pathname === '/shop' ? '/' : undefined } }))
     const post = await app.handle(new Request(`http://localhost${save.url}`, { method: 'POST', headers: { origin: 'http://localhost', referer: 'http://localhost/shop' }, body: new FormData() }))
     const header = post.headers.getSetCookie()[0]!
     const cookie = header.slice(0, header.indexOf(';'))
@@ -112,15 +112,15 @@ describe('the locale cookie', () => {
   const followed = { 'sec-fetch-site': 'same-origin' }
 
   it('is named kay_locale like the others, at the root or at the base', async () => {
-    const root = new Elysia().use(await pages({ root: I18N, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } }))
-    const mounted = new Elysia().use(await pages({ root: I18N, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true }, base: '/docs', trailingSlash: 'always' }))
+    const root = new Elysia().use(await pages({ root: I18N, prebuilt: false, config: { security: false, i18n: { ...i18n, mode: 'always' } } }))
+    const mounted = new Elysia().use(await pages({ root: I18N, prebuilt: false, config: { security: false, i18n: { ...i18n, mode: 'always' }, base: '/docs', trailingSlash: 'always' } }))
 
     expect((await get(root, '/fr/about', followed)).headers.get('set-cookie')).toBe('kay_locale=fr; Path=/; Max-Age=31536000; SameSite=Lax')
     expect((await get(mounted, '/fr/about/', followed)).headers.get('set-cookie')).toBe('kay_locale=fr; Path=/docs; Max-Age=31536000; SameSite=Lax')
   })
 
   it('reads the name an older kay set, the new one first, and sets no cookie for the locale it holds', async () => {
-    const served = new Elysia().use(await pages({ root: I18N, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } }))
+    const served = new Elysia().use(await pages({ root: I18N, prebuilt: false, config: { security: false, i18n: { ...i18n, mode: 'always' } } }))
     const redirect = async (cookie: string) => (await get(served, '/about', { 'accept-language': 'en', cookie })).headers.get('location')
 
     expect(await redirect('kay-locale=fr')).toBe('/fr/about')
@@ -171,8 +171,8 @@ describe('the cookies over https', () => {
   })
 
   it('names the locale cookie by the same rule, and reads either prefixed name over https and the plain one over http', async () => {
-    const root = new Elysia().use(await pages({ root: I18N, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } }))
-    const mounted = new Elysia().use(await pages({ root: I18N, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true }, base: '/docs', trailingSlash: 'always' }))
+    const root = new Elysia().use(await pages({ root: I18N, prebuilt: false, config: { security: false, i18n: { ...i18n, mode: 'always' } } }))
+    const mounted = new Elysia().use(await pages({ root: I18N, prebuilt: false, config: { security: false, i18n: { ...i18n, mode: 'always' }, base: '/docs', trailingSlash: 'always' } }))
     const get = async (served: Elysia, path: string, headers: Record<string, string>) => served.handle(new Request(`http://localhost${path}`, { headers: { ...HTTPS, 'sec-fetch-site': 'same-origin', ...headers } }))
 
     expect((await get(root, '/fr/about', {})).headers.get('set-cookie')).toBe('__Host-kay_locale=fr; Path=/; Max-Age=31536000; SameSite=Lax; Secure')

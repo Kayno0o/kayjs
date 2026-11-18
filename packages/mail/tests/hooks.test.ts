@@ -359,30 +359,3 @@ describe('a contact form', () => {
     expect(await app.drain()).toBe(0)
   })
 })
-
-describe('onSend and onSuppress, the names before 1.105', () => {
-  it('still tell, and the after name wins when both are written', async () => {
-    const told: string[] = []
-    const old = mailer({ from: 'a@example.com', onSend: () => void told.push('old'), onSuppress: () => void told.push('old suppress') })
-    const both = mailer({ from: 'a@example.com', onSend: () => void told.push('old both'), afterSend: () => void told.push('new') })
-
-    await old.send({ to: 'a@example.com', subject: 's', text: 'x' })
-    await old.suppress('b@example.com')
-    await both.send({ to: 'a@example.com', subject: 's', text: 'x' })
-    expect(told).toEqual(['old', 'old suppress', 'new'])
-  })
-
-  it('a list tells its on hooks of before 1.105', async () => {
-    const email = fresh()
-    const file = join(await scratchDir('hooks-'), 'list.sqlite')
-    const told: string[] = []
-    const list = mailer({ from: 'a@example.com' }).list('old', { file, onUnsubscribe: ({ email: who }) => void told.push(who) })
-    const lists = sqliteLists(file)
-
-    lists.confirm('old', lists.ask('old', email, 'old-1', 'en', 1000).id, 2000)
-    lists.close()
-
-    expect(await list.unsubscribe(email)).toBe(true)
-    expect(told).toEqual([email])
-  })
-})

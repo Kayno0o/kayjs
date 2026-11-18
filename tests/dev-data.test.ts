@@ -23,7 +23,7 @@ async function app(options: { dev: boolean, base?: string } = { dev: true }, pre
   await Bun.write(join(dir, 'routes/index.kay'), 'h1 Home\n')
   prepare?.(dir)
 
-  return pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, ...options })
+  return pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false }, prebuilt: false, ...options })
 }
 
 type App = Awaited<ReturnType<typeof app>>

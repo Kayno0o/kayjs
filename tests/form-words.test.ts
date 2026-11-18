@@ -33,7 +33,7 @@ describe('a field error written as a function', () => {
   })
 
   it('refuses the post in the page\'s language, and a function giving no text leaves Elysia\'s wording', async () => {
-    const site = await testSite({ dirs: { routes: `${FIXTURE}/src/routes` }, i18n })
+    const site = await testSite({ config: { dirs: { routes: `${FIXTURE}/src/routes` }, i18n } })
     const { rename } = await import(`${import.meta.dir}/fixtures/form-words/src/routes/index.kay`) as { rename: Parameters<typeof site.submit>[0] }
     const input = { name: 'A', nickname: 'B', note: 'C' }
     const english = await site.submit(rename, input, { from: '/' })
@@ -47,7 +47,7 @@ describe('a field error written as a function', () => {
   })
 
   it('words a file of the wrong type and a refused union branch in the page\'s language', async () => {
-    const site = await testSite({ dirs: { routes: `${FIXTURE}/src/routes` }, i18n })
+    const site = await testSite({ config: { dirs: { routes: `${FIXTURE}/src/routes` }, i18n } })
     const { attach } = await import(`${import.meta.dir}/fixtures/form-words/src/routes/index.kay`) as { attach: Parameters<typeof site.submit>[0] }
     const input = { photo: new File(['text'], 'a.png', { type: 'image/png' }), contact: 'nope' }
     const french = await site.submit(attach, input, { from: '/fr' })

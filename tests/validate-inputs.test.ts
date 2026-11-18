@@ -6,7 +6,7 @@ import { isRefusal, validate } from '../src/server/validate'
 import { pages } from './shared-pages'
 
 const ORIGIN = 'http://localhost'
-const app = await (async () => new Elysia().use(await pages({ root: 'tests/fixtures/validate-inputs', prebuilt: false, security: false, guards: { default: 'open' } })))()
+const app = await (async () => new Elysia().use(await pages({ root: 'tests/fixtures/validate-inputs', prebuilt: false, config: { security: false, guards: { default: 'open' } } })))()
 
 const get = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`${ORIGIN}${path}`, { headers }))
 

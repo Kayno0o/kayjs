@@ -5,7 +5,7 @@ import { pages } from './shared-pages'
 
 const ORIGIN = 'http://localhost'
 const ACTION = '/_kay/action/src/routes/index.kay'
-const app = await (async () => new Elysia().use(await pages({ root: 'tests/fixtures/standard-schema', prebuilt: false, security: false, guards: { default: 'open' } })))()
+const app = await (async () => new Elysia().use(await pages({ root: 'tests/fixtures/standard-schema', prebuilt: false, config: { security: false, guards: { default: 'open' } } })))()
 
 const send = async (path: string, body: unknown, init: RequestInit = {}) => app.handle(new Request(`${ORIGIN}${path}`, { method: 'POST', headers: { 'origin': ORIGIN, 'referer': `${ORIGIN}/`, 'content-type': 'application/json' }, body: JSON.stringify(body), ...init }))
 

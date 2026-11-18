@@ -1,1 +1,1 @@
-export { aiTables, conversationTable, createAiTables, createConversationTable, pgAi, pgConversations } from './conversation-pg'
+export { aiTables, createAiTables, pgAi } from './conversation-pg'

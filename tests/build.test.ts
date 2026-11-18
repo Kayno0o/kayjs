@@ -893,7 +893,7 @@ describe('kay.config.ts', () => {
 
   it('keeps the config\'s value for an option pages() is given as undefined', async () => {
     // A process serves one project, so the server runs in its own.
-    const serve = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ root: import.meta.dir, dev: true, dirs: { routes: undefined } }))\nconst response = await app.handle(new Request(\'http://localhost/\'))\n\nconsole.log(response.status, (await response.text()).includes(\'Home\'))\nprocess.exit(0)\n'
+    const serve = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ root: import.meta.dir, dev: true, config: { dirs: { routes: undefined } } }))\nconst response = await app.handle(new Request(\'http://localhost/\'))\n\nconsole.log(response.status, (await response.text()).includes(\'Home\'))\nprocess.exit(0)\n'
     const root = await scratchProject({ 'kay.config.ts': 'export default { dirs: { routes: \'pages\' } }\n', 'pages/index.kay': 'p Home\n', 'serve.ts': serve })
 
     const child = Bun.spawn([process.execPath, 'serve.ts'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
@@ -2091,7 +2091,7 @@ import { pages } from 'kay/server'
 
 const logged: string[] = []
 const reported: string[] = []
-const app = new Elysia().use(await pages({ security: false, observe: { log: entry => entry.type === 'message' && entry.error?.stack !== undefined && logged.push(entry.error.stack), onError: ({ error }) => reported.push((error as Error).stack ?? '') } }))
+const app = new Elysia().use(await pages({ config: { security: false, ops: { observe: { log: { sink: entry => entry.type === 'message' && entry.error?.stack !== undefined && logged.push(entry.error.stack) }, onError: ({ error }) => reported.push((error as Error).stack ?? '') } } } }))
 const status = (await app.handle(new Request('http://localhost/boom', { headers: { 'x-boom': '1' } }))).status
 const island = await app.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', 'origin': 'http://localhost' }, body: JSON.stringify({ name: 'TypeError', message: 'x', url: '/', stack: \`TypeError: x\\n\${process.env.FRAME}\\n    at https://h/_kay/gone.js:1:2\\n    at fn (https://h/_kay/..%2Fcounter.js:1:1)\` }) }))
 
@@ -2964,7 +2964,7 @@ describe('a config reading files beside it', () => {
         'kay.config.ts': config,
         'topics/alpha.ts': 'export default 1\n',
         'src/routes/index.kay': 'p Home\n',
-        'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ security: false }))\nconst moved = await app.handle(new Request(\'http://localhost/alpha\'))\n\nconsole.log(JSON.stringify({ status: moved.status, location: moved.headers.get(\'location\') }))\nprocess.exit(0)\n',
+        'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ config: { security: false } }))\nconst moved = await app.handle(new Request(\'http://localhost/alpha\'))\n\nconsole.log(JSON.stringify({ status: moved.status, location: moved.headers.get(\'location\') }))\nprocess.exit(0)\n',
       })
       const elsewhere = await scratchDir('kay-elsewhere-')
       const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', project, '--no-check', '--compile', join(project, 'server')], { cwd: elsewhere, stdout: 'pipe', stderr: 'pipe' }))
@@ -2984,10 +2984,10 @@ describe('a compiled server\'s images', () => {
   it('encodes and decodes AVIF at run time with the coders the executable carries', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { assets: { favicon: false }, images: { dirs: { \'/uploads/\': \'uploads\' } } }\n',
+      'kay.config.ts': 'export default { assets: { favicon: false, images: { dirs: { \'/uploads/\': \'uploads\' } } } }\n',
       'src/routes/index.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero, { sizes: \'100vw\' })} alt="Hero")\n',
       // 48 pixels wide is no width the build writes, so the server encodes it on the first request.
-      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\nconst src = /src=(%2F_kay%2Fassets%2F[^&]+)&amp;/.exec(page)![1]\nconst response = await app.handle(new Request(`http://localhost/_kay/images?src=${src}&w=48`, { headers: { accept: \'image/avif\' } }))\nconst bytes = new Uint8Array(await response.arrayBuffer())\nawait Bun.write(\'uploads/a.avif\', bytes)\nconst decoded = await app.handle(new Request(\'http://localhost/_kay/images?src=/uploads/a.avif&w=32\'))\n\nconsole.log(JSON.stringify({ status: response.status, type: response.headers.get(\'content-type\'), brand: new TextDecoder().decode(bytes.subarray(8, 12)), decoded: decoded.status }))\nprocess.exit(0)\n',
+      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ config: { security: false } }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\nconst src = /src=(%2F_kay%2Fassets%2F[^&]+)&amp;/.exec(page)![1]\nconst response = await app.handle(new Request(`http://localhost/_kay/images?src=${src}&w=48`, { headers: { accept: \'image/avif\' } }))\nconst bytes = new Uint8Array(await response.arrayBuffer())\nawait Bun.write(\'uploads/a.avif\', bytes)\nconst decoded = await app.handle(new Request(\'http://localhost/_kay/images?src=/uploads/a.avif&w=32\'))\n\nconsole.log(JSON.stringify({ status: response.status, type: response.headers.get(\'content-type\'), brand: new TextDecoder().decode(bytes.subarray(8, 12)), decoded: decoded.status }))\nprocess.exit(0)\n',
     })
 
     await Bun.write(join(root, 'src/hero.png'), encodePng(new Uint8Array(96 * 64 * 4).map((_, at) => at % 4 === 3 ? 255 : (at * 37) % 251), 96, 64))
@@ -3025,7 +3025,7 @@ describe('a stylesheet imported as text', () => {
       'src/routes/a.kay': '--- server\nimport other from \'../other.css\' with { type: \'text\' }\n---\np.other {other.length}\n',
       'src/routes/z.kay': '---\nimport \'../other.css\'\n---\np Z\n',
       'src/routes/index.kay': '---\nimport \'../app.css\'\nimport \'../shared.css\'\nimport Badge from \'../badge.kay\'\n---\n--- server\nimport theme from \'../theme.css\' with { type: \'text\' }\n\nconst size: number = theme.length\n---\np.size {size}\nBadge\n',
-      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\nimport shared from \'./shared.css\' with { type: \'text\' }\nimport theme from \'./theme.css\' with { type: \'text\' }\n\nconst { default: later } = await import(\'./later.css\', { with: { type: \'text\' } })\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\nconst other = await (await app.handle(new Request(\'http://localhost/a\'))).text()\n\nconsole.log(JSON.stringify({ theme, later, shared, page: /<p class="size">(\\d+)<\\/p>/.exec(page)?.[1], other: /<p class="other">(\\d+)<\\/p>/.exec(other)?.[1] }))\nprocess.exit(0)\n',
+      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\nimport shared from \'./shared.css\' with { type: \'text\' }\nimport theme from \'./theme.css\' with { type: \'text\' }\n\nconst { default: later } = await import(\'./later.css\', { with: { type: \'text\' } })\nconst app = new Elysia().use(await pages({ config: { security: false } }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\nconst other = await (await app.handle(new Request(\'http://localhost/a\'))).text()\n\nconsole.log(JSON.stringify({ theme, later, shared, page: /<p class="size">(\\d+)<\\/p>/.exec(page)?.[1], other: /<p class="other">(\\d+)<\\/p>/.exec(other)?.[1] }))\nprocess.exit(0)\n',
     })
     const theme = await Bun.file(join(root, 'src/theme.css')).text()
     const read = async (command: string[]) => {
@@ -3069,7 +3069,7 @@ describe('a compiled server', () => {
     const root = await scratchProject({
       'package.json': JSON.stringify({ name: 'notices', private: true, dependencies: { elysia: '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
       'tsconfig.json': tsconfig,
-      'kay.config.ts': `export default { favicon: 'src/favicon.svg', images: { card: { logo: 'src/favicon.svg' } }, guards: { default: 'closed' }, client: { inlineStyles: false }, preview: { secret: '${secret}' }, fonts: [{ fontsource: '@fontsource/inter', weights: [700] }], extensions: [{ name: 'lib', routes: { dir: 'lib/routes', prefix: '/lib' }, editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
+      'kay.config.ts': `export default { assets: { favicon: 'src/favicon.svg', images: { card: { logo: 'src/favicon.svg' } }, fonts: [{ fontsource: '@fontsource/inter', weights: [700] }] }, guards: { default: 'closed' }, client: { inlineStyles: false }, preview: { secret: '${secret}' }, extensions: [{ name: 'lib', routes: { dir: 'lib/routes', prefix: '/lib' }, editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
       'src/favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#c00"/></svg>',
       'lib/editor.css': '.edited { outline: 1px dashed teal }\n',
       'lib/editor.kay': '---\nimport { signal } from \'kay\'\nimport \'./editor.css\'\n\nconst clicks = signal(0)\n---\nbutton.edited(onClick={() => clicks.set(n => n + 1)}) Edit {clicks()}\n',
@@ -3090,7 +3090,7 @@ describe('a compiled server', () => {
 import { Elysia } from 'elysia'
 import { pages, previewUrl } from 'kay/server'
 
-const app = new Elysia().use(await pages({ security: false }))
+const app = new Elysia().use(await pages({ config: { security: false } }))
 const get = async (path: string, cookie = '') => app.handle(new Request(\`http://localhost\${path}\`, { headers: { cookie } }))
 const post = async (file: string, name: string, headers: Record<string, string> = {}) => (await app.handle(new Request(\`http://localhost/_kay/action/src/routes/\${file}/\${name}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/', ...headers }, body: '[{}]' }))).status
 const cookie = (await get(previewUrl('/', { edit: true }))).headers.getSetCookie()[0]!.split(';')[0]!

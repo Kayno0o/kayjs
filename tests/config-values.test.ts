@@ -70,7 +70,7 @@ describe('config values checked once at load', () => {
   })
 
   it('leaves a key set to undefined, the shapes the types take and the keys another check owns alone', () => {
-    expect(invalidConfigValues({ lang: undefined, offline: true, health: false, security: false, robots: false, client: { prefetch: false }, assets: { favicon: false }, secret: ['a', 'b'], proxy: true, metrics: true, limits: { body: 1024 }, serve: { timeout: false, shutdownTimeout: '5s' }, observe: { log: false }, checks: [], env: { compose: 'x' }, cors: { origins: '*' } })).toEqual([])
+    expect(invalidConfigValues({ lang: undefined, security: false, robots: false, client: { offline: true, prefetch: false }, assets: { favicon: false }, secret: ['a', 'b'], proxy: true, ops: { health: false, metrics: true, observe: { log: false } }, limits: { body: 1024 }, serve: { timeout: false, shutdownTimeout: '5s' }, checks: [], env: { compose: 'x' }, cors: { origins: '*' } })).toEqual([])
   })
 
   it('checks the keys of the bags 1.88 grouped', () => {

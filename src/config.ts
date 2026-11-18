@@ -65,8 +65,8 @@ export interface KayConfig extends AppHooks {
   entry?: string | undefined
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
   security?: SecurityConfig | boolean | undefined
-  // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Left out in production, one proxy is in front for a request from a private address that carries `X-Forwarded-For`; `false` says none is, and the address the server was reached from is the client. Outside production, left out or `false`, the address the server was reached from is the client.
-  proxy?: ProxyConfig | number | boolean | undefined
+  // The proxies in front of the server, `true` for one and `{ hops: 2 }` for that many, which the client's address that rate limits count is read through. Left out in production, one proxy is in front for a request from a private address that carries `X-Forwarded-For`; `false` says none is, and the address the server was reached from is the client. Outside production, left out or `false`, the address the server was reached from is the client.
+  proxy?: ProxyConfig | boolean | undefined
   // What a route no guard covers comes to. Left out, a site with a guard of its own answers 403 on each page, endpoint and API module no `_guard.ts` covers unless it sets `guards: false`, in its `page` or its `api()` options, and a site with no guard stays open. `default: 'closed'` asks it of every site and of the actions of layouts and `_actions.kay` files too, `default: 'open'` turns it off; `kay check` reports each such route. A library's routes keep the guards it gives them, and a feature that lists or changes private data (`jobs`, `vitals()`, `images.resolve`, `cms()`) is closed with no `guards` whatever the default, opened only by its own `guards: false`.
   guards?: GuardsConfig | undefined
   // Lets other sites' pages call every API module's routes from the browser, as `api({ cors })` does for one, an endpoint file setting its own in `page.cors`: `cors: { origins: ['https://app.example.com'], credentials: true }`. A module setting its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
@@ -110,8 +110,6 @@ export interface KayConfig extends AppHooks {
   store?: AppStore | undefined
   // The files `kay env` and `kay check` compare the declared variables with: a compose file or several, and the example env file (`{ compose: 'compose.prod.yaml', example: '.env.example' }`). Each variable production needs must be set by a compose service and listed in the example, and each one the example lists must be declared. `false` turns the comparison off, the default one against the root compose files and `.env.example` included.
   envFiles?: { compose?: string | string[] | undefined, example?: string | undefined } | boolean | undefined
-  /** @deprecated Written `envFiles`; `deprecated-env-files` rewrites it. Removed in 1.108. */
-  env?: { compose?: string | string[] | undefined, example?: string | undefined } | boolean | undefined
   // The app's own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report({ level, message, file, line })`, which join kay's in every format and count toward the exit code. A check that throws, or does not finish within 30 seconds, is reported as an error and the others still run.
   checks?: ProjectCheck[] | undefined
   // What libraries add to the app, each listed once: `extensions: [auth()]`.
@@ -308,11 +306,11 @@ export interface EndpointsConfig {
   api?: string | undefined
   // Where the OpenAPI document is served, `/api/openapi.json` under the API prefix by default; its reference page is set in `openapi.reference`.
   openapi?: string | undefined
-  // Where the MCP endpoint is served, `/_kay/mcp` by default. `/mcp`, where it was served before 1.105, is answered in place until 2.0 when this is not set.
+  // Where the MCP endpoint is served, `/_kay/mcp` by default.
   mcp?: string | undefined
   // Where the health check is served, `/_kay/health` by default.
   health?: string | undefined
-  // Where the metrics are served, `/_kay/metrics` by default. `/metrics`, where they were served before 1.105, answers as well until 1.108 when this is not set.
+  // Where the metrics are served, `/_kay/metrics` by default.
   metrics?: string | undefined
   // Where the page of the queues is served, `/_kay/jobs` by default.
   jobs?: string | undefined
@@ -541,24 +539,6 @@ export interface ImageLimits {
   queue?: number | false | undefined
 }
 
-// `images` as an app written it before 1.105 may still: the flat keys, each of which works until 1.108.
-export interface DeprecatedImages {
-  /** @deprecated Written `remote: { maxSize }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
-  remoteMaxSize?: ByteSize | undefined
-  /** @deprecated Written `remote: { timeout }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
-  remoteTimeout?: Duration | undefined
-  /** @deprecated Written `limits: { variants }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
-  maxVariants?: number | false | undefined
-  /** @deprecated Written `limits: { queue }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
-  queue?: number | false | undefined
-  /** @deprecated Written `formats: { quality }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
-  quality?: number | undefined
-  /** @deprecated Written `formats: { webp }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
-  webp?: { quality?: number | undefined } | undefined
-  /** @deprecated Written `formats: { avif }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
-  avif?: boolean | { quality?: number } | undefined
-}
-
 export interface CardConfig {
   // The face the title is drawn in, among `fonts`: the first family listed, at the weight nearest 700 it has, by default. A variable face draws at its default weight.
   font?: { family: string, weight?: number } | undefined
@@ -631,7 +611,7 @@ export interface KayExtension<Server extends PluginInput = AnyElysia> {
   appFiles?: Record<string, string> | undefined
   // The server plugin named by the module that exports it, `{ path: './src/auth', export: 'auth' }` for `export const auth` (`default` by default): imported only as `pages()` builds the app, and baked into an executable `kay build --compile` makes, which a path built at run time inside a library could not be. The export is the plugin, a function building it, or an object carrying it as `plugin`, as a library's `authCore` result does. `kay check` types the locals off the module itself, and off the extension's `Server` argument when it has one; used beside `server`, the module wins. A path is relative to the project root. `prepare` runs with the export before the plugin is taken from it, for a library to hand the app's module what the extension was given; a throw stops the server.
   serverModule?: { path: string, export?: string | undefined, prepare?: ((exported: unknown) => void | Promise<void>) | undefined } | undefined
-  // Config laid under the app's `kay.config.ts`: objects merged key by key, arrays joined with the extension's items first, any other value the app sets winning. Bun plugins the library's files need go in its `plugins`. It takes what `kay.config.ts` does, the keys of before 1.105 included (`fonts`, `favicon`, `observe`...), which work until 1.108 under `deprecated-config-groups`.
+  // Config laid under the app's `kay.config.ts`: objects merged key by key, arrays joined with the extension's items first, any other value the app sets winning. Bun plugins the library's files need go in its `plugins`. It takes what `kay.config.ts` does.
   config?: Omit<ConfigInput, 'extensions'> | undefined
   // A module whose default export is `defineUi({ ... })`, written as `src/ui.ts` is (string and object literals only), absolute or relative to the project root: the parts and variants it sets for components, the app's own or a library's, reach every app listing the extension, under the app's own `src/ui.ts`. A part or a variant value the app sets replaces the extension's, and a later extension's replaces an earlier one's. Names and relative specifiers resolve from the app's `src/`.
   ui?: string | undefined
@@ -685,98 +665,20 @@ export type ConfigCors = Omit<CorsOptions, 'origins' | 'credentials'> & ({ origi
 
 type Over<Bag, Given> = Omit<Bag, keyof Given> & Given
 
-// What `kay.config.ts` may write: `KayConfig` with each list that may come from a CMS or a database loadable, and the keys of before 1.105 `kay check --fix` rewrites. Kay turns it into a `KayConfig` as it loads.
-export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'mcp' | 'robots' | 'redirects' | 'i18n' | 'assets' | 'ops' | 'serve' | 'openapi'> {
-  /** @deprecated Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */
-  onStart?: AppHooks['onListen']
-  /** @deprecated Written `client.offline`; `deprecated-client-keys` rewrites it. Removed in 1.108. */
-  offline?: ClientConfig['offline']
-  /** @deprecated Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108. */
-  search?: ClientConfig['search']
-  /** @deprecated Written `client.links`; `deprecated-client-keys` rewrites it. Removed in 1.108. */
-  links?: ClientConfig['links']
-  /** @deprecated Written `assets.images`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  images?: ImagesInput | undefined
-  /** @deprecated Written `assets.fonts`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  fonts?: AssetsConfig['fonts']
-  /** @deprecated Written `assets.favicon`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  favicon?: AssetsConfig['favicon']
-  /** @deprecated Written `assets.manifest`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  manifest?: AssetsConfig['manifest']
-  /** @deprecated Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  publicCache?: AssetsConfig['publicCache']
-  /** @deprecated Written `ops.observe`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  observe?: ObserveInput | undefined
-  /** @deprecated Written `ops.health`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  health?: OpsInput['health']
-  /** @deprecated Written `ops.metrics`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  metrics?: OpsInput['metrics']
-  /** @deprecated Written `ops.jobs`; `deprecated-config-groups` rewrites it. Removed in 1.108. */
-  jobs?: OpsInput['jobs']
+// What `kay.config.ts` may write: `KayConfig` with each list that may come from a CMS or a database loadable. Kay turns it into a `KayConfig` as it loads.
+export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'robots' | 'redirects' | 'i18n' | 'assets'> {
   assets?: Over<AssetsConfig, { images?: ImagesInput | undefined }> | undefined
-  ops?: OpsInput | undefined
-  serve?: (ServeConfig & DeprecatedServe) | undefined
-  openapi?: boolean | (OpenApiConfig & DeprecatedOpenApi) | undefined
   cors?: ConfigCors | undefined
   security?: boolean | Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined }> | undefined
-  proxy?: boolean | number | Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined, key?: ProxyKey | string | undefined }> | undefined
-  mcp?: boolean | (McpConfig & DeprecatedMcp) | undefined
+  proxy?: boolean | Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined }> | undefined
   robots?: boolean | Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined, allow?: Loadable<string[]> | undefined }> | undefined
   redirects?: Loadable<Redirects> | undefined
   i18n?: I18nInput | undefined
 }
 
-// `serve` as an app written it before 1.105 may still: `apiPrefix` is `endpoints.api`, which works until 1.108.
-export interface DeprecatedServe {
-  /** @deprecated Written `endpoints.api`; `deprecated-route-keys` rewrites it. Removed in 1.108. */
-  apiPrefix?: string | undefined
-}
+export type I18nInput = Over<I18nConfig, { default?: string | undefined, paths?: Loadable<Record<string, Record<string, string>>> | undefined }>
 
-// `openapi` as an app written it before 1.105 may still: `path` is `endpoints.openapi` and `referencePath` is `reference: { path }`, which work until 1.108.
-export interface DeprecatedOpenApi {
-  /** @deprecated Written `endpoints.openapi`; `deprecated-route-keys` rewrites it. Removed in 1.108. */
-  path?: string | undefined
-  /** @deprecated Written `reference: { path }`; `deprecated-route-keys` rewrites it. Removed in 1.108. */
-  referencePath?: string | undefined
-}
-
-// The `path` the bags of `ops` and `mcp` had before 1.105, which is a key of `endpoints` since and works until 1.108.
-export interface DeprecatedPath {
-  /** @deprecated Written `endpoints` and the feature's name; `deprecated-route-keys` rewrites it. Removed in 1.108. */
-  path?: string | undefined
-}
-
-export type OpsInput = Over<OpsConfig, { observe?: ObserveInput | undefined, health?: boolean | (HealthConfig & DeprecatedPath) | undefined, metrics?: boolean | (MetricsConfig & DeprecatedPath) | undefined, jobs?: (JobsConfig & DeprecatedPath) | undefined }>
-
-// `mcp` as an app written it before 1.105 may still: `key` is `token`, which works until 1.108.
-export interface DeprecatedMcp {
-  /** @deprecated Written `endpoints.mcp`; `deprecated-route-keys` rewrites it. Removed in 1.108. */
-  path?: string | undefined
-  /** @deprecated Written `token`; `deprecated-secret-keys` rewrites it. Removed in 1.108. */
-  key?: boolean | string | { file: string } | undefined
-}
-
-// `i18n` as an app written it before 1.105 may still: `defaultLocale`, `prefixDefault` and `domains`, each of which works until 1.108.
-export interface DeprecatedI18n {
-  /** @deprecated Written `default`; `deprecated-i18n-keys` rewrites it. Removed in 1.108. */
-  defaultLocale?: string | undefined
-  /** @deprecated Written `mode: 'always'`; `deprecated-i18n-keys` rewrites it. Removed in 1.108. */
-  prefixDefault?: boolean | undefined
-  /** @deprecated Written `mode: { domains }`; `deprecated-i18n-keys` rewrites it. Removed in 1.108. */
-  domains?: Record<string, string> | undefined
-}
-
-export type I18nInput = Over<I18nConfig, { default?: string | undefined, paths?: Loadable<Record<string, Record<string, string>>> | undefined }> & DeprecatedI18n
-
-// `observe` as an app written it before 1.105 may still: `onError` here, `log` as `'json'` or a function.
-export type ObserveInput = Omit<ObserveConfig, 'log'> & {
-  // `'json'` and a function still work until 1.108, written `{ format: 'json' }` and `{ sink }` since 1.105; `deprecated-app-hooks` rewrites them.
-  log?: ObserveConfig['log'] | 'json' | ((entry: LogEntry) => void) | undefined
-  /** @deprecated Written `onError` beside `observe`; `deprecated-app-hooks` rewrites it. Removed in 1.108. */
-  onError?: AppHooks['onError']
-}
-
-export type ImagesInput = Over<ImagesConfig, { remote?: Loadable<string[]> | Over<RemoteImages, { hosts?: Loadable<string[]> | undefined }> | undefined }> & DeprecatedImages
+export type ImagesInput = Over<ImagesConfig, { remote?: Loadable<string[]> | Over<RemoteImages, { hosts?: Loadable<string[]> | undefined }> | undefined }>
 
 export const CONFIG_FILE = 'kay.config.ts'
 // The app's own request values for templates, listed as an extension's `context` while the file exists.

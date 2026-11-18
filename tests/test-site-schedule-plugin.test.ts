@@ -6,7 +6,7 @@ import { fixtureCopy } from './scratch'
 // A schedule in a file of `src/plugins`, which kay mounts as it mounts a plugin of the config, here through a plugin's own `.use`.
 const root = await fixtureCopy('bare')
 
-await Bun.write(join(root, 'src/plugins/tick.ts'), `import { Elysia } from 'elysia'\nimport { schedule } from 'kay/server'\n\nexport const ticks: number[] = []\n\nexport default new Elysia({ name: 'tick' }).use(schedule('1m', async () => void ticks.push(Date.now())))\n`)
+await Bun.write(join(root, 'src/plugins/tick.ts'), `import { Elysia } from 'elysia'\nimport { schedule } from 'kay/server'\n\nexport const ticks: number[] = []\n\nexport default new Elysia({ name: 'tick' }).use(schedule({ every: '1m' }, async () => void ticks.push(Date.now())))\n`)
 
 const site = await testSite({ root, islands: false })
 

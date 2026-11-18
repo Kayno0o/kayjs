@@ -529,15 +529,15 @@ describe('kay build --static', () => {
     }
   })
 
-  it('writes the cache-control of a page with a ttl or a cacheControl to _headers under the base, with and without the slash, and none for a page that opts out', async () => {
+  it('writes the cache-control of a page with a cache to _headers under the base, with and without the slash, and none for a page that opts out', async () => {
     const fixture = await fixtureCopy('static')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
 
     try {
-      await Bun.write(join(fixture, 'src/routes/news.kay'), '--- server\nexport const page = { prerender: true, ttl: \'1h\' }\n---\nh1 News\n')
+      await Bun.write(join(fixture, 'src/routes/news.kay'), '--- server\nexport const page = { prerender: true, cache: \'1h\' }\n---\nh1 News\n')
 
-      await Bun.write(join(fixture, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true, ttl: \'1h\', cacheControl: false }\n---\nh1 Plain\n')
-      await Bun.write(join(fixture, 'src/routes/long.kay'), '--- server\nexport const page = { prerender: true, cacheControl: \'public, max-age=300\' }\n---\nh1 Long\n')
+      await Bun.write(join(fixture, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true, cache: false }\n---\nh1 Plain\n')
+      await Bun.write(join(fixture, 'src/routes/long.kay'), '--- server\nexport const page = { prerender: true, cache: { browser: \'5m\' } }\n---\nh1 Long\n')
 
       const exported = await exportSite(elsewhere, fixture)
 
@@ -560,19 +560,19 @@ describe('kay build --static', () => {
     }
   })
 
-  it('reads the ttl and cacheControl of a layout, keeps a header the page sets itself, writes the roots under the base and leaves the nginx include without a cache-control', async () => {
+  it('reads the cache of a layout, keeps a header the page sets itself, writes the roots under the base and leaves the nginx include without a cache-control', async () => {
     const fixture = await fixtureCopy('static')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
 
     try {
       await Promise.all([
-        Bun.write(join(fixture, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true, ttl: \'30s\' }\n---\nh1 Home\n'),
-        Bun.write(join(fixture, 'src/routes/docs/_layout.kay'), '--- server\nexport const page = { ttl: \'10m\' }\n---\nslot\n'),
+        Bun.write(join(fixture, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true, cache: \'30s\' }\n---\nh1 Home\n'),
+        Bun.write(join(fixture, 'src/routes/docs/_layout.kay'), '--- server\nexport const page = { cache: \'10m\' }\n---\nslot\n'),
         Bun.write(join(fixture, 'src/routes/docs/a.kay'), '--- server\nexport const page = { prerender: true }\n---\nh1 A\n'),
-        Bun.write(join(fixture, 'src/routes/docs/b.kay'), '--- server\nexport const page = { prerender: true, ttl: \'1m\' }\n---\nh1 B\n'),
-        Bun.write(join(fixture, 'src/routes/plain/_layout.kay'), '--- server\nexport const page = { ttl: \'1h\', cacheControl: \'public, max-age=9\' }\n---\nslot\n'),
+        Bun.write(join(fixture, 'src/routes/docs/b.kay'), '--- server\nexport const page = { prerender: true, cache: \'1m\' }\n---\nh1 B\n'),
+        Bun.write(join(fixture, 'src/routes/plain/_layout.kay'), '--- server\nexport const page = { cache: { browser: \'9s\' } }\n---\nslot\n'),
         Bun.write(join(fixture, 'src/routes/plain/c.kay'), '--- server\nexport const page = { prerender: true }\n---\nh1 C\n'),
-        Bun.write(join(fixture, 'src/routes/own.kay'), '--- server\nexport const page = { prerender: true, ttl: \'1h\' }\nctx.headers.set(\'cache-control\', \'no-store\')\n---\nh1 Own\n'),
+        Bun.write(join(fixture, 'src/routes/own.kay'), '--- server\nexport const page = { prerender: true, cache: \'1h\' }\nctx.headers.set(\'cache-control\', \'no-store\')\n---\nh1 Own\n'),
       ])
 
       const exported = await exportSite(elsewhere, fixture)

@@ -17,7 +17,7 @@ describe('the links of an island', () => {
     ['dev', { dev: true }, ''],
     ['a base and a trailing slash', { base: '/repo', trailingSlash: 'always' as const }, '/'],
   ])('are marked in the server HTML as those of a page are, in %s', async (_name, options, slash) => {
-    const site = new Elysia().use(await pages({ root: 'tests/fixtures/current-island', prebuilt: false, security: false, ...options }))
+    const site = new Elysia().use(await pages({ root: 'tests/fixtures/current-island', prebuilt: false, config: { security: false }, ...options }))
 
     expect(await marks(site, '/')).toEqual(['m-home:page', 'm-own:false'])
     expect(await marks(site, `/docs${slash}`)).toEqual(['m-docs:page', 'm-own:false'])

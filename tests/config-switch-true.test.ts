@@ -32,7 +32,7 @@ describe('true on a feature key is the key left out', () => {
   it('serves the same routes and headers from an app', async () => {
     const options = { root: 'tests/fixtures/production', prebuilt: false, site: 'https://switch.example' } as const
     const left = new Elysia().use(await pages(options))
-    const on = new Elysia().use(await pages({ ...options, robots: true, sitemap: true, favicon: true, security: true, health: true, offline: false, proxy: true }))
+    const on = new Elysia().use(await pages({ ...options, config: { robots: true, sitemap: true, assets: { favicon: true }, security: true, ops: { health: true }, client: { offline: false }, proxy: true } }))
     const answered = async (app: typeof left, path: string) => {
       const response = await app.handle(new Request(`http://switch.example${path}`))
 
@@ -48,7 +48,7 @@ describe('true on a feature key is the key left out', () => {
 
   it('turns preview on with true, as it does with its options, and off with false', async () => {
     const options = { root: 'tests/fixtures/production', prebuilt: false } as const
-    const draft = async (preview: boolean) => new Elysia().use(await pages({ ...options, preview })).handle(new Request('http://localhost/_kay/draft', { method: 'POST' }))
+    const draft = async (preview: boolean) => new Elysia().use(await pages({ ...options, config: { preview } })).handle(new Request('http://localhost/_kay/draft', { method: 'POST' }))
 
     expect((await draft(true)).status).not.toBe(404)
     expect((await draft(false)).status).toBe(404)

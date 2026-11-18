@@ -214,7 +214,7 @@ describe('images.placeholder: false', () => {
       return JSON.parse(await new Response(child.stdout).text()) as { reads: number, color: string | null }
     }
 
-    expect(await run('export default { images: { placeholder: false } }\n', 202)).toEqual({ reads: 0, color: null })
+    expect(await run('export default { assets: { images: { placeholder: false } } }\n', 202)).toEqual({ reads: 0, color: null })
     expect(await run('export default {}\n', 203)).toEqual({ reads: 1, color: 'cb6432' })
   })
 })
@@ -228,7 +228,9 @@ describe('placeholder on a page', () => {
   const img = (html: string, name: string) => new RegExp(`<img [^>]*class="${name}"[^>]*>`).exec(html)?.[0]
 
   async function open(options: Record<string, unknown> = {}): Promise<Elysia> {
-    return pages({ root: dir, prebuilt: false, images: { dirs: { '/uploads/': uploads } }, ...options })
+    const { dev, images, ...rest } = options
+
+    return pages({ root: dir, prebuilt: false, dev: dev as boolean | undefined, config: { assets: { images: { dirs: { '/uploads/': uploads }, ...images as object } }, ...rest } })
   }
 
   beforeAll(async () => {

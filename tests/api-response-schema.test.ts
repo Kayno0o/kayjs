@@ -41,7 +41,7 @@ const reported: string[] = []
 const FIRST_LINE = /^.*/
 
 async function app(options: { dev?: boolean, base?: string, trailingSlash?: 'always' | 'never' } = {}) {
-  return pages({ guards: { default: 'open' }, dirs: { routes: ROUTES, api: join(dir, 'api') }, observe: { onError: ({ error, request }) => void reported.push(`${new URL(request!.url).pathname}: ${FIRST_LINE.exec((error as Error).message)![0]}`) }, prebuilt: true, ...options })
+  return pages({ config: { guards: { default: 'open' }, dirs: { routes: ROUTES, api: join(dir, 'api') }, onError: ({ error, request }) => void reported.push(`${new URL(request!.url).pathname}: ${FIRST_LINE.exec((error as Error).message)![0]}`) }, prebuilt: true, ...options })
 }
 
 beforeAll(async () => {
@@ -152,7 +152,7 @@ describe('the code of a response that fails its own schema', () => {
     const tracer = { startSpan: () => span, startActiveSpan: (_name: string, _options: unknown, ...rest: unknown[]) => (rest.at(-1) as (made: typeof span) => unknown)(span) } as unknown as Tracer
 
     try {
-      const served = await pages({ guards: { default: 'open' }, dirs: { routes: ROUTES, api: join(dir, 'api') }, observe: { onError: ({ error, code }) => void events.push({ error, code }), log: entry => void entries.push(entry), tracer }, prebuilt: true })
+      const served = await pages({ config: { guards: { default: 'open' }, dirs: { routes: ROUTES, api: join(dir, 'api') }, onError: ({ error, code }) => void events.push({ error, code }), ops: { observe: { log: { sink: entry => void entries.push(entry) }, tracer } } }, prebuilt: true })
 
       expect((await served.handle(new Request('http://localhost/api/items/wrong'))).status).toBe(500)
 

@@ -29,7 +29,7 @@ describe('the store of a mailer and of a list', () => {
     expect(() => app.list('news', { store: sqliteLists(':memory:') })).toThrow('another store')
   })
 
-  it('reads a mailer\'s lists from store.lists, store.suppressions and store.file, and from listStore and suppressionStore as before', async () => {
+  it('reads a mailer\'s lists from store.lists, store.suppressions and store.file', async () => {
     const lists = sqliteLists(':memory:')
 
     const ask = async (app: ReturnType<typeof mailer>) => {
@@ -39,7 +39,6 @@ describe('the store of a mailer and of a list', () => {
     }
 
     expect(await ask(mailer({ from: 'a@fixture.test', store: { lists } }))).toBe(0)
-    expect(await ask(mailer({ from: 'a@fixture.test', listStore: lists }))).toBe(0)
 
     const file = join(await scratchDir('mail-store-mailer'), 'mail.sqlite')
     const app = mailer({ from: 'a@fixture.test', store: sqlite.sqliteMail(file) })
@@ -48,16 +47,9 @@ describe('the store of a mailer and of a list', () => {
     expect(existsSync(file)).toBe(true)
   })
 
-  it('refuses store beside listStore or suppressionStore', () => {
-    expect(() => mailer({ from: 'a@fixture.test', store: {}, listStore: sqliteLists(':memory:') })).toThrow('replaces `listStore` and `suppressionStore`')
-    expect(() => mailer({ from: 'a@fixture.test', store: {}, suppressionStore: sqlite.sqliteSuppressions(':memory:') })).toThrow('replaces `listStore` and `suppressionStore`')
-  })
-
-  it('keeps the names of before 1.105 as the new ones', () => {
-    expect(pg.mailListTableNames).toBe(pg.mailTables)
-    expect(pg.createMailListTables).toBe(pg.createMailTables)
+  it('names its tables and its list opener as the other libraries do', () => {
     expect(pg.mailTables).toEqual(['kay_mail_subscribers', 'kay_mail_broadcasts', 'kay_mail_deliveries', 'kay_mail_suppressions'])
-    expect(sqlite.openLists).toBe(sqlite.sqliteLists)
+    expect(Object.keys(sqlite)).not.toContain('openLists')
   })
 })
 

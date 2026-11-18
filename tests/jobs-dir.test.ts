@@ -3,7 +3,6 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { jobFiles } from '../src/config-extensions'
 import { background, queue, schedule, workflow } from '../src/server'
-import { scheduledOf } from '../src/server/jobs'
 import { memoryJobs } from '../src/server/queue'
 import { testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
@@ -131,16 +130,6 @@ describe('schedule shapes', () => {
 
     expect(none).toBeDefined()
   })
-
-  it('takes the schedule written the old way until 1.108', async () => {
-    const seen: string[] = []
-    const app = new Elysia().use(schedule('1m', (run: { schedule: string }) => void seen.push(run.schedule)))
-
-    for (const entry of scheduledOf(app))
-      await entry.fire()
-
-    expect(seen).toEqual(['every 1m'])
-  })
 })
 
 describe('background', () => {
@@ -160,21 +149,16 @@ describe('background', () => {
 })
 
 describe('timeout, the one name of a job\'s time limit', () => {
-  it('reads timeout, and lostAfter as its old name', async () => {
+  it('aborts the signal of a run past its timeout and fails it', async () => {
     const aborted: string[] = []
-    const made = (options: { timeout?: '200ms', lostAfter?: '200ms' }) => queue('limit', async (_: string, { signal }) => {
+    const limited = queue('limit', async (_: string, { signal }) => {
       await new Promise(resolve => signal.addEventListener('abort', resolve))
       aborted.push('aborted')
-    }, { store: memoryJobs(), attempts: 1, ...options })
+    }, { store: memoryJobs(), attempts: 1, timeout: '200ms' })
 
-    for (const options of [{ timeout: '200ms' as const }, { lostAfter: '200ms' as const }]) {
-      const limited = made(options)
-
-      await limited.enqueue('x')
-      expect(await limited.drain()).toBe(1)
-      expect((await limited.failed())[0]?.error).toBe('it ran past its timeout, 200 ms')
-    }
-
-    expect(aborted).toEqual(['aborted', 'aborted'])
+    await limited.enqueue('x')
+    expect(await limited.drain()).toBe(1)
+    expect((await limited.failed())[0]?.error).toBe('it ran past its timeout, 200 ms')
+    expect(aborted).toEqual(['aborted'])
   })
 })

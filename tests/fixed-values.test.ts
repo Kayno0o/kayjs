@@ -30,8 +30,8 @@ describe('health.timeout', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const tight = await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { check: slow(300), timeout: '100ms' } })
-      const loose = await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { check: slow(300), timeout: '2s' } })
+      const tight = await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { ops: { health: { check: slow(300), timeout: '100ms' } } } })
+      const loose = await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { ops: { health: { check: slow(300), timeout: '2s' } } } })
 
       expect((await tight.handle(new Request('http://localhost/_kay/health'))).status).toBe(503)
       expect(logged.mock.calls.map(call => String(call[0]))).toEqual([expect.stringContaining('the health check took longer than 0.1 s')])
@@ -45,11 +45,11 @@ describe('health.timeout', () => {
   it('runs the check once for the probes of a few seconds, and again after', async () => {
     let calls = 0
     let healthy = true
-    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { check: () => {
+    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { ops: { health: { check: () => {
       calls += 1
 
       return healthy
-    } } })
+    } } } } })
     const status = async () => (await app.handle(new Request('http://localhost/_kay/health'))).status
     const now = spyOn(Date, 'now')
     const start = Date.now()
@@ -72,7 +72,7 @@ describe('health.timeout', () => {
 
   it('is 5 seconds when unset, and refused when it is no positive duration', async () => {
     for (const timeout of [0, -1, '5 s', Number.NaN, '30d'])
-      await expect(pages({ root: 'tests/fixtures/production', prebuilt: false, health: { timeout } as never })).rejects.toThrow('health.timeout is')
+      await expect(pages({ root: 'tests/fixtures/production', prebuilt: false, config: { ops: { health: { timeout } as never } } })).rejects.toThrow('health.timeout is')
 
     expect(await probeHealth({ timeout: '0s' })).toBe(1)
   })
@@ -85,7 +85,7 @@ describe('health.timeout', () => {
   })
 
   it('makes the probe wait as long as the check may', async () => {
-    const serve = async () => new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, health: { path: '/up', check: slow(200), timeout: '1s' } })).listen(0)
+    const serve = async () => new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { endpoints: { health: '/up' }, ops: { health: { check: slow(200), timeout: '1s' } } } })).listen(0)
     const [patient, hurried] = [await serve(), await serve()]
 
     try {
@@ -201,22 +201,22 @@ describe('requestIdHeader', () => {
   const idFrom = async (app: Awaited<ReturnType<typeof pages>>, header: string, headers: Record<string, string> = {}) => (await app.handle(new Request('http://localhost/contact', { headers }))).headers.get(header)
 
   it('names the header an id goes out on and comes in from a trusted proxy on, one name for the process', async () => {
-    const plain = await pages({ dirs: { routes }, prebuilt: false, proxy: { hops: 1 } })
+    const plain = await pages({ config: { dirs: { routes }, proxy: { hops: 1 } }, prebuilt: false })
 
     expect(await idFrom(plain, 'x-request-id', { 'x-request-id': 'edge-9' })).toBe('edge-9')
 
-    const renamed = await pages({ dirs: { routes }, observe: { requestIdHeader: 'X-Correlation-Id' }, prebuilt: false, proxy: { hops: 1 } })
+    const renamed = await pages({ config: { dirs: { routes }, proxy: { hops: 1 }, ops: { observe: { requestIdHeader: 'X-Correlation-Id' } } }, prebuilt: false })
 
     expect(await idFrom(renamed, 'x-correlation-id')).toMatch(/^[\w-]{22}$/)
     expect(await idFrom(renamed, 'x-request-id')).toBeNull()
     expect(await idFrom(renamed, 'x-correlation-id', { 'x-correlation-id': 'edge-7' })).toBe('edge-7')
     expect(await idFrom(renamed, 'x-correlation-id', { 'x-request-id': 'edge-8' })).not.toBe('edge-8')
-    await expect(pages({ dirs: { routes }, observe: { requestIdHeader: 'x-other-id' }, prebuilt: false })).rejects.toThrow('a process uses one name')
-    expect(await idFrom(await pages({ dirs: { routes }, prebuilt: false }), 'x-correlation-id')).toMatch(/^[\w-]{22}$/)
+    await expect(pages({ config: { dirs: { routes }, ops: { observe: { requestIdHeader: 'x-other-id' } } }, prebuilt: false })).rejects.toThrow('a process uses one name')
+    expect(await idFrom(await pages({ config: { dirs: { routes } }, prebuilt: false }), 'x-correlation-id')).toMatch(/^[\w-]{22}$/)
   })
 
   it('can be reset for apps naming another header in one process', async () => {
-    const other = async (name: string) => idFrom(await pages({ dirs: { routes }, observe: { requestIdHeader: name }, prebuilt: false }), name)
+    const other = async (name: string) => idFrom(await pages({ config: { dirs: { routes }, ops: { observe: { requestIdHeader: name } } }, prebuilt: false }), name)
 
     expect(await other('x-first-id')).toMatch(/^[\w-]{22}$/)
     await expect(other('x-second-id')).rejects.toThrow('a process uses one name')
@@ -226,14 +226,14 @@ describe('requestIdHeader', () => {
 
   it('refuses a name that is no header', async () => {
     for (const name of ['', 'two words', 'a:b', 'Set-Cookie', 'content-type']) {
-      await expect(pages({ dirs: { routes }, observe: { requestIdHeader: name }, prebuilt: false })).rejects.toThrow('requestIdHeader is')
+      await expect(pages({ config: { dirs: { routes }, ops: { observe: { requestIdHeader: name } } }, prebuilt: false })).rejects.toThrow('requestIdHeader is')
     }
   })
 })
 
 describe('redirects with a status', () => {
   it('answer 301 or 302 when asked, and keep 308 and 307 otherwise', async () => {
-    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false, redirects: { '/a': { to: '/contact', status: 301 }, '/b': { to: '/contact', status: 302 }, '/c': '/contact', '/d': { to: '/contact', status: 307 }, '/e': { to: '/contact', status: 301 }, '/f/*': { to: '/contact?x=*', status: 302 } } })
+    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { redirects: { '/a': { to: '/contact', status: 301 }, '/b': { to: '/contact', status: 302 }, '/c': '/contact', '/d': { to: '/contact', status: 307 }, '/e': { to: '/contact', status: 301 }, '/f/*': { to: '/contact?x=*', status: 302 } } } })
     const statusOf = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).status
 
     expect(await Promise.all(['/a', '/b', '/c', '/d', '/e', '/f/1'].map(statusOf))).toEqual([301, 302, 308, 307, 301, 302])
@@ -269,7 +269,7 @@ describe('options that also take false', () => {
   })
 
   it('reads proxy: false on an app as no proxy, a forwarded address and id both ignored', async () => {
-    const app = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, proxy: false })).get('/who', ({ request }) => clientAddress(request, undefined))
+    const app = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { proxy: false } })).get('/who', ({ request }) => clientAddress(request, undefined))
     const headers = { 'x-forwarded-for': '9.9.9.9', 'x-real-ip': '9.9.9.9', 'x-request-id': 'edge-1' }
     const who = await app.handle(new Request('http://localhost/who', { headers }))
     const page = await app.handle(new Request('http://localhost/contact', { headers }))
@@ -279,8 +279,8 @@ describe('options that also take false', () => {
   })
 
   it('reads preview: false as no preview, serving none of its routes', async () => {
-    const withPreview = await pages({ root: 'tests/fixtures/production', prebuilt: false, preview: { secret: 'a'.repeat(40) } })
-    const without = await pages({ root: 'tests/fixtures/production', prebuilt: false, preview: false })
+    const withPreview = await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { preview: { secret: 'a'.repeat(40) } } })
+    const without = await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { preview: false } })
     const draft = async (app: typeof without) => app.handle(new Request('http://localhost/_kay/draft', { method: 'POST' }))
 
     expect((await draft(withPreview)).status).not.toBe(404)
@@ -318,7 +318,7 @@ describe('security.csp: false in a layout', () => {
       Bun.write(join(root, 'src/routes/plain/inner.kay'), 'h1 Inner\n'),
     ])
 
-    const app = await pages({ dirs: { routes: join(root, 'src/routes') }, prebuilt: false })
+    const app = await pages({ config: { dirs: { routes: join(root, 'src/routes') } }, prebuilt: false })
     const policy = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).headers.get('content-security-policy')
 
     expect(await policy('/')).toContain('default-src')

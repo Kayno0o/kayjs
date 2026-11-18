@@ -143,7 +143,7 @@ catch (error) {
       const script = `
 import { Elysia } from '${ROOT}/node_modules/elysia'
 import { pages } from '${ROOT}/src/server'
-const app = new Elysia().use(await pages({ root: '${ROOT}/tests/fixtures/production', prebuilt: false, security: false }))
+const app = new Elysia().use(await pages({ root: '${ROOT}/tests/fixtures/production', prebuilt: false, config: { security: false } }))
 try {
   app.listen(0)
   console.log(JSON.stringify('listening'))

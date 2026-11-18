@@ -10,7 +10,7 @@ const VARIANTS: Record<string, object> = {
 }
 const port = Number(Bun.argv[2] ?? 3999)
 const fixture = await imageFixture()
-const app = new Elysia().use(await pages({ root: fixture.root, prebuilt: false, observe: { log: false }, serve: { compress: true }, ...VARIANTS[Bun.argv[3] ?? 'stock'] })).listen({ port, hostname: '127.0.0.1' })
+const app = new Elysia().use(await pages({ root: fixture.root, prebuilt: false, config: { ops: { observe: { log: false } }, serve: { compress: true }, ...VARIANTS[Bun.argv[3] ?? 'stock'] } })).listen({ port, hostname: '127.0.0.1' })
 const origin = `http://127.0.0.1:${port}`
 const { image, asset } = heroPaths(await (await fetch(`${origin}/`)).text())
 

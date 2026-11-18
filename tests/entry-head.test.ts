@@ -8,7 +8,7 @@ import { entryHeadOf } from '../src/server/entry-head'
 import { testSite } from '../src/test'
 
 const FIXTURE = 'tests/fixtures/entry-head/src'
-const site = await testSite({ dirs: { routes: `${FIXTURE}/routes` }, contentConfig: `${FIXTURE}/content.config.ts`, islands: false, site: 'https://notes.example', seo: { name: 'Notes', titleTemplate: '%s | Notes' } })
+const site = await testSite({ config: { dirs: { routes: `${FIXTURE}/routes` }, contentConfig: `${FIXTURE}/content.config.ts`, site: 'https://notes.example', seo: { name: 'Notes', titleTemplate: '%s | Notes' } }, islands: false })
 
 afterAll(async () => site.close())
 

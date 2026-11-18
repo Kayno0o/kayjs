@@ -69,7 +69,7 @@ describe('the development outbox page', () => {
 
   it('is served by an app listing the mailer as an extension, with no .use of its own', async () => {
     const mail = mailer({ from: 'dev@example.com' })
-    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtensionOf({ server: async () => mail })] })
+    const site = await testSite({ root: 'tests/fixture', config: { extensions: [mailExtensionOf({ server: async () => mail })] } })
 
     await mail.send({ to: 'ada@example.com', subject: 'Through the app', text: 'Hello' })
 
@@ -77,7 +77,7 @@ describe('the development outbox page', () => {
   })
 
   it('is served by an app naming the module that exports the mailer, kay importing it', async () => {
-    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtensionOf({ module: './src/extension-mail' })] })
+    const site = await testSite({ root: 'tests/fixture', config: { extensions: [mailExtensionOf({ module: './src/extension-mail' })] } })
     const { mail } = await import('./fixture/src/extension-mail')
 
     await mail.send({ to: 'ada@example.com', subject: 'Through the module', text: 'Hello' })
@@ -87,7 +87,7 @@ describe('the development outbox page', () => {
 
   it('serves every page of the dev pages through an app, the page fallback not answering for them', async () => {
     const mail = mailer({ from: 'dev@example.com' })
-    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtensionOf({ server: async () => mail })] })
+    const site = await testSite({ root: 'tests/fixture', config: { extensions: [mailExtensionOf({ server: async () => mail })] } })
 
     await mail.send({ to: 'ada@example.com', subject: 'Through the app', html: '<p>Hi</p>' })
 
@@ -274,7 +274,7 @@ describe('the mail samples page', () => {
 
   it('serves its pages through an app too', async () => {
     const mail = mailer({ from: 'dev@example.com' })
-    const site = await testSite({ root: '.', extensions: [mailExtensionOf({ server: async () => mail })] })
+    const site = await testSite({ root: '.', config: { extensions: [mailExtensionOf({ server: async () => mail })] } })
 
     expect((await site.fetch('/_kay/mail/samples')).status).toBe(200)
     expect((await site.fetch('/_kay/mail/samples?mail=welcome.kay')).status).toBe(200)

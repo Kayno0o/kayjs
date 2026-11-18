@@ -46,9 +46,8 @@ export const REFERENCE_PATH = `${API_PREFIX}/reference`
 export function apiPathOf(value: string | undefined): string {
   return value === undefined ? API_PREFIX : servedPath(value, 'endpoints.api')
 }
-// Where `mcp` serves the app's tools, and where it did before 1.105, which is answered in place until 2.0.
+// Where `mcp` serves the app's tools.
 export const MCP_PATH = '/_kay/mcp'
-export const FORMER_MCP_PATH = '/mcp'
 // Where an MCP client finds how to sign in, which the endpoint's 401 points to.
 export const RESOURCE_METADATA = '/.well-known/oauth-protected-resource'
 const SERVED_PATH = /^\/[\w.~-]+(?:\/[\w.~-]+)*$/

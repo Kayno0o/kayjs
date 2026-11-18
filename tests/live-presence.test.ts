@@ -80,7 +80,7 @@ describe('presence on the server', () => {
   beforeAll(async () => {
     presenceGrace.ms = GRACE_MS
     rooms = memoryRooms()
-    site = await testSite({ root: ROOT, store: { rooms } })
+    site = await testSite({ root: ROOT, config: { store: { rooms } } })
   })
 
   afterAll(async () => {
@@ -363,7 +363,7 @@ describe('presence on the server', () => {
 
 describe('presence with a base and a trailing slash', () => {
   it('names the page\'s path under base for presence() with no argument', async () => {
-    const site = await testSite({ root: ROOT, base: '/shop', trailingSlash: 'always' })
+    const site = await testSite({ root: ROOT, config: { base: '/shop', trailingSlash: 'always' } })
 
     try {
       expect((await visit(site, '/crowd/')).keys).toEqual([keyOf('/crowd', null)])
@@ -374,7 +374,7 @@ describe('presence with a base and a trailing slash', () => {
   })
 
   it('names it under a locale prefix as the browser is at it', async () => {
-    const site = await testSite({ root: ROOT, i18n: { locales: ['en', 'fr'], default: 'en' } })
+    const site = await testSite({ root: ROOT, config: { i18n: { locales: ['en', 'fr'], default: 'en' } } })
 
     try {
       expect((await visit(site, '/fr/crowd')).keys).toEqual([keyOf('/fr/crowd', null)])
@@ -391,7 +391,7 @@ describe('presence across processes', () => {
     const file = join(await scratchDir('presence-'), 'presence.sqlite')
     const rooms = sqliteRooms(file, { poll: '25ms' })
     const other = sqliteRooms(file, { poll: '25ms' })
-    const site = await testSite({ root: ROOT, store: { rooms } })
+    const site = await testSite({ root: ROOT, config: { store: { rooms } } })
 
     try {
       const ann = await enter(site, 'Ann', 'ann-tab')
@@ -427,7 +427,7 @@ describe('a tab reconnecting to another process', () => {
     const file = join(await scratchDir('presence-'), 'presence.sqlite')
     const rooms = sqliteRooms(file, { poll: '25ms' })
     const other = sqliteRooms(file, { poll: '25ms' })
-    const site = await testSite({ root: ROOT, store: { rooms } })
+    const site = await testSite({ root: ROOT, config: { store: { rooms } } })
 
     try {
       const bob = await enter(site, 'Bob', 'bob-tab')

@@ -10,7 +10,7 @@ const ROOT = join(import.meta.dir, 'own-fixture')
 let site: Awaited<ReturnType<typeof testSite>>
 
 beforeAll(async () => {
-  site = await testSite({ root: ROOT, extensions: [auth({ admin: 'admin', roles: { admin: [] }, twoFactor: { require: ['admin'] } })], islands: false })
+  site = await testSite({ root: ROOT, config: { extensions: [auth({ admin: 'admin', roles: { admin: [] }, twoFactor: { require: ['admin'] } })] }, islands: false })
 }, 180_000)
 
 afterAll(async () => {

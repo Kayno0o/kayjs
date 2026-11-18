@@ -36,14 +36,3 @@ describe('what a collection sets beside the cms\'s own', () => {
     expect(() => configure({ collections: { posts: { onPublish: own } as never } })).toThrow('onPublish')
   })
 })
-
-describe('onSave and onUpload, the names before 1.105', () => {
-  test('are read as afterSave and afterUpload, the new names winning', () => {
-    configure({ onSave: global, onUpload: global, collections: { posts: { onSave: own, afterUpload: own, onUpload: global } } })
-
-    expect(hooksOf('afterSave', 'posts')).toEqual([global, own])
-    expect(hooksOf('afterUpload', 'posts')).toEqual([global, own])
-    configure({ onSave: global, afterSave: own })
-    expect(hooksOf('afterSave', undefined)).toEqual([own, undefined])
-  })
-})

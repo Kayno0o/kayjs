@@ -113,8 +113,6 @@ export interface QueueOptions<Payload> {
   concurrency?: number | undefined
   // How long a run may take: past it, the run counts as failed, its signal aborts and its worker is freed, and another process takes a job its dead process held as lost. 10 minutes by default, the name a schedule's limit has too.
   timeout?: Duration | undefined
-  /** @deprecated `timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it. */
-  lostAfter?: Duration | undefined
   // `false` runs nothing: the queue starts no worker, so a job needing an optional service is switched by its setting, `enabled: url !== undefined`, as a schedule is. A job enqueued meanwhile waits in the store for a process that runs the queue.
   enabled?: boolean | undefined
   // The longest an idle queue waits between looks at the store, 10 seconds by default.
@@ -468,17 +466,16 @@ export function defaultJobStore(): JobStore {
 // A queue of jobs the server runs in the background, each surviving a restart: `enqueue` from an action, `app.use(queue)` in the server to run them.
 // A run that throws is retried later, waiting `backoff` then twice as long each time, until `attempts` runs failed: it is then kept as failed, logged and handed to `onError`.
 export function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, ctx: JobContext<Progress>) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload, Progress> {
-  // The run's job is also the third argument, which a handler written `(payload, signal, job)` before 1.105 reads.
-  return jobQueue<Payload, Progress>(name, (payload, ctx) => (handler as (payload: Payload, ctx: JobContext<Progress>, job: JobRef<Progress>) => unknown)(payload, ctx, ctx.job), options).queued
+  return jobQueue<Payload, Progress>(name, handler, options).queued
 }
 
 const REMOVED_OPTIONS = { onFailed: '`onError`, which also gets `id` and `attempts`', keepFailed: '`failedTtl`' }
 
 // `queue` for `workflow`: its handler also gets the hold of its run, and the admin it returns is what the workflow wakes its own queue and attaches its calls with.
-export function jobQueue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, ctx: JobContext<Progress> & AbortSignal, run: RunHold) => unknown, options: QueueOptions<Payload> = {}, kind: 'queue' | 'workflow' = 'queue'): { queued: Queue<Payload, Progress>, admin: QueueAdmin } {
+export function jobQueue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, ctx: JobContext<Progress>, run: RunHold) => unknown, options: QueueOptions<Payload> = {}, kind: 'queue' | 'workflow' = 'queue'): { queued: Queue<Payload, Progress>, admin: QueueAdmin } {
   const attempts = options.attempts ?? DEFAULT_ATTEMPTS
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
-  const lostAfter = durationSeconds(options.timeout ?? options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s timeout`) * 1000
+  const lostAfter = durationSeconds(options.timeout ?? DEFAULT_LOST_AFTER, `queue('${name}')'s timeout`) * 1000
   const concurrency = options.concurrency ?? 1
   const idlePoll = durationSeconds(options.idlePoll ?? DEFAULT_IDLE_POLL, `queue('${name}')'s idlePoll`) * 1000
   const keepFailed = options.failedTtl === false ? undefined : durationSeconds(options.failedTtl ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s failedTtl`) * 1000

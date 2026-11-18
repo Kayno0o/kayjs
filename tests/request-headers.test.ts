@@ -59,7 +59,7 @@ describe('answers that start from prebuilt headers', () => {
           set.headers['x-frame-options'] = 'DENY'
         })
         .use(await build.serve({ root: PRODUCTION }))
-      const off = await build.serve({ root: PRODUCTION, security: false })
+      const off = await build.serve({ root: PRODUCTION, config: { security: false } })
 
       for (const path of ['/_kay/health', '/news'])
         expect((await own.handle(new Request(`${ORIGIN}${path}`))).headers.get('x-frame-options')).toBe('DENY')

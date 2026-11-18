@@ -228,7 +228,7 @@ export const ERRORS = {
   },
   'locales-invalid': {
     group: 'build',
-    summary: 'An `i18n` config that does not hold together: no locales, a tag that is none, a default outside the locales, domains and `prefixDefault` together, `paths` naming a page that does not exist, a catalog that exports no messages or not as `defineMessages`, or `writeDraftMessages` given a locale the config does not translate.',
+    summary: 'An `i18n` config that does not hold together: no locales, a tag that is none, a default outside the locales, `paths` naming a page that does not exist, a catalog that exports no messages or not as `defineMessages`, or `writeDraftMessages` given a locale the config does not translate.',
     fix: { file: 'llms/locales.md', heading: 'Configuring locales' },
   },
   'font-invalid': {

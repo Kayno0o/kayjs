@@ -7,7 +7,7 @@ const path = browserPath()
 
 describe('the ui extension', () => {
   it('mounts one Toaster and one TooltipHost on a page that renders neither', async () => {
-    const site = await testSite({ root: FIXTURE, extensions: [ui()], islands: false })
+    const site = await testSite({ root: FIXTURE, config: { extensions: [ui()] }, islands: false })
 
     try {
       const html = (await site.visit('/shell')).html
@@ -25,7 +25,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
   let site: Awaited<ReturnType<typeof testSite>>
 
   beforeAll(async () => {
-    site = await testSite({ root: FIXTURE, extensions: [ui()], browser: { path } })
+    site = await testSite({ root: FIXTURE, config: { extensions: [ui()] }, browser: { path } })
   }, 120_000)
 
   afterAll(async () => site.close())

@@ -301,7 +301,7 @@ describe('the share card template stamp', () => {
 
 describe.skipIf(!chrome)('a share card laid out in _card.kay', () => {
   it('is drawn on demand from the app\'s components, Tailwind classes and the image, signed and kept', async () => {
-    const app = await pages({ site: 'https://cards.example', seo: { name: 'Cards' }, plugins: [tailwind], root: FIXTURE, prebuilt: false })
+    const app = await pages({ config: { site: 'https://cards.example', seo: { name: 'Cards' }, plugins: [tailwind] }, root: FIXTURE, prebuilt: false })
     const link = async (page: string) => {
       const html = await (await app.handle(new Request(`http://localhost${page}`))).text()
 
@@ -375,7 +375,7 @@ const background = t('nav.home') === 'Accueil' ? 'bg-[#dc2626]' : 'bg-[#1e40af]'
 div(class={'relative h-[630px] w-[1200px] ' + background})
   h1(class="m-0 text-6xl font-black text-white") {title}
 `)
-    const app = await pages({ site: 'https://cards.example', seo: { name: 'Cards' }, plugins: [tailwind], root: copy, prebuilt: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+    const app = await pages({ config: { site: 'https://cards.example', seo: { name: 'Cards' }, plugins: [tailwind], i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, root: copy, prebuilt: false })
 
     for (const [page, background] of [['/', [30, 64, 175]], ['/fr', [220, 38, 38]]] as const) {
       const html = await (await app.handle(new Request(`http://localhost${page}`))).text()
@@ -509,7 +509,7 @@ h1 Home
     await Bun.write(join(root, 'src/routes/uploaded.kay'), '---\nimport { shareCard } from \'kay/image\'\n---\nhead\n  title Uploaded\n  meta(property="og:image" content={shareCard({ title: \'Uploaded\', image: \'/uploads/photo.png\' })})\nh1 Uploaded\n')
 
     try {
-      const app = await pages({ site: 'https://cards.example', seo: { name: 'Cards' }, plugins: [tailwind], root, prebuilt: false, images: { dirs: { '/uploads/': uploads } } })
+      const app = await pages({ config: { site: 'https://cards.example', seo: { name: 'Cards' }, plugins: [tailwind], assets: { images: { dirs: { '/uploads/': uploads } } } }, root, prebuilt: false })
       const html = await (await app.handle(new Request('http://localhost/uploaded'))).text()
       const link = (/<meta property="og:image" content="([^"]+)">/).exec(html)![1]!.replaceAll('&amp;', '&').slice('https://cards.example'.length)
       const served = await app.handle(new Request(`http://localhost${link}`))

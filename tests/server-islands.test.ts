@@ -45,7 +45,7 @@ function stamps(html: string): string[] {
 describe('server islands', () => {
   // Boots the site, which builds the browser bundle and manifest the tests read: a worker of `bun test --parallel` has its own, which no file before this one may have built.
   beforeAll(async () => {
-    await pages({ dirs: { routes }, prebuilt: false })
+    await pages({ config: { dirs: { routes } }, prebuilt: false })
   }, 60_000)
 
   it('prerenders a page reaching one, and renders each per request: spliced in, or fetched by the browser', async () => {
@@ -79,9 +79,9 @@ describe('server islands', () => {
       expect(await Bun.file(join(build.pages, 'deferred.html')).text()).toMatch(WHEN)
       expect(await Bun.file(join(build.pages, 'plain.html')).text()).not.toMatch(WHEN)
 
-      const app = await build.serve({ dirs: { routes }, security: false })
+      const app = await build.serve({ config: { dirs: { routes }, security: false } })
       // Its loads run per request, so they are timed as a page rendered afresh is.
-      const timed = await build.serve({ dirs: { routes }, observe: { serverTiming: true }, security: false })
+      const timed = await build.serve({ config: { dirs: { routes }, security: false, ops: { observe: { serverTiming: true } } } })
 
       expect((await timed.handle(new Request('http://localhost/'))).headers.get('server-timing')).toMatch(/render;dur=/)
       const visit = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
@@ -177,7 +177,7 @@ describe('server islands', () => {
     try {
       await build.prerender({ dirs: { routes: copied } })
 
-      const app = await build.serve({ dirs: { routes: copied }, security: false })
+      const app = await build.serve({ config: { dirs: { routes: copied }, security: false } })
       const html = await (await app.handle(new Request('http://localhost/reply'))).text()
 
       // In place of the island, not only in what the prerendered stream left after it.
@@ -218,7 +218,7 @@ describe('server islands', () => {
           try {
             await build.prerender({ dirs: { routes: copied }, ...site, ...i18n })
 
-            const app = await build.serve({ dirs: { routes: copied }, security: false, ...site, ...i18n })
+            const app = await build.serve({ config: { dirs: { routes: copied }, security: false }, ...site, ...i18n })
             const slash = site.base === undefined ? '' : '/'
             const visit = async (path: string, headers: Record<string, string> = {}) => (await app.handle(new Request(`http://localhost${french ? '/fr' : ''}${path.replace('?', `${slash}?`)}`, { headers }))).text()
             const checked = (html: string) => ({
@@ -296,7 +296,7 @@ describe('server islands', () => {
       // An interactive component carries its own block through the island wrapper too.
       expect(islands[3]).toContain('<slot data-kay-failure role="alert" hidden><p class="live-failure">Live failure</p>')
 
-      const app = await build.serve({ dirs: { routes }, security: false })
+      const app = await build.serve({ config: { dirs: { routes }, security: false } })
       const fetched = await (await app.handle(new Request('http://localhost/failed?kay_island=0', { headers: { [ISLAND_HEADER]: '1' } }))).text()
 
       expect(fetched).toBe('<p class="own-count">1</p>')

@@ -1,4 +1,5 @@
 import type { Action } from '../src/runtime'
+import type { Duration } from '../src/runtime/duration'
 import type { SessionData, SessionStore } from '../src/server'
 import { hkdfSync } from 'node:crypto'
 import { rename, rm } from 'node:fs/promises'
@@ -269,7 +270,7 @@ process.exit(0)`)
       const store = memorySessions()
       const kept: SessionData[] = []
 
-      return { kept, store: { ...store, set: async (id: string, data: SessionData, maxAge: number) => {
+      return { kept, store: { ...store, set: async (id: string, data: SessionData, maxAge: Duration) => {
         kept.push({ ...data })
 
         return store.set(id, data, maxAge)
@@ -345,13 +346,13 @@ process.exit(0)`)
   it('caps the memory store, the oldest sessions going first and a session written again counting as new', async () => {
     const store = memorySessions()
 
-    await store.set('first', { n: 0 }, 60_000)
+    await store.set('first', { n: 0 }, '1m')
 
     for (let index = 0; index < 99_999; index++)
-      await store.set(`s${index}`, { n: index }, 60_000)
+      await store.set(`s${index}`, { n: index }, '1m')
 
-    await store.set('first', { n: 1 }, 60_000)
-    await store.set('overflow', { n: 2 }, 60_000)
+    await store.set('first', { n: 1 }, '1m')
+    await store.set('overflow', { n: 2 }, '1m')
 
     expect(await store.get('first')).toEqual({ n: 1 })
     expect(await store.get('s0')).toBeUndefined()
@@ -789,17 +790,17 @@ process.exit(0)`)
 
   for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
     it(`refuses a maxAge that is no number ${name}, which the stores receive in milliseconds`, () => {
-      expect(async () => store.set('a', { userId: 1 }, Number.NaN)).toThrow('a session store')
+      expect(async () => store.set('a', { userId: 1 }, Number.NaN as never)).toThrow('a session store')
       expect(async () => store.set('a', { userId: 1 }, 'soon' as never)).toThrow('a session store')
-      expect(async () => store.set('a', { userId: 1 }, Infinity)).toThrow('a session store')
+      expect(async () => store.set('a', { userId: 1 }, Infinity as never)).toThrow('a session store')
     })
   }
 
   for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
     it(`erases the sessions ${name} whose data matches, and only those`, async () => {
-      await store.set('a', { userId: 1 }, 60_000)
-      await store.set('b', { userId: 2 }, 60_000)
-      await store.set('c', { userId: 1, cart: [3] }, 60_000)
+      await store.set('a', { userId: 1 }, '1m')
+      await store.set('b', { userId: 2 }, '1m')
+      await store.set('c', { userId: 1, cart: [3] }, '1m')
 
       expect(await store.deleteWhere(data => data.userId === 1)).toBe(2)
       expect([await store.get('a'), await store.get('b'), await store.get('c')]).toEqual([undefined, { userId: 2 }, undefined])
@@ -809,13 +810,13 @@ process.exit(0)`)
   for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
     it(`erases one person's sessions ${name} out of many by an object match, equal values only`, async () => {
       for (let n = 0; n < 1200; n++)
-        await store.set(`other${n}`, { userId: n % 2 === 0 ? 'u2' : 12 }, 60_000)
+        await store.set(`other${n}`, { userId: n % 2 === 0 ? 'u2' : 12 }, '1m')
 
-      await store.set('a', { userId: 1 }, 60_000)
-      await store.set('b', { userId: '1' }, 60_000)
-      await store.set('c', { userId: 1, cart: [3] }, 60_000)
-      await store.set('d', { other: 1, userId: null }, 60_000)
-      await store.set('e', { userId: 'u1', note: 'u2' }, 60_000)
+      await store.set('a', { userId: 1 }, '1m')
+      await store.set('b', { userId: '1' }, '1m')
+      await store.set('c', { userId: 1, cart: [3] }, '1m')
+      await store.set('d', { other: 1, userId: null }, '1m')
+      await store.set('e', { userId: 'u1', note: 'u2' }, '1m')
 
       expect(await store.deleteWhere({ userId: 1 })).toBe(2)
       expect(await store.deleteWhere({ userId: 'u1' })).toBe(1)
@@ -830,11 +831,11 @@ process.exit(0)`)
     it(`finds ${name} a value with escapes, a zero stored as -0, a boolean, and a match on two fields`, async () => {
       const odd = 'a"b\\c \u{1F600}\n\uD800'
 
-      await store.set('odd', { userId: odd, ok: true }, 60_000)
-      await store.set('odd2', { userId: odd, ok: false }, 60_000)
-      await store.set('zero', { n: -0 }, 60_000)
-      await store.set('flag', { done: true, who: 'x' }, 60_000)
-      await store.set('flag2', { done: true, who: 'y' }, 60_000)
+      await store.set('odd', { userId: odd, ok: true }, '1m')
+      await store.set('odd2', { userId: odd, ok: false }, '1m')
+      await store.set('zero', { n: -0 }, '1m')
+      await store.set('flag', { done: true, who: 'x' }, '1m')
+      await store.set('flag2', { done: true, who: 'y' }, '1m')
 
       expect(await store.deleteWhere({ userId: odd, ok: true })).toBe(1)
       expect(await store.deleteWhere({ userId: odd })).toBe(1)
@@ -844,7 +845,7 @@ process.exit(0)`)
     })
 
     it(`refuses an object match ${name} that is empty or holds undefined, which would end every session or none`, async () => {
-      await store.set('a', { userId: 1 }, 60_000)
+      await store.set('a', { userId: 1 }, '1m')
       await expect(store.deleteWhere({})).rejects.toThrow('deleteWhere takes')
       await expect(store.deleteWhere({ userId: undefined } as never)).rejects.toThrow('deleteWhere takes')
       await expect(store.deleteWhere({ userId: new Date(0) } as never)).rejects.toThrow('deleteWhere takes')
@@ -858,7 +859,7 @@ process.exit(0)`)
     const store = sqliteStoreAt(file)
     const db = new Database(file)
 
-    await store.set('seed', { userId: 0 }, 60_000)
+    await store.set('seed', { userId: 0 }, '1m')
     db.run(`INSERT INTO kay_sessions (id, data, expires) SELECT 'bulk' || n, ?, ${Date.now() + 60_000} FROM (WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM s WHERE n < 1300) SELECT n FROM s)`, [stringify({ userId: 1 })])
 
     let seen = 0
@@ -902,8 +903,8 @@ process.exit(0)`)
     const store = sqliteStoreAt(file)
     const db = new Database(file)
 
-    await store.set('a', { userId: 1 }, 60_000)
-    await store.set('old', { userId: 1 }, 60_000)
+    await store.set('a', { userId: 1 }, '1m')
+    await store.set('old', { userId: 1 }, '1m')
     db.run('UPDATE kay_sessions SET expires = ? WHERE id = ?', [Date.now() - 1000, 'old'])
     db.run('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?)', ['broken', '{not devalue', Date.now() + 60_000])
 
@@ -917,7 +918,7 @@ process.exit(0)`)
 
     const memory = memorySessions()
 
-    await memory.set('old', { userId: 1 }, 1000)
+    await memory.set('old', { userId: 1 }, '1s')
     setSystemTime(Date.now() + 2000)
     expect(await memory.deleteWhere(() => true)).toBe(0)
   })
@@ -979,12 +980,12 @@ process.exit(0)`)
     const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
     const store = sqliteStoreAt(file)
 
-    await store.set('a', { userId: 1 }, 60_000)
+    await store.set('a', { userId: 1 }, '1m')
     await deleteSqlite(file)
 
     expect(sqliteStoreAt(file)).toBe(store)
     expect(await store.get('a')).toBeUndefined()
-    await store.set('b', { userId: 2 }, 60_000)
+    await store.set('b', { userId: 2 }, '1m')
     expect(readSessionIds(file)).toEqual(['b'])
   })
 
@@ -995,13 +996,13 @@ process.exit(0)`)
 
     try {
       setSystemTime(new Date())
-      await store.set('a', { userId: 1 }, 60_000)
+      await store.set('a', { userId: 1 }, '1m')
       await deleteSqlite(file)
       // Within the few seconds, the deleted file's handle still answers.
       expect(await store.get('a')).toEqual({ userId: 1 })
 
       setSystemTime(new Date(Date.now() + 10_000))
-      await store.set('b', { userId: 2 }, 60_000)
+      await store.set('b', { userId: 2 }, '1m')
       expect(readSessionIds(file)).toEqual(['b'])
 
       const replacement = new Database(join(dir, 'replacement.sqlite'))
@@ -1043,7 +1044,7 @@ process.exit(0)`)
 
   it('reaches pages, actions and their redirects as ctx.locals.session', async () => {
     const { sessions } = await import(SESSIONS) as { sessions: Elysia }
-    const app = new Elysia().use(sessions).use(await pages({ guards: { default: 'open' }, root: 'tests/fixtures/production', prebuilt: false, security: false }))
+    const app = new Elysia().use(sessions).use(await pages({ config: { guards: { default: 'open' }, security: false }, root: 'tests/fixtures/production', prebuilt: false }))
     const { signIn, signOut } = await import(ACCOUNT) as { signIn: Action<{ user: string }, void>, signOut: Action<object, void> }
     const visit = browser(app)
     const post = async (url: string, form: Record<string, string>) => visit(url, { method: 'POST', body: new URLSearchParams(form), headers: { 'content-type': 'application/x-www-form-urlencoded' } })
@@ -1073,7 +1074,7 @@ describe('a refused form post on a running server', () => {
     const app = new Elysia()
       .use(session({ secret: SECRET }))
       .derive({ as: 'global' }, () => ({ greeting: 'Hello' }))
-      .use(await pages({ guards: { default: 'open' }, root: 'tests/fixtures/session', prebuilt: false, security: false }))
+      .use(await pages({ config: { guards: { default: 'open' }, security: false }, root: 'tests/fixtures/session', prebuilt: false }))
       .listen({ port: 0, hostname: 'localhost' })
     const { signIn } = await import(SIGN_IN) as { signIn: Action<{ name: string }, unknown> }
     const origin = `http://localhost:${app.server!.port}`
@@ -1097,8 +1098,8 @@ describe('a page read by who sent it', () => {
     const app = new Elysia()
       .use(session({ secret: SECRET }))
       .derive({ as: 'global' }, () => ({ greeting: 'Hello' }))
-      .use(await pages({ guards: { default: 'open' }, root: 'tests/fixtures/session', prebuilt: false, security: false }))
-    const plain = new Elysia().use(await pages({ guards: { default: 'open' }, root: 'tests/fixtures/production', prebuilt: false, security: false }))
+      .use(await pages({ config: { guards: { default: 'open' }, security: false }, root: 'tests/fixtures/session', prebuilt: false }))
+    const plain = new Elysia().use(await pages({ config: { guards: { default: 'open' }, security: false }, root: 'tests/fixtures/production', prebuilt: false }))
     const personal = await app.handle(new Request('http://localhost/'))
     const shared = await plain.handle(new Request('http://localhost/feed'))
     // Asking whether a form post failed depends on a cookie even when the request carries none.
@@ -1123,7 +1124,7 @@ describe('a page read by who sent it', () => {
       Bun.write(join(dir, 'themed.kay'), '--- server\nexport const page = { prerender: true }\n--- script\nimport { persisted } from "kay"\n\nconst theme = persisted.cookie("theme", "light")\n---\np {theme()}\n'),
     ])
 
-    const app = new Elysia().use(await pages({ dirs: { routes: dir }, prebuilt: false, security: false }))
+    const app = new Elysia().use(await pages({ config: { dirs: { routes: dir }, security: false }, prebuilt: false }))
     const visit = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).headers
     const own = await visit('/own')
     const varied = await visit('/varied')
@@ -1163,7 +1164,7 @@ describe('sqliteSessions under bun test', () => {
     const file = join(dir, 'data', 'sessions.sqlite')
     const store = sqliteSessions(file)
 
-    await store.set('a', { userId: 1 }, 60_000)
+    await store.set('a', { userId: 1 }, '1m')
 
     expect(await store.get('a')).toEqual({ userId: 1 })
     expect(await Bun.file(file).exists()).toBe(false)

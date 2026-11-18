@@ -7,7 +7,7 @@ const COOKIE = /kay_preview=([^;]+)/
 
 describe('/_kay/draft', () => {
   it('answers 429 with Retry-After to an editor past 300 drafts a minute, and an outsider is refused before it counts', async () => {
-    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false, preview: { secret: SECRET } })
+    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { preview: { secret: SECRET } } })
     const link = await app.handle(new Request(`http://localhost${previewUrl('/', { edit: true })}`))
     const cookie = `kay_preview=${COOKIE.exec(link.headers.get('set-cookie') ?? '')![1]}`
     const post = async (headers: Record<string, string>) => app.handle(new Request('http://localhost/_kay/draft', { method: 'POST', headers, body: '{}' }))

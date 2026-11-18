@@ -191,7 +191,7 @@ export const notes = collection('content/notes', {
 `)
     await Bun.write(join(copy, 'src/content/notes/one.md'), '---\ntitle: One\n---\n\n[two](./two.md) ![pic](cat.png)\n\n## Part\n\n<script>alert(1)</script>\n')
     await Bun.write(join(copy, 'src/routes/notes/[slug].kay'), '--- server\nimport { notes } from \'../../content.config\'\n\nconst note = await notes.get(ctx.params.slug) ?? ctx.notFound()\nconst { Content } = note\n---\narticle\n  Content\n')
-    app = new Elysia().use(await pages({ dirs: { routes: `${copy}/src/routes` }, contentConfig: `${copy}/src/content.config.ts`, prebuilt: false, security: false, site: 'https://x.example', base: '/root', trailingSlash: 'always' }))
+    app = new Elysia().use(await pages({ config: { dirs: { routes: `${copy}/src/routes` }, contentConfig: `${copy}/src/content.config.ts`, security: false, site: 'https://x.example', base: '/root', trailingSlash: 'always' }, prebuilt: false }))
   }, 60_000)
 
   afterAll(async () => {

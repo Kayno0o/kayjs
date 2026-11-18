@@ -62,16 +62,16 @@ describe('search', () => {
   beforeAll(async () => {
     root = await scratchDir('search-')
     await Promise.all([
-      Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { favicon: false }, guards: { default: \'open\' }, search: true, i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }\n'),
+      Bun.write(join(root, 'kay.config.ts'), 'export default { assets: { favicon: false }, guards: { default: \'open\' }, client: { search: true }, i18n: { locales: [\'en\', \'fr\'], default: \'en\' } }\n'),
       Bun.write(join(root, 'src/messages/en.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ hello: \'Hello world\' })\n'),
       Bun.write(join(root, 'src/messages/fr.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ hello: \'Bonjour le monde\' })\n'),
       Bun.write(join(root, 'src/routes/_layout.kay'), 'nav\n  a(href="/") Menu everywhere\nmain\n  slot\n'),
       Bun.write(join(root, 'src/routes/index.kay'), `--- server\nimport { t } from 'kay/i18n'\n\n${PRERENDER}\n---\nh1 Welcome home\np {t('hello')}\nh2#install Installing the package\np Run bun add to install it, then install again &amp; again.\nscript var hidden = 'scriptword'\nh3#deps Dépendances\np Nothing else is needed, no other dépendance.\ndiv(data-search="false") Skippedword\n`),
-      Bun.write(join(root, 'src/routes/guide.kay'), `--- server\nexport const page = { prerender: true, search: { weight: 0.5 } }\n---\nh1 Guide\np How to install the package, slowly.\n`),
-      Bun.write(join(root, 'src/routes/hidden.kay'), `--- server\nexport const page = { prerender: true, search: false }\n---\nh1 Hidden\np Secretword\n`),
-      Bun.write(join(root, 'src/routes/notes/[slug].kay'), `--- server\nexport const page = {\n  prerender: [{ slug: 'loud' }, { slug: 'quiet' }, { slug: 'gone' }],\n  search: async (params: Record<string, string>) => params.slug === 'gone' ? false : params.slug === 'quiet' ? { weight: 0.2 } : undefined,\n}\n\nconst { slug } = ctx.params\n---\nh1 Note {slug}\np Quokka facts.\n`),
-      Bun.write(join(root, 'src/routes/hush/[slug].kay'), `--- server\nexport const page = { prerender: [{ slug: 'a' }], noindex: true, search: () => ({ weight: 5 }) }\n---\nh1 Hush\np Wombatword\n`),
-      Bun.write(join(root, 'src/routes/private.kay'), `--- server\nexport const page = { prerender: true, noindex: true }\n---\nh1 Private\np Noindexword\n`),
+      Bun.write(join(root, 'src/routes/guide.kay'), `--- server\nexport const page = { prerender: true, seo: { search: { weight: 0.5 } } }\n---\nh1 Guide\np How to install the package, slowly.\n`),
+      Bun.write(join(root, 'src/routes/hidden.kay'), `--- server\nexport const page = { prerender: true, seo: { search: false } }\n---\nh1 Hidden\np Secretword\n`),
+      Bun.write(join(root, 'src/routes/notes/[slug].kay'), `--- server\nexport const page = {\n  prerender: [{ slug: 'loud' }, { slug: 'quiet' }, { slug: 'gone' }],\n  seo: { search: async (params: Record<string, string>) => params.slug === 'gone' ? false : params.slug === 'quiet' ? { weight: 0.2 } : undefined },\n}\n\nconst { slug } = ctx.params\n---\nh1 Note {slug}\np Quokka facts.\n`),
+      Bun.write(join(root, 'src/routes/hush/[slug].kay'), `--- server\nexport const page = { prerender: [{ slug: 'a' }], seo: { noindex: true, search: () => ({ weight: 5 }) } }\n---\nh1 Hush\np Wombatword\n`),
+      Bun.write(join(root, 'src/routes/private.kay'), `--- server\nexport const page = { prerender: true, seo: { noindex: true } }\n---\nh1 Private\np Noindexword\n`),
       Bun.write(join(root, 'src/routes/admin/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403))\n'),
       Bun.write(join(root, 'src/routes/admin/index.kay'), `--- server\n${PRERENDER}\n---\nh1 Admin\np Guardedword\n`),
     ])
@@ -137,8 +137,8 @@ describe('search', () => {
 
     try {
       await Promise.all([
-        Bun.write(join(bad, 'kay.config.ts'), 'export default { assets: { favicon: false }, guards: { default: \'open\' }, search: true }\n'),
-        Bun.write(join(bad, 'src/routes/[slug].kay'), `--- server\nexport const page = { prerender: [{ slug: 'a' }], search: () => ({ weight: -1 }) }\n---\nh1 Bad\n`),
+        Bun.write(join(bad, 'kay.config.ts'), 'export default { assets: { favicon: false }, guards: { default: \'open\' }, client: { search: true } }\n'),
+        Bun.write(join(bad, 'src/routes/[slug].kay'), `--- server\nexport const page = { prerender: [{ slug: 'a' }], seo: { search: () => ({ weight: -1 }) } }\n---\nh1 Bad\n`),
       ])
       const child = Bun.spawn([process.execPath, CLI, 'build', bad, '--no-check'], { stdout: 'pipe', stderr: 'pipe' })
       const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -207,7 +207,7 @@ describe('search', () => {
 
     try {
       await Promise.all([
-        Bun.write(join(site, 'kay.config.ts'), 'export default { assets: { favicon: false }, guards: { default: \'open\' }, search: true, trailingSlash: \'always\', base: \'/docs\' }\n'),
+        Bun.write(join(site, 'kay.config.ts'), 'export default { assets: { favicon: false }, guards: { default: \'open\' }, client: { search: true }, trailingSlash: \'always\', base: \'/docs\' }\n'),
         Bun.write(join(site, 'src/routes/about.kay'), `--- server\n${PRERENDER}\n---\nh1 About\nh2#team The team\np Teamword\n`),
       ])
       await build(site)
@@ -259,8 +259,8 @@ describe('search', () => {
         await rm(site, { recursive: true, force: true })
       }
     }
-    const off = await built('search: false')
-    const on = await built('search: true')
+    const off = await built('client: { search: false }')
+    const on = await built('client: { search: true }')
 
     expect(off.holding).toEqual([])
     expect(on.holding.length).toBeGreaterThan(0)
@@ -278,7 +278,7 @@ describe('search', () => {
     process.chdir(root)
 
     try {
-      const app = await pages({ prebuilt: true, guards: { default: 'open' } })
+      const app = await pages({ prebuilt: true, config: { guards: { default: 'open' } } })
       const manifest = await Bun.file(join(client, 'search.json')).json() as SearchManifest
       const [listed, words] = await Promise.all([SEARCH_MANIFEST, `/_kay/search/${manifest.dir}/0/index.json`].map(async path => app.handle(new Request(`http://localhost${path}`))))
 
@@ -295,7 +295,7 @@ describe('search', () => {
 
     try {
       await Promise.all([
-        Bun.write(join(site, 'kay.config.ts'), 'export default { assets: { favicon: false }, search: true, guards: { default: \'closed\' }, trailingSlash: \'always\' }\n'),
+        Bun.write(join(site, 'kay.config.ts'), 'export default { assets: { favicon: false }, client: { search: true }, guards: { default: \'closed\' }, trailingSlash: \'always\' }\n'),
         Bun.write(join(site, 'src/routes/pricing.kay'), `--- server\n${PRERENDER}\n---\nh1 Pricing\np Pricingword\n`),
         Bun.write(join(site, 'src/routes/about.kay'), '--- server\nexport const page = { prerender: true, guards: false }\n---\nh1 About\np Aboutword\n'),
       ])
@@ -316,7 +316,7 @@ describe('search', () => {
 
     try {
       await Promise.all([
-        Bun.write(join(site, 'kay.config.ts'), 'export default { assets: { favicon: false }, guards: { default: \'open\' }, search: true }\n'),
+        Bun.write(join(site, 'kay.config.ts'), 'export default { assets: { favicon: false }, guards: { default: \'open\' }, client: { search: true } }\n'),
         Bun.write(join(site, 'src/components/finder.kay'), '---\nimport { searchResults, signal } from \'kay\'\n\nconst query = signal(\'\')\nconst { hits } = searchResults(query)\n---\ninput(aria-label="Search" bind:value={query})\nfor hit of hits() key={bare(hit.href)}\n  a(href={bare(hit.href)}) {hit.page}\n'),
         Bun.write(join(site, 'src/routes/index.kay'), '---\nimport Finder from \'../components/finder.kay\'\n---\nh1 Home\np Staticword\nFinder\n'),
       ])

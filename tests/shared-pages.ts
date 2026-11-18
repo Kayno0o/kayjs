@@ -3,12 +3,25 @@ import type { InternalConfig } from '../src/config'
 import type { ClientBuild } from '../src/server/client'
 import { inOutput, testWorker } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
+import { CONFIG_KEYS } from '../src/config-shape'
 import { clientOptionsOf, resolveProject } from '../src/project'
 import { pages as bundlingPages } from '../src/server'
-import { pagesApp, servePages } from '../src/server/app'
+import { flatOptions, pagesApp, servePages } from '../src/server/app'
 import { projectSource } from '../src/server/source'
 
-type PagesOptions = NonNullable<Parameters<typeof bundlingPages>[0]> & InternalConfig
+type RealOptions = NonNullable<Parameters<typeof bundlingPages>[0]>
+// The options of `pages()` with the config keys written beside `root`, which a test of this file does for brevity and `nested` lays into `config` before kay reads them.
+type PagesOptions = RealOptions & InternalConfig & NonNullable<RealOptions['config']>
+
+function nested(options: PagesOptions): RealOptions & InternalConfig {
+  const config: Record<string, unknown> = {}
+  const rest: Record<string, unknown> = {}
+
+  for (const [key, value] of Object.entries(options))
+    (CONFIG_KEYS.has(key) && key !== 'config' ? config : rest)[key] = value
+
+  return { ...rest, config: { ...config, ...options.config } }
+}
 
 const builds = new Map<string, Promise<ClientBuild>>()
 
@@ -28,12 +41,13 @@ export async function sharedClient(root: string, clientOptions: ClientOptions): 
 }
 
 // The project `pages(options)` serves, resolved as it does.
-async function projectOf(options: PagesOptions) {
+async function projectOf(flat: PagesOptions) {
+  const options = nested(flat)
   const source = projectSource()
   const mode = source.mode(options)
   const root = source.root(options.root ?? process.cwd())
 
-  return { mode, root, project: resolveProject(root, { ...await source.config(root, options), dev: mode.dev, prebuilt: mode.prebuilt }, mode) }
+  return { mode, root, project: resolveProject(root, { ...await source.config(root, flatOptions(options)), dev: mode.dev, prebuilt: mode.prebuilt }, mode) }
 }
 
 // Boots the site as `pages(options)` does, which loads its pages, and returns the browser build it serves: what `readClient(root)` gives a test reading the default output.
@@ -55,7 +69,9 @@ export async function bootedPages(options: PagesOptions = {}): Promise<Awaited<R
 // `pages()` for the tests that bundle the islands as the server boots: the build is made once per root and client options for the whole file, each into an output of its own so a later build never rewrites the files an earlier server serves.
 // Its fonts, and the assets its pages write, go to that output too, which the server serves from. A test reading the default output (`clientDir(root)`, `readClient(root)`, a manifest) takes `builtClient(options)` for the build instead, or keeps `pages()` from `src/server`, or leaves `prebuilt` unset; one changing the fixture between two servers keeps `pages()` from `src/server` too.
 // A development server and a prebuilt one go through `pages()` itself, and the key ignores function-valued options such as `plugins`, which no test here passes; the Bun check and boot-failure recording of `pages()` are skipped too.
-export async function pages(options: PagesOptions = {}): Promise<Awaited<ReturnType<typeof bundlingPages>>> {
+export async function pages(flat: PagesOptions = {}): Promise<Awaited<ReturnType<typeof bundlingPages>>> {
+  const options = nested(flat)
+
   if (options.dev || options.prebuilt !== false)
     return bundlingPages(options)
 

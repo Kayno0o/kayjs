@@ -5,8 +5,8 @@ import { fixtureCopy } from './scratch'
 const SETTINGS = /^const KAY = (.+)$/m
 const root = await fixtureCopy('bare')
 const sites = [
-  await testSite({ root, islands: false, offline: true }),
-  await testSite({ root, offline: { pages: ['/'], fallback: '/' } }),
+  await testSite({ root, islands: false, config: { client: { offline: true } } }),
+  await testSite({ root, config: { client: { offline: { pages: ['/'], fallback: '/' } } } }),
 ]
 
 afterAll(async () => {

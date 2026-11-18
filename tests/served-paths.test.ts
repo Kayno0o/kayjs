@@ -60,12 +60,12 @@ describe('served paths', () => {
 
   it('refuses a public file at a path a page serves in a locale, and one a redirect takes', async () => {
     const dir = await scratchDir('served-public-')
-    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') }
+    const i18n = { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') }
 
     await Bun.write(join(dir, 'en/about'), 'shadowed')
     await Bun.write(join(dir, 'old'), 'moved')
-    await expect(pages({ root: 'tests/fixtures/i18n', dirs: { public: dir }, prebuilt: false, i18n })).rejects.toThrow('and a page both serve /en/about')
-    await expect(pages({ root: 'tests/fixtures/site', dirs: { public: dir }, prebuilt: false, redirects: { '/old': '/about' } })).rejects.toThrow('/old and the redirect from /old both serve /old; remove one')
+    await expect(pages({ root: 'tests/fixtures/i18n', config: { dirs: { public: dir }, i18n }, prebuilt: false })).rejects.toThrow('and a page both serve /en/about')
+    await expect(pages({ root: 'tests/fixtures/site', config: { dirs: { public: dir }, redirects: { '/old': '/about' } }, prebuilt: false })).rejects.toThrow('/old and the redirect from /old both serve /old; remove one')
   })
 
   it('serves a public file at a path an HTML file or a translated page only offered', async () => {
@@ -80,7 +80,7 @@ describe('served paths', () => {
       Bun.write(join(publicDir, 'about'), 'about file'),
     ])
 
-    const app = await pages({ root: dir, dirs: { routes: 'routes', public: publicDir }, prebuilt: false, redirects: { '/old': '/' }, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages'), paths: { '/about': { fr: '/a-propos' } } } })
+    const app = await pages({ root: dir, config: { dirs: { routes: 'routes', public: publicDir }, redirects: { '/old': '/' }, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages'), paths: { '/about': { fr: '/a-propos' } } } }, prebuilt: false })
     const visit = async (path: string) => app.handle(new Request(`http://localhost${path}`))
 
     expect((await visit('/old')).headers.get('location')).toBe('/')
@@ -107,7 +107,7 @@ describe('served paths', () => {
     const root = await scratchDir('served-locales-')
 
     await Promise.all([
-      Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ i18n: { locales: ['fr', 'en'], default: 'fr', prefixDefault: true, paths: { '/about': { fr: '/a-propos' } } } })\n`),
+      Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ i18n: { locales: ['fr', 'en'], default: 'fr', mode: 'always', paths: { '/about': { fr: '/a-propos' } } } })\n`),
       Bun.write(join(root, 'src/routes/index.kay'), 'h1 Home\n'),
       Bun.write(join(root, 'src/routes/about.kay'), 'h1 About\n'),
       ...['fr', 'en'].map(async locale => Bun.write(join(root, `src/messages/${locale}.ts`), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n')),
@@ -126,7 +126,7 @@ describe('served paths', () => {
     expect(await refresh('en/about.html')).toBeUndefined()
 
     // Under `trailingSlash: 'always'`, the server's slash redirect comes first: each page sends where the path with its slash goes.
-    await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ base: '/b', trailingSlash: 'always', i18n: { locales: ['fr', 'en'], default: 'fr', prefixDefault: true, paths: { '/about': { fr: '/a-propos' } } } })\n`)
+    await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ base: '/b', trailingSlash: 'always', i18n: { locales: ['fr', 'en'], default: 'fr', mode: 'always', paths: { '/about': { fr: '/a-propos' } } } })\n`)
 
     const slashed = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe' })
     const [slashErrors, slashCode] = await Promise.all([new Response(slashed.stderr).text(), slashed.exited])

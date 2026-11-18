@@ -87,8 +87,6 @@ export interface CheckOptions extends Omit<Pick<KayConfig, (typeof CHECK_CONFIG)
   launch?: boolean | undefined
   // Set by `kay build --static`: a static host reads no `SITE_URL` once built, so a missing site is reported.
   exported?: boolean | undefined
-  // The header `proxy.key` names, which the fix of `testSite({ proxyKey })` writes beside the secret.
-  proxyHeader?: string | undefined
 }
 
 export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'severity' | 'fixes'> {
@@ -114,9 +112,8 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
 export function configCheckOptions(config: LoadedConfig): CheckOptions {
   const { ops, ...picked } = pickConfig(config, CHECK_CONFIG)
   const { observe } = ops ?? {}
-  const proxyHeader = typeof config.proxy === 'object' ? config.proxy.key?.header : undefined
 
-  return { ...picked, ...proxyHeader !== undefined && { proxyHeader }, ...config.store?.database !== undefined && { storeDatabase: config.store.database }, ...ops !== undefined && { ops: { health: ops.health, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader, loadBudget: observe.loadBudget } } } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
+  return { ...picked, ...config.store?.database !== undefined && { storeDatabase: config.store.database }, ...ops !== undefined && { ops: { health: ops.health, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader, loadBudget: observe.loadBudget } } } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

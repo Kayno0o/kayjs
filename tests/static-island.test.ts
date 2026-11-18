@@ -18,7 +18,7 @@ const MARKERS = /<!--.*?-->/g
 
 for (const { name, base, trailingSlash, dev, locale } of VARIANTS) {
   describe(`a use of an island that turns none of its interactive props on, ${name}`, () => {
-    const app = (async () => new Elysia().use(await pages({ root: 'tests/fixtures/static-island', prebuilt: false, security: false, base: base || undefined, trailingSlash, dev, i18n: locale === undefined ? undefined : { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })))()
+    const app = (async () => new Elysia().use(await pages({ root: 'tests/fixtures/static-island', prebuilt: false, config: { security: false, base: base || undefined, trailingSlash, i18n: locale === undefined ? undefined : { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, dev })))()
     const fetched = async (path: string): Promise<string> => (await (await app).handle(new Request(`http://localhost${locale === undefined ? '' : `/${locale}`}${path}${trailingSlash === 'always' ? '/' : ''}`))).text()
     // The markers the server writes for the browser to claim are left out of the markup read.
     const html = async (path: string): Promise<string> => (await fetched(path)).replace(MARKERS, '')

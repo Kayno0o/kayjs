@@ -17,8 +17,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('route() in
     await Bun.write(join(copy, 'src/components/linker.kay'), `---\nimport { route, signal } from 'kay'\nimport { localize } from 'kay/i18n'\n\nconst shown = signal(false)\n---\ndiv\n  a.ssr(href={${made}}) Post\n  a.localized(href={localize(${made}, 'fr')}) Post\n  button(type="button" onClick={() => shown.set(true)}) Show\n  if shown()\n    a.revealed(href={${made}}) Post\n    a.revealed-localized(href={localize(${made}, 'fr')}) Post\n`)
     await Bun.write(join(copy, 'src/routes/routed.kay'), '---\nimport Linker from \'../components/linker.kay\'\n---\nLinker\n')
 
-    const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages', paths: { '/blog/:slug': { en: '/articles/:slug' } } }
-    const site = await testSite({ root: copy, i18n, base, browser: { path } })
+    const i18n = { locales: ['fr', 'en'], default: 'fr', messages: 'src/messages', paths: { '/blog/:slug': { en: '/articles/:slug' } } }
+    const site = await testSite({ root: copy, config: { i18n, base }, browser: { path } })
     const front = Bun.serve({
       port: 0,
       async fetch(request) {

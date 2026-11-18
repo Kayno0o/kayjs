@@ -53,7 +53,7 @@ describe('what a guard hands on', () => {
       Bun.write(join(dir, 'api/sock.ts'), 'import { api } from \'kay/server\'\n\nexport default api<{ who: string }>().ws(\'/\', { message(ws) {\n  ws.send(ws.data.guard)\n} })\n'),
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api({ guards: false })\n  .get(\'/\', ({ guard }) => ({ keys: Object.keys(guard) }))\n'),
     ])
-    app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
+    app = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' } }, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

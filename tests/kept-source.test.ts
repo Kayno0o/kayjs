@@ -71,7 +71,7 @@ describe('what a kept page\'s scan reads of a source', () => {
   })
 
   it('reads nothing in the value of `lastmod`, which the sitemap reads and no render does', () => {
-    const source = '--- server\nexport const page = { lastmod: new Date() }\n---\np x\n'
+    const source = '--- server\nexport const page = { seo: { lastmod: new Date() } }\n---\np x\n'
     const value = source.indexOf('new Date()')
 
     expect(readKeptSource('a.kay', source, { start: value, end: value + 'new Date()'.length }).read).toBeUndefined()
@@ -192,7 +192,7 @@ describe('a page the scan reads from its parse', () => {
     const root = await scratchDir('kept-source-')
     const files = {
       'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } } })\n',
       'src/routes/index.kay': '---\nconst tone = [\'mt-1\', \'mt-2\'][0]\n---\np(class={tone}) Hi\n',
     }
 

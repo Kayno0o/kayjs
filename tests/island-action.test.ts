@@ -11,8 +11,8 @@ import { decodeValue, encodeValue, serverWritten, unflattenValue } from '../src/
 import { browserPath, testSite } from '../src/test'
 
 const site = await testSite({ root: 'tests/fixtures/island-action', browser: true })
-const mounted = await testSite({ root: 'tests/fixtures/island-action', islands: false, base: '/blog', trailingSlash: 'always' })
-const localized = await testSite({ root: 'tests/fixtures/island-action', islands: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
+const mounted = await testSite({ root: 'tests/fixtures/island-action', islands: false, config: { base: '/blog', trailingSlash: 'always' } })
+const localized = await testSite({ root: 'tests/fixtures/island-action', islands: false, config: { i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } } })
 const developed = await testSite({ root: 'tests/fixtures/island-action', islands: false, dev: true })
 const fixture = join(import.meta.dir, 'fixtures/island-action/src')
 const { greet } = await import(join(fixture, 'routes/index.kay')) as { greet: Action<{ name: string }, string> }

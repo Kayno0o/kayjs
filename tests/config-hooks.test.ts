@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { mergeConfig, withConfig } from '../src/config-loader'
 import { resolveConfig } from '../src/config-resolve'
 import { flatOptions } from '../src/server/app'
 import { loggerOf } from '../src/server/log'
@@ -17,21 +18,19 @@ describe('the flat hooks and the grouped log', () => {
     expect(resolved.onError).toBe(onError)
   })
 
-  test('the old onStart and observe.onError resolve to the new keys, the new ones winning', async () => {
-    const onStart = hook()
-    const onError = hook()
-    const own = hook()
-    const old = await resolveConfig({ onStart, observe: { onError } })
-
-    expect(old.onListen).toBe(onStart)
-    expect(old.onError).toBe(onError)
-    expect(old.ops?.observe).toEqual({})
-    expect((await resolveConfig({ onStart, onListen: own })).onListen).toBe(own)
+  test('the old onStart and observe are refused, naming the new keys', () => {
+    expect(() => mergeConfig({}, { onStart: hook() } as never)).toThrow('`onStart`, now `onListen`')
+    expect(() => mergeConfig({}, { observe: { log: 'json' } } as never)).toThrow('`observe`, now `ops.observe`')
   })
 
-  test('observe.log as \'json\' or a function resolves to the group', async () => {
-    expect((await resolveConfig({ observe: { log: 'json' } })).ops?.observe?.log).toEqual({ format: 'json' })
-    expect((await resolveConfig({ observe: { log: quiet } })).ops?.observe?.log).toEqual({ sink: quiet })
+  test('an old nested key given in code is refused, not dropped', async () => {
+    await expect(withConfig('tests/fixtures/static', { mcp: { key: 'secret' } } as never)).rejects.toThrow('`mcp.key`, moved to `mcp.token`')
+    await expect(withConfig('tests/fixtures/static', { serve: { apiPrefix: '/v1' } } as never)).rejects.toThrow('`serve.apiPrefix`, moved to `endpoints.api`')
+  })
+
+  test('observe.log takes a format or a sink', async () => {
+    expect((await resolveConfig({ ops: { observe: { log: { format: 'json' } } } })).ops?.observe?.log).toEqual({ format: 'json' })
+    expect((await resolveConfig({ ops: { observe: { log: { sink: quiet } } } })).ops?.observe?.log).toEqual({ sink: quiet })
   })
 
   test('loggerOf reads format, requests and sink', () => {
@@ -48,7 +47,7 @@ describe('pages and testSite options', () => {
     const flat = flatOptions({ root: '.', config: { site: 'https://a.test', trailingSlash: 'always' } })
 
     expect(flat as object).toEqual({ root: '.', site: 'https://a.test', trailingSlash: 'always' })
-    expect(flatOptions({ root: '.', site: 'https://a.test', config: { site: 'https://b.test' } }).site).toBe('https://b.test')
-    expect(flatOptions({ root: '.', site: 'https://a.test' })).toEqual({ root: '.', site: 'https://a.test' })
+    expect(flatOptions({ root: '.' })).toEqual({ root: '.' })
+    expect(() => flatOptions({ root: '.', site: 'https://a.test' } as never)).toThrow('config keys beside `root`')
   })
 })

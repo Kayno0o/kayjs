@@ -9,7 +9,7 @@ it('hands an endpoint its path value decoded once, with a suffix and a trailing 
   await Bun.write(join(root, 'src/routes/e/[name].json.ts'), 'export function GET({ params }: { params: { name: string } }) { return params.name }\n')
   await Bun.write(join(root, 'src/routes/p/[name].txt.ts'), 'export function GET({ params }: { params: { name: string } }) { return params.name }\n')
 
-  const site = await testSite({ root, base: '/shop', trailingSlash: 'always' })
+  const site = await testSite({ root, config: { base: '/shop', trailingSlash: 'always' } })
 
   try {
     expect(await (await site.fetch('/e/a%2Fb.json')).text()).toBe('a/b')

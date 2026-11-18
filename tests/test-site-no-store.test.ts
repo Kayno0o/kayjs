@@ -52,7 +52,7 @@ it('gives each site files of its own, released as it closes, whichever closes fi
 it('serves the files a test names, with no store configured', async () => {
   const mine = memoryFiles()
   const outside = defaultFileStore()
-  const site = await testSite({ root: await storeLessRoot(), islands: false, store: { files: mine } })
+  const site = await testSite({ root: await storeLessRoot(), islands: false, config: { store: { files: mine } } })
 
   try {
     expect(appStore()?.files).toBe(mine)

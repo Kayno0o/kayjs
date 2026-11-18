@@ -64,7 +64,7 @@ describe('a client per test', () => {
 
   it('posts as the client the header of a trusted proxy names', async () => {
     const limited = await limit()
-    const proxied = await testSite({ root: 'tests/fixtures/session', use: [session({ secret: 'a test secret of at least 32 characters' })], proxy: { header: 'x-real-ip' } })
+    const proxied = await testSite({ root: 'tests/fixtures/session', use: [session({ secret: 'a test secret of at least 32 characters' })], config: { proxy: { header: 'x-real-ip' } } })
     const from = (address: string) => ({ headers: { 'x-real-ip': address } })
 
     expect(await proxied.call(limited, {}, from('203.0.113.9'))).toBe('ok')

@@ -605,10 +605,10 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
   }
 
   const { lists } = named
-  const run: ActionRun = { action: named.name, file: named.file, input: context.body, ctx }
+  const run: ActionRun = { action: named.name, file: named.file, input: context.body }
 
   try {
-    const stopping = await refusedBeforeRun(lists, run)
+    const stopping = await refusedBeforeRun(lists, run, ctx)
 
     if (stopping !== undefined) {
       if (stopping.retryAfter !== undefined)
@@ -631,7 +631,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // A library's failed result, such as kayjs-auth's, returned as it is: its status and `data` refuse the call, a string `data` being the form's message.
     if (isFailure(result)) {
-      await tellError(lists, run, { status: result.status, message: typeof result.data === 'string' ? result.data : result.errors?.[''] ?? '', errors: result.errors ?? {}, data: result.data, error: undefined })
+      await tellError(lists, run, ctx, { status: result.status, message: typeof result.data === 'string' ? result.data : result.errors?.[''] ?? '', errors: result.errors ?? {}, data: result.data, error: undefined })
 
       return await failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: { ...typeof result.data === 'string' ? { '': result.data } : {}, ...result.errors }, data: result.data }, context.server, back)
     }
@@ -641,7 +641,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     const answer = isAsyncIterable(result) ? await (streams ? started : lastOf)(gathering(result, invalidated, askedKeys(request)), requestSignal(request)) : result
 
     await countGoneThrough(action, request, context.server, options)
-    await tellSuccess(lists, run, answer)
+    await tellSuccess(lists, run, ctx, answer)
 
     // A stream names its keys on its end event, as the handler goes on invalidating until then.
     invalidatedHeader(invalidated, headers, isCall(request) && !streams)
@@ -654,11 +654,11 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     // Sent on after it went through, as to a thank-you page.
     if (error instanceof Redirect) {
       await countGoneThrough(action, request, context.server, options)
-      await tellSuccess(lists, run, undefined)
+      await tellSuccess(lists, run, ctx, undefined)
     }
 
     if (error instanceof Denied || error instanceof NotFound)
-      await tellError(lists, run, { status: error instanceof Denied ? error.status : 404, message: error instanceof Denied ? error.message : 'Not Found', errors: {}, data: undefined, error })
+      await tellError(lists, run, ctx, { status: error instanceof Denied ? error.status : 404, message: error instanceof Denied ? error.message : 'Not Found', errors: {}, data: undefined, error })
 
     if (error instanceof Redirect || error instanceof Denied || error instanceof NotFound)
       return stopped(error, request, state, options)
@@ -671,7 +671,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // A library's limit, such as kayjs-ai's, answers like the action's own rate limit.
     if (refused !== undefined) {
-      await tellError(lists, run, { status: refused.status, message: refused.message, errors: refused.errors, data: refused.data, error })
+      await tellError(lists, run, ctx, { status: refused.status, message: refused.message, errors: refused.errors, data: refused.data, error })
 
       if (refused.retryAfter !== undefined)
         headers.set('retry-after', String(refused.retryAfter))
@@ -681,7 +681,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // A mistake, or a service the handler relies on gone down: logged as any server error, and told the visitor beside the form they keep, as a refusal is.
     reportServerError(error, request, options.onError)
-    await tellError(lists, run, { status: 500, message: 'Internal server error', errors: {}, data: undefined, error })
+    await tellError(lists, run, ctx, { status: 500, message: 'Internal server error', errors: {}, data: undefined, error })
 
     return failed(request, headers, jar.cookies, { action: action.url, status: 500, values: submittedValues(context.body), errors: { '': await serverErrorMessage(action, error, ctx, request, options.onError) } }, context.server, back)
   }

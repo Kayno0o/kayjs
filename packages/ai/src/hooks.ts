@@ -6,13 +6,6 @@ import { answersAsFake } from './fake'
 const SLOT = Symbol.for('kayjs-ai.hooks')
 const NAMES = ['beforeRequest', 'afterStep', 'afterToolCall', 'afterRequest', 'onError'] as const
 
-// The `on` names of 1.104 still work until 1.108: each is read where its `after` name is not written.
-function settled(options: AskHooks): AskHooks {
-  const { onStep, onToolCall, onSuccess, ...rest } = options
-
-  return { ...rest, afterStep: rest.afterStep ?? onStep, afterToolCall: rest.afterToolCall ?? onToolCall, afterRequest: rest.afterRequest ?? onSuccess }
-}
-
 // The hooks an ask runs, each one's list in order: `ai()`'s first, then the ask's.
 export interface Hooks {
   beforeRequest: readonly BeforeHook<RequestHookCall, RequestHookChange>[]
@@ -34,8 +27,7 @@ function slot(): AskHooks {
 }
 
 // Called by `ai()`, which the app's config runs again on every reload: the hooks are replaced.
-export function configureHooks(given: AskHooks): void {
-  const options = settled(given)
+export function configureHooks(options: AskHooks): void {
   const next: AskHooks = {}
 
   for (const name of NAMES) {
@@ -58,8 +50,7 @@ function listed<Fn>(...hooks: (Fn | undefined)[]): Fn[] {
 }
 
 // The hooks an ask runs: those `ai()` set, then those named in its own options. The fake answering an ask is no real provider, so a hook set in `ai()` (a bill, an audit trail) is not run for it; one given to the ask itself is.
-export function hooksFor(given: AskHooks, provider: Provider): Hooks {
-  const options = settled(given)
+export function hooksFor(options: AskHooks, provider: Provider): Hooks {
   const set = slot()
   const fake = answersAsFake(provider)
 

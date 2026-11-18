@@ -28,7 +28,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
   let site: TestSite
 
   beforeAll(async () => {
-    site = await testSite({ root: ROOT, extensions: [ui(), who()], plugins: [tailwind], browser: { path: chrome }, trailingSlash: 'always' })
+    site = await testSite({ root: ROOT, config: { extensions: [ui(), who()], plugins: [tailwind], trailingSlash: 'always' }, browser: { path: chrome } })
   }, 180_000)
 
   afterAll(async () => {

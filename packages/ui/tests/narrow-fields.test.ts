@@ -9,7 +9,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('fields at 
   let site: Awaited<ReturnType<typeof testSite>>
 
   beforeAll(async () => {
-    site = await testSite({ root: FIXTURE, extensions: [ui()], browser: { path } })
+    site = await testSite({ root: FIXTURE, config: { extensions: [ui()] }, browser: { path } })
   }, 120_000)
 
   afterAll(async () => site.close())

@@ -71,7 +71,7 @@ afterAll(async () => {
 })
 
 async function open(options: Record<string, unknown> = {}) {
-  const site = await testSite({ root: dir, dirs: { routes: 'routes' }, islands: false, ...options })
+  const site = await testSite({ root: dir, islands: false, config: { dirs: { routes: 'routes' }, ...options } })
 
   sites.push(site)
 

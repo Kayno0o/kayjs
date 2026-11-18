@@ -6,14 +6,14 @@ import { schedule, talks } from './fixtures/scheduled/src/content.config'
 import { scratchBuild } from './prerendered'
 
 const FIXTURE = 'tests/fixtures/scheduled/src'
-const OPTIONS = { dirs: { routes: `${FIXTURE}/routes` }, contentConfig: `${FIXTURE}/content.config.ts`, security: false as const, site: 'https://talks.example', observe: { log: false as const } }
+const OPTIONS = { dirs: { routes: `${FIXTURE}/routes` }, contentConfig: `${FIXTURE}/content.config.ts`, security: false as const, site: 'https://talks.example', ops: { observe: { log: false as const } } }
 const NOW = new Date('2026-10-19T12:00:00Z')
 
 // The servers a test started, stopped as it ends, so none keeps watching the dates of the next test's entries.
 const servers: Awaited<ReturnType<ScratchBuild['serve']>>[] = []
 
 async function serve(scratch: ScratchBuild) {
-  const app = await scratch.serve(OPTIONS)
+  const app = await scratch.serve({ config: OPTIONS })
 
   servers.push(app)
 

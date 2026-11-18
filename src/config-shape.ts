@@ -1,5 +1,5 @@
 import type { BudgetConfig } from './build/budget'
-import type { ActionsConfig, AssetsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DeprecatedMcp, DeprecatedOpenApi, DeprecatedPath, DeprecatedServe, DirsConfig, EndpointsConfig, FaviconConfig, HealthConfig, I18nInput, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, ManifestShareTarget, MarkdownConfig, MetricsConfig, ObserveInput, OfflineConfig, OpsConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
+import type { ActionsConfig, AssetsConfig, CardConfig, ClientConfig, ConfigInput, CookieDefaults, DirsConfig, EndpointsConfig, FaviconConfig, HealthConfig, I18nInput, ImageFormats, ImageLimits, ImagesInput, JobsConfig, LimitsConfig, LiveConfig, LogConfig, ManifestConfig, ManifestShareTarget, MarkdownConfig, MetricsConfig, ObserveConfig, OfflineConfig, OpsConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
 import type { Rule } from './config-rules'
 import type { McpConfig } from './server/api-modules'
 import type { OpenApiConfig } from './server/openapi'
@@ -11,38 +11,36 @@ import { nearest } from './nearest'
 const localized = either(str, map(str))
 const guardOption = either(fn, list(fn), bag({ load: fn }), lit(false))
 const SECURITY_KEYS: Record<keyof SecurityConfig, Rule> = { csp: either(bool, map(either(list(str), lit(false)))), reportOnly: map(either(list(str), lit(false))), reports: either(lit(true), str), permissions: map(either(str, list(str), lit(false))), headers: map(either(str, lit(false))), hosts: either(fn, list(str), bool), cookies: either(bool, bag({ httpOnly: bool, sameSite: oneOf('lax', 'strict', 'none'), secure: either(bool, oneOf('auto')), path: str } satisfies Record<keyof CookieDefaults, Rule>)) }
-const I18N: Record<keyof I18nInput, Rule> = { locales: list(str), default: str, mode: either(oneOf('prefix', 'always'), bag({ domains: map(str) })), defaultLocale: str, prefixDefault: bool, domains: map(str), paths: either(fn, map(map(str))), messages: str }
-const I18N_BAG = bag(I18N, ({ locales, default: named, defaultLocale }, path, out) => {
-  const chosen = named ?? defaultLocale
-
+const I18N: Record<keyof I18nInput, Rule> = { locales: list(str), default: str, mode: either(oneOf('prefix', 'always'), bag({ domains: map(str) })), paths: either(fn, map(map(str))), messages: str }
+const I18N_BAG = bag(I18N, ({ locales, default: chosen }, path, out) => {
   if (Array.isArray(locales) && typeof chosen === 'string' && !locales.includes(chosen))
-    out.push(`\`${path}.${named === undefined ? 'defaultLocale' : 'default'}\` is ${JSON.stringify(chosen)}, expected one of its locales: ${locales.map(locale => JSON.stringify(locale)).join(', ')}`)
+    out.push(`\`${path}.default\` is ${JSON.stringify(chosen)}, expected one of its locales: ${locales.map(locale => JSON.stringify(locale)).join(', ')}`)
 })
 const SEO: Record<keyof SeoConfig, Rule> = { name: localized, titleTemplate: localized, description: localized, image: localized, imageAlt: localized, noindex: bool, twitter: str, locale: localized, themeColor: either(str, bag({ light: str, dark: str })), jsonLd: list(obj) }
 const DIRS: Record<keyof DirsConfig, Rule> = { routes: str, api: str, public: str }
 const LIMITS: Record<keyof LimitsConfig, Rule> = { body: bytes, byPath: map(bytes) }
-const SERVE: Record<keyof (ServeConfig & DeprecatedServe), Rule> = { apiPrefix: str, compress: bool, compressionDictionary: bool, shutdownTimeout: duration, timeout: either(duration, lit(false)) }
+const SERVE: Record<keyof ServeConfig, Rule> = { compress: bool, compressionDictionary: bool, shutdownTimeout: duration, timeout: either(duration, lit(false)) }
 const LOG: Record<keyof LogConfig, Rule> = { format: oneOf('text', 'json'), requests: bool, sink: fn }
-const OBSERVE: Record<keyof ObserveInput, Rule> = { log: either(bool, oneOf('json'), fn, bag(LOG)), serverTiming: bool, loadBudget: either(duration, lit(false)), requestIdHeader: str, tracer: true, extract: either(fn, lit(false)), onError: fn }
+const OBSERVE: Record<keyof ObserveConfig, Rule> = { log: either(bool, bag(LOG)), serverTiming: bool, loadBudget: either(duration, lit(false)), requestIdHeader: str, tracer: true, extract: either(fn, lit(false)) }
 const OFFLINE: Record<keyof OfflineConfig, Rule> = { pages: list(str), fallback: str }
 const LINKS = bag({ outside: oneOf('new-tab', 'same-tab'), schemes: list(str) })
 const HYDRATION = bag({ visible: str, serverIslands: str })
 const CLIENT: Record<keyof ClientConfig, Rule> = { navigation: bool, inlineStyles: bool, lateStyles: bool, typography: bool, hydration: HYDRATION, prefetch: either(oneOf('conservative', 'moderate', 'eager'), lit(false)), saveData: bool, pageTimeout: duration, loadingDelay: duration, offline: either(bool, bag(OFFLINE)), search: bool, links: LINKS }
 const ACTIONS: Record<keyof ActionsConfig, Rule> = { protect: either(lit(false), obj), maxSize: bytes, messages: obj, beforeRun: fn, onSuccess: fn, onError: fn }
-const HEALTH: Record<keyof (HealthConfig & DeprecatedPath), Rule> = { path: str, timeout: duration, check: fn }
+const HEALTH: Record<keyof HealthConfig, Rule> = { timeout: duration, check: fn }
 const SECRET = either(str, bag({ env: str, file: str }))
-const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted: either(fn, list(str)), trustPrivate: lit(false), key: either(str, bag({ header: str, secret: SECRET })), open: list(str) }
+const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted: either(fn, list(str)), trustPrivate: lit(false), key: bag({ header: str, secret: SECRET }), open: list(str) }
 const ENDPOINTS: Record<keyof EndpointsConfig, Rule> = { api: str, openapi: str, mcp: str, health: str, metrics: str, jobs: str }
-const OPENAPI: Record<keyof (OpenApiConfig & DeprecatedOpenApi), Rule> = { title: str, version: str, path: str, reference: either(bool, bag({ path: str })), referencePath: str, dev: bool }
-const MCP: Record<keyof (McpConfig & DeprecatedMcp), Rule> = { path: str, rateLimit: either(bool, obj), token: either(lit(true), SECRET), key: either(bool, str, bag({ file: str })), instructions: str }
+const OPENAPI: Record<keyof OpenApiConfig, Rule> = { title: str, version: str, reference: either(bool, bag({ path: str })), dev: bool }
+const MCP: Record<keyof McpConfig, Rule> = { rateLimit: either(bool, obj), token: either(lit(true), SECRET), instructions: str }
 const SITEMAP: Record<keyof SitemapConfig, Rule> = { ttl: duration }
 const ROBOTS: Record<keyof RobotsConfig, Rule> = { disallow: either(fn, list(str)), allow: either(fn, list(str)) }
 const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: duration, sharedNotBefore: fn }
 // The limit of kay's own routes: `RateLimit` but for `key`, as they count the client's address.
 const KAY_ROUTE_LIMIT: Record<string, Rule> = { max: num, window: duration, store: obj, onLimit: fn }
 const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)) }
-const JOBS: Record<keyof (JobsConfig & DeprecatedPath), Rule> = { guards: guardOption, path: str }
-const METRICS: Record<keyof (MetricsConfig & DeprecatedPath), Rule> = { path: str, token: either(lit(true), SECRET) }
+const JOBS: Record<keyof JobsConfig, Rule> = { guards: guardOption }
+const METRICS: Record<keyof MetricsConfig, Rule> = { token: either(lit(true), SECRET) }
 const BUDGET: Record<keyof BudgetConfig, Rule> = { js: bytes, css: bytes, weight: bytes, grade: oneOf('A', 'B', 'C', 'D', 'E', 'F', 'G') }
 const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
 const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: either(str, bag({ light: str, dark: str })), backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj), shareTarget: bag({ action: str, files: list(str), params: bag({ title: str, text: str, url: str, files: str }) } satisfies Record<keyof ManifestShareTarget, Rule>) }
@@ -52,7 +50,7 @@ const AVIF = either(bool, bag({ quality: num }))
 const REMOTE_IMAGES: Record<keyof RemoteImages, Rule> = { hosts: either(fn, list(str)), maxSize: bytes, timeout: duration }
 const IMAGE_FORMATS: Record<keyof ImageFormats, Rule> = { quality: num, webp: bag({ quality: num }), avif: AVIF }
 const IMAGE_LIMITS: Record<keyof ImageLimits, Rule> = { variants: either(num, lit(false)), queue: either(num, lit(false)) }
-const IMAGES: Record<keyof ImagesInput, Rule> = { ttl: duration, dirs: map(str), remote: either(fn, list(str), bag(REMOTE_IMAGES)), formats: bag(IMAGE_FORMATS), limits: bag(IMAGE_LIMITS), remoteMaxSize: bytes, remoteTimeout: duration, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: AVIF, maxDensity: numOrInfinity, placeholder: bool, aspects: list(str), card: bag(CARD), resolve: fn, guards: guardOption }
+const IMAGES: Record<keyof ImagesInput, Rule> = { ttl: duration, dirs: map(str), remote: either(fn, list(str), bag(REMOTE_IMAGES)), formats: bag(IMAGE_FORMATS), limits: bag(IMAGE_LIMITS), rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)), widths: list(num), maxDensity: numOrInfinity, placeholder: bool, aspects: list(str), card: bag(CARD), resolve: fn, guards: guardOption }
 const ASSETS: Record<keyof AssetsConfig, Rule> = { images: bag(IMAGES), fonts: list(obj), favicon: either(str, bool, bag(FAVICON)), manifest: bag(MANIFEST), publicCache: map(duration) }
 const OPS: Record<keyof OpsConfig, Rule> = { observe: bag(OBSERVE), health: either(bool, bag(HEALTH)), metrics: either(bool, bag(METRICS)), jobs: bag(JOBS) }
 const CORS = bag({ origins: either(oneOf('*'), list(str), fn), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
@@ -63,18 +61,15 @@ const CONFIG: Record<keyof ConfigInput, Rule> = {
   endpoints: bag(ENDPOINTS),
   assets: bag(ASSETS),
   ops: bag(OPS),
-  observe: bag(OBSERVE),
   client: bag(CLIENT),
   actions: bag(ACTIONS),
   beforeRequest: fn,
   onResponse: fn,
   onListen: fn,
-  onStart: fn,
   onStop: fn,
   onError: fn,
 
   i18n: I18N_BAG,
-  publicCache: map(duration),
   minify: bool,
   lang: str,
   site: str,
@@ -82,30 +77,20 @@ const CONFIG: Record<keyof ConfigInput, Rule> = {
   robots: either(bool, bag(ROBOTS)),
   sitemap: either(bool, bag(SITEMAP)),
   head: list(obj),
-  images: bag(IMAGES),
   budget: bag(BUDGET),
-  favicon: either(str, bool, bag(FAVICON)),
-  manifest: bag(MANIFEST),
   entry: str,
-  offline: either(bool, bag(OFFLINE)),
-  search: bool,
-  fonts: list(obj),
   security: either(bool, bag(SECURITY_KEYS)),
-  proxy: either(bool, num, bag(PROXY)),
+  proxy: either(bool, bag(PROXY)),
   guards: bag({ default: oneOf('open', 'closed') }),
   cors: CORS,
   openapi: either(bool, bag(OPENAPI)),
   mcp: either(bool, bag(MCP)),
-  health: either(bool, bag(HEALTH)),
-  metrics: either(bool, bag(METRICS)),
-  jobs: bag(JOBS),
   rewrite: true,
   redirects: true,
   runtimeRedirects: bag({ hosts: list(str) }),
   live: bag(LIVE),
   timeZone: str,
   base: str,
-  links: LINKS,
   trailingSlash: oneOf('never', 'always', 'ignore'),
   contentConfig: str,
   markdown: bag(MARKDOWN),
@@ -115,13 +100,24 @@ const CONFIG: Record<keyof ConfigInput, Rule> = {
   secret: either(str, list(str)),
   preview: either(bool, bag(PREVIEW)),
   store: true,
-  env: true,
   envFiles: true,
   checks: true,
   extensions: list(obj),
 }
 
-// The names a config key had before 1.88 (`fileStore` before 1.87) and no longer has, each with where it lives now: one is reported as an unknown key naming its replacement.
+// The keys inside a group that moved before 1.105, by their path, each with where it lives now.
+const REMOVED_NESTED: Record<string, string> = {
+  'mcp.key': 'mcp.token',
+  'mcp.path': 'endpoints.mcp',
+  'openapi.path': 'endpoints.openapi',
+  'openapi.referencePath': 'openapi.reference.path',
+  'serve.apiPrefix': 'endpoints.api',
+  'i18n.defaultLocale': 'i18n.default',
+  'i18n.prefixDefault': 'i18n.mode: \'always\'',
+  'i18n.domains': 'i18n.mode: { domains }',
+}
+
+// The names a config key had before 1.88 (`fileStore` before 1.87) or before 1.105 and no longer has, each with where it lives now: one is reported as an unknown key naming its replacement.
 export const REMOVED_KEYS: Record<string, string> = {
   routes: 'dirs.routes',
   api: 'dirs.api',
@@ -150,12 +146,26 @@ export const REMOVED_KEYS: Record<string, string> = {
   hydration: 'client.hydration',
   prefetch: 'client.prefetch',
   saveData: 'client.saveData',
+  onStart: 'onListen',
+  offline: 'client.offline',
+  search: 'client.search',
+  links: 'client.links',
+  images: 'assets.images',
+  fonts: 'assets.fonts',
+  favicon: 'assets.favicon',
+  manifest: 'assets.manifest',
+  publicCache: 'assets.publicCache',
+  observe: 'ops.observe',
+  health: 'ops.health',
+  metrics: 'ops.metrics',
+  jobs: 'ops.jobs',
+  env: 'envFiles',
 }
 
 // The keys the config takes at its top level, which `kay check` tells from the other options of `pages()` and `testSite()`.
 export const CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(CONFIG))
 
-export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'endpoints', 'observe', 'client', 'assets', 'ops'] as const
+export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'endpoints', 'client', 'assets', 'ops'] as const
 
 export const isBag = isRecord
 
@@ -211,7 +221,8 @@ export function unknownConfigKeys(config: object): string[] {
       }
 
       const found = nearest(key, Object.keys(known))
-      const removed = path === '' && Object.hasOwn(REMOVED_KEYS, key) ? REMOVED_KEYS[key] : undefined
+      const table = path === '' ? REMOVED_KEYS : REMOVED_NESTED
+      const removed = Object.hasOwn(table, `${path}${key}`) ? table[`${path}${key}`] : undefined
       // A typo of a name that moved is offered with where it lives now.
       const oldName = removed === undefined && found === undefined && path === '' ? nearest(key, Object.keys(REMOVED_KEYS)) : undefined
       let hint = ''

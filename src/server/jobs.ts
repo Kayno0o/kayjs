@@ -133,12 +133,8 @@ export type ScheduleCron<Cron extends string = string> = { cron: Cron & CronSche
 export function schedule<const Every extends Duration>(options: ScheduleEvery<Every>, jobs: Jobs): KayPlugin
 export function schedule<const Cron extends string>(options: ScheduleCron<Cron>, jobs: Jobs): KayPlugin
 export function schedule<const Table extends Record<string, Jobs>>(table: Table & { readonly [Key in keyof Table & string]: WhenOf<Key> }, options?: ScheduleOptions): KayPlugin
-/** @deprecated `schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it. */
-export function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions): KayPlugin
-/** @deprecated `schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it. */
-export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions): KayPlugin
-export function schedule(first: Duration | string | Record<string, Jobs> | ScheduleEvery | ScheduleCron, second?: Jobs | ScheduleOptions, third?: ScheduleOptions) {
-  const { entries, options } = scheduled(first, second, third)
+export function schedule(first: Record<string, Jobs> | ScheduleEvery | ScheduleCron, second?: Jobs | ScheduleOptions) {
+  const { entries, options } = scheduled(first, second)
 
   if ('tz' in options)
     throw new KayError('config-invalid', 'kay: schedule takes timeZone, not tz, which 1.102 dropped')
@@ -164,10 +160,10 @@ export function schedule(first: Duration | string | Record<string, Jobs> | Sched
   return kayPlugin(plugins.length === 1 ? plugins[0]! : plugins.reduce((app, plugin) => app.use(plugin), new Elysia()))
 }
 
-// The schedules and the options of a call, whichever of its three shapes it is: an options object with `every` or `cron` and the jobs, a table of schedules to jobs and its options, or, before 1.105, the schedule, the jobs and the options.
-function scheduled(first: unknown, second: unknown, third: unknown): { entries: (readonly [Duration | string, Jobs])[], options: ScheduleOptions } {
+// The schedules and the options of a call, whichever of its two shapes it is: an options object with `every` or `cron` and the jobs, or a table of schedules to jobs and its options.
+function scheduled(first: unknown, second: unknown): { entries: (readonly [Duration | string, Jobs])[], options: ScheduleOptions } {
   if (typeof first !== 'object' || first === null)
-    return { entries: [[first as Duration | string, second as Jobs]], options: third as ScheduleOptions | undefined ?? {} }
+    throw new KayError('config-invalid', 'kay: schedule takes `{ every }`, `{ cron }` or a table of schedules to jobs')
 
   if (!('every' in first || 'cron' in first))
     return { entries: Object.entries(first as Record<string, Jobs>), options: second as ScheduleOptions | undefined ?? {} }

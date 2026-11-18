@@ -228,7 +228,7 @@ describe('cached', () => {
   })
 
   it('shares a value across requests from a page\'s server fence', async () => {
-    const app = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, security: false }))
+    const app = new Elysia().use(await pages({ root: 'tests/fixtures/production', prebuilt: false, config: { security: false } }))
     const visit = async () => (await app.handle(new Request('http://localhost/feed'))).text()
 
     feed.items = ['one']
@@ -345,7 +345,7 @@ describe('cached with a store', () => {
 
     try {
       await build.prerender({})
-      const app = await build.serve({ root: 'tests/fixtures/production', security: false, observe: { serverTiming: true } })
+      const app = await build.serve({ root: 'tests/fixtures/production', config: { security: false, ops: { observe: { serverTiming: true } } } })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 
       expect(await visit()).toContain('<h1>Edition 1</h1>')
@@ -381,7 +381,7 @@ describe('cached with a store', () => {
     try {
       await build.prerender({})
 
-      const app = await build.serve({ root: 'tests/fixtures/production', security: false })
+      const app = await build.serve({ root: 'tests/fixtures/production', config: { security: false } })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 
       expect(await visit()).toContain('<h1>Edition 1</h1>')

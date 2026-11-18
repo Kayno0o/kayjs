@@ -13,7 +13,7 @@ async function sitemapOf(entries: { slug: string, translationKey?: string }[]): 
   count++
   const items = entries.map(({ slug, translationKey }) => `{ slug: '${slug}', data: { title: 'x'${translationKey === undefined ? '' : `, translationKey: '${translationKey}'`} } }`).join(', ')
 
-  await Bun.write(file, `import { s } from 'kay'\nimport { collection } from 'kay/content'\n\nexport const page = { sitemap: collection({ name: 'sitemap-translated-${count}', load: () => [${items}] }, { schema: s.Object({ title: s.String(), translationKey: s.Optional(s.String()) }), localized: true }) }\n`)
+  await Bun.write(file, `import { s } from 'kay'\nimport { collection } from 'kay/content'\n\nexport const page = { seo: { sitemap: collection({ name: 'sitemap-translated-${count}', load: () => [${items}] }, { schema: s.Object({ title: s.String(), translationKey: s.Optional(s.String()) }), localized: true }) } }\n`)
   const route = { pattern: '/blog/:slug', params: ['slug'], file, layouts: [], guards: [] } as unknown as ServedRoute
 
   return [...(await sitemapXml([route], 'https://x.example', undefined, SETTINGS)).matchAll(/<url>.*?<\/url>/g)].map(match => match[0])

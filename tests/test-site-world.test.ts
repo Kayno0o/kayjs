@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { testSite } from '../src/test'
 
-const site = await testSite({ guards: { default: 'open' }, root: 'tests/fixtures/site' })
+const site = await testSite({ config: { guards: { default: 'open' } }, root: 'tests/fixtures/site' })
 
 describe('site.fetchStub', () => {
   it('answers a call to the matching address and lists what it received', async () => {

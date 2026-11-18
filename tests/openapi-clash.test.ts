@@ -3,6 +3,6 @@ import { testSite } from '../src/test'
 
 describe('the OpenAPI document', () => {
   it('refuses to start when a module serves the path the document or its page is served at', async () => {
-    await expect(testSite({ root: 'tests/fixtures/openapi-clash', openapi: { reference: true } })).rejects.toThrow('serves /api/reference, where `openapi` serves its reference page')
+    await expect(testSite({ root: 'tests/fixtures/openapi-clash', config: { openapi: { reference: true } } })).rejects.toThrow('serves /api/reference, where `openapi` serves its reference page')
   })
 })

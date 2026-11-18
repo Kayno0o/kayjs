@@ -122,7 +122,7 @@ describe('kay routes', () => {
     const root = await scratchDir('routes-domains-')
 
     await Promise.all([
-      Bun.write(join(root, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\', domains: { en: \'example.com\', fr: \'example.fr\' }, paths: { \'/about\': { fr: \'/a-propos\' } } } }\n'),
+      Bun.write(join(root, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], default: \'en\', mode: { domains: { en: \'example.com\', fr: \'example.fr\' } }, paths: { \'/about\': { fr: \'/a-propos\' } } } }\n'),
       Bun.write(join(root, 'src/routes/about.kay'), 'h1 About\n'),
     ])
 
@@ -169,7 +169,7 @@ describe('the dev tool\'s data', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const dev = await pages({ root, dirs: { routes, api }, dev: true })
+      const dev = await pages({ root, config: { dirs: { routes, api } }, dev: true })
       const request = async (path: string) => {
         const html = await (await dev.handle(new Request(`http://localhost${path}`))).text()
 
@@ -198,13 +198,13 @@ describe('the dev tool\'s data', () => {
       ])
 
       // An app sending no `Server-Timing` still sees its loads timed in the dev tool.
-      const untimed = await pages({ root, dirs: { routes, api }, observe: { serverTiming: false }, dev: true })
+      const untimed = await pages({ root, config: { dirs: { routes, api }, ops: { observe: { serverTiming: false } } }, dev: true })
       const response = await untimed.handle(new Request('http://localhost/items/1'))
 
       expect(response.headers.has('server-timing')).toBe(false)
       expect((JSON.parse(REQUEST_BLOCK.exec(await response.text())![1]!) as DevRequest).loads[1]!.ms).toBeGreaterThanOrEqual(4)
 
-      const served = await pages({ root, dirs: { routes, api } })
+      const served = await pages({ root, config: { dirs: { routes, api } } })
 
       expect(await (await served.handle(new Request('http://localhost/items/1'))).text()).not.toContain('kay-dev-request')
       expect((await served.handle(new Request(`http://localhost${DEV_ROUTES}`))).status).toBe(404)
@@ -219,7 +219,7 @@ const CONTENT = 'tests/fixtures/content'
 const FAVICON = resolve('tests/fixtures/seo/src/favicon.png')
 
 async function listedBy(options: Parameters<typeof pages>[0]): Promise<DevRoutes> {
-  const dev = await pages({ prebuilt: false, security: false, dev: true, ...options })
+  const dev = await pages({ prebuilt: false, config: { security: false }, dev: true, ...options })
 
   return await (await dev.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoutes
 }
@@ -227,14 +227,7 @@ async function listedBy(options: Parameters<typeof pages>[0]): Promise<DevRoutes
 describe('the dev tool\'s routes served by kay', () => {
   it('lists the sitemap, robots.txt, a feed, the manifest and a library\'s pages, each GET path linked', async () => {
     const library = new Elysia().get('/_kay/lib', () => 'lib').post('/_kay/lib/clear', () => 'cleared')
-    const { routes, notes } = await listedBy({
-      root: CONTENT,
-      site: 'https://blog.example',
-      favicon: FAVICON,
-      seo: { name: 'Blog' },
-      manifest: { shortName: 'Blog' },
-      extensions: [{ name: 'kayjs-lib', server: library }],
-    })
+    const { routes, notes } = await listedBy({ root: CONTENT, config: { site: 'https://blog.example', seo: { name: 'Blog' }, extensions: [{ name: 'kayjs-lib', server: library }], assets: { favicon: FAVICON, manifest: { shortName: 'Blog' } } } })
     const kay = routes.filter(route => route.kind === 'kay')
     const at = (path: string) => kay.find(route => route.path === path)
 
@@ -286,18 +279,18 @@ describe('the dev tool\'s routes served by kay', () => {
     await Bun.write(join(dir, 'routes/health.kay'), 'p Mine\n')
     await Bun.write(join(dir, 'routes/up.txt.ts'), 'export function GET() {\n  return \'mine\'\n}\n')
 
-    const own = await pages({ root, dirs: { routes }, dev: true, health: { path: '/health' } })
+    const own = await pages({ root, config: { dirs: { routes }, endpoints: { health: '/health' }, ops: { health: {} } }, dev: true })
     const listed = (await (await own.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoutes).routes
 
     expect(listed.filter(route => route.path === '/health').map(route => route.kind)).toEqual(['page'])
     expect(await (await own.handle(new Request('http://localhost/health'))).text()).toContain('Mine')
 
-    const endpoint = await pages({ root, dirs: { routes }, dev: true, health: { path: '/up.txt' } })
+    const endpoint = await pages({ root, config: { dirs: { routes }, endpoints: { health: '/up.txt' }, ops: { health: {} } }, dev: true })
 
     expect(await (await endpoint.handle(new Request('http://localhost/up.txt'))).text()).toBe('mine')
 
-    const custom = await pages({ root, dirs: { routes }, dev: true, health: { path: '/ping' } })
-    const standard = await pages({ root, dirs: { routes }, dev: true })
+    const custom = await pages({ root, config: { dirs: { routes }, endpoints: { health: '/ping' }, ops: { health: {} } }, dev: true })
+    const standard = await pages({ root, config: { dirs: { routes } }, dev: true })
 
     expect((await custom.handle(new Request('http://localhost/ping'))).status).toBe(200)
     expect((await standard.handle(new Request('http://localhost/_kay/health'))).status).toBe(200)
@@ -326,7 +319,7 @@ describe('the dev tool\'s routes served by kay', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const dev = await pages({ root, dirs: { routes }, dev: true, guards: { default: 'open' }, redirects: { '/old': '/static', '/away': 'https://other.example/static' } })
+      const dev = await pages({ root, config: { dirs: { routes }, guards: { default: 'open' }, redirects: { '/old': '/static', '/away': 'https://other.example/static' } }, dev: true })
       const visit = async (path: string, headers: Record<string, string> = {}) => {
         const response = await dev.handle(new Request(`http://localhost${path}`, { headers, redirect: 'manual' }))
         const block = REQUEST_BLOCK.exec(await response.text())
@@ -411,7 +404,7 @@ describe('the dev tool\'s routes served by kay', () => {
     const closed = new Elysia().onBeforeHandle({ as: 'global' }, ({ request }) => new URL(request.url).pathname === '/_kay/health' ? new Response('closed', { status: 401 }) : undefined)
     const settings = { root, dirs: { routes }, redirects: { '/old': '/login' }, trailingSlash: 'never' as const }
     const outcomes = async (dev: boolean, extensions: NonNullable<Parameters<typeof pages>[0]>['extensions'] = []) => {
-      const app = await pages({ ...settings, dev, extensions })
+      const app = await pages({ ...settings, dev, config: { extensions } })
       const noted: (string | undefined)[] = []
 
       for (const path of ['/old', '/login/', '/members']) {
@@ -427,7 +420,7 @@ describe('the dev tool\'s routes served by kay', () => {
     expect((await outcomes(false)).noted).toEqual([undefined, undefined, undefined])
     expect((await outcomes(true)).noted[0]).toBe('the redirect from /old')
     expect((await outcomes(true)).noted[2]).toBe(`the guard ${at}/members/_guard.ts`)
-    expect((await (await pages({ ...settings, extensions: [{ name: 'closed', server: closed }] })).handle(new Request('http://localhost/_kay/health/'))).status).toBe(200)
+    expect((await (await pages({ ...settings, config: { extensions: [{ name: 'closed', server: closed }] } })).handle(new Request('http://localhost/_kay/health/'))).status).toBe(200)
     expect((await outcomes(false, [{ name: 'closed', server: closed }])).health).toBe(200)
     expect((await outcomes(true, [{ name: 'closed', server: closed }])).health).toBe(200)
   })
@@ -439,17 +432,17 @@ describe('the dev tool\'s i18n tab data', () => {
   it('lists the page in each locale under the base and the locale paths, and leaves a site without i18n, or with one locale, out', async () => {
     const { root, routes } = await site()
     const request = async (options: Parameters<typeof pages>[0], path: string) => {
-      const dev = await pages({ root, dirs: { routes }, dev: true, security: false, ...options })
+      const dev = await pages({ root, config: { dirs: { routes }, security: false }, dev: true, ...options })
       const html = await (await dev.handle(new Request(`http://localhost${path}`))).text()
 
       return JSON.parse(REQUEST_BLOCK.exec(html)![1]!) as DevRequest
     }
-    const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: MESSAGES }
+    const i18n = { locales: ['en', 'fr'], default: 'en', messages: MESSAGES }
 
     expect((await request({ i18n }, '/'))).toMatchObject({ locale: 'en', locales: [{ locale: 'en', href: '/' }, { locale: 'fr', href: '/fr' }] })
     expect((await request({ i18n }, '/fr/broken')).locales).toEqual([{ locale: 'en', href: '/broken' }, { locale: 'fr', href: '/fr/broken' }])
     expect((await request({ i18n, base: '/shop' }, '/')).locales).toEqual([{ locale: 'en', href: '/shop/' }, { locale: 'fr', href: '/shop/fr' }])
-    expect((await request({ i18n: { ...i18n, domains: { en: 'example.com', fr: 'example.fr' } } }, '/')).locales).toEqual([{ locale: 'en', href: '//example.com/' }, { locale: 'fr', href: '//example.fr/' }])
+    expect((await request({ i18n: { ...i18n, mode: { domains: { en: 'example.com', fr: 'example.fr' } } } }, '/')).locales).toEqual([{ locale: 'en', href: '//example.com/' }, { locale: 'fr', href: '//example.fr/' }])
     expect((await request({}, '/')).locales).toBeUndefined()
     expect((await request({ i18n: { locales: ['en'], default: 'en', messages: MESSAGES } }, '/')).locales).toBeUndefined()
   })

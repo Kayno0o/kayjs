@@ -30,7 +30,7 @@ async function sameDocument(page: TestPage): Promise<boolean> {
 // The entries of a production build: a page posting forms and holding no island loads navigation alone, which links and posts between such pages keep, a page holding islands loads in full from it, and a page running the islands' entry swaps the form-only pages in.
 const MODES: [name: string, options: TestOptions, prefix: string, slash: string][] = [
   ['at the root', {}, '', ''],
-  ['under a base with trailing slashes, in a locale', { base: '/blog', trailingSlash: 'always', i18n: { locales: ['fr', 'en'], default: 'fr', messages: MESSAGES } }, '/blog/en', '/'],
+  ['under a base with trailing slashes, in a locale', { config: { base: '/blog', trailingSlash: 'always', i18n: { locales: ['fr', 'en'], default: 'fr', messages: MESSAGES } } }, '/blog/en', '/'],
 ]
 
 for (const [name, options, prefix, slash] of MODES) {
@@ -54,7 +54,7 @@ for (const [name, options, prefix, slash] of MODES) {
       expect(login).toMatch(NAV_ENTRY)
       expect(login).not.toMatch(ISLANDS_ENTRY)
       expect(login).toContain('<meta name="kay-build"')
-      expect(login.match(NAV_ENTRY)![1]!.startsWith(`${options.base ?? ''}/_kay/`)).toBe(true)
+      expect(login.match(NAV_ENTRY)![1]!.startsWith(`${options.config?.base ?? ''}/_kay/`)).toBe(true)
       expect(home).toMatch(ISLANDS_ENTRY)
       expect(home).not.toContain('data-kay-nav')
     })
@@ -159,10 +159,10 @@ describe('a prerendered page holding a server island and posting a form', () => 
   it('loads the islands\' entry, not the navigation-only one, whether the island is spliced in or deferred', async () => {
     const root = await fixtureCopy('navigation-entry')
 
-    await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } } })\n')
     expect((await kayBuild([root, '--no-check'])).code).toBe(0)
 
-    const app = new Elysia().use(await pages({ root, prebuilt: true, observe: { log: false }, serve: { compress: false } }))
+    const app = new Elysia().use(await pages({ root, prebuilt: true, config: { serve: { compress: false }, ops: { observe: { log: false } } } }))
 
     for (const path of ['/joined', '/deferred']) {
       const html = await (await app.handle(new Request(`http://localhost${path}`))).text()

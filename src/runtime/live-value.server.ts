@@ -544,7 +544,7 @@ function datedTogether(id: string): void {
           continue
 
         try {
-          const sent = store.endAll(dated, lengthFor(store, ttl))
+          const sent = store.endAll(dated, lengthFor(ttl))
 
           if (sent !== undefined)
             void logged(sent, dated)

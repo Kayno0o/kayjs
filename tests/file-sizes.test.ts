@@ -5,7 +5,7 @@ import { s } from '../src/runtime/schema'
 import { testSite } from '../src/test'
 
 const MB = 1024 * 1024
-const site = await testSite({ root: 'tests/fixtures/file-sizes', islands: false, security: false })
+const site = await testSite({ root: 'tests/fixtures/file-sizes', islands: false, config: { security: false } })
 const actions = await import(join(import.meta.dir, 'fixtures/file-sizes/src/routes/index.kay')) as {
   upload: Action<{ file: File }, number>
   own: Action<{ file: File }, number>

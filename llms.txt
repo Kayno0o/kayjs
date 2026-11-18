@@ -96,8 +96,6 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [SEO lints](llms/seo-lints.md): `seo`
 - [Performance lints](llms/performance-lints.md): `performance`
 - [Deprecated lints](llms/deprecated-lints.md): old forms and fixes
-- [Deprecated lints of 1.105](llms/deprecated-lints-1-105.md): the 1.105 old forms and fixes
-- [Deprecated lints of the 1.105 libraries](llms/deprecated-lints-1-105-libraries.md): old forms of the libraries
 - [Errors](llms/errors.md): codes and fixes
 - [Thrown errors](llms/errors-runtime.md): `Result`
 - [Project setup](llms/project.md): `kay.config.ts`, tsconfig, Astro

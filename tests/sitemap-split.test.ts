@@ -10,7 +10,7 @@ const CLI = resolve('src/cli.ts')
 // The limits are lowered so a few dozen pages split.
 const LIMIT = 20
 const MANY = LIMIT + 10
-const PAGE = `--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { sitemap: Array.from({ length: ${MANY} }, (_, number) => ({ n: String(number) })) }\n---\nh1 Many\n`
+const PAGE = `--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { seo: { sitemap: Array.from({ length: ${MANY} }, (_, number) => ({ n: String(number) })) } }\n---\nh1 Many\n`
 const COUNT = /<url>/g
 const LOCS = /<sitemap><loc>([^<]+)<\/loc><\/sitemap>/g
 
@@ -30,7 +30,7 @@ async function app(options: Parameters<typeof pages>[0] = {}) {
 }
 
 async function build(options: Parameters<typeof pages>[0]) {
-  return pages({ dirs: { routes: join(root, 'src/routes') }, observe: { onError: ({ error, request }) => void errors.push([error, request]) }, prebuilt: false, security: false, site: 'https://x.example', ...options })
+  return pages({ config: { dirs: { routes: join(root, 'src/routes') }, onError: ({ error, request }) => void errors.push([error, request]), security: false, site: 'https://x.example' }, prebuilt: false, ...options })
 }
 
 async function read(served: Awaited<ReturnType<typeof app>>, path: string, host = 'localhost') {
@@ -111,7 +111,7 @@ describe('a sitemap past its limits', () => {
 
     await Bun.write(join(copy, 'src/routes/[slug].kay'), '--- server\nexport const page = { prerender: false }\n---\nh1 Slug\n')
 
-    const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example' })
+    const served = await pages({ root: copy, prebuilt: false, config: { security: false, site: 'https://x.example' } })
 
     expect((await read(served, '/sitemap-guide')).text).toContain('Slug')
   })
@@ -125,7 +125,7 @@ describe('a sitemap past its limits', () => {
   })
 
   it('gives each host of a site by domain its own index on its own host', async () => {
-    const served = await app({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], default: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: join(root, 'src/messages') } })
+    const served = await app({ site: 'https://x.fr', i18n: { locales: ['fr', 'en'], default: 'fr', mode: { domains: { fr: 'x.fr', en: 'x.com' } }, messages: join(root, 'src/messages') } })
     const english = await read(served, '/sitemap.xml', 'x.com')
     const french = await read(served, '/sitemap.xml', 'x.fr')
 
@@ -135,7 +135,7 @@ describe('a sitemap past its limits', () => {
   })
 
   it('agrees on the base in the parts, the URLs and robots.txt of a site by domain', async () => {
-    const served = await app({ site: 'https://x.fr', base: '/docs', i18n: { locales: ['fr', 'en'], default: 'fr', domains: { fr: 'x.fr', en: 'x.com' }, messages: join(root, 'src/messages') } })
+    const served = await app({ site: 'https://x.fr', base: '/docs', i18n: { locales: ['fr', 'en'], default: 'fr', mode: { domains: { fr: 'x.fr', en: 'x.com' } }, messages: join(root, 'src/messages') } })
     const index = await read(served, '/sitemap.xml', 'x.com')
     const robots = await read(served, '/robots.txt', 'x.com')
 
@@ -146,7 +146,7 @@ describe('a sitemap past its limits', () => {
   })
 
   it('is one plain sitemap again for the same site under the limit', async () => {
-    const served = await app({ dirs: { routes: 'tests/fixtures/site-output/src/routes' } })
+    const served = await app({ config: { dirs: { routes: 'tests/fixtures/site-output/src/routes' }, security: false, site: 'https://x.example' } })
     const plain = await read(served, '/sitemap.xml')
 
     expect(plain.text).toContain('<urlset')
@@ -163,10 +163,10 @@ describe('a lastmod that cannot be read', () => {
       for (const dev of [false, true]) {
         const copy = await fixtureCopy('site-output')
 
-        await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), `--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { sitemap: [{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }], lastmod: ({ slug }) => { if (slug === 'b') throw new Error('Database down'); return slug === 'a' ? '2026-02-31' : '2026-05-06' } }\n---\nh1 Post\n`)
+        await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), `--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { seo: { sitemap: [{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }], lastmod: ({ slug }) => { if (slug === 'b') throw new Error('Database down'); return slug === 'a' ? '2026-02-31' : '2026-05-06' } } }\n---\nh1 Post\n`)
         errors.length = 0
 
-        const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example', dev, observe: { onError: ({ error, request }) => void errors.push([error, request]) } })
+        const served = await pages({ root: copy, prebuilt: false, config: { security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]) }, dev })
         const { status, text } = await read(served, '/sitemap.xml')
 
         expect(status).toBe(200)
@@ -190,10 +190,10 @@ describe('a sitemap built without a lastmod', () => {
     const copy = await fixtureCopy('site-output')
     const down = globalThis as { sitemapDatabaseDown?: boolean }
 
-    await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { sitemap: [{ slug: \'a\' }], lastmod: () => { if ((globalThis as { sitemapDatabaseDown?: boolean }).sitemapDatabaseDown) throw new Error(\'Database down\'); return \'2026-05-06\' } }\n---\nh1 Post\n')
+    await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { seo: { sitemap: [{ slug: \'a\' }], lastmod: () => { if ((globalThis as { sitemapDatabaseDown?: boolean }).sitemapDatabaseDown) throw new Error(\'Database down\'); return \'2026-05-06\' } } }\n---\nh1 Post\n')
 
     try {
-      const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example', observe: { onError: ({ error, request }) => void errors.push([error, request]) } })
+      const served = await pages({ root: copy, prebuilt: false, config: { security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]) } })
       const fetched = async () => served.handle(new Request('http://localhost/sitemap.xml'))
 
       down.sitemapDatabaseDown = true
@@ -224,11 +224,11 @@ describe('the sitemap ttl', () => {
     const copy = await fixtureCopy('site-output')
     const counted = globalThis as { sitemapBuilds?: number }
 
-    await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nexport const page = { sitemap: [{ slug: \'a\' }], lastmod: () => { const state = globalThis as { sitemapBuilds?: number }; state.sitemapBuilds = (state.sitemapBuilds ?? 0) + 1; return \'2026-05-06\' } }\n---\nh1 Post\n')
+    await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nexport const page = { seo: { sitemap: [{ slug: \'a\' }], lastmod: () => { const state = globalThis as { sitemapBuilds?: number }; state.sitemapBuilds = (state.sitemapBuilds ?? 0) + 1; return \'2026-05-06\' } } }\n---\nh1 Post\n')
 
     try {
       const builds = async (sitemap?: { ttl: `${number}${'s' | 'm'}` }) => {
-        const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example', ...sitemap && { sitemap } })
+        const served = await pages({ root: copy, prebuilt: false, config: { security: false, site: 'https://x.example' }, ...sitemap && { sitemap } })
 
         counted.sitemapBuilds = 0
         await (await served.handle(new Request('http://localhost/sitemap.xml'))).text()
@@ -255,11 +255,11 @@ describe('a sitemap with a lastmod that is no date', () => {
     const copy = await fixtureCopy('site-output')
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
-    await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { sitemap: [{ slug: \'a\' }], lastmod: () => \'2026-02-31\' }\n---\nh1 Post\n')
+    await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nprocess.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\nexport const page = { seo: { sitemap: [{ slug: \'a\' }], lastmod: () => \'2026-02-31\' } }\n---\nh1 Post\n')
     errors.length = 0
 
     try {
-      const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example', observe: { onError: ({ error, request }) => void errors.push([error, request]) } })
+      const served = await pages({ root: copy, prebuilt: false, config: { security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]) } })
       const fetched = async () => served.handle(new Request('http://localhost/sitemap.xml'))
       const first = await fetched()
 
@@ -281,7 +281,7 @@ describe('a static export', () => {
     const copy = await fixtureCopy('static')
     const out = join(copy, 'out')
 
-    await Bun.write(join(copy, 'src/routes/many/[n].kay'), `--- server\nconst list = Array.from({ length: ${MANY} }, (_, number) => ({ n: String(number) }))\n\nexport const page = { prerender: list, sitemap: list }\n---\nh1 Many\n`)
+    await Bun.write(join(copy, 'src/routes/many/[n].kay'), `--- server\nconst list = Array.from({ length: ${MANY} }, (_, number) => ({ n: String(number) }))\n\nexport const page = { prerender: list, seo: { sitemap: list } }\n---\nh1 Many\n`)
 
     // The build runs in a process of its own, which a preload gives the lowered limits.
     const preload = join(copy, 'limits.ts')
@@ -305,11 +305,11 @@ describe('a static export', () => {
 describe('a sitemap whose build read more keys than a page keeps', () => {
   it('is rebuilt by an invalidation of any key, as it stands for all of them', async () => {
     const copy = await fixtureCopy('site-output')
-    const page = '--- server\nimport { cached } from \'kay/cache\'\nasync function listed() {\n  process.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\n  return Promise.all(Array.from({ length: 250 }, async (_, number) => ({ n: String(await cached(`overflow-${number}`, \'1h\', () => number)) })))\n}\nexport const page = { sitemap: listed }\n---\nh1 Overflow\n'
+    const page = '--- server\nimport { cached } from \'kay/cache\'\nasync function listed() {\n  process.env.OVERFLOW_BUILDS = String(Number(process.env.OVERFLOW_BUILDS ?? 0) + 1)\n  return Promise.all(Array.from({ length: 250 }, async (_, number) => ({ n: String(await cached(`overflow-${number}`, \'1h\', () => number)) })))\n}\nexport const page = { seo: { sitemap: listed } }\n---\nh1 Overflow\n'
 
     await Bun.write(join(copy, 'src/routes/overflow/[n].kay'), page)
 
-    const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example' })
+    const served = await pages({ root: copy, prebuilt: false, config: { security: false, site: 'https://x.example' } })
     const builds = () => Number(process.env.OVERFLOW_BUILDS)
 
     await read(served, '/sitemap.xml')
@@ -325,7 +325,7 @@ describe('a sitemap whose build read more keys than a page keeps', () => {
 })
 
 describe('a sitemap built while a key is invalidated', () => {
-  const page = '--- server\nimport { cached } from \'kay/cache\'\nasync function listed() {\n  process.env.INFLIGHT_BUILDS = String(Number(process.env.INFLIGHT_BUILDS ?? 0) + 1)\n  await cached(\'inflight-key\', \'1h\', () => 1)\n  await Bun.sleep(300)\n  return [{ n: \'1\' }]\n}\nexport const page = { sitemap: listed }\n---\nh1 Inflight\n'
+  const page = '--- server\nimport { cached } from \'kay/cache\'\nasync function listed() {\n  process.env.INFLIGHT_BUILDS = String(Number(process.env.INFLIGHT_BUILDS ?? 0) + 1)\n  await cached(\'inflight-key\', \'1h\', () => 1)\n  await Bun.sleep(300)\n  return [{ n: \'1\' }]\n}\nexport const page = { seo: { sitemap: listed } }\n---\nh1 Inflight\n'
   const builds = () => Number(process.env.INFLIGHT_BUILDS)
 
   // Invalidates `key` once the build has begun, and reads the sitemap again after it ended.
@@ -335,7 +335,7 @@ describe('a sitemap built while a key is invalidated', () => {
     await Bun.write(join(copy, 'src/routes/inflight/[n].kay'), page)
     process.env.INFLIGHT_BUILDS = '0'
 
-    const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example' })
+    const served = await pages({ root: copy, prebuilt: false, config: { security: false, site: 'https://x.example' } })
     const first = read(served, '/sitemap.xml')
     const { invalidate } = await import('../src/runtime/cache')
 

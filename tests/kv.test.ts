@@ -35,7 +35,7 @@ describe.each(kinds)('the %s kv store', (_name, open) => {
   it('drops a value once its ttl has passed', async () => {
     const store = await open()
 
-    await store.set('a', 'one', 1000)
+    await store.set('a', 'one', '1s')
     expect(await store.get('a')).toBe('one')
     setSystemTime(Date.now() + 1001)
     expect(await store.get('a')).toBeUndefined()
@@ -44,21 +44,21 @@ describe.each(kinds)('the %s kv store', (_name, open) => {
 
   it('takes a key once until its ttl passes, however many ask together', async () => {
     const store = await open()
-    const taken = await Promise.all(Array.from({ length: 5 }, async () => store.once('ticket', 1000)))
+    const taken = await Promise.all(Array.from({ length: 5 }, async () => store.once('ticket', '1s')))
 
     expect(taken.filter(Boolean)).toHaveLength(1)
-    expect(await store.once('ticket', 1000)).toBe(false)
+    expect(await store.once('ticket', '1s')).toBe(false)
     setSystemTime(Date.now() + 1001)
-    expect(await store.once('ticket', 1000)).toBe(true)
+    expect(await store.once('ticket', '1s')).toBe(true)
   })
 
   it('takes a key a value is kept under only after it ended, and lets a deleted one be taken', async () => {
     const store = await open()
 
     await store.set('a', 'one')
-    expect(await store.once('a', 1000)).toBe(false)
+    expect(await store.once('a', '1s')).toBe(false)
     await store.delete('a')
-    expect(await store.once('a', 1000)).toBe(true)
+    expect(await store.once('a', '1s')).toBe(true)
   })
 })
 
@@ -67,7 +67,7 @@ describe('the process memory fallback and a closed store', () => {
     const store = memoryKv(3)
 
     await store.set('a', '1')
-    await store.set('b', '2', 1)
+    await store.set('b', '2', '1ms')
     await store.set('c', '3')
     await Bun.sleep(5)
     await store.set('d', '4')
@@ -132,7 +132,7 @@ describe('kv(namespace)', () => {
     await first.set('a', 'one')
     expect(await second.get('a')).toBeUndefined()
     expect(await first.get('a')).toBe('one')
-    expect(await second.once('a', 1000)).toBe(true)
+    expect(await second.once('a', '1s')).toBe(true)
     expect(await first.delete('a')).toBe(true)
   })
 
@@ -161,13 +161,13 @@ describe('the Postgres kv store', () => {
     expect(await second.delete('pg:a')).toBe(true)
     expect(await first.delete('pg:a')).toBe(false)
 
-    const taken = await Promise.all([first, second, first, second].map(async store => store.once('pg:ticket', 60_000)))
+    const taken = await Promise.all([first, second, first, second].map(async store => store.once('pg:ticket', '1m')))
 
     expect(taken.filter(Boolean)).toHaveLength(1)
 
-    await first.set('pg:short', 'x', 50)
+    await first.set('pg:short', 'x', '50ms')
     await Bun.sleep(120)
     expect(await second.get('pg:short')).toBeUndefined()
-    expect(await second.once('pg:short', 60_000)).toBe(true)
+    expect(await second.once('pg:short', '1m')).toBe(true)
   })
 })

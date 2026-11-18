@@ -138,7 +138,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
 
         return new Promise<void>(noop)
       })
-    }, { store, lostAfter: '300ms' })
+    }, { store, timeout: '300ms' })
     const id = await first.start()
     const draining = first.drain()
 
@@ -248,7 +248,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const flow = workflow<undefined>(named(), async (_, { step }) => {
       await step.run('slow', async () => Bun.sleep(450))
       await step.run('next', () => void calls.push('next'))
-    }, { store, lostAfter: '300ms' })
+    }, { store, timeout: '300ms' })
 
     await flow.start()
     await flow.drain()
@@ -812,7 +812,7 @@ pgDescribe('two workflows on separate Postgres connections', () => {
 
         calls.push('two')
       })
-    }, { lostAfter: '1s' })
+    }, { timeout: '1s' })
     const id = await first.start()
     const draining = first.drain()
 

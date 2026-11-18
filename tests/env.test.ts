@@ -354,7 +354,7 @@ describe('kay env', () => {
     expect(named('AGENT_TOKEN')).toMatchObject({ source: 'mcp.token', required: 'production', secret: true })
     expect(named('KAY_MCP_KEY')).toBeUndefined()
 
-    for (const mcp of ['true', '{ token: "a-literal-key-0123456789" }', '{ token: { file: "data/mcp-key" } }', '{ key: false }', '{}']) {
+    for (const mcp of ['true', '{ token: "a-literal-key-0123456789" }', '{ token: { file: "data/mcp-key" } }', '{}']) {
       const none = await listing(mcp)
 
       expect(none('KAY_MCP_KEY')).toBeUndefined()
@@ -417,7 +417,7 @@ describe('a compiled server', () => {
       'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
       'kay.config.ts': 'export default { assets: { favicon: false } }\n',
       'src/routes/index.kay': 'p Home\n',
-      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { defineEnv, pages } from \'kay/server\'\nimport { s } from \'kay\'\n\nconst env = defineEnv(s.Object({ SESSION_SECRET: s.String({ default: \'dev\', requiredInProduction: true }) }))\nawait new Elysia().use(await pages({ security: false })).handle(new Request(\'http://localhost/\'))\nconsole.log(env.SESSION_SECRET)\nprocess.exit(0)\n',
+      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { defineEnv, pages } from \'kay/server\'\nimport { s } from \'kay\'\n\nconst env = defineEnv(s.Object({ SESSION_SECRET: s.String({ default: \'dev\', requiredInProduction: true }) }))\nawait new Elysia().use(await pages({ config: { security: false } })).handle(new Request(\'http://localhost/\'))\nconsole.log(env.SESSION_SECRET)\nprocess.exit(0)\n',
     })
     const built = Bun.spawn([process.execPath, cli, 'build', root, '--compile', join(root, 'server'), '--no-check'], { stdout: 'pipe', stderr: 'pipe' })
 
@@ -755,7 +755,7 @@ describe('kay env against compose and .env.example', () => {
     expect((await run(await project({ ...files, 'app.env': '' }), [])).findings).toHaveLength(1)
     expect((await run(await project({ 'kay.config.ts': files['kay.config.ts'], 'src/env.ts': env }), [])).findings).toBeUndefined()
 
-    const configured = await project({ ...files, 'kay.config.ts': 'export default { assets: { favicon: false }, env: { compose: \'compose.yaml\', example: \'.env.example\' } }\n', 'app.env': '' })
+    const configured = await project({ ...files, 'kay.config.ts': 'export default { assets: { favicon: false }, envFiles: { compose: \'compose.yaml\', example: \'.env.example\' } }\n', 'app.env': '' })
     const { code, findings } = await run(configured, [])
 
     expect(code).toBe(1)
@@ -765,7 +765,7 @@ describe('kay env against compose and .env.example', () => {
   it('has kay check compare the root compose files by default, and env: false turns it off for kay check and kay env', async () => {
     const broken = { ...files, 'app.env': '' }
     const problems = async (root: string) => (JSON.parse((await kay(['check', '--format', 'json'], root)).stdout) as { problems: { message: string }[] }).problems.map(({ message }) => message)
-    const off = { ...broken, 'kay.config.ts': 'export default { assets: { favicon: false }, env: false }\n' }
+    const off = { ...broken, 'kay.config.ts': 'export default { assets: { favicon: false }, envFiles: false }\n' }
 
     expect(await problems(await project(broken))).toContain('DISCORD_ID is required in production (src/env.ts) and no service of compose.yaml sets it')
     expect(await problems(await project(files))).not.toContain('DISCORD_ID is required in production (src/env.ts) and no service of compose.yaml sets it')
@@ -854,8 +854,8 @@ describe('kay env against compose and .env.example', () => {
     const bad = async (config: string) => kay(['check', await project({ ...files, 'kay.config.ts': config })], process.cwd())
 
     expect((await bad('export default { checks: 42 }\n')).stderr).toContain('`checks` in kay.config.ts is a list of functions')
-    expect((await bad('export default { env: { compose: 42 } }\n')).stderr).toContain('`env` in kay.config.ts is `{ compose, example }`')
-    expect((await bad('export default { env: \'x\' }\n')).stderr).toContain('`env` in kay.config.ts is `{ compose, example }`')
+    expect((await bad('export default { envFiles: { compose: 42 } }\n')).stderr).toContain('`envFiles` in kay.config.ts is `{ compose, example }`')
+    expect((await bad('export default { envFiles: \'x\' }\n')).stderr).toContain('`envFiles` in kay.config.ts is `{ compose, example }`')
   })
 
   it('refuses publicEnv in the config, written in kay.config.ts or brought by an extension, and types it out of defineConfig', async () => {
@@ -877,14 +877,14 @@ describe('kay env against compose and .env.example', () => {
     expect((await bad('export default { nothing: 1 }\n')).stderr).toContain('`nothing`')
     expect((await bad('export default { limits: \'4mb\' }\n')).stderr).toContain('`limits` in kay.config.ts is an object of options, `limits: { ... }`, not "4mb"')
     expect((await bad('export default { serve: false, limits: { body: \'4mb\' } }\n')).stderr).toContain('`serve` in kay.config.ts is an object of options')
-    expect((await bad('export default { lang: \'en\', offline: true, health: false, security: false }\n')).stderr).not.toContain('does not know')
+    expect((await bad('export default { lang: \'en\', client: { offline: true }, ops: { health: false }, security: false }\n')).stderr).not.toContain('does not know')
     // @ts-expect-error a key kay does not know, next to valid ones
     expect(defineConfig({ lang: 'en', trailingslash: 'always' })).toBeDefined()
     // @ts-expect-error the same through a spread
     expect(defineConfig({ ...spread, prefech: 'eager' })).toBeDefined()
     // @ts-expect-error a mistyped key of an option bag
     expect(defineConfig({ security: { reprots: true } })).toBeDefined()
-    expect(defineConfig({ lang: 'en', trailingSlash: 'always', offline: true, security: { hosts: true } })).toBeDefined()
+    expect(defineConfig({ lang: 'en', trailingSlash: 'always', client: { offline: true }, security: { hosts: true } })).toBeDefined()
   })
 
   it('prints the findings as text and exits 1 on an error', async () => {
@@ -896,7 +896,7 @@ describe('kay env against compose and .env.example', () => {
   })
 
   it('runs inside kay check from the config, its findings counting under --deny-warnings', async () => {
-    const root = await project({ ...files, 'kay.config.ts': 'export default { assets: { favicon: false }, env: { compose: \'compose.yaml\', example: \'.env.example\' } }\n', 'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n', 'src/lib.ts': 'export const a = process.env.FOO\n', 'src/routes/index.kay': 'h1 Hi\n' })
+    const root = await project({ ...files, 'kay.config.ts': 'export default { assets: { favicon: false }, envFiles: { compose: \'compose.yaml\', example: \'.env.example\' } }\n', 'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n', 'src/lib.ts': 'export const a = process.env.FOO\n', 'src/routes/index.kay': 'h1 Hi\n' })
     const checked = async (args: string[]) => kay(['check', '--format', 'json', ...args], root)
     const warning = JSON.parse((await checked([])).stdout) as { errors: number, warnings: number, problems: { file: string, message: string }[] }
 
@@ -908,7 +908,7 @@ describe('kay env against compose and .env.example', () => {
 })
 
 describe('kay check --fix on raw environment reads', () => {
-  const config = { 'kay.config.ts': 'export default { assets: { favicon: false }, env: { example: \'.env.example\' } }\n', '.env.example': '', 'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n', 'src/routes/index.kay': 'h1 Hi\n' }
+  const config = { 'kay.config.ts': 'export default { assets: { favicon: false }, envFiles: { example: \'.env.example\' } }\n', '.env.example': '', 'tsconfig.json': '{ "extends": "kay/tsconfig.json" }\n', 'src/routes/index.kay': 'h1 Hi\n' }
   const read = async (root: string, path: string) => Bun.file(join(root, path)).text()
   const names = async (root: string) => (JSON.parse((await kay(['env', '--format', 'json'], root)).stdout) as { variables: { name: string, source: string, default?: unknown }[] }).variables.filter(({ source }) => source !== 'kay')
 
@@ -989,7 +989,7 @@ describe('kay check --fix on raw environment reads', () => {
   it('follows a `.js` import, a `.kay` import, an entry outside src with --cwd, and a custom content path', async () => {
     const root = await project({
       ...config,
-      'kay.config.ts': 'export default { assets: { favicon: false }, contentConfig: \'app/collections.ts\', env: { example: \'.env.example\' } }\n',
+      'kay.config.ts': 'export default { assets: { favicon: false }, contentConfig: \'app/collections.ts\', envFiles: { example: \'.env.example\' } }\n',
       'package.json': '{ "scripts": { "a": "bun build --compile scripts/a.ts --outfile out/a.js", "b": "bun build --cwd tools --target bun b.ts --outdir dist" } }\n',
       'scripts/a.ts': 'import { one } from \'../src/one.js\'\nimport two from \'../src/two.kay\'\n\nexport const a = [one, two]\n',
       'src/one.ts': 'export const one = process.env.VIA_JS\n',

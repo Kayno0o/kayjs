@@ -43,7 +43,7 @@ describe('a loaded body\'s links', () => {
 
   beforeAll(async () => {
     copy = await copyWithLoader()
-    app = new Elysia().use(await pages({ dirs: { routes: `${copy}/src/routes` }, contentConfig: `${copy}/src/content.config.ts`, prebuilt: false, security: false, site: 'https://x.example', base: '/root', trailingSlash: 'always' }))
+    app = new Elysia().use(await pages({ config: { dirs: { routes: `${copy}/src/routes` }, contentConfig: `${copy}/src/content.config.ts`, security: false, site: 'https://x.example', base: '/root', trailingSlash: 'always' }, prebuilt: false }))
   }, 60_000)
 
   afterAll(async () => {
@@ -90,7 +90,7 @@ describe('a loaded body\'s links in a localized site', () => {
     copy = await fixtureCopy('i18n')
     await Bun.write(join(copy, 'src/content.config.ts'), `import { t } from 'elysia'${CONFIG}`)
     await Bun.write(join(copy, 'src/routes/loaded/[slug].kay'), ROUTE)
-    localized = new Elysia().use(await pages({ dirs: { routes: `${copy}/src/routes` }, contentConfig: `${copy}/src/content.config.ts`, prebuilt: false, security: false, site: 'https://x.example', i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve(copy, 'src/messages') } }))
+    localized = new Elysia().use(await pages({ config: { dirs: { routes: `${copy}/src/routes` }, contentConfig: `${copy}/src/content.config.ts`, security: false, site: 'https://x.example', i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve(copy, 'src/messages') } }, prebuilt: false }))
   }, 60_000)
 
   afterAll(async () => {

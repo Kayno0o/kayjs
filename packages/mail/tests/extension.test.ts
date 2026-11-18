@@ -211,8 +211,8 @@ describe('mail() with no module', () => {
 describe('mail() on real test sites', () => {
   it('gives each site of one process its own mailer, send reaching the latest started (a closed test site runs no onStop yet, kaynooo/kayjs#3053)', async () => {
     const root = join(import.meta.dir, 'fixture')
-    const first = await testSite({ root, extensions: [mail({ from: 'first@site.test', queue: { name: 'site-first' } })], islands: false })
-    const second = await testSite({ root, extensions: [mail({ from: 'second@site.test', queue: { name: 'site-second' } })], islands: false })
+    const first = await testSite({ root, config: { extensions: [mail({ from: 'first@site.test', queue: { name: 'site-first' } })] }, islands: false })
+    const second = await testSite({ root, config: { extensions: [mail({ from: 'second@site.test', queue: { name: 'site-second' } })] }, islands: false })
 
     try {
       await send(message('Latest'))

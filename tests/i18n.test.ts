@@ -29,7 +29,7 @@ const messages = resolve(`${FIXTURE}/src/messages`)
 const i18n: I18nConfig = { locales: ['fr', 'en'], default: 'fr', messages }
 const SITE = 'https://x.example'
 const chrome = browserPath()
-const app = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: 'https://x.example', i18n }))
+const app = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, site: 'https://x.example', i18n } }))
 
 // Built by the first test reading it, then shared by the others, as building the fixture's pages again for each would only cost time.
 function once<T>(build: () => Promise<T>): () => Promise<T> {
@@ -207,7 +207,7 @@ describe('locale prefixes', () => {
   it('write dir="rtl" on a page in a locale written right to left, and nothing on one written left to right', async () => {
     expect(['ar', 'he', 'fa-IR', 'ur', 'yi', 'en', 'fr', 'az-Arab', 'zz-invalid-tag-!'].map(textDirection)).toEqual(['rtl', 'rtl', 'rtl', 'rtl', 'rtl', 'ltr', 'ltr', 'rtl', 'ltr'])
 
-    const arabic = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: 'https://x.example', i18n: { ...i18n, locales: ['fr', 'ar'], messages: resolve(`${FIXTURE}/rtl-messages`) } }))
+    const arabic = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, site: 'https://x.example', i18n: { ...i18n, locales: ['fr', 'ar'], messages: resolve(`${FIXTURE}/rtl-messages`) } } }))
 
     expect((await get('/ar', arabic)).html).toContain('<html lang="ar" dir="rtl">')
     expect((await get('/', arabic)).html).toContain('<html lang="fr">')
@@ -246,7 +246,7 @@ describe('locale prefixes', () => {
 
     try {
       await Bun.write(join(copy, 'src/routes/en/x.kay'), 'p x\n')
-      await expect(pages({ root: copy, prebuilt: false, i18n: { ...i18n, messages: resolve(copy, 'src/messages') } })).rejects.toThrow('under the prefix of the locale en')
+      await expect(pages({ root: copy, prebuilt: false, config: { i18n: { ...i18n, messages: resolve(copy, 'src/messages') } } })).rejects.toThrow('under the prefix of the locale en')
     }
     finally {
       await rm(copy, { recursive: true, force: true })
@@ -254,7 +254,7 @@ describe('locale prefixes', () => {
 
     expect(() => localeSettings({ locales: ['fr'], default: 'en' })).toThrow('i18n\'s default en is not one of its locales')
     expect(() => localeSettings({ locales: ['fr', 'en'], default: 'fr', mode: { domains: { fr: 'x.fr' } } })).toThrow('none to en')
-    await expect(pages({ root: FIXTURE, prebuilt: false, i18n: { ...i18n, locales: ['fr', 'de'] } })).rejects.toThrow('so its messages go in')
+    await expect(pages({ root: FIXTURE, prebuilt: false, config: { i18n: { ...i18n, locales: ['fr', 'de'] } } })).rejects.toThrow('so its messages go in')
   })
 })
 
@@ -264,7 +264,7 @@ describe('html lang set by a page', () => {
 
     try {
       await Bun.write(join(copy, 'src/routes/own-lang.kay'), 'head\n  html(lang="ar")\np x\n')
-      const site = new Elysia().use(await pages({ root: copy, prebuilt: false, security: false, i18n: { ...i18n, messages: resolve(copy, 'src/messages') } }))
+      const site = new Elysia().use(await pages({ root: copy, prebuilt: false, config: { security: false, i18n: { ...i18n, messages: resolve(copy, 'src/messages') } } }))
 
       expect((await get('/own-lang', site)).html).toContain('<html lang="fr">')
     }
@@ -275,7 +275,7 @@ describe('html lang set by a page', () => {
 })
 
 describe('the default locale prefixed', () => {
-  const prefixedSite = once(async () => new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } })))
+  const prefixedSite = once(async () => new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, i18n: { ...i18n, mode: 'always' } } })))
 
   it('sends an unprefixed path to the visitor\'s locale: their cookie, then their browser\'s languages', async () => {
     const prefixed = await prefixedSite()
@@ -303,7 +303,7 @@ describe('the default locale prefixed', () => {
 })
 
 describe('locales by domain', () => {
-  const domainsSite = once(async () => new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: 'https://x.fr', i18n: { ...i18n, domains: { fr: 'x.fr', en: 'x.com' } } })))
+  const domainsSite = once(async () => new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, site: 'https://x.fr', i18n: { ...i18n, mode: { domains: { fr: 'x.fr', en: 'x.com' } } } } })))
 
   it('serve each host its locale, linking to another locale on its own host', async () => {
     const domains = await domainsSite()
@@ -330,7 +330,7 @@ describe('locales by domain', () => {
 describe('translated paths', () => {
   const paths = { '/about': { fr: '/a-propos', en: '/about-us' }, '/blog/:slug': { en: '/articles/:slug' } }
   const translated = { ...i18n, paths }
-  const translatedSite = once(async () => new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, i18n: translated })))
+  const translatedSite = once(async () => new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, i18n: translated } })))
 
   it('serve a page at its path in each locale, links and the locale switcher following', async () => {
     const served = await translatedSite()
@@ -365,7 +365,7 @@ describe('translated paths', () => {
   })
 
   it('serve a host only its own locale\'s paths, and list them in the sitemap', async () => {
-    const domains = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: 'https://x.fr', i18n: { ...translated, domains: { fr: 'x.fr', en: 'x.com' } } }))
+    const domains = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, site: 'https://x.fr', i18n: { ...translated, mode: { domains: { fr: 'x.fr', en: 'x.com' } } } } }))
     const english = await get('http://x.com/about-us', domains)
 
     expect(english.html).toContain('<h1>About</h1>')
@@ -393,14 +393,14 @@ describe('translated paths', () => {
   it('refuse a translation whose params are not the page\'s, or that another page of its locale takes', async () => {
     expect(() => localeSettings({ ...i18n, paths: { '/blog/:slug': { en: '/articles/:id' } } })).toThrow('whose params are not the page\'s')
     expect(() => localeSettings({ ...i18n, paths: { '/about': { de: '/uber' } } })).toThrow('de, which is not one of its locales')
-    await expect(pages({ root: FIXTURE, prebuilt: false, security: false, i18n: { ...i18n, paths: { '/contact': { en: '/reach-us' } } } })).rejects.toThrow('translates /contact, which no page serves')
-    await expect(pages({ root: FIXTURE, prebuilt: false, security: false, i18n: { ...i18n, paths: { '/about': { en: '/' } } } })).rejects.toThrow('are both served at / in en')
+    await expect(pages({ root: FIXTURE, prebuilt: false, config: { security: false, i18n: { ...i18n, paths: { '/contact': { en: '/reach-us' } } } } })).rejects.toThrow('translates /contact, which no page serves')
+    await expect(pages({ root: FIXTURE, prebuilt: false, config: { security: false, i18n: { ...i18n, paths: { '/about': { en: '/' } } } } })).rejects.toThrow('are both served at / in en')
     expect(() => localeSettings({ ...i18n, paths: { '/about': { en: '/about//us' } } })).toThrow('has an empty segment')
     expect(localeSettings({ ...i18n, paths: { '/about': { en: '/about-us/' } } }).paths).toEqual({ '/about': { en: '/about-us' } })
   })
 
   it('keep the path of a page a translated pattern would also take', async () => {
-    const served = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: SITE, i18n: { ...i18n, paths: { '/blog/:slug': { en: '/articles/:slug' } } } }))
+    const served = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, site: SITE, i18n: { ...i18n, paths: { '/blog/:slug': { en: '/articles/:slug' } } } } }))
     const sitemap = (await get('/sitemap.xml', served)).html
 
     expect((await get('/en/blog/new', served)).html).toContain('<h1 class="new">New post</h1>')
@@ -462,7 +462,7 @@ describe('localized content', () => {
     expect(sitemap).not.toContain('<loc>https://x.example/news/english-only</loc>')
     expect((await get('/news/english-only', served)).status).toBe(404)
 
-    const domains = new Elysia().use(await pages({ ...config, i18n: { ...config.i18n, domains: { fr: 'x.fr', en: 'x.com' } } }))
+    const domains = new Elysia().use(await pages({ ...config, config: { i18n: { ...config.i18n, mode: { domains: { fr: 'x.fr', en: 'x.com' } } } } }))
     const onHost = (await get('http://x.com/news/rss.xml', domains)).html
 
     expect(onHost).toContain('<atom:link href="https://x.com/news/rss.xml" rel="self" type="application/rss+xml"/>')
@@ -473,7 +473,7 @@ describe('localized content', () => {
 
   it('points the head alternates of an entry at each translation\'s own url', async () => {
     const copy = await fixtureCopy('i18n-content')
-    const paired = async (trailingSlash?: 'always', domains?: Record<string, string>) => pages({ ...config, root: copy, contentConfig: resolve(`${copy}/src/content.config.ts`), trailingSlash, i18n: { ...config.i18n, messages: resolve(`${copy}/src/messages`), ...domains && { domains } } })
+    const paired = async (trailingSlash?: 'always', domains?: Record<string, string>) => pages({ ...config, root: copy, config: { contentConfig: resolve(`${copy}/src/content.config.ts`), trailingSlash, i18n: { ...config.i18n, messages: resolve(`${copy}/src/messages`), ...domains && { mode: { domains } } } } })
 
     try {
       const configFile = join(copy, 'src/content.config.ts')
@@ -602,7 +602,7 @@ describe('locale detection', () => {
     await Bun.write(join(copy, 'src/routes/computed.kay'), '--- server\nimport { t } from \'kay/i18n\'\n\nconst state = [\'drafted\'][0]!\nconst label = t(`status.${state}` as never)\n---\np {label}\n')
 
     try {
-      const served = new Elysia().use(await pages({ root: copy, prebuilt: false, security: false, i18n: { ...i18n, messages: resolve(copy, 'src/messages') }, observe: { onError: () => undefined } }))
+      const served = new Elysia().use(await pages({ root: copy, prebuilt: false, config: { security: false, i18n: { ...i18n, messages: resolve(copy, 'src/messages') }, onError: () => undefined } }))
 
       expect((await get('/computed', served)).status).toBe(500)
     }
@@ -631,7 +631,7 @@ describe('prerendering', () => {
       expect(await Bun.file(join(build.pages, 'index.html')).text()).toContain('<h1>Bonjour Ada</h1>')
       expect(await Bun.file(join(build.pages, 'en.html')).text()).toContain('<h1>Hello Ada</h1>')
 
-      const built = new Elysia().use(await build.serve({ root: FIXTURE, security: false, i18n }))
+      const built = new Elysia().use(await build.serve({ root: FIXTURE, config: { security: false, i18n } }))
       const english = await get('/en', built)
 
       expect(english.html).toContain('<h1>Hello Ada</h1>')
@@ -664,10 +664,10 @@ describe('prerendering', () => {
   })
 
   it('keeps each domain\'s copy apart, served to its host', async () => {
-    const domains = { ...i18n, domains: { fr: 'x.fr', en: 'x.com' } }
+    const domains = { ...i18n, mode: { domains: { fr: 'x.fr', en: 'x.com' } } }
 
     await prerendered(domains, async (build) => {
-      const built = new Elysia().use(await build.serve({ root: FIXTURE, security: false, i18n: domains }))
+      const built = new Elysia().use(await build.serve({ root: FIXTURE, config: { security: false, i18n: domains } }))
       const english = await get('http://x.com/', built)
       const french = await get('http://x.fr/', built)
 
@@ -737,7 +737,7 @@ describe('kay check', () => {
           '    strong {text}',
           '',
         ].join('\n')),
-        Bun.write(nested, '--- server\nimport { T, formatDuration } from \'kay/i18n\'\n---\nT(key="greeting" name={formatDuration(\'abc\')})\nT(key="greeting" name="{" nom="x")\n'),
+        Bun.write(nested, '--- server\nimport { T, formatRelativeTime } from \'kay/i18n\'\n---\nT(key="greeting" name={formatRelativeTime(\'abc\', {})})\nT(key="greeting" name="{" nom="x")\n'),
         Bun.write(scripted, [
           '--- server',
           'import { T } from \'kay/i18n\'',
@@ -1056,7 +1056,7 @@ describe('in the browser', () => {
 // CI installs Chromium for this: there, a missing browser fails rather than skipping.
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('an island in a browser', () => {
   it('hydrates T\'s blocks and fills them again when a placeholder changes, its links in the page\'s locale', async () => {
-    const site = await testSite({ root: FIXTURE, i18n, browser: { path: chrome } })
+    const site = await testSite({ root: FIXTURE, config: { i18n }, browser: { path: chrome } })
 
     try {
       const page = await site.open('/en')
@@ -1078,10 +1078,7 @@ describe('localized seo defaults', () => {
   const seoApp = async () => new Elysia().use(await pages({
     root: FIXTURE,
     prebuilt: false,
-    security: false,
-    site: SITE,
-    i18n,
-    seo: { name: { fr: 'Le site', en: 'The site' }, titleTemplate: { fr: '%s | Le site', en: '%s | The site' }, description: { fr: 'Ce que fait le site', en: 'What the site does' }, image: { fr: '/fr.png', en: '/en.png' }, imageAlt: { fr: 'Le logo', en: 'The logo' }, locale: { fr: 'fr_FR' } },
+    config: { security: false, site: SITE, i18n, seo: { name: { fr: 'Le site', en: 'The site' }, titleTemplate: { fr: '%s | Le site', en: '%s | The site' }, description: { fr: 'Ce que fait le site', en: 'What the site does' }, image: { fr: '/fr.png', en: '/en.png' }, imageAlt: { fr: 'Le logo', en: 'The logo' }, locale: { fr: 'fr_FR' } } },
   }))
 
   // One app for every request, as the head of each locale is built once and kept; built by the first test, as a build started while the file loads runs beside the other tests' builds into the same client folder.
@@ -1110,7 +1107,7 @@ describe('localized seo defaults', () => {
   })
 
   it('titles the one OpenAPI document with the default locale\'s name, whatever locale asked', async () => {
-    const server = new Elysia().use(await pages({ root: FIXTURE, dirs: { api: resolve('tests/fixtures/openapi/src/api') }, prebuilt: false, security: false, site: SITE, i18n, openapi: true, seo: { name: { en: 'The site', fr: 'Le site' } } }))
+    const server = new Elysia().use(await pages({ root: FIXTURE, config: { dirs: { api: resolve('tests/fixtures/openapi/src/api') }, security: false, site: SITE, i18n, openapi: true, seo: { name: { en: 'The site', fr: 'Le site' } } }, prebuilt: false }))
 
     const response = await server.handle(new Request('http://localhost/api/openapi.json', { headers: { 'x-key': 'open', 'accept-language': 'en' } }))
 
@@ -1118,7 +1115,7 @@ describe('localized seo defaults', () => {
   })
 
   it('leaves a manifest link of the app\'s own head alone in every locale', async () => {
-    const server = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: SITE, i18n, assets: { favicon: false }, head: [{ tag: 'link', props: { rel: 'manifest', href: '/my-app.json' } }], seo: { name: { fr: 'Le site', en: 'The site' } } }))
+    const server = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, site: SITE, i18n, assets: { favicon: false }, head: [{ tag: 'link', props: { rel: 'manifest', href: '/my-app.json' } }], seo: { name: { fr: 'Le site', en: 'The site' } } } }))
 
     for (const path of ['/', '/en'])
       expect(await (await server.handle(new Request(`http://localhost${path}`))).text()).toContain('<link rel="manifest" href="/my-app.json">')
@@ -1140,7 +1137,7 @@ describe('localized seo defaults', () => {
 
     await Bun.write(join(publicDir, 'manifest.webmanifest'), '{"name":"Mine"}')
 
-    const server = new Elysia().use(await pages({ root: FIXTURE, dirs: { public: publicDir }, prebuilt: false, security: false, site: SITE, i18n, seo: { name: { fr: 'Le site', en: 'The site' } } }))
+    const server = new Elysia().use(await pages({ root: FIXTURE, config: { dirs: { public: publicDir }, security: false, site: SITE, i18n, seo: { name: { fr: 'Le site', en: 'The site' } } }, prebuilt: false }))
     const html = await (await server.handle(new Request('http://localhost/en'))).text()
 
     expect(html).toContain(`<link rel="manifest" href="/manifest.webmanifest?v=${MARK_VERSION}" crossorigin="use-credentials">`)
@@ -1155,7 +1152,7 @@ describe('localized seo defaults', () => {
 
     for (const variant of [{}, { base: '/docs' }]) {
       const prefix = 'base' in variant ? '/docs' : ''
-      const server = new Elysia().use(await pages({ root: dir, prebuilt: false, security: false, site: SITE, i18n: { ...i18n, messages: resolve(dir, 'src/messages') }, seo: { name: { fr: 'Le site', en: 'The site' } }, ...variant }))
+      const server = new Elysia().use(await pages({ root: dir, prebuilt: false, config: { security: false, site: SITE, i18n: { ...i18n, messages: resolve(dir, 'src/messages') }, seo: { name: { fr: 'Le site', en: 'The site' } } }, ...variant }))
       const html = await (await server.handle(new Request(`http://localhost/en`))).text()
 
       expect(html).toContain(`<link rel="manifest" href="${prefix}/manifest.webmanifest?v=${MARK_VERSION}" crossorigin="use-credentials">`)
@@ -1167,7 +1164,7 @@ describe('localized seo defaults', () => {
   it('serves one manifest while the texts are written once or the other locale reads the default\'s, whatever base and trailingSlash', async () => {
     for (const seo of [{ name: 'The site' }, { name: { fr: 'Le site' }, description: { fr: 'Ce que fait le site' } }]) {
       for (const variant of [{}, { base: '/docs', trailingSlash: 'always' as const }]) {
-        const server = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: SITE, i18n, seo, ...variant }))
+        const server = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, site: SITE, i18n, seo }, ...variant }))
         const html = await (await server.handle(new Request(`http://localhost/en${'base' in variant ? '/' : ''}`))).text()
 
         expect(html).toContain(`<link rel="manifest" href="${'base' in variant ? '/docs' : ''}/manifest.webmanifest?v=${MARK_VERSION}" crossorigin="use-credentials">`)
@@ -1181,7 +1178,7 @@ describe('localized seo defaults', () => {
   })
 
   it('links the manifest of another locale under base, which its icons and start page go under too', async () => {
-    const server = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: SITE, i18n, base: '/docs', trailingSlash: 'always', seo: { name: { fr: 'Le site', en: 'The site' } } }))
+    const server = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, site: SITE, i18n, base: '/docs', trailingSlash: 'always', seo: { name: { fr: 'Le site', en: 'The site' } } } }))
     const html = await (await server.handle(new Request('http://localhost/en/'))).text()
     const manifest = await (await server.handle(new Request('http://localhost/manifest.en.webmanifest'))).json() as { name: string, start_url: string, icons: { src: string }[] }
 
@@ -1214,7 +1211,7 @@ describe('a path the visitor typed with extra slashes', () => {
     expect(localePath(SETTINGS, '//evil.com/x', 'en')).toBe('/en/evil.com/x')
   })
 
-  const served = async (options: { base?: string, trailingSlash?: 'always' | 'never', prefixDefault?: boolean }) => new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: SITE, i18n: { ...i18n, prefixDefault: options.prefixDefault }, ...options.base === undefined ? {} : { base: options.base }, ...options.trailingSlash === undefined ? {} : { trailingSlash: options.trailingSlash } }))
+  const served = async (options: { base?: string, trailingSlash?: 'always' | 'never', prefixDefault?: boolean }) => new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, config: { security: false, site: SITE, i18n: { ...i18n, ...options.prefixDefault === true && { mode: 'always' as const } } }, ...options.base === undefined ? {} : { base: options.base }, ...options.trailingSlash === undefined ? {} : { trailingSlash: options.trailingSlash } }))
 
   it.each([
     ['plain', {}],

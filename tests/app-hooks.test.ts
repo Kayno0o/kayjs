@@ -154,7 +154,7 @@ const form = { 'content-type': 'application/x-www-form-urlencoded', 'origin': SI
 
 describe('the hooks pagesApp registers', () => {
   it('runs in production, for each kind of request, in the order pinned', async () => {
-    const app = await pages({ root, prebuilt: false, site: 'https://x.example', serve: { compress: true }, observe: { log: quiet }, extensions, mcp: true, openapi: true, metrics: true, cors: { origins: ['https://other.example'] }, redirects: { '/old': '/' }, rewrite: url => url.pathname === '/renamed' ? '/' : undefined })
+    const app = await pages({ root, prebuilt: false, config: { site: 'https://x.example', serve: { compress: true }, extensions, mcp: true, openapi: true, cors: { origins: ['https://other.example'] }, redirects: { '/old': '/' }, rewrite: url => url.pathname === '/renamed' ? '/' : undefined, ops: { observe: { log: { sink: quiet } }, metrics: true } } })
     const { run, pinned } = recorder(app)
     const page = await (await app.handle(new Request(`${SITE}/`))).text()
     const chunk = CHUNK.exec(page)?.[0]
@@ -179,7 +179,7 @@ describe('the hooks pagesApp registers', () => {
       'POST /mcp': new Request(`${SITE}/_kay/mcp`, { method: 'POST', headers: json, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) }),
       'GET /ext, an extension\'s route': new Request(`${SITE}/ext`),
       'GET /_kay/health': new Request(`${SITE}/_kay/health`),
-      'GET /metrics': new Request(`${SITE}/metrics`),
+      'GET /_kay/metrics': new Request(`${SITE}/_kay/metrics`),
     }
     const answers: Record<string, unknown> = {}
 
@@ -198,7 +198,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs with the app\'s own hooks set, in the order pinned', async () => {
-    const app = await pages({ root, prebuilt: false, observe: { log: quiet }, extensions, beforeRequest: () => undefined, onResponse: quiet, onStart: quiet, onStop: quiet, actions: { protect: { rateLimit: { max: 5, window: '1m' } }, beforeRun: quiet, onSuccess: quiet, onError: quiet } })
+    const app = await pages({ root, prebuilt: false, config: { extensions, beforeRequest: () => undefined, onResponse: quiet, onStop: quiet, actions: { protect: { rateLimit: { max: 5, window: '1m' } }, beforeRun: quiet, onSuccess: quiet, onError: quiet }, onListen: quiet, ops: { observe: { log: { sink: quiet } } } } })
     const { run, pinned } = recorder(app)
     const action = app.routes.find(route => route.method === 'POST' && route.path.startsWith('/_kay/action/'))?.path
     const answers: Record<string, unknown> = {}
@@ -211,7 +211,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('keeps the cookie cache guard ahead of every other mapResponse, whichever stages the config adds', async () => {
-    const app = await pages({ root, prebuilt: false, site: 'https://x.example', serve: { compress: true }, observe: { log: quiet }, extensions, security: { cookies: {} }, redirects: { '/old': '/' } })
+    const app = await pages({ root, prebuilt: false, config: { site: 'https://x.example', serve: { compress: true }, extensions, security: { cookies: {} }, redirects: { '/old': '/' }, ops: { observe: { log: { sink: quiet } } } } })
     const mapResponses = hooksOf(app).filter(({ type }) => type === 'mapResponse').map(({ container }) => sourceOf(container.fn))
 
     expect(mapResponses.length).toBeGreaterThan(2)
@@ -228,7 +228,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs under a base with trailing slashes, in the order pinned', async () => {
-    const app = await pages({ root, prebuilt: false, base: '/shop', trailingSlash: 'always', observe: { log: quiet }, extensions, redirects: { '/old': '/' } })
+    const app = await pages({ root, prebuilt: false, config: { base: '/shop', trailingSlash: 'always', extensions, redirects: { '/old': '/' }, ops: { observe: { log: { sink: quiet } } } } })
     const { run, pinned } = recorder(app)
     const answers: Record<string, unknown> = {}
 
@@ -240,7 +240,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs in development, its dev routes included, in the order pinned', async () => {
-    const app = await bundlingPages({ root, dev: true, observe: { log: quiet }, extensions })
+    const app = await bundlingPages({ root, dev: true, config: { extensions, ops: { observe: { log: { sink: quiet } } } } })
     const { run, pinned } = recorder(app)
     const action = app.routes.find(route => route.method === 'POST' && route.path.startsWith('/_kay/action/'))?.path
     const answers: Record<string, unknown> = {}
@@ -273,7 +273,7 @@ describe('the hooks pagesApp registers', () => {
     try {
       await build.prerender(options)
 
-      const app = await build.serve(options)
+      const app = await build.serve({ config: options })
       const { run, pinned } = recorder(app)
       const at = (path: string, headers: Record<string, string> = {}, init: RequestInit = {}) => new Request(`${SITE}${path}`, { ...init, headers: { 'host': 'x.example', 'x-upstream-key': 'upstream', ...headers } })
       const action = app.routes.find(route => route.method === 'POST' && route.path.startsWith('/_kay/action/'))?.path
@@ -306,7 +306,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs the trust group as the receive phase of kay\'s server, behind one Elysia hook, with a request refused there answered by either', async () => {
-    const options = { root, prebuilt: false, site: 'https://x.example', security: { hosts: ['x.example'] }, observe: { log: quiet }, extensions, proxy: { key: { header: 'x-upstream-key', secret: 'upstream' } } }
+    const options = { root, prebuilt: false, site: 'https://x.example', security: { hosts: ['x.example'] }, ops: { observe: { log: { sink: quiet } } }, extensions, proxy: { key: { header: 'x-upstream-key', secret: 'upstream' } } }
     const { app, kay } = await bootedPages(options)
     const requestHooks = ((app.event.request ?? []) as Container[]).map(container => sourceOf(container.fn as Hook))
 
@@ -325,7 +325,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('lists in the dev tool what registers after its Routes tab: the API module, the actions and the extension\'s route', async () => {
-    const app = await bundlingPages({ root, dev: true, observe: { log: quiet }, extensions })
+    const app = await bundlingPages({ root, dev: true, config: { extensions, ops: { observe: { log: { sink: quiet } } } } })
     const { routes: listed } = await (await app.handle(new Request(`${SITE}/_kay/dev/routes`))).json() as DevRoutes
     const named = listed.map(route => `${route.kind} ${route.method} ${route.path}${route.owner === undefined ? '' : ` (${route.owner})`}`)
 

@@ -32,8 +32,8 @@ describe('a Table drawn by a page that sorts', () => {
     }
 
     await Promise.all(Object.entries(tables).map(async ([name, table]) => Bun.write(join(root, `src/routes/sort-${name}.kay`), `${HEAD}${table}\n`)))
-    app = new Elysia().use(await pages({ root, prebuilt: false, security: false }))
-    mounted = new Elysia().use(await pages({ root, prebuilt: false, security: false, base: '/repo', trailingSlash: 'always' }))
+    app = new Elysia().use(await pages({ root, prebuilt: false, config: { security: false } }))
+    mounted = new Elysia().use(await pages({ root, prebuilt: false, config: { security: false, base: '/repo', trailingSlash: 'always' } }))
   }, 120_000)
 
   afterAll(async () => rm(root, { recursive: true, force: true }))

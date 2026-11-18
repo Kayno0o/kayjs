@@ -68,8 +68,6 @@ export interface PutOptions {
 export interface UrlOptions {
   // How long a link to a private file stays valid, an hour by default; it is rounded up so pages rendered minutes apart give the same link, which the browser keeps cached.
   ttl?: Duration | undefined
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
-  maxAge?: Duration | undefined
 }
 
 const DEFAULT_DIR = 'data/files'
@@ -100,11 +98,8 @@ let current: { store: FileStore | undefined, cacheDir: string | undefined, varia
 let defaultStore: FileStore | undefined
 
 // Files in a directory of this machine, `data/files` by default, relative to where the server runs: `diskFiles({ dir, onWrite, onDelete })`, as `s3Files` and `memoryFiles` take their options.
-export function diskFiles(options?: FileHooks & { dir?: string | undefined }): FileStore
-/** @deprecated `diskFiles({ dir, ...hooks })`. Removed in 1.108; `deprecated-disk-files` rewrites it. */
-export function diskFiles(dir: string, hooks?: FileHooks): FileStore
-export function diskFiles(first: string | (FileHooks & { dir?: string | undefined }) = {}, second: FileHooks = {}): FileStore {
-  const { dir = DEFAULT_DIR, ...hooks } = typeof first === 'string' ? { dir: first, ...second } : first
+export function diskFiles(options: FileHooks & { dir?: string | undefined } = {}): FileStore {
+  const { dir = DEFAULT_DIR, ...hooks } = options
   const path = (key: string) => join(resolve(dir), key)
 
   return {
@@ -403,7 +398,7 @@ export const files = {
 
     readScriptSecret()
 
-    const seconds = durationSeconds(options.ttl ?? options.maxAge ?? DEFAULT_EXPIRES, 'files.url()\'s ttl')
+    const seconds = durationSeconds(options.ttl ?? DEFAULT_EXPIRES, 'files.url()\'s ttl')
     const step = Math.min(EXPIRY_STEP, seconds)
     const until = Math.ceil((Date.now() / 1000 + seconds) / step) * step
 

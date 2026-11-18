@@ -7,8 +7,10 @@ describe('the loaders and tables of the cms', () => {
     expect(pg.cmsTables).toEqual(['kay_content'])
   })
 
-  it('keeps pgLoader and sqliteLoader of before 1.105 as pgCms and sqliteCms', () => {
-    expect(pg.pgLoader).toBe(pg.pgCms)
-    expect(sqlite.sqliteLoader).toBe(sqlite.sqliteCms)
+  it('names its loaders pgCms and sqliteCms alone', () => {
+    expect(Object.keys(pg)).toContain('pgCms')
+    expect(Object.keys(pg)).not.toContain('pgLoader')
+    expect(Object.keys(sqlite)).toContain('sqliteCms')
+    expect(Object.keys(sqlite)).not.toContain('sqliteLoader')
   })
 })

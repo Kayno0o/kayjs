@@ -188,14 +188,13 @@ rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }
 
 `store` takes a `RateStore`, from `kay`, to count in Redis or a database. `hit` adds a weight under a key, one attempt unless given, and opens a window of `window`, a `Duration`, when none is open. It answers with the count so far, this hit included, and when the window closes.
 
-Declare `durations: true` on the store to be given a `Duration`. A store without it was written before 1.105 and is given milliseconds as a number, which kay keeps doing until 1.108. `lengthMs(window)` from `kay` is the milliseconds of either.
+`lengthMs(window)` from `kay` is the milliseconds of the `Duration`.
 
 ```ts
 import type { RateStore } from 'kay'
 import { lengthMs } from 'kay'
 
 const store: RateStore = {
-  durations: true,
   hit: async (key, window, weight = 1) => {
     const count = await redis.incrby(key, weight)
 

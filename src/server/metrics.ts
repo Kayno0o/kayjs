@@ -11,8 +11,6 @@ import { sameText } from './seal'
 import { checkSecret, readSecret, secretSource, verifying } from './secret'
 
 export const METRICS_PATH = '/_kay/metrics'
-// Where the metrics were served before 1.105, which answers as well until 1.108 while `endpoints.metrics` is not set.
-export const FORMER_METRICS_PATH = '/metrics'
 const TOKEN_VARIABLE = 'KAY_METRICS_TOKEN'
 // Seconds, the Prometheus client libraries' default buckets.
 const BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
@@ -82,7 +80,7 @@ function labelled(value: string): string {
 }
 
 // Counts the requests the server answered and writes them, with the jobs, the cache and the open connections, as the Prometheus text format.
-export function serveMetrics(app: Elysia, options: { root: string, path: string, base: string, proxy: ProxyConfig | undefined, token?: MetricsConfig['token'], health: string | undefined, holds: () => boolean, former?: { path: string, holds: () => boolean } | undefined, connections: () => number }): void {
+export function serveMetrics(app: Elysia, options: { root: string, path: string, base: string, proxy: ProxyConfig | undefined, token?: MetricsConfig['token'], health: string | undefined, holds: () => boolean, connections: () => number }): void {
   const started = Date.now()
   const token = configuredToken(options.token, options.root)
   const requests = new Map<string, number>()
@@ -97,7 +95,7 @@ export function serveMetrics(app: Elysia, options: { root: string, path: string,
     // A trailing slash is the same route, as Elysia routes it, and the path is read with or without the base a proxy keeps.
     const at = (route: string, holds: () => boolean): boolean => holds() && [pathname, routerPath(pathname, options.base)].some(path => path === route || path === `${route}/`)
 
-    return at(options.path, options.holds) || (options.former !== undefined && at(options.former.path, options.former.holds))
+    return at(options.path, options.holds)
   }
 
   const lines = (): string => {

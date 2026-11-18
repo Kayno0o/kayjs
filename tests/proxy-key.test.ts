@@ -36,7 +36,7 @@ async function served(env: Record<string, string | undefined>, options: Options)
   }
 
   try {
-    return await pages({ root: PRODUCTION, prebuilt: false, store: STORE, ...options })
+    return await pages({ root: PRODUCTION, prebuilt: false, config: { store: STORE }, ...options })
   }
   finally {
     for (const [index, name] of names.entries()) {
@@ -100,7 +100,7 @@ describe('proxy.key', () => {
   })
 
   it('still takes the header as a string, the form of before 1.105', async () => {
-    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER } })
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } } })
 
     expect(await status(app, '/contact', { [HEADER]: KEY })).toBe(200)
     expect(await status(app, '/contact')).toBe(403)
@@ -132,11 +132,10 @@ describe('proxy.key', () => {
 
   it('logs a refused request like any other, under the id its 403 carries, without the key header', async () => {
     const lines: LogEntry[] = []
-    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } }, observe: {
-      log: (entry) => {
+    const app = await served({ KAY_PROXY_KEY: KEY }, { config: { proxy: { key: { header: HEADER } }, ops: { observe: { log: { sink: (entry) => {
+      if (entry.type === 'request')
         lines.push(entry)
-      },
-    } })
+    } } } } } })
     const refused = await app.handle(new Request('http://localhost/secret?token=1', { headers: { [HEADER]: 'wrong-guess' } }))
     const id = refused.headers.get('x-request-id')
 
@@ -149,14 +148,14 @@ describe('proxy.key', () => {
   })
 
   it('logs nothing for a refusal while requests are not logged, and still sends the id', async () => {
-    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } }, observe: { log: false } })
+    const app = await served({ KAY_PROXY_KEY: KEY }, { config: { proxy: { key: { header: HEADER } }, ops: { observe: { log: false } } } })
 
     expect((await app.handle(new Request('http://localhost/'))).headers.get('x-request-id')).toBeTruthy()
   })
 
   it('leaves the health route open, wherever the app puts it', async () => {
     const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } } })
-    const moved = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: { header: HEADER } }, health: { path: '/up' } })
+    const moved = await served({ KAY_PROXY_KEY: KEY }, { config: { proxy: { key: { header: HEADER } }, endpoints: { health: '/up' } } })
 
     expect(await status(app, '/_kay/health')).toBe(200)
     expect(await status(moved, '/up')).toBe(200)

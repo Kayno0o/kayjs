@@ -120,8 +120,6 @@ interface CmsOptions
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined;
 }
   newsletter?: Record<string, NewsletterOptions> | undefined
-  /** @deprecated Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSave?: Hook<SaveEvent> | undefined
-  /** @deprecated Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onUpload?: Hook<UploadEvent> | undefined
   pageLink?: PageLinkOptions | boolean | undefined
   pageSize?: number | undefined
   prefix?: string | undefined
@@ -149,8 +147,6 @@ interface CollectionSettings
   beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
   beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
   fourEyes?: boolean | undefined
-  /** @deprecated Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSave?: Hook<SaveEvent> | undefined
-  /** @deprecated Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onUpload?: Hook<UploadEvent> | undefined
   uploads?: UploadOptions | undefined
 
 [.] Commit
@@ -851,14 +847,6 @@ interface PgCmsOptions extends LoaderOptions
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
 
-[./pg] pgLoader
-/** @deprecated Use `pgCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-function pgLoader(options: PgCmsOptions): ContentLoader<unknown>
-
-[./pg] PgLoaderOptions
-/** @deprecated Use `PgCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-type PgLoaderOptions = PgCmsOptions
-
 [./presence] entryPresence
 function entryPresence(ctx: GuardContext, collection: string, entry: { slug: string; locale?: string | undefined; }): Promise<EntryPresence>
 
@@ -902,14 +890,6 @@ interface SqliteCmsOptions extends LoaderOptions
   table?: string | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-
-[./sqlite] sqliteLoader
-/** @deprecated Use `sqliteCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-function sqliteLoader(options: SqliteCmsOptions): ContentLoader<unknown>
-
-[./sqlite] SqliteLoaderOptions
-/** @deprecated Use `SqliteCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-type SqliteLoaderOptions = SqliteCmsOptions
 
 [./test] CmsEntryOptions
 interface CmsEntryOptions

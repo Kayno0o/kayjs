@@ -22,11 +22,11 @@ export interface JobContext<Progress = unknown> {
   locale: Locale
 }
 
-// The context of a run as the handler is handed it: the run's own signal carrying the fields, so a handler written `(payload, signal, job)` before 1.105 still reads a signal in its second argument.
-export function runContext<Progress>(signal: AbortSignal, job: JobRef<Progress>, log: Log): JobContext<Progress> & AbortSignal {
+// The context of a run as the handler is handed it.
+export function runContext<Progress>(signal: AbortSignal, job: JobRef<Progress>, log: Log): JobContext<Progress> {
   // `Locale` is the app's registered locales where the app declares them, which `siteDefaultLocale()`'s string is not.
   // eslint-disable-next-line ts/no-unnecessary-type-assertion
-  return Object.assign(signal, { signal, job, log, locale: siteDefaultLocale() as Locale })
+  return { signal, job, log, locale: siteDefaultLocale() as Locale }
 }
 
 // What a run that outlasted its `timeout` fails with, in milliseconds below a second.

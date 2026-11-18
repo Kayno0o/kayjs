@@ -12,6 +12,7 @@ import type { Scanned } from './setup'
 import { join } from 'node:path'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
+import { CONFIG_KEYS } from '../config-shape'
 import { refuseFeedsWithoutSite } from '../content/server'
 import { mcpInstructions, mcpPath, mcpRateLimit } from './api-modules'
 import { actionOptionsOf, apiDocuments, appRoutes, bootOf, bootWarnings, buildFiles, compressAnswers, files, hookLifecycleOf, hookRequestsOf, identifyRequests, kayEndpoints, keptPageWrites, knowPages, lateApp, limitBodiesAndClaimApi, logAnswers, pageRoutes, reports, rewriteAnswers, serveDevRoutes, serverMode, siteFiles, stopOnSignals, trustRequests, useExtensions } from './app-stages'
@@ -38,8 +39,8 @@ import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
 import { projectSource } from './source'
 
-// The options of `pages()` and `testSite()`: `config` holds what wins over the project's `kay.config.ts`, key by key, one bag level deep. The config's keys written beside `root` instead work until 1.108, as `deprecated-pages-options` rewrites them.
-export interface PagesOptions extends ConfigInput {
+// The options of `pages()` and `testSite()`: `config` holds what wins over the project's `kay.config.ts`, key by key, one bag level deep.
+export interface PagesOptions {
   // Config laid over the project's `kay.config.ts`, as `kay.config.ts` writes it: `pages({ config: { client: { navigation: false } } })`.
   config?: ConfigInput | undefined
   // Project root: island ids and `.kay/` output are relative to it. Defaults to the working directory.
@@ -50,9 +51,13 @@ export interface PagesOptions extends ConfigInput {
   prebuilt?: boolean | undefined
 }
 
-// The options with the keys of `config` laid over those written beside it, the way an app wrote them before 1.105, so what reads the options sees the config's keys at one level; a key given in both is the one of `config`.
-export function flatOptions<Options extends PagesOptions>(options: Options): Omit<Options, 'config'> {
+// The options with the keys of `config` laid at one level beside the others, so what reads the options sees the config's keys together. A config key written beside `root` is refused.
+export function flatOptions<Options extends PagesOptions>(options: Options): Omit<Options, 'config'> & ConfigInput {
   const { config, ...rest } = options
+  const beside = Object.keys(rest).filter(key => CONFIG_KEYS.has(key))
+
+  if (beside.length > 0)
+    throw new KayError('config-invalid', `kay: the options have config keys beside \`root\`: ${beside.map(key => `\`${key}\``).join(', ')}; write them in \`config\``)
 
   return config === undefined ? rest : { ...rest, ...Object.fromEntries(Object.entries(config).filter(([, value]) => value !== undefined)) }
 }

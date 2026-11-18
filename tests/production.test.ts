@@ -76,7 +76,7 @@ function directives(policy: string | null): Map<string, string[]> {
 
 describe('security headers', () => {
   it('sends a strict policy allowing kay\'s inline scripts, and the other headers, on pages and app routes alike', async () => {
-    const app = new Elysia().get('/api/ping', () => 'pong').use(await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false }))
+    const app = new Elysia().get('/api/ping', () => 'pong').use(await pages({ config: { guards: { default: 'open' } }, root: SEO, prebuilt: false }))
 
     for (const path of ['/about', '/api/ping', '/sitemap-missing']) {
       const response = await app.handle(new Request(`http://localhost${path}`))
@@ -127,7 +127,7 @@ describe('security headers', () => {
 
   it('sends HSTS on every kind of response of a production https site, behind a proxy too', async () => {
     const answer = async (config: { site?: string, dev?: boolean, proxy?: boolean, security?: false }, path: string, headers: Record<string, string> = {}) => {
-      const app = new Elysia().get('/api/ping', () => 'pong').get('/redirect', ({ redirect }) => redirect('/elsewhere')).use(await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false, ...config }))
+      const app = new Elysia().get('/api/ping', () => 'pong').get('/redirect', ({ redirect }) => redirect('/elsewhere')).use(await pages({ config: { guards: { default: 'open' } }, root: SEO, prebuilt: false, ...config }))
 
       return (await app.handle(new Request(`http://localhost${path}`, { headers }))).headers.get('strict-transport-security')
     }
@@ -199,12 +199,12 @@ describe('security headers', () => {
 
   it('sends them on the build\'s files and image variants too, under a header the app set itself', async () => {
     const IMAGES = 'tests/fixtures/images'
-    const stock = await pages({ guards: { default: 'open' }, root: IMAGES, prebuilt: false })
+    const stock = await pages({ config: { guards: { default: 'open' } }, root: IMAGES, prebuilt: false })
     const own = new Elysia()
       .onRequest(({ set }) => {
         set.headers['content-security-policy'] = 'default-src *'
       })
-      .use(await pages({ guards: { default: 'open' }, root: IMAGES, prebuilt: false }))
+      .use(await pages({ config: { guards: { default: 'open' } }, root: IMAGES, prebuilt: false }))
     const hero = (/src=(%2F_kay%2Fassets%2F[^&]+)&amp;/).exec(await (await stock.handle(new Request('http://localhost/'))).text())![1]!
     const paths = [decodeURIComponent(hero), `/_kay/images?src=${hero}&w=320`, `/_kay/images?src=${hero}&w=7`]
 
@@ -232,7 +232,7 @@ describe('security headers', () => {
     const scriptSources = async (app: { handle: (request: Request) => Promise<Response> }) => directives((await app.handle(new Request('http://localhost/about'))).headers.get('content-security-policy')).get('script-src')
     const dev = { dev: true, prebuilt: false, underKayDev: false, devRoutes: true }
 
-    expect(await scriptSources(await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false, dev: true }))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
+    expect(await scriptSources(await pages({ config: { guards: { default: 'open' } }, root: SEO, prebuilt: false, dev: true }))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
     expect(await scriptSources(await servePages(resolveProject(SEO, { dirs: { routes: 'src/routes' } }, dev), async () => (await readClient(SEO))!))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
   })
 
@@ -240,10 +240,10 @@ describe('security headers', () => {
     const app = await pages({
       root: SEO,
       prebuilt: false,
-      security: {
+      config: { security: {
         csp: { 'img-src': ['\'self\''], 'frame-ancestors': false, 'script-src': ['\'self\'', 'https://cdn.example.com'] },
         headers: { 'Strict-Transport-Security': 'max-age=63072000', 'x-frame-options': false, 'permissions-policy': 'geolocation=(self)', 'cross-origin-opener-policy': false },
-      },
+      } },
     })
     const response = await app.handle(new Request('http://localhost/about'))
     const policy = directives(response.headers.get('content-security-policy'))
@@ -258,7 +258,7 @@ describe('security headers', () => {
   })
 
   it('merges `security.permissions` over kay\'s Permissions-Policy, and a `permissions-policy` header still replaces it', async () => {
-    const policy = async (security: Record<string, unknown>) => (await (await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false, security })).handle(new Request('http://localhost/about'))).headers.get('permissions-policy')
+    const policy = async (security: Record<string, unknown>) => (await (await pages({ config: { guards: { default: 'open' }, security }, root: SEO, prebuilt: false })).handle(new Request('http://localhost/about'))).headers.get('permissions-policy')
 
     expect(await policy({ permissions: { microphone: 'self' } })).toBe('camera=(), microphone=(self), geolocation=(), payment=(), usb=(), browsing-topics=()')
     expect(await policy({ permissions: { microphone: ['self', 'https://voice.example.com'], camera: '*' } })).toBe('camera=*, microphone=(self "https://voice.example.com"), geolocation=(), payment=(), usb=(), browsing-topics=()')
@@ -278,7 +278,7 @@ describe('security headers', () => {
         Bun.write(join(dir, 'games/emulator.kay'), `${settings('{ security: { headers: { \'cross-origin-embedder-policy\': \'require-corp\', \'x-frame-options\': false }, csp: { \'worker-src\': [\'blob:\'], \'frame-src\': [\'https://player.example.com\'], \'object-src\': false } } }')}h1 Emulator\n`),
         Bun.write(join(dir, 'player.kay'), `${settings('{ reload: true }')}h1 Player\n`),
       ])
-      const app = await pages({ root: dir, dirs: { routes: '.' }, prebuilt: false, security: { csp: { 'script-src': ['\'self\'', 'https://site.example.com'] } } })
+      const app = await pages({ root: dir, config: { dirs: { routes: '.' }, security: { csp: { 'script-src': ['\'self\'', 'https://site.example.com'] } } }, prebuilt: false })
       const get = async (path: string) => app.handle(new Request(`http://localhost${path}`))
       const [home, games, emulator, player] = await Promise.all(['/', '/games', '/games/emulator', '/player'].map(get))
       const policy = directives(emulator!.headers.get('content-security-policy'))
@@ -301,7 +301,7 @@ describe('security headers', () => {
       expect(home!.headers.has('x-kay-reload')).toBe(false)
 
       // A site sending no security headers still sends what a page asks for.
-      const bare = await (await pages({ root: dir, dirs: { routes: '.' }, prebuilt: false, security: false })).handle(new Request('http://localhost/games/emulator'))
+      const bare = await (await pages({ root: dir, config: { dirs: { routes: '.' }, security: false }, prebuilt: false })).handle(new Request('http://localhost/games/emulator'))
 
       expect(bare.headers.get('cross-origin-embedder-policy')).toBe('require-corp')
       expect(bare.headers.has('content-security-policy')).toBe(false)
@@ -313,7 +313,7 @@ describe('security headers', () => {
 
   it('keeps a header a route sets, on its Response or through set.headers', async () => {
     const app = new Elysia()
-      .use(await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false }))
+      .use(await pages({ config: { guards: { default: 'open' } }, root: SEO, prebuilt: false }))
       .get('/api/own', () => new Response('own', { headers: { 'x-frame-options': 'DENY' } }))
       .get('/api/set', ({ set }) => {
         set.headers['content-security-policy'] = 'default-src \'none\''
@@ -330,8 +330,8 @@ describe('security headers', () => {
       .onRequest(({ set }) => {
         set.headers['content-security-policy'] = 'default-src *'
       })
-      .use(await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false }))
-    const off = await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false, security: false })
+      .use(await pages({ config: { guards: { default: 'open' } }, root: SEO, prebuilt: false }))
+    const off = await pages({ config: { guards: { default: 'open' }, security: false }, root: SEO, prebuilt: false })
     const offResponse = await off.handle(new Request('http://localhost/about'))
 
     expect((await own.handle(new Request('http://localhost/about'))).headers.get('content-security-policy')).toBe('default-src *')
@@ -340,7 +340,7 @@ describe('security headers', () => {
   })
 
   it('sends report directives and a report-only policy beside the enforced one, for kay\'s route or a collector', async () => {
-    const own = await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false, base: '/docs', security: { reports: true, reportOnly: { 'style-src': ['\'self\''] } } })
+    const own = await pages({ config: { guards: { default: 'open' }, base: '/docs', security: { reports: true, reportOnly: { 'style-src': ['\'self\''] } } }, root: SEO, prebuilt: false })
     const response = await own.handle(new Request('http://localhost/about'))
     const enforced = directives(response.headers.get('content-security-policy'))
     const trial = directives(response.headers.get('content-security-policy-report-only'))
@@ -354,7 +354,7 @@ describe('security headers', () => {
     expect(trial.get('script-src')).toEqual(['\'self\'', ...inlineScriptHashes({ base: '/docs' })])
     expect(trial.get('report-to')).toEqual(['csp'])
 
-    const collector = await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false, security: { csp: false, reports: 'https://reports.example.com/csp', reportOnly: { 'img-src': ['\'self\''] } } })
+    const collector = await pages({ config: { guards: { default: 'open' }, security: { csp: false, reports: 'https://reports.example.com/csp', reportOnly: { 'img-src': ['\'self\''] } } }, root: SEO, prebuilt: false })
     const collected = await collector.handle(new Request('http://localhost/about'))
 
     expect(collected.headers.get('reporting-endpoints')).toBe('csp="https://reports.example.com/csp"')
@@ -365,7 +365,7 @@ describe('security headers', () => {
 
   it('logs each violation a browser reports once, in either format, and hands it to onError', async () => {
     const caught: unknown[] = []
-    const app = await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false, security: { reports: true }, proxy: { header: 'x-real-ip' }, observe: { onError: ({ error }) => void caught.push(error) } })
+    const app = await pages({ config: { guards: { default: 'open' }, security: { reports: true }, proxy: { header: 'x-real-ip' }, onError: ({ error }) => void caught.push(error) }, root: SEO, prebuilt: false })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const post = async (body: string, address = '10.0.0.1') => (await app.handle(new Request('http://localhost/_kay/csp', { method: 'POST', headers: { 'content-type': 'application/reports+json', 'x-real-ip': address }, body }))).status
     const batch = JSON.stringify([
@@ -412,7 +412,7 @@ describe('security headers', () => {
 
   it('answers a report about another origin without logging it or handing it to onError, once the site is known', async () => {
     const caught: unknown[] = []
-    const app = await pages({ guards: { default: 'open' }, root: SEO, prebuilt: false, security: { reports: true }, site: 'https://site.example', proxy: { header: 'x-real-ip' }, observe: { onError: ({ error }) => void caught.push(error) } })
+    const app = await pages({ config: { guards: { default: 'open' }, security: { reports: true }, site: 'https://site.example', proxy: { header: 'x-real-ip' }, onError: ({ error }) => void caught.push(error) }, root: SEO, prebuilt: false })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const report = (url: string, directive = 'script-src-elem') => JSON.stringify({ 'csp-report': { 'document-uri': url, 'blocked-uri': 'inline', 'violated-directive': directive, 'disposition': 'enforce' } })
     const post = async (body: string) => (await app.handle(new Request('http://localhost/_kay/csp', { method: 'POST', headers: { 'content-type': 'application/csp-report', 'x-real-ip': '10.0.0.1' }, body }))).status
@@ -434,7 +434,7 @@ describe('security headers', () => {
 
 describe('API routes', () => {
   it('answer a bigint as JSON, written as its digits, keeping the status and headers the route set', async () => {
-    const app = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false })
+    const app = await pages({ config: { guards: { default: 'open' } }, root: PRODUCTION, prebuilt: false })
     const ledger = await app.handle(new Request('http://localhost/api/ledger'))
     const created = await app.handle(new Request('http://localhost/api/ledger/created'))
 
@@ -470,7 +470,7 @@ export default api()
   })
 `)
 
-      const app = await pages({ guards: { default: 'open' }, root: copy, prebuilt: false })
+      const app = await pages({ config: { guards: { default: 'open' } }, root: copy, prebuilt: false })
 
       const server = Bun.serve({ port: 0, fetch: app.fetch })
 
@@ -522,7 +522,7 @@ export default api()
   .get('/redirect', ({ redirect }) => redirect('/elsewhere'))
 `)
 
-      const app = await pages({ guards: { default: 'open' }, root: copy, prebuilt: false, observe: { log: entry => entries.push(entry) } })
+      const app = await pages({ config: { guards: { default: 'open' }, ops: { observe: { log: { sink: entry => entries.push(entry) } } } }, root: copy, prebuilt: false })
       const answer = async (path: string) => app.handle(new Request(`http://localhost/api/rows${path}`))
       const row = await answer('')
 
@@ -591,7 +591,7 @@ export default api()
 `)
 
       const entries: LogEntry[] = []
-      const app = await pages({ guards: { default: 'open' }, root: copy, prebuilt: false, observe: { log: entry => entries.push(entry) } })
+      const app = await pages({ config: { guards: { default: 'open' }, ops: { observe: { log: { sink: entry => entries.push(entry) } } } }, root: copy, prebuilt: false })
       const post = async (headers: Record<string, string>) => app.handle(new Request('http://localhost/api/open', { method: 'POST', headers }))
 
       expect((await post({ 'sec-fetch-site': 'cross-site' })).status).toBe(403)
@@ -619,7 +619,7 @@ describe('SQLite stores', () => {
 
     try {
       // The rates and session stores open their file on first use, so a config naming them creates nothing until then.
-      await sqliteRates(join(dir, 'rates/rates.sqlite')).hit('a', 60_000)
+      await sqliteRates(join(dir, 'rates/rates.sqlite')).hit('a', '60000ms')
       await sqliteStoreAt(join(dir, 'sessions/sessions.sqlite')).get('a')
       sqliteCache(join(dir, 'cache/cache.sqlite')).set('a', '["a"]', 0)
       // The job store opens its file on the first write, so a server whose queue never gets a job writes nothing.
@@ -644,8 +644,8 @@ describe('revalidation', () => {
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      const stopped = await build.serve({ prebuilt: true, security: false, observe: { log: false } })
-      const running = await build.serve({ prebuilt: true, security: false, observe: { log: false } })
+      const stopped = await build.serve({ prebuilt: true, config: { security: false, ops: { observe: { log: false } } } })
+      const running = await build.serve({ prebuilt: true, config: { security: false, ops: { observe: { log: false } } } })
       const edition = async (app: typeof running) => (await (await app.handle(new Request('http://localhost/news'))).text()).match(/<h1>(Edition \d)<\/h1>/)?.[1]
 
       stopped.listen(0)
@@ -698,7 +698,7 @@ describe('revalidation', () => {
 
     // Mounts the fixture's API modules, which kept the last app they were mounted in (kaynooo/kayjs#1895).
     const dropped = await (async () => {
-      const app = await build.serve({ prebuilt: true, security: false, observe: { log: false }, dirs: { api: resolve(PRODUCTION, 'src/api') } })
+      const app = await build.serve({ prebuilt: true, config: { security: false, dirs: { api: resolve(PRODUCTION, 'src/api') }, ops: { observe: { log: false } } } })
 
       await app.handle(new Request('http://localhost/news'))
 
@@ -717,7 +717,7 @@ describe('revalidation', () => {
     const listeners = process.listeners('beforeExit').length
 
     const stopped = await (async () => {
-      const app = new Elysia().use(await build.serve({ prebuilt: true, security: false, observe: { log: false } }))
+      const app = new Elysia().use(await build.serve({ prebuilt: true, config: { security: false, ops: { observe: { log: false } } } }))
 
       app.listen(0)
       await fetch(`http://localhost:${app.server!.port}/news`)
@@ -742,13 +742,13 @@ describe('revalidation', () => {
   it('keeps an API module answering for the app it is mounted in once a collection ran', async () => {
     const { default: echo } = await import('./fixtures/production/src/api/echo') as unknown as { default: { getParent: () => unknown, getGlobalRoutes: () => unknown[] } }
     // A throwaway app mounts the same modules first; once it is collected a collection certainly ran, whatever the engine skipped before.
-    const thrown = await (async () => new WeakRef(await build.serve({ dirs: { api: resolve(PRODUCTION, 'src/api') }, observe: { log: false }, prebuilt: true, security: false })))()
+    const thrown = await (async () => new WeakRef(await build.serve({ config: { dirs: { api: resolve(PRODUCTION, 'src/api') }, security: false, ops: { observe: { log: false } } }, prebuilt: true })))()
 
     await collectUntil(() => thrown.deref() === undefined)
 
     expect(thrown.deref()).toBeUndefined()
 
-    const app = await build.serve({ dirs: { api: resolve(PRODUCTION, 'src/api') }, observe: { log: false }, prebuilt: true, security: false })
+    const app = await build.serve({ config: { dirs: { api: resolve(PRODUCTION, 'src/api') }, security: false, ops: { observe: { log: false } } }, prebuilt: true })
 
     Bun.gc(true)
     expect(echo.getParent()).not.toBeNull()
@@ -760,7 +760,7 @@ describe('revalidation', () => {
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      const app = await build.serve({ prebuilt: true, security: false })
+      const app = await build.serve({ prebuilt: true, config: { security: false } })
       const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/news', { headers }))
       const built = await visit()
       const etag = built.headers.get('etag')!
@@ -794,7 +794,7 @@ describe('revalidation', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const app = await build.serve({ prebuilt: true, security: false })
+      const app = await build.serve({ prebuilt: true, config: { security: false } })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 
       news.failing = true
@@ -830,15 +830,15 @@ describe('revalidation', () => {
       await build.keeping(async () => {
         await build.prerender({ site: 'https://example.com' })
 
-        expect(await canonical(await build.serve({ prebuilt: true, security: false, site: 'https://example.com' }))).toBe('https://example.com/news')
+        expect(await canonical(await build.serve({ prebuilt: true, config: { security: false, site: 'https://example.com' } }))).toBe('https://example.com/news')
         expect(warned).not.toHaveBeenCalled()
 
         // Built where the variable naming the host is unset, run where it is.
-        expect(await canonical(await build.serve({ prebuilt: true, security: false, site: 'http://127.0.0.1:4173' }))).toBe('http://127.0.0.1:4173/news')
+        expect(await canonical(await build.serve({ prebuilt: true, config: { security: false, site: 'http://127.0.0.1:4173' } }))).toBe('http://127.0.0.1:4173/news')
         expect(warned).toHaveBeenCalledWith('kay: kay build rendered its pages for https://example.com and this server runs for http://127.0.0.1:4173: each renders again on its first request')
 
         // Once rendered again, it goes out as small as the build would have written it.
-        const moved = await build.serve({ prebuilt: true, security: false, site: 'http://127.0.0.1:4173' })
+        const moved = await build.serve({ prebuilt: true, config: { security: false, site: 'http://127.0.0.1:4173' } })
         const html = await (await moved.handle(new Request('http://localhost/news'))).text()
 
         const strongest = (await compressTextStrongest(html)).br!
@@ -858,13 +858,13 @@ describe('revalidation', () => {
     const missing = 'kay: `seo` is set, but not the origin the site is public at, in kay.config.ts or SITE_URL: pages get no canonical link or og:url, and the site no sitemap or robots.txt'
 
     try {
-      await build.serve({ prebuilt: true, security: false, seo: { name: 'Example' } })
+      await build.serve({ prebuilt: true, config: { security: false, seo: { name: 'Example' } } })
 
       expect(warned.mock.calls.filter(([message]) => message === missing)).toHaveLength(1)
 
       warned.mockClear()
-      await build.serve({ prebuilt: true, security: false, seo: { name: 'Example' }, site: 'https://example.com' })
-      await build.serve({ prebuilt: true, security: false })
+      await build.serve({ prebuilt: true, config: { security: false, seo: { name: 'Example' }, site: 'https://example.com' } })
+      await build.serve({ prebuilt: true, config: { security: false } })
 
       expect(warned.mock.calls.filter(([message]) => message === missing)).toEqual([])
     }
@@ -879,7 +879,7 @@ describe('revalidation', () => {
     try {
       expect((await readManifest(root, build.dir))!.pages!['/origin']!.readsSite).toBe(true)
 
-      const app = await build.serve({ prebuilt: true, security: false, site: 'https://example.com' })
+      const app = await build.serve({ prebuilt: true, config: { security: false, site: 'https://example.com' } })
 
       expect(await (await app.handle(new Request('http://localhost/origin'))).text()).toContain('<p class="origin">https://example.com</p>')
       // Built for no site and served for one, as one build for several hosts is, it goes quietly.
@@ -895,7 +895,7 @@ describe('revalidation', () => {
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      const app = await build.serve({ prebuilt: true, security: false })
+      const app = await build.serve({ prebuilt: true, config: { security: false } })
       const { publish } = await import(NEWS) as { publish: Action<{ edition: number }, void> }
       const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/news', { headers }))
       const built = await visit()
@@ -936,7 +936,7 @@ describe('revalidation', () => {
       await build.keeping(async () => {
         await hookPrerendered(root, extensions.map(extension => extension.transformPage), { clientDir: (await build.client()).dir, publicDir: join(root, 'public'), base: '' }, build.dir)
 
-        const app = await build.serve({ prebuilt: true, security: false, extensions })
+        const app = await build.serve({ prebuilt: true, config: { security: false, extensions } })
         const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
         const built = await visit()
 
@@ -962,21 +962,21 @@ describe('revalidation', () => {
     const copy = await fixtureCopy('production')
 
     try {
-      await Bun.write(join(copy, 'src/routes/broken.kay'), '--- server\nexport const page = { prerender: true, ttl: \'hourly\' }\n---\np Broken\n')
+      await Bun.write(join(copy, 'src/routes/broken.kay'), '--- server\nexport const page = { prerender: true, cache: \'hourly\' }\n---\np Broken\n')
 
-      await expect(refusedPrerender({ dirs: { routes: resolve(copy, 'src/routes') } }, await build.client(), undefined, resolve(PRODUCTION))).rejects.toThrow('broken.kay\'s ttl is \'hourly\'; it takes a positive duration')
+      await expect(refusedPrerender({ dirs: { routes: resolve(copy, 'src/routes') } }, await build.client(), undefined, resolve(PRODUCTION))).rejects.toThrow('is "hourly", which is no duration')
     }
     finally {
       await rm(copy, { recursive: true, force: true })
     }
   })
 
-  it('refuses a cacheControl that is no one-line text, nor false', async () => {
+  it('refuses a cache that is no duration, object, private nor false', async () => {
     for (const value of ['\'\'', '\'public\\nx\'', '5']) {
       const copy = await fixtureCopy('production')
 
       try {
-        await Bun.write(join(copy, 'src/routes/broken.kay'), `--- server\nexport const page = { prerender: true, ttl: '1h', cacheControl: ${value} }\n---\np Broken\n`)
+        await Bun.write(join(copy, 'src/routes/broken.kay'), `--- server\nexport const page = { prerender: true, cache: ${value} }\n---\np Broken\n`)
 
         await expect(refusedPrerender({ dirs: { routes: resolve(copy, 'src/routes') } }, await build.client(), undefined, resolve(PRODUCTION))).rejects.toMatchObject({ code: 'page-settings-invalid' })
       }
@@ -998,7 +998,7 @@ describe('a prerendered page posted to', () => {
   const build = prerendered({}, withEntry, resolve(PRODUCTION))
 
   it('renders for the post a form sent, and for the request carrying how it went, kept by no cache, the built file served before and after', async () => {
-    const app = await build.serve({ prebuilt: true, security: false })
+    const app = await build.serve({ prebuilt: true, config: { security: false } })
     const { join: subscribe } = await import(NEWSLETTER) as { join: Action<{ email: string }, string> }
     const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/newsletter', { headers }))
     const post = async (email: string) => app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/newsletter' }, body: new URLSearchParams({ email }) }))
@@ -1048,7 +1048,7 @@ describe('a prerendered page posted to', () => {
     try {
       expect(await Bun.file(join(build.pages, 'brochure.html')).text()).toContain('name="kay_since" value="kay-stamp:')
 
-      const app = await build.serve({ prebuilt: true, security: false })
+      const app = await build.serve({ prebuilt: true, config: { security: false } })
       const { order } = await import(BROCHURE) as { order: Action<{ address: string }, number> }
       const visit = async (encoding: string) => app.handle(new Request('http://localhost/brochure', { headers: { 'accept-encoding': encoding } }))
       const stampOf = (html: string) => (/name="kay_since" value="([^"]+)"/).exec(html)![1]!
@@ -1085,7 +1085,7 @@ describe('a prerendered page posted to', () => {
   it('signs a fresh proof-of-work challenge into a prerendered page on every visit, each solved once', async () => {
     expect(await Bun.file(join(build.pages, 'leaflet.html')).text()).toContain('"kay-work:')
 
-    const app = await build.serve({ prebuilt: true, security: false })
+    const app = await build.serve({ prebuilt: true, config: { security: false } })
     const { subscribe } = await import(LEAFLET) as { subscribe: Action<{ email: string }, number> }
     const challengeOf = async () => Object.values(JSON.parse((/data-kay-work>(.*?)<\/script>/).exec(await (await app.handle(new Request('http://localhost/leaflet'))).text())![1]!) as Record<string, string>)[0]!
     const post = async (solution: string) => app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/leaflet', 'x-kay-work': solution }, body: new URLSearchParams({ email: 'a@b.c' }) }))
@@ -1103,7 +1103,7 @@ describe('a prerendered page posted to', () => {
   it('signs a fresh `workChallenge` into a prerendered page\'s field on every visit, which the action verifies once', async () => {
     expect(await Bun.file(join(build.pages, 'pamphlet.html')).text()).toContain('data-kay-work="kay-work:')
 
-    const app = await build.serve({ prebuilt: true, security: false })
+    const app = await build.serve({ prebuilt: true, config: { security: false } })
     const { join: joinUp } = await import(PAMPHLET) as { join: Action<{ proof: string }, string> }
     const challengeOf = async () => (/data-kay-work="([^"]+)"/).exec(await (await app.handle(new Request('http://localhost/pamphlet'))).text())![1]!
     const post = async (proof: string) => app.handle(new Request(`http://localhost${joinUp.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/pamphlet' }, body: new URLSearchParams({ proof }) }))
@@ -1124,7 +1124,7 @@ describe('compression', () => {
     const report = new Response('row '.repeat(2000), { headers: { 'content-type': 'text/plain' } })
     const small = new Response('ok', { headers: { 'content-type': 'text/plain' } })
     const app = new Elysia()
-      .use(await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, serve: { compress: true } }))
+      .use(await pages({ config: { guards: { default: 'open' }, serve: { compress: true } }, root: PRODUCTION, prebuilt: false }))
       .get('/api/report', () => report)
       .get('/api/small', () => small)
     const fetch = async (path: string, encoding: string) => app.handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': encoding } }))
@@ -1156,7 +1156,7 @@ describe('compression', () => {
         controller.close()
     } }), { headers: { 'content-type': 'text/plain' } })
     const app = new Elysia()
-      .use(await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, serve: { compress: true }, observe: { onError: ({ error }) => void caught.push(error) } }))
+      .use(await pages({ config: { guards: { default: 'open' }, serve: { compress: true }, onError: ({ error }) => void caught.push(error) }, root: PRODUCTION, prebuilt: false }))
       .get('/api/stream', () => streamed)
     const fetch = async () => app.handle(new Request('http://localhost/api/stream', { headers: { 'accept-encoding': 'gzip' } }))
 
@@ -1168,7 +1168,7 @@ describe('compression', () => {
   it('compresses what renders per request for a browser taking zstd, brotli or gzip, headers and cookies kept', async () => {
     // Registered after the pages, as hooks only reach the routes that come after them.
     const app = new Elysia()
-      .use(await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, serve: { compress: true } }))
+      .use(await pages({ config: { guards: { default: 'open' }, serve: { compress: true } }, root: PRODUCTION, prebuilt: false }))
       .get('/api/report', () => new Response(JSON.stringify({ rows: Array.from({ length: 100 }, (_, i) => i) }), { headers: { 'content-type': 'application/json', 'set-cookie': 'seen=1' } }))
       .get('/api/tiny', () => new Response('{}', { headers: { 'content-type': 'application/json', 'content-length': '2' } }))
       .get('/api/ok', () => new Response('ok', { headers: { 'content-type': 'text/plain' } }))
@@ -1217,7 +1217,7 @@ describe('compression', () => {
 
   it('compresses in production unless told not to, and nowhere else unless told to', async () => {
     const encodingOf = async (serve: { compress?: boolean }) => {
-      const app = new Elysia().use(await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, serve }))
+      const app = new Elysia().use(await pages({ config: { guards: { default: 'open' }, serve }, root: PRODUCTION, prebuilt: false }))
       const page = await app.handle(new Request('http://localhost/contact', { headers: { 'accept-encoding': 'br' } }))
 
       return page.headers.get('content-encoding')
@@ -1463,7 +1463,7 @@ describe('compression', () => {
 
   it('compresses a page for a browser taking zstd or gzip without loading node:zlib', async () => {
     const { compressResponse, wholeResponse } = await import('../src/server/compress')
-    const app = new Elysia().use(await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, serve: { compress: true } }))
+    const app = new Elysia().use(await pages({ config: { guards: { default: 'open' }, serve: { compress: true } }, root: PRODUCTION, prebuilt: false }))
     const loaded = spyOn(process, 'getBuiltinModule')
 
     try {
@@ -1580,7 +1580,7 @@ describe('compression', () => {
   })
 
   it('leaves responses alone unless compress is on', async () => {
-    const app = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false })
+    const app = await pages({ config: { guards: { default: 'open' } }, root: PRODUCTION, prebuilt: false })
 
     expect((await app.handle(new Request('http://localhost/contact', { headers: { 'accept-encoding': 'br' } }))).headers.get('content-encoding')).toBeNull()
   })
@@ -1652,8 +1652,8 @@ describe('lifecycle', () => {
   }
 
   it('answers the health route while it takes requests', async () => {
-    const app = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false })
-    const unhealthy = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, health: { path: '/up', check: () => false } })
+    const app = await pages({ config: { guards: { default: 'open' } }, root: PRODUCTION, prebuilt: false })
+    const unhealthy = await pages({ config: { guards: { default: 'open' }, endpoints: { health: '/up' }, ops: { health: { check: () => false } } }, root: PRODUCTION, prebuilt: false })
     const health = await app.handle(new Request('http://localhost/_kay/health'))
 
     expect(health.status).toBe(200)
@@ -1665,7 +1665,7 @@ describe('lifecycle', () => {
       expect(await (await app.handle(new Request(`http://localhost${spelling}`))).text()).toBe('ok')
 
     expect((await unhealthy.handle(new Request('http://localhost/up'))).status).toBe(503)
-    expect((await (await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, health: false })).handle(new Request('http://localhost/_kay/health'))).status).toBe(404)
+    expect((await (await pages({ config: { guards: { default: 'open' }, ops: { health: false } }, root: PRODUCTION, prebuilt: false })).handle(new Request('http://localhost/_kay/health'))).status).toBe(404)
   })
 
   it('pings each store beside the check, once per store however many keys name it', async () => {
@@ -1673,13 +1673,13 @@ describe('lifecycle', () => {
     const shared = { ping: () => {
       pings.push('shared')
     } }
-    const healthy = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, store: { sessions: { ...shared, get: () => undefined, set: () => undefined, delete: () => undefined }, files: { ping: () => {
+    const healthy = await pages({ config: { guards: { default: 'open' }, store: { sessions: { ...shared, get: () => undefined, set: () => undefined, delete: () => undefined }, files: { ping: () => {
       pings.push('files')
-    }, write: async () => undefined, read: async () => undefined, delete: async () => false } } })
-    const down = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, store: { ping: async () => {
+    }, write: async () => undefined, read: async () => undefined, delete: async () => false } } }, root: PRODUCTION, prebuilt: false })
+    const down = await pages({ config: { guards: { default: 'open' }, store: { ping: async () => {
       throw new Error('store down')
-    } } })
-    const slow = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, health: { timeout: '50ms' }, store: { ping: async () => Bun.sleep(500) } })
+    } } }, root: PRODUCTION, prebuilt: false })
+    const slow = await pages({ config: { guards: { default: 'open' }, store: { ping: async () => Bun.sleep(500) }, ops: { health: { timeout: '50ms' } } }, root: PRODUCTION, prebuilt: false })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1712,12 +1712,12 @@ describe('lifecycle', () => {
     }
 
     const remote = new Remote()
-    const app = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, store: { sessions: remote, rates: remote } })
+    const app = await pages({ config: { guards: { default: 'open' }, store: { sessions: remote, rates: remote } }, root: PRODUCTION, prebuilt: false })
     const failing = new Remote()
 
     failing.up = false
 
-    const down = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, store: { sessions: failing } })
+    const down = await pages({ config: { guards: { default: 'open' }, store: { sessions: failing } }, root: PRODUCTION, prebuilt: false })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1732,9 +1732,9 @@ describe('lifecycle', () => {
   })
 
   it('logs a health check that throws with its path, never its query', async () => {
-    const failing = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, health: { check: () => {
+    const failing = await pages({ config: { guards: { default: 'open' }, ops: { health: { check: () => {
       throw new Error('Database down')
-    } } })
+    } } } }, root: PRODUCTION, prebuilt: false })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1747,7 +1747,7 @@ describe('lifecycle', () => {
   })
 
   it('probes the health route of a server beside it, as an executable run with --health does', async () => {
-    const app = new Elysia().use(await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, health: { path: '/up' } })).listen(0)
+    const app = new Elysia().use(await pages({ config: { guards: { default: 'open' }, endpoints: { health: '/up' } }, root: PRODUCTION, prebuilt: false })).listen(0)
     const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -2031,7 +2031,7 @@ describe('request logging', () => {
     const lines = spyOn(console, 'log').mockImplementation(() => undefined)
 
     try {
-      const app = new Elysia().use(await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, observe: { log: true } })).get('/api/fail', ({ set }) => {
+      const app = new Elysia().use(await pages({ config: { guards: { default: 'open' }, ops: { observe: { log: true } } }, root: PRODUCTION, prebuilt: false })).get('/api/fail', ({ set }) => {
         set.status = 418
 
         return 'teapot'
@@ -2061,8 +2061,8 @@ describe('request logging', () => {
   it('answers each request with an id of its own, the one a trusted proxy passed on, kept across a rewrite and readable from onError', async () => {
     const ids: string[] = []
     const passed = { 'x-request-id': 'edge-42' }
-    const open = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, rewrite: url => url.pathname === '/old-contact' ? '/contact' : undefined })
-    const behind = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, proxy: { hops: 1 }, observe: { onError: ({ request }) => void ids.push(requestId(request!)) } })
+    const open = await pages({ config: { guards: { default: 'open' }, rewrite: url => url.pathname === '/old-contact' ? '/contact' : undefined }, root: PRODUCTION, prebuilt: false })
+    const behind = await pages({ config: { guards: { default: 'open' }, proxy: { hops: 1 }, onError: ({ request }) => void ids.push(requestId(request!)) }, root: PRODUCTION, prebuilt: false })
     const idOf = async (app: typeof open, path: string, headers: Record<string, string> = {}) => (await app.handle(new Request(`http://localhost${path}`, { headers }))).headers.get('x-request-id')
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
@@ -2094,12 +2094,12 @@ describe('request logging', () => {
     const entries: LogEntry[] = []
 
     try {
-      const json = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, observe: { log: 'json' }, health })
+      const json = await pages({ config: { guards: { default: 'open' }, ops: { observe: { log: { format: 'json' } }, health } }, root: PRODUCTION, prebuilt: false })
 
       await json.handle(new Request('http://localhost/_kay/health?token=secret'))
       expect(JSON.parse(String(logged.mock.calls[0]![0]))).toEqual({ type: 'message', time: expect.any(String), level: 'error', from: 'kay', message: 'the health check failed', request: { method: 'GET', path: '/_kay/health', id: expect.any(String) }, error: { name: 'Error', message: 'Database down', stack: expect.stringMatching(/^Error: Database down\n\s+at check \(\S+production\.test\.ts:\d+:\d+\)/) } })
 
-      const custom = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, observe: { log: entry => void entries.push(entry) }, health })
+      const custom = await pages({ config: { guards: { default: 'open' }, ops: { observe: { log: { sink: entry => void entries.push(entry) } }, health } }, root: PRODUCTION, prebuilt: false })
 
       await custom.handle(new Request('http://localhost/_kay/health'))
       expect(logged).toHaveBeenCalledTimes(1)
@@ -2193,7 +2193,7 @@ describe('request logging', () => {
         Bun.write(join(dir, 'api/_guard.ts'), `import { guard } from 'kay'\n\n${logging}export default guard(() => {\n  log.info('api guarded')\n})\n`),
         Bun.write(join(dir, 'api/notes.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => [])\n'),
       ])
-      const app = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes', api: 'api' }, observe: { log: entry => void entries.push(entry) }, prebuilt: false })
+      const app = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'routes', api: 'api' }, ops: { observe: { log: { sink: entry => void entries.push(entry) } } } }, root: dir, prebuilt: false })
 
       await app.handle(new Request('http://localhost/feed.txt'))
       await app.handle(new Request('http://localhost/api/notes'))
@@ -2213,9 +2213,9 @@ describe('request logging', () => {
     const entries: unknown[] = []
 
     try {
-      const json = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, observe: { log: 'json' } })
-      const custom = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, observe: { log: entry => entries.push(entry) } })
-      const quiet = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false })
+      const json = await pages({ config: { guards: { default: 'open' }, ops: { observe: { log: { format: 'json' } } } }, root: PRODUCTION, prebuilt: false })
+      const custom = await pages({ config: { guards: { default: 'open' }, ops: { observe: { log: { sink: entry => entries.push(entry) } } } }, root: PRODUCTION, prebuilt: false })
+      const quiet = await pages({ config: { guards: { default: 'open' } }, root: PRODUCTION, prebuilt: false })
 
       for (const [app, expected] of [[json, 2], [custom, 4], [quiet, 4]] as const) {
         app.listen(0)
@@ -2241,7 +2241,7 @@ describe('rewrites', () => {
   it('serves a host from a section through the whole app, the query kept and derives reached', async () => {
     const app = new Elysia()
       .derive(({ request }) => ({ seenAt: new URL(request.url).pathname }))
-      .use(await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, security: false, rewrite }))
+      .use(await pages({ config: { guards: { default: 'open' }, security: false, rewrite }, root: PRODUCTION, prebuilt: false }))
       .get('/shop/api/where', ({ seenAt }) => seenAt)
       .get('/shop/api/marked', ({ request }) => String(request.headers.has('x-kay-rewritten') || request.headers.has('x-kay-client')))
       .post('/shop/api/echo', ({ body }) => body)
@@ -2261,7 +2261,7 @@ describe('rewrites', () => {
       expect(await (await fetchAt('localhost', '/shop/mug')).text()).toContain('<p class="item">Shop mug in any at /shop/mug</p>')
       expect((await fetchAt('localhost', '/mug')).status).toBe(404)
       // Without a server, kay's own pages serve it.
-      expect(await (await (await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, rewrite })).handle(new Request('http://shop.localhost/mug'))).text()).toContain('<p class="item">Shop mug in any at /shop/mug</p>')
+      expect(await (await (await pages({ config: { guards: { default: 'open' }, rewrite }, root: PRODUCTION, prebuilt: false })).handle(new Request('http://shop.localhost/mug'))).text()).toContain('<p class="item">Shop mug in any at /shop/mug</p>')
     }
     finally {
       await shutdown(app)
@@ -2277,7 +2277,7 @@ describe('rewrites', () => {
 
   it('refuses a rewrite to anything but a path', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
-    const app = await pages({ guards: { default: 'open' }, root: PRODUCTION, prebuilt: false, rewrite: () => 'https://elsewhere.example/' })
+    const app = await pages({ config: { guards: { default: 'open' }, rewrite: () => 'https://elsewhere.example/' }, root: PRODUCTION, prebuilt: false })
 
     try {
       expect((await app.handle(new Request('http://localhost/contact'))).status).toBe(500)

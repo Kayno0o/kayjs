@@ -1061,7 +1061,7 @@ const FAILURE: typeof FAILURE
 
 [./library] FallbackMemory
 interface FallbackMemory
-  hit: (key: string, windowMs: number, weight?: number | undefined) => RateWindow
+  hit: (key: string, window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, weight?: number | undefined) => RateWindow
   peek: (key: string) => RateWindow | undefined
   refund?: ((key: string, resetAt: number) => void) | undefined
   reset?: ((key: string) => void) | undefined
@@ -1178,7 +1178,7 @@ function keepCookiesPrivate(set: { headers: Record<string, unknown>; }, response
 function keyedDigest(use: string, text: string): string
 
 [./library] knownAddress
-function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | boolean | number | undefined): string | undefined
+function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | boolean | undefined): string | undefined
 
 [./library] kv
 function kv(namespace: string, store?: KvStore | undefined): Kv
@@ -1187,18 +1187,17 @@ function kv(namespace: string, store?: KvStore | undefined): Kv
 interface Kv
   delete: (key: string) => Promise<boolean>
   get: (key: string) => Promise<string | undefined>
-  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => Promise<boolean>
-  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number | undefined) => Promise<void>
+  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => Promise<boolean>
+  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined) => Promise<void>
 
 [./library] KvStore
 interface KvStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (key: string) => MaybePromise<boolean>
-  durations?: true | undefined
   get: (key: string) => MaybePromise<string | undefined>
-  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => MaybePromise<boolean>
+  once: (key: string, ttl: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => MaybePromise<boolean>
   ping?: (() => unknown) | undefined
-  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number | undefined) => MaybePromise<void>
+  set: (key: string, value: string, ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined) => MaybePromise<void>
 
 [./library] lazily
 function lazily(guard: Guard | LazyGuard): Guard
@@ -1750,10 +1749,6 @@ interface AuthMailData
   detail?: string | undefined
   email: string
   locale: string
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: undefined | {
-  link?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
-  code?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
-}
   name: string
   ttl?: undefined | {
   link?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;

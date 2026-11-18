@@ -16,7 +16,7 @@ const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromiu
 const STORE = memoryNotifications()
 
 async function site(options: Partial<Parameters<typeof testSite>[0]> = {}): Promise<TestSite> {
-  return testSite({ root: ROOT, extensions: [ui(), who()], plugins: [tailwind], browser: { path: chrome }, ...options })
+  return testSite({ root: ROOT, browser: { path: chrome }, ...options, config: { extensions: [ui(), who()], plugins: [tailwind], ...options.config } })
 }
 
 beforeEach(() => {

@@ -9,7 +9,7 @@ type ObjectExpression = NodeOfType<'ObjectExpression'>
 
 // The options of `pages()` and `testSite()` that are no config key.
 const PAGES_OPTIONS = ['root', 'dev', 'prebuilt', 'config']
-const TEST_OPTIONS = [...PAGES_OPTIONS, 'outgoing', 'headers', 'use', 'locals', 'mcpKey', 'browser', 'islands', 'styles', 'proxyKey']
+const TEST_OPTIONS = [...PAGES_OPTIONS, 'outgoing', 'headers', 'use', 'locals', 'browser', 'islands', 'styles']
 
 const FROM_SERVER = (source: string): boolean => source === 'kay/server' || source === 'kay'
 const FROM_TEST = (source: string): boolean => source === 'kay/test'

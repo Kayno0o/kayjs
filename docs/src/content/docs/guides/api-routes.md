@@ -175,7 +175,7 @@ Actions that set `tool` are listed too, as `POST` operations.
 
 Set `mcp: true` in kay.config.ts to let an AI agent use your app. Kay serves an MCP endpoint at `/_kay/mcp`, or at the path of `endpoints: { mcp: '/tools' }`, and an agent pointed at it can list and call your tools. You write no MCP server. A client may send the endpoint 120 requests a minute; `mcp: { rateLimit: { max: 60, window: '1m' } }` changes that and `false` removes it. With a `store.rates`, replicas count together.
 
-Until 2.0 an app that did not set `endpoints.mcp` is answered at `/mcp` as well, where the endpoint was before 1.105, unless the app serves something there.
+The endpoint was at `/mcp` before 1.105; that path stopped answering in 1.109.
 
 Guidance that spans tools, such as which one to call first, goes in `mcp: { instructions: 'Read French text through resolve first.' }`. The client receives it when it connects, before it looks at any tool description.
 

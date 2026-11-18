@@ -16,14 +16,14 @@ async function site() {
     Bun.write(join(dir, 'routes/index.kay'), 'head\n  title Home\n  meta(name="description" content="The shop")\nh1 Home\n'),
     Bun.write(join(dir, 'routes/long.kay'), `head\n  title Long\n  meta(name="description" content="${LONG}")\n  meta(name="robots" content="noindex")\nh1 Long\n`),
     Bun.write(join(dir, 'routes/bare.kay'), 'h1 Bare\n'),
-    Bun.write(join(dir, 'routes/hidden.kay'), '--- server\nexport const page = { sitemap: false }\n---\nh1 Hidden\n'),
+    Bun.write(join(dir, 'routes/hidden.kay'), '--- server\nexport const page = { seo: { sitemap: false } }\n---\nh1 Hidden\n'),
   ])
 
   return { root: relative(process.cwd(), dir), dirs: { routes: 'routes' } }
 }
 
 async function askAbout(options: Parameters<typeof pages>[0], path: string, headers: Record<string, string> = { 'x-kay-dev': '1' }, mount = ''): Promise<{ status: number, head?: DevHead | undefined }> {
-  const dev = await pages({ prebuilt: false, security: false, dev: true, ...options })
+  const dev = await pages({ prebuilt: false, config: { security: false }, dev: true, ...options })
   const page = await (await dev.handle(new Request(`http://localhost${path}`))).text()
   const response = await dev.handle(new Request(`http://localhost${DEV_HEAD}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ path: mount + path, head: `<head>${HEAD.exec(page)![1]}</head>` }) }))
 
@@ -68,7 +68,7 @@ describe('the dev tool\'s head check', () => {
 
     const dir = await scratchDir('dev-head-broken-')
 
-    await Bun.write(join(dir, 'routes/index.kay'), '--- server\nexport const page = { sitemap: () => { throw new Error(\'no database\') } }\n---\nh1 Home\n')
+    await Bun.write(join(dir, 'routes/index.kay'), '--- server\nexport const page = { seo: { sitemap: () => { throw new Error(\'no database\') } } }\n---\nh1 Home\n')
 
     const broken = (await askAbout({ root: dir, dirs: { routes: 'routes' }, site: 'https://shop.example' }, '/')).head!
 
@@ -81,9 +81,9 @@ describe('the dev tool\'s head check', () => {
     const counter = join(dir, 'count.txt')
 
     await Bun.write(counter, '')
-    await Bun.write(join(dir, 'routes/items/[id].kay'), `--- server\nimport { appendFileSync } from 'node:fs'\nexport const page = { sitemap: () => { appendFileSync(${JSON.stringify(counter)}, 'x'); return [{ id: '1' }] } }\n---\nh1 Home\n`)
+    await Bun.write(join(dir, 'routes/items/[id].kay'), `--- server\nimport { appendFileSync } from 'node:fs'\nexport const page = { seo: { sitemap: () => { appendFileSync(${JSON.stringify(counter)}, 'x'); return [{ id: '1' }] } } }\n---\nh1 Home\n`)
 
-    const dev = await pages({ root: dir, dirs: { routes: 'routes' }, site: 'https://shop.example', prebuilt: false, security: false, dev: true })
+    const dev = await pages({ root: dir, config: { dirs: { routes: 'routes' }, site: 'https://shop.example', security: false }, prebuilt: false, dev: true })
     const ask = async () => (await dev.handle(new Request(`http://localhost${DEV_HEAD}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-dev': '1' }, body: JSON.stringify({ path: '/items/1', head: '<head><title>Home</title></head>' }) }))).json() as Promise<DevHead>
 
     expect((await ask()).sitemap).toBe('listed')
@@ -94,9 +94,9 @@ describe('the dev tool\'s head check', () => {
     const flag = join(broken, 'fail')
 
     await Bun.write(flag, '')
-    await Bun.write(join(broken, 'routes/items/[id].kay'), `--- server\nimport { existsSync, rmSync } from 'node:fs'\nexport const page = { sitemap: () => { if (existsSync(${JSON.stringify(flag)})) { rmSync(${JSON.stringify(flag)}); throw new Error('once') } return [{ id: '1' }] } }\n---\nh1 Home\n`)
+    await Bun.write(join(broken, 'routes/items/[id].kay'), `--- server\nimport { existsSync, rmSync } from 'node:fs'\nexport const page = { seo: { sitemap: () => { if (existsSync(${JSON.stringify(flag)})) { rmSync(${JSON.stringify(flag)}); throw new Error('once') } return [{ id: '1' }] } } }\n---\nh1 Home\n`)
 
-    const retry = await pages({ root: broken, dirs: { routes: 'routes' }, site: 'https://shop.example', prebuilt: false, security: false, dev: true })
+    const retry = await pages({ root: broken, config: { dirs: { routes: 'routes' }, site: 'https://shop.example', security: false }, prebuilt: false, dev: true })
     const again = async () => (await retry.handle(new Request(`http://localhost${DEV_HEAD}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-dev': '1' }, body: JSON.stringify({ path: '/items/1', head: '<head><title>Home</title></head>' }) }))).json() as Promise<DevHead>
 
     expect((await again()).sitemap).toBe('error')

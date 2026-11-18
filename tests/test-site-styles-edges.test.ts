@@ -19,7 +19,7 @@ await Bun.write(`${root}/src/routes/sub/_layout.kay`, 'head\n  link(rel="stylesh
 await Bun.write(`${root}/src/routes/sub/page.kay`, 'h1.text-used Sub\n')
 
 it('css() reads the stylesheets of an app under a base path', async () => {
-  const site = await testSite({ root, styles: true, base: '/blog' })
+  const site = await testSite({ root, styles: true, config: { base: '/blog' } })
   const css = await (await site.visit('/')).css()
 
   expect(css).toContain('--color-used: #123456')

@@ -12,7 +12,7 @@ const ROOT = join(import.meta.dir, 'bell-fixture')
 let site: Awaited<ReturnType<typeof testSite>>
 
 beforeAll(async () => {
-  site = await testSite({ root: ROOT, extensions: [auth(), push()], islands: false })
+  site = await testSite({ root: ROOT, config: { extensions: [auth(), push()] }, islands: false })
 }, 180_000)
 
 afterAll(async () => {

@@ -160,7 +160,7 @@ export default api().ws('/', {
 })
 `)
 
-    const app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, guards: { default: 'open' } } as never)
+    const app = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' }, guards: { default: 'open' } }, prebuilt: false } as never)
 
     app.listen({ port: 0, hostname: '127.0.0.1' })
 

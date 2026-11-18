@@ -101,10 +101,7 @@ export function formatBytes(size: ByteSize, options?: NumberFormatOptions): stri
 }
 
 // kept: free, a format by the locale, which a kept copy is stored per.
-export function formatDuration(duration: Duration, options?: DurationFormatOptions): string
-// Milliseconds, until 1.108: `deprecated-format-duration` rewrites a literal.
-export function formatDuration(milliseconds: number, options?: DurationFormatOptions): string
-export function formatDuration(duration: Duration | number, options?: DurationFormatOptions): string {
+export function formatDuration(duration: Duration, options?: DurationFormatOptions): string {
   return formatDurationIn(formatLocale(), duration, options)
 }
 

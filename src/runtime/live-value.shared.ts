@@ -74,9 +74,8 @@ export interface LiveStore extends StoreBase {
   // Gives a value held with no end the end, leaving its text and any end it has; optional, a store without it has the value written again with the end, which can overwrite a text another process set meanwhile.
   end?: (id: string, key: string, expiresAt: number) => void | Promise<void>
 
-  // Gives every value of an id held with no end the end of now plus `ttl`, a `Duration` for a store with `durations: true` and milliseconds for one written before 1.105 (kept until 1.108; `lengthMs(ttl)` from `kay` reads either), in one write and one event, including a row this process did not read, which only the other processes then hear dated; optional, a store without it has `end` called for each value, and one that only keeps `set` has each written again.
-  // eslint-disable-next-line ts/method-signature-style -- method syntax keeps a store written with `number` assignable (bivariance)
-  endAll?(id: string, ttl: Duration | number): void | Promise<void>
+  // Gives every value of an id held with no end the end of now plus `ttl`, a `Duration` (`lengthMs(ttl)` from `kay` reads it), in one write and one event, including a row this process did not read, which only the other processes then hear dated; optional, a store without it has `end` called for each value, and one that only keeps `set` has each written again.
+  endAll?: (id: string, ttl: Duration) => void | Promise<void>
   // Drops a key and tells the other processes.
   delete: (id: string, key: string) => void | Promise<void>
   // Calls `listener` with the text now held for a key another process set, and when it ends if it has a `ttl`, or undefined once it deleted it; never for this process's own.

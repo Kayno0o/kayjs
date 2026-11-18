@@ -108,8 +108,7 @@ A route with params serves many pages, so `search` can also be a function of the
 ```kay
 --- server
 export const page = {
-  prerender: [{ slug: 'intro' }, { slug: 'changelog' }, { slug: 'draft' }],
-  search: params => params.slug === 'draft' ? false : params.slug === 'changelog' ? { weight: 0.3 } : undefined,
+  prerender: [{ slug: 'intro' }, { slug: 'changelog' }, { slug: 'draft' }], seo: { search: params => params.slug === 'draft' ? false : params.slug === 'changelog' ? { weight: 0.3 } : undefined },
 }
 
 const { slug } = ctx.params

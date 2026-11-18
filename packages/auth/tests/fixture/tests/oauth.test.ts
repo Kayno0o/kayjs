@@ -25,7 +25,7 @@ function served(options: Parameters<typeof testSite>[0]): () => Site {
 const json = async (response: Response) => await response.json() as Record<string, unknown>
 
 describe('discovery', () => {
-  const site = served({ mcp: true })
+  const site = served({ config: { mcp: true } })
 
   test('the 401 of the MCP endpoint points at the resource metadata, which names the app\'s own authorization server', async () => {
     const refused = await site().fetch('/_kay/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) })
@@ -84,7 +84,7 @@ describe('discovery without mcp', () => {
 })
 
 describe('discovery under a base', () => {
-  const site = served({ mcp: true, base: '/shop', trailingSlash: 'always' })
+  const site = served({ config: { mcp: true, base: '/shop', trailingSlash: 'always' } })
 
   test('a site under a base and with trailing slashes puts the base in every URL, and a client finds the metadata by path appending under the issuer', async () => {
     const refused = await site().fetch('/_kay/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) })
@@ -152,7 +152,7 @@ async function signIn(site: Site, issuer: string, email: string, mount = { base:
 }
 
 describe('signing in', () => {
-  const site = served({ mcp: true })
+  const site = served({ config: { mcp: true } })
 
   test('an MCP client registers, the user approves it on the consent page, and the token it is given works on the MCP endpoint', async () => {
     const { exchanged, authorize, clientId } = await signIn(site(), 'http://localhost', 'mcp-user@example.com')
@@ -184,7 +184,7 @@ describe('signing in', () => {
 })
 
 describe('signing in under a base', () => {
-  const site = served({ mcp: true, base: '/shop', trailingSlash: 'always' })
+  const site = served({ config: { mcp: true, base: '/shop', trailingSlash: 'always' } })
 
   test('the full flow works with the base and trailing slashes, the issuer carrying the base, and the token works on /_kay/mcp', async () => {
     const { exchanged } = await signIn(site(), 'http://localhost/shop', 'shop-user@example.com', { base: '/shop', slash: '/' })

@@ -40,7 +40,7 @@ const varies = (response: Response) => (response.headers.get('vary') ?? '').spli
 
 // Boots the site, which builds the browser bundle and manifest the prerendered pages are served with.
 beforeAll(async () => {
-  await pages({ dirs: { routes: ROUTES }, prebuilt: false })
+  await pages({ config: { dirs: { routes: ROUTES } }, prebuilt: false })
 }, 60_000)
 
 afterAll(async () => {
@@ -80,7 +80,7 @@ describe.each([
 
     await build.prerender(options)
 
-    return { app: await build.serve(options), remove: build.remove }
+    return { app: await build.serve({ config: options }), remove: build.remove }
   }
 
   it('leaves out the font preloads and the speculation rules for a visitor saving data, with the fonts shown only from the cache', async () => {
@@ -223,7 +223,7 @@ describe('a prerendered page', () => {
       await Bun.write(`${file}.br`, brotliCompressSync(page))
       await Bun.write(`${file}.gz`, gzipSync(page))
 
-      const app = await build.serve({ ...options, serve: { compress: true } })
+      const app = await build.serve({ config: { ...options, serve: { compress: true } } })
       const full = await app.handle(request('/about', { 'accept-encoding': 'br, gzip' }))
       const saving = await app.handle(request('/about', { ...ON, 'accept-encoding': 'br, gzip' }))
 
@@ -252,7 +252,7 @@ describe('a prerendered page with server islands', () => {
     try {
       await build.prerender(options)
 
-      const app = await build.serve({ ...options, serve: { compress: true } })
+      const app = await build.serve({ config: { ...options, serve: { compress: true } } })
       const full = await app.handle(request('/', { 'accept-encoding': 'gzip' }))
       const saving = await app.handle(request('/', { ...ON, 'accept-encoding': 'gzip' }))
       const html = await textOf(saving)

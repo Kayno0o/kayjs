@@ -1,4 +1,5 @@
 import type { GuardContext } from '../src/runtime'
+import type { Duration } from '../src/runtime/duration'
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
@@ -33,9 +34,9 @@ const guard = basicAuth({ user: 'owntracks', password: 'p@ss:word', realm: 'voya
 describe('basicAuth rate limit options', () => {
   it('counts in the limit\'s own store and tells onLimit of each guess past it', async () => {
     const rates = memoryRates()
-    const store = { hit: (key: string, window: number, weight?: number) => rates.hit(key, window, weight) }
+    const store = { hit: (key: string, window: Duration, weight?: number) => rates.hit(key, window, weight) }
     const counted = new Set<string>()
-    const counting = { hit: (key: string, window: number, weight?: number) => {
+    const counting = { hit: (key: string, window: Duration, weight?: number) => {
       counted.add(key)
 
       return store.hit(key, window, weight)
@@ -146,9 +147,9 @@ describe('basicAuth as a guard of a directory', () => {
       Bun.write(join(dir, 'api/track/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().post(\'/\', () => \'stored\')\n'),
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'open\')\n'),
     ])
-    plain = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
-    mounted = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, base: '/blog', trailingSlash: 'always' })
-    localized = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+    plain = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'routes', api: 'api' } }, root: dir, prebuilt: false })
+    mounted = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'routes', api: 'api' }, base: '/blog', trailingSlash: 'always' }, root: dir, prebuilt: false })
+    localized = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'routes', api: 'api' }, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, root: dir, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -226,7 +227,7 @@ describe('basicAuth failures', () => {
       Bun.write(join(dir, 'routes/free/_guard.ts'), guard('free', ', rateLimit: false')),
       Bun.write(join(dir, 'routes/free/index.kay'), 'h1 Free\n'),
     ])
-    app = await pages({ guards: { default: 'open' }, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, proxy: { hops: 1 } })
+    app = await pages({ config: { guards: { default: 'open' }, dirs: { routes: 'routes', api: 'api' }, proxy: { hops: 1 } }, root: dir, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

@@ -221,7 +221,7 @@ With `NODE_ENV=production`, the server's first line says where it listens, the k
 GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw
 ```
 
-An error logged while answering the request starts with the same id. `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept, and `observe: { requestIdHeader: 'x-correlation-id' }` in kay.config.ts names another header for both.
+An error logged while answering the request starts with the same id. `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept, and `ops: { observe: { requestIdHeader: 'x-correlation-id' } }` in kay.config.ts names another header for both.
 
 Set `log: { format: 'json' }` to write these lines, and kay's own errors and warnings, as one JSON object each. Use it for a log collector.
 
@@ -242,7 +242,7 @@ Their lines start with their name, `kayjs-mail: ...`, and carry it as `from` in 
 
 ### Metrics
 
-`ops: { metrics: true }` in `kay.config.ts` serves `/_kay/metrics` in the Prometheus text format, for Prometheus or any compatible collector. It counts requests by method, route and status with their durations, scheduled runs, cache reads and open live connections. `endpoints: { metrics: '/stats' }` moves it. Before 1.105 it was served at `/metrics`, which answers as well until 1.108 while `endpoints.metrics` is not set, so a collector keeps scraping while you point it at the new path.
+`ops: { metrics: true }` in `kay.config.ts` serves `/_kay/metrics` in the Prometheus text format, for Prometheus or any compatible collector. It counts requests by method, route and status with their durations, scheduled runs, cache reads and open live connections. `endpoints: { metrics: '/stats' }` moves it. Before 1.105 it was served at `/metrics`, which stopped answering in 1.109: point a collector at the new path.
 
 Metrics are never public by default. Only a request that reached the server from this machine or a private network, such as a collector in the same Docker network, and that no proxy forwarded is answered. Every other gets 403. Do not forward `/_kay/metrics` from your reverse proxy: one that sets no `X-Forwarded-For` cannot be told from a collector.
 

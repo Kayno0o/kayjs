@@ -184,9 +184,3 @@ function connect(path: string): Database {
 
   return db
 }
-
-/** @deprecated Use `sqliteCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-export const sqliteLoader = sqliteCms
-
-/** @deprecated Use `SqliteCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-export type SqliteLoaderOptions = SqliteCmsOptions

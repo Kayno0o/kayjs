@@ -28,7 +28,7 @@ export function workOf(protection: ResolvedProtection): { difficulty: number, ma
   if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 1e9)
     throw new KayError('config-invalid', `kay: proofOfWork's difficulty is ${difficulty}; it takes a whole number from 1 to 1,000,000,000`)
 
-  return { difficulty, maxAge: durationSeconds(options.ttl ?? options.maxAge ?? DAY, 'proofOfWork.ttl') * 1000, pretend: options.pretend === true, store: options.store }
+  return { difficulty, maxAge: durationSeconds(options.ttl ?? DAY, 'proofOfWork.ttl') * 1000, pretend: options.pretend === true, store: options.store }
 }
 
 // `minTime` in milliseconds, read once it is set.
@@ -40,7 +40,7 @@ export function minTimeOf(protection: ResolvedProtection): { after: number, maxA
 
   const options = typeof minTime === 'object' ? minTime : { after: minTime }
 
-  return { after: durationSeconds(options.after, 'minTime') * 1000, maxAge: durationSeconds(options.ttl ?? options.maxAge ?? DAY, 'minTime.ttl') * 1000, pretend: options.pretend === true }
+  return { after: durationSeconds(options.after, 'minTime') * 1000, maxAge: durationSeconds(options.ttl ?? DAY, 'minTime.ttl') * 1000, pretend: options.pretend === true }
 }
 
 export function honeypotField(protection: ResolvedProtection | undefined): string | undefined {

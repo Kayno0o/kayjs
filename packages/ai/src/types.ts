@@ -366,16 +366,10 @@ export interface AskHooks {
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   // Called after each request of the reply to the provider, a tool loop making one per round.
   afterStep?: Hook<Step> | undefined
-  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onStep?: Hook<Step> | undefined
   // Called as each tool call starts (`running`) and again as it ends (`done` or `failed`).
   afterToolCall?: Hook<AiToolCall> | undefined
-  /** @deprecated Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onToolCall?: Hook<AiToolCall> | undefined
   // Called once the reply ended, finished, cut short or stopped (`stopped`).
   afterRequest?: Hook<FinishHookCall> | undefined
-  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */
-  onSuccess?: Hook<FinishHookCall> | undefined
   // Called when the reply fails, with the error its readers get, and for each failed request that was retried or fell back.
   onError?: Hook<ErrorHookCall> | undefined
 
@@ -406,7 +400,7 @@ export interface Resilience {
 }
 
 // What every call to a model takes, `ask`, `describeImage`, `transcribe`, `speak` and `embed` alike: which model on which provider, what stops it, how long it may take, how a failure is asked again or falls back, and the hooks that watch it. The hooks of `ai()` run for each of them, before the call's own.
-export interface CallOptions extends Resilience, Pick<AskHooks, 'afterStep' | 'onStep' | 'afterRequest' | 'onSuccess' | 'onError'> {
+export interface CallOptions extends Resilience, Pick<AskHooks, 'afterStep' | 'afterRequest' | 'onError'> {
   // The model for this call: its id, or a name from `ai({ models })`; `ai({ default })` or `AI_MODEL` when left out of an ask, the environment's own variable for the others.
   model?: string | undefined
   // Calls this provider instead of the one the environment names, such as `openai({ baseUrl })`; under `bun test` the fake answers in its place.

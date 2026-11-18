@@ -10,7 +10,7 @@ const VARIANTS: Record<string, object> = {
 }
 const variant = Bun.argv[2] ?? 'stock'
 const fixture = await imageFixture()
-const app = await pages({ root: fixture.root, prebuilt: false, observe: { log: false }, serve: { compress: true }, ...VARIANTS[variant] })
+const app = await pages({ root: fixture.root, prebuilt: false, config: { ops: { observe: { log: false } }, serve: { compress: true }, ...VARIANTS[variant] } })
 const headers = { 'accept': 'image/avif,image/webp,*/*', 'accept-encoding': 'br, gzip' }
 
 try {

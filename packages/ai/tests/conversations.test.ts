@@ -780,24 +780,13 @@ describe('the SQLite store', () => {
     expect(conversationStore()).not.toBe(own)
   })
 
-  it('still takes conversations, the name before 1.105, and refuses both', async () => {
-    const own = sqliteAi(':memory:')
-
-    ai({ conversations: own })
-    expect(conversationStore()).toBe(own)
-    expect(() => ai({ store: own, conversations: own })).toThrow('ai() takes `store`')
-    ai()
-  })
-
   it('names its tables and its helpers as the other libraries do', async () => {
     const pg = await import('../src/pg')
     const sqlite = await import('../src/sqlite')
 
     expect(pg.aiTables).toEqual(['kay_ai_conversations'])
-    expect(pg.conversationTable).toBe(pg.aiTables[0])
-    expect(pg.pgConversations).toBe(pg.pgAi)
-    expect(pg.createConversationTable).toBe(pg.createAiTables)
-    expect(sqlite.sqliteConversations).toBe(sqlite.sqliteAi)
+    expect(Object.keys(pg).sort()).toEqual(['aiTables', 'createAiTables', 'pgAi'])
+    expect(Object.keys(sqlite)).toEqual(['sqliteAi'])
   })
 })
 

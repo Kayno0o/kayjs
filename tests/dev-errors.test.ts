@@ -99,7 +99,7 @@ describe('the errors kay dev lists for a reader without a browser', () => {
   })
 
   it('lists an error an island met in the browser under its page, the path the app serves it at under a base, until the page is served again', async () => {
-    const app = await pages({ root, dev: true, prebuilt: false, base: '/repo' })
+    const app = await pages({ root, dev: true, prebuilt: false, config: { base: '/repo' } })
     // As the browser sends it: the page's origin and path, under the mount point.
     const report = { name: 'TypeError', message: 'count is undefined', url: 'http://localhost/repo/', island: 'src/components/counter.kay', stack: 'TypeError: count is undefined\n    at click (http://localhost/repo/_kay/counter.js:1:10)' }
 

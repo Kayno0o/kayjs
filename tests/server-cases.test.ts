@@ -8,7 +8,7 @@ import { pages } from './shared-pages'
 
 // Pins what a page request answers (status, headers in order, body) on the paths the per-request work touches, so a change to that work shows any byte it moves.
 const messages = resolve('tests/fixtures/server-cases/src/messages')
-const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages }
+const i18n = { locales: ['fr', 'en'], default: 'fr', messages }
 
 const sites = {
   plain: { trailingSlash: 'never' },
@@ -35,7 +35,7 @@ describe.each(Object.entries(sites))('the page answers of a site with %s', (_nam
 
   beforeAll(async () => {
     // One boot at a time: each builds the client bundle into the same `.kay`.
-    served = new Elysia().use(await pages({ root: 'tests/fixtures/server-cases', prebuilt: false, site: 'https://x.example', ...options }))
+    served = new Elysia().use(await pages({ root: 'tests/fixtures/server-cases', prebuilt: false, config: { site: 'https://x.example' }, ...options }))
   })
 
   it('answers every path as pinned', async () => {

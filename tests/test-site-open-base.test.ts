@@ -11,8 +11,8 @@ const MESSAGES = resolve('tests/fixtures/i18n/src/messages')
 
 // `open()` serves a site under its base as the proxy in front of it would, its scripts, posts, redirects and sockets included.
 const MODES: [name: string, options: TestOptions, prefix: string, slash: string][] = [
-  ['under a base', { base: '/blog' }, '/blog', ''],
-  ['under a base with trailing slashes, in a locale', { base: '/blog', trailingSlash: 'always', i18n: { locales: ['fr', 'en'], default: 'fr', messages: MESSAGES } }, '/blog/en', '/'],
+  ['under a base', { config: { base: '/blog' } }, '/blog', ''],
+  ['under a base with trailing slashes, in a locale', { config: { base: '/blog', trailingSlash: 'always', i18n: { locales: ['fr', 'en'], default: 'fr', messages: MESSAGES } } }, '/blog/en', '/'],
 ]
 
 for (const [name, options, prefix, slash] of MODES) {
@@ -62,7 +62,7 @@ for (const [name, options, prefix, slash] of MODES) {
     })
 
     it('opens a path given without the base under it', async () => {
-      await using page = await site.open(options.i18n ? '/en/done/' : '/done')
+      await using page = await site.open(options.config?.i18n ? '/en/done/' : '/done')
 
       await page.waitFor('h1', { text: 'Done' })
       expect(await page.path()).toBe(at('/done'))

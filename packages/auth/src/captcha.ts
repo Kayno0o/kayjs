@@ -42,8 +42,6 @@ export interface AuthProofOfWorkOptions {
   difficulty?: number | undefined
   // How long a challenge stays good, an hour by default.
   ttl?: Duration | undefined
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
-  maxAge?: Duration | undefined
   // Where the solutions already used are kept, this process's memory by default: `sqliteRates(path)` from `kay/server` shares them between processes.
   store?: RateStore | undefined
   // Registering, resets and magic links ask always by default, a password sign-in from the third attempt, a guest sign-in never, as an app often makes one with no form.
@@ -81,7 +79,7 @@ export function proofOfWork(options: AuthProofOfWorkOptions = {}): ProofOfWorkCa
     throw configError('auth', 'proofOfWork', `proofOfWork's difficulty is ${difficulty}; it takes a whole number from 1 to ${1e9 / 2 ** MOST_DOUBLINGS}`)
 
   return {
-    proofOfWork: { difficulty, ttl: options.ttl ?? options.maxAge ?? '1h', store: options.store },
+    proofOfWork: { difficulty, ttl: options.ttl ?? '1h', store: options.store },
     on: { 'register': 'always', 'guest': false, 'reset': 'always', 'magic-link': 'always', 'sign-in': 3, ...options.on },
   }
 }

@@ -1426,7 +1426,7 @@ describe('kay check on a project still naming the old packages', () => {
     await Promise.all([
       Bun.write(join(root, 'package.json'), '{ "name": "app", "dependencies": { "@kayjs/ui": "~1.104.0" } }\n'),
       Bun.write(join(root, 'tsconfig.json'), await Bun.file(join(import.meta.dir, 'fixtures/ui-list/tsconfig.json')).text()),
-      Bun.write(join(root, 'kay.config.ts'), 'import { ui } from \'@kaynooo/kayjs-ui/extension\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [ui()], observe: { log: false }, guards: { default: \'open\' } })\n'),
+      Bun.write(join(root, 'kay.config.ts'), 'import { ui } from \'@kaynooo/kayjs-ui/extension\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [ui()], ops: { observe: { log: false } }, guards: { default: \'open\' } })\n'),
       Bun.write(join(root, 'src/routes/index.kay'), 'h1 Hi\n'),
     ])
 

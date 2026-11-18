@@ -6,8 +6,6 @@ import { signedText, signText, useScriptSecret } from './stamp'
 export interface SignOptions {
   // How long the signature stays valid: `'1h'` when left out.
   ttl?: Duration | undefined
-  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
-  maxAge?: Duration | undefined
 }
 
 const DEFAULT_TTL = '1h'
@@ -36,7 +34,7 @@ export const signed = {
   sign(use: string, value: string, options: SignOptions = {}): string {
     checked(use, value)
 
-    const seconds = durationSeconds(options.ttl ?? options.maxAge ?? DEFAULT_TTL, 'signed.sign()\'s ttl')
+    const seconds = durationSeconds(options.ttl ?? DEFAULT_TTL, 'signed.sign()\'s ttl')
 
     if (seconds > MAX_SECONDS)
       throw new KayError('argument-invalid', 'kay: signed.sign()\'s ttl is at most 1 year (\'52w\')')

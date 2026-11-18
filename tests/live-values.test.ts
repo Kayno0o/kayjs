@@ -264,7 +264,7 @@ describe('live values on the server', () => {
 
 describe('the connections of one client', () => {
   async function withSite(run: (connect: (proofs?: LiveRequest['proofs']) => Promise<Response>, proofs: LiveRequest['proofs']) => Promise<void>, live?: { connections?: number, rateLimit?: { max: number, window: '1m' | '1h' } }): Promise<void> {
-    const site = await testSite({ root: ROOT, live })
+    const site = await testSite({ root: ROOT, config: { live } })
 
     try {
       const proofs = proofsOf(pagesOf((await site.visit('/other')).html))
@@ -462,7 +462,7 @@ describe('live values in a page', () => {
   })
 
   it('gets the same ids in each locale', async () => {
-    const site = await testSite({ root: ROOT, i18n: { locales: ['en', 'fr'], default: 'en' } })
+    const site = await testSite({ root: ROOT, config: { i18n: { locales: ['en', 'fr'], default: 'en' } } })
 
     try {
       const english = pagesOf((await site.visit('/')).html)[0]!
@@ -927,7 +927,7 @@ describe('live values in a production build', () => {
   it('builds, keeps the pages reading none, and serves the rest per request with a connection each', async () => {
     const root = resolve(await fixtureCopy('live-values'))
 
-    await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } } })\n')
 
     const build = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
     const [out, err, built] = await Promise.all([new Response(build.stdout).text(), new Response(build.stderr).text(), build.exited])
@@ -948,7 +948,7 @@ describe('live values in a production build', () => {
       `import { pages } from ${server}`,
       `import { decodeServerValue } from ${wire}`,
       '',
-      `const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, guards: { default: 'open' }, observe: { log: false }, serve: { compress: false } }))`,
+      `const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, config: { guards: { default: 'open' }, ops: { observe: { log: false } }, serve: { compress: false } } }))`,
       'const page = async path => (await app.handle(new Request(`http://localhost${path}`))).text()',
       'const home = await page(\'/\')',
       'const about = await page(\'/about\')',

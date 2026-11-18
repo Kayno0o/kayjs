@@ -18,7 +18,7 @@ type Route = Parameters<typeof keptScan>[0]
 const keptStop = async (route: Route) => (await keptScan(route)).stop
 const readsNothing = async (route: Route) => await keptStop(route) === undefined
 
-const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, guards: { default: \'open\' } })\n'
+const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } }, guards: { default: \'open\' } })\n'
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
@@ -64,8 +64,8 @@ interface Answered {
 // A server of its own on what the build wrote, which the requests go through in order, a group of them together: one process serves one project.
 // The warnings it logged come with the answers.
 // `parent` is chained onto the app ahead of `pages()`, as hooks of a parent app are.
-async function servedWith(root: string, asked: (Asked | Asked[])[], options = '', parent = ''): Promise<{ answers: Answered[], warnings: string }> {
-  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia()${parent}.use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, observe: { log: false }, serve: { compress: false }${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body, wait }) => {\n  if (wait)\n    await Bun.sleep(wait)\n\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
+async function servedWith(root: string, asked: (Asked | Asked[])[], options = '', parent = '', config = ''): Promise<{ answers: Answered[], warnings: string }> {
+  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia()${parent}.use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, config: { ops: { observe: { log: false } }, serve: { compress: false }${config} }${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body, wait }) => {\n  if (wait)\n    await Bun.sleep(wait)\n\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
 
   const child = Bun.spawn([process.execPath, join(root, 'serve.ts')], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -78,8 +78,8 @@ async function servedWith(root: string, asked: (Asked | Asked[])[], options = ''
   return { answers: JSON.parse(out.slice(at)) as Answered[], warnings: `${out.slice(0, at)}${err}` }
 }
 
-async function served(root: string, asked: (Asked | Asked[])[], options = ''): Promise<Answered[]> {
-  return (await servedWith(root, asked, options)).answers
+async function served(root: string, asked: (Asked | Asked[])[], options = '', config = ''): Promise<Answered[]> {
+  return (await servedWith(root, asked, options, '', config)).answers
 }
 
 // The page and what it imports, under src/routes by the page's name.
@@ -104,7 +104,7 @@ const READING: Record<string, string> = {
   'src/routes/closure.kay': '---\nimport { tick } from \'../ticking\'\n---\np {tick()}\n',
   'src/routes/through-component.kay': '---\nimport Clock from \'../clock.kay\'\n---\nClock\n',
   'src/routes/opted-out.kay': '--- server\nexport const page = { prerender: false }\n---\np Opted out\n',
-  'src/routes/revalidated.kay': '--- server\nexport const page = { ttl: \'1h\' }\n---\np Revalidated\n',
+  'src/routes/revalidated.kay': '--- server\nexport const page = { cache: \'1h\' }\n---\np Revalidated\n',
   'src/routes/[name].kay': 'p Params\n',
   'src/routes/barrel.kay': '---\nimport { now } from \'../lib\'\n---\np {now()}\n',
   'src/routes/relative.kay': '--- server\nimport { formatRelativeTime } from \'kay/i18n\'\n---\np {formatRelativeTime(1_700_000_000_000)}\n',
@@ -196,7 +196,7 @@ describe('a page that reads nothing from its request', () => {
 
   it('is kept once per locale, under a base and a trailing slash', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, guards: { default: \'open\' }, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], default: \'fr\', messages: \'src/messages\' } })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } }, guards: { default: \'open\' }, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], default: \'fr\', messages: \'src/messages\' } })\n',
       'src/messages/fr.ts': MESSAGES.fr,
       'src/messages/en.ts': MESSAGES.en,
       'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\n---\nh1 {t(\'hello\')}\na(href="/about") About\n',
@@ -249,7 +249,7 @@ const GUESTBOOK: Record<string, string> = {
 
 const under: Record<string, string> = {
   ...GUESTBOOK,
-  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, guards: { default: \'open\' }, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], default: \'fr\', messages: \'src/messages\' } })\n',
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } }, guards: { default: \'open\' }, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], default: \'fr\', messages: \'src/messages\' } })\n',
   'src/messages/fr.ts': MESSAGES.fr,
   'src/messages/en.ts': MESSAGES.en,
   'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\nimport { messages } from \'../guestbook\'\n---\np {t(\'hello\')} {messages.join(\',\')}\n',
@@ -401,7 +401,7 @@ describe('a kept page after a request that can write', () => {
 
   it('is not rechecked after the MCP endpoint, whatever its path or slashes', async () => {
     const root = await guestbook()
-    const answers = await served(root, [noise('/mcp'), noise('/mcp/'), noise('/tools/'), read('/about'), read('/calls.json')], ', mcp: { path: \'/tools\' }')
+    const answers = await served(root, [noise('/mcp'), noise('/mcp/'), noise('/tools/'), read('/about'), read('/calls.json')], '', ', mcp: true, endpoints: { mcp: \'/tools\' }')
 
     expect((JSON.parse(answers.at(-1)!.text) as Tally).stable).toBe(0)
   }, 120_000)
@@ -486,7 +486,7 @@ describe('a kept page and the state a script declares', () => {
 
   it('tells a page setting from another export in a server fence', async () => {
     const root = await scratch({
-      'src/routes/settings.kay': '--- server\nlet title = \'Home\'\n\nexport const page = { prerender: true, ttl: \'1h\' }\n---\nh1 {title}\n',
+      'src/routes/settings.kay': '--- server\nlet title = \'Home\'\n\nexport const page = { prerender: true, cache: \'1h\' }\n---\nh1 {title}\n',
       'src/routes/typed.kay': '--- server\nlet title = \'Home\'\n\nexport type Row = { id: number }\n---\nh1 {title}\n',
       'src/routes/named.kay': '--- server\nconst seen = []\n\nexport const pageSize = seen.length\n---\np {pageSize}\n',
       'src/routes/function.kay': '--- server\nlet count = 0\n\nexport async function bump(): Promise<void> {\n  count++\n}\n---\np {count}\n',
@@ -503,7 +503,7 @@ describe('a kept page and the state a script declares', () => {
   it('judges a server fence the compiler cannot place, but that parses, by its first export besides a type or a page setting', async () => {
     const root = await scratch({
       'src/routes/function.kay': '--- server\nlet count = 0\nconst pending\n\nexport async function bump(): Promise<void> {\n  count++\n}\n---\np {count}\n',
-      'src/routes/settings.kay': '--- server\nlet title = \'Home\'\nconst pending\n\nexport const page = { prerender: true, ttl: \'1h\' }\n---\nh1 {title}\n',
+      'src/routes/settings.kay': '--- server\nlet title = \'Home\'\nconst pending\n\nexport const page = { prerender: true, cache: \'1h\' }\n---\nh1 {title}\n',
       'src/routes/typed.kay': '--- server\nlet title = \'Home\'\nlet title = \'Again\'\n\nexport type Row = { id: number }\n---\nh1 {title}\n',
     })
 
@@ -514,9 +514,9 @@ describe('a kept page and the state a script declares', () => {
 
   it('keeps a page whose lastmod reads the clock, as the sitemap reads it and no render does', async () => {
     const root = await scratch({
-      'src/routes/dated.kay': '--- server\nexport const page = { sitemap: true, lastmod: new Date(\'2026-03-04T10:00:00Z\') }\n---\nh1 Dated\n',
-      'src/routes/computed.kay': '--- server\nexport const page = {\n  lastmod: () => new Date(Date.now() - 1000),\n}\n---\nh1 Computed\n',
-      'src/routes/reading.kay': '--- server\nexport const page = { lastmod: new Date(\'2026-03-04\') }\nconst now = new Date()\n---\nh1 {now.getFullYear()}\n',
+      'src/routes/dated.kay': '--- server\nexport const page = { seo: { sitemap: true, lastmod: new Date(\'2026-03-04T10:00:00Z\') } }\n---\nh1 Dated\n',
+      'src/routes/computed.kay': '--- server\nexport const page = { seo: { \n  lastmod: () => new Date(Date.now() - 1000) }, \n }\n---\nh1 Computed\n',
+      'src/routes/reading.kay': '--- server\nexport const page = { seo: { lastmod: new Date(\'2026-03-04\') } }\nconst now = new Date()\n---\nh1 {now.getFullYear()}\n',
     })
 
     expect(await readsNothing(route(root, 'src/routes/dated.kay'))).toBe(true)
@@ -855,7 +855,7 @@ describe('what stops a page from being kept', () => {
 
   it('names what stops a page found while it renders: a stale copy and a path two pages share', async () => {
     const root = await project({
-      'src/routes/revalidated.kay': '--- server\nexport const page = { ttl: \'1h\' }\n---\np Revalidated\n',
+      'src/routes/revalidated.kay': '--- server\nexport const page = { cache: \'1h\' }\n---\np Revalidated\n',
       'src/routes/a.kay': 'p A\n',
       'src/routes/[id].kay': '--- server\nexport const page = { prerender: [{ id: \'a\' }] }\n---\np Item\n',
     })
@@ -891,7 +891,7 @@ describe('what stops a page from being kept', () => {
 
   it('reports a page saying keep: true that is not kept at the level unkept-page has, and under --static a page the export renders', async () => {
     const files = { 'src/routes/random.kay': '--- server\nexport const page = { keep: true }\n---\np {Math.random()}\n' }
-    const config = (lints: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, lints: { 'unkept-page': '${lints}' } })\n`
+    const config = (lints: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ ops: { observe: { log: false } }, lints: { 'unkept-page': '${lints}' } })\n`
     const levels = async (lints: string, args: string[] = []) => {
       const root = await project({ ...files, 'kay.config.ts': config(lints) })
 
@@ -1109,7 +1109,7 @@ describe('what kay exports to a page that is kept', () => {
 
   it('keeps such pages in a build under a base', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\' })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } }, base: \'/app\' })\n',
       'src/routes/index.kay': '---\nimport { shape } from \'../shape\'\n---\np {typeof shape}\n',
       'src/routes/local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.local(\'theme\', \'light\')\n---\np {theme()}\n',
       'src/routes/cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.cookie(\'theme\', \'light\')\n---\np {theme()}\n',
@@ -1239,7 +1239,7 @@ describe('a page reading only what its path fixes', () => {
     const files = { 'src/routes/about.kay': AT_PATH, 'src/routes/index.kay': AT_PATH }
 
     for (const trailingSlash of ['never', 'always', 'ignore']) {
-      const root = await project({ ...files, 'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, trailingSlash: '${trailingSlash}' })\n` })
+      const root = await project({ ...files, 'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ ops: { observe: { log: false } }, trailingSlash: '${trailingSlash}' })\n` })
 
       roots.push(root)
       expect(await built(root), trailingSlash).toEqual(['/', '/about'])
@@ -1270,7 +1270,7 @@ describe('a page reading only what its path fixes', () => {
 
   it('serves a layout reading the pathname at the rendered spelling alone, and stores the path it was rendered at', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, trailingSlash: \'ignore\' })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } }, trailingSlash: \'ignore\' })\n',
       'src/routes/_layout.kay': '--- server\nconst { url: { pathname } } = ctx\n---\nheader {pathname}\nslot\n',
       'src/routes/about.kay': 'p About\n',
       'src/routes/plain.kay': 'p Plain\n',
@@ -1312,7 +1312,7 @@ describe('a page reading only what its path fixes', () => {
 
   it('is kept once per locale prefix and under a base, the pathname being the one the router sees', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\', i18n: { locales: [\'fr\', \'en\'], default: \'fr\', messages: \'src/messages\' } })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } }, base: \'/app\', i18n: { locales: [\'fr\', \'en\'], default: \'fr\', messages: \'src/messages\' } })\n',
       'src/messages/fr.ts': MESSAGES.fr,
       'src/messages/en.ts': MESSAGES.en,
       'src/routes/_layout.kay': '--- server\nimport { t } from \'kay/i18n\'\n\nconst here = ctx.url.pathname\n---\nheader {t(\'hello\')} {here}\nslot\n',
@@ -1332,7 +1332,7 @@ describe('a page reading only what its path fixes', () => {
 
   it('is also kept by a static build, rendered at the path the host answers it at', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, trailingSlash: \'always\' })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } }, trailingSlash: \'always\' })\n',
       'src/routes/about.kay': AT_PATH,
     })
 
@@ -1438,7 +1438,7 @@ describe('a layout reading ctx.locals', () => {
   }, 60_000)
 
   it('names the file and line in a static export, under a base', async () => {
-    const root = await project({ ...FILES, 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\' })\n' })
+    const root = await project({ ...FILES, 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } }, base: \'/app\' })\n' })
 
     roots.push(root)
 
@@ -1450,7 +1450,7 @@ describe('a layout reading ctx.locals', () => {
   }, 60_000)
 
   it('is kept per request under a base too', async () => {
-    const root = await project({ ...FILES, 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\' })\n' })
+    const root = await project({ ...FILES, 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ ops: { observe: { log: false } }, base: \'/app\' })\n' })
 
     roots.push(root)
     expect(await built(root)).toEqual([])
@@ -1458,7 +1458,7 @@ describe('a layout reading ctx.locals', () => {
 })
 
 describe('the requests that count as writes', () => {
-  it('leaves out the former MCP path only where kay serves it', async () => {
+  it('leaves out the MCP path only where kay serves it', async () => {
     const app = new Elysia()
     let held = true
     const writes = countWrites(app, () => held ? ['/mcp'] : [])

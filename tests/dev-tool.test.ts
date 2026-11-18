@@ -1502,7 +1502,7 @@ describe('the dev tool', () => {
     const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
     const { href } = location
     const asked: string[] = []
-    let app = await pages({ root: dir, dirs: { routes }, dev: true, publicEnv: true })
+    let app = await pages({ root: dir, config: { dirs: { routes } }, dev: true, publicEnv: true })
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
       asked.push(url)
 
@@ -1554,7 +1554,7 @@ describe('the dev tool', () => {
 
       // No public field: nothing reaches the browser, and the tab says so after the restart.
       await rm(join(dir, 'src/env.ts'))
-      app = await pages({ root: dir, dirs: { routes }, dev: true })
+      app = await pages({ root: dir, config: { dirs: { routes } }, dev: true })
       document.dispatchEvent(new CustomEvent('kay:dev-built', { detail: { changed: 'kay.config.ts', ms: 1 } }))
       await eventually(() => expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('sends no public env'))
 

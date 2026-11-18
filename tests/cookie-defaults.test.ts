@@ -49,17 +49,17 @@ describe('cookie defaults', () => {
 
     const base = { root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, guards: { default: 'open' as const } }
 
-    servers.plain = await pages({ ...base, security: false })
-    servers.off = await pages({ ...base, security: { cookies: false } })
-    servers.safe = await pages({ ...base, security: { cookies: {} } })
+    servers.plain = await pages({ ...base, config: { security: false } })
+    servers.off = await pages({ ...base, config: { security: { cookies: false } } })
+    servers.safe = await pages({ ...base, config: { security: { cookies: {} } } })
     servers.unset = await pages(base)
-    servers.unsetMounted = await pages({ ...base, base: '/app' })
-    servers.unsetSlash = await pages({ ...base, base: '/app', trailingSlash: 'always' })
-    servers.unsetSecurity = await pages({ ...base, security: { csp: false } })
-    servers.mounted = await pages({ ...base, base: '/app', security: { cookies: {} } })
-    servers.custom = await pages({ ...base, security: { cookies: { sameSite: 'none', path: '/shop', httpOnly: false } } })
-    servers.never = await pages({ ...base, security: { cookies: { secure: false } } })
-    servers.always = await pages({ ...base, security: { cookies: { secure: true } } })
+    servers.unsetMounted = await pages({ ...base, config: { base: '/app' } })
+    servers.unsetSlash = await pages({ ...base, config: { base: '/app', trailingSlash: 'always' } })
+    servers.unsetSecurity = await pages({ ...base, config: { security: { csp: false } } })
+    servers.mounted = await pages({ ...base, config: { base: '/app', security: { cookies: {} } } })
+    servers.custom = await pages({ ...base, config: { security: { cookies: { sameSite: 'none', path: '/shop', httpOnly: false } } } })
+    servers.never = await pages({ ...base, config: { security: { cookies: { secure: false } } } })
+    servers.always = await pages({ ...base, config: { security: { cookies: { secure: true } } } })
   })
 
   afterAll(async () => {
@@ -185,7 +185,7 @@ describe('cookie defaults', () => {
   })
 
   it('keeps plain-http localhost working under kay dev', async () => {
-    const dev = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, guards: { default: 'open' as const }, dev: true, security: { cookies: {} } })
+    const dev = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' }, guards: { default: 'open' }, security: { cookies: {} } }, prebuilt: false, dev: true })
 
     expect((await dev.handle(new Request('http://localhost/cookie'))).headers.getSetCookie()[0]).toBe('theme=dark; Path=/; HttpOnly; SameSite=Lax')
   })
@@ -219,7 +219,7 @@ describe('cookie defaults', () => {
       setSite(undefined)
     }
 
-    const dev = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, guards: { default: 'open' as const }, dev: true })
+    const dev = await pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' }, guards: { default: 'open' } }, prebuilt: false, dev: true })
 
     expect((await dev.handle(new Request('http://localhost/cookie'))).headers.getSetCookie()[0]).toBe('theme=dark; Path=/; HttpOnly; SameSite=Lax')
     expect((await cookies('off', '/cookie')).set[0]).toBe('theme=dark; Path=/; SameSite=Lax')
@@ -227,8 +227,8 @@ describe('cookie defaults', () => {
   })
 
   it('refuses a setting that is no cookie attribute', async () => {
-    await expect(pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, security: { cookies: { sameSite: 'sometimes' as 'lax' } } })).rejects.toThrow('security.cookies.sameSite')
-    await expect(pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, security: { cookies: { path: 'shop' } } })).rejects.toThrow('security.cookies.path')
+    await expect(pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' }, security: { cookies: { sameSite: 'sometimes' as 'lax' } } }, prebuilt: false })).rejects.toThrow('security.cookies.sameSite')
+    await expect(pages({ root: dir, config: { dirs: { routes: 'routes', api: 'api' }, security: { cookies: { path: 'shop' } } }, prebuilt: false })).rejects.toThrow('security.cookies.path')
     expect(unknownConfigKeys({ security: { cookies: { samesite: 'lax' } } })).toEqual(['`security.cookies.samesite`, did you mean `security.cookies.sameSite`?'])
   })
 })

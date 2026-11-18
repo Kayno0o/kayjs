@@ -14,11 +14,11 @@ async function failing() {
 }
 
 const site = await testSite({
-  dirs: { routes, api },
+  config: { dirs: { routes, api } },
   islands: false,
   use: [new Elysia().use(schedule({ cron: '@hourly' }, hourly)).use(schedule({ every: '30s' }, quick)).use(schedule({ cron: '@daily' }, failing))],
 })
-const bare = await testSite({ dirs: { routes, api }, islands: false })
+const bare = await testSite({ config: { dirs: { routes, api } }, islands: false })
 
 afterAll(async () => {
   await Promise.all([site.close(), bare.close()])
@@ -53,7 +53,7 @@ describe('site.advance()', () => {
   it('moves the clock and fires a schedule at every instant it fell due, with the clock at that instant', async () => {
     setSystemTime(new Date('2030-01-01T00:10:00Z'))
     const stamps: number[] = []
-    const timed = await testSite({ dirs: { routes, api }, islands: false, use: [schedule({ every: '15m' }, async () => void stamps.push(Date.now()))] })
+    const timed = await testSite({ config: { dirs: { routes, api } }, islands: false, use: [schedule({ every: '15m' }, async () => void stamps.push(Date.now()))] })
 
     expect(await timed.advance('1h')).toBe(4)
     expect(stamps.map(at => new Date(at).toISOString())).toEqual([
@@ -80,7 +80,7 @@ describe('site.advance()', () => {
   })
 
   it('puts the clock back when the site closes', async () => {
-    const timed = await testSite({ dirs: { routes, api }, islands: false })
+    const timed = await testSite({ config: { dirs: { routes, api } }, islands: false })
     const real = Date.now()
 
     await timed.advance('365d')

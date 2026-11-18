@@ -8,9 +8,9 @@ import { kayTypes } from './kay-types'
 const CLI = resolve('src/cli.ts')
 const KEY = { 'x-key': 'open' }
 const projects: string[] = []
-const site = await testSite({ root: 'tests/fixtures/openapi', openapi: { title: 'Shop', version: '2.1.0', reference: true }, base: '/shop' })
-const signedIn = await testSite({ root: 'tests/fixtures/openapi', openapi: true, locals: request => ({ key: request.headers.get('x-session-key') ?? undefined }) })
-const hidden = await testSite({ root: 'tests/fixtures/openapi', openapi: { dev: true } })
+const site = await testSite({ root: 'tests/fixtures/openapi', config: { openapi: { title: 'Shop', version: '2.1.0', reference: true }, base: '/shop' } })
+const signedIn = await testSite({ root: 'tests/fixtures/openapi', config: { openapi: true }, locals: request => ({ key: request.headers.get('x-session-key') ?? undefined }) })
+const hidden = await testSite({ root: 'tests/fixtures/openapi', config: { openapi: { dev: true } } })
 
 afterAll(async () => {
   await Promise.all([site.close(), signedIn.close(), hidden.close(), ...projects.map(async dir => rm(dir, { recursive: true, force: true }))])

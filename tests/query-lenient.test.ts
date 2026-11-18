@@ -85,9 +85,9 @@ describe('a lenient query field of a page and its layout', () => {
       Bun.write(join(dir, 'routes/strict.kay'), '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.object({ q: s.string({ optional: true }) }) }\nconst keys = Object.keys(ctx.query).join(\',\')\nconst q = ctx.query.q ?? \'\'\n---\np.read {keys}|{q}\n'),
       Bun.write(join(dir, 'routes/_error.kay'), '--- server\nconst { status } = ctx.error\n---\nh1 Error {status}\n'),
     ])
-    plain = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false })
-    mounted = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, base: '/repo', trailingSlash: 'always' })
-    localized = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+    plain = await pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false }, prebuilt: false })
+    mounted = await pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false, base: '/repo', trailingSlash: 'always' }, prebuilt: false })
+    localized = await pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

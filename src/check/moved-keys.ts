@@ -31,7 +31,7 @@ export async function movedKeys(root: string, options: CheckOptions, { lint, nee
   return scan(root, options, lint, needle, ({ file, parsed, report }) => {
     for (const { ast, base, text } of parsed) {
       for (const { object, call } of configObjects(file, ast)) {
-        // The options of a call are moved into `config` by `deprecated-pages-options` first.
+        // The options of a call are written in `config`.
         if (call !== undefined)
           continue
 

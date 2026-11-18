@@ -25,7 +25,7 @@ describe('a Table drawn by a page', () => {
 
     await Promise.all(Object.entries(tables).map(async ([name, table]) => Bun.write(join(root, `src/routes/static-${name}.kay`), PAGE(table))))
 
-    const app = new Elysia().use(await pages({ root, prebuilt: false, security: false }))
+    const app = new Elysia().use(await pages({ root, prebuilt: false, config: { security: false } }))
     const page = async (name: string) => (await app.handle(new Request(`http://localhost/static-${name}`))).text()
     const slots = (html: string) => html.match(/<slot data-component="[^"]*table\.kay"/g)?.length ?? 0
     const plain = await page('plain')

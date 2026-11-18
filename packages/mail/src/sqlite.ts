@@ -1,8 +1,6 @@
 import type { MailStore } from './mail-store'
 
 export { sqliteLists } from './list-store'
-/** @deprecated Use `sqliteLists`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-export { sqliteLists as openLists } from './list-store'
 export type { MailStore } from './mail-store'
 
 export { sqliteSuppressions } from './suppressions'

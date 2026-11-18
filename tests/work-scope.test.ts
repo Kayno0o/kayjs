@@ -16,7 +16,7 @@ describe('workChallenge', () => {
   const SCOPED = /data-kay-work="([^"]+)"/
 
   it('gives a form field a challenge the action checks itself, solved once by kay/test as the browser does', async () => {
-    const site = await testSite({ root: 'tests/fixtures/navigation', security: false })
+    const site = await testSite({ root: 'tests/fixtures/navigation', config: { security: false } })
     const { contact } = await import(SCOPED_PAGE) as { contact: Action<{ message: string, proof?: string }, number> }
     const page = await site.visit('/scoped')
     const challenge = SCOPED.exec(page.html)![1]!
@@ -28,14 +28,14 @@ describe('workChallenge', () => {
   })
 
   it('solves the field for a from given as a path, visiting the page as a Visit would be', async () => {
-    const site = await testSite({ root: 'tests/fixtures/navigation', security: false })
+    const site = await testSite({ root: 'tests/fixtures/navigation', config: { security: false } })
     const { contact } = await import(SCOPED_PAGE) as { contact: Action<{ message: string, proof?: string }, number> }
 
     expect((await site.submit(contact, { message: 'hello' }, { from: '/scoped' })).html).toContain('<p class="sent">Sent 5</p>')
   })
 
   it('refuses as expired a challenge of another scope, an action\'s, an easier one, one past its maxAge or signed before the key changed', async () => {
-    const solved = solveWork(workChallenge('contact', { difficulty: 50, maxAge: '1m' }))!
+    const solved = solveWork(workChallenge('contact', { difficulty: 50, ttl: '1m' }))!
 
     expect(await verifyWork(solved, 'newsletter')).toBe('expired')
     expect(await verifyWork(solveWork(signWork('contact', 50, 60_000)), 'contact')).toBe('expired')
@@ -65,7 +65,7 @@ console.log(JSON.stringify([await verifyWork(before, 'contact'), await verifyWor
   })
 
   it('leaves a prerendered page a mark the server fills in with a fresh challenge per visit', async () => {
-    const mark = withServerIslands(newServerIslands(true), () => workChallenge('contact', { difficulty: 50, maxAge: '1m' }))
+    const mark = withServerIslands(newServerIslands(true), () => workChallenge('contact', { difficulty: 50, ttl: '1m' }))
     const holes = [...`<input type="hidden" name="proof" data-kay-work="${mark}">`.matchAll(STAMP_HOLE)]
 
     expect(holes).toHaveLength(1)

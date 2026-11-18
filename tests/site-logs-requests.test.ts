@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { testSite, waitUntil } from '../src/test'
 
 // A function logger keeps the request lines out of the test output; the entries reach `site.logs` either way.
-const site = await testSite({ dirs: { routes: 'tests/fixtures/site-logs/src/routes' }, observe: { log: () => undefined }, islands: false })
+const site = await testSite({ config: { dirs: { routes: 'tests/fixtures/site-logs/src/routes' }, ops: { observe: { log: { sink: () => undefined } } } }, islands: false })
 
 afterAll(async () => site.close())
 

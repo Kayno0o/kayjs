@@ -65,7 +65,7 @@ export interface ListStore {
   sent: (broadcast: string, subscriber: string, now?: number) => MaybePromise<unknown>
   release: (broadcast: string, subscriber: string, now?: number) => MaybePromise<unknown>
   progress: (broadcast: Broadcast) => MaybePromise<BroadcastProgress>
-  // Bounces and complaints, as a `SuppressionStore` keeps them, which a store of an app's own may leave out: the mailer then keeps them in its `suppressionStore`, else the default file.
+  // Bounces and complaints, as a `SuppressionStore` keeps them, which a store of an app's own may leave out: the mailer then keeps them in its `store.suppressions`, else the default file.
   suppress?: SuppressionStore['suppress'] | undefined
   suppressed?: SuppressionStore['suppressed'] | undefined
   lift?: SuppressionStore['lift'] | undefined

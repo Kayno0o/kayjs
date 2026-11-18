@@ -255,7 +255,7 @@ describe('a French page served', () => {
     await pages({ root: 'tests/fixtures/typography', prebuilt: false })
   }, 60_000)
 
-  const site = async (more: Record<string, unknown> = {}) => new Elysia().use(await pages({ root: 'tests/fixtures/typography', prebuilt: false, security: false, lang: 'fr', client: { inlineStyles: false }, observe: { onError: () => undefined }, ...more }))
+  const site = async (more: Record<string, unknown> = {}) => new Elysia().use(await pages({ root: 'tests/fixtures/typography', prebuilt: false, config: { security: false, lang: 'fr', client: { inlineStyles: false }, onError: () => undefined, ...more } }))
 
   it('writes a non-breaking space for the template, a prop, a constant, a collection, the head and a streamed block, and leaves the rest', async () => {
     const { status, html } = await get(await site(), '/')
@@ -318,7 +318,7 @@ describe('a French page served', () => {
   })
 
   it('follows the locale of the page on a site that is English otherwise', async () => {
-    const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages }
+    const i18n = { locales: ['en', 'fr'], default: 'en', messages }
     const served = await site({ lang: undefined, i18n })
 
     expectPlain((await get(served, '/')).html)
@@ -326,7 +326,7 @@ describe('a French page served', () => {
     expect((await get(served, '/fr/nowhere')).html).toContain(`Introuvable${N}: désolé${N}!`)
     expect((await get(served, '/nowhere')).html).toContain('Introuvable : désolé !')
 
-    const french = await site({ lang: undefined, i18n: { ...i18n, defaultLocale: 'fr' } })
+    const french = await site({ lang: undefined, i18n: { ...i18n, default: 'fr' } })
 
     expectSpaced((await get(french, '/')).html)
     expectPlain((await get(french, '/en')).html)
@@ -350,7 +350,7 @@ describe('a French page served', () => {
 
       expectSpaced(written)
 
-      const served = await build.serve({ dirs: { routes }, contentConfig: content, security: false, lang: 'fr' })
+      const served = await build.serve({ config: { dirs: { routes }, security: false, lang: 'fr', contentConfig: content } })
       const { html } = await get(served, '/')
 
       expect(html).toBe(written)
@@ -371,7 +371,7 @@ describe('a French page served', () => {
       expect(built).toContain(`<h1>Îles${N}!</h1>`)
       expect(built).toContain(`Île${N}: différée`)
 
-      const served = await build.serve({ dirs: { routes }, contentConfig: content, security: false, lang: 'fr' })
+      const served = await build.serve({ config: { dirs: { routes }, security: false, lang: 'fr', contentConfig: content } })
       const { html } = await get(served, '/island')
 
       expect(html).toContain(`<p class="prop">Île${N}: serveur</p>`)
@@ -380,7 +380,7 @@ describe('a French page served', () => {
 
       expect(fetched.html).toContain(`<p class="prop">Île${N}: différée</p>`)
 
-      const plain = await build.serve({ dirs: { routes }, client: { typography: false }, contentConfig: content, security: false, lang: 'fr' })
+      const plain = await build.serve({ config: { dirs: { routes }, client: { typography: false }, security: false, lang: 'fr', contentConfig: content } })
 
       expect((await get(plain, '/island?kay_island=1', { [ISLAND_HEADER]: '1' })).html).toContain('<p class="prop">Île : différée</p>')
     }
@@ -390,9 +390,9 @@ describe('a French page served', () => {
   })
 
   it('writes the spaces of the page a visitor offline gets', async () => {
-    const i18n = { locales: ['fr'], defaultLocale: 'fr', messages }
+    const i18n = { locales: ['fr'], default: 'fr', messages }
     const offline = async (more: Record<string, unknown> = {}) => {
-      const served = await pages({ root: 'tests/fixtures/typography', prebuilt: false, security: false, site: 'https://x.example', offline: true, i18n, ...more })
+      const served = await pages({ root: 'tests/fixtures/typography', prebuilt: false, config: { security: false, site: 'https://x.example', client: { offline: true, ...more.client as object }, i18n } })
       const script = await (await served.handle(new Request('http://localhost/sw.js'))).text()
 
       return (JSON.parse((/const KAY = (.*)\n/).exec(script)![1]!) as { offline: string }).offline

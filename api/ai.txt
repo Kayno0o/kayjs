@@ -36,16 +36,12 @@ interface AiOptions extends AskHooks, Resilience, ModelsOptions
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   budget?: BudgetOptions | false | undefined
   conversationAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-  conversations?: ConversationStore | undefined
   default?: string | undefined
   fallback?: readonly FallbackModel[] | undefined
   imageAlt?: boolean | undefined | { reviewed?: string[] | undefined; }
   key?: ((request: Request) => Promise<string | undefined> | string | undefined) | undefined
   models?: Record<string, NamedModel> | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onStep?: Hook<Step> | undefined
-  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuccess?: Hook<FinishHookCall> | undefined
-  /** @deprecated Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onToolCall?: Hook<AiToolCall> | undefined
   rateLimit?: AskLimit | AskLimit[] | false | undefined
   retry?: RetryOptions | false | undefined
   store?: ConversationStore | undefined
@@ -107,9 +103,6 @@ interface AskHooks
   afterToolCall?: Hook<AiToolCall> | undefined
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onStep?: Hook<Step> | undefined
-  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuccess?: Hook<FinishHookCall> | undefined
-  /** @deprecated Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onToolCall?: Hook<AiToolCall> | undefined
 
 [.] AskLimit
 type AskLimit = Omit<RateLimit, 'key'> & { hit?: never }
@@ -132,9 +125,6 @@ interface AskOptions extends CallOptions, AskHooks
   maxTokens?: number | undefined
   model?: string | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onStep?: Hook<Step> | undefined
-  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuccess?: Hook<FinishHookCall> | undefined
-  /** @deprecated Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onToolCall?: Hook<AiToolCall> | undefined
   outlive?: boolean | undefined
   provider?: Provider | undefined
   retry?: RetryOptions | false | undefined
@@ -159,14 +149,12 @@ interface BudgetOptions
   window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] CallOptions
-interface CallOptions extends Resilience, Pick<AskHooks, 'afterStep' | 'onStep' | 'afterRequest' | 'onSuccess' | 'onError'>
+interface CallOptions extends Resilience, Pick<AskHooks, 'afterStep' | 'afterRequest' | 'onError'>
   afterRequest?: Hook<FinishHookCall> | undefined
   afterStep?: Hook<Step> | undefined
   fallback?: readonly FallbackModel[] | undefined
   model?: string | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onStep?: Hook<Step> | undefined
-  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuccess?: Hook<FinishHookCall> | undefined
   provider?: Provider | undefined
   retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
@@ -406,8 +394,6 @@ interface DescribeImageOptions extends CallOptions
   locale?: string | undefined
   model?: string | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onStep?: Hook<Step> | undefined
-  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuccess?: Hook<FinishHookCall> | undefined
   provider?: Provider | undefined
   retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
@@ -435,8 +421,6 @@ interface EmbedOptions extends CallOptions
   fallback?: readonly FallbackModel[] | undefined
   model?: string | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onStep?: Hook<Step> | undefined
-  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuccess?: Hook<FinishHookCall> | undefined
   provider?: Provider | undefined
   retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
@@ -714,8 +698,6 @@ interface SpeakOptions extends CallOptions
   maxInputChars?: number | undefined
   model?: string | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onStep?: Hook<Step> | undefined
-  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuccess?: Hook<FinishHookCall> | undefined
   provider?: Provider | undefined
   retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
@@ -797,9 +779,6 @@ interface StructuredAskOptions<Spec extends Schema = Schema> extends AskOptions
   maxTokens?: number | undefined
   model?: string | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onStep?: Hook<Step> | undefined
-  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuccess?: Hook<FinishHookCall> | undefined
-  /** @deprecated Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onToolCall?: Hook<AiToolCall> | undefined
   outlive?: boolean | undefined
   provider?: Provider | undefined
   retry?: RetryOptions | false | undefined
@@ -872,8 +851,6 @@ interface TranscribeOptions extends CallOptions
   maxSize?: number | string | undefined
   model?: string | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  /** @deprecated Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onStep?: Hook<Step> | undefined
-  /** @deprecated Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSuccess?: Hook<FinishHookCall> | undefined
   provider?: Provider | undefined
   retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
@@ -1250,30 +1227,14 @@ component default
 [./pg] aiTables
 const aiTables: readonly ["kay_ai_conversations"]
 
-[./pg] conversationTable
-/** @deprecated Use `aiTables`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-const conversationTable: "kay_ai_conversations"
-
 [./pg] createAiTables
 function createAiTables(source: PgSource): Promise<void>
-
-[./pg] createConversationTable
-/** @deprecated Use `createAiTables`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-function createConversationTable(source: PgSource): Promise<void>
 
 [./pg] pgAi
 function pgAi(source: PgSource): ConversationStore & { close: () => Promise<void>; }
 
-[./pg] pgConversations
-/** @deprecated Use `pgAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-function pgConversations(source: PgSource): ConversationStore & { close: () => Promise<void>; }
-
 [./sqlite] sqliteAi
 function sqliteAi(path?: string): ConversationStore
-
-[./sqlite] sqliteConversations
-/** @deprecated Use `sqliteAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
-function sqliteConversations(path?: string): ConversationStore
 
 [./test] AiTest
 type AiTest = Pick<Fake, 'reply' | 'fail' | 'asked' | 'last' | 'clear' | 'heard' | 'transcript' | 'spoken' | 'speech' | 'embedded' | 'embedding'> & {

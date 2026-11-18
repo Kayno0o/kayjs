@@ -474,7 +474,7 @@ pgDescribe('pgData live values', () => {
     const heard: [string, string | undefined][] = []
 
     other.subscribe((_id, key, text) => heard.push([key, text]))
-    await store.endAll!('app:stars', 60_000)
+    await store.endAll!('app:stars', '1m')
     await waitFor(() => heard.length === 2, 'the other replica to hear both keys')
 
     expect(heard.sort()).toEqual([['*', '[1]'], ['\\*', '[2]']])
@@ -488,7 +488,7 @@ pgDescribe('pgData live values', () => {
     const [store] = twoReplicas()
 
     await store.set('app:legacy', '*', '[1]', Date.now() + 60_000)
-    await store.endAll!('app:legacy', 60_000)
+    await store.endAll!('app:legacy', '1m')
 
     const [event] = await sql.unsafe<{ id: string, key: string }[]>('SELECT id, key FROM kay_live_events ORDER BY kay_live_events.seq DESC LIMIT 1')
     // What the build before it did with an event: read the row of its id and key.
@@ -551,7 +551,7 @@ pgDescribe('pgData live values', () => {
     }
 
     await lockWaited(sql)
-    await other.endAll!('app:race', 60_000)
+    await other.endAll!('app:race', '1m')
     await waitFor(() => heard.some(([key]) => key === 'J'), 'the end of J to be heard')
     await waitFor(() => heard.some(([key, text]) => key === 'K' && text === '[2]'), 'the new text of K')
     await holder.release()

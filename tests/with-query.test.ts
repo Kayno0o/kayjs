@@ -25,9 +25,9 @@ describe('withQuery in a server fence', () => {
       Bun.write(join(dir, 'routes/shop/index.kay'), '--- server\nimport { withQuery } from \'kay\'\n\nconst page = withQuery({ page: 2, sort: \'name\' })\nconst drop = withQuery({ sort: null, page: undefined })\nconst empty = withQuery({ sort: \'\' })\nconst same = withQuery({})\nconst zero = withQuery({ page: 0 })\n---\na.next(href={page}) Next\na.drop(href={drop}) Drop\na.empty(href={empty}) Empty\na.same(href={same}) Same\na.zero(href={zero}) Zero\n'),
       Bun.write(join(dir, 'routes/index.kay'), '--- server\nimport { withQuery } from \'kay\'\n\nconst filtered = withQuery({ filter: \'a&b=c\' })\n---\na.filtered(href={filtered}) Filter\n'),
     ])
-    plain = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false })
-    mounted = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, base: '/repo', trailingSlash: 'always' })
-    localized = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+    plain = await pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false }, prebuilt: false })
+    mounted = await pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false, base: '/repo', trailingSlash: 'always' }, prebuilt: false })
+    localized = await pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false, i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

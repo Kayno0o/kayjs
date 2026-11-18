@@ -25,7 +25,7 @@ async function app(base: string) {
   let held = sites.get(base)
 
   if (!held) {
-    held = testSite({ root: ROOT, extensions: [ui(), who()], plugins: [tailwind], islands: false, base: base || undefined })
+    held = testSite({ root: ROOT, config: { extensions: [ui(), who()], plugins: [tailwind], base: base || undefined }, islands: false })
     sites.set(base, held)
   }
 
@@ -172,7 +172,7 @@ describe('the inbox route', () => {
 
 describe('the Bell with trailingSlash always', () => {
   it('draws for a signed-in visitor, and its routes answer in place rather than redirect', async () => {
-    slashed ??= testSite({ root: ROOT, extensions: [ui(), who()], plugins: [tailwind], islands: false, trailingSlash: 'always' })
+    slashed ??= testSite({ root: ROOT, config: { extensions: [ui(), who()], plugins: [tailwind], trailingSlash: 'always' }, islands: false })
 
     const site = await slashed
     const page = await site.fetch('/', { headers: ADA })

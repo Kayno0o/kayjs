@@ -71,7 +71,7 @@ export default defineConfig({
 })
 ```
 
-- `proxy: false` is none, as left out; `proxy: true` is one proxy in front, `{ hops: 2 }` two; a bare `proxy: 2` still works until 1.108, `deprecated-config-switch` rewriting it.
+- `proxy: false` is none, as left out; `proxy: true` is one proxy in front, `{ hops: 2 }` two; a bare `proxy: 2` is refused, write `{ hops: 2 }`.
 - `hops` is the number of proxies in front, each appending the address it was reached from to `X-Forwarded-For`, so the visitor is the entry `hops` from its end: 1 for nginx or Caddy alone, 2 for Cloudflare then nginx.
 - A request with fewer entries skipped an outer proxy, and its first entry is who reached the inner one.
 - `header` names a header a proxy sets to the visitor's address, read instead: `{ header: 'cf-connecting-ip' }`, or `{ header: 'x-real-ip' }` for nginx's `proxy_set_header X-Real-IP $remote_addr`.

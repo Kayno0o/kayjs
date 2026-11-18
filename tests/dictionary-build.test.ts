@@ -41,7 +41,7 @@ const paragraphs = (topic: string, count = 30) => Array.from({ length: count }, 
 function files(config: string, i18n: boolean): Record<string, string> {
   return {
     // Rendered again in the background once a second old.
-    'src/routes/tick.kay': `--- server\nexport const page = { prerender: true, ttl: '1s' }\nconst stamp = Date.now()\n---\nh1 Tick\np tick-{stamp}\n${paragraphs('Tick')}\n`,
+    'src/routes/tick.kay': `--- server\nexport const page = { prerender: true, cache: '1s' }\nconst stamp = Date.now()\n---\nh1 Tick\np tick-{stamp}\n${paragraphs('Tick')}\n`,
     'tsconfig.json': tsconfig,
     'kay.config.ts': config,
     'src/routes/_layout.kay': layout('/'),
@@ -356,7 +356,7 @@ describe('development', () => {
   it('has no dictionary, even over a build that has one and with compression asked for', async () => {
     const [root] = sites
     const { dictionary } = await manifestOf(root!)
-    const app = await pages({ root: root!.root, dev: true, prebuilt: true, serve: { compress: true }, observe: { log: false } })
+    const app = await pages({ root: root!.root, dev: true, prebuilt: true, config: { serve: { compress: true }, ops: { observe: { log: false } } } })
     const reply = await app.handle(new Request('http://localhost/about', { headers: { 'accept-encoding': ACCEPT, 'available-dictionary': `:${dictionary!.hash}:` } }))
     const file = await app.handle(new Request(`http://localhost/_kay/${dictionary!.file}`))
 

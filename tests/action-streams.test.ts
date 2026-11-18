@@ -12,9 +12,9 @@ import { inLiveReads } from '../src/server/live'
 import { browserPath, testSite } from '../src/test'
 import { untilHolds } from './helpers/until-holds'
 
-const site = await testSite({ root: 'tests/fixtures/action-streams', browser: true, mcp: true })
-const mounted = await testSite({ root: 'tests/fixtures/action-streams', islands: false, base: '/blog', trailingSlash: 'always' })
-const localized = await testSite({ root: 'tests/fixtures/action-streams', islands: false, i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
+const site = await testSite({ root: 'tests/fixtures/action-streams', browser: true, config: { mcp: true } })
+const mounted = await testSite({ root: 'tests/fixtures/action-streams', islands: false, config: { base: '/blog', trailingSlash: 'always' } })
+const localized = await testSite({ root: 'tests/fixtures/action-streams', islands: false, config: { i18n: { locales: ['fr', 'en'], default: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } } })
 const fixture = join(import.meta.dir, 'fixtures/action-streams/src')
 const actions = await import(join(fixture, 'routes/index.kay')) as {
   count: Action<{ to: number }, AsyncIterable<number>>
@@ -344,7 +344,7 @@ describe('an action returning an async iterable', () => {
   })
 
   it('sends each value as it comes when compressed, and stops once the client goes away', async () => {
-    const compressed = await testSite({ root: 'tests/fixtures/action-streams', islands: false, serve: { compress: true } })
+    const compressed = await testSite({ root: 'tests/fixtures/action-streams', islands: false, config: { serve: { compress: true } } })
     const before = seen.stopped
     const { headers, body } = encodeCall(undefined)
     const response = await compressed.fetch(actions.endless.url, { method: 'POST', headers: { ...headers, 'origin': 'http://localhost', 'accept-encoding': 'gzip' }, body })

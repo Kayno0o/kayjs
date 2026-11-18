@@ -454,7 +454,7 @@ describe('the routes a browser calls', () => {
   beforeAll(async () => {
     const auth = new Elysia().onRequest(({ request }) => nameUser(request, () => signedIn))
 
-    site = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', extensions: [{ name: 'test/auth', server: auth }, push()] })
+    site = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', extensions: [{ name: 'test/auth', server: auth }, push()] } })
   })
 
   async function post(path: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> {
@@ -568,7 +568,7 @@ describe('the routes a browser calls', () => {
     expect(worker).toContain('notificationclick')
     expect(worker).toContain('showNotification')
     expect(worker).not.toContain('unregister()')
-    const offlineOnly = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', offline: true })
+    const offlineOnly = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', client: { offline: true } } })
 
     expect(await (await offlineOnly.handle(new Request('http://localhost/about'))).text()).not.toContain('beforeinstallprompt')
     expect(worker).not.toContain('addEventListener(\'fetch\'')
@@ -578,7 +578,7 @@ describe('the routes a browser calls', () => {
 describe('the routes under a base', () => {
   it('answer at the router path a base proxy strips the base to', async () => {
     const auth = new Elysia().onRequest(({ request }) => nameUser(request, () => 'ada'))
-    const site = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', extensions: [{ name: 'test/auth', server: auth }, push()] })
+    const site = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', base: '/repo', extensions: [{ name: 'test/auth', server: auth }, push()] } })
     const phone = await device('phone')
     const key = await site.handle(new Request('http://localhost/_kay/push/key'))
     const sent = await site.handle(new Request('http://localhost/_kay/push/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: phone.endpoint, keys: { p256dh: phone.keys.publicKey, auth: phone.auth } }) }))
@@ -597,14 +597,14 @@ describe('the routes under a base', () => {
 
 describe('the worker', () => {
   it('has no push handlers without push()', async () => {
-    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', offline: true })
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', client: { offline: true } } })
     const worker = await (await app.handle(new Request('http://localhost/sw.js'))).text()
 
     expect(worker).not.toContain('notificationclick')
   })
 
   it('adds them to the offline worker, under the base', async () => {
-    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', offline: { pages: ['/'] }, extensions: [push()] })
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', base: '/repo', extensions: [push()], client: { offline: { pages: ['/'] } } } })
     const worker = await (await app.handle(new Request('http://localhost/sw.js'))).text()
 
     expect(worker).toContain('notificationclick')
@@ -613,7 +613,7 @@ describe('the worker', () => {
   })
 
   it('is served in development too, caching nothing', async () => {
-    const app = await pages({ root: 'tests/fixtures/static', dev: true, site: 'http://localhost', extensions: [push()] })
+    const app = await pages({ root: 'tests/fixtures/static', dev: true, config: { site: 'http://localhost', extensions: [push()] } })
     const worker = await (await app.handle(new Request('http://localhost/sw.js'))).text()
 
     expect(worker).toContain('notificationclick')
@@ -625,7 +625,7 @@ describe('the worker handlers', () => {
   type Listener = (event: unknown) => void
 
   async function run(base: string, navigator: object = {}): Promise<{ shown: { title: string, options: Record<string, unknown> }[], opened: string[], focused: string[], fire: (type: string, event: object) => Promise<void> }> {
-    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base, extensions: [push()] })
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', base, extensions: [push()] } })
     const script = await (await app.handle(new Request(`http://localhost/sw.js`))).text()
     const listeners = new Map<string, Listener>()
     const shown: { title: string, options: Record<string, unknown> }[] = []
@@ -727,7 +727,7 @@ describe('the worker handlers on a rotated subscription', () => {
   type Listener = (event: unknown) => void
 
   async function scope(fetching: (url: string, init?: RequestInit) => Promise<Response>, offline = false) {
-    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', extensions: [push()], offline })
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, config: { site: 'https://x.example', base: '/repo', extensions: [push()], client: { offline } } })
     const script = await (await app.handle(new Request('http://localhost/sw.js'))).text()
     const listeners = new Map<string, Listener>()
     const subscribed: { applicationServerKey: Uint8Array, unsubscribed: boolean }[] = []

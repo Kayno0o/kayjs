@@ -36,7 +36,7 @@ describe('the grouped config keys', () => {
   })
 
   it('checks the keys of each bag', () => {
-    expect(unknownConfigKeys({ dirs: { routes: 'a' }, limits: { body: 1 }, serve: { compress: true }, observe: { log: false }, client: { saveData: false } })).toEqual([])
+    expect(unknownConfigKeys({ dirs: { routes: 'a' }, limits: { body: 1 }, serve: { compress: true }, ops: { observe: { log: false } }, client: { saveData: false } })).toEqual([])
     expect(unknownConfigKeys({ dirs: { route: 'a' }, client: { saveDat: false }, limits: { max: 1 } })).toEqual(['`dirs.route`, did you mean `dirs.routes`?', '`client.saveDat`, did you mean `client.saveData`?', '`limits.max`'])
   })
 })
@@ -44,17 +44,17 @@ describe('the grouped config keys', () => {
 describe('the unknown keys defineConfig refuses by type', () => {
   it('checks every option bag of the config, at any depth, with no list of them', () => {
     // @ts-expect-error a mistyped key of a bag the type once left unchecked
-    expect(defineConfig({ images: { widht: 1 } })).toBeDefined()
+    expect(defineConfig({ assets: { images: { widht: 1 } } })).toBeDefined()
     // @ts-expect-error a bag held by a bag
     expect(defineConfig({ security: { cookies: { httpOnlee: true } } })).toBeDefined()
     // @ts-expect-error a bag three levels down, whose own `family` is required
-    expect(defineConfig({ images: { card: { font: { family: 'Inter', wieght: 400 } } } })).toBeDefined()
+    expect(defineConfig({ assets: { images: { card: { font: { family: 'Inter', wieght: 400 } } } } })).toBeDefined()
     // @ts-expect-error a bag with required keys
     expect(defineConfig({ i18n: { locales: ['en'], default: 'en', mesages: 'm' } })).toBeDefined()
     // @ts-expect-error the extra key of a favicon
-    expect(defineConfig({ favicon: { image: 'a.png', svg: 'a.svg', sizes: [1] } })).toBeDefined()
+    expect(defineConfig({ assets: { favicon: { image: 'a.png', svg: 'a.svg', sizes: [1] } } })).toBeDefined()
     // @ts-expect-error a bag that takes a switch
-    expect(defineConfig({ health: { pth: '/up' } })).toBeDefined()
+    expect(defineConfig({ ops: { health: { pth: '/up' } } })).toBeDefined()
     // @ts-expect-error the library bags
     expect(defineConfig({ store: { sesions: undefined } })).toBeDefined()
   })
@@ -63,7 +63,7 @@ describe('the unknown keys defineConfig refuses by type', () => {
     expect(defineConfig({ mcp: { token: { env: 'MCP_KEY' } } })).toBeDefined()
     expect(defineConfig({ mcp: { token: { file: 'data/mcp-key' } } })).toBeDefined()
     expect(defineConfig({ mcp: { token: 'secret' } })).toBeDefined()
-    expect(defineConfig({ metrics: { token: { file: 'data/metrics-key' } } })).toBeDefined()
+    expect(defineConfig({ ops: { metrics: { token: { file: 'data/metrics-key' } } } })).toBeDefined()
     expect(defineConfig({ cors: { origins: '*', credentials: false } })).toBeDefined()
     expect(defineConfig({ cors: { origins: ['https://a.fr'], credentials: true } })).toBeDefined()
     // @ts-expect-error a mistyped key inside a member of the union
@@ -83,16 +83,14 @@ describe('the unknown keys defineConfig refuses by type', () => {
     const config = defineConfig({
       robots: true,
       sitemap: false,
-      favicon: true,
+      assets: { favicon: true, images: { placeholder: true, rateLimit: false, card: { font: { family: 'Inter' } } } },
       security: { cookies: true, csp: false },
-      health: { check: () => true },
-      images: { avif: true, placeholder: true, rateLimit: false, card: { font: { family: 'Inter' } } },
+      ops: { health: { check: () => true } },
       live: { rateLimit: true },
-      offline: false,
       preview: true,
       proxy: true,
-      client: { hydration: { visible: '200px' } },
-      observe: { onError: event => void event.error },
+      client: { offline: false, hydration: { visible: '200px' } },
+      onError: event => void event.error,
     })
 
     expect(config.robots).toBe(true)

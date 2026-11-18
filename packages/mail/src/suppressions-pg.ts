@@ -19,7 +19,7 @@ export async function createMailSuppressionTables(source: PgSource): Promise<voi
   }
 }
 
-// Bounces and complaints in the app's Postgres, in the `kay_mail_suppressions` table alone, shared by every server: `mailer({ suppressionStore: pgSuppressions(db) })` for a site with no list, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgData` takes. `pgLists` keeps them the same way beside its lists.
+// Bounces and complaints in the app's Postgres, in the `kay_mail_suppressions` table alone, shared by every server: `mailer({ store: { suppressions: pgSuppressions(db) } })` for a site with no list, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgData` takes. `pgLists` keeps them the same way beside its lists.
 // The table is made by the first suppression, a read or a lift before it finding nobody; a role that may not create it has the owner run `createMailSuppressionTables(db)`.
 export function pgSuppressions(source: PgSource): SuppressionStore & { close: () => Promise<void> } {
   const db = connectionOf(source)

@@ -1,16 +1,16 @@
 import type { Collection } from '../content'
-import type { PageSettings } from '../runtime'
+import type { PageSeo, PageSettings } from '../runtime'
 import { KayError } from '../compiler/errors'
 import { SEO_SETTINGS } from '../compiler/page-settings'
 import { isRouteOf } from '../content/claims'
 import { registeredCollections } from '../content/edit-registry'
 import { durationSeconds } from '../runtime/duration'
 
-// A setting of a page module: its key of `export const page`, those of `seo` read from there first.
-export function pageSetting(module: object, name: keyof PageSettings): unknown {
+// A setting of a page module: its key of `export const page`, those of `seo` read from there.
+export function pageSetting(module: object, name: keyof PageSettings | keyof PageSeo): unknown {
   const page = (module as { page?: PageSettings }).page
 
-  return SEO_SETTINGS.includes(name) ? ((page?.seo as Record<string, unknown> | undefined)?.[name] ?? page?.[name]) : page?.[name]
+  return SEO_SETTINGS.includes(name) ? (page?.seo as Record<string, unknown> | undefined)?.[name] : page?.[name as keyof PageSettings]
 }
 
 // A text of a page's `seo` group, as it is written.
@@ -61,7 +61,7 @@ function cacheOf(file: string, cache: NonNullable<PageSettings['cache']>): { ttl
 }
 
 // A setting along a route's modules, layouts outermost first and the page last: the innermost that sets it wins, so a page may undo what its layouts say.
-export function chainSetting(modules: object[], name: keyof PageSettings): unknown {
+export function chainSetting(modules: object[], name: keyof PageSettings | keyof PageSeo): unknown {
   for (let index = modules.length - 1; index >= 0; index--) {
     const value = pageSetting(modules[index]!, name)
 
@@ -72,25 +72,16 @@ export function chainSetting(modules: object[], name: keyof PageSettings): unkno
   return undefined
 }
 
-// A page's lifetime and `cache-control` along its route: the `cache` of the innermost module that sets one, else its `ttl` and `cacheControl` as they were written before 1.105, each the innermost that sets it.
+// A page's lifetime and `cache-control` along its route: the `cache` of the innermost module that sets one.
 export function chainCache(file: string, modules: object[]): { ttl: unknown, cacheControl: unknown } {
-  let ttl: unknown
-  let cacheControl: unknown
-
   for (let index = modules.length - 1; index >= 0; index--) {
-    const page = (modules[index] as { page?: PageSettings }).page
+    const cache = (modules[index] as { page?: PageSettings }).page?.cache
 
-    if (page?.cache !== undefined) {
-      const given = cacheOf(file, page.cache)
-
-      return { ttl: ttl ?? given.ttl, cacheControl: cacheControl ?? given.cacheControl }
-    }
-
-    ttl ??= page?.ttl
-    cacheControl ??= page?.cacheControl
+    if (cache !== undefined)
+      return cacheOf(file, cache)
   }
 
-  return { ttl, cacheControl }
+  return { ttl: undefined, cacheControl: undefined }
 }
 
 interface PageRoute {

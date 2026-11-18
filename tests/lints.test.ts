@@ -581,6 +581,28 @@ describe('page settings', () => {
     expect(fixed(twice)).toEqual([])
   })
 
+  it.each([
+    ['noindex', 'noindex: true', 'seo: { noindex'],
+    ['sitemap', 'sitemap: false', 'seo: { sitemap'],
+    ['lastmod', 'lastmod: \'2026-01-01\'', 'seo: { lastmod'],
+    ['search', 'search: false', 'seo: { search'],
+    ['feed', 'feed: false', 'seo: { feed'],
+    ['ttl', 'ttl: \'1h\'', 'cache: \'1h\''],
+    ['cacheControl', 'cacheControl: false', 'cache: false'],
+  ])('refuses the old page key %s, naming where it is written now', (name, entry, where) => {
+    const { diagnostics } = compileKay(`--- server\nexport const page = { ${entry} }\n---\np x`, 'list.kay')
+    const found = diagnostics.filter(d => d.message.startsWith(`\`${name}\` is `))
+
+    expect(found).toHaveLength(1)
+    expect(found[0]!.help).toContain(where)
+  })
+
+  it('takes the same keys inside seo and cache', () => {
+    const { diagnostics } = compileKay('--- server\nexport const page = { seo: { noindex: true, sitemap: false }, cache: \'1h\' }\n---\np x', 'list.kay')
+
+    expect(diagnostics.map(d => d.message)).toEqual([])
+  })
+
   it('reports a page export kay cannot read as written', () => {
     expect(compileKay('--- server\nconst base = {}\nexport const page = { ...base, [\'x\']: 1 }\nexport const other = settings()\n---\np x', 'list.kay', { check: true }).diagnostics.map(d => d.message)).toEqual(['kay reads each setting of `page` as written', 'kay reads each setting of `page` as written'])
     expect(compileKay('--- server\nexport const page = settings()\n---\np x', 'list.kay', { check: true }).diagnostics.map(d => d.message)).toEqual(['kay reads `page` as written, an object literal'])

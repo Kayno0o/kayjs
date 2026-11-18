@@ -1,8 +1,8 @@
-import type { RateStore, RateWindow } from 'kay'
+import type { Duration, RateStore, RateWindow } from 'kay'
 import type { Limiter } from 'kay/library'
 import type { AuthRateLimit } from './limits'
 import type { AuthStore } from './store'
-import { limiter } from 'kay/library'
+import { lengthMs, limiter } from 'kay/library'
 
 const SWEEP_EVERY = 1000
 
@@ -11,7 +11,7 @@ export type AuthRates = RateStore
 
 // Answered at once, as memory needs no promise; `sweep` drops the windows ended by `now`.
 export interface MemoryAuthRates {
-  hit: (key: string, windowMs: number, weight?: number) => RateWindow
+  hit: (key: string, length: Duration, weight?: number) => RateWindow
   peek: (key: string) => RateWindow | undefined
   reset: (key: string) => void
   sweep: (now: number) => void
@@ -38,7 +38,7 @@ export function memoryAuthRates(): MemoryAuthRates {
     hit(key, length, weight = 1) {
       const now = Date.now()
       const open = windows.get(key)
-      const window = open && open.resetAt > now ? { ...open, count: open.count + weight } : { count: weight, resetAt: now + length }
+      const window = open && open.resetAt > now ? { ...open, count: open.count + weight } : { count: weight, resetAt: now + lengthMs(length) }
 
       if (++hits % SWEEP_EVERY === 0)
         sweep(now)

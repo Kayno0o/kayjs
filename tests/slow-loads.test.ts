@@ -50,7 +50,7 @@ describe('the load budget of a page in development', () => {
 
 describe('the load budget through a dev render', () => {
   const render = async (observe: { loadBudget?: `${number}ms` | false }) => {
-    const site = await pages({ root: 'tests/fixtures/timeouts', prebuilt: false, security: false, dev: true, observe })
+    const site = await pages({ root: 'tests/fixtures/timeouts', prebuilt: false, config: { security: false, ops: { observe } }, dev: true })
 
     return (await site.handle(new Request('http://localhost/slow', { headers: { accept: 'text/html' } }))).text()
   }
@@ -68,7 +68,7 @@ describe('the load budget through a dev render', () => {
   })
 
   it('warns of a layout whose load outlasts the page\'s own, naming its file and both times', async () => {
-    const site = await pages({ root: 'tests/fixtures/timeouts', prebuilt: false, security: false, dev: true })
+    const site = await pages({ root: 'tests/fixtures/timeouts', prebuilt: false, config: { security: false }, dev: true })
     const html = await (await site.handle(new Request('http://localhost/layered', { headers: { accept: 'text/html' } }))).text()
     const { slowLayout } = JSON.parse((/id="kay-dev-request">([^<]*)</).exec(html)![1]!.replaceAll('\\u003c', '<')) as { slowLayout?: { file: string, ms: number, pageMs: number, budget: number } }
 

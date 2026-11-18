@@ -19,7 +19,7 @@ afterAll(async () => {
 beforeEach(reset)
 
 async function open(path = '/', options: Record<string, unknown> = {}): Promise<TestPage> {
-  const made = await testSite({ root: ROOT, browser: { path: chrome }, client: { loadingDelay: '300ms' }, ...options })
+  const made = await testSite({ root: ROOT, browser: { path: chrome }, config: { client: { loadingDelay: '300ms' }, ...options } })
 
   sites.push(made)
 
@@ -160,7 +160,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a page f
 
   it('shows it under a base, the front of a real deploy taking it off', async () => {
     const base = '/repo'
-    const site = await testSite({ root: ROOT, browser: { path: chrome }, base, client: { loadingDelay: '300ms' } })
+    const site = await testSite({ root: ROOT, browser: { path: chrome }, config: { base, client: { loadingDelay: '300ms' } } })
 
     sites.push(site)
 
