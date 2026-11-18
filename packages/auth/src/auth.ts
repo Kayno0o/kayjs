@@ -95,7 +95,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own. A throw is logged and reported with source `auth.onEvent`. It gets one object: `event`, `user`, `context` (where from, and who acted when not the user), and the fields of its kind, such as the `role` of a `role-granted` or the `method` of a `signed-in`.
   onEvent?: ((info: AuthEventInfo) => unknown) | undefined
 
-  // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` a string such as '365d', a year by default. Each entry keeps the address cut to its /24 (IPv4) or /48 (IPv6) unless `ip` is 'full'.
+  // Keeps the same events in the store's audit log, for `admin.listAuditLog()`; `maxAge` a string such as '365d', a year by default. Each entry keeps the address cut to its /24 (IPv4) or /48 (IPv6) unless `ip` is 'full'.
   audit?: boolean | { maxAge?: Duration, ip?: 'full' | 'truncated' } | undefined
   // What a bearer token may be limited to, such as `['posts:read', 'posts:write']`: a route asks for one with `scope:`.
   scopes?: readonly Scope[] | undefined
