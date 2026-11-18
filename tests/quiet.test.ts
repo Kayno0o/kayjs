@@ -9,7 +9,7 @@ const cli = join(import.meta.dir, '../src/cli.ts')
 const dirs: string[] = []
 // The worker id goes too: a kay command run under it reads its build from `.kay/client-<id>`, not the `.kay/client` these projects hold.
 const LEFT_OUT_ENV = new Set(['NO_COLOR', 'FORCE_COLOR', 'NODE_DISABLE_COLORS', 'BUN_TEST_WORKER_ID'])
-const unformatted = '---  client\nconst a = 1\n---\np {a}\n'
+const unformatted = '---\nconst a = 1\n---\np(class="x"  ) {a}\n'
 const counter = '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n'
 
 afterAll(async () => {

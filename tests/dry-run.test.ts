@@ -7,7 +7,7 @@ import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '../src/cli.ts')
 const dirs: string[] = []
-const unformatted = '---  client\nconst a = 1\n---\np {a}\n'
+const unformatted = '---\nconst a = 1\n---\np(class="x"  ) {a}\n'
 
 afterAll(async () => {
   await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))

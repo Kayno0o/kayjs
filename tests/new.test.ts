@@ -1197,7 +1197,8 @@ describe('kay build --compile', () => {
       'src/routes/notes/[slug].kay': '--- server\nimport { notes } from \'../../content.config\'\n\nconst note = await notes.get(ctx.params.slug) ?? ctx.notFound()\nconst { Content } = note\n---\nh1 {note.data.title}\nContent\n',
       'src/routes/photo.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero)} alt="Hero")\n',
       // An island loading wasm and starting a module worker, which the executable serves from its build.
-      'src/routes/lab.kay': '---\nimport { onMount, signal } from \'kay\'\nimport wasm from \'../add.wasm\'\n\nconst echoed = signal(\'\')\n\nonMount(() => {\n  const worker = new Worker(new URL(\'../echo.ts\', import.meta.url), { type: \'module\' })\n\n  worker.onmessage = (event: MessageEvent<string>) => echoed = event.data\n})\n---\np.wasm {wasm}\np {echoed()}\n',
+      'src/lab.kay': '---\nimport { onMount, signal } from \'kay\'\nimport wasm from \'./add.wasm\'\n\nconst echoed = signal(\'\')\n\nonMount(() => {\n  const worker = new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n\n  worker.onmessage = (event: MessageEvent<string>) => echoed = event.data\n})\n---\np.wasm {wasm}\np {echoed()}\n',
+      'src/routes/lab.kay': '---\nimport Lab from \'../lab.kay\'\n---\nLab\n',
       'src/api/ping.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'pong\')\n',
       'src/api/members/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, { message: \'Members only\' }))\n',
       'src/api/members/index.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'secret\')\n',

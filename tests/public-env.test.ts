@@ -9,7 +9,7 @@ import { scratchDir } from './scratch'
 const cli = join(import.meta.dir, '../src/cli.ts')
 const dirs: string[] = []
 const env = 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ MAP_KEY: s.Public(s.String()), SESSION_NOTE: s.String({ default: \'x\' }) }))\n'
-const map = '---  client\nimport { publicEnv } from \'kay\'\n\nconst key = publicEnv.MAP_KEY\n---\np {key}\n'
+const map = '---\nimport { publicEnv } from \'kay\'\n\nisland({ render: \'client\' })\nconst key = publicEnv.MAP_KEY\n---\np {key}\n'
 const page = '--- server\nimport Map from \'../map.kay\'\n---\nMap\n'
 
 afterAll(async () => {
