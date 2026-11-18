@@ -1258,6 +1258,9 @@ type FileRejection = 'type' | 'size' | 'count'
 [./lib/file-limits] takeFiles
 function takeFiles(files: Iterable<File>, limits: FileLimits): { taken: File[]; rejected: { files: File[]; reason: FileRejection; }[]; }
 
+[./lib/followed-row] followedRow
+function followedRow<Row, Drawn>(read: () => Row | undefined, draw: (row: Row) => Drawn): Drawn
+
 [./lib/form-calls] callAction
 function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined, onError?: ((failure: {
   error: unknown;

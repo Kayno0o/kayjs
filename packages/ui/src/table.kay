@@ -13,6 +13,7 @@ import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import LoadMore from './load-more.kay'
 import Pagination from './pagination.kay'
+import { followedRow } from './followed-row'
 import { followList } from './table-list'
 import { paging } from './table-page'
 import { selection } from './table-select'
@@ -513,7 +514,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 span(part="cellLabel") {column.header}
               div(part="cellBody")
                 if uses('cell') && cell && drawnByBlock(column, given)
-                  | {cell(row, column)}
+                  | {followedRow(() => row, view => cell!(view, column))}
                 else
                   | {cellText(row, column)}
               if (uses('rowHref') || uses('onRowClick')) && columnIndex === 0 && linked()
@@ -524,7 +525,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
         if uses('expandable') && expandable && detail && expansion!.openSet().has(rowKeyOf(row, rowKey))
           tr(part="detailRow" id={expansion!.detailId(row)})
             td(part="detailCell" colspan={columnCount()})
-              | {detail(row)}
+              | {followedRow(() => row, view => detail!(view))}
       else
         if skeleton()
           for index of skeletonIndexes() key={index}

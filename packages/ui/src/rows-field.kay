@@ -8,6 +8,7 @@ import type { FieldSize } from './field-look'
 import { FIELD_MESSAGE, LABEL_TEXT } from './field-look'
 import { linkChoice } from './choice-link'
 import { formIssues } from './form-context'
+import { followedRow } from './followed-row'
 import { labelText } from './label-text'
 import Button from './button.kay'
 import IconButton from './icon-button.kay'
@@ -168,18 +169,8 @@ function drawCell(id: number, column: { key: string, label: string, name?: strin
     get message() { return issueOf(id) },
     get id() { return issueOf(id) === undefined ? undefined : `${issuesBase}_${id}` },
   }
-  const view = new Proxy({} as Row, {
-    get: (_, key) => (rowOf(id) as Record<PropertyKey, unknown> | undefined)?.[key],
-    has: (_, key) => key in (rowOf(id) ?? {}),
-    ownKeys: () => Reflect.ownKeys(rowOf(id) ?? {}),
-    getOwnPropertyDescriptor: (_, key) => {
-      const own = Object.getOwnPropertyDescriptor(rowOf(id) ?? {}, key)
 
-      return own && { ...own, configurable: true }
-    },
-  })
-
-  return untrack(() => cell!({ key: column.key, label: column.label, name: postName(column), size }, view, () => placeOf(id), text => edit(placeOf(id), column.key, text), issue))
+  return followedRow(() => rowOf(id), view => cell!({ key: column.key, label: column.label, name: postName(column), size }, view, () => placeOf(id), text => edit(placeOf(id), column.key, text), issue))
 }
 const full = () => max !== undefined && current().length >= max
 const removeName = (index: number) => removeLabel === undefined ? wording('ui.rowsField.remove', 'Remove row {n}', { n: index + 1 }) : labelText(removeLabel, { n: index + 1, index }, index)

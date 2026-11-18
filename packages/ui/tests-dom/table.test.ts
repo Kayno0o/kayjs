@@ -7,6 +7,7 @@ import FeatureTable from '../tests/fixture/src/components/feature-table.kay'
 import FilteredTable from '../tests/fixture/src/components/filtered-table.kay'
 import ListedTable from '../tests/fixture/src/components/listed-table.kay'
 import PagedTable from '../tests/fixture/src/components/paged-table.kay'
+import ReplacedRows from '../tests/fixture/src/components/replaced-rows.kay'
 import SelectableFeed from '../tests/fixture/src/components/selectable-feed.kay'
 import SelectableTable from '../tests/fixture/src/components/selectable-table.kay'
 import TableComponent from '../tests/fixture/src/components/table.kay'
@@ -928,5 +929,56 @@ describe('Table with a pageSize', () => {
     click(header(mounted.root, 0).querySelector('button'))
     await settle()
     expect(pagedRows(mounted.root)[0]).toBe('Item 01')
+  })
+})
+
+describe('Table rows replaced with the same keys', () => {
+  test('keep their cells, so a field typed in keeps the focus and Tab moves on to the next', async () => {
+    mounted = await mountComponent(ReplacedRows, {})
+
+    const { root } = mounted
+    const field = (label: string) => root.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!
+    const days = field('Days 1')
+
+    days.focus()
+    days.value = '9'
+    days.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+
+    expect(field('Days 1')).toBe(days)
+    expect(days.value).toBe('9')
+    expect(document.activeElement).toBe(days)
+
+    const risk = field('Risk 1')
+
+    risk.focus()
+    risk.value = '7'
+    risk.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+
+    expect(field('Risk 1')).toBe(risk)
+    expect(document.activeElement).toBe(risk)
+    expect(field('Days 1').value).toBe('9')
+  })
+
+  test('draw a detail again with the new values, in the same node', async () => {
+    mounted = await mountComponent(ReplacedRows, {})
+
+    const { root } = mounted
+
+    click(root.querySelector('[data-part=toggle]'))
+    await settle()
+
+    const note = root.querySelector('p.note')!
+
+    expect(note.textContent).toBe('2 days at risk 1')
+
+    const days = root.querySelector<HTMLInputElement>('input[aria-label="Days 1"]')!
+
+    days.value = '5'
+    days.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+    expect(root.querySelector('p.note')).toBe(note)
+    expect(note.textContent).toBe('5 days at risk 1')
   })
 })

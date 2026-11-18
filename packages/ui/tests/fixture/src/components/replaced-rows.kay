@@ -1,0 +1,18 @@
+---
+import { signal } from 'kay'
+import TextInput from '@kayjs/ui/text-input.kay'
+import Table from '@kayjs/ui/table.kay'
+
+// Lines edited in place, the rows held in a signal and replaced by a copy on each edit.
+const lines = signal([{ id: 1, days: '2', risk: '1' }, { id: 2, days: '4', risk: '3' }])
+const columns = [{ key: 'days', header: 'Days', cell: true }, { key: 'risk', header: 'Risk', cell: true }]
+
+function patch(id: number, key: 'days' | 'risk', value: string) {
+  lines = lines().map(line => line.id === id ? { ...line, [key]: value } : line)
+}
+---
+Table(columns={columns} rows={lines()} rowKey="id" sortable={false} expandable)
+  @cell(line, column)
+    TextInput(aria-label={`${column.header} ${line.id}`} value={line[column.key as 'days' | 'risk']} onInput={({ value }) => patch(line.id, column.key as 'days' | 'risk', value)})
+  @detail(line)
+    p.note {line.days} days at risk {line.risk}
