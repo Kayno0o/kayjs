@@ -298,6 +298,36 @@ describe('a component handing its rest props on', () => {
     expect(await features({ 'outer.kay': outer('Dialog({...rest} title="t" level={level})') })).toBeUndefined()
   })
 
+  it('ends on a cycle of components handing their rest props on, and counts what its callers write', async () => {
+    const first = `---\nimport Dialog from '${dialog}'\nimport Second from './second.kay'\nconst { ...rest } = props<{ [key: string]: unknown }>()\n---\nDialog({...rest} title="t")\nSecond({...rest})\n`
+    const second = `---\nimport First from './first.kay'\nconst { ...rest } = props<{ [key: string]: unknown }>()\n---\nFirst({...rest})\n`
+
+    expect(await features({ 'first.kay': first, 'second.kay': second, 'page.kay': `---\nimport First from './first.kay'\n---\nFirst(level={3})\n` })).toEqual(['level'])
+  })
+
+  it('keeps a default-on feature in the variant of a component handing a spread on, whatever its callers write', async () => {
+    const table = join(import.meta.dir, '../packages/ui/src/table.kay')
+    const through = `---\nimport Table from '${table}'\nconst { ...rest } = props<{ [key: string]: unknown }>()\n---\nTable({...rest} rows={[]} columns={[]} rowKey="id")\n`
+    const page = (props: string) => `---\nimport Through from './through.kay'\n---\nThrough(${props})\n`
+    const sortable = async (props: string) => {
+      const dir = await scratchDir('variants-')
+      const paths = [join(dir, 'through.kay'), join(dir, 'page.kay')]
+
+      await Bun.write(paths[0]!, through)
+      await Bun.write(paths[1]!, page(props))
+
+      const query = usesOf(await new VariantIndex(paths).entry(table))
+
+      await rm(dir, { recursive: true, force: true })
+
+      return query.slice(0, query.indexOf('~')).split('-').includes('sortable')
+    }
+
+    expect(await sortable('')).toBe(true)
+    // A value passed on through the spread is not known to be false, so a caller writing it keeps the feature too.
+    expect(await sortable('sortable={false}')).toBe(true)
+  })
+
   it('follows a chain of components handing their rest props on', async () => {
     const middle = `---\nimport Outer from './outer.kay'\nconst { ...rest } = props<{ [key: string]: unknown }>()\n---\nOuter({...rest} title="m")\n`
 
