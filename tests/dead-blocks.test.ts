@@ -26,7 +26,10 @@ describe('a branch whose test is the literal false in the browser output', () =>
   })
 
   it('has no block in a fragment either', () => {
-    expect(dom('for item of items\n  if false\n    b one\n  i two')).not.toContain('<b>one</b>')
+    const code = dom('for item of items\n  if false\n    b one\n  i two')
+
+    expect(code).not.toContain('<b>one</b>')
+    expect(code).toContain('KayMarkers(')
   })
 })
 
@@ -53,6 +56,12 @@ describe('specializedSource on an attribute with a false condition', () => {
     const kept = 'td(a={uses(\'x\') || y ? 1 : undefined} b={uses(\'x\') && y ? 1 : 2} c={uses(\'x\') && y ? 1 : p ? 2 : undefined})'
 
     expect(absent(kept)).toBe(kept.replaceAll('uses(\'x\')', 'false'))
+  })
+
+  it('keeps a handler whose condition sits after an arrow, an assignment or a comma', () => {
+    const arrow = 'td(onX={() => s && uses(\'x\') ? run() : undefined} a={(b = uses(\'x\')) && y ? 1 : undefined} c={(p, uses(\'x\')) ? 1 : undefined})'
+
+    expect(absent(arrow)).toBe(arrow.replaceAll('uses(\'x\')', 'false'))
   })
 
   it('keeps the true branch when the feature is on', () => {

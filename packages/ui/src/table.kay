@@ -537,7 +537,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
               for cellIndex of skeletonCells() key={cellIndex}
                 td(part="skeletonCell")
                   span(part="skeletonBar")
-        else if !broke() && (list ? filtering!() : rows().length > 0) && uses('noMatch') && noMatch
+        else if uses('noMatch') && noMatch && !broke() && (list ? filtering!() : rows().length > 0)
           tr
             td(part="emptyCell" colspan={columnCount()})
               | {noMatch}

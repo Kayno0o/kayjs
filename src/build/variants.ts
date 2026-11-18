@@ -331,6 +331,9 @@ function topLevel(text: string, char: '?' | ':'): number[] {
   return found
 }
 
+// An arrow, an assignment or a comma in a condition binds looser than the ternary, so what comes before the `?` is not the whole test.
+const LOWER_THAN_TERNARY = /=>|,|(?<![=!<>])=(?!=)/
+
 // An attribute `name={cond ? value : undefined}` whose condition is false is `{undefined}`, which the compiler leaves unbound. Only a ternary with no other at its top level is read.
 function foldAbsentAttributes(line: string): string {
   let result = line
@@ -359,7 +362,7 @@ function foldAbsentAttributes(line: string): string {
 
     from = start
 
-    if (depth === 0 && question !== undefined && colons.length === 1 && inner.slice(colons[0]! + 1).trim() === 'undefined' && alwaysFalse(inner.slice(0, question)))
+    if (depth === 0 && question !== undefined && colons.length === 1 && inner.slice(colons[0]! + 1).trim() === 'undefined' && !LOWER_THAN_TERNARY.test(inner.slice(0, question)) && alwaysFalse(inner.slice(0, question)))
       result = `${result.slice(0, start)}undefined${result.slice(end - 1)}`
   }
 }
