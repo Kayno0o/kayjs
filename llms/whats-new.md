@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.107.0
 
 - `--- script` as a file's first fence is a compile error naming `---`, and the `deprecated-script-fence` lint is gone ([components](components.md)).
 - `kay new` pins kay with `^` from 2.0.0, when a breaking change is a major, and with `~` through 1.x, where a minor may break; the semver policy is stated in [Upgrading](upgrading.md) and the install pages ([project](project.md))
