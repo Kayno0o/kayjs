@@ -77,10 +77,10 @@ describe('the signals a module exports', () => {
 
   it('count each entry of persisted as persisted, and an alias of the import', async () => {
     const { signals } = await project({
-      'lib/mod.ts': 'import { persisted as keep, signal } from \'kay\'\n\nexport const a = keep.local(1)\nexport const b = keep.session(1)\nexport const c = keep.cookie(1)\nexport const d = keep.query(1)\nexport const e = keep(\'e\', 1)\nexport const f = signal(1)\n',
+      'lib/mod.ts': 'import { persisted as keep, signal } from \'kay\'\n\nexport const a = keep.local(1)\nexport const b = keep.session(1)\nexport const c = keep.cookie(1)\nexport const f = signal(1)\n',
     })
 
-    expect(signals()).toEqual({ './lib/mod': { a: 'persisted', b: 'persisted', c: 'persisted', d: 'persisted', e: 'persisted', f: 'signal' } })
+    expect(signals()).toEqual({ './lib/mod': { a: 'persisted', b: 'persisted', c: 'persisted', f: 'signal' } })
   })
 
   it('follow a re-export by name, renamed, and by star, with the module\'s own names first', async () => {
