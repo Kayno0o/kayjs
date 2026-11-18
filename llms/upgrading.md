@@ -4,6 +4,10 @@ What each release breaks, and what an app changes to move to it. kay and its lib
 
 ## 1.107.0
 
+### `TSchema` is gone from `kay/library`
+
+Import `Schema` from `kay/library` instead, kay's own name for what `s` builds; `kay upgrade` on 1.106 rewrote the import and its uses. The `deprecated-schema-type` lint is gone with it.
+
 ### `--- script` opening a file is an error
 
 A file opens its script with `---`; `--- script` is only for a script that follows a `--- server`, `--- module` or `--- style` fence. The `deprecated-script-fence` lint is gone, and `--- script` first in a file is a `fence-invalid` error whose safe fix `kay check --fix` applies.

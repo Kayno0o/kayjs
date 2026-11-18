@@ -107,8 +107,6 @@ export { sha256 } from './sha256'
 export { stoppers } from './signals'
 export { appSecrets, keyedDigest } from './stamp'
 export type { MissingTranslations } from './translations'
-// Deprecated since 1.103: `Schema`, kay's own name for it.
-export type { TSchema } from 'elysia'
 
 type Translations = typeof import('./translations')
 type Drafts = typeof import('./message-drafts')

@@ -37,7 +37,6 @@ import { refusalCalls } from '../src/check/refusal-calls'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { routeKeys } from '../src/check/route-keys'
 import { schemaBuilders } from '../src/check/schema-builders'
-import { schemaType } from '../src/check/schema-type'
 import { secretKeys } from '../src/check/secret-keys'
 import { socketFrames } from '../src/check/socket-frames'
 import { sourceReaders } from '../src/check/source-readers'
@@ -95,7 +94,6 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-island-events': islandEvents,
   'deprecated-listen-target': listenTarget,
   'deprecated-import-path': movedImports,
-  'deprecated-schema-type': schemaType,
   'deprecated-schema-builders': schemaBuilders,
   'deprecated-action-options': actionOptions,
   'deprecated-test-helpers': testHelpers,

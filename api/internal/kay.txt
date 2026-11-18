@@ -1483,9 +1483,6 @@ interface ToolResult
 [./library] trackDetached
 function trackDetached(work: Promise<unknown>): void
 
-[./library] TSchema
-interface TSchema extends TKind, SchemaOptions
-
 [./library] uiConfigEntries
 function uiConfigEntries(text: string): Promise<UiConfigEntry[] | undefined>
 
