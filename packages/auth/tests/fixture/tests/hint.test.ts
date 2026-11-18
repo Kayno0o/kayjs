@@ -15,7 +15,7 @@ for (const { name, options, base, slash } of [{ name: 'at the root', options: {}
     let register: Parameters<Site['submit']>[0]
 
     beforeAll(async () => {
-      site = await testSite({ root: ROOT, ...options })
+      site = await testSite({ root: ROOT, config: options })
       // After the site loads, as the page's module is compiled with it.
       register = (await import(join(PAGES, 'register.kay')) as { register: typeof register }).register
     })
