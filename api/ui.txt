@@ -722,9 +722,7 @@ type Unwrapped<T> = T extends {
 [./accordion.kay] default
 component default
   boxed?: boolean | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   items: readonly AccordionItem[]
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   meta?: ((value: string) => Element) | undefined
@@ -762,9 +760,7 @@ function announce(text: string, within?: Element | null): void
 
 [./app-header.kay] default
 component default
-  | { actions?: Element; brand?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; current: URL | string; expandLabel?: string | undefined; items: readonly NavLink[]; label: string; link?: ((link: NavLink) => Element) | undefined; links?: undefined; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
+  | { actions?: Element; brand?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: URL | string; expandLabel?: string | undefined; items: readonly NavLink[]; label: string; link?: ((link: NavLink) => Element) | undefined; links?: undefined; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
   root?: string | undefined;
   brand?: string | undefined;
   nav?: readonly unknown[] | string | undefined | {
@@ -791,9 +787,7 @@ component default
   };
   end?: string | undefined;
 }; sticky?: boolean | undefined }
-  | { actions?: Element; brand?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; current: URL | string; expandLabel?: string | undefined; items?: undefined; label: string; link?: ((link: NavLink) => Element) | undefined; links: readonly NavLink[]; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
+  | { actions?: Element; brand?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: URL | string; expandLabel?: string | undefined; items?: undefined; label: string; link?: ((link: NavLink) => Element) | undefined; links: readonly NavLink[]; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
   root?: string | undefined;
   brand?: string | undefined;
   nav?: readonly unknown[] | string | undefined | {
@@ -825,9 +819,7 @@ component default
 component default
   appIcon?: ((app: SwitcherApp) => Element) | undefined
   apps: readonly SwitcherApp[]
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   current?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id?: string | undefined
@@ -866,9 +858,7 @@ component default
   artwork?: string | undefined
   chapters?: readonly AudioChapter[] | undefined
   chaptersLabel?: string | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   cues?: readonly AudioCue[] | undefined
   failureLabel?: string | undefined
   lead?: ((chapter: AudioChapter, index: number) => Element) | undefined
@@ -932,9 +922,7 @@ component default
 
 [./avatar-group.kay] default
 component default
-  | { avatar?: ((person: GroupedAvatar) => Element) | undefined; avatars?: undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; failureLabel?: string | undefined; items: OptionsSource<GroupedAvatar>; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
+  | { avatar?: ((person: GroupedAvatar) => Element) | undefined; avatars?: undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; failureLabel?: string | undefined; items: OptionsSource<GroupedAvatar>; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
   root?: string | undefined;
   count?: string | undefined;
   status?: string | undefined;
@@ -949,9 +937,7 @@ component default
   row?: string | undefined;
   name?: string | undefined;
 }; placement?: Placement | undefined; rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined; retryLabel?: string | undefined; size?: "xl" | Size | undefined; triggerProps?: PopoverButtonProps | undefined }
-  | { avatar?: ((person: GroupedAvatar) => Element) | undefined; avatars: OptionsSource<GroupedAvatar>; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; failureLabel?: string | undefined; items?: undefined; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
+  | { avatar?: ((person: GroupedAvatar) => Element) | undefined; avatars: OptionsSource<GroupedAvatar>; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; failureLabel?: string | undefined; items?: undefined; label?: string | undefined; loadingLabel?: string | undefined; max?: number | undefined; moreHref?: string | undefined; moreLabel?: ((count: number) => string) | string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly GroupedAvatar[]; query: string; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
   root?: string | undefined;
   count?: string | undefined;
   status?: string | undefined;
@@ -969,9 +955,7 @@ component default
 
 [./avatar.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   fallback?: Element
   href?: string | undefined
   label?: string | undefined
@@ -987,9 +971,7 @@ component default
 [./badge.kay] default
 component default
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   color?: string | undefined
   dot?: boolean | undefined
   href?: string | undefined
@@ -1003,9 +985,7 @@ component default
 [./bar-chart.kay] default
 component default
   active?: null | number | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   formatLabel?: LabelFormat | undefined
@@ -1051,9 +1031,7 @@ component default
 
 [./bar-list.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   onSelect?: ((event: { item: Row; }) => unknown) | undefined
@@ -1071,9 +1049,7 @@ component default
 [./bare-icon-button.kay] default
 component default
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   href?: string | undefined
   label: string
   parts?: undefined | { root?: string | undefined; }
@@ -1085,9 +1061,7 @@ component default
 [./bell-inbox.kay] default
 component default
   appBadge?: boolean | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   item?: ((note: Item & ((BellItem | InboxItem) & { key: string; label: string; href?: string | undefined; })) => Element) | undefined
   items?: BellItems<Item> | undefined
   label?: string | undefined
@@ -1126,9 +1100,7 @@ component default
 
 [./breadcrumb.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   item?: ((item: Pick<NavItem, "icon" | "label"> & { href?: string | undefined; newTab?: NewTab | undefined; }) => Element) | undefined
   items: readonly (Pick<NavItem, "icon" | "label"> & { href?: string | undefined; newTab?: NewTab | undefined; })[]
   label: string
@@ -1148,9 +1120,7 @@ component default
 
 [./button.kay] default
 component default
-  | { busy?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; expanded?: boolean | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; parts?: undefined | {
+  | { busy?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; expanded?: boolean | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; parts?: undefined | {
   root?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
     spinner?: readonly unknown[] | string | undefined | {
@@ -1161,9 +1131,7 @@ component default
     root?: string | undefined;
   };
 }; pressed?: boolean | undefined; size?: "lg" | "md" | "sm" | "xs" | undefined; spinner?: boolean | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined; type?: "button" | "reset" | "submit" | undefined; variant?: "ghost" | "inline" | "solid" | undefined }
-  | { busy?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; href: string; icon?: IconProps | IconSlot | undefined; label?: string | undefined; parts?: undefined | {
+  | { busy?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; href: string; icon?: IconProps | IconSlot | undefined; label?: string | undefined; parts?: undefined | {
   root?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
     spinner?: readonly unknown[] | string | undefined | {
@@ -1179,9 +1147,7 @@ component default
 component default
   actions?: Element
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   href?: string | undefined
   left?: Element
   parts?: undefined | { root?: string | undefined; body?: string | undefined; link?: string | undefined; actions?: string | undefined; }
@@ -1189,18 +1155,12 @@ component default
 
 [./card.kay] default
 component default
-  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; href?: undefined; level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined; parts?: undefined | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; }; title?: Element }
-  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; href: string; level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined; parts?: undefined | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; }; title: Element }
+  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; href?: undefined; level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined; parts?: undefined | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; }; title?: Element }
+  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; href: string; level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined; parts?: undefined | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; }; title: Element }
 
 [./carousel.kay] default
 component default
-  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; items: (InfiniteList<Slide> | readonly Slide[] | undefined) & (InfiniteList<Slide> | readonly Slide[]); label?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; parts?: undefined | {
+  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; items: (InfiniteList<Slide> | readonly Slide[] | undefined) & (InfiniteList<Slide> | readonly Slide[]); label?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; parts?: undefined | {
   root?: string | undefined;
   empty?: string | undefined;
   viewport?: string | undefined;
@@ -1220,9 +1180,7 @@ component default
     };
   };
 }; pauseLabel?: string | undefined; perView?: number | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ slides?: undefined }
-  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; items?: undefined; label?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; parts?: undefined | {
+  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; items?: undefined; label?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; parts?: undefined | {
   root?: string | undefined;
   empty?: string | undefined;
   viewport?: string | undefined;
@@ -1242,9 +1200,7 @@ component default
     };
   };
 }; pauseLabel?: string | undefined; perView?: number | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ slides: readonly Slide[] }
-  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; items?: undefined; label?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Slide>; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; parts?: undefined | {
+  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; items?: undefined; label?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Slide>; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; parts?: undefined | {
   root?: string | undefined;
   empty?: string | undefined;
   viewport?: string | undefined;
@@ -1268,9 +1224,7 @@ component default
 [./checkbox.kay] default
 component default
   checked?: boolean | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   hint?: number | string | undefined
   indeterminate?: boolean | undefined
   inputProps?: HtmlAttributes<"input"> | undefined
@@ -1293,9 +1247,7 @@ component default
 
 [./chip-group.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   disabled?: boolean | undefined
   failureLabel?: string | undefined
   invalid?: boolean | undefined
@@ -1348,9 +1300,7 @@ component default
 component default
   boxed?: boolean | undefined
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   disabled?: boolean | undefined
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   meta?: Element
@@ -1370,9 +1320,7 @@ component default
 
 [./color-input.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   inputProps?: HtmlAttributes<"input"> | undefined
   invalid?: boolean | undefined
   label: string
@@ -1384,9 +1332,7 @@ component default
 
 [./combobox.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   create?: boolean | undefined
   createLabel?: ((text: string) => string) | string | undefined
   disabled?: boolean | undefined
@@ -1433,9 +1379,7 @@ component default
 
 [./command-palette.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; empty?: Element; emptyLabel?: string | undefined; entries?: undefined; groups?: string[] | undefined; items: PaletteEntry[]; label?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; onRecentChange?: ((event: { recent: string[]; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; entries?: undefined; groups?: string[] | undefined; items: PaletteEntry[]; label?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; onRecentChange?: ((event: { recent: string[]; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
   root?: string | undefined;
   search?: string | undefined;
   icon?: readonly unknown[] | string | undefined | {
@@ -1456,9 +1400,7 @@ component default
   empty?: string | undefined;
   count?: string | undefined;
 }; placeholder?: string | undefined; recent?: string[] | undefined; recentLabel?: string | undefined; resultsLabel?: ((count: number) => string) | string | undefined; search?: ((query: string) => PromiseLike<PaletteEntry[]>) | undefined; searchError?: string | undefined; searchLabel?: string | undefined; shortcut?: false | null | string | undefined; siteSearch?: boolean | undefined | { limit?: number | undefined; }; siteSearchError?: string | undefined; siteSearchLabel?: string | undefined; siteSearchMore?: ((count: number) => string) | undefined; size?: "full" | "lg" | "md" | "sm" | undefined }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; empty?: Element; emptyLabel?: string | undefined; entries: PaletteEntry[]; groups?: string[] | undefined; items?: undefined; label?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; onRecentChange?: ((event: { recent: string[]; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; entries: PaletteEntry[]; groups?: string[] | undefined; items?: undefined; label?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; onRecentChange?: ((event: { recent: string[]; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
   root?: string | undefined;
   search?: string | undefined;
   icon?: readonly unknown[] | string | undefined | {
@@ -1484,9 +1426,7 @@ component default
 component default
   ask?: "dialog" | "inline" | undefined
   cancelLabel?: string | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   confirmLabel?: string | undefined
   details?: Element
   disabled?: boolean | undefined
@@ -1527,9 +1467,7 @@ component default
 
 [./confirm-host.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   fallback?: (boolean & ((() => Element) | Html | Node | Range | bigint | boolean | null | number | readonly Element[] | string)) | undefined
   parts?: undefined | {
   root?: readonly unknown[] | string | undefined | {
@@ -1546,9 +1484,7 @@ component default
 component default
   action: Action<never, unknown, never>
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   consent?: boolean | undefined
   consentLabel?: string | undefined
   emailLabel?: string | undefined
@@ -1583,9 +1519,7 @@ component default
 [./contribution-graph.kay] default
 component default
   active?: null | number | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   color: string
   days: readonly ContributionDay[]
   empty?: Element
@@ -1602,9 +1536,7 @@ component default
 
 [./copy-button.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   copiedFor?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   copiedLabel?: string | undefined
   failureLabel?: string | undefined
@@ -1620,9 +1552,7 @@ component default
 
 [./date-input.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   day?: ((iso: string, state: { selected: boolean; today: boolean; outside: boolean; disabled: boolean; }) => Element) | undefined
   disabledDay?: ((iso: string) => boolean) | undefined
   firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined
@@ -1676,9 +1606,7 @@ component default
 
 [./date-range-input.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   day?: ((iso: string, state: { selected: boolean; today: boolean; outside: boolean; disabled: boolean; }) => Element) | undefined
   disabled?: boolean | undefined
   disabledDay?: ((iso: string) => boolean) | undefined
@@ -1704,9 +1632,7 @@ component default
 
 [./date-time-input.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   disabled?: boolean | undefined
   form?: string | undefined
   invalid?: boolean | undefined
@@ -1730,9 +1656,7 @@ component default
 
 [./description-list.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   items: readonly Item[]
@@ -1741,12 +1665,8 @@ component default
 
 [./dialog.kay] default
 component default
-  | { actions?: Element; autosave?: boolean | undefined; bare?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; docked?: boolean | undefined; footer?: Element; handle?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; open?: boolean | undefined; parts?: undefined | { root?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; footer?: string | undefined; }; placement?: "center" | "right" | undefined; size?: "full" | "lg" | "md" | "sm" | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
-  | { actions?: Element; autosave?: boolean | undefined; bare?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; docked?: boolean | undefined; footer?: Element; handle?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | { root?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; footer?: string | undefined; }; placement?: "center" | "right" | undefined; size?: "full" | "lg" | "md" | "sm" | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
+  | { actions?: Element; autosave?: boolean | undefined; bare?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; docked?: boolean | undefined; footer?: Element; handle?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; open?: boolean | undefined; parts?: undefined | { root?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; footer?: string | undefined; }; placement?: "center" | "right" | undefined; size?: "full" | "lg" | "md" | "sm" | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
+  | { actions?: Element; autosave?: boolean | undefined; bare?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; docked?: boolean | undefined; footer?: Element; handle?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | { root?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; footer?: string | undefined; }; placement?: "center" | "right" | undefined; size?: "full" | "lg" | "md" | "sm" | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
 
 [./dnd] Bar
 interface Bar
@@ -1846,9 +1766,7 @@ interface SortableOptions
 [./empty-state.kay] default
 component default
   actions?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   description?: Element
   icon?: IconProps | IconSlot | undefined
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
@@ -1871,9 +1789,7 @@ function ui(): KayExtension<AnyElysia>
 component default
   accept?: string | undefined
   chooseLabel?: string | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   content?: ((zone: { open: () => void; dragging: () => boolean; }) => Element) | undefined
   disabled?: boolean | undefined
   dropLabel?: string | undefined
@@ -1912,9 +1828,7 @@ component default
   autosave?: boolean | undefined
   cancelLabel?: string | undefined
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   close?: Element
   closeHref?: string | undefined
   closeLabel?: string | undefined
@@ -1956,9 +1870,7 @@ component default
 component default
   actions?: Element
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   field?: string | undefined
   group?: boolean | undefined
   hint?: string | undefined
@@ -1983,9 +1895,7 @@ component default
 component default
   action: Action<never, Output, never>
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   failureLabel?: string | undefined
   onError?: ((failure: { error: unknown; }) => unknown) | undefined
   onSave?: ((event: { data: Answer<Exclude<Output, Failure<unknown>>>; }) => unknown) | undefined
@@ -1998,9 +1908,7 @@ component default
 component default
   anchor?: Element | null | undefined
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   closeDelay?: number | undefined
   id?: string | undefined
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
@@ -2013,9 +1921,7 @@ component default
 
 [./icon-button.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   href?: string | undefined
   icon: (() => Element) | Html | IconProps | Node | Range | bigint | boolean | null | number | readonly Element[] | string | undefined
   label: string
@@ -2027,9 +1933,7 @@ component default
 
 [./icon-picker.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   clearLabel?: string | undefined
   disabled?: boolean | undefined
   empty?: Element
@@ -2070,18 +1974,12 @@ component default
 
 [./icon-tile.kay] default
 component default
-  | { children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; color?: string | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; parts?: undefined | { root?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }; size?: "lg" | "md" | "sm" | undefined; style?: string | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined }
-  | { children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; color?: string | undefined; href: string; icon?: IconProps | IconSlot | undefined; label: string; parts?: undefined | { root?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }; size?: "lg" | "md" | "sm" | undefined; style?: string | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined }
+  | { children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; color?: string | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; parts?: undefined | { root?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }; size?: "lg" | "md" | "sm" | undefined; style?: string | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined }
+  | { children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; color?: string | undefined; href: string; icon?: IconProps | IconSlot | undefined; label: string; parts?: undefined | { root?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }; size?: "lg" | "md" | "sm" | undefined; style?: string | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined }
 
 [./icon.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   icon: IconProps | IconSlot
   label?: string | undefined
   parts?: undefined | { root?: string | undefined; }
@@ -2089,9 +1987,7 @@ component default
 [./image-cropper.kay] default
 component default
   alt?: string | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   crop?: CropRect | undefined
   cropLabel?: string | undefined
   cropText?: string | undefined
@@ -2121,9 +2017,7 @@ component default
 component default
   active?: null | number | undefined
   animate?: boolean | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   eventsLabel?: string | undefined
@@ -2180,9 +2074,7 @@ component default
 
 [./load-more.kay] default
 component default
-  | { button?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; failureLabel?: string | undefined; items: LoadMoreSource; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadedLabel?: ((count: number) => string) | string | undefined; loadingLabel?: string | undefined; margin?: number | undefined; moreLabel?: string | undefined; parts?: undefined | {
+  | { button?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; failureLabel?: string | undefined; items: LoadMoreSource; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadedLabel?: ((count: number) => string) | string | undefined; loadingLabel?: string | undefined; margin?: number | undefined; moreLabel?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   failed?: string | undefined;
   message?: string | undefined;
@@ -2190,9 +2082,7 @@ component default
   text?: string | undefined;
   announced?: string | undefined;
 }; retryLabel?: string | undefined }
-  | { button?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; failureLabel?: string | undefined; items?: undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: LoadMoreSource; loadedLabel?: ((count: number) => string) | string | undefined; loadingLabel?: string | undefined; margin?: number | undefined; moreLabel?: string | undefined; parts?: undefined | {
+  | { button?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; failureLabel?: string | undefined; items?: undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: LoadMoreSource; loadedLabel?: ((count: number) => string) | string | undefined; loadingLabel?: string | undefined; margin?: number | undefined; moreLabel?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   failed?: string | undefined;
   message?: string | undefined;
@@ -2205,9 +2095,7 @@ component default
 component default
   attribution?: string | undefined
   center?: MapPoint | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   darkAttribution?: string | undefined
   darkTiles?: string | undefined
   highlight?: readonly MapPoint[] | undefined
@@ -2232,9 +2120,7 @@ component default
 [./markdown-editor.kay] default
 component default
   actions?: ((tools: ToolbarTools) => Element) | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   invalid?: boolean | undefined
   keysHint?: string | undefined
   label?: string | undefined
@@ -2266,18 +2152,12 @@ component default
 
 [./masonry.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; gap?: number | undefined; items: (InfiniteList<Item> | readonly Item[] | undefined) & (InfiniteList<Item> | readonly Item[]); key: (item: Item) => Key; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; minWidth?: number | undefined; parts?: undefined | { root?: string | undefined; tile?: string | undefined; }; style?: string | undefined; tile: (item: Item) => Element }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; gap?: number | undefined; items?: undefined; key: (item: Item) => Key; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Item>; minWidth?: number | undefined; parts?: undefined | { root?: string | undefined; tile?: string | undefined; }; style?: string | undefined; tile: (item: Item) => Element }
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; gap?: number | undefined; items: (InfiniteList<Item> | readonly Item[] | undefined) & (InfiniteList<Item> | readonly Item[]); key: (item: Item) => Key; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; minWidth?: number | undefined; parts?: undefined | { root?: string | undefined; tile?: string | undefined; }; style?: string | undefined; tile: (item: Item) => Element }
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; gap?: number | undefined; items?: undefined; key: (item: Item) => Key; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Item>; minWidth?: number | undefined; parts?: undefined | { root?: string | undefined; tile?: string | undefined; }; style?: string | undefined; tile: (item: Item) => Element }
 
 [./media-gallery.kay] default
 component default
-  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; closeLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items: (InfiniteList<Item> | Item[] | undefined) & (InfiniteList<Item> | Item[]); /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; index: number; }) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; parts?: undefined | {
+  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; closeLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items: (InfiniteList<Item> | Item[] | undefined) & (InfiniteList<Item> | Item[]); /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; index: number; }) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   stage?: string | undefined;
   frame?: string | undefined;
@@ -2303,9 +2183,7 @@ component default
     };
   };
 }; previousLabel?: string | undefined; ratio?: string | undefined }
-  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; closeLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items?: undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Item>; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; index: number; }) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; parts?: undefined | {
+  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; closeLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items?: undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Item>; nextLabel?: string | undefined; onIndexChange?: ((event: { index: number; }) => unknown) | undefined; onOpenChange?: ((event: { open: boolean; index: number; }) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   stage?: string | undefined;
   frame?: string | undefined;
@@ -2335,9 +2213,7 @@ component default
 [./menu.kay] default
 component default
   at?: undefined | { x: number; y: number; }
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   failureLabel?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id?: string | undefined
@@ -2383,9 +2259,7 @@ component default
 
 [./meter.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   /** @deprecated Use `parts={{ fill: '...' }}`, which replaces the accent the same way. Removed in 2.0.0. No lint: an old prop with no mechanical rewrite to a class map. */ fillClass?: string | undefined
   formatValue?: ((value: number, max: number) => string) | undefined
   label: string
@@ -2408,9 +2282,7 @@ interface MeterSegment
 [./multi-select.kay] default
 component default
   allLabel?: string | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   disabled?: boolean | undefined
   empty?: Element
   emptyLabel?: string | undefined
@@ -2465,9 +2337,7 @@ component default
 
 [./navigation-progress.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   delay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onHide?: (() => unknown) | undefined
   onShow?: (() => unknown) | undefined
@@ -2479,9 +2349,7 @@ component default
 component default
   actions?: Element
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   dismissLabel?: string | undefined
   dismissible?: boolean | undefined
   icon?: IconProps | IconSlot | boolean | undefined
@@ -2513,9 +2381,7 @@ component default
 component default
   actions?: Element
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   description?: Element
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   meta?: Element
@@ -2533,9 +2399,7 @@ component default
 component default
   actions?: Element
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   parts?: undefined | { root?: string | undefined; head?: string | undefined; heading?: string | undefined; title?: string | undefined; subtitle?: string | undefined; }
   sticky?: boolean | undefined
@@ -2544,9 +2408,7 @@ component default
 
 [./pagination.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; label?: string | undefined; limit?: never; limitParam?: string | undefined; more?: never; nextLabel?: string | undefined; of: PagedList; offset?: never; onPage?: ((event: { page: number; event: MouseEvent; }) => unknown) | undefined; onSize?: ((event: { size: number; event: MouseEvent; }) => unknown) | undefined; page?: never; pageSize?: never; pages?: never; param?: string | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; label?: string | undefined; limit?: never; limitParam?: string | undefined; more?: never; nextLabel?: string | undefined; of: PagedList; offset?: never; onPage?: ((event: { page: number; event: MouseEvent; }) => unknown) | undefined; onSize?: ((event: { size: number; event: MouseEvent; }) => unknown) | undefined; page?: never; pageSize?: never; pages?: never; param?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   step?: string | undefined;
   range?: string | undefined;
@@ -2555,9 +2417,7 @@ component default
   sizes?: string | undefined;
   size?: string | undefined;
 }; previousLabel?: string | undefined; rangeLabel?: ((range: { from: number; to: number; total: number; }) => string) | string | undefined; siblings?: number | undefined; sizeLabel?: string | undefined; sizes?: readonly number[] | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; total?: never; url?: never }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; label?: string | undefined; limit?: never; limitParam?: string | undefined; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; onPage?: ((event: { page: number; event: MouseEvent; }) => unknown) | undefined; onSize?: ((event: { size: number; event: MouseEvent; }) => unknown) | undefined; page: number; pageSize?: never; pages: number; param?: string | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; label?: string | undefined; limit?: never; limitParam?: string | undefined; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; onPage?: ((event: { page: number; event: MouseEvent; }) => unknown) | undefined; onSize?: ((event: { size: number; event: MouseEvent; }) => unknown) | undefined; page: number; pageSize?: never; pages: number; param?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   step?: string | undefined;
   range?: string | undefined;
@@ -2566,9 +2426,7 @@ component default
   sizes?: string | undefined;
   size?: string | undefined;
 }; previousLabel?: string | undefined; rangeLabel?: ((range: { from: number; to: number; total: number; }) => string) | string | undefined; siblings?: number | undefined; sizeLabel?: string | undefined; sizes?: readonly number[] | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; total?: never; url?: URL | string | undefined }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; label?: string | undefined; limit?: never; limitParam?: string | undefined; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; onPage?: ((event: { page: number; event: MouseEvent; }) => unknown) | undefined; onSize?: ((event: { size: number; event: MouseEvent; }) => unknown) | undefined; page: number; pageSize: number; pages?: never; param?: string | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; label?: string | undefined; limit?: never; limitParam?: string | undefined; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; onPage?: ((event: { page: number; event: MouseEvent; }) => unknown) | undefined; onSize?: ((event: { size: number; event: MouseEvent; }) => unknown) | undefined; page: number; pageSize: number; pages?: never; param?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   step?: string | undefined;
   range?: string | undefined;
@@ -2577,9 +2435,7 @@ component default
   sizes?: string | undefined;
   size?: string | undefined;
 }; previousLabel?: string | undefined; rangeLabel?: ((range: { from: number; to: number; total: number; }) => string) | string | undefined; siblings?: number | undefined; sizeLabel?: string | undefined; sizes?: readonly number[] | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; total: number; url?: URL | string | undefined }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; label?: string | undefined; limit?: never; limitParam?: string | undefined; more: boolean; nextLabel?: string | undefined; of?: never; offset?: never; onPage?: ((event: { page: number; event: MouseEvent; }) => unknown) | undefined; onSize?: ((event: { size: number; event: MouseEvent; }) => unknown) | undefined; page: number; pageSize?: never; pages?: never; param?: string | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; label?: string | undefined; limit?: never; limitParam?: string | undefined; more: boolean; nextLabel?: string | undefined; of?: never; offset?: never; onPage?: ((event: { page: number; event: MouseEvent; }) => unknown) | undefined; onSize?: ((event: { size: number; event: MouseEvent; }) => unknown) | undefined; page: number; pageSize?: never; pages?: never; param?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   step?: string | undefined;
   range?: string | undefined;
@@ -2588,9 +2444,7 @@ component default
   sizes?: string | undefined;
   size?: string | undefined;
 }; previousLabel?: string | undefined; rangeLabel?: ((range: { from: number; to: number; total: number; }) => string) | string | undefined; siblings?: number | undefined; sizeLabel?: string | undefined; sizes?: readonly number[] | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; total?: never; url?: URL | string | undefined }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; label?: string | undefined; limit: number; limitParam?: string | undefined; more: boolean; nextLabel?: string | undefined; of?: never; offset: number; onPage?: ((event: { page: number; event: MouseEvent; }) => unknown) | undefined; onSize?: ((event: { size: number; event: MouseEvent; }) => unknown) | undefined; page?: never; pageSize?: never; pages?: never; param?: string | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; label?: string | undefined; limit: number; limitParam?: string | undefined; more: boolean; nextLabel?: string | undefined; of?: never; offset: number; onPage?: ((event: { page: number; event: MouseEvent; }) => unknown) | undefined; onSize?: ((event: { size: number; event: MouseEvent; }) => unknown) | undefined; page?: never; pageSize?: never; pages?: never; param?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   step?: string | undefined;
   range?: string | undefined;
@@ -2604,9 +2458,7 @@ component default
 component default
   at?: undefined | { x: number; y: number; }
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   id?: string | undefined
   label?: string | undefined
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
@@ -2619,9 +2471,7 @@ component default
 
 [./progress.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   formatValue?: ((value: number, max: number) => string) | undefined
   label: string
   max?: number | undefined
@@ -2634,9 +2484,7 @@ component default
 
 [./qr-code.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   inline?: boolean | undefined
   label?: string | undefined
   options?: Omit<QrCodeSvgOptions, "ariaLabel" | "size" | "title"> | undefined
@@ -2647,9 +2495,7 @@ component default
 
 [./radio-group.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   disabled?: boolean | undefined
   failureLabel?: string | undefined
   invalid?: boolean | undefined
@@ -2698,9 +2544,7 @@ component default
 
 [./range-input.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   fromLabel?: string | undefined
   invalid?: boolean | undefined
   label: string
@@ -2725,9 +2569,7 @@ component default
 [./rating.kay] default
 component default
   allowClear?: boolean | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   disabled?: boolean | undefined
   icon?: IconProps | IconSlot | undefined
   invalid?: boolean | undefined
@@ -2753,9 +2595,7 @@ component default
 
 [./record-button.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   failureLabel?: string | undefined
   label?: string | undefined
   maxDuration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
@@ -2804,9 +2644,7 @@ component default
 [./relation-graph.kay] default
 component default
   centre: RelationNode
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   failureLabel?: string | undefined
@@ -2837,9 +2675,7 @@ component default
 
 [./relative-time.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   date: Date | number | string
   dateOptions?: DateTimeFormatOptions | undefined
   focusable?: boolean | undefined
@@ -2859,9 +2695,7 @@ component default
   readonly message: string | undefined;
   readonly id: string | undefined;
 }) => Element) | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   columns: readonly {
   key: string;
   label: string;
@@ -2924,9 +2758,7 @@ component default
   cancelHref?: string | undefined
   cancelLabel?: string | undefined
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   cleanLabel?: string | undefined
   confirm?: string | undefined
   confirmLabel?: string | undefined
@@ -2958,9 +2790,7 @@ component default
 [./scatter-chart.kay] default
 component default
   active?: null | number | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   corners?: undefined | { topLeft?: string; topRight?: string; bottomLeft?: string; bottomRight?: string; }
   empty?: Element
   emptyLabel?: string | undefined
@@ -2992,9 +2822,7 @@ component default
 
 [./segmented.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   disabled?: boolean | undefined
   failureLabel?: string | undefined
   invalid?: boolean | undefined
@@ -3047,9 +2875,7 @@ component default
 [./select.kay] default
 component default
   busy?: boolean | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   emptyOption?: Empty
   failureLabel?: string | undefined
   invalid?: boolean | undefined
@@ -3069,9 +2895,7 @@ component default
 
 [./side-nav.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   collapseLabel?: string | undefined
   collapsed?: boolean | undefined
   collapsedKey?: string | undefined
@@ -3124,9 +2948,7 @@ component default
 
 [./side-panel.kay] default
 component default
-  | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; launcher?: undefined; launcherButton?: undefined | {
+  | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; launcher?: undefined; launcherButton?: undefined | {
   icon?: IconProps | IconSlot | undefined;
   openIcon?: IconProps | IconSlot | undefined;
   openLabel?: string | undefined;
@@ -3152,9 +2974,7 @@ component default
     root?: string | undefined;
   };
 }; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
-  | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; launcher: string; launcherButton?: undefined | {
+  | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; launcher: string; launcherButton?: undefined | {
   icon?: IconProps | IconSlot | undefined;
   openIcon?: IconProps | IconSlot | undefined;
   openLabel?: string | undefined;
@@ -3180,9 +3000,7 @@ component default
     root?: string | undefined;
   };
 }; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element; trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined }
-  | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; launcher?: string | undefined; launcherButton?: undefined | {
+  | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; keep?: boolean | undefined; label?: string | undefined; launcher?: string | undefined; launcherButton?: undefined | {
   icon?: IconProps | IconSlot | undefined;
   openIcon?: IconProps | IconSlot | undefined;
   openLabel?: string | undefined;
@@ -3211,9 +3029,7 @@ component default
 
 [./site-favicon.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   fallback?: Element
   name: string
   onError?: ((failure: { event: Event; }) => unknown) | undefined
@@ -3223,9 +3039,7 @@ component default
 
 [./site-nav.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; current: URL | string; expandLabel?: string | undefined; id?: string | undefined; items: readonly NavLink[]; label: string; link?: ((link: NavLink) => Element) | undefined; links?: undefined; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: URL | string; expandLabel?: string | undefined; id?: string | undefined; items: readonly NavLink[]; label: string; link?: ((link: NavLink) => Element) | undefined; links?: undefined; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
   root?: string | undefined;
   icon?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
@@ -3247,9 +3061,7 @@ component default
   };
   children?: string | undefined;
 } }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; current: URL | string; expandLabel?: string | undefined; id?: string | undefined; items?: undefined; label: string; link?: ((link: NavLink) => Element) | undefined; links: readonly NavLink[]; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: URL | string; expandLabel?: string | undefined; id?: string | undefined; items?: undefined; label: string; link?: ((link: NavLink) => Element) | undefined; links: readonly NavLink[]; menuLabel?: string | undefined; onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined; open?: boolean | undefined; parts?: undefined | {
   root?: string | undefined;
   icon?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
@@ -3274,9 +3086,7 @@ component default
 
 [./skeleton.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   height?: string | undefined
   label?: string | undefined
   lines?: number | undefined
@@ -3287,9 +3097,7 @@ component default
 
 [./slider.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   formatValue?: ((value: number) => string) | undefined
   inputProps?: HtmlAttributes<"input"> | undefined
   invalid?: boolean | undefined
@@ -3308,9 +3116,7 @@ component default
 [./sparkline.kay] default
 component default
   active?: null | number | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   color?: string | undefined
   empty?: Element
   emptyLabel?: string | undefined
@@ -3338,9 +3144,7 @@ component default
 [./split-layout.kay] default
 component default
   backLabel?: string | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   detail: Element
   detailHead?: Element
   detailOpen?: boolean | undefined
@@ -3371,9 +3175,7 @@ component default
 
 [./stat.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   delta?: StatDelta | undefined
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
@@ -3407,9 +3209,7 @@ component default
 [./status-strip.kay] default
 component default
   cells: readonly (Tone | undefined)[]
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   hints?: readonly (string | undefined)[] | undefined
@@ -3418,9 +3218,7 @@ component default
 
 [./steps.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; current: string; done?: readonly string[] | undefined; doneLabel?: string | undefined; errorLabel?: string | undefined; failureLabel?: string | undefined; items: OptionsSource<StepItem<string>>; label: string; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly StepItem<string>[]; query: string; }) => unknown) | undefined; onSelect?: ((event: { key: string; }) => unknown) | undefined; param?: string | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: string; done?: readonly string[] | undefined; doneLabel?: string | undefined; errorLabel?: string | undefined; failureLabel?: string | undefined; items: OptionsSource<StepItem<string>>; label: string; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly StepItem<string>[]; query: string; }) => unknown) | undefined; onSelect?: ((event: { key: string; }) => unknown) | undefined; param?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   marker?: string | undefined;
   icon?: readonly unknown[] | string | undefined | {
@@ -3434,9 +3232,7 @@ component default
   status?: string | undefined;
   retry?: string | undefined;
 }; retryLabel?: string | undefined; skippedLabel?: string | undefined; step?: ((step: StepItem<string>, state: "current" | "done" | "upcoming") => Element) | undefined; stepLabel?: ((step: StepItem<string>, state: "current" | "done" | "upcoming") => Element) | ((step: StepItem<string>, state: "current" | "done" | "upcoming") => string) | undefined; steps?: undefined; url?: URL | string | undefined }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; current: string; done?: readonly string[] | undefined; doneLabel?: string | undefined; errorLabel?: string | undefined; failureLabel?: string | undefined; items?: undefined; label: string; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly StepItem<string>[]; query: string; }) => unknown) | undefined; onSelect?: ((event: { key: string; }) => unknown) | undefined; param?: string | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: string; done?: readonly string[] | undefined; doneLabel?: string | undefined; errorLabel?: string | undefined; failureLabel?: string | undefined; items?: undefined; label: string; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly StepItem<string>[]; query: string; }) => unknown) | undefined; onSelect?: ((event: { key: string; }) => unknown) | undefined; param?: string | undefined; parts?: undefined | {
   root?: string | undefined;
   marker?: string | undefined;
   icon?: readonly unknown[] | string | undefined | {
@@ -3455,9 +3251,7 @@ component default
 component default
   action: Action<never, unknown, never>
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   label?: string | undefined
   noticeText?: string | undefined
   onError?: ((failure: FormFailure<never, unknown, never>) => unknown) | undefined
@@ -3472,9 +3266,7 @@ component default
 
 [./tab-nav.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; current: URL | string; keep?: readonly string[] | undefined; label: string; links: readonly ({ href: string; } & NavItem & Omit<TabLink, "href">)[]; orientation?: "horizontal" | "vertical" | undefined; param?: undefined; paramDefault?: undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current: URL | string; keep?: readonly string[] | undefined; label: string; links: readonly ({ href: string; } & NavItem & Omit<TabLink, "href">)[]; orientation?: "horizontal" | "vertical" | undefined; param?: undefined; paramDefault?: undefined; parts?: undefined | {
   root?: string | undefined;
   icon?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
@@ -3482,9 +3274,7 @@ component default
   badge?: string | undefined;
   link?: string | undefined;
 }; tab?: ((tab: TabEntry) => Element) | undefined; tabs?: undefined; variant?: "segmented" | "underline" | undefined }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; current?: undefined; keep?: undefined; label: string; links?: undefined; orientation?: "horizontal" | "vertical" | undefined; param: string; paramDefault?: number | string | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; current?: undefined; keep?: undefined; label: string; links?: undefined; orientation?: "horizontal" | "vertical" | undefined; param: string; paramDefault?: number | string | undefined; parts?: undefined | {
   root?: string | undefined;
   icon?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
@@ -3495,9 +3285,7 @@ component default
 
 [./table.kay] default
 component default
-  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items?: undefined; label?: string | undefined; limitParam?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
+  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items?: undefined; label?: string | undefined; limitParam?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
   root?: string | undefined;
   filter?: string | undefined;
   field?: string | undefined;
@@ -3561,9 +3349,7 @@ component default
     size?: string | undefined;
   };
 }; plain?: boolean | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows: (RowsSource<Row> | undefined) & RowsSource<Row>; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; triggerProps?: PopoverLookButtonProps | undefined; virtual?: boolean | undefined }
-  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items: InfiniteList<Row>; label?: string | undefined; limitParam?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
+  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items: InfiniteList<Row>; label?: string | undefined; limitParam?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
   root?: string | undefined;
   filter?: string | undefined;
   field?: string | undefined;
@@ -3627,9 +3413,7 @@ component default
     size?: string | undefined;
   };
 }; plain?: boolean | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; triggerProps?: PopoverLookButtonProps | undefined; virtual?: boolean | undefined }
-  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items?: undefined; label?: string | undefined; limitParam?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Row>; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
+  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; items?: undefined; label?: string | undefined; limitParam?: string | undefined; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Row>; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((event: { keys: string[]; }) => unknown) | undefined; onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined; onOpenChange?: ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined; onPageChange?: ((event: { page: number; size: number; }) => unknown) | undefined; onRowClick?: ((event: { row: Row; event: MouseEvent; }) => unknown) | undefined; onScrollChange?: ((event: { scrolls: boolean; }) => unknown) | undefined; onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onSortChange?: ((event: { sort: SortState; }) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; panelProps?: PopoverPanelProps | undefined; parts?: undefined | {
   root?: string | undefined;
   filter?: string | undefined;
   field?: string | undefined;
@@ -3696,9 +3480,7 @@ component default
 
 [./tabs.kay] default
 component default
-  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; disabled?: boolean | undefined; failureLabel?: string | undefined; items: OptionsSource<{ value: Value; } & NavItem>; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; parts?: undefined | {
+  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; disabled?: boolean | undefined; failureLabel?: string | undefined; items: OptionsSource<{ value: Value; } & NavItem>; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; parts?: undefined | {
   root?: string | undefined;
   list?: string | undefined;
   tab?: string | undefined;
@@ -3710,9 +3492,7 @@ component default
   retry?: string | undefined;
   panel?: string | undefined;
 }; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs?: undefined; value: Value }
-  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; disabled?: boolean | undefined; failureLabel?: string | undefined; items: OptionsSource<{ value: Value; } & NavItem>; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; parts?: undefined | {
+  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; disabled?: boolean | undefined; failureLabel?: string | undefined; items: OptionsSource<{ value: Value; } & NavItem>; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; parts?: undefined | {
   root?: string | undefined;
   list?: string | undefined;
   tab?: string | undefined;
@@ -3724,9 +3504,7 @@ component default
   retry?: string | undefined;
   panel?: string | undefined;
 }; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs?: undefined; value?: undefined }
-  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; disabled?: boolean | undefined; failureLabel?: string | undefined; items?: undefined; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; parts?: undefined | {
+  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; disabled?: boolean | undefined; failureLabel?: string | undefined; items?: undefined; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; parts?: undefined | {
   root?: string | undefined;
   list?: string | undefined;
   tab?: string | undefined;
@@ -3738,9 +3516,7 @@ component default
   retry?: string | undefined;
   panel?: string | undefined;
 }; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: OptionsSource<{ value: Value; } & NavItem>; value: Value }
-  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; disabled?: boolean | undefined; failureLabel?: string | undefined; items?: undefined; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; parts?: undefined | {
+  | { activation?: "auto" | "manual" | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; disabled?: boolean | undefined; failureLabel?: string | undefined; items?: undefined; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((event: { options: readonly ({ value: Value; } & NavItem)[]; query: string; }) => unknown) | undefined; onValueChange?: ((event: { value: Value; tab: { value: Value; } & NavItem; }) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; parts?: undefined | {
   root?: string | undefined;
   list?: string | undefined;
   tab?: string | undefined;
@@ -3755,18 +3531,12 @@ component default
 
 [./text-input.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; icon?: IconProps | IconSlot | false | undefined; invalid?: boolean | undefined; label?: string | undefined; onChange?: ((event: { value: string; }) => unknown) | undefined; onInput?: ((event: { value: string; }) => unknown) | undefined; parts?: undefined | { root?: string | undefined; field?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }; size?: FieldSize | undefined; type?: "date" | "datetime-local" | "email" | "month" | "password" | "search" | "tel" | "text" | "time" | "url" | "week" | undefined; value?: string | undefined }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; icon?: IconProps | IconSlot | false | undefined; invalid?: boolean | undefined; label?: string | undefined; onChange?: ((event: { value: null | number; }) => unknown) | undefined; onInput?: ((event: { value: null | number; }) => unknown) | undefined; parts?: undefined | { root?: string | undefined; field?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }; size?: FieldSize | undefined; type: "number"; value?: null | number | string | undefined }
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; icon?: IconProps | IconSlot | false | undefined; invalid?: boolean | undefined; label?: string | undefined; onChange?: ((event: { value: string; }) => unknown) | undefined; onInput?: ((event: { value: string; }) => unknown) | undefined; parts?: undefined | { root?: string | undefined; field?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }; size?: FieldSize | undefined; type?: "date" | "datetime-local" | "email" | "month" | "password" | "search" | "tel" | "text" | "time" | "url" | "week" | undefined; value?: string | undefined }
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; icon?: IconProps | IconSlot | false | undefined; invalid?: boolean | undefined; label?: string | undefined; onChange?: ((event: { value: null | number; }) => unknown) | undefined; onInput?: ((event: { value: null | number; }) => unknown) | undefined; parts?: undefined | { root?: string | undefined; field?: string | undefined; icon?: readonly unknown[] | string | undefined | { root?: string | undefined; }; }; size?: FieldSize | undefined; type: "number"; value?: null | number | string | undefined }
 
 [./textarea.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   invalid?: boolean | undefined
   label?: string | undefined
   onChange?: ((event: { value: string; }) => unknown) | undefined
@@ -3778,9 +3548,7 @@ component default
 
 [./theme-toggle.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   cookie?: string | undefined
   label?: string | undefined
   modes?: readonly (Mode | ThemeMode)[] | undefined
@@ -3808,9 +3576,7 @@ component default
 
 [./time-input.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   invalid?: boolean | undefined
   label?: string | undefined
   onChange?: ((event: { value: string; }) => unknown) | undefined
@@ -3829,9 +3595,7 @@ component default
 
 [./timeline.kay] default
 component default
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; empty?: Element; emptyLabel?: string | undefined; entries?: undefined; items: readonly TimelineEntry<Key>[]; label: string; onSelectedChange?: ((event: { key: Key | undefined; entry: TimelineEntry<Key>; }) => unknown) | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; entries?: undefined; items: readonly TimelineEntry<Key>[]; label: string; onSelectedChange?: ((event: { key: Key | undefined; entry: TimelineEntry<Key>; }) => unknown) | undefined; parts?: undefined | {
   root?: string | undefined;
   item?: string | undefined;
   entry?: string | undefined;
@@ -3841,9 +3605,7 @@ component default
   };
   text?: string | undefined;
 }; selected?: Key | undefined }
-  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; empty?: Element; emptyLabel?: string | undefined; entries: readonly TimelineEntry<Key>[]; items?: undefined; label: string; onSelectedChange?: ((event: { key: Key | undefined; entry: TimelineEntry<Key>; }) => unknown) | undefined; parts?: undefined | {
+  | { class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; entries: readonly TimelineEntry<Key>[]; items?: undefined; label: string; onSelectedChange?: ((event: { key: Key | undefined; entry: TimelineEntry<Key>; }) => unknown) | undefined; parts?: undefined | {
   root?: string | undefined;
   item?: string | undefined;
   entry?: string | undefined;
@@ -3856,9 +3618,7 @@ component default
 
 [./toaster.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   dismissLabel?: string | undefined
   fallback?: (boolean & ((() => Element) | Html | Node | Range | bigint | boolean | null | number | readonly Element[] | string)) | undefined
   limit?: number | undefined
@@ -3896,9 +3656,7 @@ component default
 [./toggle.kay] default
 component default
   checked?: boolean | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   hint?: number | string | undefined
   inputProps?: HtmlAttributes<"input"> | undefined
   invalid?: boolean | undefined
@@ -3923,9 +3681,7 @@ component default
 component default
   caption?: string | undefined
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   floating?: boolean | undefined
   label: string
   parts?: undefined | { root?: string | undefined; caption?: string | undefined; }
@@ -3933,9 +3689,7 @@ component default
 
 [./tooltip-host.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   fallback?: (boolean & ((() => Element) | Html | Node | Range | bigint | boolean | null | number | readonly Element[] | string)) | undefined
   hideDelay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onOpenChange?: ((event: { open: boolean; element: HTMLElement; }) => unknown) | undefined
@@ -3945,9 +3699,7 @@ component default
 [./tooltip.kay] default
 component default
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   content?: Element
   parts?: undefined | { root?: string | undefined; content?: string | undefined; }
   placement?: (string & {}) | Placement | undefined
@@ -3956,9 +3708,7 @@ component default
 [./tree-view.kay] default
 component default
   actions?: ((args_0: TreeNode<Id>) => Element) | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: Element
   emptyLabel?: string | undefined
   expanded?: readonly Id[] | undefined
@@ -3991,9 +3741,7 @@ component default
 
 [./virtual-list.kay] default
 component default
-  | { busy?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items: (InfiniteList<Item> | RowsSource<Item> | undefined) & (InfiniteList<Item> | RowsSource<Item>); label: string; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onItemClick?: ((event: { item: Item; index: number; event: MouseEvent; }) => unknown) | undefined; onLoad?: ((event: { items: Item[]; }) => unknown) | undefined; overscan?: number | undefined; parts?: undefined | {
+  | { busy?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items: (InfiniteList<Item> | RowsSource<Item> | undefined) & (InfiniteList<Item> | RowsSource<Item>); label: string; /** @deprecated Write `items`. Removed in 1.108.0. */ list?: undefined; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onItemClick?: ((event: { item: Item; index: number; event: MouseEvent; }) => unknown) | undefined; onLoad?: ((event: { items: Item[]; }) => unknown) | undefined; overscan?: number | undefined; parts?: undefined | {
   root?: string | undefined;
   notices?: string | undefined;
   status?: string | undefined;
@@ -4008,9 +3756,7 @@ component default
   itemLink?: string | undefined;
   itemButton?: string | undefined;
 }; retryLabel?: string | undefined; skeletonItems?: number | undefined }
-  | { busy?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items?: undefined; label: string; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Item>; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onItemClick?: ((event: { item: Item; index: number; event: MouseEvent; }) => unknown) | undefined; onLoad?: ((event: { items: Item[]; }) => unknown) | undefined; overscan?: number | undefined; parts?: undefined | {
+  | { busy?: boolean | undefined; class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items?: undefined; label: string; /** @deprecated Write `items`. Removed in 1.108.0. */ list: InfiniteList<Item>; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onItemClick?: ((event: { item: Item; index: number; event: MouseEvent; }) => unknown) | undefined; onLoad?: ((event: { items: Item[]; }) => unknown) | undefined; overscan?: number | undefined; parts?: undefined | {
   root?: string | undefined;
   notices?: string | undefined;
   status?: string | undefined;
@@ -4028,9 +3774,7 @@ component default
 
 [./when-visible.kay] default
 component default
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   margin?: number | undefined
   onVisible: () => unknown
   parts?: undefined | { root?: string | undefined; }
@@ -4039,9 +3783,7 @@ component default
 component default
   actions?: Element
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   empty?: boolean | undefined
   emptyState?: Element
   icon?: IconProps | IconSlot | undefined
@@ -4063,9 +3805,7 @@ component default
 [./zoom-pane.kay] default
 component default
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   fitLabel?: string | undefined
   label: string
   least?: number | undefined

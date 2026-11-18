@@ -1718,9 +1718,7 @@ component default
 component default
   button?: boolean | undefined
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   href?: string | undefined
   parts?: undefined | {
   root?: readonly unknown[] | string | undefined | {
@@ -1740,9 +1738,7 @@ component default
 [./components/sign-out-button.kay] default
 component default
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   parts?: undefined | {
   root?: string | undefined;
   button?: readonly unknown[] | string | undefined | {
@@ -1774,9 +1770,7 @@ component default
 component default
   account?: boolean
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   parts?: undefined | { root?: string | undefined; }
   redirect?: string | undefined
   signIn?: boolean

@@ -358,15 +358,11 @@ export type HandedPart<Component, Name extends string> = PartsOf<Component> exte
 // What `part="root spinner"` checks of the called component: it names a part `Name`, or the call is refused.
 export type HandsPart<Component, Name extends string> = 0 extends 1 & Component ? unknown : [HandedPart<Component, Name>] extends [never] ? { kayError: `The called component has no part ${Name}` } : unknown
 
-// An object of classes by part name, `{ head: 'p-6' }`, told from a `{ name: condition }` object by its string values.
-type PartsObject<Item> = 0 extends 1 & Item ? never : Item extends readonly unknown[] ? never : Item extends object ? [Extract<Item[keyof Item], string>] extends [never] ? never : Item : never
-
 // A string known to be non-empty: a literal other than the empty string.
 type NonEmpty<Item> = Item extends string ? string extends Item ? never : '' extends Item ? never : Item : never
 
 // What a component call spreads for its `class`, merged from its shorthand, `class` and spreads: a `class` that is always a string when a non-empty literal takes part, else one that may be unset, as an optional property so `class?: string` takes it under `exactOptionalPropertyTypes` and a required `class: string` refuses it.
-// A parts object cannot be merged, so it is reported as the `class`.
-export type ComponentClass<List extends readonly unknown[]> = [PartsObject<List[number]>] extends [never] ? [{ [Index in keyof List]: NonEmpty<List[Index]> }[number]] extends [never] ? { class?: string } : { class: string } : { class: { kayError: 'A parts object cannot be merged with a shorthand or a spread: give the parts as their own attribute, parts={{ root: "mt-4", head: "p-6" }}' } }
+export type ComponentClass<List extends readonly unknown[]> = [{ [Index in keyof List]: NonEmpty<List[Index]> }[number]] extends [never] ? { class?: string } : { class: string }
 
 // What the template's control flow and dynamic tags read as in the code the type checker reads: a `for` block is called on the spot with a row of its list, so TypeScript narrows it where the browser build hands accessors.
 export interface TemplateHelpers {

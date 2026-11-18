@@ -5,7 +5,7 @@ import type { Sites } from './rewrite-types'
 import { bindsOwnProp, failedBlockOf, handedParts, isSlot, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
 import { addConstValue, addKeyParameters, addRowItem, contentOf, rowKeying, slotValue } from './items'
-import { addMergedClass, addOldParts, addShorthandClass, quoteAttribute } from './jsx-class'
+import { addMergedClass, addShorthandClass, quoteAttribute } from './jsx-class'
 import { addFieldName, addInheritedName, addWrittenField } from './jsx-field'
 import { DYNAMIC_TAG } from './mapping'
 import { addBindWrite, bindRead, helperName, RAW_ELEMENTS } from './markup'
@@ -679,7 +679,7 @@ export class JsxTemplate {
     const part = partAttribute(element, this.src)
 
     for (const attribute of element.attributes) {
-      if (addOldParts(b, element, this.src, attribute) || ((merge.shorthand || merge.last) && attribute === merge.attribute))
+      if ((merge.shorthand || merge.last) && attribute === merge.attribute)
         continue
 
       // Not a prop of the element or the component: it names a part, whose class the component's own `class` type takes.

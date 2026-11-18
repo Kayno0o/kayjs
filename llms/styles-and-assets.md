@@ -51,7 +51,7 @@ section.rounded.border
 
 - A part renders `data-part="head"`, for selectors and `data-[part=head]:` utilities; one name may sit on several elements, every row of a `for`, and inside an `if` or a slot.
 - A part that is a component, `Button(part="action")`, hands its entry to it, a string or an object of its parts: `parts={{ action: { icon: 'size-5' } }}`. `data-part` reaches its root through the spread. Names after the first, `Busy(part="root spinner")`, hand those parts of this component on too, under the same names, for a part inside the called component. `kay check` reports a handed part the called component does not name, types its entry as that part takes it, and refuses one in a page or a layout, which has no class to hand from.
-- `parts` sits beside a shorthand, a spread and a `class` on the call, `Card.mt-4(parts={{ head: 'p-6' }})`. Until 1.108 a `class` literal of before 1.105 is handed on as `parts`: word keys, each value a string, template, conditional or array of those, or a nested literal (`deprecated-parts-class` writes `parts`). Any other `class` object is conditions; a held one is a type error naming `parts`.
+- `parts` sits beside a shorthand, a spread and a `class` on the call, `Card.mt-4(parts={{ head: 'p-6' }})`. `class` is a string, an array or an object of conditions, so an object of strings in it is a type error: write `parts`.
 - `kay check` reports a part named by an expression, an unknown part at a call, a string `class` on a template with several top elements and no `part="root"`, and a component that also destructures `class` or `parts`, which the compiler owns. `...rest` leaves them out.
 - A page or a layout has no `class` prop: its parts render `data-part` only.
 

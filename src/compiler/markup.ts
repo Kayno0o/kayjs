@@ -13,11 +13,11 @@ import { addBoundWrites, calledByBinds, changeOf } from './bound-props'
 import { joinTexts } from './class-items'
 import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
+import { closeHandParts, handsEntry, openClassList, writtenParts } from './hand-parts'
 import { IMAGE_OPTIONS, imageDefaults as imageDefaultsOf, imageOptions, NO_PLACEHOLDER, placeholderOff, writeImageArguments } from './image-attributes'
 import { contentOf } from './items'
 import { controlId, fieldAttribute, inheritedAttributes, inheritedField } from './markup-fields'
 import { PROPS } from './names'
-import { closeHandParts, oldPartsEntry, openClassList, writtenParts } from './old-parts'
 import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, shapeOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
 import { bindEvent } from './validate'
 
@@ -514,8 +514,8 @@ export abstract class TemplateWriter {
         continue
       }
 
-      // The `class` of before 1.105 is the component's `parts`.
-      if (oldPartsEntry(element, this.src, attribute, b, entry, element.component && parts.length > 0))
+      // The `parts` and spreads of a call handing parts on are written with its own.
+      if (handsEntry(element, this.src, attribute, element.component && parts.length > 0))
         continue
 
       const name = this.source(attribute.name)

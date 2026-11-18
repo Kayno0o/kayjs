@@ -44,6 +44,9 @@ A call read as its data (`const list = await call(notes, '/')` then `list.items`
 ### `limit.enforce(ctx)` is `limit.check(ctx)`
 
 `rateLimit()`'s `enforce(ctx, message?)` is gone: write `check(ctx, message?)`; `limiter().enforce(key)` keeps its name. The `deprecated-rate-enforce` lint is gone.
+### The parts object of `class` is gone
+
+A component's parts are its `parts` attribute: `Card(class={{ head: 'p-6' }})` is `Card(parts={{ head: 'p-6' }})`, as `kay upgrade` on 1.108 wrote it. `class` is a string, an array or an object of conditions, so `{ head: 'p-6' }` in it is the class `head` and a type error on a component with parts. The `deprecated-parts-class` lint is gone with it.
 
 ## 1.108.0
 
@@ -142,7 +145,7 @@ A component no longer declares `children?: Snippet`, nor an optional block it re
 
 ### A component's parts are the `parts` attribute
 
-`Card(class={{ head: 'p-6' }})` is `Card(parts={{ head: 'p-6' }})`: `class` keeps strings, arrays and objects of conditions, and `parts` holds an entry per part, `root` included, so a shorthand or a spread can sit beside it, and a component declaring its own `parts` prop is refused as one declaring `class` is (`Card.mt-4(parts={{ head: 'p-6' }})`). A component with parts takes both props, and `parts` leaves `...rest` as `class` does. A component with parts takes `class` as a string, an array or an object of conditions, and until 1.108 the old parts object too, decided where the call is written: a `class` that is an object literal of word keys whose values are each a string, a template, a conditional of those, an array of those or a nested literal (`class={{ head: 'p-6', body: ['p-4', 'p-2'], foot: on ? 'a' : 'b' }}`) is handed on as `parts`, and any other value is conditions (`{ active: user && user.name }`, `{ active: true, head: 'p-4' }`, `{ head: size }`). A part the literal and a `parts` written beside it both give takes the literal's entry. `kay check --fix` writes the new form (`deprecated-parts-class`); a parts object held in a variable, or one with an expression for a value (`class={{ head: size }}`), is conditions now, and `kay check` reports it as a type error naming `parts`, so write it as `parts={...}`.
+`Card(class={{ head: 'p-6' }})` is `Card(parts={{ head: 'p-6' }})`: `class` keeps strings, arrays and objects of conditions, and `parts` holds an entry per part, `root` included, so a shorthand or a spread can sit beside it, and a component declaring its own `parts` prop is refused as one declaring `class` is (`Card.mt-4(parts={{ head: 'p-6' }})`). A component with parts takes both props, and `parts` leaves `...rest` as `class` does. A component with parts takes `class` as a string, an array or an object of conditions.
 
 ### Websocket frames are always JSON
 

@@ -17,14 +17,6 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Stat from \'@kayjs/ui/stat.kay\'\n---\nStat(value={12} label="moons" variant="tile")',
     right: '---\nimport Stat from \'@kayjs/ui/stat.kay\'\n---\nStat(value={12} label="moons" layout="tile")',
   },
-  'deprecated-parts-class': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.105',
-    summary: 'The parts of a component given as its `class`, `parts` since 1.105: `Card(class={{ head: \'p-6\' }})` is `Card(parts={{ head: \'p-6\' }})`, so `class` keeps strings, arrays and objects of conditions and no longer has two meanings, and a shorthand or a spread can sit beside the parts. The old form works until 1.108, the compiler handing a literal of it on as `parts`. Found on a component call whose `class` is an object literal of string classes by name, or of a nested object for a part that is a component, as `kay check` reads no types: a parts object held in a variable, or with an expression for a value, is conditions now and not found. The fix writes `parts` for `class`; it offers none where `parts` is already written.',
-    wrong: '---\nimport Card from \'./card.kay\'\n---\nCard(class={{ head: \'p-6\' }})',
-    right: '---\nimport Card from \'./card.kay\'\n---\nCard(parts={{ head: \'p-6\' }})',
-  },
   'deprecated-test-helpers': {
     level: 'warn',
     group: 'deprecated',

@@ -129,7 +129,7 @@ A part that is a component, `Button(part="action")`, hands its entry to that com
 
 `kay check` reports a handed part the called component does not name, and a page or a layout, which has no class to hand from, refuses them.
 
-`parts` can sit beside a shorthand, a spread and `class` on the call, `Card.mt-4(parts={{ head: 'p-6' }})`. Before 1.105 the parts were an object given as `class`. Only an object literal keeps working, until 1.108, and `kay check --fix` writes `parts` for it.
+`parts` can sit beside a shorthand, a spread and `class` on the call, `Card.mt-4(parts={{ head: 'p-6' }})`. Before 1.105 the parts were an object given as `class`, which is conditions now.
 
 In that literal the keys are words, and each value is a string, a template, a choice between those, an array of those, or a literal of its own for a part that is a component. Any other object in `class` is conditions, so an object held in a variable, or one with another kind of value, is a type error that names `parts`.
 

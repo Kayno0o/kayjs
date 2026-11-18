@@ -16,7 +16,6 @@ import { browserReads } from './browser'
 import { wrapActionButtons } from './button-forms'
 import { generate, isInteractive, islandCause, lineOf } from './codegen'
 import { deprecatedPageSettings } from './deprecated-page'
-import { deprecatedPartsClass } from './deprecated-parts'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
 import { openRedirects } from './fence-redirects'
 import { cwd, scopeStorage } from './host'
@@ -385,7 +384,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...linkFlags(file), ...deprecatedPartsClass(file), ...deprecatedPageSettings(source, server))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...linkFlags(file), ...deprecatedPageSettings(source, server))
   }
 
   if (checked && pin !== undefined)

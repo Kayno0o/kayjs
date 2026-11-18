@@ -3,7 +3,6 @@ import type { FieldContent, FormInfo } from './form-info'
 import type { IslandDeclaration } from './island-declaration'
 import { actionOf, componentAction } from './form-action'
 import { formTargets, initialHelpers } from './form-info'
-import { oldPartsClass } from './old-parts'
 import { childBlocks, visitNodes, walkNodes } from './template-walk'
 
 export { actionOf, componentAction } from './form-action'
@@ -799,8 +798,7 @@ function mergesComponentClass(element: ElementNode, source: string): boolean {
   if (!element.component)
     return false
 
-  const old = oldPartsClass(element, source)
-  const attribute = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && attribute !== old && source.slice(attribute.name.start, attribute.name.end) === 'class')
+  const attribute = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'class')
 
   if (element.attributes.some(attribute => attribute.kind === 'spread'))
     return element.classes.length > 0 || attribute !== undefined

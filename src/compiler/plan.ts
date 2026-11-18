@@ -3,7 +3,6 @@ import type { CodeBuilder } from './mapping'
 import type { PlannedAttribute } from './markup'
 import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
-import { oldPartsClass } from './old-parts'
 
 // Whether a group (the signal of a `bind:group`, a string for radios or an array for checkboxes) holds a value, as the checked state of the box reads it.
 export const GROUP_HAS = '((kayGroup: unknown, kayValue: string) => Array.isArray(kayGroup) ? kayGroup.includes(kayValue) : kayGroup === kayValue)'
@@ -126,8 +125,7 @@ export interface ClassMerge {
 }
 
 export function classMergeOf(element: ElementNode, src: string): ClassMerge {
-  const old = oldPartsClass(element, src)
-  const attribute = element.attributes.find((candidate): candidate is NamedAttribute => candidate.kind !== 'spread' && candidate !== old && src.slice(candidate.name.start, candidate.name.end) === 'class')
+  const attribute = element.attributes.find((candidate): candidate is NamedAttribute => candidate.kind !== 'spread' && src.slice(candidate.name.start, candidate.name.end) === 'class')
   const spreads = element.attributes.some(candidate => candidate.kind === 'spread')
   const shorthand = element.classes.length > 0 ? { start: element.classes[0]!.start, end: element.classes.at(-1)!.end } : undefined
 

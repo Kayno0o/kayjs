@@ -66,15 +66,14 @@ describe('kay check on a part handed to a called component', () => {
 
   it('types the handed part as the called component types it', async () => {
     expect(await problems(`${HANDS}Busy(part="root spinner")\n`, CALLER)).toEqual([])
-    expect(await problems('---\nimport Hands from \'../hands.kay\'\n---\nHands(class={{ root: \'a\', spinner: \'b\' }})\n')).toEqual([])
     expect(await problems('---\nimport Hands from \'../hands.kay\'\n---\nHands(parts={{ root: \'a\', spinner: \'b\' }})\n')).toEqual([])
-    expect(await problems('---\nimport Hands from \'../hands.kay\'\n---\nHands(class={{ spinner: 5 }})\n')).toEqual([expect.stringContaining('not assignable')])
+    expect(await problems('---\nimport Hands from \'../hands.kay\'\n---\nHands(parts={{ spinner: 5 }})\n')).toEqual([expect.stringContaining('not assignable')])
   })
 })
 
 describe('kay check on a component with parts', () => {
   it('passes a string for the root, an object of parts, and a nested object for a part that is a component', async () => {
-    expect(await problems(`${IMPORTS}Card(class="mt-4") a\nCard(class={{ root: 'mt-4', head: 'p-6' }}) b\nPair(class={{ top: 'a', bottom: 'b' }})\nPanel(class={{ card: { head: 'p-2' }, root: 'x' }})\nPanel(class={{ card: 'mt-2' }})\n`)).toEqual([])
+    expect(await problems(`${IMPORTS}Card(class="mt-4") a\nCard(parts={{ root: 'mt-4', head: 'p-6' }}) b\nPair(parts={{ top: 'a', bottom: 'b' }})\nPanel(parts={{ card: { head: 'p-2' }, root: 'x' }})\nPanel(parts={{ card: 'mt-2' }})\n`)).toEqual([])
   })
 
   it('takes the parts as their own attribute, beside a shorthand, a spread and a class string, and reports an unknown or mistyped part', async () => {
@@ -92,27 +91,15 @@ describe('kay check on a component with parts', () => {
     expect(await problems(`${IMPORTS}Card(parts={{ head: rest.id === 'x' ? 'p-6' : undefined }}) a\n`, undefined, exact)).toEqual([])
   })
 
-  it('reports a part the component does not have, at the call', async () => {
-    expect(await problems(`${IMPORTS}Card(class={{ foot: 'p-6' }}) a\n`)).toEqual([expect.stringContaining('foot')])
-    expect(await problems(`${IMPORTS}Panel(class={{ card: { foot: 'p-6' } }})\n`)).toEqual([expect.stringContaining('foot')])
-  })
-
   it('reports a string class on a template with several top elements and no root', async () => {
     expect(await problems(`${IMPORTS}Pair(class="mt-4")\n`)).toEqual([expect.stringContaining('several top elements')])
   })
 
-  it('takes a literal parts object as the parts beside a shorthand or a spread, reports one held in a variable, and lets a condition object through', async () => {
-    expect(await problems(`${IMPORTS}Card.mt-4(class={{ head: 'p-6' }}) a\n`)).toEqual([])
-    expect(await problems(`${IMPORTS}Card({...rest} class={{ head: 'p-6' }}) a\n`)).toEqual([])
-    expect(await problems(`${IMPORTS}Card.mt-4(class={mine}) a\n`)).toEqual([expect.stringContaining('cannot be merged')])
+  it('takes an object of strings in class as conditions, which a component with parts refuses, and a condition object beside a shorthand or a spread, which merges', async () => {
+    for (const call of ['Card(class={{ head: \'p-6\' }}) a', 'Card(class={mine}) a', 'Card(class={{ head: size }}) a'])
+      expect(await problems(`${IMPORTS}${call}\n`)).toEqual([expect.stringContaining('not assignable')])
+
     expect(await problems(`${IMPORTS}Plain.mt-4(class={{ on: true }})\nPlain({...rest} class={{ on: true }})\n`)).toEqual([])
-  })
-
-  it('refuses a parts object the compiler cannot see as one, naming the parts attribute, and takes one it can', async () => {
-    for (const call of ['Card(class={mine}) a', 'Card(class={{ head: size }}) a'])
-      expect(await problems(`${IMPORTS}${call}\n`)).toEqual([expect.stringContaining('parts')])
-
-    expect(await problems(`${IMPORTS}Card(class={{ head: rest.id === 'x' ? 'a' : 'b' }}) a\nCard(class={{ head: \`p-\${size}\` }}) b\n`)).toEqual([])
   })
 
   describe('a merged class on a component typing its class prop, under exactOptionalPropertyTypes', () => {
@@ -153,11 +140,9 @@ describe('kay check on a component with parts', () => {
   })
 
   it('reports a class error on the class attribute', async () => {
-    const parts = 'Card.mt-4(class={mine}) a'
-    const spread = 'Card.mt-4({...rest} class={mine}) a'
+    const parts = 'Card(class={mine}) a'
 
     expect(await positions(`${IMPORTS}${parts}\n`)).toEqual([at(parts, 'class')])
-    expect(await positions(`${IMPORTS}${spread}\n`)).toEqual([at(spread, 'class')])
   })
 
   it('refuses a required class prop with a spread after the class and with an empty class string, at the tag', async () => {
@@ -170,7 +155,7 @@ describe('kay check on a component with parts', () => {
     }
   })
 
-  it('reads a condition object with a string-typed value beside a shorthand as a parts object, which the docs say', async () => {
-    expect(await problems(`${IMPORTS}Plain.mt-4(class={{ 'p-4': rest.id }})\n`)).toEqual([expect.stringContaining('cannot be merged')])
+  it('merges a condition object with a string-typed value beside a shorthand', async () => {
+    expect(await problems(`${IMPORTS}Plain.mt-4(class={{ 'p-4': rest.id }})\n`)).toEqual([])
   })
 })

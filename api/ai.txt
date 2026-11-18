@@ -916,9 +916,7 @@ component default
   argumentsLabel: string
   block?: ((call: AiToolCall) => Element) | undefined
   calls: AiToolCall[]
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   details: boolean
   doneLabel: string
   failedLabel: string
@@ -1087,9 +1085,7 @@ component default
 [./chat-panel.kay] default
 component default
   children?: Element
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   closeIcon: Element
   collapseIcon: Element
   expandIcon: Element
@@ -1116,9 +1112,7 @@ component default
 [./chat-sources.kay] default
 component default
   block?: ((source: Source, n: number) => Element) | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   here?: boolean | undefined
   label: string
   newTab?: "auto" | boolean | undefined
@@ -1133,9 +1127,7 @@ component default
   attach?: boolean | undefined
   autoplay?: boolean | undefined
   call?: ((call: AiToolCall) => Element) | undefined
-  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined | {
-  kayError: "A parts object is the parts attribute: write parts={{ head: \"p-6\" }}";
-}
+  class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   conversationIn?: "address" | "browser" | undefined
   conversations?: boolean | undefined
   disclosure?: string | undefined
