@@ -27,7 +27,7 @@ const look = recipe({
     bar: 'min-h-px min-w-px flex-1 rounded-t-sm data-stub:h-1 data-stacked:flex-none data-stacked:rounded-none',
     axis: 'relative ml-10 h-[1lh] text-2xs',
     // A shown label is as wide as its text, centred on its column; the first and the last line up with the plot's edges, so a label wider than its column spills inward and not out of the figure.
-    axisLabel: 'absolute top-0 -translate-x-1/2 data-[edge=start]:translate-x-0 data-[edge=end]:translate-x-0 text-2xs whitespace-nowrap text-[var(--color-muted)]',
+    axisLabel: 'absolute top-0 -translate-x-1/2 data-[edge]:translate-x-0 rtl:translate-x-1/2 rtl:data-[edge]:translate-x-0 text-2xs whitespace-nowrap text-[var(--color-muted)]',
     // The parts of a feature no call site writes stay out of the island's code (`uses`).
     ...(uses('marks'))
       ? {
@@ -114,9 +114,9 @@ const axisAt = uses('xLabels')
     const total = labels.length
 
     if (total > 1 && at === 0)
-      return 'left: 0'
+      return 'inset-inline-start: 0'
 
-    return total > 1 && at === total - 1 ? 'right: 0' : `left: calc((100% + var(--axis-gap)) * ${(at + 0.5) / total} - var(--axis-gap) / 2)`
+    return total > 1 && at === total - 1 ? 'inset-inline-end: 0' : `inset-inline-start: calc((100% + var(--axis-gap)) * ${(at + 0.5) / total} - var(--axis-gap) / 2)`
   }
   : undefined
 const edge = uses('xLabels') ? (at: number) => labels.length < 2 ? undefined : at === 0 ? 'start' : at === labels.length - 1 ? 'end' : undefined : undefined
