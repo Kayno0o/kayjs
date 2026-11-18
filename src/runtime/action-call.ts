@@ -25,9 +25,11 @@ export { OUTCOME_SCRIPT }
 
 const QUERY = /\?.*/
 
+const CODE_RETRIES = 2
 // Once loaded, a call is made in the same task, as one made from `pagehide` must be: a dynamic import resolves a task later, when the page may be gone.
 let running: typeof import('./action-run') | undefined
-const CODE_RETRIES = 2
+// The load the calls made before it ends share, so they go on in the order they were made.
+let loading: Promise<typeof import('./action-run')> | undefined
 
 // A property of the handle an action builds, readable and listed.
 const read = (value: unknown) => ({ value, enumerable: true })
@@ -123,7 +125,7 @@ function validator(url: () => string, failed: () => { errors: Record<string, str
   }
 }
 
-// Posts a call, counting the ones in flight; a call that redirects rejects with `ActionRedirectError` once the browser is on its way, so the action stops being pending.
+// Makes the call of an action, counting the ones in flight; a call that redirects rejects with `ActionRedirectError` once the browser is on its way, so the action stops being pending.
 // How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
 export function callable(url: () => string): { call: (input: never, options?: CallOptions) => CallPromise<CallResult<unknown, unknown>>, reads: PropertyDescriptorMap, bound: Bound } {
   const [inFlight, setInFlight, flying] = lazySignal(0)
@@ -165,9 +167,10 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
     let code: typeof import('./action-run')
 
     try {
-      code = running ?? await runCode()
+      code = running ?? await (loading ??= runCode())
     }
     catch (error) {
+      loading = undefined
       shift(-1)
 
       if (host.latest(start.turn))

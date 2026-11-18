@@ -243,7 +243,7 @@ function supersede(lane: Lane, later: AbortController): void {
   lane.latest = later
 }
 
-// Runs a call in its lane, counting it in flight until it settles.
+// Runs a call in its lane, whose in flight count the action started and this ends.
 export async function run(host: Host, start: Start, lane: Lane, given: unknown, fixed: Record<string, unknown> | undefined, options?: CallOptions): Promise<unknown> {
   const { page, visits, caller, turn } = start
   const input = withFixed(given, fixed)
