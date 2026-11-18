@@ -323,6 +323,19 @@ describe('kay env', () => {
     expect(listed.unread[0]!.error).toContain('missing')
   })
 
+  it('lists the schema of a module kay.config.ts imports, and kay check compares it with .env.example', async () => {
+    const root = await project({
+      'kay.config.ts': 'import { env } from \'./src/env\'\n\nexport default { assets: { favicon: false }, extensions: env === undefined ? [] : [] }\n',
+      'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ CLIENT_ID: s.String({ default: \'dev\', requiredInProduction: true }) }))\n',
+      '.env.example': 'PORT=\n',
+    })
+    const listed = JSON.parse((await kay(['env', '--format', 'json', '--example', '.env.example'], root)).stdout) as { variables: { name: string, source: string, required: string | false }[], findings?: { message: string }[] }
+
+    expect(listed.variables.filter(variable => variable.name === 'CLIENT_ID')).toEqual([expect.objectContaining({ source: 'src/env.ts', required: 'production' })])
+    expect(listed.findings?.map(({ message }) => message).join('\n')).toContain('CLIENT_ID')
+    expect((await kay(['check', '--format', 'json'], root)).stdout).toContain('CLIENT_ID')
+  })
+
   it('lists KAY_MCP_KEY and KAY_MCP_KEY_FILE while mcp.token asks for a token from the environment, the variable { env } names, and none for a value or a file', async () => {
     const listing = async (mcp: string) => {
       const root = await project({ ...files, 'kay.config.ts': `export default { assets: { favicon: false }, mcp: ${mcp} }\n` })

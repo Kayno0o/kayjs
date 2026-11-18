@@ -127,7 +127,7 @@ function resolvedUnder(root: string, path: string): string[] {
 
 export async function listEnv(root: string): Promise<{ variables: Listed[], unread: { file: string, error: string }[] }> {
   const config = await loadConfigWithin(root)
-  const declared = listingEnv()
+  const recorded = listingEnv()
   const shown = (file: string) => relative(root, file)
   const unread: { file: string, error: string }[] = []
   // The server entry listens as it is imported, so its own schema is left out.
@@ -153,6 +153,9 @@ export async function listEnv(root: string): Promise<{ variables: Listed[], unre
       unread.push({ file, error: error instanceof Error ? error.message : String(error) })
     }
   }
+
+  // The calls of this project only, each module's last: a module the config imported and one read again by an earlier listing of this process are counted once.
+  const declared = [...new Map(recorded.filter(({ file }) => file === undefined || !relative(root, file).startsWith('..')).map(call => [`${call.file}:${Object.keys(call.schema.properties).join()}`, call])).values()]
 
   // A library built at import time declares its own variables for the app, which says more than the extension's list, so the list adds only the rest.
   const declaredNames = new Set(declared.flatMap(({ schema }) => Object.keys(schema.properties)))

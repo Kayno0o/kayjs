@@ -4,10 +4,15 @@ import { dirname, join } from 'node:path'
 // What the environment loader and the commands that run without it share, apart from `./env` so `kay check` and the editor load no Elysia.
 // On the global object, so a copy of kay the app loads beside the CLI's sees it too.
 const BUILDING = Symbol.for('kay.building')
+const LISTED = Symbol.for('kay.envListed')
 
 // `kay build` renders pages, and `kay check` reads content and messages, without the server's environment: from then on a variable missing or refused fails the page reading it rather than the module declaring it.
 export function buildingWithoutEnv(): void {
-  (globalThis as { [BUILDING]?: boolean })[BUILDING] = true
+  const holder = globalThis as { [BUILDING]?: boolean, [LISTED]?: DeclaredEnv[] }
+
+  holder[BUILDING] = true
+  // The calls of `defineEnv` from here on are kept, so a module the config imports, which `kay env` cannot import again, still lists.
+  holder[LISTED] ??= []
 }
 
 const LOADING = Symbol.for('kay.loading')
@@ -22,7 +27,6 @@ export function loading(): boolean {
   return (globalThis as { [LOADING]?: boolean })[LOADING] === true
 }
 
-const LISTED = Symbol.for('kay.envListed')
 // The caller's file in a stack frame such as `at /app/src/env.ts:3:20` or `at env (file:///app/src/env.ts:3:20)`.
 const FRAME_FILE = /^at (?:.*? \()?(?:file:\/\/)?(\/[^():]+):\d+:\d+\)?$/
 // A library of kay declares its variables for the app that builds it, so the app's module is the one to list them under.
@@ -38,13 +42,11 @@ export interface DeclaredEnv {
   file?: string | undefined
 }
 
-// `kay env` loads the modules calling `defineEnv` and takes each schema as it is declared: from then on every call is recorded.
+// Every call of `defineEnv` since a command began building without the environment, the config's own imports included, as `kay env` cannot import a module the config already loaded again. The listing takes the calls of its project and reads the modules calling `defineEnv` that are left.
 export function listingEnv(): DeclaredEnv[] {
-  const found: DeclaredEnv[] = []
+  const holder = globalThis as { [LISTED]?: DeclaredEnv[] }
 
-  ;(globalThis as { [LISTED]?: DeclaredEnv[] })[LISTED] = found
-
-  return found
+  return holder[LISTED] ??= []
 }
 
 export function recordEnv(schema: EnvSchemaRecord, declaredBy: (...args: never[]) => unknown): void {
