@@ -1,0 +1,6 @@
+---
+import '../app.css'
+import ProseTasks from '../components/prose-tasks.kay'
+---
+main
+  ProseTasks

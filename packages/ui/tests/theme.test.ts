@@ -30,8 +30,8 @@ const PAIRED = /^light-dark\(|^var\(--color-[\w-]+\)$|^color-mix\(in (?:oklab|sr
 const SCHEME = /([^{}\n]*[^{}\s])\s*\{\s*color-scheme: (\w+);/g
 // A quoted class name, as a script or a component's own script writes one: `classList.add('x')`, `{ 'x': on }`.
 const QUOTED = /'([a-z][\w-]*)'/g
-// What chartist and Leaflet draw themselves, styled here but written by no source of the library, and Tailwind's `group`, which the app writes on what holds a stamp.
-const THIRD_PARTY = /^(?:ct-|leaflet-|group$)/
+// What chartist and Leaflet draw themselves, styled here but written by no source of the library, Tailwind's `group`, which the app writes on what holds a stamp, and the `task-list-item` classes kay/markdown writes.
+const THIRD_PARTY = /^(?:ct-|leaflet-|group$|task-list-item)/
 // The tokens of a skin's offset shadows and press-down, with their value.
 const PRESS_TOKEN = /(--(?:shadow-raised|shadow-press|press-travel)): ([^;]+);/g
 

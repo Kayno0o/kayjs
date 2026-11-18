@@ -1,0 +1,15 @@
+---
+// What kay/markdown makes of `- [ ] a`, `- [x] b` and `- c`, in the reading view of an app.
+---
+.kui-prose#prose
+  ul
+    li.task-list-item#open
+      label
+        input.task-list-item-checkbox(type="checkbox" disabled)
+        | Open
+    li.task-list-item#done
+      label
+        input.task-list-item-checkbox(type="checkbox" disabled checked)
+        | Done
+    li#plain Plain
+  span.bg-accent#accent

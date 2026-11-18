@@ -108,7 +108,7 @@
   }
 
   /* A drawn checkbox: a square in the field's line that fills with the accent and shows a tick once checked. */
-  :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']) {
+  :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox'], .kui-prose input.task-list-item-checkbox) {
     display: inline-grid;
     place-content: center;
     appearance: none;
@@ -148,12 +148,12 @@
   }
 
   @media (forced-colors: active) {
-    :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox'])::before {
+    :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox'], .kui-prose input.task-list-item-checkbox)::before {
       background: HighlightText;
     }
 
-    :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']):checked,
-    :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']):indeterminate {
+    :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox'], .kui-prose input.task-list-item-checkbox):checked,
+    :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox'], .kui-prose input.task-list-item-checkbox):indeterminate {
       background: Highlight;
     }
   }

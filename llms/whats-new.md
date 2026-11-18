@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's `Checkbox`, `RadioGroup` choices and `Toggle` rows are at least 24px tall, the tap target of WCAG 2.5.8, whatever the label's line height.
 - kayjs-ui's `Segmented` keeps each option's label on one line and scrolls sideways inside its container when the options do not fit, and a `Badge` wraps its text between words inside its parent, instead of overflowing it.
 - kayjs-ui's `BarChart` draws each shown x-axis label in a box as wide as its text, centred on its column, and no box for a column with no label, so a chart of many columns no longer has labels running past their own box.
+- A task list item (`- [ ] a`) inside `.kui-prose`, such as a MarkdownEditor preview, shows no bullet and a drawn box in the accent hanging where the bullet was, not the browser's dimmed checkbox; the space skin draws it too.
 
 ## 1.109.0
 

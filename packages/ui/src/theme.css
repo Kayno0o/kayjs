@@ -1054,6 +1054,30 @@
       @apply text-muted;
     }
 
+    /* A task item has no bullet: its box hangs where the bullet was, so its text lines up with the other items'. The box is drawn, as a disabled native one is dimmed and these are read-only, not unavailable. */
+    :where(li.task-list-item) {
+      @apply list-none;
+    }
+
+    :where(input.task-list-item-checkbox) {
+      @apply -ms-6 me-2 inline-grid size-4 shrink-0 appearance-none place-content-center rounded-sm border-solid border-[length:var(--border-width)] border-input bg-surface align-middle;
+
+      &::before {
+        @apply size-2.5 bg-accent-foreground;
+        content: '';
+        clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+        transform: scale(0);
+      }
+
+      &:checked {
+        @apply border-accent bg-accent;
+
+        &::before {
+          transform: scale(1);
+        }
+      }
+    }
+
     :where(dt) {
       @apply mt-3 font-semibold;
     }
