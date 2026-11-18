@@ -47,8 +47,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
   beforeAll(async () => {
     site = await testSite({ root: ROOT, use: [signedIn], browser: true })
     live = await import(resolve(ROOT, 'src/live.ts')) as Values
-    live.unread.set('alice', 3)
-    live.unread.set('bob', 5)
+    live.unread.set(3, { user: 'alice' })
+    live.unread.set(5, { user: 'bob' })
 
     server = Bun.serve({
       port: 0,
@@ -122,8 +122,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
 
     session = undefined
     unavailable = false
-    live.unread.set('alice', 3)
-    live.unread.set('bob', 5)
+    live.unread.set(3, { user: 'alice' })
+    live.unread.set(5, { user: 'bob' })
   })
 
   afterAll(async () => {
@@ -148,10 +148,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
     await bob.waitUntil(...shows(5))
     // The connections are open once the values are followed.
     await untilHolds(() => cut.size === 2)
-    live.unread.set('alice', 4)
+    live.unread.set(4, { user: 'alice' })
     await alice.waitUntil(...shows(4))
     expect(await unread(bob)).toBe('5 unread')
-    live.unread.set('bob', 6)
+    live.unread.set(6, { user: 'bob' })
     await bob.waitUntil(...shows(6))
     expect(await unread(alice)).toBe('4 unread')
     expect(alice.errors).toEqual([])
@@ -164,7 +164,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
     await tab.waitUntil(...shows(3))
     await tab.waitUntil(() => document.querySelector('p.told')?.textContent === '3', { timeout: '8s' })
     await untilHolds(() => cut.size === 1)
-    live.unread.set('alice', 4)
+    live.unread.set(4, { user: 'alice' })
     await tab.waitUntil(() => document.querySelector('p.told')?.textContent === '4', { timeout: '8s' })
     expect(await tab.text('p.failed')).toBe('')
 
@@ -189,7 +189,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
     session = null
     drop()
     await untilHolds(() => connections > answered)
-    live.unread.set('alice', 9)
+    live.unread.set(9, { user: 'alice' })
     // Nothing is meant to arrive for the refused tab, so a short window is all there is to wait out.
     await Bun.sleep(1000)
     expect(await unread(tab)).toBe('3 unread')
@@ -206,10 +206,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
     session = 'bob'
     drop()
     await untilHolds(() => accepted > letThrough)
-    live.unread.set('alice', 9)
-    live.unread.set('bob', 7)
+    live.unread.set(9, { user: 'alice' })
+    live.unread.set(7, { user: 'bob' })
     await tab.waitUntil(...shows(7))
-    live.unread.set('alice', 10)
+    live.unread.set(10, { user: 'alice' })
     // The old user's value is not meant to reach the tab, so a short window is all there is to wait out.
     await Bun.sleep(500)
     expect(await unread(tab)).toBe('7 unread')

@@ -97,7 +97,7 @@ const READING: Record<string, string> = {
   'src/routes/date.kay': 'p {new Date().getFullYear()}\n',
   'src/routes/random.kay': 'p {Math.random()}\n',
   'src/routes/env.kay': 'p {process.env.HOME}\n',
-  'src/routes/persisted.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
+  'src/routes/persisted.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.cookie(\'theme\', \'light\')\n---\np {theme()}\n',
   'src/routes/package.kay': '---\nimport { sessionOf } from \'kayjs-auth\'\n---\np Package\n',
   'src/routes/server-import.kay': '--- server\nimport { site } from \'kay/server\'\n---\np Server\n',
   'src/routes/state.kay': '---\nimport { next } from \'../counted\'\n---\np {next()}\n',
@@ -961,13 +961,13 @@ describe('what kay exports to a page that is kept', () => {
       'src/routes/entry-local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.local(\'theme\', \'light\')\nconst step = persisted.session(\'step\', \'one\', { values: [\'one\', \'two\'] })\n---\np {theme()}{step()}\n',
       'src/routes/entry-aliased.kay': '--- server\n---\n---\nimport { persisted as keep } from \'kay\'\n\nconst open = keep.local<boolean>(\'open\', false)\n---\np {open()}\n',
       'src/routes/entry-cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.cookie(\'theme\', \'light\')\n---\np {theme()}\n',
-      'src/routes/entry-query.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst page = persisted.query(\'page\', \'1\')\n---\np {page()}\n',
-      'src/routes/entry-mixed.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst a = persisted.local(\'a\', \'1\')\nconst b = persisted.query(\'b\', \'1\')\n---\np {a()}{b()}\n',
+      'src/routes/entry-query.kay': '--- server\n---\n---\nimport { queryParam } from \'kay\'\n\nconst page = queryParam(\'page\', { default: \'1\' })\n---\np {page()}\n',
+      'src/routes/entry-mixed.kay': '--- server\n---\n---\nimport { persisted, queryParam } from \'kay\'\n\nconst a = persisted.local(\'a\', \'1\')\nconst b = queryParam(\'b\', { default: \'1\' })\n---\np {a()}{b()}\n',
       'src/routes/entry-passed.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst make = persisted.local\nconst a = make(\'a\', \'1\')\n---\np {a()}\n',
-      'src/routes/cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
+      'src/routes/cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.cookie(\'theme\', \'light\')\n---\np {theme()}\n',
       'src/routes/through-barrel.kay': '---\nimport { cookie } from \'../barrel\'\n---\np {cookie()}\n',
       'src/barrel.ts': 'export * from \'./cookie\'\n',
-      'src/cookie.ts': 'import { persisted } from \'kay\'\n\nexport const cookie = persisted(\'c\', \'1\')\n',
+      'src/cookie.ts': 'import { persisted } from \'kay\'\n\nexport const cookie = persisted.cookie(\'c\', \'1\')\n',
       'src/theme.ts': 'import { persisted } from \'kay\'\n\nexport const theme = persisted.local(\'theme\', \'light\')\n',
     })
 
@@ -979,7 +979,7 @@ describe('what kay exports to a page that is kept', () => {
       expect(await at(`src/routes/${page}.kay`)).toBeUndefined()
 
     for (const page of ['entry-cookie', 'entry-query', 'entry-mixed', 'entry-passed', 'cookie'])
-      expect(await at(`src/routes/${page}.kay`)).toMatchObject({ why: expect.stringMatching(/^imports `persisted(?: as keep)?` from `kay`, which a request or the clock can change$/) })
+      expect(await at(`src/routes/${page}.kay`)).toMatchObject({ why: expect.stringMatching(/^imports `(?:persisted|queryParam)(?: as keep)?` from `kay`, which a request or the clock can change$/) })
 
     expect(await at('src/routes/through-barrel.kay')).toMatchObject({ file: join(root, 'src/cookie.ts') })
   })
@@ -988,7 +988,7 @@ describe('what kay exports to a page that is kept', () => {
     const root = await project({
       'src/routes/free.kay': '---\nimport { signal, uid } from \'kay\'\n\nconst id = uid()\nconst count = signal(1)\n---\np {id} {count()}\n',
       'src/routes/local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.local(\'theme\', \'light\')\n---\np {theme()}\n',
-      'src/routes/cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
+      'src/routes/cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.cookie(\'theme\', \'light\')\n---\np {theme()}\n',
       'src/routes/server.kay': '--- server\nimport { publicEnv } from \'kay\'\n\nconst origin = publicEnv.SITE\n---\np {origin}\n',
       'src/routes/declared.kay': '---\nconst live = 1\n---\np {live}\n',
       'src/routes/template.kay': '---\nimport { publicEnv } from \'kay\'\n---\np {publicEnv.SITE}\n',
@@ -1112,7 +1112,7 @@ describe('what kay exports to a page that is kept', () => {
       'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\' })\n',
       'src/routes/index.kay': '---\nimport { shape } from \'../shape\'\n---\np {typeof shape}\n',
       'src/routes/local.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.local(\'theme\', \'light\')\n---\np {theme()}\n',
-      'src/routes/cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
+      'src/routes/cookie.kay': '--- server\n---\n---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.cookie(\'theme\', \'light\')\n---\np {theme()}\n',
       'src/shape.ts': 'import { s } from \'kay\'\n\nexport const shape = s.Object({ id: s.Number() })\n',
     })
 

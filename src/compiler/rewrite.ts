@@ -359,7 +359,7 @@ class RewriteFinder {
     const rightEnd = right && map.isExact(node.end - 1) ? map.toSource(node.end - 1) : undefined
 
     if (kind === 'memo' || kind === 'live') {
-      this.diagnostics.push({ ...span, message: kind === 'live' ? `\`${name}\` is a live value, which the server writes and a browser only reads` : `\`${name}\` is a memo, which cannot be written`, help: kind === 'live' ? `write it with \`${name}.set(value)\`, or \`${name}.set(key, value)\` for a keyed one, from a server fence, an action or a job` : 'write the signals it is derived from' })
+      this.diagnostics.push({ ...span, message: kind === 'live' ? `\`${name}\` is a live value, which the server writes and a browser only reads` : `\`${name}\` is a memo, which cannot be written`, help: kind === 'live' ? `write it with \`${name}.set(value)\`, or \`${name}.set(value, { key })\` for a keyed one, from a server fence, an action or a job` : 'write the signals it is derived from' })
 
       return
     }
@@ -586,7 +586,7 @@ class RewriteFinder {
   }
 
   private madeSignal(path: Path<VariableDeclarator>, id: Identifier, init: CallExpression) {
-    // `persisted.local(...)` and the other entries make a signal as `persisted(...)` does.
+    // `persisted.local(...)` and the other entries make a signal.
     const entry = init.callee.type === 'MemberExpression' && !init.callee.computed && init.callee.property.type === 'Identifier' && PERSISTED_ENTRIES.has(init.callee.property.name) && importedFromKay(path.scope, init.callee.object) === 'persisted' ? 'persisted' : undefined
     // `relativeTime` from `kay/i18n` makes a memo too.
     const made = entry ?? importedFromKay(path.scope, init.callee) ?? (importedFromKay(path.scope, init.callee, 'kay/i18n') === 'relativeTime' ? 'memo' : undefined)

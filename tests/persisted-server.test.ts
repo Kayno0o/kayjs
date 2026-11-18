@@ -9,10 +9,10 @@ const report = () => undefined
 function render(cookie: string): unknown[] {
   const request = new Request('http://localhost/', { headers: { cookie } })
 
-  return inServerScope(request, report, () => [persisted.cookie('tone', 'peach')(), persisted('theme', 'light')(), persisted.local('draft', 'none')(), persisted.session('step', 'one')()])
+  return inServerScope(request, report, () => [persisted.cookie('tone', 'peach')(), persisted.cookie('theme', 'light')(), persisted.local('draft', 'none')(), persisted.session('step', 'one')()])
 }
 
-it('renders persisted.cookie from the request cookie, as persisted() does', () => {
+it('renders persisted.cookie from the request cookie, as persisted.cookie() does', () => {
   expect(render([persistedCookie('tone', 'blue'), persistedCookie('theme', 'dark')].join('; '))).toEqual(['blue', 'dark', 'none', 'one'])
   expect(render('')).toEqual(['peach', 'light', 'none', 'one'])
 })

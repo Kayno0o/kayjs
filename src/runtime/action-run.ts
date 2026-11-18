@@ -288,7 +288,7 @@ export async function run(host: Host, start: Start, lane: Lane, given: unknown, 
 
     const streamEnded = (status: ConnectionStatus) => {
       if (status === 'done') {
-        host.called(page, { action: host.url(), succeeded: true, data: untrack((answer as ActionStream<unknown>).last) }, turn)
+        host.called(page, { action: host.url(), succeeded: true, data: untrack((answer as ActionStream<unknown>).data) }, turn)
         refreshPage()
       }
 

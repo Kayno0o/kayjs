@@ -47,6 +47,21 @@ A call read as its data (`const list = await call(notes, '/')` then `list.items`
 ### The parts object of `class` is gone
 
 A component's parts are its `parts` attribute: `Card(class={{ head: 'p-6' }})` is `Card(parts={{ head: 'p-6' }})`, as `kay upgrade` on 1.108 wrote it. `class` is a string, an array or an object of conditions, so `{ head: 'p-6' }` in it is the class `head`: a type error on a component with parts, unreported when a shorthand or a spread sits beside it. The `deprecated-parts-class` lint is gone with it.
+### `persisted(...)` and `persisted.query` are `persisted.cookie(...)` and `queryParam`
+
+A bare `persisted(name, value)` is `persisted.cookie(name, value)`, and `persisted.query(name, value, options)` is `queryParam(name, { default: value, ...options })`. The `deprecated-persisted-call` and `deprecated-persisted-query` lints are gone, and `PersistedQueryOptions` with them.
+
+### `navigate({ query })`, `onNavigate` and `onBeforeNavigate` are gone
+
+`navigate({ query: changes })` is `navigate.query(changes)`, and the imported `onNavigate(fn)` and `onBeforeNavigate(fn)` are `navigation.onNavigate(fn)` and `navigation.onBeforeNavigate(fn)`. The `deprecated-navigate-query` and `deprecated-navigation-hooks` lints are gone.
+
+### `set(key, next)` and `presence(room, member)` are refused
+
+`room.set(next, { key })` of a live value per key and `unread.set(next, { user })` of one per user take the next value first; the old order throws. `presence({ room, member, signal })` takes one object. The `deprecated-live-api` lint is gone.
+
+### The old readers of a source are gone
+
+`value()`, `last()`, `rows()` (of a `resource`, `stream`, `socket`, `local()` and `infiniteList()`, and a list of your own given to `LoadMore`, `Table` or `VirtualList`), `unsynced()`, `syncStatus()`, `onSuccess` and `onSync` of a source or a `track()` handle, and an action's `succeeded()` are `data()`, `sync.queued()`, `sync.status()` and `onData({ value })` (an action's `succeeded()` is `data()`). The `deprecated-source-readers` lint is gone.
 
 ## 1.108.0
 

@@ -8,5 +8,5 @@ const count = signal(0)
 ---
 button.count(type="button" onClick={() => count.set(n => n + 1)}) Clicked {count()}
 button.send(type="button" onClick={() => messages.send({ text: 'hi' })}) Send
-p.echo {messages.last()?.text ?? ''}
+p.echo {messages.data()?.text ?? ''}
 p.hits {hits()} hits

@@ -8,7 +8,7 @@ const ctx = {} as GuardContext
 const key = (entry: { room: string, member: { name: string } }) => JSON.stringify([entry.room, entry.member])
 
 // What the entry screen does with it: presence() throws for a room and member past 256 characters.
-const opens = (entry: { room: string, member: { name: string } }) => presence(entry.room, entry.member)
+const opens = (entry: { room: string, member: { name: string } }) => presence({ room: entry.room, member: entry.member })
 
 describe('the room editors of an entry share', () => {
   test('names the collection, the slug and the locale, and lists the editor by the author\'s name', async () => {

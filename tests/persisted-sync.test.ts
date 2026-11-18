@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { persisted } from '../src/runtime'
+import { persisted, queryParam } from '../src/runtime'
 import { encodeValue } from '../src/runtime/wire'
 
 // Stands for the other tabs of the origin: every instance gets what another instance posts.
@@ -42,8 +42,8 @@ describe('persisted signals of one name in a page', () => {
   afterAll(async () => GlobalRegistrator.unregister())
 
   it('share one signal per storage and name, the first call\'s default standing', () => {
-    const first = persisted('theme-shared', 'light')
-    const second = persisted('theme-shared', 'dark')
+    const first = persisted.cookie('theme-shared', 'light')
+    const second = persisted.cookie('theme-shared', 'dark')
 
     expect(second).toBe(first)
     first.set('night')
@@ -53,11 +53,11 @@ describe('persisted signals of one name in a page', () => {
   })
 
   it('keeps a signal alone with sync: false', () => {
-    const shared = persisted('alone', 'a')
-    const alone = persisted('alone', 'a', { sync: false })
+    const shared = persisted.cookie('alone', 'a')
+    const alone = persisted.cookie('alone', 'a', { sync: false })
 
     expect(alone).not.toBe(shared)
-    expect(persisted('alone', 'a', { sync: false })).not.toBe(alone)
+    expect(persisted.cookie('alone', 'a', { sync: false })).not.toBe(alone)
     shared.set('b')
     expect(alone()).toBe('a')
     fromOtherTab(['alone', encodeValue('c')])
@@ -94,12 +94,11 @@ describe('persisted signals of one name in a page', () => {
     expect(persisted.local('entries', 'b')).toBe(local)
     expect(persisted.session('entries', 'b')).toBe(session)
     expect(persisted.cookie('entries', 'b')).toBe(cookie)
-    expect(persisted('entries', 'b')).toBe(cookie)
     expect(persisted.local('entries', 'b')).toBe(local)
   })
 
-  it('keeps the deprecated storage option on the entry it names', () => {
-    expect(persisted.query('entries', 'a')).not.toBe(persisted.cookie('entries', 'a'))
+  it('keeps a query param apart from a cookie of the same name', () => {
+    expect(queryParam('entries', { default: 'a' })).not.toBe(persisted.cookie('entries', 'a'))
     expect(persisted.local('entries', 'a')).toBe(persisted.local('entries', 'a'))
   })
 
@@ -151,7 +150,7 @@ describe('persisted signals of one name in a page', () => {
 
     listener.addEventListener('message', event => posted.push(event.data))
 
-    const accent = persisted('accent', 'red')
+    const accent = persisted.cookie('accent', 'red')
 
     fromOtherTab(['accent', encodeValue('blue')])
     expect(accent()).toBe('blue')
@@ -167,7 +166,7 @@ describe('persisted signals of one name in a page', () => {
 
     // @ts-expect-error -- a browser without one
     delete globalThis.BroadcastChannel
-    expect(() => persisted('quiet', 'a').set('b')).not.toThrow()
+    expect(() => persisted.cookie('quiet', 'a').set('b')).not.toThrow()
     globalThis.BroadcastChannel = saved
   })
 })
@@ -205,7 +204,7 @@ describe('persisted signals without a channel, or before hydration', () => {
   })
 
   it('ignores a channel message that is not a name and a text', () => {
-    const odd = persisted('odd', 'a')
+    const odd = persisted.cookie('odd', 'a')
 
     fromOtherTab('nonsense')
     fromOtherTab([1, 2])

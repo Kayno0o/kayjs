@@ -30,7 +30,7 @@ describe('randomId', () => {
 
     try {
       delete hold.tab
-      presence('room')
+      presence({ room: 'room' })
       expect(hold.tab).toMatch(/^[0-9a-f]{24}$/)
     }
     finally {

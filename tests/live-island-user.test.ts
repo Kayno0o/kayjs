@@ -50,8 +50,8 @@ describe('a value of each user in a deferred island and on the error pages', () 
       },
     } }))
     live = await import(join(process.cwd(), ROOT, 'src/live.ts')) as Values
-    live.unread.set('alice', 3)
-    live.unread.set('bob', 5)
+    live.unread.set(3, { user: 'alice' })
+    live.unread.set(5, { user: 'bob' })
   }, 120_000)
 
   afterAll(async () => {
@@ -89,9 +89,9 @@ describe('a value of each user in a deferred island and on the error pages', () 
     const feed = new Feed(await open(proofs, 'alice'))
 
     expect(await feed.next()).toEqual([[UNREAD, '', 3]])
-    live.unread.set('alice', 4)
+    live.unread.set(4, { user: 'alice' })
     expect(await feed.next()).toEqual([[UNREAD, '', 4]])
-    live.unread.set('alice', 3)
+    live.unread.set(3, { user: 'alice' })
     await feed.close()
     expect((await open(proofs, 'bob')).status).toBe(403)
     expect((await open(proofs, undefined)).status).toBe(403)

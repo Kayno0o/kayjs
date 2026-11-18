@@ -102,7 +102,7 @@ describe('an action returning an async iterable', () => {
       yield to
     })
     const answer = async (): Promise<ActionStream<number>> => typed({ to: 1 }).orThrow()
-    const last = (): number | undefined => typed.succeeded()?.data
+    const last = (): number | undefined => typed.data()
     // @ts-expect-error each value is a number
     const wrong = async (): Promise<ActionStream<string>> => typed({ to: 1 })
 
@@ -434,7 +434,7 @@ describe('the stream an island reads', () => {
     const status = await new Promise(resolve => stream[SETTLED](resolve))
 
     expect(status).toBe('failed')
-    expect(stream.last()).toBe(0)
+    expect(stream.data()).toBe(0)
     expect(cancelled()).toBe(true)
   })
 
@@ -456,7 +456,7 @@ describe('the stream an island reads', () => {
     const status = await new Promise(resolve => stream[SETTLED](resolve))
 
     expect(status).toBe('done')
-    expect(stream.last()).toBe(1)
+    expect(stream.data()).toBe(1)
   })
 
   it('is awaited to its end with ended(), its last value or undefined for none, even once it ended', async () => {
@@ -486,7 +486,7 @@ describe('the stream an island reads', () => {
 
     await expect(stream.ended()).rejects.toBeInstanceOf(ActionError)
     await expect(stream.ended()).rejects.toMatchObject({ status: 500, message: 'The stream of /_kay/actions/reply failed after its first value' })
-    expect(stream.last()).toBe(1)
+    expect(stream.data()).toBe(1)
   })
 })
 

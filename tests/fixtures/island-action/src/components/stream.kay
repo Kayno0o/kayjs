@@ -6,4 +6,4 @@ const { actions } = props<{ actions: { count: Action<{ to: number }, AsyncIterab
 const answer = signal<ActionStream<number> | undefined>(undefined)
 ---
 button.count(type="button" onClick={async () => answer = await actions.count({ to: 3 }).orThrow()}) Count
-p.last {answer()?.last()}
+p.last {answer()?.data()}

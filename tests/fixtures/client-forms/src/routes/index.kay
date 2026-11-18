@@ -17,8 +17,8 @@ export const quiet = action({ input: t.Object({}), protect: { minTime: { after: 
 import Opener from '../components/opener.kay'
 ---
 h1 Client forms
-if guarded.succeeded() then done
-  p.sent Sent {done.data}
+if guarded.data() then done
+  p.sent Sent {done}
 if guarded.form.error() then message
   p.error {message}
 form.server(action={guarded})

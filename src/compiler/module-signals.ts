@@ -12,7 +12,7 @@ const NAMES_KAY = /["']kay["']/
 const EXPORT = /\bexport\b/
 
 // The entries `persisted` carries, one per storage.
-export const PERSISTED_ENTRIES = new Set(['cookie', 'local', 'session', 'query'])
+export const PERSISTED_ENTRIES = new Set(['cookie', 'local', 'session'])
 
 // The names a module exports as `export const name = signal(...)`, or `persisted`, `linked`, `queryParam`, `memo`, `debounced`, `throttled` or `live`, called as imported from `kay`: what a component importing them writes by assigning, and reads by calling.
 export function moduleSignals(source: string, jsx = false): Record<string, SignalKind> {
@@ -56,7 +56,7 @@ function allTypes(specifiers: Node[]): boolean {
   return specifiers.length > 0 && specifiers.every(specifier => (specifier.type === 'ImportSpecifier' && specifier.importKind === 'type') || (specifier.type === 'ExportSpecifier' && specifier.exportKind === 'type'))
 }
 
-// The local name a call's callee makes a signal by: `signal` of `signal(...)`, and `persisted` of `persisted.local(...)`, `.session`, `.cookie` and `.query`, which make one as `persisted(...)` does.
+// The local name a call's callee makes a signal by: `signal` of `signal(...)`, and `persisted` of `persisted.local(...)`, `.session`, and `.cookie`, which make one.
 function madeBy(callee: Node, persisted: Set<string>): string | undefined {
   if (callee.type === 'Identifier')
     return callee.name

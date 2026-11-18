@@ -149,13 +149,13 @@ export const refuses = action(t.Object({ full: t.Boolean() }), async ({ full }, 
   })()
 })
 
-const done = count.succeeded()
+const done = count.data()
 --- script
 import Counter from '../components/counter.kay'
 ---
 h1 Streams
 if done
-  p.done Last: {done.data}
+  p.done Last: {done}
 form(action={count})
   input(field="to")
   button Count

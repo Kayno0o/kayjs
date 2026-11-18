@@ -209,7 +209,7 @@ A cookie can hold a value your app never offers, after an old release or an edit
 
 A param kept in the URL takes `values` too: `queryParam('tab', { default: 'site', values: ['site', 'logs'] })`; a number or a boolean in `values` is compared with what the page's `query` schema reads, or, with no schema naming the param, with its text, so `?page=2` reads as `2` for `values: [1, 2, 3]`.
 
-Each storage has its own entry, taking the options that storage can use: `persisted.cookie()`, `persisted.local()` and `persisted.session()`, and a call always names its storage. A bare `persisted(name, value)` still keeps a cookie until 1.108, and `kay upgrade` writes `.cookie` for it.
+Each storage has its own entry, taking the options that storage can use: `persisted.cookie()`, `persisted.local()` and `persisted.session()`, and a call always names its storage.
 
 `queryParam('q', { default: '' })` keeps a string in the page's URL instead, as `?q=...`, and is the one signal of a query param. A filter then survives a reload and a shared link. A param that is cleared stays cleared too: when the default is not empty, an empty string or list is written as `?q=` or `?tags=`, so a reload reads it back as empty rather than as the default.
 

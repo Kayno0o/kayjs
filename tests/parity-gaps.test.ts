@@ -154,12 +154,12 @@ describe('concurrent calls of one action', () => {
     }) as unknown as typeof fetch)
 
     try {
-      const save = actionStub('/_kay/action/test/concurrent') as unknown as { (input: object): Promise<unknown>, pending: () => boolean, succeeded: () => { data: unknown } | undefined }
+      const save = actionStub('/_kay/action/test/concurrent') as unknown as { (input: object): Promise<unknown>, pending: () => boolean, data: () => unknown }
       const running = [save({}), save({})]
 
       await Promise.all(running)
       await settle()
-      expect([save.pending(), save.succeeded()?.data]).toEqual([false, 'second'])
+      expect([save.pending(), save.data()]).toEqual([false, 'second'])
     }
     finally {
       answered.mockRestore()

@@ -66,8 +66,6 @@ export type InfiniteListOptions<Row, Target extends Action = never> = InfiniteLi
 export interface InfiniteList<Row> extends Source<LoadStatus> {
   // The rows loaded so far, the first page first.
   data: () => Row[]
-  /** @deprecated Write `data()`. Removed in 1.108.0. No lint: `infiniteList()` comes from kayjs-ui, whose bindings `kay check` does not follow. */
-  rows: () => Row[]
   // Whether the last page was short, so no more exist.
   ended: () => boolean
   // `loading` while a page is on its way, `failed` once the last page failed, else `ready`.
@@ -106,8 +104,6 @@ export interface InfiniteList<Row> extends Source<LoadStatus> {
 // What `LoadMore` needs of a list: the data and where it ends, `more` to ask for the next page, and the shared `status`, `pending`, `error` and `retry` of a Source, so a list of your own draws the same end as an `infiniteList`.
 export interface LoadMoreSource extends Source<LoadStatus> {
   data: () => readonly unknown[]
-  /** @deprecated Write `data()`. Removed in 1.108.0. No lint: a list of your own is no call `kay check` knows. */
-  rows?: (() => readonly unknown[]) | undefined
   ended: () => boolean
   more: () => unknown
 }
@@ -437,5 +433,5 @@ export function infiniteList<Row, Target extends Action = never>(given: Row[] | 
   const more = async () => failed() ? undefined : loadPage()
   const retry = async () => failed() ? loadPage() : undefined
 
-  return { data: rows, rows, ended, status, failed, error, pending, more, retry, reload, sort: () => sort, sortBy, filter: () => filter, filterBy, restart, patch }
+  return { data: rows, ended, status, failed, error, pending, more, retry, reload, sort: () => sort, sortBy, filter: () => filter, filterBy, restart, patch }
 }

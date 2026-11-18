@@ -199,7 +199,7 @@ describe('the handle of a helper that lasts as long as an island', () => {
   it('presence: stops reading the room, once or twice, or on abort', () => {
     presence.readPresenceWith(() => ['{"name":"b"}', '{"name":"a"}'])
 
-    const { handle } = island(() => presence.presence('room:stop', { name: 'a' }))
+    const { handle } = island(() => presence.presence({ room: 'room:stop', member: { name: 'a' } }))
 
     expect(handle.count()).toBe(2)
     expect(handle.others()).toEqual([{ name: 'b' }])
@@ -209,13 +209,13 @@ describe('the handle of a helper that lasts as long as an island', () => {
     expect(handle.others()).toEqual([])
 
     const abort = new AbortController()
-    const { handle: second } = island(() => presence.presence('room:stop', { name: 'a' }, { signal: abort.signal }))
+    const { handle: second } = island(() => presence.presence({ room: 'room:stop', member: { name: 'a' }, signal: abort.signal }))
 
     expect(second.count()).toBe(2)
     abort.abort()
     expect(second.count()).toBe(0)
 
-    expect(presence.presence('room:stop', null, { signal: abort.signal }).count()).toBe(0)
+    expect(presence.presence({ room: 'room:stop', signal: abort.signal }).count()).toBe(0)
     expect(presence.presence({ signal: abort.signal }).count()).toBe(0)
   })
 
@@ -236,7 +236,7 @@ describe('the handle of a helper that lasts as long as an island', () => {
       leave.guardLeave(() => true)
       followLog.followLog(element)
 
-      return presence.presence('room:island', null)
+      return presence.presence({ room: 'room:island' })
     })
 
     expect(leaveGuards.size).toBe(1)

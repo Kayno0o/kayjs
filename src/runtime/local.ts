@@ -235,7 +235,7 @@ function inert<Row, Key extends keyof Row>(): Local<Row, Key> {
 
   const stop = () => () => undefined
 
-  return { data: () => [], rows: () => [], get: () => undefined, put: refuse, remove: refuse, unsynced: () => 0, syncStatus: () => 'loading', error: () => undefined, retry: () => undefined, onData: stop, onSync: stop, onIssue: stop, onError: stop, pending: () => true, status: () => 'loading', issues: () => [], dismiss: nothing, sync: Object.assign(nothing, { status: () => 'loading' as const, queued: () => 0 }), clear: nothing }
+  return { data: () => [], get: () => undefined, put: refuse, remove: refuse, error: () => undefined, retry: () => undefined, onData: stop, onIssue: stop, onError: stop, pending: () => true, status: () => 'loading', issues: () => [], dismiss: nothing, sync: Object.assign(nothing, { status: () => 'loading' as const, queued: () => 0 }), clear: nothing }
 }
 
 // A collection the island reads and writes at once, kept in IndexedDB so it works offline: a write is applied in the browser and queued, then replayed through the collection's action, once, when the server can be reached.
@@ -252,8 +252,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   private readonly problems = createSignal<LocalIssue<Row>[]>([])
   private readonly state = createSignal<LocalSyncStatus>('loading')
   private readonly failure = createSignal<ApiError | undefined>(undefined)
-  // Tells `value` to `onData` and the same rows as `rows` to the deprecated `onSync`.
-  private readonly synced = listenerSet<{ value: readonly Row[], rows: readonly Row[] }>()
+  private readonly synced = listenerSet<{ value: readonly Row[] }>()
   private readonly raised = listenerSet<{ issue: LocalIssue<Row> }>()
   private readonly failed = listenerSet<{ error: ApiError }>()
   // The issues already told, by id; undefined until the first read, which tells none of those kept from an earlier visit.
@@ -281,9 +280,6 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     if (options.onData)
       this.synced.on(options.onData)
 
-    if (options.onSync)
-      this.synced.on(options.onSync)
-
     if (options.onIssue)
       this.raised.on(options.onIssue)
 
@@ -307,16 +303,15 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   api(): Local<Row, Key> {
     return {
       data: () => this.view[0]().list,
-      rows: () => this.view[0]().list,
+
       get: key => this.view[0]().byKey.get(String(key)),
       put: async row => this.write('put', row),
       remove: async key => this.write('remove', { [this.options.key]: key } as Row),
-      unsynced: this.count[0],
-      syncStatus: this.state[0],
+
       error: this.failure[0],
       retry: () => this.again(),
       onData: this.synced.on,
-      onSync: this.synced.on,
+
       onIssue: this.raised.on,
       onError: this.failed.on,
       pending: () => this.state[0]() === 'loading',
@@ -535,7 +530,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     clearTimeout(this.timer)
     this.paused = false
 
-    // Whether this run sent a write or took the server's rows in, so `onSync` has something to tell.
+    // Whether this run sent a write or took the server's rows in, so `onData` has something to tell.
     let moved = false
 
     await quiet(async () => locked(async () => {
@@ -552,9 +547,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     this.schedule()
 
     if (moved && !this.ended && this.state[0]() === 'synced') {
-      const rows = this.view[0]().list
-
-      this.synced.emit({ value: rows, rows })
+      this.synced.emit({ value: this.view[0]().list })
     }
   }
 

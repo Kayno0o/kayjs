@@ -176,10 +176,10 @@
     "complexity": 46
   },
   "src/runtime/live.ts": {
-    "max-lines": 731
+    "max-lines": 724
   },
   "src/runtime/local.ts": {
-    "max-lines": 631
+    "max-lines": 624
   },
   "src/runtime/page-swap.ts": {
     "complexity": 49

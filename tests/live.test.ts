@@ -169,7 +169,7 @@ describe('API modules', () => {
 
     expect(await room.next()).toEqual({ room: 'general', from: 'ada', text: 'hello' })
     expect(room.status()).toBe('open')
-    expect(room.last()).toEqual({ room: 'general', from: 'ada', text: 'hello' })
+    expect(room.data()).toEqual({ room: 'general', from: 'ada', text: 'hello' })
 
     room.close()
     expect(room.status()).toBe('closed')
@@ -524,14 +524,14 @@ describe('stream() started from a handler', () => {
 
     ticks.start({ query: { count: 2 } })
     await until(() => ticks.status() === 'done')
-    expect(ticks.last()?.tick).toBe(2)
+    expect(ticks.data()?.tick).toBe(2)
     expect(String(served.mock.calls.at(-1)?.[0])).toBe('/api/chat/ticks?count=2')
 
     ticks.start({ query: { count: 1 } })
     expect(ticks.status()).toBe('connecting')
-    expect(ticks.last()).toBeUndefined()
+    expect(ticks.data()).toBeUndefined()
     await until(() => ticks.status() === 'done')
-    expect(ticks.last()?.at).toEqual(new Date(Date.UTC(2026, 0, 1)))
+    expect(ticks.data()?.at).toEqual(new Date(Date.UTC(2026, 0, 1)))
   })
 
   it('hands each value to onData, waits for the end with ended(), and has start() on a stream that starts by itself', async () => {
@@ -550,13 +550,13 @@ describe('stream() started from a handler', () => {
     const before = await stopped()
 
     forever.start()
-    await until(() => (forever.last() ?? 0) >= 2)
+    await until(() => (forever.data() ?? 0) >= 2)
     forever.close()
     expect(forever.status()).toBe('closed')
     expect(await stopsReach(before + 1)).toBe(before + 1)
 
     forever.start()
-    await until(() => (forever.last() ?? 0) >= 1)
+    await until(() => (forever.data() ?? 0) >= 1)
     expect(forever.status()).toBe('open')
     forever.start()
     expect(await stopsReach(before + 2)).toBe(before + 2)
@@ -574,7 +574,7 @@ describe('stream() started from a handler', () => {
     try {
       const [forever, dispose] = root(dispose => [stream(chat, '/forever'), dispose] as const)
 
-      await until(() => (forever.last() ?? 0) >= 1)
+      await until(() => (forever.data() ?? 0) >= 1)
       dispose()
       expect(forever.status()).toBe('closed')
       expect(await stopsReach(before + 1)).toBe(before + 1)
@@ -638,7 +638,7 @@ describe('stream() started from a handler', () => {
       stream(chat, '/answer', { body: { prompt: '' } })
       lines.start({ body: new FormData() })
 
-      const tick: number | undefined = ticks.last()?.tick
+      const tick: number | undefined = ticks.data()?.tick
 
       return tick
     }
@@ -668,8 +668,8 @@ describe('resource()', () => {
     await until(() => rooms.status() !== 'loading')
 
     expect(rooms.status()).toBe('ready')
-    expect(rooms.value()?.map(room => room.name)).toEqual(['general', 'games', 'news'])
-    expect(rooms.value()?.[0]?.opened).toBe('2026-01-01T00:00:00.000Z')
+    expect(rooms.data()?.map(room => room.name)).toEqual(['general', 'games', 'news'])
+    expect(rooms.data()?.[0]?.opened).toBe('2026-01-01T00:00:00.000Z')
     expect(served.mock.calls[0]?.[1]?.headers).toEqual({ accept: 'application/json' })
   })
 
@@ -678,15 +678,15 @@ describe('resource()', () => {
     const rooms = root(() => resource(chat, '/rooms', () => ({ query: { prefix: prefix() } })))
 
     await until(() => rooms.status() === 'ready')
-    expect(rooms.value()?.map(room => room.name)).toEqual(['general', 'games'])
+    expect(rooms.data()?.map(room => room.name)).toEqual(['general', 'games'])
 
     prefix.set('n')
     flush()
     expect(rooms.status()).toBe('loading')
-    expect(rooms.value()?.map(room => room.name)).toEqual(['general', 'games'])
+    expect(rooms.data()?.map(room => room.name)).toEqual(['general', 'games'])
 
     await until(() => rooms.status() === 'ready')
-    expect(rooms.value()?.map(room => room.name)).toEqual(['news'])
+    expect(rooms.data()?.map(room => room.name)).toEqual(['news'])
   })
 
   it('drops an answer a newer request overtook', async () => {
@@ -704,7 +704,7 @@ describe('resource()', () => {
     // Nothing happens: the overtaken answer, applied late, would show within this time.
     await Bun.sleep(20)
 
-    expect(rooms.value()?.map(room => room.name)).toEqual(['news'])
+    expect(rooms.data()?.map(room => room.name)).toEqual(['news'])
     expect(rooms.status()).toBe('ready')
   })
 
@@ -776,7 +776,7 @@ describe('resource()', () => {
     // Nothing happens: the overtaken answer, applied late, would show within this time.
     await Bun.sleep(10)
 
-    expect(found.value()).toBe('B')
+    expect(found.data()).toBe('B')
     expect(found.status()).toBe('ready')
   })
 
@@ -798,7 +798,7 @@ describe('resource()', () => {
     found.refresh()
     await until(() => found.status() === 'ready')
 
-    expect(found.value()).toBe('up')
+    expect(found.data()).toBe('up')
     expect(found.error()).toBeUndefined()
   })
 
@@ -813,7 +813,7 @@ describe('resource()', () => {
     await until(() => found.status() === 'failed')
     expect(found.error()).toMatchObject({ status: 503, message: 'busy' })
 
-    const typed: Promise<number | undefined> = Promise.resolve(root(() => resource(async () => 1)).value())
+    const typed: Promise<number | undefined> = Promise.resolve(root(() => resource(async () => 1)).data())
 
     await typed
     dispose()
@@ -829,7 +829,7 @@ describe('resource()', () => {
       // @ts-expect-error: a number crosses as bare text, typed nowhere
       resource(chat, '/count')
       // @ts-expect-error: a value from JSON has no Date
-      resource(chat, '/rooms').value()?.[0]?.opened.getTime() // eslint-disable-line ts/no-unsafe-call -- the line is a type test: it must fail to type, which leaves the call unresolved
+      resource(chat, '/rooms').data()?.[0]?.opened.getTime() // eslint-disable-line ts/no-unsafe-call -- the line is a type test: it must fail to type, which leaves the call unresolved
     }
 
     expect(typed).toBeFunction()
@@ -1689,7 +1689,7 @@ describe('stream() over an async iterable', () => {
     flush()
     await until(() => reader.status() === 'done')
 
-    expect(reader.last()).toBe(2)
+    expect(reader.data()).toBe(2)
     expect(heard).toEqual([1, 2])
   })
 
@@ -1703,7 +1703,7 @@ describe('stream() over an async iterable', () => {
     flush()
     await until(() => reader.status() === 'failed')
 
-    expect(reader.last()).toBe(1)
+    expect(reader.data()).toBe(1)
   })
 
   it('never starts once closed before it mounts', () => {
@@ -1734,14 +1734,14 @@ describe('stream() over an async iterable', () => {
     }))
 
     flush()
-    await until(() => reader.last() === 1)
+    await until(() => reader.data() === 1)
     reader.close()
     // Nothing happens: past the 20 ms the source waits, a second value would show.
     await Bun.sleep(40)
 
     expect(aborted?.aborted).toBe(true)
     expect(reader.status()).toBe('closed')
-    expect(reader.last()).toBe(1)
+    expect(reader.data()).toBe(1)
   })
 })
 

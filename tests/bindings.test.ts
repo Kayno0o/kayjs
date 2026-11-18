@@ -268,7 +268,7 @@ describe('an action stub', () => {
     }) as unknown as typeof fetch)
 
     try {
-      const late = actionStub('/_kay/action/test/late') as unknown as { (input: object): Promise<unknown>, pending: () => boolean, succeeded: () => { data: unknown } | undefined }
+      const late = actionStub('/_kay/action/test/late') as unknown as { (input: object): Promise<unknown>, pending: () => boolean, data: () => unknown }
       const early = actionStub('/_kay/action/test/early') as unknown as typeof late
       const seen: boolean[] = []
       const stop = reactive.root((dispose) => {
@@ -283,12 +283,12 @@ describe('an action stub', () => {
       await Promise.all(running)
       await settle()
       expect([late.pending(), early.pending(), seen]).toEqual([false, false, [false, true, false]])
-      expect(late.succeeded()?.data).toBe('ok')
+      expect(late.data()).toBe('ok')
       stop()
 
       const idle = actionStub('/_kay/action/test/idle') as unknown as typeof late
 
-      expect([idle.pending(), idle.succeeded()]).toEqual([false, undefined])
+      expect([idle.pending(), idle.data()]).toEqual([false, undefined])
     }
     finally {
       answered.mockRestore()

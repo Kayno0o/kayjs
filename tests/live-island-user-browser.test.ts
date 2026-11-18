@@ -55,8 +55,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     build = await scratchBuild({}, false, join(process.cwd(), ROOT))
     await build.prerender({})
     live = await import(join(process.cwd(), ROOT, 'src/live.ts')) as Values
-    live.unread.set('alice', 3)
-    live.unread.set('bob', 5)
+    live.unread.set(3, { user: 'alice' })
+    live.unread.set(5, { user: 'bob' })
 
     const app = new Elysia().onRequest(signedIn).use(await build.serve({ security: false }))
 
@@ -128,8 +128,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     session = undefined
     slowIsland = 0
     asked.length = 0
-    live.unread.set('alice', 3)
-    live.unread.set('bob', 5)
+    live.unread.set(3, { user: 'alice' })
+    live.unread.set(5, { user: 'bob' })
   })
 
   afterAll(async () => {
@@ -149,10 +149,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
 
     const loads = islandLoads().length
 
-    live.unread.set('alice', 4)
+    live.unread.set(4, { user: 'alice' })
     await alice.waitUntil(...shows(4))
     expect(await unread(bob)).toBe('5 unread')
-    live.unread.set('bob', 6)
+    live.unread.set(6, { user: 'bob' })
     await bob.waitUntil(...shows(6))
     expect(await unread(alice)).toBe('4 unread')
     // No island or page was asked for again.
@@ -167,9 +167,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
 
     await tab.waitUntil(...shows(3))
     await untilHolds(() => cut.size > 0)
-    live.unread.set('alice', 4)
+    live.unread.set(4, { user: 'alice' })
     await tab.waitUntil(...shows(4))
-    live.unread.set('bob', 3)
+    live.unread.set(3, { user: 'bob' })
     session = 'bob'
     drop()
     await tab.waitUntil(...shows(3))
@@ -206,11 +206,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     session = 'bob'
     drop()
     await tab.waitUntil(...shows(5))
-    live.unread.set('alice', 9)
+    live.unread.set(9, { user: 'alice' })
     // The old user's value is not meant to reach the tab, so a short window is all there is to wait out.
     await Bun.sleep(500)
     expect(await unread(tab)).toBe('5 unread')
-    live.unread.set('bob', 7)
+    live.unread.set(7, { user: 'bob' })
     await tab.waitUntil(...shows(7))
     expect(tab.errors).toEqual([])
   })
@@ -227,7 +227,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     drop()
     await untilHolds(() => islandLoads().length > loads, 8000)
     await tab.waitUntil(...shows(0))
-    live.unread.set('alice', 9)
+    live.unread.set(9, { user: 'alice' })
     // Nothing is meant to reach the tab of nobody, so a short window is all there is to wait out.
     await Bun.sleep(1000)
     expect(await unread(tab)).toBe('0 unread')

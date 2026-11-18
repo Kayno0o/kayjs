@@ -509,7 +509,7 @@ If the handler throws an error carrying `Symbol.for('kay.refused')` as `{ status
 
 `refuse(status, { message, errors, data })` throws what `ctx.deny` does in an action, so a function the handler calls can refuse too. kayjs-ai refuses a visitor over its limit this way, and the action's `messages.rateLimit` can word it.
 
-An island calling it gets a stream once the first value is there. `last()` reads the latest value, `status()` tells whether it is still open (`pending()` and `error()` read it too), and `close()` stops it.
+An island calling it gets a stream once the first value is there. `data()` reads the latest value, `status()` tells whether it is still open (`pending()` and `error()` read it too), and `close()` stops it.
 
 ```kay
 ---
@@ -523,7 +523,7 @@ button(onClick={async () => answer = await reply({ prompt: 'Hello' })}) Ask
 p {answer()?.data()}
 ```
 
-Yield the whole text so far, not just the new piece. Then `last()` is all the island needs.
+Yield the whole text so far, not just the new piece. Then `data()` is all the island needs.
 
 Code that needs the stream's end, not each value, awaits `answer.ended()`. It resolves with the last value once the stream ran to its end, or undefined when it sent none. It rejects with an `ActionError` of status 500 when the stream failed (a call that failed before the first value answered `{ ok: false }`), and with an `AbortError` when it was closed first. A stream closes with its block and when the visitor goes to another page, so code awaiting its end there catches the `AbortError`.
 

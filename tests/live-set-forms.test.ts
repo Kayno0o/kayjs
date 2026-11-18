@@ -26,13 +26,11 @@ describe('set of a live value per key', () => {
     expect(live.room('blue')).toEqual({ id: 'blue', users: 0 })
   })
 
-  it('still writes the key first, as before 1.105', () => {
-    live.room.set('red', { id: 'red', users: 2 })
-    expect(live.room('red')).toEqual({ id: 'red', users: 2 })
-    live.room.delete('red')
+  it('refuses the key first, as before 1.105', () => {
+    expect(() => (live.room.set as unknown as (key: string, next: object) => void)('red', { id: 'red', users: 2 })).toThrow('one value for each key')
   })
 
-  it('reads an object holding only the key as the options of the new form', () => {
+  it('takes a next value that is an updater or an object', () => {
     live.tally.set(7, { key: 'a' })
     expect(live.tally('a')).toBe(7)
     live.tally.set(n => n + 1, { key: 'a' })
@@ -54,15 +52,16 @@ describe('set of a live value per key', () => {
 describe('set of a live value of each user', () => {
   const held = (user: string) => slotValue(liveSlot(MINE)!, user)
 
-  it('writes one user\'s value with the user in the options, and the old order too', () => {
+  it('writes one user\'s value with the user in the options', () => {
     live.mine.set(3, { user: 'dana' })
     live.mine.set(n => n + 1, { user: 'dana' })
-    live.mine.set('erin', 9)
     expect(held('dana')).toBe(4)
-    expect(held('erin')).toBe(9)
     live.mine.delete('dana')
-    live.mine.delete('erin')
     expect(held('dana')).toBe(0)
+  })
+
+  it('refuses the user first, as before 1.105', () => {
+    expect(() => (live.mine.set as unknown as (user: string, next: number) => void)('erin', 9)).toThrow('one value for each user')
   })
 
   it('refuses a write that names no user', () => {

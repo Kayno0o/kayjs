@@ -34,11 +34,11 @@ function island(body: () => void): () => void {
   })
 }
 
-describe('onBeforeNavigate', () => {
+describe('navigation.onBeforeNavigate', () => {
   it.each(TARGETS)('is asked with the URL %s and keeps the page when it answers false, sync or async', async (to) => {
     const asked: string[] = []
     const dispose = island(() => {
-      state.onBeforeNavigate(({ url, from }) => {
+      state.navigation.onBeforeNavigate(({ url, from }) => {
         asked.push(`${url.href} from ${from.href}`)
 
         return false
@@ -50,7 +50,7 @@ describe('onBeforeNavigate', () => {
     expect(asked).toEqual([`${to.href} from ${location.href}`])
 
     const later = island(() => {
-      state.onBeforeNavigate(async () => false)
+      state.navigation.onBeforeNavigate(async () => false)
     })
 
     expect(await navigation.mayLeave(to)).toBe(false)
@@ -60,7 +60,7 @@ describe('onBeforeNavigate', () => {
   it('asks nothing for a page kay does not swap in place: another origin or kay\'s own route', async () => {
     const asked: string[] = []
     const dispose = island(() => {
-      state.onBeforeNavigate(({ url }) => {
+      state.navigation.onBeforeNavigate(({ url }) => {
         asked.push(url.href)
 
         return false
@@ -75,8 +75,8 @@ describe('onBeforeNavigate', () => {
 
   it('lets the visit go on for no answer, true or a promise of nothing', async () => {
     const dispose = island(() => {
-      state.onBeforeNavigate(() => undefined)
-      state.onBeforeNavigate(async () => true)
+      state.navigation.onBeforeNavigate(() => undefined)
+      state.navigation.onBeforeNavigate(async () => true)
     })
 
     expect(await navigation.mayLeave(TARGETS[0]!)).toBe(true)
@@ -90,7 +90,7 @@ describe('onBeforeNavigate', () => {
     console.error = (...args: unknown[]) => logged.push(...args)
 
     const dispose = island(() => {
-      state.onBeforeNavigate(() => {
+      state.navigation.onBeforeNavigate(() => {
         throw new Error('boom')
       })
     })
@@ -109,7 +109,7 @@ describe('onBeforeNavigate', () => {
   it('stops with its island, or when its disposer runs, and leaves no hook behind', async () => {
     let stop: () => void = () => undefined
     const dispose = island(() => {
-      stop = state.onBeforeNavigate(() => false)
+      stop = state.navigation.onBeforeNavigate(() => false)
     })
 
     expect(navigation.navigation.before).toBeDefined()
@@ -118,7 +118,7 @@ describe('onBeforeNavigate', () => {
     expect(await navigation.mayLeave(TARGETS[0]!)).toBe(true)
 
     const second = island(() => {
-      state.onBeforeNavigate(() => false)
+      state.navigation.onBeforeNavigate(() => false)
     })
 
     second()
@@ -129,10 +129,10 @@ describe('onBeforeNavigate', () => {
   it('keeps the same function registered by two islands until both end', async () => {
     const refuse = () => false
     const first = island(() => {
-      state.onBeforeNavigate(refuse)
+      state.navigation.onBeforeNavigate(refuse)
     })
     const second = island(() => {
-      state.onBeforeNavigate(refuse)
+      state.navigation.onBeforeNavigate(refuse)
     })
 
     first()
@@ -146,7 +146,7 @@ describe('onBeforeNavigate', () => {
   it('is not asked for a page kay does not swap in place, where the guards still ask', async () => {
     const asked: string[] = []
     const dispose = island(() => {
-      state.onBeforeNavigate(() => asked.push('hook') > 0 && false)
+      state.navigation.onBeforeNavigate(() => asked.push('hook') > 0 && false)
       navigation.leaveGuards.add({ dirty: () => true, confirm: () => asked.push('guard') > 0 })
     })
 
@@ -159,7 +159,7 @@ describe('onBeforeNavigate', () => {
   it('answers before a leave guard, which is not asked when it refuses', async () => {
     const asked: string[] = []
     const dispose = island(() => {
-      state.onBeforeNavigate(() => false)
+      state.navigation.onBeforeNavigate(() => false)
       navigation.leaveGuards.add({ dirty: () => true, confirm: () => asked.push('guard') > 0 })
     })
 
@@ -215,7 +215,7 @@ describe('navigation', () => {
   })
 })
 
-describe('onNavigate', () => {
+describe('navigation.onNavigate', () => {
   it('logs a handler that throws or rejects and calls the others', async () => {
     const logged: unknown[] = []
     const original = console.error
@@ -224,13 +224,13 @@ describe('onNavigate', () => {
     console.error = (...args: unknown[]) => logged.push(...args)
 
     const dispose = island(() => {
-      state.onNavigate(() => {
+      state.navigation.onNavigate(() => {
         throw new Error('sync')
       })
-      state.onNavigate(async () => {
+      state.navigation.onNavigate(async () => {
         throw new Error('async')
       })
-      state.onNavigate(({ url }) => urls.push(url.href))
+      state.navigation.onNavigate(({ url }) => urls.push(url.href))
     })
 
     try {
@@ -250,7 +250,7 @@ describe('onNavigate', () => {
     const urls: string[] = []
     let stop: () => void = () => undefined
     const dispose = island(() => {
-      stop = state.onNavigate(({ url }) => urls.push(url.href))
+      stop = state.navigation.onNavigate(({ url }) => urls.push(url.href))
     })
 
     document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: TARGETS[1]!.href } }))

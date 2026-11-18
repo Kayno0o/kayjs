@@ -12,7 +12,7 @@ export const count = action(t.Object({}), () => ++store.posts)
 if (crash.form.failed())
   throw new Error('This page cannot show the refusal')
 
-const sent = upload.succeeded()
+const sent = upload.data()
 ---
 head
   title Posted
@@ -29,4 +29,4 @@ form.count(action={count})
   button Count
 p.posts {store.posts}
 if sent then done
-  p.sent Sent {done.data}
+  p.sent Sent {done}

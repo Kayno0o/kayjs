@@ -9,7 +9,7 @@ import { connectionHooks } from '../src/runtime/connection'
 import { API_MOUNT, call, openSocket, readEvents, resource, stream } from '../src/runtime/live'
 import { eventually } from './helpers/eventually'
 
-// The transition callbacks every source an island reads takes (#2804 slice 5), as options and as methods: `onOpen`, `onData`, `onError`, `onClose`, and `onSuccess` and `onError` on a tracked call.
+// The transition callbacks every source an island reads takes (#2804 slice 5), as options and as methods: `onOpen`, `onData`, `onError`, `onClose`, and `onData` and `onError` on a tracked call.
 
 const sse = (...blocks: string[]) => new Response(blocks.join(''), { headers: { 'content-type': 'text/event-stream' } })
 const value = (data: unknown) => `data: ${stringify(data)}\n\n`
@@ -290,7 +290,7 @@ describe('resource hooks', () => {
         },
       }))
 
-      expect(read.value()).toBe('start')
+      expect(read.data()).toBe('start')
       expect(seen).toEqual([])
       await eventually(() => expect(seen).toEqual(['fresh']))
       expect(read.status()).toBe('ready')
@@ -332,7 +332,7 @@ describe('resource hooks', () => {
 
     const second = root(() => resource<string>(load, { key: 'shared-hooks', onData: ({ value: answer }) => void seen.push(`data ${answer}`), onError: () => void seen.push('error') }))
 
-    await eventually(() => expect(second.value()).toBe('one'))
+    await eventually(() => expect(second.data()).toBe('one'))
     expect(seen).toEqual([])
     first.mutate('two', { refresh: false })
     expect(seen).toEqual(['data two'])
@@ -427,13 +427,13 @@ describe('track hooks', () => {
   const refusal = (status: number, text: string) => new Response(text, { status, headers: { 'content-type': 'text/plain' } })
   const saved = () => new Response('"saved"', { headers: { 'content-type': 'application/json' } })
 
-  it('call.track runs onSuccess with the data and the input, and onError for a refusal and for no answer, both as options and methods', async () => {
+  it('call.track runs onData with the data and the input, and onError for a refusal and for no answer, both as options and methods', async () => {
     const fetched = answering(saved(), refusal(409, 'Taken'), new TypeError('offline'))
     const seen: unknown[] = []
 
     try {
       const save = call.track(mounted as never, '/' as never, {
-        onSuccess: ({ data, input }: { data: unknown, input: unknown }) => seen.push(['success', data, input]),
+        onData: ({ value, input }: { value: unknown, input: unknown }) => seen.push(['success', value, input]),
       }) as unknown as ((options?: unknown) => Promise<unknown>) & { onError: (hook: (event: { error: ApiError, input: unknown }) => void) => () => void }
       const input = { method: 'post' }
 
@@ -454,7 +454,7 @@ describe('track hooks', () => {
 
     try {
       const save = call.track(mounted as never, '/' as never, {
-        onSuccess: () => seen.push('success'),
+        onData: () => seen.push('success'),
         onError: () => seen.push('error'),
       }) as unknown as ((options?: unknown) => Promise<unknown>) & { retry: () => void, settled: () => Promise<void> }
 
@@ -484,7 +484,7 @@ describe('track hooks', () => {
 
     try {
       const save = call.track(mounted as never, '/' as never, {
-        onSuccess: () => {
+        onData: () => {
           throw new Error('boom')
         },
       }) as unknown as (options?: unknown) => Promise<{ ok: boolean }>
@@ -504,7 +504,7 @@ describe('track hooks', () => {
     const seen: unknown[] = []
 
     try {
-      const save = stub.track({ onSuccess: ({ data, input }) => void seen.push(['success', data, input]) })
+      const save = stub.track({ onData: ({ value, input }) => void seen.push(['success', value, input]) })
 
       save.onError(({ error, input }) => seen.push(['error', error.status, error.message, input]))
       await save({ id: 1 })
@@ -570,34 +570,34 @@ describe('an action\'s stream hooks', () => {
   })
 })
 
-// Every source reads what it took in as `data()`, and tells it as `onData({ value })` (#3319); the old readers and hooks work beside.
+// Every source reads what it took in as `data()`, and tells it as `onData({ value })` (#3319).
 describe('data() and onData on every source', () => {
   const answering = (...answers: Response[]) => spyOn(globalThis, 'fetch').mockImplementation((async () => answers.shift()!) as unknown as typeof fetch)
 
-  it('reads a socket\'s last message as data() and last(), under the one connection status', () => {
+  it('reads a socket\'s last message as data(), under the one connection status', () => {
     const { client, made } = sockets()
 
     expect([client.data(), client.status()]).toEqual([undefined, 'connecting'])
     made[0]!.open()
     made[0]!.message('"hi"')
-    expect([client.data(), client.last(), client.status()]).toEqual(['hi', 'hi', 'open'])
+    expect([client.data(), client.status()]).toEqual(['hi', 'open'])
   })
 
-  it('reads a resource\'s answer as data() and value()', async () => {
+  it('reads a resource\'s answer as data()', async () => {
     globalThis.document = { querySelector: () => null } as unknown as Document
 
     try {
       const read = root(() => resource(async () => 7))
 
       await eventually(() => expect(read.status()).toBe('ready'))
-      expect([read.data(), read.value()]).toEqual([7, 7])
+      expect(read.data()).toBe(7)
     }
     finally {
       Reflect.deleteProperty(globalThis, 'document')
     }
   })
 
-  it('reads the last success of a tracked call as data(), kept through a failure, and tells onData and onSuccess', async () => {
+  it('reads the last success of a tracked call as data(), kept through a failure, and tells onData', async () => {
     const stub = actionStub('/_kay/action/test/data') as unknown as import('../src/runtime').Action<{ id: number }, string>
     const fetched = answering(new Response(stringify('first')), new Response(stringify({ errors: { '': 'Locked' } }), { status: 409, headers: { 'x-kay-failure': '1' } }), new Response(stringify('second')))
     const seen: unknown[] = []
@@ -606,7 +606,7 @@ describe('data() and onData on every source', () => {
       const save = stub.track({ onData: ({ value: made, input }) => void seen.push(['option', made, input]) })
 
       save.onData(({ value: made }) => seen.push(['method', made]))
-      save.onSuccess(({ data }) => seen.push(['old', data]))
+
       expect(save.data()).toBeUndefined()
       await save({ id: 1 })
       expect(save.data()).toBe('first')
@@ -614,21 +614,21 @@ describe('data() and onData on every source', () => {
       expect([save.data(), save.status()]).toEqual(['first', 'failed'])
       await save({ id: 3 })
       expect(save.data()).toBe('second')
-      expect(seen).toEqual([['option', 'first', { id: 1 }], ['method', 'first'], ['old', 'first'], ['option', 'second', { id: 3 }], ['method', 'second'], ['old', 'second']])
+      expect(seen).toEqual([['option', 'first', { id: 1 }], ['method', 'first'], ['option', 'second', { id: 3 }], ['method', 'second']])
     }
     finally {
       fetched.mockRestore()
     }
   })
 
-  it('reads an action\'s outcome as data() and status(), and succeeded() as it was', async () => {
+  it('reads an action\'s outcome as data() and status()', async () => {
     const stub = actionStub('/_kay/action/test/outcome') as unknown as import('../src/runtime').Action<{ id: number }, string>
     const fetched = answering(new Response(stringify('done')))
 
     try {
-      expect([stub.data(), stub.status(), stub.succeeded()]).toEqual([undefined, 'idle', undefined])
+      expect([stub.data(), stub.status()]).toEqual([undefined, 'idle'])
       await stub({ id: 1 })
-      expect([stub.data(), stub.status(), stub.succeeded()]).toEqual(['done', 'ready', { data: 'done' }])
+      expect([stub.data(), stub.status()]).toEqual(['done', 'ready'])
     }
     finally {
       fetched.mockRestore()

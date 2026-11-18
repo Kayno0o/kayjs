@@ -14,7 +14,6 @@ const action = Object.assign(async () => undefined, {
   [Symbol.for('kay.action')]: true,
   url: '/_kay/action/mail/form',
   pending: () => false,
-  succeeded: () => done(),
   status: () => done() === undefined ? 'idle' : 'ready',
   data: () => done()?.data,
   form: { failed: () => failed(), error: (field = '') => (failed()?.errors as Record<string, string> | undefined)?.[field] },

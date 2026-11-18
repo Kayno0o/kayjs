@@ -84,7 +84,7 @@ const stamped = new Set<string>()
 // The tags each followed key's value names, kept here as memory may drop the value that knew them: an invalidation of one still reaches the pages following the key.
 const tagged = new Map<string, readonly string[]>()
 // The last invalidation time of each key a page followed, which a connection sends first: the declaration gives 0 to a key never invalidated.
-const stamps = (live as (initial: (key: string) => number, id: string, name: string) => { set: (key: string, value: number) => void, delete: (key: string) => void })((): number => 0, CACHE_LIVE_ID, 'cache')
+const stamps = (live as (initial: (key: string) => number, id: string, name: string) => { set: (value: number, options: { key: string }) => void, delete: (key: string) => void })((): number => 0, CACHE_LIVE_ID, 'cache')
 
 // Runs the render of a request, loads included, so the cached values it reads with `live: true` are the page's to follow.
 // Who is signed in is asked only for a render that reads a value of each user: the first render of a chain does not know it will, so it runs without, and `missed` is called when it read one, for the render to run again with the user resolved. A chain that read one is resolved before its renders from then on.
@@ -382,7 +382,7 @@ onKeysInvalidated((matches) => {
   for (const key of stamped) {
     if (matches(key) || tagged.get(key)?.some(matches) === true) {
       lastStamp = at
-      stamps.set(key, at)
+      stamps.set(at, { key })
       into?.add(key)
     }
   }

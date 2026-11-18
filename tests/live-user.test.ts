@@ -50,8 +50,8 @@ describe('a live value of each user', () => {
   beforeAll(async () => {
     site = await testSite({ root: ROOT, use: [signedIn] })
     live = await import(resolve(ROOT, 'src/live.ts')) as Values
-    live.unread.set('alice', 3)
-    live.unread.set('bob', 5)
+    live.unread.set(3, { user: 'alice' })
+    live.unread.set(5, { user: 'bob' })
   })
 
   afterAll(async () => {
@@ -90,12 +90,12 @@ describe('a live value of each user', () => {
 
     expect(await feed.next()).toEqual([[UNREAD, '', 3]])
     // Bob's change comes first: were it sent, it would be the next event.
-    live.unread.set('bob', 6)
-    live.unread.set('alice', 4)
+    live.unread.set(6, { user: 'bob' })
+    live.unread.set(4, { user: 'alice' })
     expect(await feed.next()).toEqual([[UNREAD, '', 4]])
     expect(await quiet(feed)).toBe(true)
-    live.unread.set('alice', 3)
-    live.unread.set('bob', 5)
+    live.unread.set(3, { user: 'alice' })
+    live.unread.set(5, { user: 'bob' })
     await feed.close()
   })
 
@@ -137,7 +137,7 @@ describe('a live value of each user', () => {
   })
 
   it('puts a user\'s value back to what the declaration gives, telling its watchers', async () => {
-    live.unread.set('carol', 8)
+    live.unread.set(8, { user: 'carol' })
 
     const feed = new Feed(await open(proofsOf(pagesOf(await visit('/', 'carol'))), 'carol'))
 

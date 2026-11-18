@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { persisted } from '../src/runtime/persisted'
+import { queryParam } from '../src/runtime/persisted'
 import { root } from '../src/runtime/reactive'
 
 const setURL = (url: string) => (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
@@ -9,14 +9,14 @@ const navigation = async () => (await import('../src/runtime/navigation')).navig
 beforeAll(() => GlobalRegistrator.register({ url: 'http://localhost/page' }))
 afterAll(async () => GlobalRegistrator.unregister())
 
-describe('persisted.query values with no schema naming the param', () => {
+describe('queryParam values with no schema naming the param', () => {
   it('match the text of a number or a boolean, and give back the value', () => {
     setURL('http://localhost/page?page=2&on=true&other=9')
 
     root(() => {
-      expect(persisted.query('page', 1, { values: [1, 2, 3] })()).toBe(2)
-      expect(persisted.query('on', false, { values: [true, false] })()).toBe(true)
-      expect(persisted.query('other', 1, { values: [1, 2, 3] })()).toBe(1)
+      expect(queryParam('page', { default: 1, values: [1, 2, 3] })()).toBe(2)
+      expect(queryParam('on', { default: false, values: [true, false] })()).toBe(true)
+      expect(queryParam('other', { default: 1, values: [1, 2, 3] })()).toBe(1)
     })
   })
 
@@ -24,19 +24,19 @@ describe('persisted.query values with no schema naming the param', () => {
     setURL('http://localhost/page?tab=logs&bad=x')
 
     root(() => {
-      expect(persisted.query('tab', 'site', { values: ['site', 'logs'] })()).toBe('logs')
-      expect(persisted.query('bad', 'site', { values: ['site', 'logs'] })()).toBe('site')
+      expect(queryParam('tab', { default: 'site', values: ['site', 'logs'] })()).toBe('logs')
+      expect(queryParam('bad', { default: 'site', values: ['site', 'logs'] })()).toBe('site')
     })
   })
 })
 
-describe('persisted.query written empty', () => {
+describe('queryParam written empty', () => {
   it('keeps an empty string or list in the URL when the default is not empty, so a reload reads it', async () => {
     setURL('http://localhost/page')
 
     root(() => {
-      const tags = persisted.query<string[]>('tags', ['a'])
-      const q = persisted.query('q', 'x')
+      const tags = queryParam<string[]>('tags', { default: ['a'] })
+      const q = queryParam('q', { default: 'x' })
 
       tags.set([])
       q.set('')
@@ -45,8 +45,8 @@ describe('persisted.query written empty', () => {
     expect(location.search).toBe('?tags=&q=')
 
     root(() => {
-      expect(persisted.query<string[]>('tags', ['a'])()).toEqual([])
-      expect(persisted.query('q', 'x')()).toBe('')
+      expect(queryParam<string[]>('tags', { default: ['a'] })()).toEqual([])
+      expect(queryParam('q', { default: 'x' })()).toBe('')
     })
   })
 
@@ -54,8 +54,8 @@ describe('persisted.query written empty', () => {
     setURL('http://localhost/page')
 
     root(() => {
-      persisted.query('s', '').set('')
-      persisted.query<string[]>('l', []).set([])
+      queryParam('s', { default: '' }).set('')
+      queryParam<string[]>('l', { default: [] }).set([])
     })
     ;(await navigation()).flush?.()
     expect(location.search).toBe('')

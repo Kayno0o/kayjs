@@ -62,8 +62,8 @@ form(action={save})
     p.taken {data.message}
   button Save
 form(action={ping})
-  if ping.succeeded() then done
-    p.done {done.data}
+  if ping.data() then done
+    p.done {done}
   button Ping
 form.busy(action={busy})
   input(name="topic")

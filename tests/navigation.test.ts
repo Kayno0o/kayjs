@@ -2719,7 +2719,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(problem()).toEqual([])
   })
 
-  it('keeps the links an island built with withQuery on the address after navigate({ query }), a swap and Back', async () => {
+  it('keeps the links an island built with withQuery on the address after navigate.query(), a swap and Back', async () => {
     const problem = problems(page)
     const hrefs = async () => page.evaluate(() => [...document.querySelectorAll('a.next, a.clear')].map(link => link.getAttribute('href')))
 

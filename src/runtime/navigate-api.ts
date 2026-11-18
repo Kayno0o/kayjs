@@ -40,15 +40,12 @@ export function mergeQuery(params: URLSearchParams, changes: QueryChanges): void
 // Both resolve to `false` when a leave guard was declined, so the page stayed, and `true` otherwise.
 // kept: free
 interface Navigate {
-  /** @deprecated Call `navigate.query(changes)`, so one name does one job. Removed in 1.108.0; `deprecated-navigate-query` rewrites it. */
-  (to: { query: QueryChanges }, options?: NavigateOptions): Promise<boolean>
-  // Last, so a path no page serves is reported against it.
   <const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions): Promise<boolean>
   query: (changes: QueryChanges, options?: NavigateOptions) => Promise<boolean>
 }
 
-async function visit(to: string | { query: QueryChanges }, options: NavigateOptions = {}): Promise<boolean> {
-  return navigateTo(typeof to === 'string' && navigation.localize ? navigation.localize(to) : to, options, true)
+async function visit(to: string, options: NavigateOptions = {}): Promise<boolean> {
+  return navigateTo(navigation.localize ? navigation.localize(to) : to, options, true)
 }
 
 // kept: free

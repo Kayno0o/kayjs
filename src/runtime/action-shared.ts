@@ -300,7 +300,7 @@ export type InputOf<Target> = Target extends Action<infer Input, unknown> ? Inpu
 
 export type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailuresOf<Target>, Extract<HoneypotOf<Target>, string>> : never
 
-// What a page reads back through `action.succeeded()` after a plain form post succeeded.
+// What a page reads back after a plain form post succeeded.
 export interface FormSuccess<Output> {
   // What the handler returned.
   data: Output
@@ -405,8 +405,7 @@ export interface TrackedCall<Input, Result> extends Reader<Result extends { ok: 
   readonly data: () => (Result extends { ok: true, data: infer Data } ? Data : never) | undefined
   // Called with `{ value, input }` when a call succeeds (for a stream, once it is open), `input` what the call was given; returns what stops it. Hooks given to `track()` run first.
   onData: (listener: (event: { value: Result extends { ok: true, data: infer Data } ? Data : never, input: unknown }) => void) => () => void
-  /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  onSuccess: (listener: (event: { data: Result extends { ok: true, data: infer Data } ? Data : never, input: unknown }) => void) => () => void
+
   // Called with `{ error, input }` when a call fails, a refusal or no answer, not for an abort or a redirect; returns what stops it.
   onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }
@@ -441,14 +440,13 @@ export interface Action<Input = never, Output = unknown, Honeypot extends string
   readonly onData: (listener: (event: { input: FormData }) => void) => () => void
   readonly onError: (listener: (event: { error: ApiError, input: FormData }) => void) => () => void
   // A handle for the calls of one island, one row or one button: `const save = add.track()`, then `await save(input)` resolves with `{ ok, data }` or the refusal, and `save.pending()` reads only its own calls.
-  // `track({ queue: 'latest' })` sets how the handle's own calls queue, in place of each call's `queue` option; `track({ onSuccess, onError })` takes the callbacks of every call of the handle, which `onSuccess()` and `onError()` of the handle add to.
+  // `track({ queue: 'latest' })` sets how the handle's own calls queue, in place of each call's `queue` option; `track({ onData, onError })` takes the callbacks of every call of the handle, which `onData()` and `onError()` of the handle add to.
   readonly track: (options?: { queue?: CallQueue | undefined } & TrackHooks<Answer<Success<Output>>>) => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
   // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
   readonly progress: () => number | undefined
   // What a form posting to this action shows: how the post the page renders for went, refused, and the message of each field. Apart from the call state above, which is the island's own calls.
   readonly form: ActionForm<Input, Output, Honeypot>
-  /** @deprecated Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  readonly succeeded: () => FormSuccess<Final<Success<Output>>> | undefined
+
   // What the last call, or the form post the page rendered for, returned; undefined before one succeeded and after a later one failed.
   readonly data: () => Final<Success<Output>> | undefined
   // `idle` before the first call, `loading` while one is in flight, then `ready` or `failed` by the last to settle, as on every source.

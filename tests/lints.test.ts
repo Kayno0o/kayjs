@@ -1458,9 +1458,9 @@ describe('once-read-prop', () => {
     expect(found(`type Row = typeof items\nlet last = 1 as unknown as typeof items${used}`)).toEqual([])
   })
 
-  it('leaves signal() and persisted() initial values, a posted reader and an id made once alone', () => {
+  it('leaves signal() and persisted.cookie() initial values, a posted reader and an id made once alone', () => {
     expect(found(`let last = signal(items.length > 0)${used}`)).toEqual([])
-    expect(found(`let last = persisted(size, items.length)${used}`)).toEqual([])
+    expect(found(`let last = persisted.cookie(size, items.length)${used}`)).toEqual([])
     expect(found(`let last = postedValue(size, items)${used}`)).toEqual([])
     expect(found(`let last = size ?? uid()${used}`)).toEqual([])
     expect(found(`let last = size || uid()${used}`)).toHaveLength(1)

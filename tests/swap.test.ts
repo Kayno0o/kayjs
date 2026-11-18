@@ -169,7 +169,7 @@ describe('page swap, on the server', () => {
 
   it('renders a persisted query param as queryParam does, by the page\'s schema, its value standing for the param left out', () => {
     const report = () => undefined
-    const read = (url: string) => inServerScope(new Request(url), report, (): unknown[] => [persisted.query('q', 'all')(), persisted.query('page', '1')()], undefined, { page: { type: 'integer', default: 1 } })
+    const read = (url: string) => inServerScope(new Request(url), report, (): unknown[] => [queryParam('q', { default: 'all' })(), queryParam('page', { default: '1' })()], undefined, { page: { type: 'integer', default: 1 } })
 
     expect(read('http://localhost/?q=kay&page=3')).toEqual(['kay', 3])
     expect(read('http://localhost/?page=x')).toEqual(['all', 1])
@@ -177,7 +177,7 @@ describe('page swap, on the server', () => {
 
   it('reads a persisted query param outside its values as the default, on the server', () => {
     const report = () => undefined
-    const read = (url: string) => inServerScope(new Request(url), report, (): unknown[] => [persisted.query('tab', 'site', { values: ['site', 'logs'] })(), persisted.query('n', 1, { values: [1, 2] })()], undefined, { n: { type: 'integer' } })
+    const read = (url: string) => inServerScope(new Request(url), report, (): unknown[] => [queryParam('tab', { default: 'site', values: ['site', 'logs'] })(), queryParam('n', { default: 1, values: [1, 2] })()], undefined, { n: { type: 'integer' } })
 
     expect(read('http://localhost/?tab=logs&n=2')).toEqual(['logs', 2])
     expect(read('http://localhost/?tab=nope&n=3')).toEqual(['site', 1])
@@ -315,7 +315,7 @@ describe('page swap, checking a form in the browser', () => {
   it('leaves the default for a persisted cookie cut short', () => {
     document.cookie = 'cut=%E0%A4%A'
 
-    expect(persisted('cut', 'light')()).toBe('light')
+    expect(persisted.cookie('cut', 'light')()).toBe('light')
   })
 
   it('keeps a persisted cookie a year, or as long as maxAge says, and refuses a maxAge that is no duration', () => {
@@ -324,13 +324,13 @@ describe('page swap, checking a form in the browser', () => {
     Object.defineProperty(document, 'cookie', { configurable: true, get: () => '', set: (value: string) => void writes.push(value) })
 
     try {
-      persisted('year', 'a').set('b')
-      persisted('month', 'a', { maxAge: '30d' }).set('b')
-      persisted('seconds', 'a', { maxAge: '90s' }).set('b')
+      persisted.cookie('year', 'a').set('b')
+      persisted.cookie('month', 'a', { maxAge: '30d' }).set('b')
+      persisted.cookie('seconds', 'a', { maxAge: '90s' }).set('b')
 
       expect(writes.map(write => (/^(\w+)=.*max-age=(\d+)/).exec(write)!.slice(1))).toEqual([['year', '31536000'], ['month', '2592000'], ['seconds', '90']])
-      expect(() => persisted('none', 'a', { maxAge: '0s' })).toThrow('kay: the maxAge of persisted("none") is \'0s\'')
-      expect(() => persisted('bad', 'a', { maxAge: 'soon' as '1d' })).toThrow('it takes a positive duration')
+      expect(() => persisted.cookie('none', 'a', { maxAge: '0s' })).toThrow('kay: the maxAge of persisted("none") is \'0s\'')
+      expect(() => persisted.cookie('bad', 'a', { maxAge: 'soon' as '1d' })).toThrow('it takes a positive duration')
     }
     finally {
       delete (document as { cookie?: string }).cookie
@@ -338,8 +338,8 @@ describe('page swap, checking a form in the browser', () => {
   })
 
   // `bun run check` fails on an `@ts-expect-error` with no error under it, so the type check is what this asserts.
-  it('refuses persist and storage on a plain signal, which persisted() took over', () => {
-    // @ts-expect-error -- persisted('a', 'x') keeps a value
+  it('refuses persist and storage on a plain signal, which persisted.cookie() took over', () => {
+    // @ts-expect-error -- persisted.cookie('a', 'x') keeps a value
     expect(signal('x', { persist: 'a' })()).toBe('x')
     // @ts-expect-error -- persisted.local('a', 'x') does
     expect(signal('x', { storage: 'local' })()).toBe('x')
@@ -390,8 +390,8 @@ describe('page swap, checking a form in the browser', () => {
       document.head.innerHTML = '<script type="application/json" data-kay-query>{"page":{"type":"integer","default":1}}</script>'
       setURL('http://localhost/list?q=kay&page=3')
 
-      const query = persisted.query('q', 'all')
-      const page = persisted.query<number>('page', 2)
+      const query = queryParam('q', { default: 'all' })
+      const page = queryParam<number>('page', { default: 2 })
 
       expect<unknown[]>([query(), page()]).toEqual(['kay', 3])
 
@@ -417,8 +417,8 @@ describe('page swap, checking a form in the browser', () => {
 
       // Left out, the param reads as the schema's default, as the page's loads read it, before the value given.
       setURL('http://localhost/list')
-      expect(persisted.query<number>('page', 2)()).toBe(1)
-      expect(persisted.query('q', 'all')()).toBe('all')
+      expect(queryParam<number>('page', { default: 2 })()).toBe(1)
+      expect(queryParam('q', { default: 'all' })()).toBe('all')
     }
     finally {
       document.head.innerHTML = ''
@@ -428,10 +428,10 @@ describe('page swap, checking a form in the browser', () => {
 
   it('reads a persisted query param outside its values as the default, in the browser', () => {
     setURL('http://localhost/list?tab=nope')
-    expect(persisted.query('tab', 'site', { values: ['site', 'logs'] })()).toBe('site')
+    expect(queryParam('tab', { default: 'site', values: ['site', 'logs'] })()).toBe('site')
 
     setURL('http://localhost/list?tab=logs')
-    expect(persisted.query('tab', 'site', { values: ['site', 'logs'] })()).toBe('logs')
+    expect(queryParam('tab', { default: 'site', values: ['site', 'logs'] })()).toBe('logs')
   })
 
   it('writes fast-changing query params with one replaceState per 200 ms for all of them, the latest values in the address, the signals always current', () => {
@@ -442,7 +442,7 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/slider')
       tick(1000)
 
-      const params = ['a', 'b', 'c'].map(name => persisted.query<number>(name, 0))
+      const params = ['a', 'b', 'c'].map(name => queryParam<number>(name, { default: 0 }))
 
       for (let value = 1; value <= 40; value++) {
         for (const param of params) {
@@ -478,8 +478,8 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/one')
       tick(1000)
 
-      const first = persisted.query('first', '')
-      const second = persisted.query('second', '')
+      const first = queryParam('first', { default: '' })
+      const second = queryParam('second', { default: '' })
 
       first.set('a')
       second.set('b')
@@ -506,7 +506,7 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/back?x=1')
       tick(1000)
 
-      const level = persisted.query('level', '')
+      const level = queryParam('level', { default: '' })
 
       level.set('1')
       level.set('2')
@@ -552,7 +552,7 @@ describe('page swap, checking a form in the browser', () => {
       tick(1000)
 
       const tab = queryParam('tab', { history: 'push' })
-      const page = persisted.query<number>('page', 1, { history: 'push' })
+      const page = queryParam<number>('page', { default: 1, history: 'push' })
       const plain = queryParam('plain')
 
       expect<unknown[]>([tab(), page()]).toEqual(['a', 1])
@@ -612,14 +612,14 @@ describe('page swap, checking a form in the browser', () => {
 
   it('reads a shared cookie signal again when a page brings it, the cookie having changed since', () => {
     document.cookie = `swapped=${encodeURIComponent(encodeValue('one'))}; path=/`
-    const first = persisted('swapped', 'none')
+    const first = persisted.cookie('swapped', 'none')
 
     expect(first()).toBe('one')
     document.cookie = `swapped=${encodeURIComponent(encodeValue('two'))}; path=/`
-    expect(persisted('swapped', 'none')).toBe(first)
+    expect(persisted.cookie('swapped', 'none')).toBe(first)
     expect(first()).toBe('two')
     document.cookie = 'swapped=; path=/; max-age=0'
-    expect(persisted('swapped', 'none')()).toBe('none')
+    expect(persisted.cookie('swapped', 'none')()).toBe('none')
   })
 
   it('keeps replacing the entry without the history option', () => {
@@ -630,7 +630,7 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/replaced')
       tick(1000)
       queryParam('r').set('1')
-      persisted.query('r2', '', { history: 'replace' }).set('2')
+      queryParam('r2', { default: '', history: 'replace' }).set('2')
       expect(push).not.toHaveBeenCalled()
     }
     finally {
@@ -646,8 +646,8 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/leave')
       tick(1000)
 
-      const level = persisted.query('level', '')
-      const other = persisted.query('other', '')
+      const level = queryParam('level', { default: '' })
+      const other = queryParam('other', { default: '' })
 
       level.set('1')
       level.set('2')
@@ -685,7 +685,7 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/refused')
       tick(1000)
 
-      const refused = persisted.query('refused', 'a')
+      const refused = queryParam('refused', { default: 'a' })
 
       expect(() => refused.set('b')).not.toThrow()
       expect(refused()).toBe('b')
@@ -703,8 +703,8 @@ describe('page swap, checking a form in the browser', () => {
 
   it('keeps a string in the query unless the signal is typed otherwise, as the URL holds text', () => {
     // @ts-expect-error -- a query param is a string unless typed otherwise
-    expect(persisted.query('page', 1)()).toBe(1)
-    expect(persisted.query<number>('page', 1)()).toBe(1)
+    expect(queryParam('page', { default: 1 })()).toBe(1)
+    expect(queryParam<number>('page', { default: 1 })()).toBe(1)
   })
 
   it('parses each page data script once, a script a swap brings afresh, and skips one that does not parse after reporting it once, until its text changes', () => {

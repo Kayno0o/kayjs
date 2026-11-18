@@ -66,7 +66,7 @@ describe('live values on the server', () => {
 
   it('writes the live values a page read into it, each as it rendered, with a proof of their ids', async () => {
     live.visitors.set(3)
-    live.room.set('lobby', { id: 'lobby', users: 2 })
+    live.room.set({ id: 'lobby', users: 2 }, { key: 'lobby' })
 
     const { html } = await site.visit('/')
     const [page, ...others] = pagesOf(html)
@@ -121,7 +121,7 @@ describe('live values on the server', () => {
     await feed.next()
     live.visitors.set(1)
     live.visitors.set(2)
-    live.room.set('lobby', { id: 'lobby', users: 5 })
+    live.room.set({ id: 'lobby', users: 5 }, { key: 'lobby' })
 
     expect(await feed.next()).toEqual([[VISITORS, '', 2], [ROOM, 'lobby', { id: 'lobby', users: 5 }]])
     await feed.close()
@@ -144,8 +144,8 @@ describe('live values on the server', () => {
     const feed = new Feed(await open('/', [[ROOM, 'lobby']]))
 
     expect(await feed.next()).toEqual([[ROOM, 'lobby', expect.objectContaining({ id: 'lobby' })]])
-    live.room.set('elsewhere', { id: 'elsewhere', users: 9 })
-    live.room.set('lobby', { id: 'lobby', users: 7 })
+    live.room.set({ id: 'elsewhere', users: 9 }, { key: 'elsewhere' })
+    live.room.set({ id: 'lobby', users: 7 }, { key: 'lobby' })
 
     expect(await feed.next()).toEqual([[ROOM, 'lobby', { id: 'lobby', users: 7 }]])
     live.room.delete('lobby')
@@ -513,15 +513,15 @@ describe('writing a live value in a browser', () => {
     expect(compile('---\nimport { visitors } from \'../live\'\n---\nbutton(onClick={() => visitors = 1}) Reset\n')).toEqual(['`visitors` is a live value, which the server writes and a browser only reads'])
   })
 
-  it('names `.set(value)` and `.set(key, value)` as the way to write it', () => {
+  it('names `.set(value)` and `.set(value, { key })` as the way to write it', () => {
     const [diagnostic] = compileKay('---\nimport { visitors } from \'../live\'\n---\nbutton(onClick={() => visitors = 1}) Reset\n', 'src/components/writer.kay', { importedSignals: imported, check: true }).diagnostics
 
-    expect(diagnostic?.help).toBe('write it with `visitors.set(value)`, or `visitors.set(key, value)` for a keyed one, from a server fence, an action or a job')
+    expect(diagnostic?.help).toBe('write it with `visitors.set(value)`, or `visitors.set(value, { key })` for a keyed one, from a server fence, an action or a job')
   })
 
   it('is refused where a script or a handler calls its setter', () => {
     expect(compile('---\nimport { visitors } from \'../live\'\n---\nbutton(onClick={() => visitors.set(1)}) Reset\n')).toEqual(['`visitors` is a live value, written on the server: from a server fence, an action or a job'])
-    expect(compile('---\nimport { room } from \'../live\'\n\nroom.set(\'a\', { id: \'a\', users: 1 })\n---\np Hi\n')).toEqual(['`room` is a live value, written on the server: from a server fence, an action or a job'])
+    expect(compile('---\nimport { room } from \'../live\'\n\nroom.set({ id: \'a\', users: 1 }, { key: \'a\' })\n---\np Hi\n')).toEqual(['`room` is a live value, written on the server: from a server fence, an action or a job'])
   })
 
   it('is allowed in a server fence', () => {
@@ -605,26 +605,26 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
 
   it('carries every value of a page, a keyed one included, on one connection', async () => {
     connections.length = 0
-    live.room.set('lobby', { id: 'lobby', users: 1 })
+    live.room.set({ id: 'lobby', users: 1 }, { key: 'lobby' })
 
     await using page = await site.open('/')
 
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '1 in lobby')
-    live.room.set('lobby', { id: 'lobby', users: 4 })
+    live.room.set({ id: 'lobby', users: 4 }, { key: 'lobby' })
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '4 in lobby')
     expect(connections).toHaveLength(1)
   })
 
   it('opens one connection for every value the page reads at load, however late its islands hydrate', async () => {
     connections.length = 0
-    live.room.set('lobby', { id: 'lobby', users: 1 })
+    live.room.set({ id: 'lobby', users: 1 }, { key: 'lobby' })
 
     await using page = await site.open('/about')
 
     await delayRoomIsland(page)
     await page.goto('/')
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '1 in lobby')
-    live.room.set('lobby', { id: 'lobby', users: 5 })
+    live.room.set({ id: 'lobby', users: 5 }, { key: 'lobby' })
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '5 in lobby')
     live.visitors.set(77)
     await page.waitUntil(() => document.querySelector('p.online')?.textContent === '77 online')
@@ -640,10 +640,10 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     await delayChunk(page, 'room-badge', 150)
     await delayChunk(page, 'room-users', ISLAND_DELAY_MS)
     await page.goto('/staggered')
-    live.room.set('green', { id: 'green', users: 3 })
+    live.room.set({ id: 'green', users: 3 }, { key: 'green' })
     await page.waitUntil(() => document.querySelector('p.badge')?.textContent === '3 at green')
     await page.waitUntil(() => document.querySelector('p.users') !== null)
-    live.room.set('lobby', { id: 'lobby', users: 2 })
+    live.room.set({ id: 'lobby', users: 2 }, { key: 'lobby' })
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '2 in lobby')
     expect(connections).toHaveLength(1)
   })
@@ -656,7 +656,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     await delayRoomIsland(page)
     await page.click('a.home')
     await page.waitUntil(() => document.querySelector('p.users') !== null)
-    live.room.set('lobby', { id: 'lobby', users: 6 })
+    live.room.set({ id: 'lobby', users: 6 }, { key: 'lobby' })
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '6 in lobby')
     expect(connections).toHaveLength(1)
   })
@@ -676,7 +676,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
       document.dispatchEvent(new Event('visibilitychange'))
     })
     await until(() => connections.length === 1)
-    live.room.set('lobby', { id: 'lobby', users: 8 })
+    live.room.set({ id: 'lobby', users: 8 }, { key: 'lobby' })
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '8 in lobby')
     expect(connections).toHaveLength(1)
   })
@@ -689,7 +689,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     await until(() => connections.length === 1)
     await page.hover('p.users')
 
-    live.room.set('lobby', { id: 'lobby', users: 9 })
+    live.room.set({ id: 'lobby', users: 9 }, { key: 'lobby' })
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '9 in lobby')
     expect(connections).toHaveLength(2)
   })
@@ -767,12 +767,12 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
   })
 
   it('follows the value of the key a page was rendered for', async () => {
-    live.room.set('green', { id: 'green', users: 2 })
+    live.room.set({ id: 'green', users: 2 }, { key: 'green' })
 
     await using page = await site.open('/room/green')
 
     expect(await page.text('p.users')).toBe('2 in green')
-    live.room.set('green', { id: 'green', users: 3 })
+    live.room.set({ id: 'green', users: 3 }, { key: 'green' })
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '3 in green')
   })
 })

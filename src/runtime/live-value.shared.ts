@@ -33,11 +33,7 @@ export interface Live<T> extends LiveSource<{ value: T }> {
 // A value of each user, declared `live(initial, { user: true })`: read by calling it, which gives the signed-in visitor's own and `initial` for nobody; the server writes one user's with `set(next, { user })`, `user` being the id the library that signs them in names (`userOf` of `kay/library`, which kayjs-auth does).
 export interface LiveOwn<T> extends LiveSource<{ value: T }> {
   (): T
-  set: {
-    (next: Next<T>, options: { user: string }): void
-    /** @deprecated Written `set(user, next)`; `deprecated-live-api` rewrites it. Removed in 1.108. */
-    (user: string, next: Next<T>): void
-  }
+  set: (next: Next<T>, options: { user: string }) => void
   // Puts a user's value back to `initial`, and frees what is kept for it.
   delete: (user: string) => void
 }
@@ -45,11 +41,7 @@ export interface LiveOwn<T> extends LiveSource<{ value: T }> {
 // A live value per key, `room(id)` reading one: what the declaration gives a key nothing was set for. The event of `onData` names the key.
 export interface LiveByKey<K extends LiveKey, T> extends LiveSource<{ value: T, key: K }> {
   (key: K): T
-  set: {
-    (next: Next<T>, options: { key: K }): void
-    /** @deprecated Written `set(key, next)`; `deprecated-live-api` rewrites it. Removed in 1.108. */
-    (key: K, next: Next<T>): void
-  }
+  set: (next: Next<T>, options: { key: K }) => void
   // Puts a key back to what the declaration gives it, and frees what is kept for it.
   delete: (key: K) => void
 }
@@ -129,16 +121,12 @@ export function keyText(key: LiveKey): string {
   return String(key)
 }
 
-// What `set` of a value per key or per user was given, as `set(next, { key })`, or `set(key, next)` as before 1.105 wrote it: the key and the next value.
-// The options are a second argument holding only `field`, so a next value that is such an object, written in the old order, reads as options.
+// What `set` of a value per key or per user was given, as `set(next, { key })`: the key and the next value.
 export function writeArguments(args: unknown[], field: 'key' | 'user', what: string): [key: string, next: unknown] {
   const [first, second] = args
 
-  if (args.length < 2)
+  if (typeof second !== 'object' || second === null || !(field in second))
     throw new KayError('argument-invalid', `kay: ${what} is one value for each ${field}: \`set(next, { ${field} })\``)
 
-  if (typeof second === 'object' && second !== null && Object.keys(second).length === 1 && field in second)
-    return [keyText((second as Record<string, string>)[field]!), first]
-
-  return [keyText(first as string), second]
+  return [keyText((second as Record<string, string>)[field]!), first]
 }

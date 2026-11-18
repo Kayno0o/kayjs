@@ -296,13 +296,13 @@ describe('an action\'s stream', () => {
       await eventually(() => expect(acted.status()).toBe('failed'))
       await expect(acted.ended()).rejects.toBeInstanceOf(ApiError)
       acted.retry()
-      expect([acted.status(), acted.pending(), acted.last()]).toEqual(['connecting', true, undefined])
+      expect([acted.status(), acted.pending(), acted.data()]).toEqual(['connecting', true, undefined])
       expect(acted.error()).toBeInstanceOf(ApiError)
       await eventually(() => expect(acted.status()).toBe('done'))
       expect(sent).toBe(1)
       expect(begun).toEqual(['begun'])
       expect(seen).toEqual([1, 10, 20])
-      expect(acted.last()).toBe(20)
+      expect(acted.data()).toBe(20)
       expect(acted.error()).toBeUndefined()
       expect(opens).toEqual([true])
       expect(await acted.ended()).toBe(20)
@@ -322,7 +322,7 @@ describe('an action\'s stream', () => {
     const open = held(1)
     const running = actionStream<number>(open.response, SETTLED, failure, { send, read: async () => undefined, begun: () => undefined })
 
-    await eventually(() => expect(running.last()).toBe(1))
+    await eventually(() => expect(running.data()).toBe(1))
     running.retry()
     open.release()
     await running.ended()
@@ -376,7 +376,7 @@ describe('an action\'s stream', () => {
       expect(acted.status()).toBe('failed')
       acted.retry()
       await eventually(() => expect(acted.status()).toBe('done'))
-      expect(acted.last()).toBe(5)
+      expect(acted.data()).toBe(5)
     }
     finally {
       logged.mockRestore()
@@ -398,7 +398,7 @@ describe('an action\'s stream', () => {
       gate.resolve(body.response)
       await eventually(() => expect(cancelled).toHaveBeenCalled())
       expect(acted.status()).toBe('closed')
-      expect(acted.last()).toBeUndefined()
+      expect(acted.data()).toBeUndefined()
     }
     finally {
       logged.mockRestore()
@@ -441,7 +441,7 @@ describe('retry() of a stream a call answered with', () => {
       ;(stream as unknown as Settles)[SETTLED](status => void ends.push(status))
       await eventually(() => expect(stream.status()).toBe('done'))
       expect(retried).toEqual([stream])
-      expect(stream.last()).toBe(8)
+      expect(stream.data()).toBe(8)
       expect(ends).toEqual(['done'])
     }
     finally {

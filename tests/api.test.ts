@@ -205,14 +205,14 @@ it('keeps api/deprecated.txt as the list of the snapshot markers', () => {
 it('reads the marker of an export and of a member out of a snapshot', () => {
   const text = [
     '[.] Old\n/** @deprecated Use `New`. Removed in 2.0.0. No lint: a type. */\ntype Old = New',
-    '[.] Local\ninterface Local\n  /** @deprecated Read `x`; `deprecated-source-readers` rewrites it. Until 1.90. */ pending: () => number\n  ok: boolean',
+    '[.] Local\ninterface Local\n  /** @deprecated Read `x`; `deprecated-action-readers` rewrites it. Until 1.90. */ pending: () => number\n  ok: boolean',
     '[.] Bare\n/** @deprecated */\nconst Bare: 1',
   ].join('\n\n')
   const found = deprecations(new Map([['api/kay.txt', text]]))
 
   expect(found.map(({ name, removedIn, lint, noLint }) => ({ name, removedIn, lint, noLint }))).toEqual([
     { name: 'Old', removedIn: '2.0.0', lint: undefined, noLint: 'a type.' },
-    { name: 'Local.pending', removedIn: '1.90', lint: 'deprecated-source-readers', noLint: undefined },
+    { name: 'Local.pending', removedIn: '1.90', lint: 'deprecated-action-readers', noLint: undefined },
     { name: 'Bare', removedIn: undefined, lint: undefined, noLint: undefined },
   ])
   expect(problemsOf(found[0]!)).toEqual([])
@@ -221,5 +221,5 @@ it('reads the marker of an export and of a member out of a snapshot', () => {
 
 it('writes a @deprecated tag into the snapshot, and the list says what each line names', () => {
   expect(deprecatedList([{ package: 'ui', entry: '.', name: 'A', text: 'x. Removed in 2.0.0.', removedIn: '2.0.0', lint: undefined, noLint: 'x' }])).toBe('ui [.] A\t2.0.0\t-\tx. Removed in 2.0.0.\n')
-  expect(current.get('api/kay.txt')).toContain('/** @deprecated Write `data()`')
+  expect(current.get('api/kay.txt')).toContain('/** @deprecated Write `form.failed()`')
 })

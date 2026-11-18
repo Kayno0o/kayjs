@@ -17,10 +17,10 @@ describe('entryRoom', () => {
 
     const long = entryRoom('posts', { slug: 'a'.repeat(300) }, { name: 'N'.repeat(60) })
 
-    expect(() => presence(long.room, long.member)).not.toThrow()
-    expect(() => presence(watchRoom(long.room), long.member)).not.toThrow()
-    expect(() => presence(openRoom(long.room), onPage)).not.toThrow()
-    expect(() => presence(watchRoom(openRoom(long.room)), { ...long.member, page: true })).not.toThrow()
+    expect(() => presence({ room: long.room, member: long.member })).not.toThrow()
+    expect(() => presence({ room: watchRoom(long.room), member: long.member })).not.toThrow()
+    expect(() => presence({ room: openRoom(long.room), member: onPage })).not.toThrow()
+    expect(() => presence({ room: watchRoom(openRoom(long.room)), member: { ...long.member, page: true } })).not.toThrow()
   })
 
   test('names the same room whoever is listed, also for a slug of characters JSON escapes', () => {

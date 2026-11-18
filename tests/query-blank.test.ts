@@ -1,5 +1,5 @@
 import { expect, it } from 'bun:test'
-import { persisted, s } from '../src/runtime'
+import { queryParam, s } from '../src/runtime'
 import { formInput } from '../src/runtime/form'
 import { readParam } from '../src/runtime/query-param'
 import { queryRules, readQuery } from '../src/server/query'
@@ -31,15 +31,15 @@ it('leaves a param out as its default on both sides', () => {
   expect(readParam(rules, 'tags', url.searchParams)).toEqual(['a'])
 })
 
-it('renders persisted.query with numeric values and a blank list from the request, with no schema naming them', () => {
-  expect(render('?page=2', () => persisted.query('page', 1, { values: [1, 2, 3] })())).toBe(2)
-  expect(render('?page=9', () => persisted.query('page', 1, { values: [1, 2, 3] })())).toBe(1)
-  expect(render('?tags=', () => persisted.query<string[]>('tags', ['a'])())).toEqual([])
-  expect(render('?q=', () => persisted.query('q', 'x')())).toBe('')
+it('renders queryParam with numeric values and a blank list from the request, with no schema naming them', () => {
+  expect(render('?page=2', () => queryParam('page', { default: 1, values: [1, 2, 3] })())).toBe(2)
+  expect(render('?page=9', () => queryParam('page', { default: 1, values: [1, 2, 3] })())).toBe(1)
+  expect(render('?tags=', () => queryParam<string[]>('tags', { default: ['a'] })())).toEqual([])
+  expect(render('?q=', () => queryParam('q', { default: 'x' })())).toBe('')
 })
 
-it('renders persisted.query on a schema page as the server reads the query', () => {
-  expect(render('?tags=&nums=&q=', () => [persisted.query<string[]>('tags', ['a'])(), persisted.query<number[]>('nums', [1])(), persisted.query('q', 'x')()], true)).toEqual([[], [], ''])
+it('renders queryParam on a schema page as the server reads the query', () => {
+  expect(render('?tags=&nums=&q=', () => [queryParam<string[]>('tags', { default: ['a'] })(), queryParam<number[]>('nums', { default: [1] })(), queryParam('q', { default: 'x' })()], true)).toEqual([[], [], ''])
 })
 
 it('reads a blank optional field as left out on both sides, its default filling in', () => {

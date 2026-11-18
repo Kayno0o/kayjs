@@ -1120,7 +1120,7 @@ describe('a page read by who sent it', () => {
       Bun.write(join(dir, 'own.kay'), `${reading}ctx.headers.set("cache-control", "public, max-age=60")\n---\np {seen}\n`),
       Bun.write(join(dir, 'varied.kay'), `${reading}ctx.headers.set("vary", "Accept-Language, Cookie")\n---\np {seen}\n`),
       Bun.write(join(dir, 'away.kay'), `${reading}if (!seen)\n  ctx.redirect("/own")\n---\np {seen}\n`),
-      Bun.write(join(dir, 'themed.kay'), '--- server\nexport const page = { prerender: true }\n--- script\nimport { persisted } from "kay"\n\nconst theme = persisted("theme", "light")\n---\np {theme()}\n'),
+      Bun.write(join(dir, 'themed.kay'), '--- server\nexport const page = { prerender: true }\n--- script\nimport { persisted } from "kay"\n\nconst theme = persisted.cookie("theme", "light")\n---\np {theme()}\n'),
     ])
 
     const app = new Elysia().use(await pages({ dirs: { routes: dir }, prebuilt: false, security: false }))

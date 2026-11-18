@@ -14,7 +14,7 @@ export const contact = action(t.Object({ message: t.String({ maxLength: 200 }), 
 })
 
 const failure = contact.form.failed()?.data
-const sent = contact.succeeded()
+const sent = contact.data()
 ---
 head
   title Scoped
@@ -25,4 +25,4 @@ form(action={contact})
 if failure
   p.error {failure.refused}
 if sent
-  p.sent Sent {sent.data}
+  p.sent Sent {sent}

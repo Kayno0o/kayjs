@@ -201,7 +201,7 @@ describe('stream', () => {
 
       failing.start()
       await eventually(() => expect(failing.status()).toBe('failed'))
-      expect(failing.last()).toBe(1)
+      expect(failing.data()).toBe(1)
       expect(failing.error()).toBeInstanceOf(ApiError)
 
       const garbled = readEvents<number>(async () => sse('data: not devalue {\n\n'), false)
@@ -237,12 +237,12 @@ describe('stream', () => {
 
       flush()
       await eventually(() => expect(failing.status()).toBe('failed'))
-      expect(failing.last()).toBe(1)
+      expect(failing.data()).toBe(1)
       expect(failing.error()).toMatchObject({ status: 0, message: 'the source broke' })
       expect(failing.error()?.cause).toBe(boom)
       failing.retry()
       await eventually(() => expect(runs).toBe(2))
-      await eventually(() => expect(failing.last()).toBe(2))
+      await eventually(() => expect(failing.data()).toBe(2))
     }
     finally {
       Reflect.deleteProperty(globalThis, 'document')
@@ -264,7 +264,7 @@ describe('stream', () => {
     expect(reader.error()?.status).toBe(503)
     await eventually(() => expect(reader.status()).toBe('done'))
     expect(reader.error()).toBeUndefined()
-    expect(reader.last()).toBe(2)
+    expect(reader.data()).toBe(2)
     reader.retry()
     await turn()
     expect(opened).toBe(2)
@@ -359,7 +359,7 @@ describe('resource', () => {
 
     read.retry()
     await eventually(() => expect(read.status()).toBe('ready'))
-    expect([read.pending(), read.error(), read.value()]).toEqual([false, undefined, 'ok'])
+    expect([read.pending(), read.error(), read.data()]).toEqual([false, undefined, 'ok'])
   })
 
   it('retries only a failure, never when ready, loading or gone', async () => {
@@ -607,12 +607,12 @@ describe('the shared shape, further cases', () => {
       expect([read.status(), read.pending()]).toEqual(['ready', true])
       release[0]?.()
       await again
-      expect([read.value(), read.pending()]).toEqual(['two', false])
+      expect([read.data(), read.pending()]).toEqual(['two', false])
 
       const failing = refetch!()
 
       await failing
-      expect([read.status(), read.pending(), read.error(), read.value()]).toEqual(['ready', false, undefined, 'two'])
+      expect([read.status(), read.pending(), read.error(), read.data()]).toEqual(['ready', false, undefined, 'two'])
     }
     finally {
       fetched.mockRestore()
@@ -649,7 +649,7 @@ describe('the shared shape, further cases', () => {
 
     reader.start()
     reader.start(async () => sse(value(2), 'event: end\n\n'))
-    await eventually(() => expect(reader.last()).toBe(2))
+    await eventually(() => expect(reader.data()).toBe(2))
     bodies[0]?.(new Response('no', { status: 500 }))
     await turn()
     await turn()

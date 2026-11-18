@@ -138,8 +138,6 @@ export interface Socket<Send, Receive> extends Reader<Receive, ConnectionStatus>
   send: (message: Send) => void
   // Called with `{ key, fields }` when the route refuses a message it was sent: it answers it as `{ error: { key, fields } }`, which is no message of the route's `reply`, so `data()` and `onData` never see it. Returns what stops it.
   onRefused: (listener: (event: SocketRefusal) => void) => () => void
-  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  last: () => Receive | undefined
 
   // Called each time the connection opens, a reconnect included, before what was queued goes: where a client joins its rooms again, or refetches what it missed (`reconnected` is true after the first open). Returns what stops it.
   onOpen: (listener: (event: { reconnected: boolean }) => void) => () => void
@@ -151,8 +149,6 @@ export interface Socket<Send, Receive> extends Reader<Receive, ConnectionStatus>
 
 // What every stream of values an island reads shares: a `stream()`, and the stream a streaming action answers with.
 export interface Connection<T> extends Reader<T, ConnectionStatus> {
-  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  last: () => T | undefined
 
   // Called each time the stream opens, a reconnect included (`reconnected` is true after the first open): where an island refetches what a drop may have lost, when the route sends no ids to resume from. A streaming action's answer is open before a listener can attach, so for it this runs after `retry()` only. Returns what stops it.
   onOpen: (listener: (event: { reconnected: boolean }) => void) => () => void
@@ -238,7 +234,6 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined, 
         queued.shift()
     },
     data: link.last,
-    last: link.last,
     status: link.status,
     pending: link.pending,
     error: link.error,
@@ -397,7 +392,6 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
       void read(run)
     },
     data: link.last,
-    last: link.last,
     status: link.status,
     pending: link.pending,
     error: link.error,
@@ -513,7 +507,7 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>, hooks?
   onMount(start)
   onCleanup(close)
 
-  return { data: link.last, last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), ...connectionHooks(link, opened.on, hooks), ended: ended(link), close, start }
+  return { data: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), ...connectionHooks(link, opened.on, hooks), ended: ended(link), close, start }
 }
 
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page, or with `start: false` each time `start()` is called: each value typed as the route sends it, Dates, Maps and Sets included.
@@ -589,8 +583,7 @@ export interface ResourceExtras<T> {
 }
 
 export interface Resource<T> extends Reader<T, LoadStatus> {
-  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  value: () => T | undefined
+
   // Asks the route again with the same options, until the component that read it is gone, even when it is ready.
   refresh: () => void
   // Sets the value at once, for every resource sharing its key, and asks the route again to settle it: a request still in flight is dropped, so an older answer never overwrites it. `{ refresh: false }` keeps the value as set. Given a function, it gets the current value.
@@ -957,7 +950,6 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
 
   return {
     data: value,
-    value,
     status,
     pending: busy,
     error,
@@ -1045,8 +1037,7 @@ export interface TrackedApi<Module, Path> extends Reader<unknown, LoadStatus> {
   readonly data: () => unknown
   // Called with `{ value, input }` when a call succeeds, `input` the options it was given; returns what stops it. Hooks given to `call.track()` run first.
   readonly onData: (listener: (event: { value: unknown, input: unknown }) => void) => () => void
-  /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  readonly onSuccess: (listener: (event: { data: unknown, input: unknown }) => void) => () => void
+
   // Called with `{ error, input }` when a call fails, a refusal or no answer, not for an abort; returns what stops it.
   readonly onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }

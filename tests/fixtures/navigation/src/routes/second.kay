@@ -18,7 +18,7 @@ export const add = action(t.Object({ title: t.String({ maxLength: 200, minLength
 })
 
 const failure = add.form.failed()
-const success = add.succeeded()
+const success = add.data()
 const titles = store.titles
 --- script
 import './second.css'
@@ -39,7 +39,7 @@ form(action={add})
 if failure?.data then data
   p.error {data.message}
 if success then done
-  p.done Added {done.data}
+  p.done Added {done}
 ul
   for title, i of titles key={i}
     li {title}

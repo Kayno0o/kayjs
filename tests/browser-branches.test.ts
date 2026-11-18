@@ -23,7 +23,7 @@ describe('the server branches of the runtime, on a server', () => {
 
   it('names no room of its own and holds no connection open', () => {
     expect(() => presence()).toThrow('presence() with no room')
-    expect(presence('lobby').count()).toBe(0)
+    expect(presence({ room: 'lobby' }).count()).toBe(0)
     expect(hold.tab).toBeUndefined()
   })
 

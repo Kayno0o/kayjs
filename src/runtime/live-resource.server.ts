@@ -80,7 +80,6 @@ export function serverResource<T>(key: string | undefined, url: string | undefin
 
   return {
     data: () => value,
-    value: () => value,
     status: () => ready ? 'ready' : 'loading',
     pending: () => !ready,
     error: () => undefined,

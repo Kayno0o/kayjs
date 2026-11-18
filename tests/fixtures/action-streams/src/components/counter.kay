@@ -21,6 +21,6 @@ button.start(type="button" onClick={start}) Start
 button.forever(type="button" onClick={forever}) Forever
 button.quiet(type="button" onClick={hush}) Quiet
 button.stop(type="button" onClick={() => answer()?.close()}) Stop
-p.last {String(answer()?.last() ?? '')}
+p.last {String(answer()?.data() ?? '')}
 p.status {answer()?.status() ?? 'none'}
 p.pending {String(count.pending() || endless.pending())}

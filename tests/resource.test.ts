@@ -69,8 +69,8 @@ const { initial } = props<{ initial?: { items: string[], locale: string } }>()
 const list = resource(data, '/items', initial === undefined ? undefined : { initial })
 ---
 p.status {list.status()}
-p.items {list.value()?.items.join(',')}
-p.locale {list.value()?.locale}
+p.items {list.data()?.items.join(',')}
+p.locale {list.data()?.locale}
 `,
   'src/components/Other.kay': `---
 import { resource } from 'kay'
@@ -80,7 +80,7 @@ const list = resource(data, '/boom')
 const evil = resource(data, '/evil')
 ---
 p.boom {list.status()}
-p.evil {evil.status()}: {evil.value()?.text}
+p.evil {evil.status()}: {evil.data()?.text}
 `,
   'src/components/Me.kay': `---
 import { resource } from 'kay'
@@ -88,7 +88,7 @@ import priv from '../api/private'
 
 const me = resource(priv, '/me')
 ---
-p.me {me.status()}: {me.value()?.user}
+p.me {me.status()}: {me.data()?.user}
 `,
   'src/routes/index.kay': `---
 import Items from '../components/Items.kay'
@@ -147,7 +147,7 @@ import data from '../api/data'
 
 const who = resource(data, '/who')
 ---
-p.who {who.value()?.cookie}|{who.value()?.language}
+p.who {who.data()?.cookie}|{who.data()?.language}
 `,
   'src/components/Editor.kay': `---
 import { resource } from 'kay'
@@ -157,7 +157,7 @@ const entry = resource(data, '/entry', { seed: false })
 const room = resource(data, '/names')
 ---
 p.entry {entry.status()}
-p.names {room.value()?.names.join(',')}/{room.value()?.count}
+p.names {room.data()?.names.join(',')}/{room.data()?.count}
 `,
   'src/routes/editor.kay': `---
 import Editor from '../components/Editor.kay'
@@ -435,11 +435,11 @@ describe('resource() in the browser', () => {
     await until(() => one.status() === 'ready' && other.status() === 'ready')
 
     expect(answers - before).toBe(2)
-    expect(two.value()).toEqual(one.value())
+    expect(two.data()).toEqual(one.data())
 
     one.mutate({ n: 99 }, { refresh: false })
-    expect(two.value()).toEqual({ n: 99 })
-    expect(other.value()).not.toEqual({ n: 99 })
+    expect(two.data()).toEqual({ n: 99 })
+    expect(other.data()).not.toEqual({ n: 99 })
   })
 
   it('shares by key when given one', async () => {
@@ -449,7 +449,7 @@ describe('resource() in the browser', () => {
     await until(() => two.status() === 'ready')
 
     expect(answers - before).toBe(1)
-    expect(one.value()).toEqual(two.value())
+    expect(one.data()).toEqual(two.data())
   })
 
   it('asks a keyed function again when a signal it read changes', async () => {
@@ -463,9 +463,9 @@ describe('resource() in the browser', () => {
       return now
     }, { key: 'fn-key' }))
 
-    await until(() => found.value() === 'a')
+    await until(() => found.data() === 'a')
     query.set('b')
-    await until(() => found.value() === 'b')
+    await until(() => found.data() === 'b')
     expect(seen).toEqual(['a', 'b'])
   })
 
@@ -477,11 +477,11 @@ describe('resource() in the browser', () => {
     await Bun.sleep(5)
 
     expect(found.status()).toBe('ready')
-    expect(found.value()).toEqual({ n: 0 })
+    expect(found.data()).toEqual({ n: 0 })
     expect(answers).toBe(before)
 
     found.refresh()
-    await until(() => (found.value() as { n: number }).n !== 0)
+    await until(() => (found.data() as { n: number }).n !== 0)
 
     expect(answers - before).toBe(1)
   })
@@ -503,7 +503,7 @@ describe('resource() in the browser', () => {
     await Bun.sleep(5)
 
     expect(found.status()).toBe('ready')
-    expect(found.value()).toEqual({ n: 'from the server' })
+    expect(found.data()).toEqual({ n: 'from the server' })
     expect(answers).toBe(before)
   })
 
@@ -519,19 +519,19 @@ describe('resource() in the browser', () => {
     found.refresh()
     expect(found.status()).toBe('loading')
     found.mutate({ n: 'mutated' })
-    expect(found.value()).toEqual({ n: 'mutated' })
+    expect(found.data()).toEqual({ n: 'mutated' })
     expect(found.status()).toBe('ready')
 
     old.resolve({ n: 'older' })
     await Bun.sleep(10)
-    expect(found.value()).toEqual({ n: 'mutated' })
+    expect(found.data()).toEqual({ n: 'mutated' })
 
     settled.resolve({ n: 'settled' })
-    await until(() => (found.value() as { n: unknown }).n === 'settled')
+    await until(() => (found.data() as { n: unknown }).n === 'settled')
     expect(found.pending()).toBe(false)
 
     found.mutate((current: unknown) => ({ n: `${(current as { n: string }).n}!` }), { refresh: false })
-    expect(found.value()).toEqual({ n: 'settled!' })
+    expect(found.data()).toEqual({ n: 'settled!' })
   })
 
   it('revalidates on focus, on reconnect and on a duration, quietly, and stops with the component', async () => {

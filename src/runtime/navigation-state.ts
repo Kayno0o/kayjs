@@ -147,15 +147,3 @@ async function logged<A, T>(fn: (argument: A) => T, argument: A): Promise<Awaite
     return undefined
   }
 }
-
-// kept: free
-/** @deprecated Call `navigation.onBeforeNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it. */
-export function onBeforeNavigate(fn: (event: BeforeNavigate) => boolean | void | Promise<boolean | void>): () => void {
-  return beforeNavigate(fn)
-}
-
-// kept: free
-/** @deprecated Call `navigation.onNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it. */
-export function onNavigate(fn: (event: NavigateEvent) => unknown): () => void {
-  return afterNavigate(fn)
-}

@@ -1324,8 +1324,8 @@ describe('signal writes', () => {
     expect(checked.tsx).toContain('KayWritable(open).set(!open())')
   })
 
-  it('read and write the signals an entry of persisted makes like the ones persisted() makes', () => {
-    const source = '---\nimport { persisted } from \'kay\'\nconst size = persisted.local(\'size\', 1)\nconst step = persisted.session(\'step\', \'a\')\nconst tab = persisted.query(\'tab\', \'x\')\nconst tone = persisted.cookie(\'tone\', \'y\')\nfunction f() {\n  size = 2\n  step = \'b\'\n  tab = \'z\'\n  tone = \'w\'\n}\n---\np {size} {step} {tab} {tone}\n'
+  it('read and write the signals an entry of persisted makes', () => {
+    const source = '---\nimport { persisted, queryParam } from \'kay\'\nconst size = persisted.local(\'size\', 1)\nconst step = persisted.session(\'step\', \'a\')\nconst tab = queryParam(\'tab\', { default: \'x\' })\nconst tone = persisted.cookie(\'tone\', \'y\')\nfunction f() {\n  size = 2\n  step = \'b\'\n  tab = \'z\'\n  tone = \'w\'\n}\n---\np {size} {step} {tab} {tone}\n'
     const runs = compileKay(source, 'test.kay', { output: 'dom' })
 
     expect(runs.diagnostics.map(d => d.message)).toEqual([])
@@ -1359,14 +1359,14 @@ describe('signal writes', () => {
 
 describe('module signals', () => {
   it('finds the signals and memos a module exports as export const, made by kay\'s functions', () => {
-    expect(moduleSignals('import { signal as s, memo, persisted } from \'kay\'\nimport { linked } from \'other\'\n\nexport const a = s(1), b = memo(() => a())\nexport const c = persisted(\'c\', 0)\nexport const d = linked(() => 1)\nconst e = s(2)\nexport let f = s(3)\nexport { e }\n')).toEqual({ a: 'signal', b: 'memo', c: 'persisted', e: 'signal' })
+    expect(moduleSignals('import { signal as s, memo, persisted } from \'kay\'\nimport { linked } from \'other\'\n\nexport const a = s(1), b = memo(() => a())\nexport const c = persisted.cookie(\'c\', 0)\nexport const d = linked(() => 1)\nconst e = s(2)\nexport let f = s(3)\nexport { e }\n')).toEqual({ a: 'signal', b: 'memo', c: 'persisted', e: 'signal' })
     expect(moduleSignals('import { debounced, signal } from \'kay\'\n\nexport const typed = signal(\'\')\nexport const settled = debounced(typed, \'300ms\')\n')).toEqual({ typed: 'signal', settled: 'memo' })
     expect(moduleSignals('import { throttled, signal } from \'kay\'\n\nexport const typed = signal(\'\')\nexport const slow = throttled(typed, \'300ms\')\n')).toEqual({ typed: 'signal', slow: 'memo' })
     expect(moduleSignals('export const a = signal(1)\n')).toEqual({})
   })
 
   it('finds the signals made by an entry of persisted, under the name persisted is imported as', () => {
-    expect(moduleSignals('import { persisted as keep, signal } from \'kay\'\n\nexport const a = keep.local(\'a\', 0), b = keep.session(\'b\', 0), c = keep.cookie(\'c\', 0), d = keep.query(\'d\', \'\')\nexport const e = signal.local(\'e\')\nexport const f = other.local(\'f\')\nexport const g = keep.other(\'g\')\n')).toEqual({ a: 'persisted', b: 'persisted', c: 'persisted', d: 'persisted' })
+    expect(moduleSignals('import { persisted as keep, signal } from \'kay\'\n\nexport const a = keep.local(\'a\', 0), b = keep.session(\'b\', 0), c = keep.cookie(\'c\', 0)\nexport const e = signal.local(\'e\')\nexport const f = other.local(\'f\')\nexport const g = keep.other(\'g\')\n')).toEqual({ a: 'persisted', b: 'persisted', c: 'persisted' })
   })
 })
 

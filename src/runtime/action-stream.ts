@@ -114,7 +114,6 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
 
   const self: ActionStream<T> & Settles = {
     data: link.last,
-    last: link.last,
     status: link.status,
     pending: link.pending,
     error: link.error,

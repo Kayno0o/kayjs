@@ -224,7 +224,7 @@ describe('a vouched innerHTML in the browser', () => {
 
 describe('a spread onto an element in the browser, as it changes', () => {
   const mount2 = site({
-    'main.kay': '---\nimport { persisted, signal, trustHtml } from \'kay\'\n\nconst safe = trustHtml(\'<b>live-dom-1</b>\')\nconst turn = signal(0)\nconst stored = persisted(\'forged\', \'\')\n---\ndiv.live({...{ get innerHTML() { return turn() === 0 ? safe : \'<i>live-raw-1</i>\' } }})\nbutton(onClick={() => turn.set(1)}) turn\ndiv.cookie({...{ innerHTML: stored() }})\n',
+    'main.kay': '---\nimport { persisted, signal, trustHtml } from \'kay\'\n\nconst safe = trustHtml(\'<b>live-dom-1</b>\')\nconst turn = signal(0)\nconst stored = persisted.cookie(\'forged\', \'\')\n---\ndiv.live({...{ get innerHTML() { return turn() === 0 ? safe : \'<i>live-raw-1</i>\' } }})\nbutton(onClick={() => turn.set(1)}) turn\ndiv.cookie({...{ innerHTML: stored() }})\n',
   })
 
   it('checks a getter on each read, warns when it turns raw, and reads a forged cookie as nothing vouched for', async () => {

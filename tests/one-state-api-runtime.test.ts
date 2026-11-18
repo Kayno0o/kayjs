@@ -66,15 +66,6 @@ describe('queryParam', () => {
       expect(location.search).toBe('')
     })
   })
-
-  it('is what the deprecated persisted.query gives', () => {
-    setURL('http://localhost/page?n=3')
-
-    reactive.root(() => {
-      expect(persisted.persisted.query('n', 1, { values: [1, 2, 3] })()).toBe(3)
-      expect(persisted.queryParam('n', { default: 1, values: [1, 2, 3] })()).toBe(3)
-    })
-  })
 })
 
 describe('navigate.query', () => {
@@ -105,38 +96,10 @@ describe('navigate.query', () => {
       navigation.navigation.hooks = previous as never
     }
   })
-
-  it('is the form navigate({ query }) still takes', async () => {
-    setURL('http://localhost/page?a=1')
-
-    const asked: string[] = []
-    const previous = navigation.navigation.hooks
-
-    navigation.navigation.hooks = {} as never
-
-    try {
-      const stop = reactive.root((dispose) => {
-        state.navigation.onBeforeNavigate(({ url }) => {
-          asked.push(url.search)
-
-          return false
-        })
-
-        return dispose
-      })
-
-      expect(await api.navigate({ query: { b: 2 } })).toBe(false)
-      expect(asked).toEqual(['?a=1&b=2'])
-      stop()
-    }
-    finally {
-      navigation.navigation.hooks = previous as never
-    }
-  })
 })
 
 describe('navigation.onNavigate', () => {
-  it('is the hook the standalone onNavigate gives, called with the URL a swap shows and removed by its island', () => {
+  it('is called with the URL a swap shows and removed by its island', () => {
     const seen: string[] = []
     const dispose = reactive.root((stop) => {
       state.navigation.onNavigate(({ url }) => void seen.push(url.pathname))

@@ -206,7 +206,6 @@ interface InfiniteList<Row> extends Source<LoadStatus>
   reload: (rows?: Row[] | undefined) => Promise<void>
   restart: (change: { sort?: SortState | undefined; filter?: Partial<ListFilter>; }) => Promise<void>
   retry: () => Promise<void>
-  /** @deprecated Write `data()`. Removed in 1.108.0. No lint: `infiniteList()` comes from kayjs-ui, whose bindings `kay check` does not follow. */ rows: () => Row[]
   sort: () => SortState | undefined
   sortBy: (sort: SortState | undefined) => Promise<void>
   status: () => LoadStatus

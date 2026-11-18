@@ -79,10 +79,6 @@ export function reviveActions(): void {
   }
 }
 
-function succeededOf(found: Outcome | undefined): { data: unknown } | undefined {
-  return found?.succeeded ? { data: found.data } : undefined
-}
-
 function statusOf(inFlight: number, found: Outcome | undefined, failed: object | undefined): LoadStatus {
   if (inFlight > 0)
     return 'loading'
@@ -204,8 +200,8 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       settled: read(async () => idle.wait(flying())),
       ...formHooks(url),
       progress: read(progress),
-      form: read({ failed, error, validate }),
-      succeeded: read(() => succeededOf(outcome())),
+      form: read({ failed, error, validate }),,
+
       data: read(() => outcome()?.succeeded ? outcome()?.data : undefined),
       status: read(() => statusOf(inFlight(), outcome(), failed())),
       refused: read((error: unknown) => error instanceof ActionError && refusedAt.get(error) === url()),

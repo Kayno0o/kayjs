@@ -261,7 +261,7 @@ if (uses('pageSize') && pageSize !== undefined && ((uses('virtual') && virtual) 
   throw new KayError('argument-invalid', 'kayjs-ui: a Table with a pageSize cannot be virtual or take a list, which already hold their rows by the window or by the page')
 
 const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: failure => onError?.(failure) })
-const rows = () => list ? (list.data ?? list.rows)() : source.rows()
+const rows = () => list ? list.data() : source.rows()
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
 // The sort kept in the address is read when the table is made.
 // A Table drawn as plain markup has no script to sort with, so it keeps its sort in the URL under `sort` unless `sortParam` names another, and its headers link to it.

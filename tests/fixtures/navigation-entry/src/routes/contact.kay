@@ -7,8 +7,8 @@ export const send = action(t.Object({ note: t.String({ maxLength: 200 }) }), () 
 h1 Contact
 form(action={send})
   input(name="note" aria-label="Note")
-  if send.succeeded() then done
-    p.sent {done.data}
+  if send.data() then done
+    p.sent {done}
   button Send
 a.home(href="/") Home
 a.login(href="/login") Login

@@ -230,7 +230,7 @@ describe('the value encoder', () => {
     const root = resolve(await fixtureCopy('runtime-chunks'))
 
     dirs.push(root)
-    await Bun.write(join(root, 'src/components/kept.kay'), '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\nbutton.kept(onClick={() => theme.set(\'dark\')}) Kept {theme()}\n')
+    await Bun.write(join(root, 'src/components/kept.kay'), '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.local(\'theme\', \'light\')\n---\nbutton.kept(onClick={() => theme.set(\'dark\')}) Kept {theme()}\n')
     await Bun.write(join(root, 'src/routes/kept.kay'), '---\nimport Kept from \'../components/kept.kay\'\n---\nh1 Kept\nKept\n')
 
     const client = await buildClient(root)

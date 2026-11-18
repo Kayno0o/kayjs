@@ -329,7 +329,7 @@ const answer = stream(chat, '/answer', {
 p {answer.data()}
 ```
 
-`last()` is the latest event, `onData(({ value }) => ...)` gets each one, and `status()` tells whether the stream is open, done or failed. A failed stream has its reason in `error()`, and `retry()` starts it again. `await answer.ended()` waits for the end and gives the last event, or throws the reason it failed.
+`data()` is the latest event, `onData(({ value }) => ...)` gets each one, and `status()` tells whether the stream is open, done or failed. A failed stream has its reason in `error()`, and `retry()` starts it again. `await answer.ended()` waits for the end and gives the last event, or throws the reason it failed.
 
 ### Starting a stream by hand
 
@@ -368,7 +368,7 @@ news.onClose(({ status }) => console.log(status))
 
 ### Streaming anything else
 
-`stream` also takes a function returning an async iterable, and gives `last()`, `onData()`, `status()` and `close()`. The iterable has to stop on the `signal` the function receives.
+`stream` also takes a function returning an async iterable, and gives `data()`, `onData()`, `status()` and `close()`. The iterable has to stop on the `signal` the function receives.
 
 <ReadMore href="/llms/api-from-islands#event-streams">How a source is read and stopped, failure handling and keep-alive comments are in the full API routes reference.</ReadMore>
 
@@ -390,7 +390,7 @@ export default api().ws('/:room', {
 })
 ```
 
-An island opens it with `socket()`. `send` takes the route's `body`, and `last()` reads the last message reactively. `last()` and `onData()` are typed from the route's `response`; a route with a `body` and no `response` gives them as `unknown`, and `kay check` warns about it (`untyped-socket`).
+An island opens it with `socket()`. `send` takes the route's `body`, and `data()` reads the last message reactively. `data()` and `onData()` are typed from the route's `response`; a route with a `body` and no `response` gives them as `unknown`, and `kay check` warns about it (`untyped-socket`).
 
 ```kay
 ---
@@ -515,7 +515,7 @@ export default api()
 
 `publish(room, message)` sends to everyone in the room. Pass `{ except: ws }` to skip the sender.
 
-Rooms know the type of what they send, so `response: chats.response` hands it to the route. An island's `socket()` then receives typed messages, and you do not write the same union again as a schema, or cast what `last()` gives. Give `rooms({ reply: schema })` the schema of what the rooms send, and each message you publish is checked against it where you publish it, so a wrong one throws in your code instead of reaching a client; without it the schema accepts any message and checks nothing.
+Rooms know the type of what they send, so `response: chats.response` hands it to the route. An island's `socket()` then receives typed messages, and you do not write the same union again as a schema, or cast what `data()` gives. Give `rooms({ reply: schema })` the schema of what the rooms send, and each message you publish is checked against it where you publish it, so a wrong one throws in your code instead of reaching a client; without it the schema accepts any message and checks nothing.
 
 A room no one is in is gone. Rooms live in the memory of one process by default. To reach every process of the machine, give `rooms` `sqliteRooms(path)`. A message reaches the other processes as soon as the file changes. The `poll` option, `'250ms'` by default, is how often a process also looks, in case the folder cannot be watched.
 

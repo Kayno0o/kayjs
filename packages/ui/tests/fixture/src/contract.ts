@@ -100,7 +100,7 @@ import Widget from '@kayjs/ui/widget.kay'
 import ZoomPane from '@kayjs/ui/zoom-pane.kay'
 
 const noop = () => undefined
-const action = Object.assign(async () => undefined, { pending: () => false, url: '/_kay/action/contract', form: { failed: () => undefined, error: () => undefined }, succeeded: () => false, status: () => 'idle', data: () => undefined })
+const action = Object.assign(async () => undefined, { pending: () => false, url: '/_kay/action/contract', form: { failed: () => undefined, error: () => undefined }, status: () => 'idle', data: () => undefined })
 const icon = 'plus'
 const rows = [{ key: 'a', label: 'Mars', value: 2, display: 'two' }, { key: 'b', label: 'Venus', value: 1 }]
 const tree = [{ key: 'mars', label: 'Mars', children: [{ key: 'phobos', label: 'Phobos' }] }, { key: 'venus', label: 'Venus' }]
@@ -265,7 +265,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'icon-tile': { icon, color: '#2a5f9e' },
   'image-cropper': { src: '/map.png' },
   'line-chart': { labels: ['a', 'b'], series: [{ name: 'Visits', values: [1, 2] }], label: 'Visits' },
-  'load-more': { list: { rows: () => [], ended: () => false, status: () => 'ready', error: () => undefined, pending: () => false, retry: noop, more: noop } },
+  'load-more': { list: { data: () => [], ended: () => false, status: () => 'ready', error: () => undefined, pending: () => false, retry: noop, more: noop } },
   'markdown-editor': { 'value': '# Hi', 'aria-label': 'Body' },
   'masonry': { items: [1, 2], key: (item: number) => item, tile: (item: number) => String(item) },
   'map-view': { label: 'Route', lines: [[[48.85, 2.35], [48.86, 2.36]]] },

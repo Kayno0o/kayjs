@@ -16,9 +16,9 @@ import { untilHolds } from './helpers/until-holds'
 const declare = live as unknown as (initial: number, id: string, name: string) => { (): number, set: (next: number) => void }
 // A value declared with a lifetime: the options come before the id and name the build adds.
 const declareTtl = live as unknown as (initial: number, id: string, name: string, options: { ttl: string }) => { (): number, set: (next: number) => void }
-const declareKeyedTtl = live as unknown as (initial: (key: string) => number, id: string, name: string, options: { ttl: string }) => { (key: string): number, set: (key: string, next: number) => void, delete: (key: string) => void }
+const declareKeyedTtl = live as unknown as (initial: (key: string) => number, id: string, name: string, options: { ttl: string }) => { (key: string): number, set: (next: number, options: { key: string }) => void, delete: (key: string) => void }
 // A value of each user: the options come before the id and name the build adds.
-const declareOwn = live as unknown as (initial: number, id: string, name: string, options: { user: true }) => { (): number, set: (user: string, next: number) => void, delete: (user: string) => void }
+const declareOwn = live as unknown as (initial: number, id: string, name: string, options: { user: true }) => { (): number, set: (next: number, options: { user: string }) => void, delete: (user: string) => void }
 const dirs: string[] = []
 const VALUE = resolve('src/runtime/live-value.ts')
 const STORE = resolve('src/server/sqlite-live.ts')
@@ -67,7 +67,7 @@ process.exit(0)`)
 
     expect(new TextDecoder().decode((await reader.read()).value).trim()).toBe('ready')
 
-    const setter = spawnProcess(path, 'count.set(n => n + 4)\nroom.set(\'a\', { id: \'a\', users: 1, since: new Date(5) })\nroom.set(\'a\', { id: \'a\', users: 2, since: new Date(5) })')
+    const setter = spawnProcess(path, 'count.set(n => n + 4)\nroom.set({ id: \'a\', users: 1, since: new Date(5) }, { key: \'a\' })\nroom.set({ id: \'a\', users: 2, since: new Date(5) }, { key: \'a\' })')
 
     await output(setter)
 
@@ -110,9 +110,9 @@ process.exit(0)`)
     const unread = declareOwn(0, 'test:unread', 'unread', { user: true })
 
     setLiveStore(store)
-    unread.set('alice@example.com', 3)
-    unread.set('bob', 4)
-    unread.set('bob', 5)
+    unread.set(3, { user: 'alice@example.com' })
+    unread.set(4, { user: 'bob' })
+    unread.set(5, { user: 'bob' })
     unread.delete('bob')
     expect(store.entries()).toEqual([['test:unread', 'alice@example.com', '[3]']])
     setLiveStore(undefined)
@@ -197,7 +197,7 @@ process.exit(0)`)
 
   it('tells the watchers of another process a key was deleted, and a value never declared there stays held', async () => {
     const path = await storePath()
-    const setter = spawnProcess(path, 'room.set(\'z\', { id: \'z\', users: 3, since: new Date(0) })\nconsole.log(\'set\')\nawait Bun.sleep(1500)\nroom.delete(\'z\')\nroom.delete(\'never\')')
+    const setter = spawnProcess(path, 'room.set({ id: \'z\', users: 3, since: new Date(0) }, { key: \'z\' })\nconsole.log(\'set\')\nawait Bun.sleep(1500)\nroom.delete(\'z\')\nroom.delete(\'never\')')
 
     const reader = setter.stdout.getReader()
 
@@ -424,12 +424,12 @@ describe('a live value with a lifetime', () => {
 
     const aEnds = Date.now() + 300
 
-    room.set('a', 1)
+    room.set(1, { key: 'a' })
     await Bun.sleep(200)
 
     const bEnds = Date.now() + 300
 
-    room.set('b', 2)
+    room.set(2, { key: 'b' })
     await Bun.sleep(150)
 
     const [a, b] = [room('a'), room('b')]
@@ -461,7 +461,7 @@ describe('a live value with a lifetime', () => {
     }
 
     for (let key = 0; key < 20_000; key++) {
-      room.set(String(key), 1)
+      room.set(1, { key: String(key) })
 
       // Spreads the ends over a few timer passes.
       if (key % 2000 === 1999)
@@ -492,7 +492,7 @@ describe('a live value with a lifetime', () => {
     let told = false
 
     watchSlot(liveSlot('test:ttl-renewed-by-watcher')!, 'a', () => {
-      room.set('b', 7)
+      room.set(7, { key: 'b' })
       told = true
     })
     await untilHolds(() => told)

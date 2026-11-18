@@ -68,7 +68,7 @@ const { items: given, list: legacy, item, itemKey, estimate = 48, overscan = 4, 
 
 const source = isInfiniteList<Item>(given) ? given : legacy
 const loaded = asyncRows<Item>(() => isInfiniteList<Item>(given) ? undefined : given, { onLoad: ({ rows }) => onLoad?.({ items: rows }), onError: failure => onError?.(failure) })
-const items = () => source ? source.rows() : loaded.rows()
+const items = () => source ? source.data() : loaded.rows()
 const waiting = () => busy || (source ? source.pending() && !source.failed() : loaded.loading())
 const skeleton = () => waiting() && items().length === 0
 const none = () => items().length === 0 && !waiting() && !loaded.failed() && (source === undefined || (source.ended() && !source.failed() && !source.pending()))

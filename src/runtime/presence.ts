@@ -61,12 +61,8 @@ function holdConnection(): void {
 // The page proves the room and the member as it does any live read, so what a visitor is listed as comes from the server fence that passed it, and the page is rendered per request.
 // A member is any value that crosses as island props do, compared as JSON; a room and its member take at most 256 characters as JSON.
 // kept: request
-export function presence<Member = null>(options?: PresenceOptions<Member>): Presence<Member>
-/** @deprecated Written `presence(room, member)`; `deprecated-live-api` rewrites it. Removed in 1.108. */
-export function presence<Member = null>(room: string, member?: Member, options?: Pick<PresenceOptions, 'signal'>): Presence<Member>
-export function presence(first?: string | PresenceOptions<unknown>, second?: unknown, extra?: PresenceOptions): Presence<unknown> {
-  const options = typeof first === 'object' ? first : { room: first, member: second, signal: extra?.signal }
-  const { room, member } = options
+export function presence<Member = null>(options?: PresenceOptions<Member>): Presence<Member> {
+  const { room, member } = options ?? {}
   const key = JSON.stringify([room ?? pagePath(), member ?? null])
 
   if (key.length > MAX_PRESENCE_KEY)
@@ -93,7 +89,7 @@ export function presence(first?: string | PresenceOptions<unknown>, second?: unk
   const end = lasting('presence', presence, () => onCleanup(() => stop(true)), options?.signal)
 
   return Object.assign(end, {
-    others: () => [...new Set(read().filter(text => text !== own))].map(text => JSON.parse(text) as unknown),
+    others: () => [...new Set(read().filter(text => text !== own))].map(text => JSON.parse(text) as Member),
     count: () => read().length,
   })
 }

@@ -501,7 +501,7 @@ describe('reload', () => {
     await list.more()
 
     const seen: number[] = []
-    const stop = list.rows
+    const stop = list.data
 
     const reloading = list.reload()
 

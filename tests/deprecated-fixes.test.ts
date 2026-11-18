@@ -23,16 +23,15 @@ import { hookNames } from '../src/check/hook-names'
 import { i18nKeys } from '../src/check/i18n-keys'
 import { imagesKeys } from '../src/check/images-keys'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
-import { liveApi } from '../src/check/live-api'
+
 import { mailApi } from '../src/check/mail-api'
-import { navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
 import { pagesOptions } from '../src/check/pages-options'
 
 import { routeKeys } from '../src/check/route-keys'
 import { schemaBuilders } from '../src/check/schema-builders'
 import { secretKeys } from '../src/check/secret-keys'
 import { socketFrames } from '../src/check/socket-frames'
-import { sourceReaders } from '../src/check/source-readers'
+
 import { storeMs } from '../src/check/store-ms'
 import { storeNames } from '../src/check/store-names'
 import { testHelpers } from '../src/check/test-helpers'
@@ -53,14 +52,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-schedule-call': scheduleCalls,
   'deprecated-job-options': jobOptions,
   'deprecated-disk-files': diskFilesCalls,
-  'deprecated-source-readers': sourceReaders,
-  'deprecated-live-api': liveApi,
   'deprecated-socket-frames': socketFrames,
-
-  'deprecated-persisted-call': persistedCall,
-  'deprecated-persisted-query': persistedQuery,
-  'deprecated-navigate-query': navigateQuery,
-  'deprecated-navigation-hooks': navigationHooks,
   'deprecated-schema-builders': schemaBuilders,
   'deprecated-action-options': actionOptions,
   'deprecated-test-helpers': testHelpers,

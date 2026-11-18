@@ -27,7 +27,6 @@ function fakeStream() {
 
   const stream: ActionStream<string | Progress> = {
     data: () => last,
-    last: () => last,
     status,
     pending: () => false,
     error: () => undefined,

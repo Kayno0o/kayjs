@@ -342,8 +342,8 @@ describe('presence on the server', () => {
   it('throws an argument-invalid KayError for a room and member over 256 characters, and a 500 page for the page that reads them', async () => {
     const { presence } = await import('../src/runtime/presence')
 
-    expect(() => presence('r'.repeat(250), { name: 'Ann' })).toThrow(KayError)
-    expect(() => presence('r'.repeat(200), { name: 'Ann' })).not.toThrow()
+    expect(() => presence({ room: 'r'.repeat(250), member: { name: 'Ann' } })).toThrow(KayError)
+    expect(() => presence({ room: 'r'.repeat(200), member: { name: 'Ann' } })).not.toThrow()
     expect((await site.visit(`/long/${'r'.repeat(300)}`)).status).toBe(500)
     expect((await site.visit(`/long/${'r'.repeat(100)}`)).status).toBe(200)
   })

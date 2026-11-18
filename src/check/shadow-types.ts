@@ -63,11 +63,9 @@ import { islandOnlyComponents } from './island-only'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 
 import { largePublicImages } from './large-images'
-import { liveApi } from './live-api'
 
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
-import { navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
 import { unreadOpenSettings } from './open-settings'
 import { pagesOptions } from './pages-options'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
@@ -80,7 +78,7 @@ import { secretKeys } from './secret-keys'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { socketFrames } from './socket-frames'
 import { untypedSockets } from './socket-routes'
-import { sourceReaders } from './source-readers'
+
 import { unusedStatusPages } from './status-pages'
 import { storeMs } from './store-ms'
 import { storeNames } from './store-names'
@@ -187,15 +185,11 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
-  async ({ root, options }) => sourceReaders(root, options),
-  async ({ root, options }) => liveApi(root, options),
+
+
   async ({ root, options }) => socketFrames(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
 
-  async ({ root, options }) => persistedCall(root, options),
-  async ({ root, options }) => persistedQuery(root, options),
-  async ({ root, options }) => navigateQuery(root, options),
-  async ({ root, options }) => navigationHooks(root, options),
 
   async ({ root, options }) => schemaBuilders(root, options),
   async ({ root, options }) => schemaJson(root, options),

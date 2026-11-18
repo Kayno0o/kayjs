@@ -108,17 +108,9 @@ kay [./test] TestOptions.publicCache	1.108	deprecated-config-groups	Written `ass
 kay [./test] TestOptions.search	1.108	deprecated-client-keys	Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108.
 kay [./test] TestSite.refusal	1.108.0	deprecated-test-helpers	`site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 kay [./test] TestSite.socketRefusal	1.108.0	deprecated-test-helpers	`site.socket.refused`, beside the `site.socket` it refuses. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
-kay [.] Action.succeeded	1.108.0	deprecated-source-readers	Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] ActionDone.ctx	1.108	deprecated-hook-context	Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108.
 kay [.] ActionFailed.ctx	1.108	deprecated-hook-context	Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108.
 kay [.] ActionRun.ctx	1.108	deprecated-hook-context	Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108.
-kay [.] Connection.last	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] Local.onSync	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] Local.rows	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] Local.syncStatus	1.108.0	deprecated-source-readers	Write `sync.status()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] Local.unsynced	1.108.0	deprecated-source-readers	Write `sync.queued()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] LocalHooks.onSync	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] LocalOptions.onSync	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] MinTimeOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [.] PageSettings.cacheControl	1.108.0	deprecated-page-cache	Write `cache: { browser, shared, swr }`, or `cache: false`. Removed in 1.108.0; `deprecated-page-cache` rewrites `false`.
 kay [.] PageSettings.feed	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
@@ -128,17 +120,7 @@ kay [.] PageSettings.search	1.108.0	deprecated-page-seo	Write it in `seo`. Remov
 kay [.] PageSettings.sitemap	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
 kay [.] PageSettings.ttl	1.108.0	deprecated-page-cache	Write `cache: '1h'`. Removed in 1.108.0; `deprecated-page-cache` rewrites it.
 kay [.] ProofOfWorkOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
-kay [.] Resource.value	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] ServerAction.succeeded	1.108.0	deprecated-source-readers	Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] Socket.last	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] SocketStatus	1.108.0	-	Write `ConnectionStatus`, which a socket shares with every connection. Removed in 1.108.0. No lint: a type, and a socket still never reads `idle`.
-kay [.] Stream.last	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] TrackHooks.onSuccess	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] TrackedApi.onSuccess	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] TrackedCall.onSuccess	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
-kay [.] onBeforeNavigate	1.108.0	deprecated-navigation-hooks	Call `navigation.onBeforeNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it.
-kay [.] onNavigate	1.108.0	deprecated-navigation-hooks	Call `navigation.onNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it.
-kay [.] presence	1.108	deprecated-live-api	Written `presence(room, member)`; `deprecated-live-api` rewrites it. Removed in 1.108.
 mail [./test] mailTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 mail [.] ContactOptions.onSend	1.108	deprecated-hook-names	Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 mail [.] ListOptions.onBroadcast	1.108	deprecated-hook-names	Written `afterBroadcast`; `deprecated-hook-names` rewrites it. Removed in 1.108.
@@ -149,14 +131,10 @@ mail [.] MailExtensionOptions.onSend	1.108	deprecated-hook-names	Written `afterS
 mail [.] MailExtensionOptions.onSuppress	1.108	deprecated-hook-names	Written `afterSuppress`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 mail [.] MailerOptions.onSend	1.108	deprecated-hook-names	Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 mail [.] MailerOptions.onSuppress	1.108	deprecated-hook-names	Written `afterSuppress`; `deprecated-hook-names` rewrites it. Removed in 1.108.
-ui [./lib/index] InfiniteList.rows	1.108.0	-	Write `data()`. Removed in 1.108.0. No lint: `infiniteList()` comes from kayjs-ui, whose bindings `kay check` does not follow.
 ui [./lib/index] PaletteLink.external	2.0.0	-	Use `newTab: true`, which wins when both are given. Removed in 2.0.0. No lint: the prop is set on an object a command or a data function builds, as often as on a tag.
 ui [./lib/index] SparkTone	2.0.0	-	Use `Tone`, where `neutral` is the quiet grey `muted` was. Removed in 2.0.0. No lint: a type alias an app imports by name, which editors strike through.
-ui [./lib/infinite-list] InfiniteList.rows	1.108.0	-	Write `data()`. Removed in 1.108.0. No lint: `infiniteList()` comes from kayjs-ui, whose bindings `kay check` does not follow.
-ui [./lib/infinite-list] LoadMoreSource.rows	1.108.0	-	Write `data()`. Removed in 1.108.0. No lint: a list of your own is no call `kay check` knows.
 ui [./lib/palette] PaletteLink.external	2.0.0	-	Use `newTab: true`, which wins when both are given. Removed in 2.0.0. No lint: the prop is set on an object a command or a data function builds, as often as on a tag.
 ui [./lib/sparkline] SparkTone	2.0.0	-	Use `Tone`, where `neutral` is the quiet grey `muted` was. Removed in 2.0.0. No lint: a type alias an app imports by name, which editors strike through.
 ui [./meter.kay] default.fillClass	2.0.0	-	Use `parts={{ fill: '...' }}`, which replaces the accent the same way. Removed in 2.0.0. No lint: an old prop with no mechanical rewrite to a class map.
-ui [.] InfiniteList.rows	1.108.0	-	Write `data()`. Removed in 1.108.0. No lint: `infiniteList()` comes from kayjs-ui, whose bindings `kay check` does not follow.
 ui [.] PaletteLink.external	2.0.0	-	Use `newTab: true`, which wins when both are given. Removed in 2.0.0. No lint: the prop is set on an object a command or a data function builds, as often as on a tag.
 ui [.] SparkTone	2.0.0	-	Use `Tone`, where `neutral` is the quiet grey `muted` was. Removed in 2.0.0. No lint: a type alias an app imports by name, which editors strike through.

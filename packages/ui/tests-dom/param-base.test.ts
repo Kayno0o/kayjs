@@ -5,7 +5,7 @@ import ParamPickers from '../tests/fixture/src/components/param-pickers.kay'
 import ParamTabs from '../tests/fixture/src/components/param-tabs.kay'
 import { click } from './dom'
 
-// The site is mounted under /docs and the page is its French one. `navigate({ query })` and `withQuery` start from the address the browser is at, so these tests pin that both the base and the locale of the page survive a pick.
+// The site is mounted under /docs and the page is its French one. `navigate.query()` and `withQuery` start from the address the browser is at, so these tests pin that both the base and the locale of the page survive a pick.
 const meta = document.createElement('meta')
 
 meta.name = 'kay-base'

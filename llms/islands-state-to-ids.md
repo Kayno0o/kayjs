@@ -15,8 +15,8 @@
 - A page's `--- server` fence, which loads its data before the render, reads a `persisted.cookie()` signal by calling it: `open()` there is the request's value, decoded and checked against `values` as the render does, the default when the cookie is missing or refused, so the fence needs no `ctx.cookies` and no knowledge of the cookie's encoding. The page then answers with `Vary: Cookie`.
 - A page `kay build` prerendered renders a `persisted` signal's default, in its server fence too, and the island corrects it as it hydrates.
 - The cookie is named as it is given, so it never reuses the name of a cookie the app sets itself.
-- `persisted` has one entry per storage, `persisted.cookie()`, `persisted.local()` and `persisted.session()`, each taking the options its storage can use, and a call always names its storage: a bare `persisted(name, value)`, which kept a cookie without saying so, works until 1.108 and `kay upgrade` writes `.cookie` for it (`deprecated-persisted-call`). The `storage` option is gone since 1.105.
-- A query param is not persisted but `queryParam`, below: `persisted.query(name, value, options)` is `queryParam(name, { default: value, ...options })`, works until 1.108 and `kay upgrade` rewrites it (`deprecated-persisted-query`).
+- `persisted` has one entry per storage, `persisted.cookie()`, `persisted.local()` and `persisted.session()`, each taking the options its storage can use, and a call always names its storage: there is no bare `persisted(name, value)`.
+- A query param is not persisted but `queryParam`, below.
 - `queryParam<number>('page')` from `kay` is a signal holding one query param of the page, read as the page's `query` schema reads `ctx.query` (see routing): a number, a boolean, one of an enum, a list from a repeated param, the schema's `default` when the param is left out.
 - The server writes the schema's rules for its params into the page, which the island reads them by, so an island works on any page and Elysia's `t` never reaches the browser; the server renders the same value from the first paint.
 - A value the rules refuse reads as the default rather than throwing.

@@ -37,8 +37,7 @@ export interface LocalConflict<Row> {
 export interface LocalHooks<Row> {
   // A read of the server was taken in, or the queue was sent and the collection stands `synced`; `value` is the rows held then.
   onData?: ((event: { value: readonly Row[] }) => void) | undefined
-  /** @deprecated Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  onSync?: ((event: { rows: readonly Row[] }) => void) | undefined
+
   // A write the server did not take as it was: once for each new issue (it is in `issues()` then), not for those kept from an earlier visit.
   onIssue?: ((event: { issue: LocalIssue<Row> }) => void) | undefined
   // The server could not be read, or the browser keeps no IndexedDB: once for each failure, as `error()` is set.
@@ -71,16 +70,12 @@ export interface LocalSync {
 export interface Local<Row, Key extends keyof Row> extends Reader<readonly Row[], LoadStatus> {
   // The rows held, in key order, reactive; empty until the browser's copy is read.
   data: () => readonly Row[]
-  /** @deprecated Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  rows: () => readonly Row[]
+
   get: (key: Row[Key]) => Row | undefined
   // Both keep the change in the browser at once and resolve then; the server gets it when it can.
   put: (row: Row) => Promise<void>
   remove: (key: Row[Key]) => Promise<void>
-  /** @deprecated Write `sync.queued()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  unsynced: () => number
-  /** @deprecated Write `sync.status()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  syncStatus: () => LocalSyncStatus
+
   // `loading` until the browser's copy is read, then `ready`, or `failed` while `error()` is set; `idle` is never read. Whether writes wait for the server is `sync.status()`, not a failure.
   status: () => LoadStatus
   // Whether the browser's copy is still being read.
@@ -91,8 +86,7 @@ export interface Local<Row, Key extends keyof Row> extends Reader<readonly Row[]
   retry: () => void
   // Called after a sync, with `{ value }` the rows held; returns what stops it.
   onData: (listener: (event: { value: readonly Row[] }) => void) => () => void
-  /** @deprecated Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  onSync: (listener: (event: { rows: readonly Row[] }) => void) => () => void
+
   // Called with each new issue; returns what stops it.
   onIssue: (listener: (event: { issue: LocalIssue<Row> }) => void) => () => void
   // Called when a read of the server failed; returns what stops it.

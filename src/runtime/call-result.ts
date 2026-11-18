@@ -71,8 +71,7 @@ export function settling<Data>(throwing: Promise<Data>, refused: (error: unknown
 export interface TrackHooks<Data> {
   // A call succeeded, `value` what it answered; for a streaming action, once the stream is open.
   onData?: ((event: { value: Data, input: unknown }) => void) | undefined
-  /** @deprecated Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it. */
-  onSuccess?: ((event: { data: Data, input: unknown }) => void) | undefined
+
   // A call failed, for a refusal and for no answer alike; not for an abort or a redirect.
   onError?: ((event: { error: ApiError, input: unknown }) => void) | undefined
 }
@@ -106,13 +105,9 @@ export function trackCalls<Args extends unknown[]>(
   // An error that is no failure of the call, such as a redirect, which `status()`, `error()` and `retry()` leave alone (a retry would post a login or a checkout again).
   aside?: (error: unknown) => boolean,
   hooks?: TrackHooks<never>,
-): ((...args: Args) => CallPromise<CallResult<unknown, unknown>>) & Reader<unknown, LoadStatus> & { settled: () => Promise<void> } & { onSuccess: (listener: (event: { data: unknown, input: unknown }) => void) => () => void } {
-  const successes = listenerSet<{ data: unknown, input: unknown }>()
+): ((...args: Args) => CallPromise<CallResult<unknown, unknown>>) & Reader<unknown, LoadStatus> & { settled: () => Promise<void> } {
   const answers = listenerSet<{ value: unknown, input: unknown }>()
   const failures = listenerSet<{ error: ApiError, input: unknown }>()
-
-  if (hooks?.onSuccess)
-    successes.on(hooks.onSuccess as never)
 
   if (hooks?.onData)
     answers.on(hooks.onData as never)
@@ -147,7 +142,6 @@ export function trackCalls<Args extends unknown[]>(
       setAnswer(data)
       tell = () => {
         answers.emit({ value: data, input: args[0] })
-        successes.emit({ data, input: args[0] })
       }
 
       return data
@@ -181,7 +175,7 @@ export function trackCalls<Args extends unknown[]>(
     error,
     data: answer,
     onData: answers.on,
-    onSuccess: successes.on,
+
     onError: failures.on,
     settled: async () => idle.wait(untrack(inFlight)),
     retry: () => {

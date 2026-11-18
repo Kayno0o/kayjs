@@ -799,7 +799,7 @@ describe('kay mcp tools that write', () => {
   })
 
   it('fixes a deprecated form only with apply, and previews it before', async () => {
-    const source = '--- server\nimport { local } from \'kay\'\n\nconst notes = local({ key: \'id\', read: () => [] })\n\nexport const waiting = () => notes.unsynced()\n---\np x\n'
+    const source = '--- server\nimport { local } from \'kay\'\n\nconst notes = local({ key: \'id\', read: () => [] })\n\nexport const waiting = () => notes.sync.queued()\n---\np x\n'
 
     await Bun.write(join(app, 'src/routes/theme.kay'), source)
 

@@ -38,7 +38,7 @@ describe('who is signed in, asked for the pages that read a value of each user o
   it('gives a streamed page its user\'s value on the first request, as the response is not sent until it is settled', async () => {
     const live = await import(resolve('tests/fixtures/live-user/src/live.ts')) as typeof import('./fixtures/live-user/src/live')
 
-    live.unread.set('alice', 3)
+    live.unread.set(3, { user: 'alice' })
 
     const html = await visit('/streamed')
 
@@ -50,7 +50,7 @@ describe('who is signed in, asked for the pages that read a value of each user o
   it('renders a streamed page reading the value of its user outside the block again for that user', async () => {
     const live = await import(resolve('tests/fixtures/live-user/src/live.ts')) as typeof import('./fixtures/live-user/src/live')
 
-    live.unread.set('alice', 4)
+    live.unread.set(4, { user: 'alice' })
 
     const html = await visit('/streamed-head')
 
