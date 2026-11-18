@@ -1,0 +1,1 @@
+{ "name": "ui-list", "private": true, "dependencies": { "kay": "*", "@kayjs/ui": "*", "@iconify-json/tabler": "*" } }
