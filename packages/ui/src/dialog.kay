@@ -11,7 +11,7 @@ import { closeWatcher, discardAndClose, followsHref, leave, renderedOpen, syncOp
 // The width comes from `--dialog-w`, which `size` sets, so one size is one width in every placement, less the margin only a centred dialog keeps.
 const look = recipe({
   parts: {
-    root: 'flex w-full flex-col overflow-hidden border-solid focus-visible:outline-none border-border-strong bg-surface p-0 [&[open]:not(:modal)]:fixed [&[open]:not(:modal)]:z-30 [&[open]:not(:modal):not([data-modal=false])]:shadow-[0_0_0_100vmax_rgb(0_0_0/0.5)]',
+    root: 'flex w-full flex-col overflow-hidden border-solid border-border-strong bg-surface p-0 [&[open]:not(:modal)]:fixed [&[open]:not(:modal)]:z-30 [&[open]:not(:modal):not([data-modal=false])]:shadow-[0_0_0_100vmax_rgb(0_0_0/0.5)] focus-visible:outline-none',
     head: 'flex shrink-0 items-center gap-2 border-b border-border px-5 py-3',
     title: 'min-w-0 flex-1 text-lg [font-weight:var(--font-weight-semibold)] tracking-label text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     // The body of a `bare` dialog writes data-bare too, as a child cannot read the attribute of its parent in a utility.
