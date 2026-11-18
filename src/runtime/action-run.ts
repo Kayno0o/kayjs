@@ -10,7 +10,7 @@ import { post } from './action-post'
 import { apiErrorOf } from './api-error'
 import { durationSeconds, isZeroDuration } from './duration'
 import { navigation } from './navigation'
-import { released, undoable } from './optimistic'
+import { released } from './optimistic'
 import { randomId } from './random-id'
 import { untrack } from './reactive'
 
@@ -41,6 +41,8 @@ export interface Start {
   visits: number | undefined
   caller: Caller
   turn: number
+  // Puts back what the call's `optimistic` change wrote, which the action applied before this code loaded.
+  undo?: (() => void) | undefined
 }
 
 function idempotencyKey(): string {
@@ -245,14 +247,13 @@ function supersede(lane: Lane, later: AbortController): void {
 
 // Runs a call in its lane, whose in flight count the action started and this ends.
 export async function run(host: Host, start: Start, lane: Lane, given: unknown, fixed: Record<string, unknown> | undefined, options?: CallOptions): Promise<unknown> {
-  const { page, visits, caller, turn } = start
+  const { page, visits, caller, turn, undo } = start
   const input = withFixed(given, fixed)
   const left = () => navigation.visits !== visits
   const mode = options?.queue ?? lane.queue ?? 'parallel'
 
   void hooked(options?.onStart, { input })
 
-  let undo: (() => void) | undefined
   let posted = false
   const flags = { sent: false, timedOut: false }
   // A stream keeps the call in flight until it ends.
@@ -266,8 +267,6 @@ export async function run(host: Host, start: Start, lane: Lane, given: unknown, 
   const whole = join([options?.signal, later?.signal], later !== undefined)
 
   try {
-    undo = options?.optimistic ? undoable(options.optimistic) : undefined
-
     if (later)
       supersede(lane, later)
 

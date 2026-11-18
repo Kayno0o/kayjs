@@ -1,4 +1,4 @@
-import type { Lane } from './action-run'
+import type { Lane, Start } from './action-run'
 import type { Action, ActionErrorDetail, ActionStartDetail, ActionStream, ActionSuccessDetail, CallOptions, CallQueue, Outcome, TrackedCall } from './action-shared'
 import type { ApiError } from './api-error'
 import type { CallPromise, CallResult, TrackHooks } from './call-result'
@@ -13,6 +13,7 @@ import { withoutBase } from './base'
 import { skew } from './build'
 import { settling, signalAborted, trackCalls, whenIdle } from './call-result'
 import { navigation } from './navigation'
+import { released, undoable } from './optimistic'
 import { pageData } from './page-data'
 import { getOwner, liveOwner, onCleanup, ownSignal, untrack } from './reactive'
 import { OUTCOME_SCRIPT } from './swap'
@@ -159,7 +160,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
 
   // The state a call changes is the action's own and is read from the first paint, so a call counts itself in flight at once and hands the rest to the code that runs it, which loads with the first call.
   const run = async (lane: Lane, input: unknown, fixed: Record<string, unknown> | undefined, options?: CallOptions) => {
-    const start = { page: navigation.page, visits: navigation.visits, caller: { owner: liveOwner(getOwner()), arrivals: navigation.arrivals }, turn: ++started }
+    const start: Start = { page: navigation.page, visits: navigation.visits, caller: { owner: liveOwner(getOwner()), arrivals: navigation.arrivals }, turn: ++started }
 
     shift(1)
     called(start.page, null)
@@ -168,11 +169,18 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
     let attempt: typeof loading
 
     try {
+      // An optimistic change shows at once, as the call is pending at once.
+      start.undo = options?.optimistic ? undoable(options.optimistic) : undefined
       code = running ?? await (attempt = loading ??= runCode())
     }
     catch (error) {
       if (loading === attempt)
         loading = undefined
+
+      if (start.undo) {
+        start.undo()
+        released(start.undo)
+      }
 
       shift(-1)
 

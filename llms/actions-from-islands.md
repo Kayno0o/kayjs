@@ -99,7 +99,7 @@ p {answer()?.data()}
 
 ### Show a change before the server answers
 
-`optimistic` writes the signals as soon as the call's code is in (at once once an island has been idle, which loads it) and puts them back if the call fails:
+`optimistic` writes the signals at once and puts them back if the call fails:
 
 ```kay
 ---
