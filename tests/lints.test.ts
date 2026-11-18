@@ -1550,6 +1550,7 @@ describe('signal-from-prop', () => {
   it('leaves a seed prop, another value, a name declared again and an allowed line alone', () => {
     expect(found(island('const picked = signal(initialOpen)'))).toEqual([])
     expect(found(island('const picked = signal(0)'))).toEqual([])
+    expect(found(island('const picked = signal<string>(light)'))).toEqual([])
     expect(found(island('const picked = signal(light.toUpperCase())'))).toEqual([])
     expect(found(island('const picked = signal(light) // kay-allow signal-from-prop'))).toEqual([])
     expect(found(island('const picked = linked(() => light)', 'linked'))).toEqual([])

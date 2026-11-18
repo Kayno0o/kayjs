@@ -664,7 +664,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
         }
       }, () => rendering.headers.append('vary', 'cookie'), rules)
       const chunks = islandChunks(client)
-      const { deferred, islands: shell } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(page.modules, page.data), undefined, chunks)))
+      const { deferred, islands: shell } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(page.modules, page.data, undefined, page.files), undefined, chunks)))
       const unrevivable = unrevivableAction(shell, client)
 
       if (unrevivable)

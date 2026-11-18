@@ -139,7 +139,7 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
     }
   }
 
-  keepMatched(old, body, matching, kept, standIns, keep)
+  keepMatched(old, body, matching, standIns, keep)
 
   // Every island left is taken away, as the morph never keeps one.
   navigation.hooks!.dispose(old)
@@ -200,12 +200,21 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
 }
 
 // An island of the next page that has its match among those of this one, the same component in the same place, stays and takes the new props: what the visitor did in it is its own.
-function keepMatched(old: Element, body: Element, matching: string, kept: ReadonlySet<Element>, standIns: ReadonlyMap<Element, Element>, keep: (placeholder: Element, live: Element) => void): void {
+function keepMatched(old: Element, body: Element, matching: string, standIns: ReadonlyMap<Element, Element>, keep: (placeholder: Element, live: Element) => void): void {
   const live = new Map<string, KeptIsland[]>()
 
+  // Only the islands of the page itself take part: one in another's static slot goes where its parent goes.
   for (const island of old.querySelectorAll<KeptIsland>(matching)) {
-    if (island.dataset.persist === undefined && ![...kept].some(other => other.contains(island)))
-      live.set(placeOf(island), [...live.get(placeOf(island)) ?? [], island])
+    if (island.dataset.persist !== undefined || island.parentElement?.closest(ISLAND))
+      continue
+
+    const place = placeOf(island)
+    const list = live.get(place)
+
+    if (list)
+      list.push(island)
+    else
+      live.set(place, [island])
   }
 
   if (live.size === 0)
@@ -213,7 +222,7 @@ function keepMatched(old: Element, body: Element, matching: string, kept: Readon
 
   for (const placeholder of body.querySelectorAll<HTMLElement>(matching)) {
     // One in the static slot of an island kept went along with it, or away with the copy it replaced.
-    if (placeholder.dataset.persist !== undefined || !body.contains(placeholder) || standIns.has(placeholder) || [...kept].some(island => island.contains(placeholder)))
+    if (placeholder.dataset.persist !== undefined || !body.contains(placeholder) || standIns.has(placeholder) || placeholder.parentElement?.closest(ISLAND))
       continue
 
     const match = live.get(placeOf(placeholder))?.shift()

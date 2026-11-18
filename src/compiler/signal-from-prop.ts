@@ -90,6 +90,10 @@ export function signalFromProps(fence: ParsedFence, props: PropsDeclaration | un
     if (name !== undefined && followed.has(name))
       continue
 
+    // A call with type arguments would lose them in the fix, and `linked` would take the prop's narrower type.
+    if (call.typeArguments)
+      continue
+
     const seed = call.arguments[0]!
     const root = propRoot(seed)
 

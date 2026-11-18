@@ -19,7 +19,7 @@ export { CHUNK_TIMEOUT_MS } from './swap-flight'
 export { TRANSITION_TIMEOUT_MS } from './swap-transition'
 
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link, and `./forms` once a form is posted.
-// The body's content becomes the next page's, morphed so what renders again stays the same element, islands kept only by `persist` or a refresh.
+// The body's content becomes the next page's, morphed so what renders again stays the same element, islands kept by `persist`, a match in the same place, or a refresh.
 // Everything else follows one rule: what the server served changes as the next page serves it, what a script changed or added since stays the script's. The served state is `served` for `<html>`, read from the server's meta, each head element's own `_$s` for the head, and none for `<body>`, which the server writes bare.
 // Its parts: the fetch in `./swap-fetch`, `<html>` and the head in `./swap-head`, the body's islands and what they keep in `./swap-kept` (a deferred server island's render in the lazy `./swap-held`), the morph in `./swap-morph`, the focus in `./swap-focus`, view transitions in `./swap-transition`, and the policy and what the swaps under way share in `./swap-flight`.
 

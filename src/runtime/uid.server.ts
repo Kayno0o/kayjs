@@ -61,9 +61,10 @@ export function islandPrefix(persist?: string): string {
   if (persist === undefined)
     return `${page.token}-${page.islands++}-`
 
-  const seen = page.kept.get(persist) ?? 0
+  const hash = Bun.hash(persist).toString(36).slice(-6)
+  const seen = page.kept.get(hash) ?? 0
 
-  page.kept.set(persist, seen + 1)
+  page.kept.set(hash, seen + 1)
 
-  return `${page.token}-p${Bun.hash(persist).toString(36).slice(-6)}${seen === 0 ? '' : `_${seen}`}-`
+  return `${page.token}-p${hash}${seen === 0 ? '' : `_${seen}`}-`
 }

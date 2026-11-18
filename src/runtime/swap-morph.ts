@@ -3,7 +3,7 @@ import { navigation } from './navigation'
 import { inFlight } from './swap-flight'
 
 const NOTHING: ReadonlySet<Node> = new Set()
-// What the morph never keeps across pages: islands are kept by `persist` or a refresh alone, and a script or a template is put in afresh.
+// What the morph never keeps across pages: islands are kept by `persist`, a match in the same place or a refresh, never morphed, and a script or a template is put in afresh.
 const OPAQUE = `${ISLAND},slot[data-kay-server],script,template`
 // The tags OPAQUE can match, so the selector is only matched for them.
 const OPAQUE_TAGS = new Set(['slot', 'script', 'template'])
@@ -75,8 +75,15 @@ function holdTabStop(element: Element): void {
 
 // Whether a `details` the visitor toggled keeps its state: the render leaves what the server wrote as `open` when the visitor toggled it, so only the visitor changed it. One the server changed takes the server's, and is the visitor's again from its next toggle.
 function keepsOpen(live: Element, other: Element): boolean {
-  if (!inFlight.typing || !(live instanceof HTMLDetailsElement))
+  if (!(live instanceof HTMLDetailsElement))
     return false
+
+  // A swap that keeps nothing of the visitor's leaves what it served as the new baseline.
+  if (!inFlight.typing) {
+    navigation.opened.delete(live)
+
+    return false
+  }
 
   const served = navigation.opened.get(live)
 
