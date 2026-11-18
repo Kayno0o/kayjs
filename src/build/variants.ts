@@ -698,7 +698,8 @@ export class VariantIndex {
     seen.add(path)
 
     for (const { from, taken, forwards } of links) {
-      const outer = this.writtenOf(from, seen)
+      // A file no scanned call site writes is called from where the scan does not look (a route, a layout, a `.ts` module, a package), so what reaches it is unknown.
+      const outer = this.union.has(from) || this.through.has(from) ? this.writtenOf(from, seen) : ANY
 
       if (outer === ANY)
         return ANY
@@ -745,11 +746,11 @@ export class VariantIndex {
   async variantImports(code: string, file: string, source: string): Promise<string> {
     const candidates = await candidatesOf(code, file)
 
-    if (candidates.length === 0)
-      return code
-
     await this.scanned()
     await this.add(file, source)
+
+    if (candidates.length === 0)
+      return code
 
     let result = code
 

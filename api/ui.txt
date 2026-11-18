@@ -2941,6 +2941,7 @@ component default
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
+  close?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
   launcher?: readonly unknown[] | string | undefined | {
@@ -2968,6 +2969,7 @@ component default
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
+  close?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
   launcher?: readonly unknown[] | string | undefined | {
@@ -2995,6 +2997,7 @@ component default
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
+  close?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
   launcher?: readonly unknown[] | string | undefined | {

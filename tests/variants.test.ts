@@ -294,6 +294,10 @@ describe('a component handing its rest props on', () => {
     expect(await features({ 'outer.kay': outer('Dialog({...other} title="t")'), 'page.kay': caller('title="a"') })).toBeUndefined()
   })
 
+  it('counts every prop when no scanned file calls the component that hands them on', async () => {
+    expect(await features({ 'outer.kay': outer('Dialog({...rest} title="t" level={level})') })).toBeUndefined()
+  })
+
   it('follows a chain of components handing their rest props on', async () => {
     const middle = `---\nimport Outer from './outer.kay'\nconst { ...rest } = props<{ [key: string]: unknown }>()\n---\nOuter({...rest} title="m")\n`
 
