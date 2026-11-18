@@ -82,9 +82,10 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Live values and presence](llms/live-values.md): `live()`, presence, websockets
 - [Local collections](llms/local-collections.md): `local()`, offline rows
 - [Rooms](llms/rooms.md): websocket groups, shared state, a snapshot on join
-- [Testing](llms/testing.md): `kay/test`, pages and actions in `bun test`
-- [Testing requests and sockets](llms/testing-requests-jobs-sockets.md): requests, jobs, sockets
-- [Test databases and setup](llms/testing-setup.md): `kay/test/preload`, seeds
+- [Testing](llms/testing.md): `kay/test`, pages and actions
+- [Testing components](llms/testing-mount.md): `mountComponent`
+- [Testing requests](llms/testing-requests-jobs-sockets.md): jobs, sockets
+- [Test databases](llms/testing-setup.md): seeds
 - [Testing in a browser](llms/testing-browser.md): `site.open`
 - [Checks and lints](llms/checks.md): what `kay check` verifies, ESLint on `.kay` files
 - [Lints and warnings](llms/lints.md): levels, groups, fixes, allowing one
