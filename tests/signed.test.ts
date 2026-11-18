@@ -41,7 +41,7 @@ console.log(JSON.stringify([
 
   it('refuses an expired token and one whose expiry was moved', async () => {
     const script = `${HEAD}
-const token = signed.sign('shot', 'abc', { maxAge: '1s' })
+const token = signed.sign('shot', 'abc', { ttl: '1s' })
 const [until, sig] = token.split('.')
 const later = String(Number(until) + 3600) + '.' + sig
 const first = signed.verify('shot', 'abc', token)
@@ -52,7 +52,7 @@ console.log(JSON.stringify([first, signed.verify('shot', 'abc', token), signed.v
     expect(await isolated(script)).toEqual([true, false, false])
   })
 
-  it('does not pass for a signature kay made itself, and rejects a bare number maxAge', async () => {
+  it('does not pass for a signature kay made itself, and rejects a bare number ttl', async () => {
     const script = `${HEAD}
 const until = String(Math.ceil(Date.now() / 1000) + 600)
 let threw = false
