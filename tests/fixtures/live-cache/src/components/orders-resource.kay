@@ -4,4 +4,4 @@ import orders from '../api/orders'
 
 const answer = resource(orders, '/')
 ---
-p.answer {answer.value()?.orders ?? 'none'} via {answer.status()}
+p.answer {answer.data()?.orders ?? 'none'} via {answer.status()}

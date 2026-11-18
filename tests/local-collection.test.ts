@@ -951,7 +951,7 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     expect(await page.text('p.status')).toBe('synced')
   }, 60_000)
 
-  it('tells onIssue once for each new issue and none of those kept from an earlier visit, and onSync with the rows', async () => {
+  it('tells onIssue once for each new issue and none of those kept from an earlier visit, and onData with the rows', async () => {
     const page = await opened()
 
     await page.evaluate(() => {

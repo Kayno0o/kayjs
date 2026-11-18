@@ -303,15 +303,12 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   api(): Local<Row, Key> {
     return {
       data: () => this.view[0]().list,
-
       get: key => this.view[0]().byKey.get(String(key)),
       put: async row => this.write('put', row),
       remove: async key => this.write('remove', { [this.options.key]: key } as Row),
-
       error: this.failure[0],
       retry: () => this.again(),
       onData: this.synced.on,
-
       onIssue: this.raised.on,
       onError: this.failed.on,
       pending: () => this.state[0]() === 'loading',

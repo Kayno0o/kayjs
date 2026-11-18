@@ -64,7 +64,7 @@ const outcomes = new AsyncLocalStorage<() => Outcome | null>()
 
 setRequestOutcome(() => outcomes.getStore()?.())
 
-// Answers a request whose form post, if any, `read` gives: an action's `form.failed()` and `succeeded()` read it in its loads and templates alike.
+// Answers a request whose form post, if any, `read` gives: an action's `form.failed()` and `data()` read it in its loads and templates alike.
 export function withOutcome<T>(read: () => Outcome | null, run: () => T): T {
   return outcomes.run(read, run)
 }

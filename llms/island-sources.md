@@ -71,7 +71,7 @@ A hook is an option of the source and a method of the same name, takes one objec
 
 `socket(chat, '/:room', { params, onData: ({ value }) => add(value), onError: ({ error }) => toast.error(error.message) })` takes them as options; `messages.onClose(({ status }) => ...)` adds one later.
 
-Every source reads alike: a `resource`'s `value()`, a stream's or socket's `last()`, a collection's `rows()`, `unsynced()` and `syncStatus()`, an action's `succeeded()` and the `onSuccess({ data })` and `onSync({ rows })` hooks are gone, as `data()`, `status()`, `sync.queued()`, `sync.status()` and `onData({ value })` do their jobs.
+Every source reads alike: `data()`, `status()`, `pending()`, `error()` and `retry()`, and `onData({ value })` and `onError`; a collection adds `sync.queued()` and `sync.status()`.
 
 ### kayjs-ui components
 

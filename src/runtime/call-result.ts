@@ -71,7 +71,6 @@ export function settling<Data>(throwing: Promise<Data>, refused: (error: unknown
 export interface TrackHooks<Data> {
   // A call succeeded, `value` what it answered; for a streaming action, once the stream is open.
   onData?: ((event: { value: Data, input: unknown }) => void) | undefined
-
   // A call failed, for a refusal and for no answer alike; not for an abort or a redirect.
   onError?: ((event: { error: ApiError, input: unknown }) => void) | undefined
 }
@@ -175,7 +174,6 @@ export function trackCalls<Args extends unknown[]>(
     error,
     data: answer,
     onData: answers.on,
-
     onError: failures.on,
     settled: async () => idle.wait(untrack(inFlight)),
     retry: () => {

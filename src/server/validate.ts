@@ -162,7 +162,7 @@ function readText(schema: unknown, value: unknown, form: boolean, trim: boolean)
   const { properties, required = [] } = (isNode(schema) ? schema : {}) as { properties?: Record<string, Node>, required?: string[] }
 
   for (const [name, field] of Object.entries(properties ?? {})) {
-    // A blank list is the empty one, as `persisted.query` writes it, never one blank item; a blank optional field with a default is left out, so the default fills in.
+    // A blank list is the empty one, as `queryParam` writes it, never one blank item; a blank optional field with a default is left out, so the default fills in.
     if (form && input[name] === '' && field.type === 'array')
       input[name] = []
     else if (form && input[name] === '' && field.default !== undefined && !required.includes(name))

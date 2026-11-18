@@ -51,10 +51,8 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   mount: 'browser',
   navigate: 'browser',
   navigation: 'browser',
-
   onCleanup: 'browser',
   onMount: 'browser',
-
   online: 'browser',
   optimistic: 'browser',
   pageVisible: 'browser',

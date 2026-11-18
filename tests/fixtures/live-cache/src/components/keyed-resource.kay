@@ -6,6 +6,6 @@ const heard = signal('')
 const first = resource(orders, '/', { key: 'orders-keyed', onData: ({ value }) => { heard = `${heard()}${value.orders};` } })
 const second = resource(orders, '/', { key: 'orders-keyed' })
 ---
-p.answer {second.value()?.orders ?? 'none'} via {second.status()}
-p.mirror {first.value()?.orders ?? 'none'}
+p.answer {second.data()?.orders ?? 'none'} via {second.status()}
+p.mirror {first.data()?.orders ?? 'none'}
 p.heard {heard()}

@@ -62,6 +62,9 @@ function holdConnection(): void {
 // A member is any value that crosses as island props do, compared as JSON; a room and its member take at most 256 characters as JSON.
 // kept: request
 export function presence<Member = null>(options?: PresenceOptions<Member>): Presence<Member> {
+  if (options !== undefined && (typeof options !== 'object' || options === null))
+    throw new KayError('argument-invalid', 'kay: presence({ room, member, signal }) takes one options object, not the room and member as arguments')
+
   const { room, member } = options ?? {}
   const key = JSON.stringify([room ?? pagePath(), member ?? null])
 

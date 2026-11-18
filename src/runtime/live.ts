@@ -583,7 +583,6 @@ export interface ResourceExtras<T> {
 }
 
 export interface Resource<T> extends Reader<T, LoadStatus> {
-
   // Asks the route again with the same options, until the component that read it is gone, even when it is ready.
   refresh: () => void
   // Sets the value at once, for every resource sharing its key, and asks the route again to settle it: a request still in flight is dropped, so an older answer never overwrites it. `{ refresh: false }` keeps the value as set. Given a function, it gets the current value.
@@ -1037,7 +1036,6 @@ export interface TrackedApi<Module, Path> extends Reader<unknown, LoadStatus> {
   readonly data: () => unknown
   // Called with `{ value, input }` when a call succeeds, `input` the options it was given; returns what stops it. Hooks given to `call.track()` run first.
   readonly onData: (listener: (event: { value: unknown, input: unknown }) => void) => () => void
-
   // Called with `{ error, input }` when a call fails, a refusal or no answer, not for an abort; returns what stops it.
   readonly onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }

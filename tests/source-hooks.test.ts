@@ -606,7 +606,6 @@ describe('data() and onData on every source', () => {
       const save = stub.track({ onData: ({ value: made, input }) => void seen.push(['option', made, input]) })
 
       save.onData(({ value: made }) => seen.push(['method', made]))
-
       expect(save.data()).toBeUndefined()
       await save({ id: 1 })
       expect(save.data()).toBe('first')

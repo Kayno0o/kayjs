@@ -339,6 +339,12 @@ describe('presence on the server', () => {
     await leaves(rooms, ROOM, 0)
   })
 
+  it('refuses the room and member as arguments, the form before 1.105', async () => {
+    const { presence } = await import('../src/runtime/presence')
+
+    expect(() => (presence as (...args: unknown[]) => unknown)('lobby', { name: 'Ann' })).toThrow(KayError)
+  })
+
   it('throws an argument-invalid KayError for a room and member over 256 characters, and a 500 page for the page that reads them', async () => {
     const { presence } = await import('../src/runtime/presence')
 

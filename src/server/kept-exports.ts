@@ -51,10 +51,8 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   mount: 'free',
   navigate: 'free',
   navigation: 'free',
-
   onCleanup: 'free',
   onMount: 'free',
-
   online: 'free',
   optimistic: 'free',
   pageVisible: 'free',

@@ -35,7 +35,7 @@ export function readParam(rules: QueryRules | undefined, name: string, search: U
     return texts[0]
 
   if (rule.type === 'array') {
-    // A blank text is the empty list, as `persisted.query` writes it.
+    // A blank text is the empty list, as `queryParam` writes it.
     if (texts.length === 1 && texts[0] === '')
       return []
 

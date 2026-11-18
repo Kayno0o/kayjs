@@ -201,7 +201,6 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       ...formHooks(url),
       progress: read(progress),
       form: read({ failed, error, validate }),,
-
       data: read(() => outcome()?.succeeded ? outcome()?.data : undefined),
       status: read(() => statusOf(inFlight(), outcome(), failed())),
       refused: read((error: unknown) => error instanceof ActionError && refusedAt.get(error) === url()),

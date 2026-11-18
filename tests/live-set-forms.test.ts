@@ -26,7 +26,7 @@ describe('set of a live value per key', () => {
     expect(live.room('blue')).toEqual({ id: 'blue', users: 0 })
   })
 
-  it('refuses the key first, as before 1.105', () => {
+  it('refuses the key first, the form before 1.105', () => {
     expect(() => (live.room.set as unknown as (key: string, next: object) => void)('red', { id: 'red', users: 2 })).toThrow('one value for each key')
   })
 
@@ -60,7 +60,7 @@ describe('set of a live value of each user', () => {
     expect(held('dana')).toBe(0)
   })
 
-  it('refuses the user first, as before 1.105', () => {
+  it('refuses the user first, the form before 1.105', () => {
     expect(() => (live.mine.set as unknown as (user: string, next: number) => void)('erin', 9)).toThrow('one value for each user')
   })
 

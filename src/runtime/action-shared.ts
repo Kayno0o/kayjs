@@ -405,7 +405,6 @@ export interface TrackedCall<Input, Result> extends Reader<Result extends { ok: 
   readonly data: () => (Result extends { ok: true, data: infer Data } ? Data : never) | undefined
   // Called with `{ value, input }` when a call succeeds (for a stream, once it is open), `input` what the call was given; returns what stops it. Hooks given to `track()` run first.
   onData: (listener: (event: { value: Result extends { ok: true, data: infer Data } ? Data : never, input: unknown }) => void) => () => void
-
   // Called with `{ error, input }` when a call fails, a refusal or no answer, not for an abort or a redirect; returns what stops it.
   onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }
@@ -446,7 +445,6 @@ export interface Action<Input = never, Output = unknown, Honeypot extends string
   readonly progress: () => number | undefined
   // What a form posting to this action shows: how the post the page renders for went, refused, and the message of each field. Apart from the call state above, which is the island's own calls.
   readonly form: ActionForm<Input, Output, Honeypot>
-
   // What the last call, or the form post the page rendered for, returned; undefined before one succeeded and after a later one failed.
   readonly data: () => Final<Success<Output>> | undefined
   // `idle` before the first call, `loading` while one is in flight, then `ready` or `failed` by the last to settle, as on every source.
