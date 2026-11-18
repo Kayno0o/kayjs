@@ -1,6 +1,5 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { followedRow } from './followed-row'
 import type { StepItem } from './steps'
 import { wording } from 'kay/words'
 import { stepHref } from './steps'
@@ -97,13 +96,13 @@ nav(part="root" {...rest} aria-label={label} aria-busy={source.loading() ? 'true
       li(part="item" data-step={state(index, step.key)} data-outcome={step.state})
         if reached(step, index) && target(step)
           a(part="link" {...target(step)} onClick={event => pick(event, step.key)})
-            {followedRow(() => step, view => body(view, index, state(index, step.key)))}
+            {body(step, index, state(index, step.key))}
         else if reached(step, index) && onSelect
           button(part="link" type="button" onClick={() => void onSelect?.({ key: step.key })})
-            {followedRow(() => step, view => body(view, index, state(index, step.key)))}
+            {body(step, index, state(index, step.key))}
         else
           span(part="link" aria-current={step.key === current ? 'step' : undefined})
-            {followedRow(() => step, view => body(view, index, state(index, step.key)))}
+            {body(step, index, state(index, step.key))}
   if source.loading()
     p(part="status" role="status") {loadingLabel}
   if source.failed()
