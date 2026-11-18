@@ -69,7 +69,7 @@ const SLASHED: Record<string, string> = {
   'tsconfig.json': TSCONFIG,
   'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ site: \'https://example.com\', trailingSlash: \'always\' })\n',
   'src/content.config.ts': CONTENT.replace('LOCALIZED', 'false'),
-  'src/routes/blog/[[page=integer]].kay': LIST.replace('prerender: blog', 'sitemap: blog'),
+  'src/routes/blog/[[page=integer]].kay': LIST.replace('prerender: blog', 'seo: { sitemap: blog }'),
   ...Object.fromEntries(['a', 'b', 'c'].map(slug => [`src/content/posts/${slug}.md`, post(slug)])),
 }
 

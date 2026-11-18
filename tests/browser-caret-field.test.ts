@@ -241,7 +241,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
   const afterSwap = {
     'production': {},
     'dev': { dev: true },
-    'a trailing slash': { trailingSlash: 'always' as const },
+    'a trailing slash': { config: { trailingSlash: 'always' as const } },
   }
 
   for (const [kind, options] of Object.entries(afterSwap)) {
@@ -249,7 +249,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
       const site = await testSite({ root: 'tests/fixtures/caret-field', ...options, browser: { path } })
 
       try {
-        const page = await site.open('trailingSlash' in options ? '/bound/' : '/bound')
+        const page = await site.open('config' in options ? '/bound/' : '/bound')
 
         // The keys arrive right as the swap hands the body to hydration, before the island's chunk resolves.
         await page.evaluate(() => {

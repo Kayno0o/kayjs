@@ -11,7 +11,7 @@ import { pages } from './shared-pages'
 const LINK = /<a\b[^>]*>/g
 
 async function render(options: Record<string, unknown> = {}): Promise<{ html: string, tags: Record<string, string> }> {
-  const site = new Elysia().use(await pages({ root: 'tests/fixtures/link-schemes', prebuilt: false, config: { security: false, client: { inlineStyles: false } }, ...options }))
+  const site = new Elysia().use(await pages({ root: 'tests/fixtures/link-schemes', prebuilt: false, config: { security: false, client: { inlineStyles: false }, ...options } }))
   const html = await (await site.handle(new Request('http://localhost/'))).text()
   const tags: Record<string, string> = {}
 
@@ -102,7 +102,7 @@ describe('links: { schemes }', () => {
   })
 
   it('renders a trusted scheme of a bound href on a page, with a meta for the islands, and the rest as before', async () => {
-    const { html, tags } = await render({ links: { schemes: ['webcal', 'geo'] } })
+    const { html, tags } = await render({ client: { links: { schemes: ['webcal', 'geo'] } } })
 
     expect(tags.calendar).toContain('href="webcal://example.com/events.ics"')
     expect(tags.place).toContain('href="GEO:48.85,2.35"')

@@ -233,7 +233,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a stream
 
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a streamed page under the page limit', () => {
   it('leaves its pending branch when the stream stalls, with no second request, and navigates on', async () => {
-    await using page = await (await site({ client: { pageTimeout: '1s' } })).open('/')
+    await using page = await (await site({ config: { client: { pageTimeout: '1s' } } })).open('/')
 
     await listen(page)
     await page.evaluate(() => {
@@ -257,7 +257,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a stream
   }, 60_000)
 
   it('still has the browser load a page whose shell never comes, after the limit the config sets', async () => {
-    await using page = await (await site({ client: { pageTimeout: '1s' } })).open('/')
+    await using page = await (await site({ config: { client: { pageTimeout: '1s' } } })).open('/')
 
     await listen(page)
 
@@ -270,9 +270,9 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a stream
 })
 
 const SETTINGS = [
-  { name: 'a base', options: { base: '/repo' }, start: '/repo/', slow: '/repo/slow' },
-  { name: 'trailingSlash always', options: { trailingSlash: 'always' as const }, start: '/', slow: '/slow/' },
-  { name: 'a locale prefix', options: { i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, start: '/fr', slow: '/fr/slow' },
+  { name: 'a base', options: { config: { base: '/repo' } }, start: '/repo/', slow: '/repo/slow' },
+  { name: 'trailingSlash always', options: { config: { trailingSlash: 'always' as const } }, start: '/', slow: '/slow/' },
+  { name: 'a locale prefix', options: { config: { i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } } }, start: '/fr', slow: '/fr/slow' },
   { name: 'kay dev', options: { dev: true }, start: '/', slow: '/slow' },
 ]
 

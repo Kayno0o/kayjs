@@ -143,7 +143,7 @@ describe('kay build --format json', () => {
   }, 60_000)
 
   it('verifies an executable whose proxy.key is only on the deploy host', async () => {
-    const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, proxy: { key: \'x-upstream-key\' } }\n', 'src/routes/index.kay': 'p Home\n' })
+    const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false }, proxy: { key: { header: \'x-upstream-key\' } } }\n', 'src/routes/index.kay': 'p Home\n' })
     const env = { ...process.env }
 
     delete env.KAY_PROXY_KEY

@@ -141,9 +141,9 @@ describe('sizeText', () => {
 
 describe('the offline page', () => {
   it('is worded in the default locale, in English without the keys', async () => {
-    const keys = { root: FIXTURE, prebuilt: false, offline: true as const }
-    const english = await offlinePage(await pages({ ...keys, config: { i18n } }))
-    const french = await offlinePage(await pages({ ...keys, config: { i18n: { ...i18n, default: 'fr' } } }))
+    const keys = { root: FIXTURE, prebuilt: false }
+    const english = await offlinePage(await pages({ ...keys, config: { i18n, client: { offline: true } } }))
+    const french = await offlinePage(await pages({ ...keys, config: { i18n: { ...i18n, default: 'fr' }, client: { offline: true } } }))
 
     expect(english).toContain('<html lang="en"')
     expect(english).toContain('<h1>Offline</h1><p>This page needs a connection, and none is open.</p>')

@@ -446,7 +446,7 @@ ${settings}
     const outdir = await scratchDir('card-aspect-')
     const template = join(root, 'src/routes/_card.kay')
 
-    await Bun.write(join(root, 'kay.config.ts'), CONFIG('  images: { aspects: [\'2/1\'] },'))
+    await Bun.write(join(root, 'kay.config.ts'), CONFIG('  assets: { images: { aspects: [\'2/1\'] } },'))
     await Bun.write(template, (await Bun.file(template).text()).replace('import hero from \'../hero.png\'', 'import hero from \'../hero.png\'\nimport { image as cut } from \'kay/image\'').replace('  div(class="absolute top-0 right-0', '  img({...cut(hero, { aspect: \'2/1\' })} class="absolute top-[200px] left-[700px] h-[100px] w-[200px] object-cover" alt="")\n  div(class="absolute top-0 right-0'))
 
     try {
@@ -481,7 +481,7 @@ ${settings}
     const host = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response(Bun.file(join(FIXTURE, 'src/hero.png')), { headers: { 'content-type': 'image/png' } }) })
     const origin = `http://127.0.0.1:${host.port}`
 
-    await Bun.write(join(root, 'kay.config.ts'), CONFIG(`  images: { remote: ['${origin}/photos/'] },`))
+    await Bun.write(join(root, 'kay.config.ts'), CONFIG(`  assets: { images: { remote: ['${origin}/photos/'] } },`))
     await Bun.write(join(root, 'src/routes/index.kay'), `---
 import { shareCard } from 'kay/image'
 ---

@@ -11,9 +11,9 @@ const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromiu
 
 // What the handler is asked for a link and for `navigate('/second')`, and the path each ends on: a link carries the base and the locale prefix as rendered, `navigate()` the same, the server's slash redirect adding the trailing slash.
 const SETTINGS = [
-  { name: 'a base', options: { base: '/repo' }, start: '/repo/', link: ['/repo/second', '/repo/second'], navigate: ['/repo/second', '/repo/second'] },
-  { name: 'trailingSlash always', options: { trailingSlash: 'always' as const }, start: '/', link: ['/second', '/second/'], navigate: ['/second', '/second/'] },
-  { name: 'a locale prefix', options: { i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, start: '/fr', link: ['/fr/second', '/fr/second'], navigate: ['/fr/second', '/fr/second'] },
+  { name: 'a base', options: { config: { base: '/repo' } }, start: '/repo/', link: ['/repo/second', '/repo/second'], navigate: ['/repo/second', '/repo/second'] },
+  { name: 'trailingSlash always', options: { config: { trailingSlash: 'always' as const } }, start: '/', link: ['/second', '/second/'], navigate: ['/second', '/second/'] },
+  { name: 'a locale prefix', options: { config: { i18n: { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } } }, start: '/fr', link: ['/fr/second', '/fr/second'], navigate: ['/fr/second', '/fr/second'] },
 ]
 
 const sites: TestSite[] = []
@@ -59,19 +59,19 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a GET fo
   }, 180_000)
 })
 
-const I18N = { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') }
+const I18N = { locales: ['en', 'fr'], default: 'en', messages: resolve('tests/fixtures/i18n/src/messages') }
 // Where `navigate()` from a button goes, by the path it is given: the current locale's prefix is put on a path with none, and a prefixed one stays as written.
 const LOCALE_TARGETS = [
-  { name: 'a plain path on a prefixed page', options: { i18n: I18N }, start: '/fr', button: 'go', path: '/fr/second' },
-  { name: 'a namespace import of kay', options: { i18n: I18N }, start: '/fr', button: 'member', path: '/fr/second' },
-  { name: 'a plain .ts module an island imports', options: { i18n: I18N }, start: '/fr', button: 'helper', path: '/fr/second' },
-  { name: 'a query and a hash', options: { i18n: I18N }, start: '/fr', button: 'query', path: '/fr/second?x=1' },
-  { name: 'a path already prefixed', options: { i18n: I18N }, start: '/fr', button: 'prefixed', path: '/fr/second' },
-  { name: 'another locale path', options: { i18n: { ...I18N, prefixDefault: true } }, start: '/fr', button: 'other', path: '/en/second' },
-  { name: 'the default locale, unprefixed', options: { i18n: I18N }, start: '/', button: 'go', path: '/second' },
-  { name: 'a prefixed default locale', options: { i18n: { ...I18N, prefixDefault: true } }, start: '/en', button: 'go', path: '/en/second' },
-  { name: 'a base', options: { i18n: I18N, base: '/repo' }, start: '/repo/fr', button: 'go', path: '/repo/fr/second' },
-  { name: 'trailingSlash always', options: { i18n: I18N, trailingSlash: 'always' as const }, start: '/fr', button: 'go', path: '/fr/second/' },
+  { name: 'a plain path on a prefixed page', options: { config: { i18n: I18N } }, start: '/fr', button: 'go', path: '/fr/second' },
+  { name: 'a namespace import of kay', options: { config: { i18n: I18N } }, start: '/fr', button: 'member', path: '/fr/second' },
+  { name: 'a plain .ts module an island imports', options: { config: { i18n: I18N } }, start: '/fr', button: 'helper', path: '/fr/second' },
+  { name: 'a query and a hash', options: { config: { i18n: I18N } }, start: '/fr', button: 'query', path: '/fr/second?x=1' },
+  { name: 'a path already prefixed', options: { config: { i18n: I18N } }, start: '/fr', button: 'prefixed', path: '/fr/second' },
+  { name: 'another locale path', options: { config: { i18n: { ...I18N, mode: 'always' } } }, start: '/fr', button: 'other', path: '/en/second' },
+  { name: 'the default locale, unprefixed', options: { config: { i18n: I18N } }, start: '/', button: 'go', path: '/second' },
+  { name: 'a prefixed default locale', options: { config: { i18n: { ...I18N, mode: 'always' } } }, start: '/en', button: 'go', path: '/en/second' },
+  { name: 'a base', options: { config: { i18n: I18N, base: '/repo' } }, start: '/repo/fr', button: 'go', path: '/repo/fr/second' },
+  { name: 'trailingSlash always', options: { config: { i18n: I18N, trailingSlash: 'always' as const } }, start: '/fr', button: 'go', path: '/fr/second/' },
 ]
 
 // One site for each distinct set of options, as a build is the slow part of a case.

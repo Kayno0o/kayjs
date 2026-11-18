@@ -74,7 +74,7 @@ describe('the spans of an API handler', () => {
   for (const [name, options] of variants) {
     it(`nest under the request's span, through a handler that awaits (${name})`, async () => {
       const { tracer, ended } = nesting()
-      const made = await site({ ...options, config: { ops: { observe: { tracer } } } })
+      const made = await site({ config: { ...options, ops: { observe: { tracer } } } })
       const response = await made.fetch('/api/probe')
 
       expect(await response.text()).toBe('worked')
@@ -118,7 +118,7 @@ describe('the spans of an API handler', () => {
 describe('Server-Timing on an API route', () => {
   for (const [name, options] of variants) {
     it(`carries the guards and the handler when serverTiming is on (${name})`, async () => {
-      const made = await site({ ...options, config: { ops: { observe: { serverTiming: true } } } })
+      const made = await site({ config: { ...options, ops: { observe: { serverTiming: true } } } })
 
       expect((await made.fetch('/api/members', { headers: AUTH })).headers.get('server-timing')).toMatch(BOTH)
       expect((await made.fetch('/api/probe')).headers.get('server-timing')).toMatch(HANDLER)
@@ -162,7 +162,7 @@ describe('Server-Timing on an API route', () => {
 describe('Server-Timing on an action', () => {
   for (const [name, options] of variants) {
     it(`carries its guards and handler when serverTiming is on (${name})`, async () => {
-      const made = await site({ ...options, config: { ops: { observe: { serverTiming: true } } } })
+      const made = await site({ config: { ...options, ops: { observe: { serverTiming: true } } } })
       const guarded = await call(made, 'members', AUTH)
 
       expect(guarded.status).toBe(200)
@@ -193,7 +193,7 @@ describe('Server-Timing on an action', () => {
 describe('Server-Timing on an endpoint', () => {
   for (const [name, options] of variants) {
     it(`carries its guards and handler when serverTiming is on (${name})`, async () => {
-      const made = await site({ ...options, config: { ops: { observe: { serverTiming: true } } } })
+      const made = await site({ config: { ...options, ops: { observe: { serverTiming: true } } } })
 
       expect((await made.fetch('/members/export.csv', { headers: AUTH })).headers.get('server-timing')).toMatch(BOTH)
       expect((await made.fetch('/open.json')).headers.get('server-timing')).toMatch(HANDLER)

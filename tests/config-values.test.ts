@@ -22,15 +22,15 @@ describe('config values checked once at load', () => {
   it('accepts a guard, a list or { load } for each guard option', () => {
     const guard = () => undefined
 
-    expect(invalidConfigValues({ jobs: { guards: { load: () => guard } }, images: { guards: [guard, guard] } })).toEqual([])
-    expect(invalidConfigValues({ images: { guards: { load: () => guard } }, jobs: { guards: [guard] }, manifest: { themeColor: { light: '#fff', dark: '#000' } }, live: { rate: { max: 1, window: '1m' } } })).toEqual([])
-    expect(invalidConfigValues({ images: { guards: 'no' } })).toHaveLength(1)
+    expect(invalidConfigValues({ ops: { jobs: { guards: { load: () => guard } } }, assets: { images: { guards: [guard, guard] } } })).toEqual([])
+    expect(invalidConfigValues({ assets: { images: { guards: { load: () => guard } }, manifest: { themeColor: { light: '#fff', dark: '#000' } } }, ops: { jobs: { guards: [guard] } }, live: { rate: { max: 1, window: '1m' } } })).toEqual([])
+    expect(invalidConfigValues({ assets: { images: { guards: 'no' } } })).toHaveLength(1)
   })
 
   it('accepts Infinity where it is documented, reads it back in a message, and shortens or hides what it prints', () => {
-    expect(invalidConfigValues({ images: { maxDensity: Infinity } })).toEqual([])
-    expect(invalidConfigValues({ images: { maxDensity: NaN } })).toEqual(['`images.maxDensity` is NaN, expected a number'])
-    expect(invalidConfigValues({ images: { quality: Infinity } })).toEqual(['`images.quality` is Infinity, expected a number'])
+    expect(invalidConfigValues({ assets: { images: { maxDensity: Infinity } } })).toEqual([])
+    expect(invalidConfigValues({ assets: { images: { maxDensity: NaN } } })).toEqual(['`assets.images.maxDensity` is NaN, expected a number'])
+    expect(invalidConfigValues({ assets: { images: { formats: { quality: Infinity } } } })).toEqual(['`assets.images.formats.quality` is Infinity, expected a number'])
     expect(invalidConfigValues({ serve: { compress: 'x'.repeat(60) } })[0]).toBe(`\`serve.compress\` is "${'x'.repeat(40)}...", expected true or false`)
     expect(problem('auth.sessionSecret', 'hunter2', 'a number')).toBe('`auth.sessionSecret` is a string, expected a number')
     expect(problem('proxy.key', 'abc', 'a number')).toBe('`proxy.key` is a string, expected a number')
@@ -43,22 +43,22 @@ describe('config values checked once at load', () => {
   })
 
   it('reports the kind of a value that is not the kind of its key, the path through bags, lists and maps', () => {
-    expect(invalidConfigValues({ lang: 5, base: true, serve: { compress: 7, timeout: 30 }, images: { webp: { quality: '90' } }, fonts: ['x'], publicCache: { '/a/**': 5 }, i18n: { locales: ['en', 3], default: 'en' } })).toEqual([
+    expect(invalidConfigValues({ lang: 5, base: true, serve: { compress: 7, timeout: 30 }, assets: { images: { formats: { webp: { quality: '90' } } }, fonts: ['x'], publicCache: { '/a/**': 5 } }, i18n: { locales: ['en', 3], default: 'en' } })).toEqual([
       '`lang` is 5, expected a string',
       '`base` is true, expected a string',
       '`serve.compress` is 7, expected true or false',
       '`serve.timeout` is 30, expected a duration such as \'250ms\', \'5m\' or \'30d\' or false',
-      '`images.webp.quality` is "90", expected a number',
-      '`fonts[0]` is "x", expected an object',
-      '`publicCache./a/**` is 5, expected a duration such as \'250ms\', \'5m\' or \'30d\'',
+      '`assets.images.formats.webp.quality` is "90", expected a number',
+      '`assets.fonts[0]` is "x", expected an object',
+      '`assets.publicCache./a/**` is 5, expected a duration such as \'250ms\', \'5m\' or \'30d\'',
       '`i18n.locales[1]` is 3, expected a string',
     ])
   })
 
   it('reports an object where a bag is, and the inner problem of the bag an object stands for', () => {
-    expect(invalidConfigValues({ images: 'x', health: 'x', security: { cookies: { secure: 'yes' } }, proxy: { hops: 'one' } })).toEqual([
-      '`images` is "x", expected an object of options',
-      '`health` is "x", expected true or false or an object of options',
+    expect(invalidConfigValues({ assets: { images: 'x' }, ops: { health: 'x' }, security: { cookies: { secure: 'yes' } }, proxy: { hops: 'one' } })).toEqual([
+      '`assets.images` is "x", expected an object of options',
+      '`ops.health` is "x", expected true or false or an object of options',
       '`security.cookies.secure` is "yes", expected true or false or one of "auto"',
       '`proxy.hops` is "one", expected a number',
     ])
@@ -78,20 +78,20 @@ describe('config values checked once at load', () => {
   })
 
   it('finds a mistyped key in every option bag, with the nearest one', () => {
-    expect(unknownConfigKeys({ images: { qualty: 80, webp: { qualty: 1 } }, markdown: { headinLinks: true }, jobs: { gard: () => undefined }, live: { connection: 1 }, links: { outsde: 'new-tab' }, cors: { origin: '*' }, client: { hydration: { visble: 'x' } }, budget: { weigth: 1 }, manifest: { shortname: 'x' }, robots: { dissallow: [] }, preview: { secrt: 'x' }, metrics: { pth: '/m' }, runtimeRedirects: { host: [] }, sitemap: { tll: '1h' } })).toEqual([
-      '`images.qualty`, did you mean `images.quality`?',
-      '`images.webp.qualty`, did you mean `images.webp.quality`?',
+    expect(unknownConfigKeys({ assets: { images: { formats: { qualty: 80, webp: { qualty: 1 } } }, manifest: { shortname: 'x' } }, markdown: { headinLinks: true }, ops: { jobs: { gard: () => undefined }, metrics: { tokn: 'x' } }, live: { connection: 1 }, cors: { origin: '*' }, client: { hydration: { visble: 'x' }, links: { outsde: 'new-tab' } }, budget: { weigth: 1 }, robots: { dissallow: [] }, preview: { secrt: 'x' }, runtimeRedirects: { host: [] }, sitemap: { tll: '1h' } })).toEqual([
+      '`assets.images.formats.qualty`, did you mean `assets.images.formats.quality`?',
+      '`assets.images.formats.webp.qualty`, did you mean `assets.images.formats.webp.quality`?',
+      '`assets.manifest.shortname`, did you mean `assets.manifest.shortName`?',
       '`markdown.headinLinks`, did you mean `markdown.headingLinks`?',
-      '`jobs.gard`, did you mean `jobs.guards`?',
+      '`ops.jobs.gard`, did you mean `ops.jobs.guards`?',
+      '`ops.metrics.tokn`, did you mean `ops.metrics.token`?',
       '`live.connection`, did you mean `live.connections`?',
-      '`links.outsde`, did you mean `links.outside`?',
       '`cors.origin`, did you mean `cors.origins`?',
       '`client.hydration.visble`, did you mean `client.hydration.visible`?',
+      '`client.links.outsde`, did you mean `client.links.outside`?',
       '`budget.weigth`, did you mean `budget.weight`?',
-      '`manifest.shortname`, did you mean `manifest.shortName`?',
       '`robots.dissallow`, did you mean `robots.disallow`?',
       '`preview.secrt`, did you mean `preview.secret`?',
-      '`metrics.pth`, did you mean `metrics.path`?',
       '`runtimeRedirects.host`, did you mean `runtimeRedirects.hosts`?',
       '`sitemap.tll`, did you mean `sitemap.ttl`?',
     ])

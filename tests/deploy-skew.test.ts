@@ -196,7 +196,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
     describe(base === '' ? 'at the root' : `under base ${base}`, () => {
       it('asks for the headers of its entry chunk, rendering no page, then loads the next link in full', async () => {
         const { forged, plugin } = forgedBuild()
-        const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin], ...base && { base } })
+        const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin], ...base && { config: { base } } })
 
         try {
           const page = await opened(site, base)
@@ -234,7 +234,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
 
       it('keeps swapping when only an action answer, as the HTTP cache may replay it, names another build', async () => {
         const { forged, plugin } = forgedBuild()
-        const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin], ...base && { base } })
+        const site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, use: [plugin], ...base && { config: { base } } })
 
         try {
           const page = await opened(site, base)

@@ -218,7 +218,7 @@ describe('server islands', () => {
           try {
             await build.prerender({ dirs: { routes: copied }, ...site, ...i18n })
 
-            const app = await build.serve({ config: { dirs: { routes: copied }, security: false }, ...site, ...i18n })
+            const app = await build.serve({ config: { dirs: { routes: copied }, security: false, ...site, ...i18n } })
             const slash = site.base === undefined ? '' : '/'
             const visit = async (path: string, headers: Record<string, string> = {}) => (await app.handle(new Request(`http://localhost${french ? '/fr' : ''}${path.replace('?', `${slash}?`)}`, { headers }))).text()
             const checked = (html: string) => ({

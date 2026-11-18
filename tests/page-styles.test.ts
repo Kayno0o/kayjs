@@ -93,7 +93,7 @@ async function copyOfFixture(): Promise<string> {
 // The heads a server writes are kept per `styles` map, so each server gets a map of its own.
 async function serve(options: PagesOptions & { dev?: boolean } = {}, built = client): Promise<App> {
   const mode = modeOf({ dev: options.dev ?? false, prebuilt: options.dev !== true })
-  const config = await resolveConfig({ dirs: { routes: 'src/routes' }, serve: { compress: false }, ...options })
+  const config = await resolveConfig({ dirs: { routes: 'src/routes' }, serve: { compress: false }, ...options.config })
 
   return servePages(resolveProject(root, config, mode), () => ({ ...built, styles: new Map(built.styles), inlineStyles: undefined, inlineSizes: undefined, pageStyles: undefined }))
 }
@@ -480,7 +480,7 @@ describe('a page\'s head', () => {
     expect(linked.blocking).toHaveLength(1)
     expect(dev.html).not.toContain('<style>')
 
-    for (const mode of [{ client: { inlineStyles: true } }, { client: { inlineStyles: false } }, { dev: true }])
+    for (const mode of [{ config: { client: { inlineStyles: true } } }, { config: { client: { inlineStyles: false } } }, { dev: true }])
       expect((await head(await serve(mode), '/bulk')).blocking[0] ?? '', JSON.stringify(mode)).not.toMatch(ROUTE_COPY)
   })
 

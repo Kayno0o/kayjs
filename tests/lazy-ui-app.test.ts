@@ -12,7 +12,7 @@ function heavyChunk(html: string): string | undefined {
 describe('a component an island draws lazily', () => {
   for (const [name, options] of [['at the root', {}], ['under a base with a trailing slash', { base: '/blog', trailingSlash: 'always' as const }]] as const) {
     it(`is preloaded by the page whose server drew it, and by no other, ${name}`, async () => {
-      const site = await testSite({ root: FIXTURE, browser: true, ...options })
+      const site = await testSite({ root: FIXTURE, browser: true, config: options })
 
       try {
         const base = 'base' in options ? `${options.base}/` : '/'

@@ -24,7 +24,7 @@ async function site(files: Record<string, string> = {}) {
 }
 
 async function listed(options: Parameters<typeof pages>[0]): Promise<DevRoutes> {
-  const dev = await pages({ prebuilt: false, config: { security: false }, dev: true, ...options })
+  const dev = await pages({ prebuilt: false, security: false, dev: true, ...options })
 
   return await (await dev.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoutes
 }

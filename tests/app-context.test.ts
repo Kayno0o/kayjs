@@ -12,7 +12,7 @@ import { fixtureCopy, scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/app-context'
-const I18N = { locales: ['en', 'fr'], defaultLocale: 'en' }
+const I18N = { locales: ['en', 'fr'], default: 'en' }
 
 interface Variant { base: string, dev: boolean, locale: boolean }
 

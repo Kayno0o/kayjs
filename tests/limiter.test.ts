@@ -56,7 +56,7 @@ describe('limiter', () => {
     await limit.hit('k')
     setupStore({ rates: shared })
     await limit.hit('k')
-    expect(hit).toHaveBeenCalledWith('late\nk', 60_000, undefined)
+    expect(hit).toHaveBeenCalledWith('late\nk', '60000ms', undefined)
   })
 
   it('counts in the memory it is given when no store is there', async () => {

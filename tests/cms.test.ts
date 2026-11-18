@@ -2248,7 +2248,7 @@ describe('preview mode', () => {
       // The page visited below, and four that read nothing from a request.
       expect(await build.prerender(options)).toBe(5)
 
-      const served = await build.serve(options)
+      const served = await build.serve({ config: options })
       const visit = async (cookie?: string) => {
         const response = await served.handle(new Request('http://localhost/news/launch', { headers: cookie === undefined ? {} : { cookie } }))
 

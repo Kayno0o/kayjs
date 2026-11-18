@@ -20,7 +20,7 @@ const CONFIG = `import { Elysia } from 'elysia'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  images: {
+  assets: { images: {
     resolve: async (src: string, ctx): Promise<string> => \`\${ctx.locals.user.name}\${ctx.locals.role}\${src}\`,
     guards: (ctx): void => {
       const wrong: number = ctx.locals.role
@@ -28,7 +28,7 @@ export default defineConfig({
       if (!wrong)
         ctx.deny(401)
     },
-  },
+  } },
   extensions: [{ name: 'lib', server: new Elysia({ name: 'lib' }).derive({ as: 'scoped' }, () => ({ role: 'admin' })) }],
 })
 `

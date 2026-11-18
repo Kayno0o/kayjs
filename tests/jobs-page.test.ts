@@ -23,12 +23,12 @@ const toLogin: Guard = ({ redirect }) => redirect('/login')
 
 let counter = 0
 
-async function app(options: { jobs?: unknown, dev?: boolean, base?: string } = {}) {
+async function app({ jobs, endpoints, ...options }: { jobs?: unknown, endpoints?: object, dev?: boolean, base?: string } = {}) {
   const dir = await scratchDir('jobs-page-')
 
   await Bun.write(join(dir, 'routes/index.kay'), 'h1 Home\n')
 
-  return pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false }, prebuilt: false, dev: false, ...options })
+  return pages({ root: dir, config: { dirs: { routes: 'routes' }, security: false, ...jobs === undefined ? {} : { ops: { jobs } }, ...endpoints && { endpoints } }, prebuilt: false, dev: false, ...options })
 }
 
 const get = async (site: Awaited<ReturnType<typeof app>>, path: string, headers: Record<string, string> = {}) => site.handle(new Request(`http://localhost${path}`, { headers }))
@@ -183,7 +183,7 @@ describe('the production jobs page', () => {
   })
 
   it('moves with path', async () => {
-    const site = await app({ jobs: { guards: allow, path: '/ops/jobs' } })
+    const site = await app({ jobs: { guards: allow }, endpoints: { jobs: '/ops/jobs' } })
 
     expect((await get(site, '/ops/jobs')).status).toBe(200)
     expect((await get(site, '/_kay/jobs')).status).toBe(404)

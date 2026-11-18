@@ -239,7 +239,7 @@ describe('testSite keeps the islands it built', () => {
 
 describe('testSite keeps its check between processes', () => {
   const visit = async (options: { base?: string } = {}): Promise<void> => {
-    const code = `import { testSite } from ${JSON.stringify(join(import.meta.dir, '../src/test'))}\nawait testSite({ root: ${JSON.stringify(root)}, ...${JSON.stringify(options)} })\nawait Bun.sleep(300)\nprocess.exit(0)\n`
+    const code = `import { testSite } from ${JSON.stringify(join(import.meta.dir, '../src/test'))}\nawait testSite({ root: ${JSON.stringify(root)}, config: ${JSON.stringify(options)} })\nawait Bun.sleep(300)\nprocess.exit(0)\n`
     const child = Bun.spawn([process.execPath, '-e', code], { cwd: root, stdout: 'ignore', stderr: 'pipe', env: { ...process.env, KAY_ROOT: root } })
     const [error, exit] = await Promise.all([new Response(child.stderr).text(), child.exited])
 

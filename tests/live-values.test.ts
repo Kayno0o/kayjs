@@ -443,7 +443,7 @@ describe('live values in a page', () => {
     ['a base path and a trailing slash', { base: '/shop', trailingSlash: 'always' as const }, '/'],
     ['no base', {}, '/'],
   ])('gets its proof and its values with %s', async (_, options, path) => {
-    const site = await testSite({ root: ROOT, ...options })
+    const site = await testSite({ root: ROOT, config: options })
 
     try {
       const { html } = await site.visit(path)

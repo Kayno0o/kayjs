@@ -24,8 +24,8 @@ async function project(config: string): Promise<string> {
     'tsconfig.json': TSCONFIG,
     'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ ops: { observe: { log: false } }, ${config} })\n`,
     'src/words.ts': `export const words = [${NOISE}]\n`,
-    'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { words } from \'./words\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {words[n()]} {n()}\n',
-    'src/light.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
+    'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { words } from \'./words\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n = n() + 1}) {words[n()]} {n()}\n',
+    'src/light.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n = n() + 1}) {n()}\n',
     'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
     'src/routes/plain.kay': 'p Plain\n',
     'src/routes/styled.kay': '---\nimport \'../note.css\'\n---\np.note Styled\n',
@@ -123,7 +123,7 @@ describe('kay build with a budget', () => {
   it('has --deny-warnings fail on a check warning with no budget set', async () => {
     const root = await project('')
 
-    await Bun.write(join(root, 'src/routes/clicks.kay'), 'p Press <kbd>Ctrl</kbd>\n')
+    await Bun.write(join(root, 'src/routes/clicks.kay'), 'input(name="email" placeholder="Email")\n')
 
     const { code, output: err } = await kayBuild([root, '--deny-warnings'])
 

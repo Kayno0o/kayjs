@@ -176,7 +176,7 @@ describe('a route a resource reads, following cached values', () => {
     ['a base path and a trailing slash', { base: '/shop', trailingSlash: 'always' as const }, '/api/orders/'],
     ['a base path', { base: '/shop' }, '/api/orders'],
   ])('gets its proof and its stream under %s', async (_, options, path) => {
-    const shop = await testSite({ root: ROOT, ...options })
+    const shop = await testSite({ root: ROOT, config: options })
 
     try {
       const response = await shop.fetch(path, { headers: { accept: 'application/json' } })

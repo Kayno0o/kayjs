@@ -23,13 +23,13 @@ describe.each([
     const options = { ...config }
 
     if (kind === 'request')
-      return { app: await pages({ root: ROOT, ...options, prebuilt: false }), remove: async () => undefined }
+      return { app: await pages({ root: ROOT, config: options, prebuilt: false }), remove: async () => undefined }
 
     const build = await scratchBuild(options, false, join(process.cwd(), ROOT))
 
     await build.prerender(options)
 
-    return { app: await build.serve(options), remove: build.remove }
+    return { app: await build.serve({ config: options }), remove: build.remove }
   }
 
   const read = async (app: { handle: (request: Request) => Response | Promise<Response> }, path: string, headers: Record<string, string> = {}) => (await app.handle(request(path, headers))).text()

@@ -58,11 +58,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
       const islandLoads = () => asked.filter(url => url.includes('kay_island='))
 
       beforeAll(async () => {
-        await pages({ root: ROOT, prebuilt: false, ...site })
+        await pages({ root: ROOT, prebuilt: false, config: site })
         build = await scratchBuild({ ...site }, false, join(process.cwd(), ROOT))
         await build.prerender({ ...site })
 
-        const app = await build.serve({ config: { security: false }, ...site })
+        const app = await build.serve({ config: { security: false, ...site } })
 
         // The front of a real deploy takes the base off, as it does for an app under one.
         server = Bun.serve({

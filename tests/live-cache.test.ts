@@ -251,7 +251,7 @@ describe('a cached value a page follows', () => {
     ['a base path and a trailing slash', { base: '/shop', trailingSlash: 'always' as const }],
     ['no base', {}],
   ])('gets its proof and its stream with %s', async (_, options) => {
-    const shop = await testSite({ root: ROOT, ...options })
+    const shop = await testSite({ root: ROOT, config: options })
 
     try {
       const { html } = await shop.visit('/')

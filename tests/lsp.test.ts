@@ -260,7 +260,7 @@ describe('kay lsp', () => {
     try {
       const list = await editor.request<CompletionList>('textDocument/completion', path, 1, 37)
 
-      expect(list.items.map(item => item.label)).toEqual(expect.arrayContaining(['prerender?', 'ttl?', 'layouts?', 'query?', 'sitemap?']))
+      expect(list.items.map(item => item.label)).toEqual(expect.arrayContaining(['prerender?', 'cache?', 'layouts?', 'query?', 'seo?']))
     }
     finally {
       await editor.change(path, text, 3)
