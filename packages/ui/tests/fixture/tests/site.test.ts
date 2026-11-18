@@ -845,7 +845,7 @@ describe('charts', () => {
     ['bars', 'plot', ['relative', 'ml-10', 'border-border']],
     ['bars', 'column', ['flex', 'items-end', 'data-stacked:flex-col-reverse']],
     ['bars', 'bar', ['min-h-px', 'flex-1', 'rounded-t-sm']],
-    ['bars', 'axisLabel', ['justify-center', 'whitespace-nowrap']],
+    ['bars', 'axisLabel', ['absolute', 'whitespace-nowrap']],
     ['stacked-bars', 'legendItem', ['flex', 'items-center', 'text-muted']],
     ['stacked-bars', 'key', ['size-2', 'shrink-0']],
     ['graph', 'month', ['row-start-1', 'w-0', 'text-muted']],

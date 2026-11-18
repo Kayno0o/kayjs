@@ -53,6 +53,28 @@ describe('BarChart at phone width', () => {
     expect(found.labelsLeft).toBeGreaterThanOrEqual(found.left - 0.5)
   })
 
+  it('draws each shown label of 24 columns as wide as its text, with no empty label box', async () => {
+    await using page = await site.open('/bar-density', { viewport: 'phone' })
+    const found = await page.evaluate(() => {
+      const figure = document.querySelector<HTMLElement>('#hours figure')!.getBoundingClientRect()
+      const labels = [...document.querySelectorAll<HTMLElement>('#hours [data-part="axisLabel"]')]
+
+      return {
+        overflowing: labels.filter(item => item.scrollWidth > item.clientWidth).length,
+        empty: labels.filter(item => (item.textContent ?? '') === '').length,
+        count: labels.length,
+        left: Math.min(...labels.map(item => item.getBoundingClientRect().left)) - figure.left,
+        right: figure.right - Math.max(...labels.map(item => item.getBoundingClientRect().right)),
+      }
+    })
+
+    expect(found.overflowing).toBe(0)
+    expect(found.empty).toBe(0)
+    expect(found.count).toBeGreaterThan(1)
+    expect(found.left).toBeGreaterThanOrEqual(-0.5)
+    expect(found.right).toBeGreaterThanOrEqual(-0.5)
+  })
+
   it.each(['week', 'month'])('keeps the 4px gap of %s', async (id) => {
     expect((await reach(id)).gap).toBeCloseTo(4, 0)
   })

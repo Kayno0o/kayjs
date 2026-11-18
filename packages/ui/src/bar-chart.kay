@@ -25,9 +25,9 @@ const look = recipe({
     column: 'flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface data-lit:bg-surface data-[kind=link]:no-underline data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-stacked:flex-col-reverse data-stacked:items-stretch data-stacked:justify-start data-stacked:gap-0',
     // A stub is the mark a column keeps where its series gives it a colour or a note but no height; a stacked bar is squared and sized by its height alone.
     bar: 'min-h-px min-w-px flex-1 rounded-t-sm data-stub:h-1 data-stacked:flex-none data-stacked:rounded-none',
-    axis: 'ml-10 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
-    // The first and the last label line up with the plot's edges, so a label wider than its slot spills inward and not out of the figure.
-    axisLabel: 'flex min-w-0 flex-1 justify-center data-[edge=start]:justify-start data-[edge=end]:justify-end text-2xs whitespace-nowrap text-[var(--color-muted)]',
+    axis: 'relative ml-10 h-[1lh] text-2xs',
+    // A shown label is as wide as its text, centred on its column; the first and the last line up with the plot's edges, so a label wider than its column spills inward and not out of the figure.
+    axisLabel: 'absolute top-0 -translate-x-1/2 data-[edge=start]:translate-x-0 data-[edge=end]:translate-x-0 text-2xs whitespace-nowrap text-[var(--color-muted)]',
     // The parts of a feature no call site writes stay out of the island's code (`uses`).
     ...(uses('marks'))
       ? {
@@ -104,10 +104,19 @@ const goalsOnAxis = memo(() => drawnGoals().filter(goal => ratios().top > 0 && g
 const goalNotes = memo(() => uses('goals') ? goalsOnAxis().map(goal => goalText(goal, formatValue)) : [])
 const ticks = memo(() => valueTicks(ratios().top))
 const times = memo(() => labelTimes(labels))
-const shown = uses('xLabels') ? memo(() => new Set(xLabels ? tickIndices(labels.length) : [])) : undefined
+const shown = uses('xLabels') ? memo(() => xLabels ? tickIndices(labels.length) : []) : undefined
 const axisTexts = uses('xLabels') ? memo(() => tickTexts(labels, times(), formatLabel)) : undefined
 const headingTexts = memo(() => headings(labels, times(), formatLabel))
 const gaps = () => `--bar-gaps: ${Math.max(labels.length - 1, 1)}`
+// A label's place on the axis: the centre of its column, which the gap between columns (`--axis-gap`, as `columns` takes it) moves by half a gap from an even split.
+const axisAt = uses('xLabels') ? (at: number) => {
+  const total = labels.length
+
+  if (total > 1 && at === 0)
+    return 'left: 0'
+
+  return total > 1 && at === total - 1 ? 'right: 0' : `left: calc((100% + var(--axis-gap)) * ${(at + 0.5) / total} - var(--axis-gap) / 2)`
+} : undefined
 const edge = uses('xLabels') ? (at: number) => labels.length < 2 ? undefined : at === 0 ? 'start' : at === labels.length - 1 ? 'end' : undefined : undefined
 const colors = (item: BarSeries, index: number, at: number) => item.colors?.[at] ?? item.color ?? PALETTE[index % PALETTE.length]!
 // With several series each is also hatched by its place, so the bars and the legend are told apart without their colours.
@@ -261,9 +270,9 @@ else
       div(part="tooltip" ref={tip!.watch} style={tip!.place(marks.anchor()!)} aria-hidden="true")
         {tooltip(mark(marks.current()!))}
     if uses('xLabels') && xLabels
-      div(part="axis" aria-hidden="true" style={gaps()})
-        for _, at of labels key={at}
-          span(part="axisLabel" data-edge={edge!(at)}) {shown!().has(at) ? axisTexts!()[at] : ''}
+      div(part="axis" aria-hidden="true" style={`${gaps()}; --axis-gap: min(var(--bar-gap, 0.25rem), calc(40% / var(--bar-gaps)))`})
+        for at of shown!() key={at}
+          span(part="axisLabel" data-edge={edge!(at)} style={axisAt!(at)}) {axisTexts!()[at]}
     if legend ?? series.length > 1
       ul(part="legend")
         for item, index of series key={item.name}
