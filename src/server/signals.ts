@@ -71,6 +71,12 @@ export class Denied {
   }
 }
 
+// The text form `deny(403, 'text')` went in 1.109: a string where the options go is a mistake to name, not a refusal with no message.
+function refuseText(options: unknown): void {
+  if (typeof options === 'string')
+    throw new KayError('argument-invalid', 'kay: ctx.deny takes a status and `{ message, errors, data }`: write `ctx.deny(403, { message: \'text\' })`')
+}
+
 // What `ctx.redirect`, `ctx.notFound` and `ctx.deny` do in every kind of context: a read is redirected with 302, a post with 303.
 export function stoppers(request: Request): Pick<RequestContext, 'redirect' | 'notFound' | 'deny'> {
   const status = request.method === 'GET' || request.method === 'HEAD' ? 302 : 303
@@ -83,6 +89,8 @@ export function stoppers(request: Request): Pick<RequestContext, 'redirect' | 'n
       throw new NotFound()
     },
     deny: (code?: number, options?: DenyOptions<ErrorData>) => {
+      refuseText(options)
+
       throw new Denied(code ?? 403, options?.message, options?.data, options?.errors as Record<string, string> | undefined)
     },
   }
@@ -93,6 +101,8 @@ export function actionStoppers(request: Request): Pick<RequestContext, 'redirect
   const { deny: stop, ...rest } = stoppers(request)
 
   const deny = (status = 403, second?: DenyOptions<ErrorData>): never => {
+    refuseText(second)
+
     if (second === undefined || ((second.message === undefined || second.message === '') && second.data === undefined && Object.keys(second.errors ?? {}).length === 0))
       return stop(status)
 

@@ -98,7 +98,7 @@ describe('an action as a tool', () => {
     expect(JSON.parse(text(result))).toEqual({ status: 422, errors: { title: 'Too short' } })
   })
 
-  it('answers what the handler passed to ctx.fail, a redirect and a throw as errors', async () => {
+  it('answers what the handler passed to ctx.deny, a redirect and a throw as errors', async () => {
     expect(JSON.parse(text(await call('refuses')))).toEqual({ status: 409, errors: {}, data: { reason: 'full' } })
     expect(text(await call('sendsAway'))).toContain('/done')
 

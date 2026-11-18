@@ -312,7 +312,7 @@ export interface Limiter {
   peek: (key: string) => Promise<RateWindow | undefined>
   // Forgets the window under `key`. A store with no `reset` has the count taken off with a hit of the negative weight, which leaves an empty window open.
   reset: (key: string) => Promise<void>
-  // Counts an attempt under `key` and answers the seconds to wait once the count is past `max`, else undefined; it answers and refuses nothing. Not `rateLimit().enforce(ctx)`, which takes a guard's context and denies with 429.
+  // Counts an attempt under `key` and answers the seconds to wait once the count is past `max`, else undefined; it answers and refuses nothing. Not `rateLimit().check(ctx)`, which takes a guard's context and denies with 429.
   enforce: (key: string, weight?: number) => Promise<number | undefined>
   // Takes back one attempt `hit` counted in the window closing at `resetAt`; false when the store has no `refund`.
   refund: (key: string, resetAt: number) => Promise<boolean>

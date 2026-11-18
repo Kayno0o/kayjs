@@ -21,7 +21,7 @@ import type { ToolOutputs } from './tool-outputs'
 import type { Source } from './validate'
 import { relative } from 'node:path'
 import { KayError } from '../compiler/errors'
-import { decodeCall, FORM_CALL, FORM_FIELD, honeypotField, isAction, protectionFields, STAMP_FIELD } from '../runtime/action'
+import { decodeCall, FORM_CALL, FORM_FIELD, honeypotField, isAction, isFailure, protectionFields, STAMP_FIELD } from '../runtime/action'
 import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
 import { localeState, runInLocale } from '../runtime/locale-state'
@@ -628,6 +628,13 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // What `ctx.once` loaded before the handler changed things is stale for the page rendered again after a failure.
     forgetOnces(request)
+
+    // A library's failed result, such as kayjs-auth's, returned as it is: its status and `data` refuse the call, a string `data` being the form's message.
+    if (isFailure(result)) {
+      await tellError(lists, run, { status: result.status, message: typeof result.data === 'string' ? result.data : result.errors?.[''] ?? '', errors: result.errors ?? {}, data: result.data, error: undefined })
+
+      return await failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: { ...typeof result.data === 'string' ? { '': result.data } : {}, ...result.errors }, data: result.data }, context.server, back)
+    }
 
     // A call reads a stream as it comes; a plain form post or an agent gets its last value, as a handler returning it would.
     const streams = isAsyncIterable(result) && isCall(request) && !isAgentCall(request)

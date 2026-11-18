@@ -5,8 +5,8 @@ import { appEnv, fixtureCopy } from './helpers/fixtureCopy'
 
 const CLI = join(import.meta.dir, '../../../src/cli.ts')
 
-// The fixture holds a Chat over a reply action that can also `ctx.fail`, which Chat's `action` must accept.
-test('Chat takes a reply action that can also ctx.fail, and kay check passes the fixture', async () => {
+// The fixture holds a Chat over a reply action that can also `ctx.deny`, which Chat's `action` must accept.
+test('Chat takes a reply action that can also ctx.deny, and kay check passes the fixture', async () => {
   const fixture = await fixtureCopy()
   const run = Bun.spawn([process.execPath, CLI, 'check'], { cwd: fixture, env: appEnv(fixture), stdout: 'ignore', stderr: 'ignore' })
 

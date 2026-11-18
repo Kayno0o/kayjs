@@ -48,7 +48,7 @@ describe('the input of an action reading files', () => {
 })
 
 describe('an action prop typed with the success output', () => {
-  it('takes an action whose handler can ctx.fail', () => {
+  it('takes an action whose handler can ctx.deny', () => {
     const prop: Action<{ dossier: string }, AsyncGenerator<string>> = summarise
 
     expect(prop).toBe(summarise)
@@ -74,7 +74,7 @@ describe('an action prop typed with the success output', () => {
     const failure: FailureOf<typeof claim> = { status: 409, message: 'Taken', values: {}, errors: {}, data: { reason: 'taken' } }
     const success: SuccessOf<typeof claim> = { data: 'ok' }
 
-    // @ts-expect-error the data is the reason ctx.fail gave
+    // @ts-expect-error the data is the reason ctx.deny gave
     const wrong: FailureOf<typeof claim> = { status: 409, values: {}, errors: {}, data: { reason: 1 } }
 
     expect([failure, success, wrong]).toHaveLength(3)
@@ -138,7 +138,7 @@ describe('an action call with an optional field', () => {
   })
 })
 
-describe('the fields ctx.fail puts a message on', () => {
+describe('the fields ctx.deny puts a message on', () => {
   it('are the schema\'s keys and the form under an empty name', () => {
     const register = action(t.Object({ email: t.String() }), (input, ctx) => {
       ctx.deny(409, { errors: { 'email': 'Taken', '': 'Not registered' } })

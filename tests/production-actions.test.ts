@@ -140,7 +140,7 @@ describe('action protection', () => {
     expect(every.peek('/_kay/action/both#1\nunknown')?.count).toBe(2)
   })
 
-  it('puts a message ctx.fail is given where a form reads its own message', async () => {
+  it('puts a message ctx.deny is given where a form reads its own message', async () => {
     const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
     const site = await testSite({ root: FIXTURE, security: false })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
@@ -150,7 +150,7 @@ describe('action protection', () => {
     expect((await site.submit(enquire, { message: 'fail' }, { from: '/enquiry' })).html).toContain('<p id="enquire-error" class="error">Not sent; try again later</p>')
   })
 
-  it('puts a message ctx.fail is given for a field on that field, for a call and for a form post', async () => {
+  it('puts a message ctx.deny is given for a field on that field, for a call and for a form post', async () => {
     const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
     const site = await testSite({ root: FIXTURE, security: false })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
@@ -164,7 +164,7 @@ describe('action protection', () => {
     expect(html).toContain('value="taken"')
   })
 
-  it('keeps hostile or unknown keys of ctx.fail errors harmless: a __proto__ key is refused plainly, a key outside the schema shown nowhere', async () => {
+  it('keeps hostile or unknown keys of ctx.deny errors harmless: a __proto__ key is refused plainly, a key outside the schema shown nowhere', async () => {
     const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
     const site = await testSite({ root: FIXTURE, security: false })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
@@ -183,7 +183,7 @@ describe('action protection', () => {
     expect(html).not.toContain('Stray')
   })
 
-  it('answers a thrown refuse() as it answers ctx.fail, with its message, field errors and data', async () => {
+  it('answers a thrown refuse() as it answers ctx.deny, with its message, field errors and data', async () => {
     const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
     const refused = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.31' }, body: stringify({ message: 'refuse' }) }))

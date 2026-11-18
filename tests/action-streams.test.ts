@@ -222,7 +222,7 @@ describe('an action returning an async iterable', () => {
     expect(refusal.errors.to).toBe('Too many')
   })
 
-  it('answers ctx.fail as for any action, or the stream the handler returned instead', async () => {
+  it('answers ctx.deny as for any action, or the stream the handler returned instead', async () => {
     const refusal = await site.expectRefused(actions.refuses, { full: true })
 
     expect(refusal.status).toBe(409)

@@ -12,6 +12,7 @@ kay [./server] sqliteCache
 kay [./test] TestOptions
 kay [.] Action
 kay [.] ActionContext
+kay [.] Deny
 kay [.] HydrateWhen
 kay [.] RefuseOptions
 kay [.] ServerAction

@@ -181,6 +181,7 @@ import { action } from 'kay'
 
 export const ok = action(t.Object({ n: t.Number() }), ({ n }) => n * 2)
 export const failing = action(t.Object({}), (_input, ctx) => ctx.deny(409, { message: 'Taken', errors: { '': 'Taken' } }))
+export const branded = action(t.Object({}), () => Object.defineProperties({ ok: false }, { [Symbol.for('kay.failure')]: { value: true }, status: { value: 401 }, data: { value: { code: 'signed-out', message: 'Signed out' } } }))
 export const crashing = action(t.Object({}), () => { throw new Error('boom') })
 export const sendOn = action(t.Object({}), (_input, ctx) => ctx.redirect('/thanks'))
 export const mine = action(t.Object({}), () => 'mine', { onSuccess: ({ action }) => { (globalThis as any).ownTold = action } })
@@ -235,6 +236,12 @@ h1 Home
     expect((await post('crashing', {}, { 'x-forwarded-for': '3.3.3.4' })).status).toBe(500)
     expect([200, 303]).toContain((await post('sendOn', {}, { 'x-forwarded-for': '3.3.3.5' })).status)
     expect(events.filter(event => !event.startsWith('before'))).toEqual(['error failing 409 Taken thrown', 'error crashing 500 Internal server error thrown', 'success sendOn undefined true'])
+  })
+
+  it('refuses a call with the status of a library\'s failed result an action returns as it is, and tells onError', async () => {
+    events.length = 0
+    expect((await post('branded', {}, { 'x-forwarded-for': '3.3.3.6' })).status).toBe(401)
+    expect(events.filter(event => !event.startsWith('before'))).toEqual(['error branded 401  fail'])
   })
 
   it('runs the action\'s own hook after the app\'s', async () => {

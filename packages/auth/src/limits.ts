@@ -5,7 +5,7 @@ import { configError, durationSeconds, limitRefused } from 'kay/library'
 
 // `max` attempts every `window`, a string such as '15m', as in kay's own `rateLimit`, counted in `store` when given. kayjs-auth counts under keys of its own, so it takes no `key`.
 // A `rateLimit()` object is not taken: its counter is under the client's address, where kayjs-auth counts under keys of its own. `onLimit` is told of each attempt refused.
-export type AuthRateLimit = Omit<RateLimit, 'key'> & { hit?: never, enforce?: never }
+export type AuthRateLimit = Omit<RateLimit, 'key'> & { hit?: never }
 
 // The limits of one bucket once resolved: the first, which the lockouts read `max` of, and the others counted beside it.
 export type LimitSet = [AuthRateLimit, ...AuthRateLimit[]]

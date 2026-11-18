@@ -4,6 +4,7 @@ import { Elysia } from 'elysia'
 import { ActionError, readActionResponse } from '../src/runtime/action'
 import { refuse, thrownRefusal } from '../src/runtime/refuse'
 import { decodeServerValue, encodeValue } from '../src/runtime/wire'
+import { actionStoppers, stoppers } from '../src/server/signals'
 import { pages } from './shared-pages'
 
 const ORIGIN = 'http://localhost'
@@ -156,5 +157,14 @@ describe('refuse with no status', () => {
 
     expect(thrown(() => refuse(status, { message: 'Over' }))).toMatchObject({ status: 403, message: 'Over' })
     expect(thrown(() => refuse(status, { message: 'Over', errors: { name: 'x' } }))).toMatchObject({ status: 422, message: 'Over' })
+  })
+})
+
+describe('the text form of deny, gone in 1.109', () => {
+  it('names the mistake where a text stands for the options, for a guard and for an action', () => {
+    const request = new Request(ORIGIN)
+
+    for (const { deny } of [stoppers(request), actionStoppers(request)])
+      expect(() => (deny as (status: number, text: string) => never)(403, 'No')).toThrow('ctx.deny takes a status and')
   })
 })

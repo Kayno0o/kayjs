@@ -1559,7 +1559,7 @@ describe('a tracked action call', () => {
     }
   })
 
-  it('answers a refusal as a result, with its status, field errors and the data ctx.fail passed, and does not throw', async () => {
+  it('answers a refusal as a result, with its status, field errors and the data ctx.deny passed, and does not throw', async () => {
     const fetched = answering(request => request === 0 ? fail(409, { errors: { id: 'Taken' }, data: { reason: 'locked' } }) : fail(422, { errors: { id: 'Bad id' } }))
 
     try {
@@ -1567,7 +1567,7 @@ describe('a tracked action call', () => {
 
       const refused = await call({ id: 1 })
 
-      // The refusal's data is typed as the handler passes it to ctx.fail.
+      // The refusal's data is typed as the handler passes it to ctx.deny.
       expect(refused.ok ? undefined : refused.data?.reason).toBe('locked')
       expect(refused).toMatchObject({ ok: false, status: 409, message: 'Taken', errors: { id: 'Taken' }, data: { reason: 'locked' } })
       expect(!refused.ok && refused.error).toBeInstanceOf(ActionError)

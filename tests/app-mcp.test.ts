@@ -584,7 +584,7 @@ describe('calling an action', () => {
     expect((await site.mcp.call('add_note', JSON.parse('{"title":"Milk","__proto__":{"admin":true}}'))).isError).toBe(true)
   })
 
-  it('answers what the handler passed to ctx.fail, with its status', async () => {
+  it('answers what the handler passed to ctx.deny, with its status', async () => {
     const result = await site.mcp.call('refuses')
 
     expect(result.isError).toBe(true)

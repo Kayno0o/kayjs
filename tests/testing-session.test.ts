@@ -37,7 +37,7 @@ describe('kay/test on a project with a session', () => {
     expect(await signed.call(profile, form([['age', '36'], ['admin', 'on'], ['tags', 'a'], ['tags', 'b'], ['rank', ''], ['avatar', new File([], '')]]))).toEqual({ age: 36, admin: true, tags: ['a', 'b'] })
     expect(await signed.call(profile, form([['age', '1'], ['avatar', new File(['png'], 'me.png', { type: 'image/png' })]]))).toMatchObject({ avatar: 'me.png' })
     await expect(signed.call(profile, form([['age', 'old'], ['admin', 'on']]))).rejects.toMatchObject({ name: 'ActionError', status: 422, errors: { age: expect.any(String) } })
-    // What the handler passed to ctx.fail, and no flash cookie: the island reads the answer itself.
+    // What the handler passed to ctx.deny, and no flash cookie: the island reads the answer itself.
     await expect(signed.call(signIn, form([['name', '']]))).rejects.toMatchObject({ status: 400, data: { error: 'Who are you?' } })
     expect(signed.cookies.has('kay_flash')).toBe(false)
     await expect(signed.call(signOut, form([]))).rejects.toMatchObject({ name: 'ActionRedirectError', location: '/' })

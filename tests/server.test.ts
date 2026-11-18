@@ -1568,7 +1568,7 @@ describe('failed actions', () => {
     expect((await get('/')).html).not.toContain('class="error"')
   })
 
-  it('shows a plain form what the handler passed to ctx.fail, never echoing a secret field', async () => {
+  it('shows a plain form what the handler passed to ctx.deny, never echoing a secret field', async () => {
     const html = await (await postForm('Serve pages')).text()
 
     expect(html).toContain('value="Serve pages"')
@@ -2193,7 +2193,7 @@ describe('action input', () => {
     expect((await bare.handle(new Request('http://localhost/survey'))).status).toBe(200)
   })
 
-  it('fails a call with the status ctx.fail gives, refusing one that is no error status', async () => {
+  it('fails a call with the status ctx.deny gives, refusing one that is no error status', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const fail = async (status: number) => post('fails', stringify({ status }), { 'content-type': 'application/json', 'x-kay-action': '1' })
 

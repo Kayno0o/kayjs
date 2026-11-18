@@ -112,7 +112,7 @@ interface AskHooks
   /** @deprecated Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onToolCall?: Hook<AiToolCall> | undefined
 
 [.] AskLimit
-type AskLimit = Omit<RateLimit, 'key'> & { hit?: never, enforce?: never }
+type AskLimit = Omit<RateLimit, 'key'> & { hit?: never }
 
 [.] AskOptions
 interface AskOptions extends CallOptions, AskHooks

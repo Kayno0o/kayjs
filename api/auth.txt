@@ -441,7 +441,7 @@ interface AuthProofOfWorkOptions
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] AuthRateLimit
-type AuthRateLimit = Omit<RateLimit, 'key'> & { hit?: never, enforce?: never }
+type AuthRateLimit = Omit<RateLimit, 'key'> & { hit?: never }
 
 [.] AuthRates
 type AuthRates = RateStore

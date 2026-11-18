@@ -1,3 +1,4 @@
+import type { Failure } from './action-shared'
 import { actionFailed, ApiError, messageOf } from './api-error'
 
 export const FAILURE = Symbol.for('kay.failure')
@@ -20,4 +21,9 @@ export class ActionRedirectError extends ActionError {
   constructor(status: number, readonly location: string) {
     super(status, `Redirected to ${location}`, {}, undefined, `Action redirected with ${status} to ${location}`)
   }
+}
+
+// What a library's failed result is to an action: kayjs-auth's carries the mark, a status and its kind as `data`, so returning it refuses the call.
+export function isFailure(value: unknown): value is Failure<unknown> {
+  return typeof value === 'object' && value !== null && FAILURE in value
 }
