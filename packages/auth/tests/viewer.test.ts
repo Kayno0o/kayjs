@@ -2,7 +2,7 @@ import type { Auth } from '../src/auth'
 import type { BareUser as User } from '../src/core'
 import { afterEach, expect, test } from 'bun:test'
 import { requestOfContext } from 'kay/library'
-import { claimBanner, currentUser, holds, isSignedOut, loadViewer, readRequestWith, registerViewer, viewerValues } from '../src/viewer'
+import { claimBanner, currentUser, holds, loadViewer, readRequestWith, registerViewer, viewerValues } from '../src/viewer'
 
 // Bun shares modules between test files, so the reader `authCore` set goes back after each test.
 afterEach(() => readRequestWith(requestOfContext))
@@ -35,8 +35,7 @@ test('without a layout loading it, the user is a promise a block waits for, read
   expect(await currentUser()).toMatchObject({ id: 'u1' })
   expect(await currentUser('admin')).toMatchObject({ id: 'u1' })
   expect(await currentUser('editor')).toBeNull()
-  expect(await isSignedOut()).toBe(false)
-  expect(reads()).toBe(4)
+  expect(reads()).toBe(3)
 })
 
 test('with the layout loading it, the user is the value itself and the store is read once', async () => {
@@ -47,7 +46,6 @@ test('with the layout loading it, the user is the value itself and the store is 
   expect(currentUser()).toMatchObject({ id: 'u1' })
   expect(currentUser('admin')).toMatchObject({ id: 'u1' })
   expect(currentUser('editor')).toBeNull()
-  expect(isSignedOut()).toBe(false)
   expect(reads()).toBe(1)
 })
 
@@ -70,7 +68,6 @@ test('a visitor and a guest are signed out', async () => {
 
     await loadViewer(request)
     expect(currentUser()).toBeNull()
-    expect(isSignedOut()).toBe(true)
   }
 })
 

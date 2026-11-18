@@ -3,7 +3,7 @@ import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
 import { ai, AiError, embed, speak, transcribe } from '../src'
 import { forgetCounts } from '../src/limits'
-import { aiTest } from '../src/test'
+import { test as aiTest } from '../src/test'
 
 const model = aiTest()
 const recording = new Blob(['not really audio'], { type: 'audio/webm' })

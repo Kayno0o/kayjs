@@ -4,26 +4,18 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 
 import { actionOptions } from '../src/check/action-options'
-import { aiLanguage } from '../src/check/ai-language'
 import { appHooks } from '../src/check/app-hooks'
-import { authMethods } from '../src/check/auth-methods'
-import { authRateLimits } from '../src/check/auth-rate-limits'
 import { clientKeys } from '../src/check/client-keys'
-import { cmsOptions } from '../src/check/cms-options'
 import { configGroups } from '../src/check/config-groups'
 import { configSwitches } from '../src/check/config-switches'
 import { envFiles } from '../src/check/env-files'
-
 import { applySafeFixes } from '../src/check/fixes'
-
 import { formatDurationNumbers } from '../src/check/format-duration'
-
 import { hookContext } from '../src/check/hook-context'
 import { hookNames } from '../src/check/hook-names'
 import { i18nKeys } from '../src/check/i18n-keys'
 import { imagesKeys } from '../src/check/images-keys'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
-import { mailApi } from '../src/check/mail-api'
 import { pagesOptions } from '../src/check/pages-options'
 
 import { routeKeys } from '../src/check/route-keys'
@@ -32,7 +24,6 @@ import { secretKeys } from '../src/check/secret-keys'
 import { socketFrames } from '../src/check/socket-frames'
 import { storeMs } from '../src/check/store-ms'
 import { storeNames } from '../src/check/store-names'
-import { testHelpers } from '../src/check/test-helpers'
 import { ttlNames } from '../src/check/ttl-names'
 
 import { compileKay } from '../src/compiler'
@@ -43,9 +34,6 @@ type Name = keyof typeof DEPRECATED_LINTS
 
 // The project-wide lints, each by the check that finds it; a deprecated lint of the compiler is found by `compileKay`, so it needs no entry.
 const SITE: Record<string, (root: string, options: CheckOptions) => Promise<CheckDiagnostic[]>> = {
-  'deprecated-ai-language': aiLanguage,
-  'deprecated-auth-rate-limits': authRateLimits,
-  'deprecated-auth-methods': authMethods,
   'deprecated-job-handler': jobHandlers,
   'deprecated-schedule-call': scheduleCalls,
   'deprecated-job-options': jobOptions,
@@ -53,8 +41,6 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-socket-frames': socketFrames,
   'deprecated-schema-builders': schemaBuilders,
   'deprecated-action-options': actionOptions,
-  'deprecated-test-helpers': testHelpers,
-  'deprecated-cms-options': cmsOptions,
   'deprecated-hook-names': hookNames,
   'deprecated-store-names': storeNames,
   'deprecated-format-duration': formatDurationNumbers,
@@ -71,18 +57,10 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-ttl-names': ttlNames,
   'deprecated-store-ms': storeMs,
   'deprecated-env-files': envFiles,
-
-  // Its fix is safe only in a project that lists kayjs-ui, where the new form comes from.
-  'deprecated-mail-form': async (root, options) => {
-    await Bun.write(join(root, 'package.json'), '{ "dependencies": { "@kayjs/ui": "*" } }')
-
-    return mailApi(root, options)
-  },
 }
 
 // Every deprecated lint has a `safe` fix, which `kay upgrade` applies, that turns its `wrong` example into its `right` one (#2843). A lint whose old form no fix can rewrite without risk goes here with the reason, and `kay upgrade` leaves it to `llms/upgrading.md`: moving code into a new file is the one today.
-const NO_SAFE_FIX: Partial<Record<Name, string>> = {
-  'deprecated-mail-send': 'a call reaches the request\'s mailer only when its function is handed the context, which an edit in place cannot know',
+const NO_SAFE_FIX: Partial<Record<Name, string>> = {,
 }
 
 // Where a lint's `wrong` example lives: the file its first comment names, a `.kay` file when it opens with a fence, a module otherwise.
@@ -102,7 +80,7 @@ describe('every deprecated lint has a safe fix', () => {
   it('lists each lint\'s check, so a new one cannot go without', () => {
     const compiled = names.filter(name => !(name in SITE))
 
-    expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-ai-links', 'deprecated-auth-signed', 'deprecated-image-options', 'deprecated-mail-send', 'deprecated-page-cache', 'deprecated-page-seo', 'deprecated-ui-callbacks', 'deprecated-ui-input', 'deprecated-ui-items', 'deprecated-ui-props'])
+    expect(compiled.sort()).toEqual(['deprecated-image-options', 'deprecated-page-cache', 'deprecated-page-seo', 'deprecated-ui-props'])
     expect(Object.keys(NO_SAFE_FIX).filter(name => !names.includes(name as Name))).toEqual([])
   })
 

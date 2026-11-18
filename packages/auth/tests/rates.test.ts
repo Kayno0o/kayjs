@@ -21,7 +21,7 @@ async function signIn(browser: ReturnType<typeof testApp>['browser'], password: 
 }
 
 async function registered(store: AuthStore) {
-  const app = testApp({ store, rateLimit: { signInAccount: { max: 2, window: '15m' } } })
+  const app = testApp({ store, rateLimit: { signIn: { account: { max: 2, window: '15m' } } } })
 
   await app.browser().post('/register', { email: 'ada@example.com', password: PASSWORD })
 

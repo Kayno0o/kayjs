@@ -114,7 +114,7 @@ describe('the prebuilt pages', () => {
     expect(text(await ada.visit('/'), '#who')).toBe('Anonymous')
   })
 
-  test('SignedIn, SignedOut and UserMenu show the signed-in user and their roles from a template with no server fence', async () => {
+  test('SignedIn and UserMenu show the signed-in user and their roles from a template with no server fence', async () => {
     const visitor = await browser()
     const anonymous = await visitor.visit('/nav')
 
@@ -263,16 +263,16 @@ describe('the prebuilt pages', () => {
     const whole = { id: 'credential', rawId: 'credential', type: 'public-key', clientExtensionResults: {}, response: { clientDataJSON: 'a', authenticatorData: 'b', signature: 'c' } }
 
     for (const response of [5, {}, { ...whole, response: 'nope' }, { ...whole, response: { clientDataJSON: 'a' } }, { ...whole, type: 'password' }])
-      expect((await visitor.refusal(passkey, { response } as never, { from })).status).toBe(422)
+      expect((await visitor.expectRefused(passkey, { response } as never, { from })).status).toBe(422)
 
-    const expired = await visitor.refusal(passkey, { response: whole as never }, { from })
+    const expired = await visitor.expectRefused(passkey, { response: whole as never }, { from })
 
     expect([expired.status, expired.data]).toEqual([400, { error: 'expired' }])
 
     // A credential id may be 1023 bytes, 1364 characters in base64url.
     const long = 'a'.repeat(1364)
 
-    expect((await visitor.refusal(passkey, { response: { ...whole, id: long, rawId: long } as never }, { from })).status).toBe(400)
+    expect((await visitor.expectRefused(passkey, { response: { ...whole, id: long, rawId: long } as never }, { from })).status).toBe(400)
   })
 
   test('a form checks the browser before going through: refused without its script, sent too soon or filling the hidden field, in the page\'s language', async () => {
@@ -770,7 +770,7 @@ describe('a site on kayjs-auth with no wiring of its own', () => {
     const anonymous = await browser()
 
     expect(await anonymous.visit('/note?a=1&b=%2F')).toMatchObject({ url: '/auth/sign-in?redirect=%2Fnote%3Fa%3D1%26b%3D%252F', status: 200 })
-    expect((await anonymous.refusal(save, { text: 'hi' }, { from: '/note' })).status).toBe(401)
+    expect((await anonymous.expectRefused(save, { text: 'hi' }, { from: '/note' })).status).toBe(401)
 
     const ada = await signedUp('note@example.com')
 
@@ -846,7 +846,7 @@ describe('a site on kayjs-auth with no wiring of its own', () => {
     expect(text(await device(scopedToken, '/note?scope=read'), '#note')).toBe('Note of bearer@example.com')
     expect(text(await device(wholeToken, '/note'), '#note')).toBe('Note of bearer@example.com')
 
-    const refused = await (await browser()).refusal(renameProfile, { name: 'Robot' }, { headers: { authorization: `Bearer ${wholeToken}` }, from: '/note' })
+    const refused = await (await browser()).expectRefused(renameProfile, { name: 'Robot' }, { headers: { authorization: `Bearer ${wholeToken}` }, from: '/note' })
 
     expect(refused.status).toBe(400)
     expect(profiles.size).toBe(0)
@@ -897,7 +897,7 @@ describe('the profile form of the account page', () => {
 
     const ada = await signedUp('throws@example.com')
 
-    expect((await ada.refusal(saveProfile, { displayName: 'boom' } as never, { from: '/auth/account' })).status).toBe(500)
+    expect((await ada.expectRefused(saveProfile, { displayName: 'boom' } as never, { from: '/auth/account' })).status).toBe(500)
     expect(profiles.size).toBe(0)
 
     const user = (await store.users.findByEmail('throws@example.com'))!
@@ -944,7 +944,7 @@ describe('the profile form of the account page', () => {
   test('an anonymous visitor cannot save one, and a value with markup is shown as text', async () => {
     profiles.clear()
 
-    expect((await (await browser()).refusal(saveProfile, { displayName: 'a' } as never, { from: '/auth/account' })).status).toBe(401)
+    expect((await (await browser()).expectRefused(saveProfile, { displayName: 'a' } as never, { from: '/auth/account' })).status).toBe(401)
     expect(profiles.size).toBe(0)
 
     const ada = await signedUp('markup@example.com')

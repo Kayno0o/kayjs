@@ -11,7 +11,7 @@ const mount = mountComponent as (component: unknown, props: unknown) => Promise<
 test.each([
   ['Table', Table, { rows: [], columns: [] }],
   ['TreeView', TreeView, { nodes: [], label: 'x' }],
-  ['Timeline', Timeline, { entries: [] }],
+  ['Timeline', Timeline, { items: [] }],
 ] as const)('%s throws for an onSelect, naming onSelectedChange', async (name, component, props) => {
   await expect(mount(component, { ...props, onSelect: () => undefined })).rejects.toThrow(`a ${name} has no onSelect since 1.91; use onSelectedChange`)
 })
@@ -19,7 +19,7 @@ test.each([
 test.each([
   ['Table', Table, { rows: [], columns: [] }],
   ['TreeView', TreeView, { nodes: [], label: 'x' }],
-  ['Timeline', Timeline, { entries: [] }],
+  ['Timeline', Timeline, { items: [] }],
 ] as const)('%s takes an onSelect a wrapper forwards as undefined', async (_name, component, props) => {
   const mounted = await mount(component, { ...props, onSelect: undefined }) as { unmount: () => void }
 

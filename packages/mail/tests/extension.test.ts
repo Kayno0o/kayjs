@@ -3,8 +3,12 @@ import type { Mailer } from '../src'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
-import { enqueue, mail, mailer, outbox, send } from '../src'
+import { mail, mailer, outbox } from '../src'
 import { runningMailer } from '../src/running'
+
+// Sends through the mailer of the latest site started, as the removed `send` and `enqueue` of the package did.
+const send: Mailer['send'] = async message => runningMailer()!.send(message)
+const enqueue: Mailer['enqueue'] = async (message, options) => runningMailer()!.enqueue(message, options)
 
 const message = (subject: string) => ({ to: 'ada@example.com', subject, text: 'Hello' })
 
@@ -126,7 +130,6 @@ describe('mail() with no module', () => {
     const extension = mail({ from: 'later@site.test' })
 
     expect(runningMailer()).toBeUndefined()
-    await expect(send(message('Nowhere'))).rejects.toThrow('no mailer is running')
 
     const site = await start(extension)
 

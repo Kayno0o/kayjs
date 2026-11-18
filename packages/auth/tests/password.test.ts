@@ -94,7 +94,7 @@ describe('signInWithPassword', () => {
   })
 
   test('stops an account after its failed attempts, even with the right password, and a success clears them', async () => {
-    const { browser } = await registered({ rateLimit: { signInAccount: { max: 2, window: '900s' } } })
+    const { browser } = await registered({ rateLimit: { signIn: { account: { max: 2, window: '900s' } } } })
     const visitor = browser()
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })
@@ -107,7 +107,7 @@ describe('signInWithPassword', () => {
   })
 
   test('counts an account once however it is named, by its email or by its name in any case', async () => {
-    const { browser } = await registered({ rateLimit: { signInAccount: { max: 3, window: '900s' } } })
+    const { browser } = await registered({ rateLimit: { signIn: { account: { max: 3, window: '900s' } } } })
 
     for (const identifier of ['ada@example.com', 'Ada', 'ADA'])
       expect(await browser().post('/password', { identifier, password: 'wrong password!' })).toMatchObject({ ok: false, error: { code: 'invalid' } })
@@ -116,7 +116,7 @@ describe('signInWithPassword', () => {
   })
 
   test('counts a burst of parallel guesses before any password is checked', async () => {
-    const { browser } = await registered({ rateLimit: { signInAccount: { max: 2, window: '900s' } } })
+    const { browser } = await registered({ rateLimit: { signIn: { account: { max: 2, window: '900s' } } } })
     const answers = await Promise.all(Array.from({ length: 6 }, async () => browser().post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })))
 
     expect(answers.filter(answer => typeof answer === 'object' && answer !== null && 'error' in answer && (answer.error as { code?: string }).code === 'invalid')).toHaveLength(2)

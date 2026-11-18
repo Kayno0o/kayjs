@@ -26,8 +26,10 @@ describe('rateLimit grouped by feature', () => {
     expect(resolveLimits({ twoFactor: [{ max: 3, window: '1m' }, { max: 8, window: '1h' }] }).twoFactor).toHaveLength(2)
   })
 
-  test('the flat keys of before 1.105 still work', () => {
-    expect(resolveLimits({ signInAccount: { max: 2, window: '15m' }, oauthRegisterAll: { max: 5, window: '1h' } }).signInAccount[0].max).toBe(2)
+  test('refuses a flat key of before 1.105, naming the part of its feature', () => {
+    expect(() => resolveLimits({ signInAccount: { max: 2, window: '15m' } } as never)).toThrow('rateLimit.signInAccount is not a limit; write signIn: { account }')
+    expect(() => resolveLimits({ oauthRegisterAll: { max: 5, window: '1h' } } as never)).toThrow('write oauth: { registerAll }')
+    expect(() => resolveLimits({ colour: { max: 5, window: '1h' } } as never)).toThrow('rateLimit.colour is not a limit')
   })
 
   test('refuses a part the feature has no limit for, naming where it is', () => {

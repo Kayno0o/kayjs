@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
-import { authTest } from '../src/test'
+import { test as authTest } from '../src/test'
 
 // Two real test sites of an app with `auth()` and no module, in one process: each signs in through the auth built for it.
 const ROOT = join(import.meta.dir, 'own-fixture')

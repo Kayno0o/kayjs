@@ -59,7 +59,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, marks, goals, onMark, eventsLabel = wording('ui.lineChart.events', 'Events'), onSelect, href, newTab, onActiveChange, onActive, active, tooltip, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), emptyLabel = wording('ui.lineChart.empty', 'No data yet.'), empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, marks, goals, onMark, eventsLabel = wording('ui.lineChart.events', 'Events'), onSelect, href, newTab, onActiveChange, active, tooltip, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), emptyLabel = wording('ui.lineChart.empty', 'No data yet.'), empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -98,8 +98,6 @@ const { labels, series, formatValue = (value: number) => formatNumber(value), fo
   newTab?: NewTab | undefined
   // Hears the index of the point the pointer or the keyboard is on, `null` when it leaves.
   onActiveChange?: ((event: { index: number | null }) => unknown) | undefined
-  // @deprecated Since 1.105, `onActiveChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
-  onActive?: ((index: number | null) => unknown) | undefined
   // The point whose cursor and dots are drawn, `null` for none; the app controls them when it gives it, the tooltip following the pointer and keyboard alone.
   active?: number | null | undefined
   // Replaces the tooltip's body with the app's own content for the point under the pointer or focus, the chart still placing it: a `@tooltip(mark)` block.
@@ -328,7 +326,7 @@ effect(() => {
     return
 
   lastActive = index
-  void untrack(() => { onActiveChange?.({ index }); onActive?.(index) })
+  void untrack(() => { onActiveChange?.({ index }) })
 })
 
 const cursor = () => {

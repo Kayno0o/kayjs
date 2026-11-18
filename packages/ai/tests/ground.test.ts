@@ -1,6 +1,6 @@
 import { expect, it } from 'bun:test'
 import { ask, embed, ground } from '../src'
-import { aiTest } from '../src/test'
+import { test as aiTest } from '../src/test'
 
 const model = aiTest()
 

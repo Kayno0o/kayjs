@@ -4,7 +4,7 @@ import { forgetPushDevice, push, pushSubscriptions } from 'kay/server'
 import { testSite } from 'kay/test'
 import { generateVapidKeys } from '../../../src/server/push-crypto'
 import { auth } from '../src/pages'
-import { authTest } from '../src/test'
+import { test as authTest } from '../src/test'
 
 // A real test site with `auth()` and `push()`: the device is subscribed through the push route and left through the sign-out route.
 const ROOT = join(import.meta.dir, 'bell-fixture')

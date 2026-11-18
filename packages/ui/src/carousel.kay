@@ -30,16 +30,12 @@ const look = recipe({
   },
 })
 
-const { items: given, slides: oldSlides, slide, list: legacy, index = 0, onIndexChange, loop = true, perView = 1, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), emptyLabel = wording('ui.carousel.empty', 'No slides.'), empty, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
+const { items: given, slide, index = 0, onIndexChange, loop = true, perView = 1, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), emptyLabel = wording('ui.carousel.empty', 'No slides.'), empty, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   // The slides to draw: an array, or slides loaded page by page, from `infiniteList`: the next page loads when the reader reaches the last slides, and a failed page shows LoadMore's alert with its retry under the controls.
   // A slide with an `href` makes the picture a link to that address, as a promo banner needs: middle-click and a new tab work, and an address off the site opens in one.
-  items?: readonly Slide[] | InfiniteList<Slide> | undefined
-  /** @deprecated Write `items`. Removed in 1.108.0. */
-  slides?: readonly Slide[] | undefined
+  items: readonly Slide[] | InfiniteList<Slide>
   // Draws each slide's content in place of its picture and link: `@slide(slide, index)`, given the slide as written and its place. `src` and `alt` stay the default, and the slide keeps its group, its label and the sliding. With a `@slide` block a slide needs no `src` or `alt`, and a `key` of its own tells it apart; without one they are what is drawn (the types do not tell the two cases apart, so a slide with neither draws an empty picture).
   slide?: Snippet<[slide: Slide, index: number]> | undefined
-  /** @deprecated Write `items`. Removed in 1.108.0. */
-  list?: InfiniteList<Slide> | undefined
   // The slide shown first; a carousel whose parent passes another follows it.
   index?: number | undefined
   // Called with the index of the first slide shown, on each turn: a button, a dot, an arrow key, a swipe or the autoplay.
@@ -65,10 +61,10 @@ const { items: given, slides: oldSlides, slide, list: legacy, index = 0, onIndex
   // What the carousel reads with no slide; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
   emptyLabel?: string | undefined
   empty?: Snippet | undefined
-} & ({ items: readonly Slide[] | InfiniteList<Slide>, slides?: undefined, list?: undefined } | { items?: undefined, slides: readonly Slide[], list?: undefined } | { items?: undefined, slides?: undefined, list: InfiniteList<Slide> })>()
+}>()
 
-const list = isInfiniteList<Slide>(given) ? given : legacy
-const all = () => list ? list.data() : isInfiniteList<Slide>(given) ? [] : given ?? oldSlides ?? []
+const list = isInfiniteList<Slide>(given) ? given : undefined
+const all = () => list ? list.data() : isInfiniteList<Slide>(given) ? [] : given ?? []
 
 const shown = signal(index)
 // Whether the pointer or the focus is on the carousel, or the carousel scrolled out of view, which holds the autoplay, as `every` does for a hidden tab.

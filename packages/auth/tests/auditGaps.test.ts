@@ -82,7 +82,7 @@ describe('resetting a password', () => {
 describe('the second factor cap', () => {
   test('mails the holder once when the account has had too many guesses', async () => {
     const box = mailbox()
-    const app = testApp({ rateLimit: { twoFactorAccount: { max: 3, window: '900s' } }, site: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false } })
+    const app = testApp({ rateLimit: { twoFactor: { account: { max: 3, window: '900s' } } }, site: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false } })
 
     await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 

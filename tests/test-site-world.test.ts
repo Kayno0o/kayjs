@@ -84,13 +84,8 @@ describe('site.signInAs', () => {
   })
 })
 
-describe('refusal names', () => {
-  it('keeps the old names as the same functions', () => {
-    expect(site.refusal).toBe(site.expectRefused)
-    expect(site.socketRefusal).toBe(site.socket.refused)
-  })
-
-  it('keeps the hooks of each as() view to that view', async () => {
+describe('as() views', () => {
+  it('keeps the hooks of each view to that view', async () => {
     const calls: string[] = []
     const first = site.as('a=1')
     const second = site.as('b=2')

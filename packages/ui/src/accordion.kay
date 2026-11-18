@@ -14,15 +14,13 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
 
 const look = recipe({ parts: { root: 'kui-accordion' } })
 
-const { items, level, multiple = false, boxed = false, value, onValueChange, onChange, panel, title, meta, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onValueChange' | 'onChange'> & {
+const { items, level, multiple = false, boxed = false, value, onValueChange, panel, title, meta, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onValueChange' | 'onChange'> & {
   // Each section is `{ key, label }`, with `open` starting it unfolded (with one open at a time, the first one flagged wins), `disabled` keeping it as it is, and `meta` drawing a count or a state in its band, as CollapsibleSection's does.
   items: readonly AccordionItem[]
   // The values open, which the accordion follows when the app passes a new one: a string, or an array with `multiple`. Left out, the reader alone decides after the first draw.
   value?: string | readonly string[] | undefined
   // Called with the values open (at most one without `multiple`) whenever the reader opens or closes a section.
   onValueChange?: ((event: { value: string[] }) => unknown) | undefined
-  // @deprecated Since 1.105, `onValueChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
-  onChange?: ((value: string[]) => unknown) | undefined
   // Lets several sections stay open; by default opening one closes the others.
   multiple?: boolean | undefined
   // Makes each section's title a heading of that level, as CollapsibleSection's `level` does.
@@ -81,7 +79,6 @@ function toggled(item: string, now: boolean) {
   touched = true
   opened = next
   onValueChange?.({ value: [...next] })
-  onChange?.([...next])
 }
 
 // A click, or Enter and Space which the browser turns into one, on a disabled header folds nothing.

@@ -172,7 +172,7 @@ describe('the API guard', () => {
   })
 })
 
-describe('cms({ role })', () => {
+describe('cms({ access: role })', () => {
   // kayjs-auth's `ctx.locals.auth`, admitting a user holding the role asked.
   function signedIn(roles: string[], asked: string[]): GuardContext {
     const ctx = context('POST', '/entries/posts/hello', false)
@@ -186,7 +186,7 @@ describe('cms({ role })', () => {
   }
 
   test('lets in whom kayjs-auth\'s requireUser({ require: role }) admits, and refuses the others', async () => {
-    configure({ role: 'editor' })
+    configure({ access: 'editor' })
 
     const asked: string[] = []
 
@@ -196,7 +196,7 @@ describe('cms({ role })', () => {
   })
 
   test('refuses every request with no kayjs-auth in its locals, or one too old to read require, logging it once', async () => {
-    configure({ role: 'editor' })
+    configure({ access: 'editor' })
 
     // A kayjs-auth before require, whose requireUser() admits every signed-in user.
     const older = Object.assign(context('POST', '/entries/posts/hello', false), { locals: { auth: { user: async () => ({ id: 'u1' }), requireUser: async () => ({ id: 'u1' }) } } })
@@ -213,13 +213,8 @@ describe('cms({ role })', () => {
     }
   })
 
-  test('is a config error beside a guard, or empty', () => {
-    expect(() => configure({ role: 'editor', guard: () => undefined })).toThrow('is not given with `cms({ guard })`')
-    expect(() => configure({ role: '' })).toThrow('`cms({ role })`')
-  })
-
   test('counts as the guard cms({ roles }) needs', () => {
-    expect(() => configure({ role: 'editor', roles: { editor: ['publish'] } })).not.toThrow()
+    expect(() => configure({ access: 'editor', roles: { editor: ['publish'] } })).not.toThrow()
   })
 })
 
@@ -286,7 +281,7 @@ describe('the screens\' guard', () => {
   })
 
   test('names the person it lets in with a digest the editor keys its drafts by, new when another signs in', async () => {
-    configure({ guard: () => undefined, member: ({ request }) => ({ name: request.headers.get('x-name') ?? '', roles: [] }) })
+    configure({ access: ({ request }) => ({ name: request.headers.get('x-name') ?? '', roles: [] }) })
 
     const ann = screen('/admin', { 'x-name': 'Ann' })
     const bob = screen('/admin', { 'x-name': 'Bob' })
@@ -406,10 +401,8 @@ describe('cms({ access })', () => {
     expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(true)
   })
 
-  test('is one option: not given with guard, role or member, and refused when it is nothing a role is', () => {
+  test('is one option: not given with guard, and refused when it is nothing a role is', () => {
     expect(() => configure({ access: 'editor', guard: () => undefined })).toThrow('not given with')
-    expect(() => configure({ access: 'editor', role: 'editor' })).toThrow('not given with')
-    expect(() => configure({ access: 'editor', member: () => undefined })).toThrow('not given with')
     expect(() => configure({ access: '' })).toThrow('it takes a kayjs-auth role')
     expect(() => configure({ access: [] })).toThrow('it takes a kayjs-auth role')
     expect(() => configure({ access: 3 as never })).toThrow('it takes a kayjs-auth role')

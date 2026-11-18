@@ -15,7 +15,7 @@ const UPGRADE = { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocke
 // The DOM typings of WebSocket hide the options Bun takes, the upgrade's headers among them.
 const BunWebSocket = NativeWebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
 
-export function socketsOf({ defaults, keyHeader, base, jar, send, listening, connections }: SiteScope): Pick<TestSite, 'socket' | 'socketRefusal' | 'stream'> {
+export function socketsOf({ defaults, keyHeader, base, jar, send, listening, connections }: SiteScope): Pick<TestSite, 'socket' | 'stream'> {
   // What a socket's upgrade carries: the site's headers, the cookies so far and the call's own.
   const upgradeHeaders = (url: string, given: Record<string, string> | undefined): Record<string, string> => {
     const headers = withDefaults(defaults, given, keyHeader)
@@ -79,7 +79,6 @@ export function socketsOf({ defaults, keyHeader, base, jar, send, listening, con
 
   return {
     socket: Object.assign(open, { refused }),
-    socketRefusal: refused,
     stream: (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
       const init = streamRequest(options)

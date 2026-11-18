@@ -59,9 +59,4 @@ export class PasskeyMethods {
   async proofOptions(): Promise<Result<{ options: PublicKeyCredentialRequestOptionsJSON }, 'signed-out' | 'none' | 'expired' | 'off'>> {
     return !this.state.core.switches.passkeys ? OFF : (await load.passkeys()).passkeyProofOptions(this.state)
   }
-
-  /** @deprecated Use `passkeys.update`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async rename(...args: Parameters<PasskeyMethods['update']>): ReturnType<PasskeyMethods['update']> {
-    return this.update(...args)
-  }
 }

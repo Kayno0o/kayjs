@@ -49,9 +49,4 @@ export class OAuthServerMethods {
   async revokeGrant(clientId: string): Promise<Result<object, 'signed-out' | 'not-found'>> {
     return (await load.grants()).revokeClient(this.state, clientId)
   }
-
-  /** @deprecated Use `oauthServer.listClients`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async clients(...args: Parameters<OAuthServerMethods['listClients']>): ReturnType<OAuthServerMethods['listClients']> {
-    return this.listClients(...args)
-  }
 }

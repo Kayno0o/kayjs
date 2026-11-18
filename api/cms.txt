@@ -119,7 +119,6 @@ interface CmsOptions
   trash?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined;
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined;
 }
-  member?: ((ctx: GuardContext) => MemberInfo | Promise<MemberInfo | undefined> | undefined) | undefined
   newsletter?: Record<string, NewsletterOptions> | undefined
   /** @deprecated Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onSave?: Hook<SaveEvent> | undefined
   /** @deprecated Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108. */ onUpload?: Hook<UploadEvent> | undefined
@@ -127,9 +126,8 @@ interface CmsOptions
   pageSize?: number | undefined
   prefix?: string | undefined
   rawHtml?: string[] | undefined
-  role?: string | undefined
   roles?: Record<string, GivenRole> | undefined
-  uploads?: UploadOptions | string[] | undefined
+  uploads?: UploadOptions | undefined
 
 [.] CollectionInfo
 interface CollectionInfo
@@ -927,10 +925,6 @@ interface CmsSaveOptions
 
 [./test] CmsSaveOutcome
 type CmsSaveOutcome = SaveOutcome
-
-[./test] cmsTest
-/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
-function cmsTest(site: Pick<TestSite, "cookies" | "fetch" | "submit"> & Partial<Pick<TestSite, "joinSignIn">>): CmsTest
 
 [./test] CmsTest
 interface CmsTest

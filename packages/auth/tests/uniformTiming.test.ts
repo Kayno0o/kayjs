@@ -131,7 +131,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
   test('the lockout answer does not wait on the holder\'s notice, held address or not', async () => {
     const slow = gate()
     const box = mailbox()
-    const app = testApp({ rateLimit: { signInAccountAll: { max: 1, window: '900s' } }, site: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false }, onEvent: async (info) => {
+    const app = testApp({ rateLimit: { signIn: { accountAll: { max: 1, window: '900s' } } }, site: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false }, onEvent: async (info) => {
       if (info.event === 'sign-in-locked')
         await slow.closed
     } })

@@ -182,11 +182,9 @@ describe('locale', () => {
     expect(provider.seen.map(({ language }) => language)).toEqual(['fr', 'pt', 'en', undefined])
   })
 
-  it('still takes the deprecated language, and refuses a tag that is none', async () => {
+  it('refuses a tag that is none', async () => {
     const provider = flaky('old', () => undefined)
 
-    await transcribe(recording, { provider, language: 'de' })
-    expect(provider.seen[0]?.language).toBe('de')
     await expect(transcribe(recording, { provider, locale: 'not a tag' })).rejects.toThrow('BCP 47')
   })
 
@@ -194,9 +192,5 @@ describe('locale', () => {
     fakeAi.reply({ data: { alt: 'un chat' } })
     await describeImage(PNG, { locale: 'pt-BR' })
     expect(fakeAi.last()?.system).toContain('Brazilian Portuguese')
-
-    fakeAi.reply({ data: { alt: 'un chat' } })
-    await describeImage(PNG, { language: 'fr' })
-    expect(fakeAi.last()?.system).toContain('French')
   })
 })

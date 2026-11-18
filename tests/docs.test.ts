@@ -160,7 +160,7 @@ describe('the documentation site', () => {
     expect(components.find(component => component.slug === 'copy-button')!.data.props.find(prop => prop.name === 'tone')!.type).toContain('"success"')
     expect(components.find(component => component.slug === 'form-field')!.data.props.find(prop => prop.name === 'size')).toMatchObject({ default: '\'md\'' })
     expect(props.has('disabled')).toBe(false)
-    expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSort')!.type).toBe('(sort: SortState) => unknown')
+    expect(components.find(component => component.slug === 'table')!.data.props.find(prop => prop.name === 'onSortChange')!.type).toBe('(event: { sort: SortState; }) => unknown')
   })
 
   // The docs read a variant from its recipe and the compiler types it from there, so a union beside it only drifts.

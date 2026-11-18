@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { auth } from '../src/pages'
-import { authTest } from '../src/test'
+import { test as authTest } from '../src/test'
 
 // A real test site whose admins must have two-factor: the admin page sends them to the security page, which sends them back once it is on.
 const ROOT = join(import.meta.dir, 'own-fixture')

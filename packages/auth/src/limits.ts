@@ -82,32 +82,6 @@ export interface LimitsOption {
   invite?: LimitOption | { sender?: LimitOption | undefined, address?: LimitOption | undefined } | undefined
   // The OAuth server's endpoints: `register` per address, `registerAll` a ceiling on all addresses together (none by default), `document` and `token`.
   oauth?: { register?: LimitOption | undefined, registerAll?: LimitOption | undefined, document?: LimitOption | undefined, token?: LimitOption | undefined } | undefined
-  /** @deprecated `signIn.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  signInAccount?: LimitOption | undefined
-  /** @deprecated `signIn.accountAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  signInAccountAll?: LimitOption | undefined
-  /** @deprecated `resend.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  resendAccount?: LimitOption | undefined
-  /** @deprecated `forgot.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  forgotAccount?: LimitOption | undefined
-  /** @deprecated `magicLink.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  magicLinkAccount?: LimitOption | undefined
-  /** @deprecated `emailChange.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  emailChangeAccount?: LimitOption | undefined
-  /** @deprecated `twoFactor.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  twoFactorAccount?: LimitOption | undefined
-  /** @deprecated `emailCode.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  emailCodeAccount?: LimitOption | undefined
-  /** @deprecated `invite.address`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  inviteAddress?: LimitOption | undefined
-  /** @deprecated `oauth.register`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  oauthRegister?: LimitOption | undefined
-  /** @deprecated `oauth.registerAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  oauthRegisterAll?: LimitOption | undefined
-  /** @deprecated `oauth.document`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  oauthDocument?: LimitOption | undefined
-  /** @deprecated `oauth.token`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
-  oauthToken?: LimitOption | undefined
 }
 
 // Where each part of a group is counted, under the name the bucket has in `DEFAULT_LIMITS`: the bare limit of a feature is its first part.
@@ -123,12 +97,30 @@ export const LIMIT_GROUPS: Record<string, Record<string, keyof Limits>> = {
   oauth: { register: 'oauthRegister', registerAll: 'oauthRegisterAll', document: 'oauthDocument', token: 'oauthToken' },
 }
 
+// A feature without a group is a bucket of its own; a part of a group's bucket, written flat as before 1.105, or any other name is refused.
+function checkBare(name: string): void {
+  if (Object.hasOwn(DEFAULT_LIMITS, name) && !Object.values(LIMIT_GROUPS).some(parts => Object.values(parts).includes(name as keyof Limits)))
+    return
+
+  for (const [feature, parts] of Object.entries(LIMIT_GROUPS)) {
+    const part = Object.entries(parts).find(([, bucket]) => bucket === name)
+
+    if (part)
+      throw configError('auth', 'rateLimit', `rateLimit.${name} is not a limit; write ${feature}: { ${part[0]} }`)
+  }
+
+  throw configError('auth', 'rateLimit', `rateLimit.${name} is not a limit of kayjs-auth`)
+}
+
 // The buckets `rateLimit` names, each with its limit and where the app wrote it: a group is read part by part, a bare limit on a feature that has a group is its first part.
 function bucketsOf(given: LimitsOption | undefined): [keyof Limits, LimitOption | undefined, string][] {
   const buckets: [keyof Limits, LimitOption | undefined, string][] = []
 
   for (const [name, value] of Object.entries(given ?? {}) as [string, unknown][]) {
     const group = Object.hasOwn(LIMIT_GROUPS, name) ? LIMIT_GROUPS[name]! : undefined
+
+    if (group === undefined)
+      checkBare(name)
 
     if (group === undefined || value === false || value === null || value === undefined || Array.isArray(value) || (typeof value === 'object' && value !== null && 'max' in value)) {
       // A bare limit on a feature with a group is its first part, as it was before the groups.

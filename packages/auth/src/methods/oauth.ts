@@ -31,14 +31,4 @@ export class OAuthMethods {
   async getProviderToken(provider: string): Promise<string | null> {
     return (await load.flow()).providerToken(this.state, provider)
   }
-
-  /** @deprecated Use `oauth.listIdentities`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async identities(...args: Parameters<OAuthMethods['listIdentities']>): ReturnType<OAuthMethods['listIdentities']> {
-    return this.listIdentities(...args)
-  }
-
-  /** @deprecated Use `oauth.getProviderToken`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async providerToken(...args: Parameters<OAuthMethods['getProviderToken']>): ReturnType<OAuthMethods['getProviderToken']> {
-    return this.getProviderToken(...args)
-  }
 }

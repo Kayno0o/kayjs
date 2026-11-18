@@ -27,7 +27,7 @@ import { log } from './log'
 import { messageId } from './message-id'
 import { addressOf, outbox, PREVIEW_ROUTES, sameAddress } from './outbox'
 import { providerFromUrl, providerName, providerOf } from './providers'
-import { register, runningOrThrow } from './running'
+import { register } from './running'
 import { checkKey, checkOptions, greetingOf, rateFromText, smtp } from './smtp'
 import { htmlToText } from './text'
 
@@ -458,18 +458,6 @@ function conventionalMailer(app: ExtensionApp | undefined): Mailer | undefined {
     throw configError('mail', 'mail', 'src/mail.ts does not export a mailer as `mail`: write `export const mail = mailer({ ... })`, or give `mail({ ... })` its options in kay.config.ts and remove the file')
 
   return exported as Mailer
-}
-
-// Renders and sends the message now through the mailer of the running site that `mail()` in kay.config.ts registered, the latest started when several run; throws when none does.
-// @deprecated Send through `ctx.locals.mail.send()` in a page, an action or a guard, and through the mailer of `src/mail.ts` elsewhere: one site per request, not the latest started. Removed in 1.108; `deprecated-mail-send` finds it.
-export async function send<P extends object>(message: MailMessage<P>): Promise<Delivery> {
-  return runningOrThrow().send(message)
-}
-
-// Renders the message now and leaves it to the queue of the running site's registered mailer, as its `enqueue`; throws when none runs.
-// @deprecated Enqueue through `ctx.locals.mail.enqueue()` in a page, an action or a guard, and through the mailer of `src/mail.ts` elsewhere: one site per request, not the latest started. Removed in 1.108; `deprecated-mail-send` finds it.
-export async function enqueue<P extends object>(message: MailMessage<P>, options?: EnqueueOptions): Promise<string> {
-  return runningOrThrow().enqueue(message, options)
 }
 
 const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, url: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, store: true, listStore: true, suppressionStore: true, events: true, inbound: true, beforeSend: true, afterSend: true, onSend: true, onError: true, afterSuppress: true, onSuppress: true, optional: true }

@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { AiError, anthropic, openai, speak, transcribe } from '../src'
-import { aiTest } from '../src/test'
+import { test as aiTest } from '../src/test'
 
 const model = aiTest()
 const recording = new Blob(['not really audio'], { type: 'audio/webm;codecs=opus' })
@@ -75,7 +75,7 @@ describe('transcribe', () => {
   it('posts the recording to /audio/transcriptions as OpenAI takes it and trims the text', async () => {
     answer = () => Response.json({ text: '  Hello there \n' })
 
-    expect(await transcribe(recording, { provider: voices, model: 'whisper-1', language: 'en' })).toBe('Hello there')
+    expect(await transcribe(recording, { provider: voices, model: 'whisper-1', locale: 'en' })).toBe('Hello there')
 
     const [sent] = received
 

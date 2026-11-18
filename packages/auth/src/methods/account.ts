@@ -78,19 +78,4 @@ export class AccountMethods {
   async export(): Promise<Result<{ data: DataExport }, 'signed-out' | 'limited' | 'impersonating' | 'stale'>> {
     return (await load.exports()).exportData(this.state)
   }
-
-  /** @deprecated Use `account.updateUsername`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async changeUsername(...args: Parameters<AccountMethods['updateUsername']>): ReturnType<AccountMethods['updateUsername']> {
-    return this.updateUsername(...args)
-  }
-
-  /** @deprecated Use `account.getProfile`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async profile(...args: Parameters<AccountMethods['getProfile']>): ReturnType<AccountMethods['getProfile']> {
-    return this.getProfile(...args)
-  }
-
-  /** @deprecated Use `account.updateProfile`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async saveProfile(...args: Parameters<AccountMethods['updateProfile']>): ReturnType<AccountMethods['updateProfile']> {
-    return this.updateProfile(...args)
-  }
 }

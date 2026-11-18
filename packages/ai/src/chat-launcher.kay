@@ -2,7 +2,7 @@
 // The launcher is on every page and the address of none: its panel keeps its state across page swaps, and the chat inside loads when the browser is idle. A conversation kept on the server is named by the browser.
 island({ persist: true, hydrate: 'idle' })
 import type { Component, Snippet } from 'kay'
-import type { ChatLauncherIcons, ChatLauncherLabelProps, ChatLauncherLabels } from './types'
+import type { ChatLauncherIcons, ChatLauncherLabels } from './types'
 import Chat from './chat.kay'
 import Panel from './chat-panel.kay'
 import { chatIcon } from './chat-icon'
@@ -11,7 +11,7 @@ import Icon from '@kayjs/ui/icon.kay'
 
 type ChatProps = typeof Chat extends Component<infer Props> ? Props : never
 
-const { icons, labels = {}, openLabel, closeLabel, open, onOpenChange, hash, newLabel, expandLabel, collapseLabel, note, newTab = 'auto', class: className, ...chat } = props<Omit<ChatProps, 'class' | 'labels' | 'icons' | 'links' | 'conversationIn' | 'newButton'> & {
+const { icons, labels = {}, open, onOpenChange, hash, note, newTab = 'auto', class: className, ...chat } = props<Omit<ChatProps, 'class' | 'labels' | 'icons' | 'conversationIn' | 'newButton'> & {
   // The texts, by the keys of the chat's own and four more: `open` and `close` name the button while the panel is closed and while it is open (`Open the chat` and `Close the chat` by default), `new` the header's button and the list's, `expand` and `collapse` the size button. The chat's `label` heads the panel.
   labels?: ChatLauncherLabels | undefined
   // Opens and closes the panel when the app sets it, such as an "Ask the assistant" button elsewhere on the page, or to close it after a navigation; left out, the button and Escape work on their own. `onOpenChange(open)` is called when the visitor opens or closes it, so the app's state follows.
@@ -25,7 +25,7 @@ const { icons, labels = {}, openLabel, closeLabel, open, onOpenChange, hash, new
   note?: Snippet
   // On the button and panel's wrapper.
   class?: string | undefined
-} & Pick<ChatLauncherLabelProps, 'openLabel' | 'closeLabel' | 'newLabel' | 'expandLabel' | 'collapseLabel'>>()
+}>()
 
 const iconOf = (name: keyof ChatLauncherIcons, fallback: string) => chatIcon(icons, name, fallback)
 
@@ -38,7 +38,7 @@ function opening() {
   }
 }
 ---
-Panel({...opening()} label={chat.label} labels={labels} openLabel={openLabel} closeLabel={closeLabel} newLabel={newLabel} expandLabel={expandLabel} collapseLabel={collapseLabel} class={className})
+Panel({...opening()} label={chat.label} labels={labels} class={className})
   @icon
     Icon(icon={iconOf('open', 'chat')})
   @closeIcon

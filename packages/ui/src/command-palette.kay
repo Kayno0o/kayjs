@@ -46,7 +46,7 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { open = false, onOpenChange, size = 'md', items, entries: oldEntries, groups = [], recent = [], onRecentChange, shortcut: keys, siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), empty, recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore, search, searchLabel = wording('ui.commandPalette.search', 'Found'), searchError = wording('ui.commandPalette.searchError', 'The search failed'), ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'class' | 'children' | 'open' | 'onClose' | 'closedby'> & {
+const { open = false, onOpenChange, size = 'md', items, groups = [], recent = [], onRecentChange, shortcut: keys, siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), empty, recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore, search, searchLabel = wording('ui.commandPalette.search', 'Found'), searchError = wording('ui.commandPalette.searchError', 'The search failed'), ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'class' | 'children' | 'open' | 'onClose' | 'closedby'> & {
   // Shows the palette; the shortcut opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
@@ -77,13 +77,7 @@ const { open = false, onOpenChange, size = 'md', items, entries: oldEntries, gro
   search?: ((query: string) => PromiseLike<PaletteEntry[]>) | undefined
   searchLabel?: string | undefined
   searchError?: string | undefined
-} & (
-  { items: PaletteEntry[], entries?: undefined } | {
-    // @deprecated Since 1.105, `items`: `deprecated-ui-items` writes the new name, and this one works until 1.108.
-    entries: PaletteEntry[]
-    items?: undefined
-  }
-)>()
+} & { items: PaletteEntry[] }>()
 
 // A row of the list, numbered the way the arrow keys walk it; a section the site search found carries the line of text it was found in, and its heading's words found marked.
 interface Row {
@@ -154,7 +148,7 @@ effect(() => {
   onCleanup(() => clearTimeout(timer))
 })
 
-const all = () => (items ?? oldEntries)!
+const all = () => items
 
 // Headed groups while the query is empty, one flat ranked list once it is not, then the sections the site search found that no entry links already.
 const sections = memo(() => {

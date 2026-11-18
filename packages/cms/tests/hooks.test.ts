@@ -204,9 +204,8 @@ describe('order', () => {
     Object.assign(devApi, { [Symbol.for('kay.api')]: '/_kay/cms/dev' })
     await saveEntry({ collection: 'notes', slug: 'one', data: { title: 'One' } }, { create: true })
     configure({
-      guard: () => undefined,
       roles: { writer: [], admin: ['delete'] },
-      member: () => ({ name: 'Wes', roles: ['writer'] }),
+      access: () => ({ name: 'Wes', roles: ['writer'] }),
       beforeSave: ({ verb }) => {
         asked.push(verb)
       },

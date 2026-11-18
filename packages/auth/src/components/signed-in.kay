@@ -2,12 +2,10 @@
 import type { AuthRequirement } from '../request'
 import { ctx } from 'kay'
 
-const { require, role } = props<{ require?: AuthRequirement<string> | undefined, role?: string | undefined }>()
-// `role` is the name `require` replaced.
-const needs = require ?? role
+const { require } = props<{ require?: AuthRequirement<string> | undefined }>()
 ---
 // A guest is no signed-in user. `ctx.user` and `ctx.can` are read ahead of the render of each page reaching this component, so it shows in the first bytes.
-if ctx.user && (needs === undefined || ctx.can(needs))
+if ctx.user && (require === undefined || ctx.can(require))
   slot
 else
   slot else

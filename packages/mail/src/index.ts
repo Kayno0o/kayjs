@@ -12,7 +12,7 @@ export type { EventSecrets, StoredSuppression, Suppression, SuppressionReason } 
 export type { BroadcastEvent, BroadcastStatus, ListConfirmProps, ListEvent, ListMessage, ListOptions, MailingList, Subscription } from './list'
 export type { Broadcast, BroadcastProgress, ListStore, Subscriber } from './list-store'
 export type { MailApi, Mailer, MailerOptions, MailExtensionOptions } from './mailer'
-export { enqueue, mail, mailer, MailNotConfiguredError, send } from './mailer'
+export { mail, mailer, MailNotConfiguredError } from './mailer'
 export type { MailReply, Attachment as ReplyAttachment } from './mime'
 export type { MailWaitOptions, Outbox, SentMail } from './outbox'
 export { outbox } from './outbox'

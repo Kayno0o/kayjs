@@ -65,7 +65,7 @@ async function streamedValues(stream: Connection<unknown> & Settles, url: string
   return values
 }
 
-export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<TestSite, 'call' | 'submit' | 'expectRefused' | 'refusal'> {
+export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<TestSite, 'call' | 'submit' | 'expectRefused'> {
   const call: TestSite['call'] = async (action, ...[input, init = {}]) => {
     const { headers, body } = encodeCall(input)
 
@@ -140,6 +140,5 @@ export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<
       return visit
     },
     expectRefused,
-    refusal: expectRefused,
   }
 }

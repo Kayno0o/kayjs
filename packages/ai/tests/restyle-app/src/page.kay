@@ -27,6 +27,6 @@ Launcher(action={reply} layout="plain" tone="neutral" size="lg" class="mb-2")
 Calls(calls={calls} labels={{}} details={true} runningLabel="Running" doneLabel="Done" failedLabel="Failed" argumentsLabel="Arguments" resultLabel="Result")
 Calls(calls={iconCalls} labels={{ home_state: 'Read the home', weather: 'Checked the weather' }} icons={{ home_state: 'close', weather: Bell }} details={true} runningLabel="Running" doneLabel="Done" failedLabel="Failed" argumentsLabel="Arguments" resultLabel="Result")
 Calls(calls={iconCalls} labels={{}} icons={{ home_state: 'close' }} details={false} runningLabel="Running" doneLabel="Done" failedLabel="Failed" argumentsLabel="Arguments" resultLabel="Result")
-Sources(sources={[{ n: 1, title: 'Tides', href: '/tides' }]} label="Sources" here={true})
+Sources(sources={[{ n: 1, title: 'Tides', href: '/tides' }]} label="Sources" newTab="auto")
 Panel(label="Ask" icon={() => undefined} closeIcon={() => undefined} newIcon={() => undefined} expandIcon={() => undefined} collapseIcon={() => undefined})
   p body

@@ -1,11 +1,9 @@
 import type { Duration, GuardContext } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
-import type { CaptchaAction } from './captcha'
 import type { AuthSessionData, BareUser, Core, SignedIn, User } from './core'
 import type { Result } from './failure'
 import type { ScopeRequirement } from './gate'
 import type { AuthFeatures } from './pages'
-import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
 import type { Requirement } from './types'
@@ -351,11 +349,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return options.bare ? user : { ...user, providers: await this.providersOf(record) }
   }
 
-  /** @deprecated Use `admin.require()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async requireAdmin(): Promise<User<UserData>> {
-    return this.admin.require()
-  }
-
   // What `admin.require()` answers with.
   private async adminUser(): Promise<User<UserData>> {
     if (!this.core.admin)
@@ -500,56 +493,11 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return featuresOf(this.core)
   }
 
-  /** @deprecated Use `oauthServer.resource()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  oauthResource(path: string, name: string): Record<string, unknown> | null {
-    return this.oauthServer.resource(path, name)
-  }
-
-  /** @deprecated Use `oauthServer.origin()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  oauthOrigin(): string | undefined {
-    return this.oauthServer.origin()
-  }
-
-  /** @deprecated Use `oauthServer.fixed()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  oauthFixed(): boolean {
-    return this.oauthServer.fixed()
-  }
-
-  /** @deprecated Use `captcha.required()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async captchaRequired(action: CaptchaAction): Promise<boolean> {
-    return this.captcha.required(action)
-  }
-
-  /** @deprecated Use `captcha.challenge()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async captchaChallenge(action: CaptchaAction): Promise<string | null> {
-    return this.captcha.challenge(action)
-  }
-
-  /** @deprecated Use `proof.recent()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async provedLately(fresh?: Duration): Promise<boolean> {
-    return this.proof.recent(fresh)
-  }
-
-  /** @deprecated Use `proof.renew()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async reprove(proof: Proof): Promise<Result<object, ProofFailure>> {
-    return this.proof.renew(proof)
-  }
-
-  /** @deprecated Use `tokens.scopes()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async scopes(): Promise<string[] | null> {
-    return this.heldScopes()
-  }
-
   // The scopes of the bearer token this request came with; null for a session, or a token with every scope.
   private async heldScopes(): Promise<string[] | null> {
     await this.record()
 
     return this.tokenScopes && [...this.tokenScopes]
-  }
-
-  /** @deprecated Use `tokens.hasScope()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async hasScope(scope: Scope): Promise<boolean> {
-    return this.tokens.hasScope(scope)
   }
 
   // The ids of the users holding `role`, one of the `roles` option or a role above it in its hierarchy, banned users left out, for server code that tells them something (a notification). Needs a signed-in user, and reads the 10,000 newest users at most.

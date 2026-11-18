@@ -24,7 +24,7 @@ const look = recipe({
   },
 })
 
-const { items, steps: oldSteps, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.done', 'completed'), errorLabel = wording('ui.steps.error', 'has an error'), skippedLabel = wording('ui.steps.skipped', 'skipped'), loadingLabel = wording('ui.steps.loading', 'Loading…'), retryLabel = wording('ui.steps.retry', 'Try again'), failureLabel = wording('ui.steps.failure', 'Could not load the steps'), onLoad, onError, onSelect, step: drawStep, stepLabel, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children' | 'onSelect' | 'onLoad' | 'onError'> & {
+const { items, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.done', 'completed'), errorLabel = wording('ui.steps.error', 'has an error'), skippedLabel = wording('ui.steps.skipped', 'skipped'), loadingLabel = wording('ui.steps.loading', 'Loading…'), retryLabel = wording('ui.steps.retry', 'Try again'), failureLabel = wording('ui.steps.failure', 'Could not load the steps'), onLoad, onError, onSelect, step: drawStep, stepLabel, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children' | 'onSelect' | 'onLoad' | 'onError'> & {
   loadingLabel?: string | undefined
   retryLabel?: string | undefined
   failureLabel?: string | undefined
@@ -52,19 +52,12 @@ const { items, steps: oldSteps, current, url, done = [], param = 'step', label, 
   step?: Snippet<[step: StepItem, state: 'current' | 'done' | 'upcoming']> | undefined
   // The text of a step in place of its `label`, from the step and its state. A block drawing markup is `@step`; `@stepLabel` as a block works until 1.92.
   stepLabel?: ((step: StepItem, state: 'current' | 'done' | 'upcoming') => string) | Snippet<[step: StepItem, state: 'current' | 'done' | 'upcoming']> | undefined
-} & (
-  {
-    // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the row busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
-    items: OptionsSource<StepItem>
-    steps?: undefined
-  } | {
-    // @deprecated Since 1.105, `items`: `deprecated-ui-items` writes the new name, and this one works until 1.108.
-    steps: OptionsSource<StepItem>
-    items?: undefined
-  }
-)>()
+} & {
+  // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the row busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
+  items: OptionsSource<StepItem>
+}>()
 
-const source = loadOptions<StepItem>(() => (items ?? oldSteps)!, { onLoad, onError, label: 'Steps' })
+const source = loadOptions<StepItem>(() => items, { onLoad, onError, label: 'Steps' })
 // The loaded steps, empty until a source answers.
 const steps = source.options
 const at = () => steps().findIndex(step => step.key === current)

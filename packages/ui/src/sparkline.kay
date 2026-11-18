@@ -24,7 +24,7 @@ const look = recipe({
   },
 })
 
-const { values, variant = 'bars', tone = 'accent', color, tones, hints, onSelect, href, newTab, onActiveChange, onActive, active, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { values, variant = 'bars', tone = 'accent', color, tones, hints, onSelect, href, newTab, onActiveChange, active, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   // One bar per value, the largest filling the height; a `null`, a zero or a negative value leaves a hairline. A `line` or an `area` runs from the lowest value to the highest, and a `null` or a value that is not a finite number breaks it in two.
   values: readonly (number | null)[]
   // `bars` (the default), a `line` through the values, or an `area`: the same line with a tint under it.
@@ -45,8 +45,6 @@ const { values, variant = 'bars', tone = 'accent', color, tones, hints, onSelect
   newTab?: NewTab | undefined
   // Hears the index of the bar the pointer or the focus is on, `null` when it leaves.
   onActiveChange?: ((event: { index: number | null }) => unknown) | undefined
-  // @deprecated Since 1.105, `onActiveChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
-  onActive?: ((index: number | null) => unknown) | undefined
   // The bar to draw as active, `null` for none; the app controls it when it gives it.
   active?: number | null | undefined
   // Says what the whole chart shows, in one sentence, such as "Requests per hour, 1,204 in all, busiest at 14:00".
@@ -60,7 +58,7 @@ const finite = (value: number | null): value is number => value !== null && Numb
 const largest = memo(() => Math.max(0, ...values.filter(finite)))
 
 const mark = (at: number): SparkMark => ({ index: at, value: values[at] ?? null })
-const marks = activeMarks({ active: () => active, onActiveChange: () => onActiveChange, onActive: () => onActive })
+const marks = activeMarks({ active: () => active, onActiveChange: () => onActiveChange })
 const interactive = () => onSelect !== undefined || href !== undefined
 const name = (at: number) => hints?.[at] ?? String(values[at] ?? '-')
 

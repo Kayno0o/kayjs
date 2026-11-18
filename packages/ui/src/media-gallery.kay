@@ -33,11 +33,9 @@ const look = recipe({
   },
 })
 
-const { items: given, list: legacy, caption, index = 0, onIndexChange, open = false, onOpenChange, ratio = '16 / 9', emptyLabel, empty, previousLabel = wording('ui.mediaGallery.previous', 'Previous'), nextLabel = wording('ui.mediaGallery.next', 'Next'), closeLabel = wording('ui.mediaGallery.close', 'Close'), openLabel = wording('ui.mediaGallery.open', 'Open full size'), itemLabel = wording('ui.mediaGallery.item', 'Media {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { items: given, caption, index = 0, onIndexChange, open = false, onOpenChange, ratio = '16 / 9', emptyLabel, empty, previousLabel = wording('ui.mediaGallery.previous', 'Previous'), nextLabel = wording('ui.mediaGallery.next', 'Next'), closeLabel = wording('ui.mediaGallery.close', 'Close'), openLabel = wording('ui.mediaGallery.open', 'Open full size'), itemLabel = wording('ui.mediaGallery.item', 'Media {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // The items to show: an array, or items loaded page by page, from `infiniteList`: the next page loads when the reader reaches the last items, and a failed page shows LoadMore's alert with its retry under the strip.
-  items?: Item[] | InfiniteList<Item> | undefined
-  /** @deprecated Write `items`. Removed in 1.108.0. */
-  list?: InfiniteList<Item> | undefined
+  items: Item[] | InfiniteList<Item>
   // Draws the caption over the stage and the lightbox in place of the item's `label`: `@caption(item, index)`, given the item and its place. The label still names the item for screen readers.
   caption?: Snippet<[item: Item, index: number]> | undefined
   // The item on the stage to start with; a gallery whose parent passes another follows it, and `onIndexChange` reports each turn.
@@ -60,9 +58,9 @@ const { items: given, list: legacy, caption, index = 0, onIndexChange, open = fa
   openLabel?: string | undefined
   // Names an item with no label, `{n}` standing for its number.
   itemLabel?: string | undefined
-} & ({ items: Item[] | InfiniteList<Item>, list?: undefined } | { items?: undefined, list: InfiniteList<Item> })>()
+}>()
 
-const list = isInfiniteList<Item>(given) ? given : legacy
+const list = isInfiniteList<Item>(given) ? given : undefined
 const all = () => list ? list.data() : isInfiniteList<Item>(given) ? [] : given ?? []
 
 const nothing = () => emptyLabel ?? wording('ui.mediaGallery.empty', 'No media.')

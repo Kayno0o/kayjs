@@ -36,7 +36,7 @@ const look = recipe({
   },
 })
 
-const { items, tabs: oldTabs, disabled = false, value, param, paramDefault, label, loadingLabel = wording('ui.tabs.loading', 'Loading…'), retryLabel = wording('ui.tabs.retry', 'Try again'), failureLabel = wording('ui.tabs.failure', 'Could not load the tabs'), orientation = 'horizontal', activation = 'auto', lazy = false, onLoad, onError, onValueChange, onChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onValueChange' | 'onChange' | 'onLoad' | 'onError'> & {
+const { items, disabled = false, value, param, paramDefault, label, loadingLabel = wording('ui.tabs.loading', 'Loading…'), retryLabel = wording('ui.tabs.retry', 'Try again'), failureLabel = wording('ui.tabs.failure', 'Could not load the tabs'), orientation = 'horizontal', activation = 'auto', lazy = false, onLoad, onError, onValueChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onValueChange' | 'onChange' | 'onLoad' | 'onError'> & {
   // `icon` sits before the label and `badge` after it; `disabled` keeps that tab from being shown, and the arrow keys skip it.
   // Keeps the tabs from being picked, the shown one staying shown: the buttons are disabled and the arrow keys do nothing. A tab's own `disabled` holds back that tab alone.
   disabled?: boolean | undefined
@@ -56,24 +56,15 @@ const { items, tabs: oldTabs, disabled = false, value, param, paramDefault, labe
   lazy?: boolean | undefined
   // Gets the tab shown as a second argument.
   onValueChange?: ((event: { value: Value, tab: { value: Value } & NavItem }) => unknown) | undefined
-  // @deprecated Since 1.105, `onValueChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
-  onChange?: ((value: Value, tab: { value: Value } & NavItem) => unknown) | undefined
   // Draws the text of each tab in place of its `label`: `@tab(tab)`, given the tab. The icon and the badge it names are still drawn around it; `label` is still the string the data holds.
   tab?: Snippet<[tab: { value: Value } & NavItem]> | undefined
   // Draws each tab's panel: `@panel(tab)`, given the tab's value. Every panel is drawn once and hidden while its tab is not shown, so what it holds survives a switch.
   // A hidden panel is hidden until found: find in page, a link to an id inside it, or kay's `focusInvalid` reaching a field in it shows its tab.
   panel: Snippet<[value: Value]>
+} & {
+  // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the tabs busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
+  items: OptionsSource<{ value: Value } & NavItem>
 } & (
-  {
-    // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the tabs busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
-    items: OptionsSource<{ value: Value } & NavItem>
-    tabs?: undefined
-  } | {
-    // @deprecated Since 1.105, `items`: `deprecated-ui-items` writes the new name, and this one works until 1.108.
-    tabs: OptionsSource<{ value: Value } & NavItem>
-    items?: undefined
-  }
-) & (
   {
     // The tab shown to start with; tabs whose parent passes another follow it. A value naming no enabled tab shows the first enabled one, with no `onValueChange` for the fallback.
     value: Value
@@ -88,7 +79,7 @@ const { items, tabs: oldTabs, disabled = false, value, param, paramDefault, labe
   }
 )>()
 
-const source = loadOptions<{ value: Value } & NavItem>(() => (items ?? oldTabs)!, { onLoad, onError, label: 'Tabs' })
+const source = loadOptions<{ value: Value } & NavItem>(() => items, { onLoad, onError, label: 'Tabs' })
 // The loaded tabs, empty until a source answers.
 const tabs = source.options
 const id = uid()
@@ -143,7 +134,6 @@ function show(next: Value) {
   const tab = tabs().find(entry => entry.value === next)!
 
   onValueChange?.({ value: next, tab })
-  onChange?.(next, tab)
 }
 
 // Moving with the keys focuses the tab it lands on, and shows it unless `activation` is manual: only the shown tab is in the page's tab order.

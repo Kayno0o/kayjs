@@ -18,7 +18,7 @@ const look = recipe({
   },
 })
 
-const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, onSelect, href, newTab, onActiveChange, onActive, active, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, onSelect, href, newTab, onActiveChange, active, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   // Ascending days starting on a Monday, as `gridDays` from `@kaynooo/utils` lists them, each with how full its cell is.
   days: readonly ContributionDay[]
   // The CSS colour the filled cells shade towards.
@@ -37,8 +37,6 @@ const { days, color, today, label = wording('ui.contributionGraph.label', 'Contr
   newTab?: NewTab | undefined
   // Hears the index of the cell the pointer or the focus is on, `null` when it leaves.
   onActiveChange?: ((event: { index: number | null }) => unknown) | undefined
-  // @deprecated Since 1.105, `onActiveChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
-  onActive?: ((index: number | null) => unknown) | undefined
   // The cell to draw as active, `null` for none; the app controls it when it gives it.
   active?: number | null | undefined
   // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
@@ -46,7 +44,7 @@ const { days, color, today, label = wording('ui.contributionGraph.label', 'Contr
   empty?: Snippet | undefined
 }>()
 
-const marks = activeMarks({ active: () => active, onActiveChange: () => onActiveChange, onActive: () => onActive })
+const marks = activeMarks({ active: () => active, onActiveChange: () => onActiveChange })
 
 function link(day: ContributionDay) {
   const to = href?.(day)

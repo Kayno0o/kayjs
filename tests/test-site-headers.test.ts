@@ -96,10 +96,10 @@ describe('site.api under a base and a trailing slash', () => {
   })
 })
 
-describe('socketRefusal under a base', () => {
+describe('socket.refused under a base', () => {
   it('refuses a cross-site upgrade on either site', async () => {
     expect((await site.socket.refused(cookies, '/feed', { headers: { origin: 'https://evil.test' } })).status).toBe(403)
-    expect((await strict.socketRefusal(cookies, '/feed', { headers: { origin: 'https://evil.test' } })).status).toBe(403)
+    expect((await strict.socket.refused(cookies, '/feed', { headers: { origin: 'https://evil.test' } })).status).toBe(403)
   })
 
   it('keeps the cookie a refusal sets', async () => {

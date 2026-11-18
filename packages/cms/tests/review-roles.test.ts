@@ -235,8 +235,8 @@ describe('a password guard and a custom guard', () => {
     expect(actors.get(ctx.request)).toEqual({ name: 'writer', id: undefined, reviewers: [] })
   })
 
-  test('hold review through the roles member() reports, and an org: name there is a name like any other', async () => {
-    configure({ guard: () => undefined, roles: { 'reviewer': ['review'], 'org:acme:reviewer': ['review'] }, member: ({ locals }) => (locals as { me?: { roles: string[] } }).me && { name: 'Ada', roles: (locals as { me: { roles: string[] } }).me.roles } })
+  test('hold review through the roles an access function reports, and an org: name there is a name like any other', async () => {
+    configure({ roles: { 'reviewer': ['review'], 'org:acme:reviewer': ['review'] }, access: ({ locals }) => (locals as { me?: { roles: string[] } }).me && { name: 'Ada', roles: (locals as { me: { roles: string[] } }).me.roles } })
 
     const as = (path: string, roles: string[]) => Object.assign(ask(path, undefined), { locals: { me: { roles } } }) as GuardContext
 

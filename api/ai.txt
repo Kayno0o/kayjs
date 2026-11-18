@@ -199,9 +199,6 @@ type ChatIcons = Partial<Record<ChatIconName, ChatIconValue>>
 [.] ChatIconValue
 type ChatIconValue = IconProps | (string & {})
 
-[.] ChatLabelProps
-type ChatLabelProps = FlatLabels<ChatLabels>
-
 [.] ChatLabels
 interface ChatLabels
   allow?: string | undefined
@@ -256,9 +253,6 @@ interface ChatLabels
 
 [.] ChatLauncherIcons
 type ChatLauncherIcons = ChatIcons & Partial<Record<'open' | 'close' | 'expand' | 'collapse', ChatIconValue>>
-
-[.] ChatLauncherLabelProps
-type ChatLauncherLabelProps = FlatLabels<ChatLauncherLabels>
 
 [.] ChatLauncherLabels
 interface ChatLauncherLabels extends ChatLabels
@@ -409,7 +403,6 @@ interface DescribeImageOptions extends CallOptions
   afterRequest?: Hook<FinishHookCall> | undefined
   afterStep?: Hook<Step> | undefined
   fallback?: readonly FallbackModel[] | undefined
-  /** @deprecated Written `locale`; `deprecated-ai-language` rewrites it. Removed in 1.108. */ language?: string | undefined
   locale?: string | undefined
   model?: string | undefined
   onError?: Hook<ErrorHookCall> | undefined
@@ -875,7 +868,6 @@ interface TranscribeOptions extends CallOptions
   afterRequest?: Hook<FinishHookCall> | undefined
   afterStep?: Hook<Step> | undefined
   fallback?: readonly FallbackModel[] | undefined
-  /** @deprecated Written `locale`, which takes a BCP 47 tag; `deprecated-ai-language` rewrites it. Removed in 1.108. */ language?: string | undefined
   locale?: string | undefined
   maxSize?: number | string | undefined
   model?: string | undefined
@@ -952,7 +944,6 @@ component default
   disclosure?: string | undefined
   editable?: boolean | undefined
   empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
-  /** @deprecated Written `labels.error`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */ failureLabel?: string | undefined
   fill?: boolean | undefined
   footer?: Element
   greeting?: string | undefined
@@ -1080,7 +1071,6 @@ component default
   transcribe?: Action<{ audio: File; }, Failure<unknown> | string | { text: string; }, never> | undefined
   turn?: ((turn: ChatTurnView, index: number) => Element) | undefined
   variant?: "bubble" | "plain" | undefined
-  /** @deprecated Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */ waitingLabel?: string | undefined
 
 [./chat-panel.kay] default
 component default
@@ -1113,7 +1103,6 @@ component default
 component default
   block?: ((source: Source, n: number) => Element) | undefined
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
-  here?: boolean | undefined
   label: string
   newTab?: "auto" | boolean | undefined
   parts?: undefined | { root?: string | undefined; label?: string | undefined; list?: string | undefined; item?: string | undefined; link?: string | undefined; }
@@ -1133,7 +1122,6 @@ component default
   disclosure?: string | undefined
   editable?: boolean | undefined
   empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
-  /** @deprecated Written `labels.error`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */ failureLabel?: string | undefined
   fill?: boolean | undefined
   footer?: Element
   greeting?: string | undefined
@@ -1145,7 +1133,6 @@ component default
   label?: string | undefined
   labels?: ChatLabels | undefined
   layout?: "bubble" | "plain" | undefined
-  links?: "apart" | "here" | undefined
   maxChars?: number | undefined
   maxFiles?: number | undefined
   maxSize?: ByteSize | undefined
@@ -1259,7 +1246,6 @@ component default
   transcribe?: Action<{ audio: File; }, Failure<unknown> | string | { text: string; }, never> | undefined
   turn?: ((turn: ChatTurnView, index: number) => Element) | undefined
   variant?: "bubble" | "plain" | undefined
-  /** @deprecated Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */ waitingLabel?: string | undefined
 
 [./pg] aiTables
 const aiTables: readonly ["kay_ai_conversations"]
@@ -1288,10 +1274,6 @@ function sqliteAi(path?: string): ConversationStore
 [./sqlite] sqliteConversations
 /** @deprecated Use `sqliteAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
 function sqliteConversations(path?: string): ConversationStore
-
-[./test] aiTest
-/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
-function aiTest(_site?: TestSite | undefined): AiTest
 
 [./test] AiTest
 type AiTest = Pick<Fake, 'reply' | 'fail' | 'asked' | 'last' | 'clear' | 'heard' | 'transcript' | 'spoken' | 'speech' | 'embedded' | 'embedding'> & {

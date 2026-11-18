@@ -65,7 +65,7 @@ test('a double extension is judged by its last one', async () => {
 })
 
 test('takes an SVG only when uploads lists it, and only one that is an SVG', async () => {
-  configure({ uploads: ['image/svg+xml'] })
+  configure({ uploads: { types: ['image/svg+xml'] } })
 
   expect(await uploadRefusal(upload('logo.svg', SVG_WITH_SCRIPT))).toBeUndefined()
   expect(await uploadRefusal(upload('logo.SVG', '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>'))).toBeUndefined()
@@ -75,7 +75,7 @@ test('takes an SVG only when uploads lists it, and only one that is an SVG', asy
 })
 
 test('checks each image type a family takes, and leaves a type it cannot recognise to its name', async () => {
-  configure({ uploads: ['image/*', 'text/csv', 'video/mp4'] })
+  configure({ uploads: { types: ['image/*', 'text/csv', 'video/mp4'] } })
 
   expect(await uploadRefusal(upload('x.png', HTML))).toContain('is not a real')
   expect(await uploadRefusal(upload('table.csv', 'a,b'))).toBeUndefined()
@@ -84,7 +84,7 @@ test('checks each image type a family takes, and leaves a type it cannot recogni
 })
 
 test('takes the types an app lists, exact or by family', async () => {
-  configure({ uploads: ['image/*', 'text/csv'] })
+  configure({ uploads: { types: ['image/*', 'text/csv'] } })
 
   expect(await uploadRefusal(upload('drawing.svg', SVG_WITH_SCRIPT))).toBeUndefined()
   expect(await uploadRefusal(upload('table.csv', 'x'))).toBeUndefined()
@@ -97,17 +97,17 @@ test('offers the picker the types uploads takes, an image field the image ones a
 
   expect(uploadRules()).toEqual({ accept: 'image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf', images: 'image/png,image/jpeg,image/webp,image/gif,image/avif', maxSize: 20 * 1024 * 1024 })
 
-  configure({ uploads: ['image/*', 'text/csv'] })
+  configure({ uploads: { types: ['image/*', 'text/csv'] } })
   expect(uploadRules()).toMatchObject({ accept: 'image/*,text/csv', images: 'image/*' })
 
-  configure({ uploads: ['application/pdf'] })
+  configure({ uploads: { types: ['application/pdf'] } })
   expect(uploadRules()).toMatchObject({ accept: 'application/pdf', images: 'application/pdf' })
 })
 
 test('reads uploads as a list of types, or as types and maxSize, each part optional', () => {
   const defaults = 'image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf'
 
-  configure({ uploads: ['application/pdf'] })
+  configure({ uploads: { types: ['application/pdf'] } })
   expect(uploadRules()).toMatchObject({ accept: 'application/pdf', maxSize: 20 * 1024 * 1024 })
 
   configure({ uploads: { types: ['application/pdf'] } })
@@ -171,7 +171,7 @@ const typeJudged = async (name: string) => (/^\S+ is ([^,;]+)/).exec((await uplo
 const typeServed = async (name: string) => (await files.response(await files.put(upload(name, 'x'), {}))).headers.get('content-type')?.replace(/;.*$/, '')
 
 test('judges a name as the type kay\'s file route serves it, whatever its case or extension', async () => {
-  configure({ uploads: [] })
+  configure({ uploads: { types: [] } })
   setupStorage(memoryFiles(), '/nonexistent', undefined)
 
   // A type a browser may show is served as itself, so the check cannot judge it as another.

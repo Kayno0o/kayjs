@@ -84,14 +84,14 @@ describe('the admin pages', () => {
 
     expect(await root.visitor.call(grant, { role: 'editor' }, { from })).toBe('done')
     expect((await store.users.get(ada.id))!.roles).toEqual(['editor'])
-    expect((await root.visitor.refusal(grant, { role: 'nobody' }, { from })).data).toEqual({ error: 'unknown-role' })
+    expect((await root.visitor.expectRefused(grant, { role: 'nobody' }, { from })).data).toEqual({ error: 'unknown-role' })
 
     const page = await root.visitor.visit(from)
 
     expect(page.find('[data-role]').map(row => row.attributes['data-role'])).toEqual(['editor'])
     expect(await root.visitor.call(revoke, { role: 'editor' }, { from })).toBe('done')
     expect((await store.users.get(ada.id))!.roles).toEqual([])
-    expect((await root.visitor.refusal(grant, { role: 'editor' }, { from: '/auth/admin/users/missing' })).data).toEqual({ error: 'not-found' })
+    expect((await root.visitor.expectRefused(grant, { role: 'editor' }, { from: '/auth/admin/users/missing' })).data).toEqual({ error: 'not-found' })
   })
 
   test('a member, or an admin who signed in long ago, changes no one', async () => {
@@ -100,13 +100,13 @@ describe('the admin pages', () => {
     const grace = await member('stale-grace@example.com')
     const from = `/auth/admin/users/${ada.id}`
 
-    expect((await grace.visitor.refusal(grant, { role: 'editor' }, { from })).data).toEqual({ error: 'forbidden' })
-    expect((await grace.visitor.refusal(remove, { confirm: true }, { from })).data).toEqual({ error: 'forbidden' })
+    expect((await grace.visitor.expectRefused(grant, { role: 'editor' }, { from })).data).toEqual({ error: 'forbidden' })
+    expect((await grace.visitor.expectRefused(remove, { confirm: true }, { from })).data).toEqual({ error: 'forbidden' })
     expect((await store.users.get(ada.id))!.roles).toEqual([])
 
     setSystemTime(new Date(Date.now() + 11 * 60_000))
 
-    const stale = await root.visitor.refusal(ban, {}, { from })
+    const stale = await root.visitor.expectRefused(ban, {}, { from })
 
     expect(stale.data).toEqual({ error: 'stale' })
     expect(await root.visitor.submit(signInAgain, {}, { from })).toMatchObject({ url: `/auth/sign-in?redirect=${encodeURIComponent(from)}` })
@@ -119,10 +119,10 @@ describe('the admin pages', () => {
     const from = `/auth/admin/users/${ada.id}`
 
     for (const until of ['2000-01-01', 'tomorrow', '2999-13-45'])
-      expect((await root.visitor.refusal(ban, { until }, { from })).data).toEqual({ error: 'until' })
+      expect((await root.visitor.expectRefused(ban, { until }, { from })).data).toEqual({ error: 'until' })
 
-    expect((await root.visitor.refusal(ban, {}, { from: `/auth/admin/users/${other.id}` })).data).toEqual({ error: 'admin' })
-    expect((await root.visitor.refusal(ban, {}, { from: `/auth/admin/users/${root.id}` })).data).toEqual({ error: 'self' })
+    expect((await root.visitor.expectRefused(ban, {}, { from: `/auth/admin/users/${other.id}` })).data).toEqual({ error: 'admin' })
+    expect((await root.visitor.expectRefused(ban, {}, { from: `/auth/admin/users/${root.id}` })).data).toEqual({ error: 'self' })
     expect(await root.visitor.call(ban, { reason: 'spam <b>', until: '2999-01-01' }, { from })).toBe('done')
 
     const page = await root.visitor.visit(from)
@@ -154,7 +154,7 @@ describe('the admin pages', () => {
 
     expect([back.status, back.headers.get('location')]).toEqual([303, '/auth/admin'])
     expect((await root.visitor.visit('/auth/admin')).status).toBe(200)
-    expect((await root.visitor.refusal(remove, {}, { from })).data).toEqual({ error: 'form' })
+    expect((await root.visitor.expectRefused(remove, {}, { from })).data).toEqual({ error: 'form' })
     expect(await store.users.get(ada.id)).toBeDefined()
     expect(await root.visitor.submit(remove, { confirm: 'on' }, { from })).toMatchObject({ url: '/auth/admin' })
     expect(await store.users.get(ada.id)).toBeUndefined()

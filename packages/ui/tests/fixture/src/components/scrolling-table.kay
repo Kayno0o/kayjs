@@ -22,10 +22,9 @@ const feed = infiniteList(rowsOf(0, first), {
   },
 })
 ---
-// kay-allow-file deprecated-ui-items -- the table keeps `list` to cover the old name of an infinite source
 #box(style={inBox ? 'height: 20rem; overflow-y: auto' : undefined})
   if table
-    Table(columns={[{ key: 'name', header: 'Name' }]} list={feed} rowKey="id" virtual={virtual})
+    Table(columns={[{ key: 'name', header: 'Name' }]} items={feed} rowKey="id" virtual={virtual})
   else
     for row of feed.data() key={row.id}
       p.row {row.name}

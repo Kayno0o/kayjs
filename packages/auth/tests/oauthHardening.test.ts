@@ -1,3 +1,4 @@
+import type { LimitsOption } from '../src/limits'
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
@@ -150,7 +151,7 @@ describe('client names', () => {
   })
 })
 
-function server(options: { documents?: Record<string, unknown>, limits?: Record<string, { max: number, window: string }>, url?: string | null } = {}) {
+function server(options: { documents?: Record<string, unknown>, limits?: LimitsOption, url?: string | null } = {}) {
   // The documents of an earlier app are not this one's.
   setupStore(undefined)
 
@@ -192,24 +193,24 @@ async function token(app: Server, form: Record<string, string>) {
 
 describe('the limits', () => {
   test('registration answers 429 past the limit of an address, and past the one of all addresses together when the app sets it', async () => {
-    const byAddress = server({ limits: { oauthRegister: { max: 2, window: '3600s' } } })
+    const byAddress = server({ limits: { oauth: { register: { max: 2, window: '3600s' } } } })
 
     expect([(await register(byAddress)).status, (await register(byAddress)).status, (await register(byAddress)).status]).toEqual([201, 201, 429])
 
-    const all = server({ limits: { oauthRegisterAll: { max: 2, window: '3600s' } } })
+    const all = server({ limits: { oauth: { registerAll: { max: 2, window: '3600s' } } } })
 
     expect([(await register(all)).status, (await register(all)).status, (await register(all)).status]).toEqual([201, 201, 429])
   })
 
   test('registration has no budget shared by all addresses unless the app sets one', async () => {
-    const app = server({ limits: { oauthRegister: { max: 600, window: '3600s' } } })
+    const app = server({ limits: { oauth: { register: { max: 600, window: '3600s' } } } })
 
     for (let n = 0; n < 501; n++)
       expect((await register(app)).status).toBe(201)
   })
 
   test('the token endpoint answers 429 past its limit', async () => {
-    const app = server({ limits: { oauthToken: { max: 2, window: '900s' } } })
+    const app = server({ limits: { oauth: { token: { max: 2, window: '900s' } } } })
     const statuses = []
 
     for (let attempt = 0; attempt < 3; attempt++)
@@ -220,7 +221,7 @@ describe('the limits', () => {
 
   test('metadata documents are read a limited number of times per address', async () => {
     const documents = { [DOCUMENT]: { client_id: DOCUMENT, redirect_uris: [REDIRECT] }, 'https://other.example/c.json': { client_id: 'https://other.example/c.json', redirect_uris: [REDIRECT] } }
-    const app = server({ documents, limits: { oauthDocument: { max: 1, window: '900s' } } })
+    const app = server({ documents, limits: { oauth: { document: { max: 1, window: '900s' } } } })
     const ada = await signedIn(app)
 
     expect(await ada.call('oauthServer.authorize', params(DOCUMENT))).toMatchObject({ kind: 'consent' })

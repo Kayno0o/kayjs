@@ -19,7 +19,7 @@ const look = recipe({
   },
 })
 
-const { items, entries: oldEntries, selected, onSelectedChange, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['ol'], 'class' | 'children' | 'onSelect'> & {
+const { items, selected, onSelectedChange, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['ol'], 'class' | 'children' | 'onSelect'> & {
   // The key of the picked entry, if any; a new one from the parent is followed.
   selected?: Key | undefined
   // Makes the entries buttons, one picked at a time; with `selected` alone they stay buttons too. Gets the picked key, or undefined when the picked entry is pressed again, and the entry pressed.
@@ -30,19 +30,12 @@ const { items, entries: oldEntries, selected, onSelectedChange, label, emptyLabe
   // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
   emptyLabel?: string | undefined
   empty?: Snippet | undefined
-} & (
-  {
-    // In the order they are shown, which is the time order: the timeline never sorts them.
-    items: readonly TimelineEntry<Key>[]
-    entries?: undefined
-  } | {
-    // @deprecated Since 1.105, `items`: `deprecated-ui-items` writes the new name, and this one works until 1.108.
-    entries: readonly TimelineEntry<Key>[]
-    items?: undefined
-  }
-)>()
+} & {
+  // In the order they are shown, which is the time order: the timeline never sorts them.
+  items: readonly TimelineEntry<Key>[]
+}>()
 
-const all = () => (items ?? oldEntries)!
+const all = () => items
 
 if ((rest as { onSelect?: unknown }).onSelect !== undefined)
   throw new KayError('argument-invalid', 'kayjs-ui: a Timeline has no onSelect since 1.91; use onSelectedChange')

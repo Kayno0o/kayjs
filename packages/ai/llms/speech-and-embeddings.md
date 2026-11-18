@@ -10,7 +10,7 @@ import { transcribe } from '@kayjs/ai'
 const text = await transcribe(recording, { locale: 'fr' })
 ```
 
-`transcribe(audio, options?)` takes a `Blob` or a `File` (an action's `s.file()`, a `Chat`'s recording) and returns the text, trimmed. `locale` is a BCP 47 tag such as `fr` or `pt-BR`, sent to the provider as the ISO 639-1 code it takes (`fr`, `pt`; the old `language` works until 1.108: `deprecated-ai-language`); left out, the model tells, which a few words may get wrong. `maxSize` caps the recording (10 MB by default). A `Chat` takes it through its `transcribe` action: [Speaking a message](chat.md#speaking-a-message).
+`transcribe(audio, options?)` takes a `Blob` or a `File` (an action's `s.file()`, a `Chat`'s recording) and returns the text, trimmed. `locale` is a BCP 47 tag such as `fr` or `pt-BR`, sent to the provider as the ISO 639-1 code it takes (`fr`, `pt`); left out, the model tells, which a few words may get wrong. `maxSize` caps the recording (10 MB by default). A `Chat` takes it through its `transcribe` action: [Speaking a message](chat.md#speaking-a-message).
 
 ### Read a text aloud
 

@@ -64,7 +64,7 @@ describe('contactForm', () => {
   })
 
   it('refuses a message holding too many links, in the page\'s language', async () => {
-    const { refusal } = await site()
+    const { expectRefused: refusal } = await site()
     const message = 'http://a.test http://b.test https://c.test https://d.test'
 
     expect((await refusal(contact, { ...fields, message })).errors['']).toBe('No more than 3 links per message.')
@@ -73,7 +73,7 @@ describe('contactForm', () => {
   })
 
   it('answers 503 with the way else to reach the site when the mail has no recipient', async () => {
-    const { refusal } = await site()
+    const { expectRefused: refusal } = await site()
     const refused = await refusal(noRecipient, basic)
 
     expect(refused.status).toBe(503)
@@ -95,7 +95,7 @@ describe('contactForm', () => {
   })
 
   it('refuses a name holding a line break and a missing topic with the field\'s message', async () => {
-    const { refusal } = await site()
+    const { expectRefused: refusal } = await site()
     const refused = await refusal(contact, { ...fields, name: 'Ada\nBcc: x@y.test', topic: undefined as unknown as Answers['topic'] })
 
     expect(refused.errors.name).toBe('Please write your name, on one line.')
@@ -118,7 +118,7 @@ describe('contactForm', () => {
   })
 
   it('renders the honeypot, and limits the posts that went through, naming how else to reach the site', async () => {
-    const { call, refusal, visit } = await site()
+    const { call, expectRefused: refusal, visit } = await site()
 
     expect((await visit('/contact')).html).toContain('name="website"')
 
@@ -136,7 +136,7 @@ describe('contactForm', () => {
   })
 
   it('words the schema\'s refusals in the page\'s language, and an errors option replaces them', async () => {
-    const { refusal } = await site()
+    const { expectRefused: refusal } = await site()
     const bad = { ...fields, email: 'nope' }
 
     expect((await refusal(contact, bad)).errors.email).toBe('Please write a valid email address.')
@@ -144,7 +144,7 @@ describe('contactForm', () => {
   })
 
   it('refuses a field with the errors option, a text or a function', async () => {
-    const { refusal } = await site()
+    const { expectRefused: refusal } = await site()
     const refused = await refusal(worded, { ...fields, name: '', email: 'nope' })
 
     expect(refused.errors.email).toBe('Bad address')
@@ -159,7 +159,7 @@ describe('contactForm', () => {
   })
 
   it('logs a mail the view could not render, with the error', async () => {
-    const { refusal } = await site()
+    const { expectRefused: refusal } = await site()
     const calls: unknown[][] = []
     const global = globalThis as { [SINK]?: unknown }
     const sink = global[SINK]
@@ -238,7 +238,7 @@ describe('contactForm', () => {
   })
 
   it('refuses an unticked or missing consent in the page\'s language, and mails nothing', async () => {
-    const { refusal } = await site()
+    const { expectRefused: refusal } = await site()
 
     for (const consent of [false, undefined]) {
       const refused = await refusal(consented, { ...basic, consent } as never)
@@ -262,7 +262,7 @@ describe('contactForm', () => {
   })
 
   it('still refuses a header injected through the name or the email beside consent', async () => {
-    const { refusal } = await site()
+    const { expectRefused: refusal } = await site()
     const refused = await refusal(consented, { ...basic, consent: true, name: 'Ada\r\nBcc: x@y.test', email: 'ada@example.com\r\nBcc: x@y.test' })
 
     expect(refused.errors.name).toBeDefined()

@@ -16,7 +16,7 @@ const look = recipe({
   },
 })
 
-const { items, links: oldLinks, link, current, label, menuLabel, expandLabel, open, onOpenChange, brand, actions, sticky = true, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'children'> & {
+const { items, link, current, label, menuLabel, expandLabel, open, onOpenChange, brand, actions, sticky = true, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'children'> & {
   // Draws the text of each link in place of its `label`, as for `SiteNav`.
   link?: Snippet<[link: NavLink]> | undefined
   // The path of the page on screen, as for `SiteNav`.
@@ -36,24 +36,17 @@ const { items, links: oldLinks, link, current, label, menuLabel, expandLabel, op
   actions?: Snippet
   // Stays at the top of the page while it scrolls; `false` lets it scroll away.
   sticky?: boolean | undefined
-} & (
-  {
-    // As for `SiteNav`: a link may hold `children`.
-    items: readonly NavLink[]
-    links?: undefined
-  } | {
-    // @deprecated Since 1.105, `items`: `deprecated-ui-items` writes the new name, and this one works until 1.108.
-    links: readonly NavLink[]
-    items?: undefined
-  }
-)>()
+} & {
+  // As for `SiteNav`: a link may hold `children`.
+  items: readonly NavLink[]
+}>()
 ---
 // The bar across the top of an app: its brand, its main links, which fold into a menu on a narrow screen, and an area at the far end.
 header(part="root" {...rest} data-sticky={sticky ? '' : undefined})
   if brand
     div(part="brand")
       | {brand}
-  SiteNav(items={items ?? oldLinks} link={link} current={current} label={label} menuLabel={menuLabel} expandLabel={expandLabel} open={open} onOpenChange={onOpenChange} part="nav")
+  SiteNav(items={items} link={link} current={current} label={label} menuLabel={menuLabel} expandLabel={expandLabel} open={open} onOpenChange={onOpenChange} part="nav")
   if actions
     div(part="end")
       | {actions}

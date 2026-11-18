@@ -2,7 +2,7 @@ import type { Duration } from 'kay'
 import type { LimitsOption } from '../src/limits'
 import { describe, expect, test } from 'bun:test'
 import { sealTotpSecret } from '../src/keys'
-import { DEFAULT_LIMITS } from '../src/limits'
+import { DEFAULT_LIMITS, LIMIT_GROUPS } from '../src/limits'
 import { base32Encode, totpCode, totpStep } from '../src/totp'
 import { SECRET, testApp, userRecord } from './helpers/app'
 import { mailbox } from './helpers/mail'
@@ -311,7 +311,10 @@ describe('rate limits', () => {
   test.each(rows.map(row => [`${row.key}${row.action === undefined ? '' : ` (${row.action})`}`, row.per, row] as const))('%s answers `limited` once its attempts are spent, per %s', async (_name, _per, row) => {
     const key = row.key
     const limit = row.limit ?? DEFAULT_LIMITS[key]
-    const attempt = await row.prepare({ [key]: { max: limit.max, window: limit.window } })
+    const value = { max: limit.max, window: limit.window }
+    const group = Object.entries(LIMIT_GROUPS).find(([, parts]) => Object.values(parts).includes(key))
+    const part = group && Object.entries(group[1]).find(([, bucket]) => bucket === key)![0]
+    const attempt = await row.prepare(group === undefined ? { [key]: value } : { [group[0]]: { [part!]: value } })
 
     for (let n = 1; n <= limit.max; n++)
       expect(await attempt(n)).toMatchObject(row.answers)
@@ -324,7 +327,7 @@ describe('a list of limits in one bucket', () => {
   const LIMITED = { ok: false, error: { code: 'limited' } } as const
 
   test('the failures ceiling holds in every limit of signInAccountAll, so a right password in between does not escape a longer window', async () => {
-    const { ada } = await registered({ signInAccountAll: [{ max: 50, window: '15m' }, { max: 2, window: '1d' }] })
+    const { ada } = await registered({ signIn: { accountAll: [{ max: 50, window: '15m' }, { max: 2, window: '1d' }] } })
     const signIn = async (password: string) => ada.post('/password', { identifier: 'ada@example.com', password })
 
     expect(await signIn(WRONG)).not.toMatchObject(LIMITED)
@@ -334,7 +337,7 @@ describe('a list of limits in one bucket', () => {
   })
 
   test('a right password forgets the hard stop in every limit of signInAccount', async () => {
-    const { ada } = await registered({ signInAccount: [{ max: 6, window: '15m' }, { max: 2, window: '15m' }] })
+    const { ada } = await registered({ signIn: { account: [{ max: 6, window: '15m' }, { max: 2, window: '15m' }] } })
     const signIn = async (password: string) => ada.post('/password', { identifier: 'ada@example.com', password })
 
     for (const password of [WRONG, PASSWORD, WRONG, PASSWORD])
@@ -342,7 +345,7 @@ describe('a list of limits in one bucket', () => {
   })
 
   test('the second factor account cap refuses past any limit of the list', async () => {
-    const { visitor } = await pendingSignIn({ twoFactorAccount: [{ max: 50, window: '15m' }, { max: 2, window: '15m' }] })
+    const { visitor } = await pendingSignIn({ twoFactor: { account: [{ max: 50, window: '15m' }, { max: 2, window: '15m' }] } })
 
     expect(await visitor.call('twoFactor.verify', '000000')).toMatchObject({ ok: false, error: { code: 'invalid' } })
     expect(await visitor.call('twoFactor.verify', '000000')).toMatchObject({ ok: false, error: { code: 'invalid' } })

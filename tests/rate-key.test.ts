@@ -23,21 +23,21 @@ describe('a rate limit with a key', () => {
   it('counts each key apart whatever the client address', async () => {
     expect(await first.call(actions.perUser, {}, as('ada'))).toBe('ok')
     expect(await first.call(actions.perUser, {}, as('grace'))).toBe('ok')
-    expect((await first.refusal(actions.perUser, {}, as('ada'))).status).toBe(429)
+    expect((await first.expectRefused(actions.perUser, {}, as('ada'))).status).toBe(429)
     // The same person from another address is the same key.
-    expect((await second.refusal(actions.perUser, {}, as('ada'))).status).toBe(429)
+    expect((await second.expectRefused(actions.perUser, {}, as('ada'))).status).toBe(429)
   })
 
   it('counts a key under the same limits behind a base and a trailing slash', async () => {
     expect(await mounted.call(actions.perUser, {}, as('ada-mounted'))).toBe('ok')
-    expect((await mounted.refusal(actions.perUser, {}, as('ada-mounted'))).status).toBe(429)
+    expect((await mounted.expectRefused(actions.perUser, {}, as('ada-mounted'))).status).toBe(429)
     expect(await mounted.call(actions.perUser, {}, as('grace-mounted'))).toBe('ok')
   })
 
   it('falls back to the client address when the key gives none', async () => {
     // No user header: `undefined`, so the visitor counts as their address.
     expect(await third.call(actions.perUser)).toBe('ok')
-    expect((await third.refusal(actions.perUser, {})).status).toBe(429)
+    expect((await third.expectRefused(actions.perUser, {})).status).toBe(429)
     expect(await fourth.call(actions.perUser)).toBe('ok')
   })
 
@@ -47,7 +47,7 @@ describe('a rate limit with a key', () => {
     try {
       for (const limited of [actions.empty, actions.throws, actions.rejects, actions.notText]) {
         expect(await first.call(limited)).toBe('ok')
-        expect((await first.refusal(limited, {})).status).toBe(429)
+        expect((await first.expectRefused(limited, {})).status).toBe(429)
         // Another address is another client, so the fallback is the address and not one bucket for everyone.
         expect(await second.call(limited)).toBe('ok')
       }
@@ -62,13 +62,13 @@ describe('a rate limit with a key', () => {
 
     expect(await third.call(actions.long, {}, { headers: { 'x-key': `${same}a` } })).toBe('ok')
     expect(await third.call(actions.long, {}, { headers: { 'x-key': `${same}b` } })).toBe('ok')
-    expect((await third.refusal(actions.long, {}, { headers: { 'x-key': `${same}a` } })).status).toBe(429)
+    expect((await third.expectRefused(actions.long, {}, { headers: { 'x-key': `${same}a` } })).status).toBe(429)
   })
 
   it('counts the posts that went through under the key they were let in by', async () => {
     expect(await fourth.call(actions.counted, {}, as('ada-counted'))).toBe('ok')
     // The handler changed the locals, which the count does not follow.
-    expect((await fourth.refusal(actions.counted, {}, as('ada-counted'))).status).toBe(429)
+    expect((await fourth.expectRefused(actions.counted, {}, as('ada-counted'))).status).toBe(429)
   })
 
   it('leaves Elysia parsing no cookie, query or header on a route whose action has a key', async () => {
@@ -77,7 +77,7 @@ describe('a rate limit with a key', () => {
 
   it('reads the request locale', async () => {
     expect(await first.call(actions.inLocale)).toBe('ok')
-    expect((await first.refusal(actions.inLocale, {})).status).toBe(429)
+    expect((await first.expectRefused(actions.inLocale, {})).status).toBe(429)
   })
 
   it('is read by the protection a test drives directly, with the context it is given', async () => {

@@ -6,7 +6,6 @@ import DateInput from '@kayjs/ui/date-input.kay'
 import Slider from '@kayjs/ui/slider.kay'
 import Toggle from '@kayjs/ui/toggle.kay'
 
-// kay-allow-file deprecated-ui-input -- the wrapper's own id, title and data-* are what this fixture covers
 // Each control that draws an input in a wrapper, given an `id`, a `data-*` and an `title` of its own, an `inputProps` and an attribute the input owns.
 ---
 Toggle(label="Toggle" name="toggle" title="wrapper" data-kind="toggle" inputProps={{ 'id': 'toggle-input', 'data-input': 'toggle' }} disabled)

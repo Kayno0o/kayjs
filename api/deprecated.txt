@@ -1,12 +1,7 @@
-ai [./chat-launcher.kay] default.failureLabel	1.108	deprecated-ai-labels	Written `labels.error`; `deprecated-ai-labels` rewrites it. Removed in 1.108.
-ai [./chat-launcher.kay] default.waitingLabel	1.108	deprecated-ai-labels	Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108.
-ai [./chat.kay] default.failureLabel	1.108	deprecated-ai-labels	Written `labels.error`; `deprecated-ai-labels` rewrites it. Removed in 1.108.
-ai [./chat.kay] default.waitingLabel	1.108	deprecated-ai-labels	Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108.
 ai [./pg] conversationTable	1.108.0	deprecated-store-names	Use `aiTables`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 ai [./pg] createConversationTable	1.108.0	deprecated-store-names	Use `createAiTables`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 ai [./pg] pgConversations	1.108.0	deprecated-store-names	Use `pgAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 ai [./sqlite] sqliteConversations	1.108.0	deprecated-store-names	Use `sqliteAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
-ai [./test] aiTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 ai [.] AiOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] AiOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] AiOptions.onToolCall	1.108	deprecated-hook-names	Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108.
@@ -18,7 +13,6 @@ ai [.] AskOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; 
 ai [.] AskOptions.onToolCall	1.108	deprecated-hook-names	Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] CallOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] CallOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
-ai [.] DescribeImageOptions.language	1.108	deprecated-ai-language	Written `locale`; `deprecated-ai-language` rewrites it. Removed in 1.108.
 ai [.] DescribeImageOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] DescribeImageOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] EmbedOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
@@ -28,42 +22,16 @@ ai [.] SpeakOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`
 ai [.] StructuredAskOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] StructuredAskOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] StructuredAskOptions.onToolCall	1.108	deprecated-hook-names	Written `afterToolCall`; `deprecated-hook-names` rewrites it. Removed in 1.108.
-ai [.] TranscribeOptions.language	1.108	deprecated-ai-language	Written `locale`, which takes a BCP 47 tag; `deprecated-ai-language` rewrites it. Removed in 1.108.
 ai [.] TranscribeOptions.onStep	1.108	deprecated-hook-names	Written `afterStep`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 ai [.] TranscribeOptions.onSuccess	1.108	deprecated-hook-names	Written `afterRequest`; `deprecated-hook-names` rewrites it. Removed in 1.108.
-auth [./test] authTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
-auth [.] Auth.captchaChallenge	1.108.0	deprecated-auth-methods	Use `captcha.challenge()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
-auth [.] Auth.captchaRequired	1.108.0	deprecated-auth-methods	Use `captcha.required()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
-auth [.] Auth.hasScope	1.108.0	deprecated-auth-methods	Use `tokens.hasScope()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
-auth [.] Auth.oauthFixed	1.108.0	deprecated-auth-methods	Use `oauthServer.fixed()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
-auth [.] Auth.oauthOrigin	1.108.0	deprecated-auth-methods	Use `oauthServer.origin()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
-auth [.] Auth.oauthResource	1.108.0	deprecated-auth-methods	Use `oauthServer.resource()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
-auth [.] Auth.provedLately	1.108.0	deprecated-auth-methods	Use `proof.recent()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
-auth [.] Auth.reprove	1.108.0	deprecated-auth-methods	Use `proof.renew()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
-auth [.] Auth.requireAdmin	1.108.0	deprecated-auth-methods	Use `admin.require()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
-auth [.] Auth.scopes	1.108.0	deprecated-auth-methods	Use `tokens.scopes()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it.
 auth [.] AuthMailMessage.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 auth [.] AuthOptions.onSignUp	1.108	deprecated-hook-names	Written `afterSignUp`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 auth [.] AuthProofOfWorkOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
-auth [.] LimitsOption.emailChangeAccount	1.108	deprecated-auth-rate-limits	`emailChange.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.emailCodeAccount	1.108	deprecated-auth-rate-limits	`emailCode.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.forgotAccount	1.108	deprecated-auth-rate-limits	`forgot.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.inviteAddress	1.108	deprecated-auth-rate-limits	`invite.address`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.magicLinkAccount	1.108	deprecated-auth-rate-limits	`magicLink.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.oauthDocument	1.108	deprecated-auth-rate-limits	`oauth.document`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.oauthRegister	1.108	deprecated-auth-rate-limits	`oauth.register`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.oauthRegisterAll	1.108	deprecated-auth-rate-limits	`oauth.registerAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.oauthToken	1.108	deprecated-auth-rate-limits	`oauth.token`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.resendAccount	1.108	deprecated-auth-rate-limits	`resend.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.signInAccount	1.108	deprecated-auth-rate-limits	`signIn.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.signInAccountAll	1.108	deprecated-auth-rate-limits	`signIn.accountAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
-auth [.] LimitsOption.twoFactorAccount	1.108	deprecated-auth-rate-limits	`twoFactor.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it.
 auth [.] OwnOptions.onSignUp	1.108	deprecated-hook-names	Written `afterSignUp`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 cms [./pg] PgLoaderOptions	1.108.0	deprecated-store-names	Use `PgCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 cms [./pg] pgLoader	1.108.0	deprecated-store-names	Use `pgCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 cms [./sqlite] SqliteLoaderOptions	1.108.0	deprecated-store-names	Use `SqliteCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
 cms [./sqlite] sqliteLoader	1.108.0	deprecated-store-names	Use `sqliteCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it.
-cms [./test] cmsTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 cms [.] CmsOptions.onSave	1.108	deprecated-hook-names	Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 cms [.] CmsOptions.onUpload	1.108	deprecated-hook-names	Written `afterUpload`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 cms [.] CollectionSettings.onSave	1.108	deprecated-hook-names	Written `afterSave`; `deprecated-hook-names` rewrites it. Removed in 1.108.
@@ -106,8 +74,6 @@ kay [./test] TestOptions.offline	1.108	deprecated-client-keys	Written `client.of
 kay [./test] TestOptions.onStart	1.108	deprecated-app-hooks	Written `onListen`; `deprecated-app-hooks` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.publicCache	1.108	deprecated-config-groups	Written `assets.publicCache`; `deprecated-config-groups` rewrites it. Removed in 1.108.
 kay [./test] TestOptions.search	1.108	deprecated-client-keys	Written `client.search`; `deprecated-client-keys` rewrites it. Removed in 1.108.
-kay [./test] TestSite.refusal	1.108.0	deprecated-test-helpers	`site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
-kay [./test] TestSite.socketRefusal	1.108.0	deprecated-test-helpers	`site.socket.refused`, beside the `site.socket` it refuses. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 kay [.] ActionDone.ctx	1.108	deprecated-hook-context	Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108.
 kay [.] ActionFailed.ctx	1.108	deprecated-hook-context	Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108.
 kay [.] ActionRun.ctx	1.108	deprecated-hook-context	Written `context`, which is the action's context with the hook's `ip`, `userAgent` and `userId`; `deprecated-hook-context` rewrites it. Removed in 1.108.
@@ -121,7 +87,6 @@ kay [.] PageSettings.sitemap	1.108.0	deprecated-page-seo	Write it in `seo`. Remo
 kay [.] PageSettings.ttl	1.108.0	deprecated-page-cache	Write `cache: '1h'`. Removed in 1.108.0; `deprecated-page-cache` rewrites it.
 kay [.] ProofOfWorkOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [.] SocketStatus	1.108.0	-	Write `ConnectionStatus`, which a socket shares with every connection. Removed in 1.108.0. No lint: a type, and a socket still never reads `idle`.
-mail [./test] mailTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 mail [.] ContactOptions.onSend	1.108	deprecated-hook-names	Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 mail [.] ListOptions.onBroadcast	1.108	deprecated-hook-names	Written `afterBroadcast`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 mail [.] ListOptions.onConfirm	1.108	deprecated-hook-names	Written `afterConfirm`; `deprecated-hook-names` rewrites it. Removed in 1.108.

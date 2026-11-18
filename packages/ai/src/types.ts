@@ -96,21 +96,6 @@ export interface ChatLauncherLabels extends ChatLabels {
   collapse?: string | undefined
 }
 
-// The flat props a component took before `labels`, one `<key>Label` each; `waitingLabel` and `failureLabel` are `thinking` and `error`. They still work, and win over `labels`.
-type FlatLabels<Labels> = {
-  /** @deprecated Written in `labels`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */
-  [Key in Exclude<keyof Labels, 'thinking' | 'error'> & string as `${Key}Label`]?: string | undefined
-} & {
-  /** @deprecated Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */
-  waitingLabel?: string | undefined
-  /** @deprecated Written `labels.error`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */
-  failureLabel?: string | undefined
-}
-
-export type ChatLabelProps = FlatLabels<ChatLabels>
-
-export type ChatLauncherLabelProps = FlatLabels<ChatLauncherLabels>
-
 // A file the model is shown: bytes or a `Blob` (a `File` from an `s.File()` field is one), or a file kay stored (`storedFile(key)`, never a key a visitor chose). What it is comes from its bytes, not its name or declared type: a PNG, JPEG, GIF or WebP image, or a PDF.
 export type AiAttachment = Blob | Uint8Array | ArrayBuffer | StoredFile
 

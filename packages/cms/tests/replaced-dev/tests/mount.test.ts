@@ -3,7 +3,7 @@ import { expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { cms } from '../../../src/extension'
 import { passwordGuard } from '../../../src/password'
-import { cmsTest } from '../../../src/test'
+import { test as cmsTest } from '../../../src/test'
 
 const ROOT = join(import.meta.dir, '..')
 

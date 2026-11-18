@@ -34,12 +34,8 @@ import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes,
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
 import { actionOptions } from './action-options'
-import { aiLanguage } from './ai-language'
 import { appHooks } from './app-hooks'
-import { authMethods } from './auth-methods'
-import { authRateLimits } from './auth-rate-limits'
 import { clientKeys } from './client-keys'
-import { cmsOptions } from './cms-options'
 import { configGroups } from './config-groups'
 import { configSwitches } from './config-switches'
 
@@ -64,7 +60,6 @@ import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-sh
 
 import { largePublicImages } from './large-images'
 
-import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { pagesOptions } from './pages-options'
@@ -81,7 +76,6 @@ import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
 import { storeMs } from './store-ms'
 import { storeNames } from './store-names'
-import { testHelpers } from './test-helpers'
 import { textSizeColour } from './text-size-colour'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
@@ -193,11 +187,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => schemaBuilders(root, options),
   async ({ root, options }) => schemaJson(root, options),
   async ({ root, options }) => actionOptions(root, options),
-  async ({ root, options }) => aiLanguage(root, options),
   async ({ root, options }) => hookNames(root, options),
-  async ({ root, options }) => mailApi(root, options),
-  async ({ root, options }) => testHelpers(root, options),
-  async ({ root, options }) => cmsOptions(root, options),
   async ({ root, options }) => jobHandlers(root, options),
   async ({ root, options }) => scheduleCalls(root, options),
   async ({ root, options }) => jobOptions(root, options),
@@ -216,8 +206,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => pagesOptions(root, options),
   async ({ root, options }) => ttlNames(root, options),
   async ({ root, options }) => storeMs(root, options),
-  async ({ root, options }) => authRateLimits(root, options),
-  async ({ root, options }) => authMethods(root, options),
   async ({ root, options }) => envFiles(root, options),
 ]
 

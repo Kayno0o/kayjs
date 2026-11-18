@@ -20,7 +20,7 @@ const look = recipe({
   },
 })
 
-const { label, plate, most = MOST, least = 1, onPlateChange, onChange, tools = true, style, zoomInLabel = wording('ui.zoomPane.zoomIn', 'Zoom in'), zoomOutLabel = wording('ui.zoomPane.zoomOut', 'Zoom out'), fitLabel = wording('ui.zoomPane.fit', 'Fit'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'tabindex' | 'onPlateChange' | 'onChange' | 'style'> & {
+const { label, plate, most = MOST, least = 1, onPlateChange, tools = true, style, zoomInLabel = wording('ui.zoomPane.zoomIn', 'Zoom in'), zoomOutLabel = wording('ui.zoomPane.zoomOut', 'Zoom out'), fitLabel = wording('ui.zoomPane.fit', 'Fit'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role' | 'tabindex' | 'onPlateChange' | 'onChange' | 'style'> & {
   // Names the view for screen readers, since what it holds is a picture rather than words.
   label: string
   // How far in it may be taken, as a multiple of fitted.
@@ -31,8 +31,6 @@ const { label, plate, most = MOST, least = 1, onPlateChange, onChange, tools = t
   plate?: Plate | undefined
   // Called with the new `{ scale, x, y }` whenever the plate moves or zooms, however it did: a gesture, a key or a button. `x` and `y` are where the plate's top-left corner sits in pixels, so what stands on the plate can follow it.
   onPlateChange?: ((event: { plate: Plate }) => unknown) | undefined
-  // @deprecated Since 1.105, `onPlateChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
-  onChange?: ((plate: Plate) => unknown) | undefined
   // Whether the buttons are drawn. The gestures work either way.
   tools?: boolean | undefined
   // Written after the pane's own touch-action, so it wins.
@@ -65,7 +63,6 @@ function put(next: Plate) {
 
   shown = next
   onPlateChange?.({ plate: next })
-  onChange?.(next)
 }
 
 function take(next: Plate) {

@@ -97,8 +97,6 @@ export interface TestSite {
   call: <Target extends Action>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
   // A call expected to be refused, as `call` makes it: the `ActionError` with its status, errors and typed data; one that went through fails the test, and any other error is thrown.
   expectRefused: <Target extends Action>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailuresOf<Target>>>
-  /** @deprecated `site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
-  refusal: <Target extends Action>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailuresOf<Target>>>
   // The site's MCP endpoint, as an agent calls it: `mcp: true` serves it. Calls carry the cookies so far and the headers given, such as an `Authorization` bearer token.
   mcp: {
     // The tools `tools/list` gives.
@@ -117,8 +115,6 @@ export interface TestSite {
   // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
   // `socket.refused(module, path, options)` is a route expected to refuse the upgrade, which it sends for real: the refusal as a response, such as a guard's 401 or the 403 of a cross-site `origin`; an upgrade that was accepted fails the test. `onError({ error })` and `onClose({ status: 'failed' })` of the options run with the refusal; there is no connection, so `onOpen` and `onData` never do.
   socket: OpenSocket & { refused: RefusedSocket }
-  /** @deprecated `site.socket.refused`, beside the `site.socket` it refuses. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
-  socketRefusal: RefusedSocket
   // A route of a module under `src/api` answering with `eventStream()`, read as an island reads it.
   stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
   // A page loaded in a headless Chrome over a server the site starts on a free port, once `browser` is set, under its `base` when it has one; its cookies are the browser's, not `cookies`.

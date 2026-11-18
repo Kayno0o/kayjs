@@ -40,7 +40,6 @@ export const hello = action(async (_input, { locals }) => {
 })
 ```
 
-The `send` and `enqueue` imported from `@kayjs/mail` work until 1.108, and `registeredMailer()` is gone. `kay check` reports them as `deprecated-mail-send`.
 
 A transport or views of your own need a module. `src/mail.ts` exports `mailer({ ... })` as `mail`, and `mail()` with no argument uses it. `mail({ module: './src/mail' })` names another path, relative to the project root, and `mail({ server: false })` builds no mailer, for an app that uses `new Elysia().use(mail)` by hand.
 

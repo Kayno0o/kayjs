@@ -65,8 +65,6 @@ class Auth
   audit: AuditMethods
   bareUser: () => Promise<BareUser<UserData> | null>
   captcha: CaptchaMethods
-  /** @deprecated Use `captcha.challenge()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ captchaChallenge: (action: CaptchaAction) => Promise<null | string>
-  /** @deprecated Use `captcha.required()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ captchaRequired: (action: CaptchaAction) => Promise<boolean>
   cookies: string[]
   core: Core
   email: EmailMethods
@@ -80,7 +78,6 @@ class Auth
   scope?: false | string | string[] | undefined;
   twoFactor?: true | undefined;
 }) => Promise<void>
-  /** @deprecated Use `tokens.hasScope()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ hasScope: (scope: Scope) => Promise<boolean>
   heldScopes: () => Promise<null | string[]>
   impersonator: () => Promise<User<Record<string, unknown>> | null>
   known?: undefined | { record: Promise<UserRecord | null>; at: number; }
@@ -90,20 +87,14 @@ class Auth
   magicLink: MagicLinkMethods
   markBrowser: (signedIn: boolean, maxAge?: number | undefined) => void
   oauth: OAuthMethods
-  /** @deprecated Use `oauthServer.fixed()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ oauthFixed: () => boolean
-  /** @deprecated Use `oauthServer.origin()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ oauthOrigin: () => string | undefined
-  /** @deprecated Use `oauthServer.resource()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ oauthResource: (path: string, name: string) => Record<string, unknown> | null
   oauthServer: OAuthServerMethods
   organizations: OrganizationMethods<OrgRole>
   passkeys: PasskeyMethods
   password: PasswordMethods
   proof: ProofMethods
-  /** @deprecated Use `proof.recent()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ provedLately: (fresh?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined) => Promise<boolean>
   providersOf: (record: UserRecord) => Promise<Record<string, { id: string; }>>
   record: () => Promise<UserRecord | null>
-  /** @deprecated Use `proof.renew()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ reprove: (proof: Proof) => Promise<Result<object, ProofFailure>>
   request: Request
-  /** @deprecated Use `admin.require()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ requireAdmin: () => Promise<User<UserData>>
   requireUser: {
   (options: RequireUserOptions<Scope, Role> & {
     bare: true;
@@ -114,7 +105,6 @@ class Auth
 }
   resolve: () => Promise<UserRecord | null>
   resolving: Promise<UserRecord | null> | undefined
-  /** @deprecated Use `tokens.scopes()`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */ scopes: () => Promise<null | string[]>
   session: Session<AuthSessionData>
   sessions: SessionMethods
   signIn: (user: Pick<User<Record<string, unknown>>, "id">, options?: { remember?: boolean | undefined; }) => Promise<void>
@@ -975,32 +965,19 @@ type Limits = Record<keyof typeof DEFAULT_LIMITS, AuthRateLimit> & { oauthRegist
 [.] LimitsOption
 interface LimitsOption
   emailChange?: LimitOption | PerClientAndAccount | undefined
-  /** @deprecated `emailChange.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ emailChangeAccount?: LimitOption | undefined
   emailCode?: LimitOption | PerClientAndAccount | undefined
-  /** @deprecated `emailCode.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ emailCodeAccount?: LimitOption | undefined
   export?: LimitOption | undefined
   forgot?: LimitOption | PerClientAndAccount | undefined
-  /** @deprecated `forgot.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ forgotAccount?: LimitOption | undefined
   invite?: LimitOption | undefined | { sender?: LimitOption | undefined; address?: LimitOption | undefined; }
-  /** @deprecated `invite.address`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ inviteAddress?: LimitOption | undefined
   link?: LimitOption | undefined
   magicLink?: LimitOption | PerClientAndAccount | undefined
-  /** @deprecated `magicLink.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ magicLinkAccount?: LimitOption | undefined
   oauth?: undefined | { register?: LimitOption | undefined; registerAll?: LimitOption | undefined; document?: LimitOption | undefined; token?: LimitOption | undefined; }
-  /** @deprecated `oauth.document`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ oauthDocument?: LimitOption | undefined
-  /** @deprecated `oauth.register`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ oauthRegister?: LimitOption | undefined
-  /** @deprecated `oauth.registerAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ oauthRegisterAll?: LimitOption | undefined
-  /** @deprecated `oauth.token`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ oauthToken?: LimitOption | undefined
   organization?: LimitOption | undefined
   register?: LimitOption | undefined
   reprove?: LimitOption | undefined
   resend?: LimitOption | PerClientAndAccount | undefined
-  /** @deprecated `resend.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ resendAccount?: LimitOption | undefined
   signIn?: (PerClientAndAccount & { accountAll?: LimitOption | undefined; }) | LimitOption | undefined
-  /** @deprecated `signIn.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ signInAccount?: LimitOption | undefined
-  /** @deprecated `signIn.accountAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ signInAccountAll?: LimitOption | undefined
   twoFactor?: LimitOption | PerClientAndAccount | undefined
-  /** @deprecated `twoFactor.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ twoFactorAccount?: LimitOption | undefined
 
 [.] linkedinProvider
 function linkedinProvider(opts?: OpenIdOptions): OAuthProvider<OpenIdClaims, OAuthUser>
@@ -1760,11 +1737,6 @@ component default
   children?: Element
   else?: Element
   require?: AuthRequirement<string> | undefined
-  role?: string | undefined
-
-[./components/signed-out.kay] default
-component default
-  children?: Element
 
 [./components/user-menu.kay] default
 component default
@@ -2153,10 +2125,6 @@ type UsernameProblem = 'length' | 'characters' | 'mixed-scripts'
 
 [./sqlite] sqliteAuth
 function sqliteAuth(path: string): StoreUrl
-
-[./test] authTest
-/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
-function authTest(site: OAuthSite): AuthTest
 
 [./test] AuthTest
 interface AuthTest

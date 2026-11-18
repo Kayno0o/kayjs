@@ -200,7 +200,6 @@ describe('cms()', () => {
     try {
       expect(boot(false, {})).toEqual([expect.stringContaining('no cms({ access })')])
       expect(boot(false, { guard: () => undefined })).toEqual([])
-      expect(boot(false, { role: 'editor' })).toEqual([])
       expect(boot(false, { access: 'editor' })).toEqual([])
       expect(boot(false, { access: { password: 'a password of its own' } })).toEqual([])
       expect(boot(false, { access: () => undefined })).toEqual([])

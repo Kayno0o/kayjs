@@ -20,7 +20,7 @@ interface Mode {
 
 interface Option { value: ThemeMode, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }
 
-const { modes = ['system', 'light', 'dark'], value, label = wording('ui.themeToggle.label', 'Theme'), showLabel = false, cookie = THEME_COOKIE, onValueChange, onChange, option, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onValueChange' | 'onChange' | 'onLoad' | 'onError'> & {
+const { modes = ['system', 'light', 'dark'], value, label = wording('ui.themeToggle.label', 'Theme'), showLabel = false, cookie = THEME_COOKIE, onValueChange, option, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onValueChange' | 'onChange' | 'onLoad' | 'onError'> & {
   // The choices, in this order: a mode (`'system'`, `'light'` or `'dark'`), or `{ value, label?, icon? }` to word or draw one yourself. All three by default, each with its icon and a `ui.themeToggle.*` word.
   modes?: readonly (ThemeMode | Mode)[] | undefined
   // The mode, when the app holds it (a signed-in visitor's saved preference): the toggle follows it and writes no cookie, `onValueChange` being where the app saves a pick. Left out, the visitor's choice is kept in the cookie.
@@ -34,8 +34,6 @@ const { modes = ['system', 'light', 'dark'], value, label = wording('ui.themeTog
   // Hears the mode picked, with its option as a second argument. A promise holds the toggle busy until it settles, and a pick that resolves to false, rejects or throws (logged) is put back and not kept, as Segmented's.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   onValueChange?: ((event: { value: ThemeMode, option: Option | undefined }) => unknown) | undefined
-  // @deprecated Since 1.105, `onValueChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
-  onChange?: ((value: ThemeMode, option: Option | undefined) => unknown) | undefined
   // Draws each option in place of its label (and icon), as Segmented's.
   option?: Snippet<[option: Option]> | undefined
 }>()
@@ -74,7 +72,7 @@ async function settle(answer: PromiseLike<unknown>, mode: ThemeMode) {
 }
 
 function pick({ value: mode, option: chosen }: { value: ThemeMode, option: Option | undefined }) {
-  const answer = onValueChange ? onValueChange({ value: mode, option: chosen }) : onChange?.(mode, chosen)
+  const answer = onValueChange?.({ value: mode, option: chosen })
 
   if (isPromiseLike(answer))
     return settle(answer, mode)

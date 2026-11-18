@@ -97,7 +97,7 @@ describe('the revocation endpoint (RFC 7009)', () => {
   })
 
   test('counts its own budget, apart from the token endpoint', async () => {
-    const app = testApp({ site: 'http://localhost', pages: auth({ server: false }), scopes: ['posts:read'], rateLimit: { oauthToken: { max: 2, window: '900s' } } } as never)
+    const app = testApp({ site: 'http://localhost', pages: auth({ server: false }), scopes: ['posts:read'], rateLimit: { oauth: { token: { max: 2, window: '900s' } } } } as never)
     const statuses = []
 
     for (let attempt = 0; attempt < 3; attempt++)

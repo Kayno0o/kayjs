@@ -8,7 +8,7 @@ import { notify } from 'kay/server'
 import { browserPath, testSite } from 'kay/test'
 import { chromium } from 'playwright-core'
 import { auth } from '../src/pages'
-import { authTest } from '../src/test'
+import { test as authTest } from '../src/test'
 
 // A real test site of an app with `auth()` and the Bell: the visitor is signed in through kayjs-auth, with no stand-in for who they are.
 const ROOT = join(import.meta.dir, 'bell-fixture')

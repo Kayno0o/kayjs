@@ -31,8 +31,6 @@ interface Draft {
 export interface DescribeImageOptions extends CallOptions {
   // The language to write in, a BCP 47 tag such as `fr` or `pt-BR`; the image's own context decides when left out.
   locale?: string | undefined
-  /** @deprecated Written `locale`; `deprecated-ai-language` rewrites it. Removed in 1.108. */
-  language?: string | undefined
 }
 
 function systemPrompt(locale: string | undefined): string {
@@ -42,8 +40,8 @@ function systemPrompt(locale: string | undefined): string {
 // One short alt text for an image, over `ask` with a `schema`: the fake answers under `bun test`, and a provider that does not see images fails the call.
 export async function describeImage(image: AiAttachment, options: DescribeImageOptions = {}): Promise<string> {
   const messages: AiMessage[] = [{ role: 'user', content: 'Write the alt text of this image.', attachments: [image] }]
-  const { locale, language, model, ...call } = options
-  const { alt } = await ask(messages, { ...call, schema: ALT, system: systemPrompt(locale ?? language), maxTokens: 300, temperature: 0, ...roleModel('imageAlt', model) })
+  const { locale, model, ...call } = options
+  const { alt } = await ask(messages, { ...call, schema: ALT, system: systemPrompt(locale), maxTokens: 300, temperature: 0, ...roleModel('imageAlt', model) })
 
   return alt.trim()
 }

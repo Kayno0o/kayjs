@@ -91,9 +91,9 @@ describe('the organization pages', () => {
     const other = await person('new-other@example.com')
     const lists = await other.visitor.visit(LIST)
 
-    expect((await other.visitor.refusal(create, { name: 'Taken', slug: 'acme-new' }, { from: lists.url })).data).toEqual({ error: 'slug-taken' })
-    expect((await other.visitor.refusal(create, { name: '  ', slug: '' }, { from: lists.url })).data).toEqual({ error: 'invalid-name' })
-    expect((await other.visitor.refusal(create, { name: 'Fine', slug: 'Not A Slug' }, { from: lists.url })).data).toEqual({ error: 'invalid-slug' })
+    expect((await other.visitor.expectRefused(create, { name: 'Taken', slug: 'acme-new' }, { from: lists.url })).data).toEqual({ error: 'slug-taken' })
+    expect((await other.visitor.expectRefused(create, { name: '  ', slug: '' }, { from: lists.url })).data).toEqual({ error: 'invalid-name' })
+    expect((await other.visitor.expectRefused(create, { name: 'Fine', slug: 'Not A Slug' }, { from: lists.url })).data).toEqual({ error: 'invalid-slug' })
   })
 
   test('a plain member sees no management and every action refuses them, an admin cannot touch an owner, and a stranger\'s post changes nothing', async () => {
@@ -107,18 +107,18 @@ describe('the organization pages', () => {
 
     const forbidden = { error: 'forbidden' }
 
-    expect((await plain.visitor.refusal(setRoles, { userId: admin.id, roles: ['member'] }, { from })).data).toEqual(forbidden)
-    expect((await plain.visitor.refusal(removeMember, { userId: admin.id }, { from })).data).toEqual(forbidden)
-    expect((await plain.visitor.refusal(invite, { email: 'x@example.com' }, { from })).data).toEqual(forbidden)
-    expect((await plain.visitor.refusal(rename, { name: 'Mine' }, { from })).data).toEqual(forbidden)
-    expect((await plain.visitor.refusal(remove, { confirm: true }, { from })).data).toEqual(forbidden)
-    expect((await plain.visitor.refusal(revoke, { id: 'whatever' }, { from })).data).toEqual({ error: 'forbidden' })
+    expect((await plain.visitor.expectRefused(setRoles, { userId: admin.id, roles: ['member'] }, { from })).data).toEqual(forbidden)
+    expect((await plain.visitor.expectRefused(removeMember, { userId: admin.id }, { from })).data).toEqual(forbidden)
+    expect((await plain.visitor.expectRefused(invite, { email: 'x@example.com' }, { from })).data).toEqual(forbidden)
+    expect((await plain.visitor.expectRefused(rename, { name: 'Mine' }, { from })).data).toEqual(forbidden)
+    expect((await plain.visitor.expectRefused(remove, { confirm: true }, { from })).data).toEqual(forbidden)
+    expect((await plain.visitor.expectRefused(revoke, { id: 'whatever' }, { from })).data).toEqual({ error: 'forbidden' })
 
     // An admin manages the members below them and nothing above.
-    expect((await admin.visitor.refusal(setRoles, { userId: owner.id, roles: [] }, { from })).data).toEqual(forbidden)
-    expect((await admin.visitor.refusal(removeMember, { userId: owner.id }, { from })).data).toEqual(forbidden)
-    expect((await admin.visitor.refusal(setRoles, { userId: plain.id, roles: ['owner'] }, { from })).data).toEqual(forbidden)
-    expect((await admin.visitor.refusal(remove, { confirm: true }, { from })).data).toEqual(forbidden)
+    expect((await admin.visitor.expectRefused(setRoles, { userId: owner.id, roles: [] }, { from })).data).toEqual(forbidden)
+    expect((await admin.visitor.expectRefused(removeMember, { userId: owner.id }, { from })).data).toEqual(forbidden)
+    expect((await admin.visitor.expectRefused(setRoles, { userId: plain.id, roles: ['owner'] }, { from })).data).toEqual(forbidden)
+    expect((await admin.visitor.expectRefused(remove, { confirm: true }, { from })).data).toEqual(forbidden)
     expect(await admin.visitor.call(setRoles, { userId: plain.id, roles: ['admin'] }, { from })).toBe('done')
 
     const adminView = await admin.visitor.visit(from)
@@ -131,9 +131,9 @@ describe('the organization pages', () => {
 
     // A post from a page of an organization they are in never reaches another one.
     for (const action of [setRoles, removeMember])
-      expect((await stranger.visitor.refusal(action, { userId: plain.id, roles: [] }, { from })).data).toEqual({ error: 'not-found' })
+      expect((await stranger.visitor.expectRefused(action, { userId: plain.id, roles: [] }, { from })).data).toEqual({ error: 'not-found' })
 
-    expect((await stranger.visitor.refusal(remove, { confirm: true }, { from })).data).toEqual({ error: 'not-found' })
+    expect((await stranger.visitor.expectRefused(remove, { confirm: true }, { from })).data).toEqual({ error: 'not-found' })
     expect((await store.members!.listByOrganization((await store.organizations!.findBySlug('roles-inc'))!.id)).map(row => row.userId)).toHaveLength(3)
   })
 
@@ -145,7 +145,7 @@ describe('the organization pages', () => {
 
     // `second` is the last owner now.
     for (const [action, input] of [[setRoles, { userId: second.id, roles: ['admin'] }], [removeMember, { userId: second.id }], [leave, { confirm: true }]] as const)
-      expect((await second.visitor.refusal(action, input as never, { from })).data).toEqual({ error: 'last-owner' })
+      expect((await second.visitor.expectRefused(action, input as never, { from })).data).toEqual({ error: 'last-owner' })
 
     expect((await store.members!.get((await store.organizations!.findBySlug('last-owner'))!.id, second.id))!.roles).toEqual(['owner'])
   })
@@ -156,12 +156,12 @@ describe('the organization pages', () => {
 
     expect(await owner.visitor.call(setRoles, { userId: ada.id, roles: ['admin', 'member'] }, { from })).toBe('done')
     expect((await owner.visitor.visit(from)).find(`[data-member="${ada.id}"] .kui-badge`).map(badge => badge.text)).toEqual(['admin', 'member'])
-    expect((await owner.visitor.refusal(setRoles, { userId: ada.id, roles: ['nobody'] }, { from })).data).toEqual({ error: 'unknown-role' })
+    expect((await owner.visitor.expectRefused(setRoles, { userId: ada.id, roles: ['nobody'] }, { from })).data).toEqual({ error: 'unknown-role' })
     expect((await owner.visitor.submit(rename, { name: 'Renamed', slug: 'renamed-cycle' }, { from })).url).toBe(`${LIST}/renamed-cycle`)
     expect((await owner.visitor.visit(from)).status).toBe(404)
     expect(await owner.visitor.call(removeMember, { userId: ada.id }, { from: `${LIST}/renamed-cycle` })).toBe('done')
     expect((await ada.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(0)
-    expect((await owner.visitor.refusal(remove, {}, { from: `${LIST}/renamed-cycle` })).data).toEqual({ error: 'form' })
+    expect((await owner.visitor.expectRefused(remove, {}, { from: `${LIST}/renamed-cycle` })).data).toEqual({ error: 'form' })
     expect((await owner.visitor.submit(remove, { confirm: 'on' }, { from: `${LIST}/renamed-cycle` })).url).toBe(LIST)
     expect(await store.organizations!.findBySlug('renamed-cycle')).toBeUndefined()
   })
@@ -170,7 +170,7 @@ describe('the organization pages', () => {
     const { owner, from } = await founded('Leave Co', 'leave-co')
     const bob = await member('leave-co', owner, 'leave-bob@example.com', ['member'])
 
-    expect((await bob.visitor.refusal(leave, {}, { from })).data).toEqual({ error: 'form' })
+    expect((await bob.visitor.expectRefused(leave, {}, { from })).data).toEqual({ error: 'form' })
     expect((await bob.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(1)
     expect((await bob.visitor.submit(leave, { confirm: 'on' }, { from })).url).toBe(LIST)
     expect((await bob.visitor.visit(LIST)).find('[data-organization]')).toHaveLength(0)
@@ -203,8 +203,8 @@ describe('inviting', () => {
     expect(await owner.visitor.call(revoke, { id }, { from })).toBe('done')
     expect((await owner.visitor.visit(from)).find('[data-invitation]')).toHaveLength(0)
     expect((await owner.visitor.visit(`/auth/invitation?invitation=${id}`)).find('p.kauth-error').map(p => p.text)).toEqual(['This invitation is invalid, expired or already used.'])
-    expect((await owner.visitor.refusal(invite, { email: 'no-at-sign' }, { from })).data).toEqual({ error: 'invalid-email' })
-    expect((await owner.visitor.refusal(invite, { email: 'role@example.com', roles: ['nobody'] }, { from })).data).toEqual({ error: 'unknown-role' })
+    expect((await owner.visitor.expectRefused(invite, { email: 'no-at-sign' }, { from })).data).toEqual({ error: 'invalid-email' })
+    expect((await owner.visitor.expectRefused(invite, { email: 'role@example.com', roles: ['nobody'] }, { from })).data).toEqual({ error: 'unknown-role' })
   })
 
   test('signed out, the page offers sign-in and registration that come back to it, and the invitee then joins', async () => {
@@ -223,7 +223,7 @@ describe('inviting', () => {
     expect(page.find('form')).toHaveLength(0)
     // The id sits in the address, which no Referer header may carry to another site.
     expect((await visitor.fetch(link.pathname + link.search)).headers.get('referrer-policy')).toBe('same-origin')
-    expect((await visitor.refusal(accept, { id: link.searchParams.get('invitation')! }, { from: page.url })).data).toEqual({ error: 'signed-out' })
+    expect((await visitor.expectRefused(accept, { id: link.searchParams.get('invitation')! }, { from: page.url })).data).toEqual({ error: 'signed-out' })
 
     // Registering with the invited address comes back to the invitation; the address is verified, then the invitation is accepted.
     const back = await visitor.submit(register, { email: 'back-invitee@example.com', password: PASSWORD, redirect: `/auth/invitation${link.search}` }, { from: await visitor.visit(`/auth/register?redirect=${here}`) })
@@ -238,7 +238,7 @@ describe('inviting', () => {
 
     const { id } = (await store.users.findByEmail('back-invitee@example.com'))!
 
-    expect((await visitor.refusal(accept, { id: link.searchParams.get('invitation')! }, { from: back.url })).data).toEqual({ error: 'unverified' })
+    expect((await visitor.expectRefused(accept, { id: link.searchParams.get('invitation')! }, { from: back.url })).data).toEqual({ error: 'unverified' })
     await store.users.update(id, { emailVerifiedAt: new Date() })
     expect((await visitor.submit(accept, { id: link.searchParams.get('invitation')! }, { from: back })).url).toBe(from)
     expect((await store.members!.get((await store.organizations!.findBySlug('back-co'))!.id, id))!.roles).toEqual(['member'])
@@ -256,7 +256,7 @@ describe('inviting', () => {
     expect(page.find('form button').map(button => button.text)).toEqual(['Join', 'Decline'])
     expect((await ada.visitor.submit(accept, { id: link.searchParams.get('invitation')! }, { from: page })).url).toBe(from)
     expect((await ada.visitor.visit(link.pathname + link.search)).find('p.kauth-error').map(p => p.text)).toEqual(['This invitation is invalid, expired or already used.'])
-    expect((await ada.visitor.refusal(accept, { id: link.searchParams.get('invitation')! }, { from: page.url })).data).toEqual({ error: 'not-found' })
+    expect((await ada.visitor.expectRefused(accept, { id: link.searchParams.get('invitation')! }, { from: page.url })).data).toEqual({ error: 'not-found' })
     expect((await ada.visitor.visit(from)).find('[data-member]')).toHaveLength(2)
   })
 
@@ -274,14 +274,14 @@ describe('inviting', () => {
 
     expect(wrong.find('p.kauth-error').map(p => p.text)).toEqual(['This invitation is for another address: sign in with the address it was sent to.'])
     expect(wrong.find('button').map(button => button.text)).toEqual(['Sign in with another account'])
-    expect((await eve.visitor.refusal(accept, { id }, { from: wrong.url })).data).toEqual({ error: 'wrong-account' })
-    expect((await eve.visitor.refusal(reject, { id }, { from: wrong.url })).data).toEqual({ error: 'not-found' })
+    expect((await eve.visitor.expectRefused(accept, { id }, { from: wrong.url })).data).toEqual({ error: 'wrong-account' })
+    expect((await eve.visitor.expectRefused(reject, { id }, { from: wrong.url })).data).toEqual({ error: 'not-found' })
 
     for (const tampered of [`${id}x`, id.toUpperCase(), '../../etc', `${id}%00`, 'x'.repeat(5000), ''])
       expect((await ada.visitor.visit(`/auth/invitation?invitation=${encodeURIComponent(tampered)}`)).find('p.kauth-error').map(p => p.text)).toEqual(['This invitation is invalid, expired or already used.'])
 
     expect((await ada.visitor.visit('/auth/invitation')).status).toBe(200)
-    expect((await ada.visitor.refusal(accept, { id: 'tampered' }, { from: path })).data).toEqual({ error: 'not-found' })
+    expect((await ada.visitor.expectRefused(accept, { id: 'tampered' }, { from: path })).data).toEqual({ error: 'not-found' })
 
     // A week and a day on the invitation is gone; the invitee signs in again as their session ended too.
     setSystemTime(new Date(Date.now() + 8 * 24 * 3600_000))
@@ -290,7 +290,7 @@ describe('inviting', () => {
 
     await later.submit(password, { identifier: 'refuse-ada@example.com', password: PASSWORD }, { from: await later.visit('/auth/sign-in') })
     expect((await later.visit(path)).find('p.kauth-error')).toHaveLength(1)
-    expect((await later.refusal(accept, { id }, { from: wrong.url })).data).toEqual({ error: 'not-found' })
+    expect((await later.expectRefused(accept, { id }, { from: wrong.url })).data).toEqual({ error: 'not-found' })
     setSystemTime()
 
     await owner.visitor.call(invite, { email: 'refuse-ada@example.com' }, { from })

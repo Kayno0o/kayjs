@@ -113,7 +113,7 @@ export interface UploadEvent {
   author?: Identity | undefined
 }
 
-// Who the guard let in, as `cms({ member })` reports them.
+// Who the guard let in, as `cms({ access })` reports them.
 export interface MemberInfo {
   name?: string | undefined
   // Where a newsletter test send goes, when `testTo` names none.
@@ -164,14 +164,12 @@ export interface CmsOptions {
   prefix?: string | undefined
   // Who may use the screens and the API, see `CmsAccess`. Left out, the screens are open to the holders of the roles `roles` lists when kayjs-auth is registered, and closed otherwise: outside `kay dev` an edit link or cookie then reads only the entries of the pages it opens.
   access?: CmsAccess | undefined
-  // Replaced by `access`: a guard, a list of guards run in order, or `{ load }` returning one. Not given with `access`.
+  // For a guard `access` cannot say: a guard, a list of guards run in order, or `{ load }` returning one. Not given with `access`.
   guard?: GuardOption | false | undefined
-  // Replaced by `access: 'editor'`. Not given with `access` or `guard`.
-  role?: string | undefined
   // Where a folder entry's file goes: `forgejo(...)`, `github(...)` or `gitlab(...)` on a deployed site, the working tree by default, for `kay dev`. Left out, a production server builds `forgejo()` from `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and `CMS_BRANCH`, or `github()` or `gitlab()` when `CMS_HOST` is `github` or `gitlab`.
   files?: FileSaver | undefined
-  // The types an upload may have, exact or as `image/*`: PNG, JPEG, WebP, GIF, AVIF and PDF by default; `{ types, maxSize }` also sets the most an upload may weigh, the list alone being the older form of `{ types }`, in bytes or as `'50mb'`, 20 MB by default, 127.9 MB at most (Bun refuses a request body over 128 MB). The upload route takes that size whatever the app's own `maxSize` is.
-  uploads?: UploadOptions | string[] | undefined
+  // The types an upload may have, exact or as `image/*`: PNG, JPEG, WebP, GIF, AVIF and PDF by default; `{ types, maxSize }` also sets the most an upload may weigh, in bytes or as `'50mb'`, 20 MB by default, 127.9 MB at most (Bun refuses a request body over 128 MB). The upload route takes that size whatever the app's own `maxSize` is.
+  uploads?: UploadOptions | undefined
   // How many entries a collection's list shows on a page, 50 by default.
   pageSize?: number | undefined
   // Collections whose bodies may hold HTML that runs as the site, such as a `<script>` or an `onclick`, which a save is otherwise refused for.
@@ -187,8 +185,6 @@ export interface CmsOptions {
   roles?: Record<string, GivenRole> | undefined
   // A last word on each request `roles` lets through, for what a role cannot say: `can: ({ person, action, collection, entry }) => ...`. It runs on the server for every act, including a read and the site-wide ones, and a refusal, or a throw, is a 403; with no `roles`, everyone it asks about is allowed first.
   can?: ((question: CanQuestion) => boolean | Promise<boolean>) | undefined
-  // Replaced by `access: ({ locals }) => ...`, which admits and names in one. Who the guard let in, for a custom guard that is neither kayjs-auth nor `passwordGuard()`; not given with `access`.
-  member?: ((ctx: GuardContext) => MemberInfo | undefined | Promise<MemberInfo | undefined>) | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined
   // `true` refuses an approval by the person who sent the draft for review, so another person reads it: the Approve button is disabled with the reason, and the server refuses it. Off by default, a reviewer may approve what they sent.
@@ -229,7 +225,7 @@ export interface CmsSettings {
   pageSize: number
   rawHtml: ReadonlySet<string>
   author: CmsOptions['author']
-  member: CmsOptions['member']
+  member: MemberAccess | undefined
   afterSave: CmsOptions['afterSave']
   beforeSave: CmsOptions['beforeSave']
   beforeUpload: CmsOptions['beforeUpload']
@@ -276,7 +272,7 @@ const admitAll: Guard = () => undefined
 
 const members = new WeakMap<Request, Promise<MemberInfo | undefined>>()
 
-// A guard admitting the requests `access` returns a person for, and the same person for `member`, read once per request.
+// A guard admitting the requests `access` returns a person for, and the same person for the screens, read once per request.
 function memberGuard(access: MemberAccess): { guard: Guard, member: MemberAccess } {
   const member: MemberAccess = async (ctx) => {
     let read = members.get(ctx.request)
@@ -302,35 +298,26 @@ function isPassword(access: unknown): access is PasswordAccess {
   return typeof access === 'object' && access !== null && !Array.isArray(access) && 'password' in access
 }
 
-// What `access` gives: the guard, and the function naming the person when the app's own does. The older `guard`, `role` and `member` stay for an app that has not moved, and none of them goes with `access`.
-function accessOf({ access, guard, role, member, roles }: Pick<CmsOptions, 'access' | 'guard' | 'role' | 'member' | 'roles'>): { guard: GuardOption | undefined, member: CmsOptions['member'] } {
-  if (access !== undefined && (guard !== undefined || role !== undefined || member !== undefined))
-    throw configError('cms', 'access', '`cms({ access })` says who is let in, so it is not given with `guard`, `role` or `member`: keep `access`')
-
-  if (guard !== undefined && role !== undefined)
-    throw configError('cms', 'extensions', '`cms({ role })` stands for a guard, so it is not given with `cms({ guard })`: keep one')
-
-  if (role !== undefined && (typeof role !== 'string' || role === ''))
-    throw configError('cms', 'role', `\`cms({ role })\` is ${JSON.stringify(role)}; it takes the name of a kayjs-auth role, such as 'editor'`)
+// What `access` gives: the guard, and the function naming the person when the app's own does. A custom `guard` stays for what `access` cannot say, and does not go with `access`.
+function accessOf({ access, guard, roles }: Pick<CmsOptions, 'access' | 'guard' | 'roles'>): { guard: GuardOption | undefined, member: MemberAccess | undefined } {
+  if (access !== undefined && guard !== undefined)
+    throw configError('cms', 'access', '`cms({ access })` says who is let in, so it is not given with `guard`: keep `access`')
 
   if (access === undefined) {
     if (guard === false)
-      return { guard: admitAll, member }
+      return { guard: admitAll, member: undefined }
 
     if (guard !== undefined)
-      return { guard, member }
-
-    if (role !== undefined)
-      return { guard: roleGuard(role), member }
+      return { guard, member: undefined }
 
     // Roles named and kayjs-auth registered: whoever holds one of them is let in, the rest of its users staying out.
     const named = Object.keys(roles ?? {}).filter(name => !isOrganizationRole(name))
 
-    return { guard: named.length === 0 ? undefined : roleGuard(named), member }
+    return { guard: named.length === 0 ? undefined : roleGuard(named), member: undefined }
   }
 
   if (access === false)
-    return { guard: admitAll, member }
+    return { guard: admitAll, member: undefined }
 
   if (typeof access === 'function')
     return memberGuard(access)
@@ -338,25 +325,25 @@ function accessOf({ access, guard, role, member, roles }: Pick<CmsOptions, 'acce
   if (isPassword(access)) {
     const { password, ...options } = access
 
-    return { guard: passwordGuard(password, options), member }
+    return { guard: passwordGuard(password, options), member: undefined }
   }
 
   if (typeof access === 'string' ? access === '' : !Array.isArray(access) || access.length === 0 || access.some(name => typeof name !== 'string' || name === ''))
     throw configError('cms', 'access', `\`cms({ access })\` is ${JSON.stringify(access)}; it takes a kayjs-auth role such as 'editor', a list of them, \`{ password }\`, a function returning the person, or false`)
 
-  return { guard: roleGuard(access), member }
+  return { guard: roleGuard(access), member: undefined }
 }
 
-export function configure({ prefix = '/admin', access, guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member: givenMember, onSave, afterSave = onSave, beforeSave, beforeUpload, onUpload, afterUpload = onUpload, collections, pageLink, roles, can, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', access, guard: own, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, onSave, afterSave = onSave, beforeSave, beforeUpload, onUpload, afterUpload = onUpload, collections, pageLink, roles, can, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw configError('cms', 'pageSize', `\`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
-  const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
+  const { types = DEFAULT_UPLOADS, maxSize } = uploads ?? {}
 
   if (can !== undefined && typeof can !== 'function')
     throw configError('cms', 'can', '`cms({ can })` is a function asked about each request, `({ person, action, collection, entry }) => boolean`')
 
-  const { guard, member } = accessOf({ access, guard: own, role, member: givenMember, roles })
+  const { guard, member } = accessOf({ access, guard: own, roles })
   const tracked = trackPasswords(guard)
 
   current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, afterSave, beforeSave, beforeUpload, afterUpload, fourEyes, pageLink: pageLink !== false, pageButton: typeof pageLink !== 'object' || pageLink.button !== false, collection: asConfigError(() => checkedCollections(collections)), roles: asConfigError(() => checkRoles(roles)), can, layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }

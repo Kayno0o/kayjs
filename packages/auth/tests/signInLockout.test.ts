@@ -49,7 +49,7 @@ describe('guessing at an account', () => {
   })
 
   test('a client that keeps failing is stopped alone, and the right password from another still signs in', async () => {
-    const app = await account({ signInAccount: { max: 3, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 3, window: '900s' } } })
 
     for (let i = 0; i < 3; i++)
       expect(await attempt(app, '10.0.0.1', WRONG)).toMatchObject({ ok: false, error: { code: 'invalid' } })
@@ -59,7 +59,7 @@ describe('guessing at an account', () => {
   })
 
   test('the attacker behind the same address as the user stops them too, as one client key', async () => {
-    const app = await account({ signInAccount: { max: 2, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 2, window: '900s' } } })
 
     await attempt(app, '10.0.0.1', WRONG)
     await attempt(app, '10.0.0.1', WRONG)
@@ -68,7 +68,7 @@ describe('guessing at an account', () => {
   })
 
   test('a successful sign-in spends nothing and clears the client\'s failures', async () => {
-    const app = await account({ signInAccount: { max: 2, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 2, window: '900s' } } })
 
     for (let i = 0; i < 6; i++)
       expect(await attempt(app, '10.0.0.1', PASSWORD)).toMatchObject({ ok: true })
@@ -80,7 +80,7 @@ describe('guessing at an account', () => {
   })
 
   test('every spelling of the email counts as one account, per client', async () => {
-    const app = await account({ signInAccount: { max: 2, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 2, window: '900s' } } })
 
     await attempt(app, '10.0.0.1', WRONG, 'ada@example.com')
     await attempt(app, '10.0.0.1', WRONG, ' ADA@Example.com ')
@@ -89,7 +89,7 @@ describe('guessing at an account', () => {
   })
 
   test('an email with no account runs out per client the same way, and mails no one', async () => {
-    const app = await account({ signInAccount: { max: 2, window: '900s' }, signInAccountAll: { max: 3, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 2, window: '900s' }, accountAll: { max: 3, window: '900s' } } })
 
     await attempt(app, '10.0.0.1', WRONG, 'nobody@example.com')
     await attempt(app, '10.0.0.1', WRONG, 'Nobody@example.com')
@@ -105,7 +105,7 @@ describe('guessing at an account', () => {
   })
 
   test('failures from many addresses reach a looser ceiling, which mails the holder once', async () => {
-    const app = await account({ signInAccount: { max: 2, window: '900s' }, signInAccountAll: { max: 5, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 2, window: '900s' }, accountAll: { max: 5, window: '900s' } } })
 
     for (let i = 1; i <= 5; i++)
       expect(await attempt(app, `10.0.1.${i}`, WRONG)).toMatchObject({ ok: false, error: { code: 'invalid' } })
@@ -124,7 +124,7 @@ describe('guessing at an account', () => {
   })
 
   test('only failures raise the ceiling: signing in over and over never reaches it', async () => {
-    const app = await account({ signInAccountAll: { max: 3, window: '900s' } })
+    const app = await account({ signIn: { accountAll: { max: 3, window: '900s' } } })
 
     for (let i = 1; i <= 10; i++)
       expect(await attempt(app, `10.0.3.${i}`, PASSWORD)).toMatchObject({ ok: true })
@@ -133,7 +133,7 @@ describe('guessing at an account', () => {
   })
 
   test('the holder signing in gives an attacker no fresh ceiling', async () => {
-    const app = await account({ signInAccount: { max: 10, window: '900s' }, signInAccountAll: { max: 4, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 10, window: '900s' }, accountAll: { max: 4, window: '900s' } } })
 
     await attempt(app, '10.0.5.1', WRONG)
     await attempt(app, '10.0.5.2', WRONG)
@@ -146,7 +146,7 @@ describe('guessing at an account', () => {
   })
 
   test('the lockout mail goes out once a day however often the ceiling is reached again', async () => {
-    const app = await account({ signInAccount: { max: 10, window: '900s' }, signInAccountAll: { max: 2, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 10, window: '900s' }, accountAll: { max: 2, window: '900s' } } })
 
     for (let window = 0; window < 3; window++) {
       for (let i = 1; i <= 4; i++)
@@ -168,14 +168,14 @@ describe('guessing at an account', () => {
   })
 
   test('a burst of parallel guesses from many addresses cannot pass the ceiling', async () => {
-    const app = await account({ signInAccount: { max: 2, window: '900s' }, signInAccountAll: { max: 4, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 2, window: '900s' }, accountAll: { max: 4, window: '900s' } } })
     const answers = await Promise.all(Array.from({ length: 12 }, async (_, i) => attempt(app, `10.0.4.${i + 1}`, WRONG)))
 
     expect(answers.filter(answer => (answer as { error?: { code: string } }).error?.code === 'invalid')).toHaveLength(4)
   })
 
   test('a second factor stays asked for: the right password from another client still reaches it during an attack', async () => {
-    const app = await account({ signInAccount: { max: 2, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 2, window: '900s' } } })
     const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))
 
     await app.store.users.update(app.user.id, { totpSecret: sealTotpSecret(SECRET, app.user.id, secret), totpEnabledAt: new Date() })
@@ -190,7 +190,7 @@ describe('guessing at an account', () => {
   })
 
   test('confirming an address with the password counts as the same client\'s guess', async () => {
-    const app = await account({ signInAccount: { max: 2, window: '900s' } })
+    const app = await account({ signIn: { account: { max: 2, window: '900s' } } })
     const token = new URL(app.box.mails.find(mail => mail.kind === 'verify-email')!.url!).searchParams.get('token')!
 
     await app.store.users.update(app.user.id, { emailVerifiedAt: null })

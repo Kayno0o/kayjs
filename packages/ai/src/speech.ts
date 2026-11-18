@@ -15,8 +15,6 @@ const MAX_SPEED = 4
 export interface TranscribeOptions extends CallOptions {
   // What is spoken, a BCP 47 tag such as `fr` or `fr-FR` as everywhere in kay, sent to the provider as the ISO 639-1 code it takes (`fr`): left out, the model tells, which a short recording may get wrong.
   locale?: string | undefined
-  /** @deprecated Written `locale`, which takes a BCP 47 tag; `deprecated-ai-language` rewrites it. Removed in 1.108. */
-  language?: string | undefined
   // The most bytes the recording may hold, bytes or a size such as `'5mb'`, 10 MB by default; a larger one fails with a `too-long` error before the provider is called. `Infinity` lifts it.
   maxSize?: number | string | undefined
 }
@@ -41,7 +39,7 @@ export async function transcribe(audio: Blob, options: TranscribeOptions = {}): 
     throw new AiError('too-long', `the recording holds ${audio.size} bytes, past the ${max} that maxSize allows`)
 
   const { send, signal } = setUp('transcribe', options)
-  const locale = options.locale ?? options.language
+  const { locale } = options
   const language = locale === undefined ? undefined : speechLanguage(locale, 'transcribe({ locale })')
 
   return billed(audio.size / BYTES_PER_CHAR, signal, async () => send({ audio, language }), text => text.length)

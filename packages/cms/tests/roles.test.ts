@@ -242,17 +242,17 @@ describe('roles', () => {
 
 describe('a custom guard', () => {
   function custom(): void {
-    configure({ guard: () => undefined, roles, member: ({ locals }) => (locals as { me?: { mail: string, groups: string[] } }).me && { name: (locals as { me: { mail: string } }).me.mail, roles: (locals as { me: { groups: string[] } }).me.groups } })
+    configure({ roles, access: ({ locals }) => (locals as { me?: { mail: string, groups: string[] } }).me && { name: (locals as { me: { mail: string } }).me.mail, roles: (locals as { me: { groups: string[] } }).me.groups } })
   }
 
   const as = (groups: string[], path = '/entries/posts/hello', method = 'DELETE') => Object.assign(ask({ method, path }), { locals: { me: { mail: 'a@b.c', groups } } }) as GuardContext
 
-  test('holds the roles `cms({ member })` reports, and no role without it', async () => {
+  test('holds the roles a `cms({ access })` function reports, and no role without it', async () => {
     custom()
     expect(await statusOf(as(['admin']))).toBe(200)
     expect(await statusOf(as(['publisher']))).toBe(403)
     expect(await statusOf(as(['stranger']))).toBe(403)
-    expect(await statusOf(ask({ method: 'DELETE', path: '/entries/posts/hello' }))).toBe(403)
+    expect(await statusOf(ask({ method: 'DELETE', path: '/entries/posts/hello' }))).toBe(401)
 
     configure({ guard: () => undefined, roles })
     expect(await statusOf(as(['admin']))).toBe(403)
@@ -370,10 +370,10 @@ describe('the screens for a site on kayjs-auth', () => {
 })
 
 describe('the members the screens read', () => {
-  test('`member` replaces kayjs-auth\'s lookup, and the password guard comes first', async () => {
+  test('an `access` function replaces kayjs-auth\'s lookup, and the password guard comes first', async () => {
     const { memberOf } = await import('../src/access')
 
-    configure({ guard: () => undefined, roles, member: () => ({ name: 'custom', roles: ['admin'] }) })
+    configure({ roles, access: () => ({ name: 'custom', roles: ['admin'] }) })
 
     const withAuth = ask({ method: 'GET', path: '/x', user: { roles: ['editor'] } })
 
@@ -381,27 +381,13 @@ describe('the members the screens read', () => {
 
     const guard = passwordGuard({ editor: 'pw' })
 
-    configure({ guard, roles, member: () => ({ name: 'custom', roles: ['admin'] }) })
+    configure({ guard, roles })
 
     const { activePasswords } = await import('../src/password')
     const ctx = ask({ method: 'GET', path: '/x', cookie: activePasswords()!.issue('editor', false).value })
 
     await guard(ctx)
     expect(await memberOf(ctx)).toEqual({ name: 'editor', held: ['editor'] })
-  })
-
-  test('a read does not look the person up unless asked', async () => {
-    let looked = 0
-
-    configure({ guard: () => undefined, roles, member: () => {
-      looked++
-
-      return undefined
-    } })
-    await statusOf(ask({ method: 'GET', path: '/entries/posts/hello' }))
-    expect(looked).toBe(0)
-    await statusOf(ask({ method: 'GET', path: '/editor/can' }))
-    expect(looked).toBe(1)
   })
 })
 
@@ -443,7 +429,7 @@ describe('where a newsletter test send goes', () => {
     await apiGuard(fallback)
     expect(testAddresses.get(fallback.request)).toBe('ed@example.com')
 
-    configure({ guard: () => undefined, member: () => ({ email: 'm@example.com', roles: [] }), newsletter: { posts: { list, message } } })
+    configure({ access: () => ({ email: 'm@example.com', roles: [] }), newsletter: { posts: { list, message } } })
 
     const custom = testRequest()
 

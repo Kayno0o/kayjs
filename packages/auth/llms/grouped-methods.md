@@ -12,11 +12,9 @@ The methods no feature owns stay on `auth` itself: the user (`user()`, `bareUser
 
 A group lists with `list` (`organizations.list()`, `organizations.listMembers(ref)`), reads with `get` (`organizations.getInvitation(id)`, `account.getProfile()`), writes with `create` and `update` (`account.updateProfile(values)`, `passkeys.update(id, name)`), removes with `delete` (`organizations.deleteMember(ref, userId)`, `account.delete(proof)`) and takes back with `revoke` (`sessions.revoke(id)`, `tokens.revoke(id)`). The admin's methods name what they act on (`admin.listUsers()`, `admin.deleteUser(id)`), and `password.change` and `email.change` keep `change`. What was on `auth` itself sits in the group it belongs to: `admin.require()` for an admin page, `captcha.required(action)` and `captcha.challenge(action)` for a form's CAPTCHA, `proof.recent(fresh?)` and `proof.renew(proof)` before a sensitive change, `tokens.scopes()` and `tokens.hasScope(scope)` for a token's scopes, `oauthServer.resource(path, name)`, `origin()` and `fixed()` for the OAuth documents, and `email.signInWithCode(code)` for the code a mail carried.
 
-The names before 1.105 (`organizations.members`, `admin.roles`, `auth.requireAdmin()`, `magicLink.signInWithCode`...) work until 1.108: `kay check` reports each call as `deprecated-auth-methods` and `kay upgrade` writes the new name.
-
 ### Move off the flat names
 
-The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassword(input)`) are gone since 1.86, and those before 1.87 (`auth.deleteAccount(proof)`, `auth.createUser(input)`) since 1.91, along with their lints: call the grouped method the tables give, `auth.admin.createUser(input)` on the `authCore` result. An app still on them runs `kay upgrade` on 1.85 or 1.90 first, which renames the calls.
+The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassword(input)`) are gone since 1.86, and those before 1.87 (`auth.deleteAccount(proof)`, `auth.createUser(input)`) since 1.91, along with their lints: call the grouped method the tables give, `auth.admin.createUser(input)` on the `authCore` result. An app still on them runs `kay upgrade` on 1.85 or 1.90 first, which renames the calls. The names before 1.105 (`organizations.members`, `admin.roles`, `auth.requireAdmin()`, `magicLink.signInWithCode`...) are gone since 1.109: an app still on them runs `kay upgrade` on 1.108 first.
 
 ## Reference
 

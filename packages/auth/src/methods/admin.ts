@@ -67,14 +67,4 @@ export class AdminMethods<Role extends string = string, UserData extends object 
   async stopImpersonating(): Promise<boolean> {
     return (await load.admin()).stopImpersonating(this.state)
   }
-
-  /** @deprecated Use `admin.listRoles`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  roles(...args: Parameters<AdminMethods<Role>['listRoles']>): ReturnType<AdminMethods<Role>['listRoles']> {
-    return this.listRoles(...args)
-  }
-
-  /** @deprecated Use `admin.listAuditLog`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async auditLog(...args: Parameters<AdminMethods<Role>['listAuditLog']>): ReturnType<AdminMethods<Role>['listAuditLog']> {
-    return this.listAuditLog(...args)
-  }
 }

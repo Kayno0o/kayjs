@@ -663,7 +663,6 @@ function activeMarks(options: {
   onActiveChange: () => ((event: {
     index: null | number;
   }) => unknown) | undefined;
-  onActive: () => ((index: null | number) => unknown) | undefined;
 }): {
   current: () => null | number;
   anchor: () => null | {

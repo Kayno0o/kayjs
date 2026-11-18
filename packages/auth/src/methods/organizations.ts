@@ -94,34 +94,4 @@ export class OrganizationMethods<OrgRole extends string = string> {
   async rejectInvitation(invitationId: string): Promise<Result<object, 'signed-out' | 'impersonating' | 'not-found'>> {
     return (await load.organizations()).declineInvitation(this.state, invitationId)
   }
-
-  /** @deprecated Use `organizations.listMembers`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async members(...args: Parameters<OrganizationMethods<OrgRole>['listMembers']>): ReturnType<OrganizationMethods<OrgRole>['listMembers']> {
-    return this.listMembers(...args)
-  }
-
-  /** @deprecated Use `organizations.updateMemberRoles`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async setMemberRoles(...args: Parameters<OrganizationMethods<OrgRole>['updateMemberRoles']>): ReturnType<OrganizationMethods<OrgRole>['updateMemberRoles']> {
-    return this.updateMemberRoles(...args)
-  }
-
-  /** @deprecated Use `organizations.deleteMember`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async removeMember(...args: Parameters<OrganizationMethods<OrgRole>['deleteMember']>): ReturnType<OrganizationMethods<OrgRole>['deleteMember']> {
-    return this.deleteMember(...args)
-  }
-
-  /** @deprecated Use `organizations.listInvitations`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async invitations(...args: Parameters<OrganizationMethods<OrgRole>['listInvitations']>): ReturnType<OrganizationMethods<OrgRole>['listInvitations']> {
-    return this.listInvitations(...args)
-  }
-
-  /** @deprecated Use `organizations.listMyInvitations`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async myInvitations(...args: Parameters<OrganizationMethods<OrgRole>['listMyInvitations']>): ReturnType<OrganizationMethods<OrgRole>['listMyInvitations']> {
-    return this.listMyInvitations(...args)
-  }
-
-  /** @deprecated Use `organizations.getInvitation`. Removed in 1.108.0; `deprecated-auth-methods` rewrites it. */
-  async invitation(...args: Parameters<OrganizationMethods<OrgRole>['getInvitation']>): ReturnType<OrganizationMethods<OrgRole>['getInvitation']> {
-    return this.getInvitation(...args)
-  }
 }

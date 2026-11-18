@@ -37,6 +37,3 @@ export function test(_site?: TestSite): AiTest {
     embedding: (answer, when) => fakeAi.embedding(answer, when),
   }
 }
-
-/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
-export const aiTest = test

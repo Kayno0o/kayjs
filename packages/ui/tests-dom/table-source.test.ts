@@ -231,7 +231,7 @@ describe('Table over a list', () => {
     const wait = deferred<Planet[]>()
     const feed = infiniteList<Planet>([], { limit: 2, load: async () => wait.promise })
 
-    mounted = await mountComponent(Table, { columns: [{ key: 'name', header: 'Name', sortValue: true }], list: feed, rowKey: 'id', sort: { key: 'name', direction: 'asc' } })
+    mounted = await mountComponent(Table, { columns: [{ key: 'name', header: 'Name', sortValue: true }], items: feed, rowKey: 'id', sort: { key: 'name', direction: 'asc' } })
     await settle()
 
     expect(skeletons(mounted.root)).toBe(5)
@@ -249,7 +249,7 @@ describe('Table over a list', () => {
       throw new Error('down')
     } })
 
-    mounted = await mountComponent(Table, { columns: [{ key: 'name', header: 'Name', sortValue: true }], list: feed, rowKey: 'id', sort: { key: 'name', direction: 'asc' } })
+    mounted = await mountComponent(Table, { columns: [{ key: 'name', header: 'Name', sortValue: true }], items: feed, rowKey: 'id', sort: { key: 'name', direction: 'asc' } })
     await settle()
 
     expect(mounted.root.querySelectorAll('[role="alert"]')).toHaveLength(1)
@@ -308,7 +308,7 @@ describe('VirtualList over a list', () => {
     const wait = deferred<string[]>()
     const feed = infiniteList<string>([], { limit: 2, load: async () => wait.promise })
 
-    mounted = await mountComponent(VirtualList, { list: feed, label: 'Planets', item: (name: string) => name })
+    mounted = await mountComponent(VirtualList, { items: feed, label: 'Planets', item: (name: string) => name })
     void feed.restart({})
     await settle()
 
@@ -460,7 +460,7 @@ describe('the empty text of a Table', () => {
     const wait = deferred<Planet[]>()
     const feed = infiniteList<Planet>([], { limit: 2, load: async () => wait.promise })
 
-    mounted = await mountComponent(Table, { columns: COLUMNS, list: feed, rowKey: 'id' })
+    mounted = await mountComponent(Table, { columns: COLUMNS, items: feed, rowKey: 'id' })
 
     expect(empty(mounted.root)).toBe('No rows.')
 

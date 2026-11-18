@@ -125,9 +125,6 @@ interface Delivery
   rejected: string[]
   response?: string | undefined
 
-[.] enqueue
-function enqueue<P extends object>(message: MailMessage<P>, options?: EnqueueOptions | undefined): Promise<string>
-
 [.] Envelope
 interface Envelope
   attachments?: MailAttachment[] | undefined
@@ -463,9 +460,6 @@ interface ResendSettings extends ProviderSettings
   apiKey: string
   baseUrl?: string | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-
-[.] send
-function send<P extends object>(message: MailMessage<P>): Promise<Delivery>
 
 [.] sendgrid
 function sendgrid(settings: SendgridSettings): Transport
@@ -819,10 +813,6 @@ function sqliteMail(path: string): MailStore
 
 [./sqlite] sqliteSuppressions
 function sqliteSuppressions(path: string): SuppressionStore
-
-[./test] mailTest
-/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
-function mailTest(site: Pick<TestSite, "runJobs">): MailTest
 
 [./test] MailTest
 interface MailTest extends Pick<Outbox, 'last' | 'to' | 'find' | 'links' | 'link' | 'token'>

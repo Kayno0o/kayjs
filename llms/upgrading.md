@@ -62,6 +62,37 @@ A bare `persisted(name, value)` is `persisted.cookie(name, value)`, and `persist
 ### The old readers of a source are gone
 
 `value()`, `last()`, `rows()` (of a `resource`, `stream`, `socket`, `local()` and `infiniteList()`, and a list of your own given to `LoadMore`, `Table` or `VirtualList`), `unsynced()`, `syncStatus()`, `onSuccess` and `onSync` of a source or a `track()` handle, and an action's `succeeded()` are `data()`, `sync.queued()`, `sync.status()` and `onData({ value })` (an action's `succeeded()` is `data()`). The `deprecated-source-readers` lint is gone.
+### kayjs-auth drops its 1.105 names
+
+- `organizations.members()`, `setMemberRoles()`, `removeMember()`, `invitations()`, `myInvitations()` and `invitation()`, `admin.roles()` and `auditLog()`, `oauthServer.clients()`, `passkeys.rename()`, `account.changeUsername()`, `profile()` and `saveProfile()`, `oauth.identities()` and `providerToken()`, `magicLink.signInWithCode()`, and the methods that sat on `auth` (`requireAdmin()`, `captchaRequired()`, `captchaChallenge()`, `provedLately()`, `reprove()`, `scopes()`, `hasScope()`, `oauthResource()`, `oauthOrigin()`, `oauthFixed()`) no longer exist: write the names of the 1.105.0 section below. `deprecated-auth-methods` is gone, so run `kay upgrade` on 1.108 first, which renames the calls.
+- `rateLimit` takes the grouped form only: the flat keys `signInAccount`, `signInAccountAll`, `resendAccount`, `forgotAccount`, `magicLinkAccount`, `emailChangeAccount`, `twoFactorAccount`, `emailCodeAccount`, `inviteAddress`, `oauthRegister`, `oauthRegisterAll`, `oauthDocument` and `oauthToken` throw at startup, naming the group to write (`signIn: { account }`, `oauth: { token }`). `deprecated-auth-rate-limits` is gone.
+- `SignedIn(role=...)` is `SignedIn(require=...)`, and the `SignedOut` component and kayjs-auth's `isSignedOut` are removed: put the children in an `@else` block of a `SignedIn`. `deprecated-auth-signed` is gone.
+
+### kayjs-mail drops `send`, `enqueue` and its own `SubscribeForm`
+
+- `send` and `enqueue` are no longer exported from `@kayjs/mail` (`registeredMailer` went in 1.105): a page, an action or a guard sends through `ctx.locals.mail.send(...)` or `.enqueue(...)`, a job or a script through the mailer of `src/mail.ts`. `deprecated-mail-send` is gone.
+- `@kayjs/mail/subscribe-form.kay` does not resolve: import `SubscribeForm` from `@kayjs/ui/subscribe-form.kay`, which takes the same props. `deprecated-mail-form` is gone, so run `kay upgrade` on 1.108 first to have the import rewritten.
+
+### kayjs-ai drops its 1.105 props and options
+
+- The `<key>Label` props of `Chat`, `ChatLauncher` and `ChatPanel` (`sendLabel`, `stopLabel`, `openLabel`, `attachTooBigLabel`...) are not read: write one `labels` object keyed as the `ai.chat.<key>` messages are, `labels={{ send: 'Go' }}`; `waitingLabel` and `failureLabel` are `labels.thinking` and `labels.error`. The `ChatLabelProps` and `ChatLauncherLabelProps` types are removed. `deprecated-ai-labels` is gone.
+- `Chat`'s `links` and `Sources`' `here` are not read: `links="apart"` is `newTab={true}` (the default), `links="here"` and `here` are `newTab="auto"`. `deprecated-ai-links` is gone.
+- `language` in the options of `transcribe()` and `describeImage()` is not read: write `locale`, a BCP 47 tag. `deprecated-ai-language` is gone.
+
+### kayjs-cms drops `role`, `member` and a list `uploads`
+
+- `cms({ role: 'editor' })` is `cms({ access: 'editor' })`, and `cms({ member })` is folded into an `access` function, which admits and names the person in one: `access: ({ locals }) => locals.user && { name: locals.user.email, roles: locals.user.roles }`. Both throw as unknown options now. A `guard` of your own stays, for what `access` cannot say, and holds no role. `deprecated-cms-options` is gone, so `guard: passwordGuard(password)` is `access: { password }` by hand.
+- `uploads: ['image/*']` is `uploads: { types: ['image/*'] }`.
+
+### kayjs-ui drops its 1.105 names
+
+- `onChange` on an Accordion, a Tabs and a ThemeToggle is `onValueChange({ value })`, a ZoomPane's is `onPlateChange({ plate })`, a Table's `onSort` is `onSortChange({ sort })` and a chart's `onActive` is `onActiveChange({ index })`: each takes one event object, and the old names are not called. `deprecated-ui-callbacks` is gone.
+- The list a component draws is `items`: `tabs`, `avatars`, `entries`, `links`, `steps`, `icons` and `slides` are not read on Tabs, AvatarGroup, CommandPalette, Timeline, SideNav, SiteNav, AppHeader, Steps, IconPicker and Carousel, nor the `list` of an infinite source on Table, Carousel, Masonry, MediaGallery, VirtualList and LoadMore. `deprecated-ui-items` is gone.
+- `deprecated-ui-input` is gone: a Toggle, Checkbox, Slider, ColorInput, Combobox or DateInput keeps its `id`, `title` and `data-*` on its root, as since 1.105, and `inputProps` is the way to reach the input.
+
+### The old test helper names are gone
+
+- `aiTest`, `mailTest`, `cmsTest` and `authTest` are not exported by the libraries' `/test` entries: import `test` (`import { test as mailTest } from '@kayjs/mail/test'`). `site.refusal(...)` is `site.expectRefused(...)` and `site.socketRefusal(...)` is `site.socket.refused(...)`. `deprecated-test-helpers` is gone.
 
 ## 1.108.0
 

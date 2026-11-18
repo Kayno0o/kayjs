@@ -26,7 +26,7 @@ const look = recipe({
   },
 })
 
-const { items, avatars: oldAvatars, max = 4, size = 'md', label, moreLabel, moreHref, placement = 'bottom-start', open, onOpenChange, loadingLabel = wording('ui.avatarGroup.loading', 'Loading…'), retryLabel = wording('ui.avatarGroup.retry', 'Try again'), failureLabel = wording('ui.avatarGroup.failure', 'Could not load the people'), onLoad, onError, avatar, rest: drawRest, panelProps = {}, triggerProps = {}, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onLoad' | 'onError'> & {
+const { items, max = 4, size = 'md', label, moreLabel, moreHref, placement = 'bottom-start', open, onOpenChange, loadingLabel = wording('ui.avatarGroup.loading', 'Loading…'), retryLabel = wording('ui.avatarGroup.retry', 'Try again'), failureLabel = wording('ui.avatarGroup.failure', 'Could not load the people'), onLoad, onError, avatar, rest: drawRest, panelProps = {}, triggerProps = {}, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onLoad' | 'onError'> & {
   // How many avatars are drawn before the overflow chip takes the rest; the chip is left out when they all fit.
   max?: number | undefined
   // Every avatar's size, whatever the entries say, the chip's included.
@@ -55,19 +55,12 @@ const { items, avatars: oldAvatars, max = 4, size = 'md', label, moreLabel, more
   panelProps?: PopoverPanelProps | undefined
   // Attributes of the button that opens the panel, written before the ones that open it; `...rest` stays on the root.
   triggerProps?: PopoverButtonProps | undefined
-} & (
-  {
-    // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the group busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
-    items: OptionsSource<GroupedAvatar>
-    avatars?: undefined
-  } | {
-    // @deprecated Since 1.105, `items`: `deprecated-ui-items` writes the new name, and this one works until 1.108.
-    avatars: OptionsSource<GroupedAvatar>
-    items?: undefined
-  }
-)>()
+} & {
+  // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the group busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
+  items: OptionsSource<GroupedAvatar>
+}>()
 
-const source = loadOptions<GroupedAvatar>(() => (items ?? oldAvatars)!, { onLoad, onError, label: 'AvatarGroup' })
+const source = loadOptions<GroupedAvatar>(() => items, { onLoad, onError, label: 'AvatarGroup' })
 
 // A max that is no whole number counts as none.
 const limit = () => Math.max(0, Math.floor(max) || 0)

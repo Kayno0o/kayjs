@@ -248,7 +248,7 @@ export interface AuthExtensionOptions extends AuthPagesOptions {
   server?: (() => PluginInput | Promise<PluginInput>) | false | undefined
   // `false` leaves out the prebuilt pages and serves the plugin alone, for an app writing every page itself. `true` by default.
   pages?: boolean | undefined
-  // Templates read `ctx.user`, `ctx.can(role)` and `ctx.impersonator` with no option, as `SignedIn`, `SignedOut`, `UserMenu` and `ImpersonationBanner` do, the session being read before the render of each page reaching one of them and of no other. `true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
+  // Templates read `ctx.user`, `ctx.can(role)` and `ctx.impersonator` with no option, as `SignedIn`, `UserMenu` and `ImpersonationBanner` do, the session being read before the render of each page reaching one of them and of no other. `true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
   viewer?: boolean | undefined
 }
 

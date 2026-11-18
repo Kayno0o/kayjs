@@ -85,13 +85,13 @@ export async function viewerValues(request: Request): Promise<ViewerValues> {
   return { user, impersonator: user && (impersonators.get(request) ?? null), deletion: user && (deletions.get(request) ?? null), can: requirement => user !== null && viewer !== undefined && holds(requirement, user, viewer.isGranted) }
 }
 
-// The auth and role check of the page being rendered, for `SignedIn`, `SignedOut` and `UserMenu`.
+// The auth and role check of the page being rendered, for `SignedIn` and `UserMenu`.
 export function currentViewer(): Viewer & { request: Request } {
   const request = requestReader?.()
   const viewer = request && viewers.get(request)
 
   if (!viewer)
-    throw new KayError('outside-request', 'kayjs-auth: SignedIn, SignedOut, UserMenu, SignInLink and SignOutButton read the signed-in user of the request being answered, so they cannot render in a prerendered page or outside a request; render the page per request (`prerender: false`)')
+    throw new KayError('outside-request', 'kayjs-auth: SignedIn, UserMenu, SignInLink and SignOutButton read the signed-in user of the request being answered, so they cannot render in a prerendered page or outside a request; render the page per request (`prerender: false`)')
 
   return { ...viewer, request }
 }
@@ -124,15 +124,4 @@ export function claimBanner(banner = 'impersonation'): boolean {
   drawn.add(banner)
 
   return free
-}
-
-// Whether the page being rendered is for a visitor with no account or a guest, `SignedOut` showing its children.
-export function isSignedOut(): boolean | Promise<boolean> {
-  const user = currentUser()
-
-  return user instanceof Promise ? settled(user) : user === null
-}
-
-async function settled(user: Promise<BareUser | null>): Promise<boolean> {
-  return await user === null
 }

@@ -55,7 +55,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = uses('stacked') ? wording('ui.barChart.total', 'Total') : '', legend, marks: events, onMark, goals, max, emptyLabel, empty, onSelect, href, newTab, onActiveChange, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = uses('stacked') ? wording('ui.barChart.total', 'Total') : '', legend, marks: events, onMark, goals, max, emptyLabel, empty, onSelect, href, newTab, onActiveChange, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   labels: string[]
   series: BarSeries[]
   // Formats the y-axis labels, the tooltips and the readings screen readers hear.
@@ -86,8 +86,6 @@ const { labels, series, formatValue = (value: number) => formatNumber(value), fo
   newTab?: NewTab | undefined
   // Hears the index of the column the pointer or the focus is on, `null` when it leaves.
   onActiveChange?: ((event: { index: number | null }) => unknown) | undefined
-  // @deprecated Since 1.105, `onActiveChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
-  onActive?: ((index: number | null) => unknown) | undefined
   // The column to draw as active, `null` for none; the app controls it when it gives it, and the pointer and focus then only report through `onActiveChange`.
   active?: number | null | undefined
   // Replaces the tooltip under the pointer or focus with the app's own content for that column, drawn by the chart where the column is.
@@ -182,7 +180,7 @@ function keyDown(event: KeyboardEvent) {
 }
 
 const mark = (at: number): ChartMark => ({ index: at, label: labels[at]!, values: series.map(item => item.values[at] ?? null) })
-const marks = activeMarks({ active: () => uses('active') ? active : undefined, onActiveChange: () => uses('onActiveChange') ? onActiveChange : undefined, onActive: () => uses('onActive') ? onActive : undefined })
+const marks = activeMarks({ active: () => uses('active') ? active : undefined, onActiveChange: () => uses('onActiveChange') ? onActiveChange : undefined })
 const tip = uses('tooltip') ? chartTooltip() : undefined
 
 const link = uses('href')

@@ -1,6 +1,6 @@
 ---
 import type { Snippet } from 'kay'
-import type { ChatLauncherLabelProps, ChatLauncherLabels } from './types'
+import type { ChatLauncherLabels } from './types'
 import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import BareIconButton from '@kayjs/ui/bare-icon-button.kay'
@@ -9,7 +9,7 @@ import { eventText } from './chat-events'
 
 const look = recipe({ parts: { root: 'kai-launcher', new: 'kai-launcher-action', expand: 'kai-launcher-action kai-launcher-expand', close: 'kai-launcher-action' } })
 
-const { labels = {}, label = wording('ai.chat.label', 'Chat'), openLabel = labels.open ?? wording('ai.chat.open', 'Open the chat'), closeLabel = labels.close ?? wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = labels.new ?? wording('ai.chat.new', 'New conversation'), expandLabel = labels.expand ?? wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = labels.collapse ?? wording('ai.chat.collapse', 'Shrink the chat'), open: wanted, onOpenChange, hash = '#chat' } = props<{
+const { labels = {}, label = wording('ai.chat.label', 'Chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, open: wanted, onOpenChange, hash = '#chat' } = props<{
   // Names the panel for screen readers and heads it.
   label?: string | undefined
   // The texts of the buttons, by key: `open` and `close` are the name and tooltip of the button while the panel is closed and while it is open, `new` clears the conversation, `expand` and `collapse` switch the size.
@@ -27,7 +27,13 @@ const { labels = {}, label = wording('ai.chat.label', 'Chat'), openLabel = label
   onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // The address fragment that opens the panel, on load and whenever it changes to it; `false` for none.
   hash?: string | false | undefined
-} & Pick<ChatLauncherLabelProps, 'openLabel' | 'closeLabel' | 'newLabel' | 'expandLabel' | 'collapseLabel'>>()
+}>()
+
+const openLabel = labels.open ?? wording('ai.chat.open', 'Open the chat')
+const closeLabel = labels.close ?? wording('ai.chat.close', 'Close the chat')
+const newLabel = labels.new ?? wording('ai.chat.new', 'New conversation')
+const expandLabel = labels.expand ?? wording('ai.chat.expand', 'Enlarge the chat')
+const collapseLabel = labels.collapse ?? wording('ai.chat.collapse', 'Shrink the chat')
 
 const open = signal(wanted === true)
 const large = signal(false)
