@@ -249,6 +249,8 @@ export function ambientHelpers(facts: { ambientForm: boolean, snippet: boolean, 
   return [...facts.ambientForm ? ['formHere' as const, 'formError' as const] : [], ...mode === 'dom' && facts.snippet && facts.forms.size > 0 ? ['issueScope' as const] : []]
 }
 
+const BOUND = /^bind:/
+
 // The props a use writes, as the object type `KayFunctionProp` takes after the component; none for a use with a spread, which may carry any.
 export function usedProps(element: ElementNode, text: (span: Span) => string): string {
   if (element.attributes.some(attribute => attribute.kind === 'spread'))
@@ -256,5 +258,5 @@ export function usedProps(element: ElementNode, text: (span: Span) => string): s
 
   const names = [...element.attributes.flatMap(attribute => attribute.kind === 'spread' ? [] : [attribute.name]), ...element.children.flatMap(child => child.kind === 'slot' ? [child.name] : [])]
 
-  return `, { ${names.map(name => `${JSON.stringify(text(name))}: 0`).join(', ')} }`
+  return `, { ${names.map(name => `${JSON.stringify(text(name).replace(BOUND, ''))}: 0`).join(', ')} }`
 }

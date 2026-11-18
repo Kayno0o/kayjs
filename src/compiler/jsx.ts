@@ -879,7 +879,7 @@ export class JsxTemplate {
     let at = start
 
     if (sent.functions) {
-      this.emitFunctionPropCheck(element, attribute.name)
+      this.emitFunctionPropCheck(element, attribute.name, false)
       b.add(' ')
     }
 
@@ -904,9 +904,9 @@ export class JsxTemplate {
   }
 
   // Reports a function passed to an island, `0` standing for the prop.
-  // The props the use writes go along, as an object type, so an island that lists its interactive props takes a function from a use turning none of them on; a spread may carry any, so it sends none.
-  private emitFunctionPropCheck(element: ElementNode, name: Span) {
-    this.b.add('{...KayFunctionProp(').addSource(element.tag).add(usedProps(element, span => this.text(span))).add(')(').wrap(name, () => this.b.add('0')).add(')}')
+  // The props the use writes go along, as an object type, so an island that lists its interactive props takes a function from a use turning none of them on; a spread may carry any, so it sends none, and a function inside a literal value sends none either, as it is never sent.
+  private emitFunctionPropCheck(element: ElementNode, name: Span, whole = true) {
+    this.b.add('{...KayFunctionProp(').addSource(element.tag).add(whole ? usedProps(element, span => this.text(span)) : '').add(')(').wrap(name, () => this.b.add('0')).add(')}')
   }
 
   // `bind:value={name}` reads the signal and writes it back from the matching input event.
