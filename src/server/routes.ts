@@ -246,6 +246,8 @@ export async function contextReadsOf(routesDir: string, mounts: RouteMount[]): P
 
   await scanRoutes(routesDir, mounts, reads)
   await specialPagesOf(routeTrees(routesDir, mounts), '', reads)
+  await scanEndpoints(routesDir, mounts, reads)
+
   return reads
 }
 
