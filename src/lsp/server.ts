@@ -445,9 +445,10 @@ export class KayLanguageServer implements LspHost {
     for (const path of Object.keys(require.cache)) {
       if (path.startsWith(root) && !path.startsWith(OWN_MODULES) && !path.split(sep).includes('node_modules'))
         delete require.cache[path]
-
-      forgetEnvCalls(path)
     }
+
+    // Whether or not each module reached the cache: one that threw on load declared before it threw.
+    forgetEnvCalls(root)
 
     const config = await projectConfig(project.root)
 

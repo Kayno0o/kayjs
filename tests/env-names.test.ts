@@ -1,9 +1,9 @@
-import { rm } from 'node:fs/promises'
+import { rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { listEnv } from '../src/commands/env'
 import { forgetModules } from '../src/server/bundle'
-import { buildingWithoutEnv, forgetEnvCalls } from '../src/server/env-state'
+import { buildingWithoutEnv, forgetEnvCalls, listingEnv } from '../src/server/env-state'
 import { scratchDir } from './scratch'
 
 const dirs: string[] = []
@@ -69,6 +69,25 @@ describe('the variables of one project\'s listing', () => {
     const names = (await listEnv(root)).variables.map(variable => variable.name)
 
     expect(names).toEqual(expect.arrayContaining(['WRAPPED_A', 'WRAPPED_B', 'LOOPED_A', 'LOOPED_B']))
+  })
+
+  it('forget the calls of a file reached through a link and of every file under a folder', async () => {
+    buildingWithoutEnv()
+
+    const root = await project({ 'real/a.ts': '', 'real/sub/b.ts': '' })
+    const link = join(root, 'link')
+
+    await symlink(join(root, 'real'), link)
+
+    const calls = listingEnv()
+    const schema = { properties: {} }
+
+    calls.length = 0
+    calls.push({ schema, file: join(root, 'real/a.ts') }, { schema, file: join(root, 'real/sub/b.ts') }, { schema, file: undefined })
+    forgetEnvCalls(join(link, 'a.ts'))
+    expect(calls.map(({ file }) => file)).toEqual([join(root, 'real/sub/b.ts'), undefined])
+    forgetEnvCalls(link)
+    expect(calls.map(({ file }) => file)).toEqual([undefined])
   })
 
   it('list only what a module declares once it is read again with another schema', async () => {

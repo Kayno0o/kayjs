@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { dirname, join, sep } from 'node:path'
 
 // What the environment loader and the commands that run without it share, apart from `./env` so `kay check` and the editor load no Elysia.
 // On the global object, so a copy of kay the app loads beside the CLI's sees it too.
@@ -60,17 +60,28 @@ export function recordEnv(schema: EnvSchemaRecord, declaredBy: (...args: never[]
   found.push({ schema, file: callerFile(declaredBy) })
 }
 
-// A module read again declares afresh: what it declared before is dropped, whatever the stack of each load.
-export function forgetEnvCalls(file: string): void {
+function realOf(path: string): string {
+  try {
+    return realpathSync(path)
+  }
+  catch {
+    return path
+  }
+}
+
+// A module read again declares afresh: what it declared before is dropped, whatever the stack of each load. A folder drops every module under it, a path through a link matches the file it leads to, and a file that no longer loads or exists is dropped all the same.
+export function forgetEnvCalls(path: string): void {
   const found = (globalThis as { [LISTED]?: DeclaredEnv[] })[LISTED]
 
   if (found === undefined)
     return
 
-  const path = file.replace(QUERY, '')
+  const target = realOf(path.replace(QUERY, ''))
 
   for (let index = found.length - 1; index >= 0; index--) {
-    if (found[index]!.file === path)
+    const file = found[index]!.file
+
+    if (file !== undefined && (realOf(file) === target || realOf(file).startsWith(`${target}${sep}`)))
       found.splice(index, 1)
   }
 }
