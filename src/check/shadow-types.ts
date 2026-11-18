@@ -9,13 +9,13 @@ import type { ApiModule } from '../server/api-modules'
 import type { PublicFile } from '../server/public'
 import type { Endpoint, Route, RouteMount } from '../server/routes'
 import type { ShadowFile, ShadowOptions, ShadowSettings } from './shadow'
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { lstat, mkdir, readdir, readlink, rm, symlink, unlink } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
 import { findKayFiles, inWalkScope, treeEntries, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
-import { extensionPackages, findKayLibraries, libraryOf, reachableLibraryFiles, throughNodeModules } from '../build/libraries'
+import { extensionPackages, findKayLibraries, libraryOf, linkedOutside, reachableLibraryFiles, throughNodeModules } from '../build/libraries'
 import { packageContextModule } from '../build/manifests'
 import { isPageFile, mountedPageDirs } from '../build/page-dirs'
 import { importedSignals } from '../build/signals'
@@ -389,7 +389,7 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   const { routes: routesDir, cache: cacheDir } = projectPaths(root, options)
   const libraries = await findKayLibraries(root)
   // The app's own directories are checked already; a linked library has its real path outside any `node_modules`, an installed one inside.
-  const linked = (path: string) => !ownFile(root, path) && existsSync(path) && !realpathSync(path).split(sep).includes('node_modules')
+  const linked = (path: string) => linkedOutside(root, path)
   const local = mounts.filter(mount => linked(mount.dir))
   const diagnostics: CheckDiagnostic[] = []
   const editor = editorOf(root, options.extensions, diagnostics)

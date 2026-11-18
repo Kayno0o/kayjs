@@ -1,10 +1,10 @@
 import type { KayExtension } from '../config'
 import type { ImportGraph, KayLibrary } from './libraries'
-import { existsSync, realpathSync } from 'node:fs'
-import { dirname, relative, sep } from 'node:path'
+import { existsSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { extensionEditor, routeMounts } from '../server/routes'
 import { findKayFiles } from './files'
-import { extensionPackages, findKayLibraries, reachableLibraryFiles } from './libraries'
+import { extensionPackages, findKayLibraries, linkedOutside, reachableLibraryFiles } from './libraries'
 
 export interface BuildFiles {
   // The project's own components, the pages of the libraries it mounts and the components of the libraries it reaches, in that order.
@@ -28,9 +28,8 @@ export async function buildFiles(root: string, extensions: KayExtension[] | unde
   const mounted = [...new Set([...mountedFiles, ...editor === undefined ? [] : [editor]])].filter(file => !ownFiles.has(file))
   const installed = await findKayLibraries(root)
   // An extension reached with no dependency on it, as a workspace link or a folder above the root, is a library whose islands the pages it wraps still render.
-  const outside = (path: string) => existsSync(path) && relative(root, path).startsWith('..') && !realpathSync(path).split(sep).includes('node_modules')
-  const mountDirs = mounts.filter(mount => mount.reaching !== 'context' && outside(mount.dir)).map(mount => mount.dir)
-  const libraries = [...installed, ...await extensionPackages(root, installed, [...mountDirs, ...editor === undefined || !outside(editor) ? [] : [dirname(editor)]])]
+  const mountDirs = mounts.filter(mount => mount.reaching !== 'context' && linkedOutside(root, mount.dir)).map(mount => mount.dir)
+  const libraries = [...installed, ...await extensionPackages(root, installed, [...mountDirs, ...editor === undefined || !linkedOutside(root, editor) ? [] : [dirname(editor)]])]
   const fromLibraries = await reachableLibraryFiles(root, libraries, [...own, ...mounted], graph)
 
   return { files: [...own, ...mounted, ...fromLibraries.components], own, mounted, editor, libraries, fromLibraries }

@@ -222,6 +222,13 @@ export function packageRoot(dir: string): string {
   }
 }
 
+// Whether `path` exists outside the project's own files and is no install: a linked library or a folder above the root, whose real path is outside any `node_modules`.
+export function linkedOutside(root: string, path: string): boolean {
+  const own = relative(resolve(root), path)
+
+  return (own.startsWith('..') || own.split(sep).includes('node_modules')) && existsSync(path) && !realpathSync(path).split(sep).includes('node_modules')
+}
+
 // The package holding each of `extensionDirs`, an extension's routes or its editor's directory, that no kay library holds, the nearest directory above them with a package.json, as a library: its components are shadowed and reached as one's are.
 export async function extensionPackages(root: string, libraries: KayLibrary[], extensionDirs: string[]): Promise<KayLibrary[]> {
   const dirs = new Set(extensionDirs.filter(dir => libraryOf(libraries, join(dir, 'page.kay')) === undefined).map(packageRoot))
@@ -236,7 +243,7 @@ export async function extensionPackages(root: string, libraries: KayLibrary[], e
   }))
 }
 
-// The library holding `file`, by its path under `node_modules` or its real one: the deepest, for a library installed inside another's `node_modules`.
+// Whether the package.json at `manifest` names a package.
 function namesPackage(manifest: string): boolean {
   try {
     return typeof (JSON.parse(readFileSync(manifest, 'utf8')) as { name?: unknown }).name === 'string'
@@ -246,6 +253,7 @@ function namesPackage(manifest: string): boolean {
   }
 }
 
+// The library holding `file`, by its path under `node_modules` or its real one: the deepest, for a library installed inside another's `node_modules`.
 export function libraryOf(libraries: KayLibrary[], file: string): KayLibrary | undefined {
   const holding = (dir: string) => file.startsWith(dir + sep) ? dir.length : 0
 
