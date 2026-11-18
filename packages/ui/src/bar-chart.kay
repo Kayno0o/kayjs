@@ -3,7 +3,7 @@ import type { JSX, Snippet } from 'kay'
 import type { LabelFormat } from './chart-axis'
 import type { BarSeries } from './plot'
 import type { ChartEvent, ChartGoal, ChartMark } from './chart-marks'
-import { memo, recipe, signal } from 'kay'
+import { memo, onCleanup, recipe, signal } from 'kay'
 import { tabOf } from './outside'
 import type { NewTab } from './outside'
 import type { PlacedEvent } from './chart-marks'
@@ -27,7 +27,7 @@ const look = recipe({
     bar: 'min-h-px min-w-px flex-1 rounded-t-sm data-stub:h-1 data-stacked:flex-none data-stacked:rounded-none',
     axis: 'relative ml-10 h-[1lh] text-2xs',
     // A shown label is as wide as its text, centred on its column; the first and the last line up with the plot's edges, so a label wider than its column spills inward and not out of the figure.
-    axisLabel: 'absolute top-0 -translate-x-1/2 data-[edge]:translate-x-0 rtl:translate-x-1/2 rtl:data-[edge]:translate-x-0 text-2xs whitespace-nowrap text-[var(--color-muted)]',
+    axisLabel: 'absolute top-0 -translate-x-1/2 data-[edge]:translate-x-0 rtl:translate-x-1/2 rtl:data-[edge]:translate-x-0 data-collides:invisible text-2xs whitespace-nowrap text-[var(--color-muted)]',
     // The parts of a feature no call site writes stay out of the island's code (`uses`).
     ...(uses('marks'))
       ? {
@@ -120,6 +120,40 @@ const axisAt = uses('xLabels')
   }
   : undefined
 const edge = uses('xLabels') ? (at: number) => labels.length < 2 ? undefined : at === 0 ? 'start' : at === labels.length - 1 ? 'end' : undefined : undefined
+// A label that would run into the one before it, by its real width, is hidden, so with few columns and wide labels the flush first and last labels never overlap a neighbour: an edge label stays and hides the middle ones it meets, the first keeping its place against the last.
+const thin = uses('xLabels')
+  ? (axis: HTMLElement) => {
+    const boxes = new Map([...axis.children].map(node => [node as HTMLElement, node.getBoundingClientRect()]))
+    const kept: HTMLElement[] = []
+    const meets = (node: HTMLElement, other: HTMLElement) => boxes.get(node)!.left < boxes.get(other)!.right + 4
+
+    for (const node of [...boxes.keys()].sort((one, other) => boxes.get(one)!.left - boxes.get(other)!.left)) {
+      node.removeAttribute('data-collides')
+
+      while (node.dataset.edge !== undefined && kept.length > 0 && meets(node, kept.at(-1)!) && kept.at(-1)!.dataset.edge === undefined)
+        kept.pop()!.setAttribute('data-collides', '')
+
+      if (kept.length > 0 && meets(node, kept.at(-1)!))
+        node.setAttribute('data-collides', '')
+      else
+        kept.push(node)
+    }
+  }
+  : undefined
+const watchAxis = uses('xLabels')
+  ? (axis: HTMLElement) => {
+    const run = () => thin!(axis)
+    const observer = new ResizeObserver(run)
+
+    observer.observe(axis)
+
+    for (const node of axis.children)
+      observer.observe(node)
+
+    run()
+    onCleanup(() => observer.disconnect())
+  }
+  : undefined
 const colors = (item: BarSeries, index: number, at: number) => item.colors?.[at] ?? item.color ?? PALETTE[index % PALETTE.length]!
 // With several series each is also hatched by its place, so the bars and the legend are told apart without their colours.
 const fill = (item: BarSeries, index: number, at: number) => seriesFill(colors(item, index, at), index, series.length > 1)
@@ -272,7 +306,7 @@ else
       div(part="tooltip" ref={tip!.watch} style={tip!.place(marks.anchor()!)} aria-hidden="true")
         {tooltip(mark(marks.current()!))}
     if uses('xLabels') && xLabels
-      div(part="axis" aria-hidden="true" style={`${gaps()}; --axis-gap: min(var(--bar-gap, 0.25rem), calc(40% / var(--bar-gaps)))`})
+      div(part="axis" aria-hidden="true" ref={watchAxis} style={`${gaps()}; --axis-gap: min(var(--bar-gap, 0.25rem), calc(40% / var(--bar-gaps)))`})
         for at of shown!() key={at}
           span(part="axisLabel" data-edge={edge!(at)} style={axisAt!(at)}) {axisTexts!()[at]}
     if legend ?? series.length > 1
