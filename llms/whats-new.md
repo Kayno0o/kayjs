@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- An endpoint file (`src/routes/a.txt.ts`) no longer stops an app with a root `_guard.ts` and an extension layout that reaches files, as kayjs-auth's, from starting or passing `kay check` (`the layouts of the extensions are placed before what the pages reach was opened`): the endpoints are scanned after what the pages reach is open, as the pages are
+- An endpoint file (`src/routes/a.txt.ts`) no longer stops an app with a root `_guard.ts` and an extension layout that reaches files, as kayjs-auth's, from starting or passing `kay check` (`the layouts of the extensions are placed before what the pages reach was opened`): the endpoints are scanned after what the pages reach is open, as the pages are.
 - `kay env` and `kay check` list the variables of a `defineEnv` module that kay.config.ts imports, as for any other module, so a variable required in production and missing from `.env.example` is reported ([environment](environment.md)).
 - kayjs-ui's centred modal `Dialog` is as tall as its content again, capped at the viewport less 2rem (`size="full"` still fills it), and the opened dialog box no longer draws a browser focus ring round itself (a regression of the 1.105 placement change).
 - An island reading a `queryParam` follows a swap that changes only the query, a link `?x=1` or a component's `param=` navigation, and Back and Forward, whatever its render mode: a signal made outside a component and shared by islands reads the address again after each swap and traversal, as one in a component does ([islands](islands.md#keep-a-filter-in-the-url)).
