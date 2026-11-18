@@ -23,6 +23,16 @@ describe('site.call and site.submit with an action fixing fields', () => {
     expect(await tally()).toBe(before + 5)
   })
 
+  it('has submit from a visited page post the form fixing the same fields', async () => {
+    const before = await tally()
+    const page = await site.visit('/lone')
+
+    await site.submit(bump.with({ by: 2 }), {}, { from: page })
+    await site.submit(bump, {}, { from: page })
+
+    expect(await tally()).toBe(before + 3)
+  })
+
   it('has submit from a path post them too', async () => {
     const before = await tally()
 

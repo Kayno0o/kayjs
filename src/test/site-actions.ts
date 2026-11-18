@@ -17,9 +17,12 @@ import { ORIGIN } from './site-scope'
 
 // The URL the form posting to `action` carries on a page, which the browser posts to.
 export function formUrl(page: PageReading, action: Pick<Action, 'url'>): URL | undefined {
-  const target = page.find('form').map(form => form.attributes.action).find(url => url !== undefined && new URL(url, ORIGIN).pathname.endsWith(action.url))
+  const found = page.find('form').flatMap(form => form.attributes.action === undefined ? [] : [new URL(form.attributes.action, ORIGIN)]).filter(url => url.pathname.endsWith(action.url))
+  const fixed = (action as { formUrl?: string }).formUrl
+  const wanted = fixed === undefined ? '' : new URL(fixed, ORIGIN).search
 
-  return target === undefined ? undefined : new URL(target, ORIGIN)
+  // A page may hold the action's form and its `with` forms: the one posted is the one fixing the same fields.
+  return found.find(url => url.search === wanted) ?? found[0]
 }
 
 // The stamp the form posting to `url` rendered with.
