@@ -95,7 +95,7 @@ describe('a stream retried', () => {
     third.finish(3)
     await eventually(() => expect(stream.status()).toBe('done'))
     expect(run.pending()).toBe(false)
-    expect(stream.last()).toBe(3)
+    expect(stream.data()).toBe(3)
   })
 
   it('is not cut by the timeout of the call, which counts for its first answer alone', async () => {
@@ -107,7 +107,7 @@ describe('a stream retried', () => {
     await eventually(() => expect(stream.status()).toBe('failed'))
     stream.retry()
     await eventually(() => expect(stream.status()).toBe('done'), 2000)
-    expect(stream.last()).toBe(9)
+    expect(stream.data()).toBe(9)
     expect(server.aborted()).toBe(0)
   })
 })
