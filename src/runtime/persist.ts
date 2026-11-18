@@ -29,6 +29,8 @@ export type Stored<T> = { found: true, value: T } | { found: false }
 // Where a kept signal's value lives: what the request being rendered holds, which the server renders with, none for a store only the browser sees; what the browser holds, and how it keeps a new value.
 export interface Store<T> {
   request?: ((scope: LoadScope) => Stored<T>) | undefined
+  // A store kept in the query: each read of it tells the render, which notes the island as reading the address.
+  query?: true | undefined
   stored: () => Stored<T>
   save: (value: T) => void
   // A store the server never sees: an island claiming its markup reads the value it rendered with, the kept one applying once it has hydrated.
@@ -116,7 +118,7 @@ export function keep<T>(store: Store<T>, read: () => T, write: (value: T) => voi
     return inBrowser(store, read, write)
 
   // Outside a browser build the page is told apart on use, not on creation: a module made before a test registers its DOM keeps its signal then.
-  const server = serverSide(store.request, read)
+  const server = serverSide(store.request, read, store.query)
   let browser: Persisted<T> | undefined
   const current = () => typeof document === 'undefined' ? server : browser ??= inBrowser(store, read, write)
 
@@ -175,7 +177,7 @@ function inBrowser<T>(store: Store<T>, read: () => T, write: (value: T) => void)
 }
 
 // The server reads the request being rendered once per request, until a render of it writes the signal.
-function serverSide<T>(request: Store<T>['request'], read: () => T): Persisted<T> {
+function serverSide<T>(request: Store<T>['request'], read: () => T, query?: true): Persisted<T> {
   const fromRequest = new WeakMap<LoadScope, Stored<T>>()
   const written = new WeakSet<LoadScope>()
 
@@ -186,7 +188,8 @@ function serverSide<T>(request: Store<T>['request'], read: () => T): Persisted<T
       if (!scope || !request)
         return read()
 
-      scope.read?.()
+      if (query)
+        scope.read?.()
 
       if (written.has(scope))
         return read()
