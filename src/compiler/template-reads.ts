@@ -173,6 +173,22 @@ export function templateWords(file: KayFile): string[] {
   return [...words]
 }
 
+// The names the template's expressions write, `count = 1`, `count += 1`, `count++` or `count.set(...)`; it over-approximates, a word before `=` in any expression counts.
+const WRITE = /([\w$]+)\s*(?:\.(?:set|update)\s*\(|(?:\*\*|<<|>>>?|&&|\|\||\?\?|[-+*/%&|^])?=(?![=>])|\+\+|--)|(?:\+\+|--)\s*([\w$]+)/g
+
+export function templateWrites(file: KayFile): Set<string> {
+  const names = new Set<string>()
+
+  visitNodes(file.template, (node) => {
+    for (const span of nodeExpressions(node)) {
+      for (const [, after, before] of file.source.slice(span.start, span.end).matchAll(WRITE))
+        names.add((after ?? before)!)
+    }
+  })
+
+  return names
+}
+
 // The child blocks of a node with the spans naming what each sees besides its parent's names: a loop's item and index, a snippet's or slot's parameters, a branch's alias.
 export function scopedBlocks(node: Node): [Node[], Span[]][] {
   switch (node.kind) {

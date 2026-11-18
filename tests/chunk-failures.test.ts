@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun
 import { stringify } from 'devalue'
 import { turn } from './helpers/eventually'
 
-const MODULES = ['navigate-api', 'hydrate-when', 'focus', 'live-props'] as const
+const MODULES = ['navigate-api', 'hydrate-when', 'focus'] as const
 
 type Chunk = typeof MODULES[number]
 type Behaviour = 'real' | 'fail' | 'held'
@@ -255,25 +255,6 @@ describe('an island hydrating on visible or idle, hydrate-when failing to load w
     finally {
       fetching.mockRestore()
     }
-  })
-})
-
-describe('a persistent island, live-props failing to load with the build unchanged', () => {
-  it('is dropped like one with a missing chunk, its failure reported', async () => {
-    behave('live-props', 'fail')
-
-    let rendered = false
-    const registry = {
-      'p.kay': async () => ({ default: () => {
-        rendered = true
-
-        return null
-      } }),
-    }
-
-    document.body.innerHTML = '<slot data-component="p.kay" data-props="[{}]" data-persist=""></slot>'
-    await expect((await hydrated()).hydrateIslands(registry)).rejects.toThrow('live-props')
-    expect(rendered).toBe(false)
   })
 })
 

@@ -291,6 +291,6 @@ if !connected()
 - A name inside a string or a whole-line comment of the file is no use of the component: only a tag or other code naming it keeps its import eager (a Table's `'Select all'` once kept its Select in every island). kayjs-ui's `Form`, `FormDialog` and `SaveForm` load the code that sends and reports a form (`forms-send`, with the toast it reports through) with the first send or blur check, tried once more when the chunk fails, so a page with a closed form-dialog does not carry it.
 - `kay/dom-lazy` is the compiler's output contract for it, not API. `kay build --analyze` lists the modules of every island, a lazy component's apart from the eager ones.
 
-A refresh, and a visit to a page with the same layout, keep an island and give it the new props in place: its state stays, and what it seeds from a prop is written `linked(() => prop)` to follow ([Navigation](navigation.md#islands-kept-across-pages)).
+A refresh, or a visit keeping its layout, keeps an island and gives it the new props in place; seed from a prop with `linked(() => prop)` ([Navigation](navigation.md#islands-kept-across-pages)).
 
 Shared and persisted state, transitions, error fallbacks, element size, context and unique ids are in [Islands: state to unique ids](islands-state-to-ids.md).

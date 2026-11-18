@@ -94,7 +94,7 @@ Each lint has a level. `deny` is an error (the seven that ship a broken page, su
 | `uncalled-signal` | deny | islands | A signal read by name where its value goes, or handed to a parameter that takes anything, not called |
 | `constant-signal` | deny | islands | A signal that is only ever read |
 | `signal-set-call` | deny | islands | A signal written with `.set(value)` where assigning it does the same |
-| `signal-from-prop` | warn | islands | A signal seeded from a prop, which keeps the first value when the page gives the island new props; `linked(() => prop)` follows it |
+| `signal-from-prop` | warn | islands | A signal seeded from a prop and never written, which keeps the first value when the page gives the island new props; `linked(() => prop)` follows it |
 | `server-only-import` | deny | islands | `invalidatePage` or `sqliteCache` imported from `kay/cache` by code that runs in the browser |
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
 | `external-redirect` | warn | security | A `redirect()` whose target is not written as a path of the site or wrapped in `localPath()`, and that the request can reach, which makes it an open redirect |

@@ -61,9 +61,9 @@ function writtenNames(ast: Node): Set<string> {
   return names
 }
 
-// A `signal(prop)` at the top of an island's script: the signal takes the prop's value when the component is created, so it keeps the first one when the page gives the island another, as a refresh does while the island stays. `linked(() => prop)` is the signal that follows its source and can still be written.
+// A `signal(prop)` at the top of an island's script that the island never writes: the signal takes the prop's value when the component is created, so it keeps the first one when the page gives the island another, as a refresh does while the island stays. `linked(() => prop)` is the signal that follows its source. A signal the island writes (a counter starting from a prop) is its own state and is left alone.
 // A prop named as a seed (`initial...`, `default...`) is meant to be read once, and a name declared again in the script is left alone.
-export function signalFromProps(fence: ParsedFence, props: PropsDeclaration | undefined): Diagnostic[] {
+export function signalFromProps(fence: ParsedFence, props: PropsDeclaration | undefined, writtenInTemplate: ReadonlySet<string>): Diagnostic[] {
   if (!props || !fence.code.includes('signal'))
     return []
 
@@ -113,18 +113,18 @@ export function signalFromProps(fence: ParsedFence, props: PropsDeclaration | un
   const followed = followedByEffects(fence.ast)
   const written = writtenNames(fence.ast)
   const found = seeds.filter(({ call, name }) => {
-    const root = call.typeArguments || (name !== undefined && followed.has(name)) ? undefined : propRoot(call.arguments[0]!)
+    // A seed the island writes is its own state, which starts from the prop by intent, as a counter does.
+    const root = call.typeArguments || (name !== undefined && (followed.has(name) || written.has(name) || writtenInTemplate.has(name))) ? undefined : propRoot(call.arguments[0]!)
 
     return root !== undefined && watched.has(root)
   })
 
-  for (const { call, name } of found) {
+  for (const { call } of found) {
     const seed = call.arguments[0]!
     const root = propRoot(seed)!
     const text = fence.code.slice(seed.start, seed.end)
     const imports: Fix['edits'] = linked || taken ? [] : [{ ...fence.shift(specifier), text: others > found.length ? 'linked, signal' : 'linked' }]
-    // A seed the island writes itself is a draft, which following the prop would reset whenever the server changes it.
-    const fix: Fix = { title: `Write \`linked(() => ${text})\``, safe: !taken && !(name !== undefined && written.has(name)), edits: [{ ...fence.shift(call), text: `linked(() => ${text})` }, ...imports] }
+    const fix: Fix = { title: `Write \`linked(() => ${text})\``, safe: !taken, edits: [{ ...fence.shift(call), text: `linked(() => ${text})` }, ...imports] }
 
     diagnostics.push({
       ...fence.shift(call),

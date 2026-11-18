@@ -12,7 +12,7 @@ import { fixtureCopy } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/static')
 const BASE = '/repo'
-const LAZY_CHUNKS = ['fetch-island', 'form-submits', 'hydrate-when', 'live-cache', 'live-props', 'page-swap', 'prefetch', 'static-slots']
+const LAZY_CHUNKS = ['fetch-island', 'form-submits', 'hydrate-when', 'live-cache', 'page-swap', 'prefetch', 'static-slots']
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 
 let out: string

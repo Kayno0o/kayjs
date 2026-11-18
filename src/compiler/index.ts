@@ -36,7 +36,7 @@ import { serialAwaits } from './serial-awaits'
 import { serverImportReads } from './server-imports'
 import { signalFromProps } from './signal-from-prop'
 import { STATUS_PAGE_FILES } from './status-pages'
-import { outerReads, templateWords } from './template-reads'
+import { outerReads, templateWords, templateWrites } from './template-reads'
 import { ISLAND_TWIN } from './twin'
 import { unownedEffects } from './unowned-effects'
 import { validate } from './validate'
@@ -288,7 +288,7 @@ export function onceReadChecks(original: string): Diagnostic[] {
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, serverNames(server), file.module)
 
-  return script.fence ? [...onceReadProps(script.fence, script.props, templateWords(file)), ...signalFromProps(script.fence, script.props)] : []
+  return script.fence ? [...onceReadProps(script.fence, script.props, templateWords(file)), ...signalFromProps(script.fence, script.props, templateWrites(file))] : []
 }
 
 const FAILED_FUNCTION = /^function KayFailed\(/m
@@ -384,7 +384,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? [...onceReadProps(script.fence!, script.props, templateWords(file)), ...signalFromProps(script.fence!, script.props)] : [], ...unusedLints, ...templateLints(file), ...linkFlags(file))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? [...onceReadProps(script.fence!, script.props, templateWords(file)), ...signalFromProps(script.fence!, script.props, templateWrites(file))] : [], ...unusedLints, ...templateLints(file), ...linkFlags(file))
   }
 
   if (checked && pin !== undefined)
