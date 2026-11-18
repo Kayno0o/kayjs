@@ -5,10 +5,13 @@ import { dirname, join } from 'node:path'
 import { elementsIn } from '../compiler/ast'
 import { changeName } from '../compiler/bound-props'
 import { parseExpanded } from '../compiler/markdown-block'
+import { analyzeScript } from '../compiler/script'
 
 // A component names the features an app may leave out with `uses('selectable')`, the `uses` it imports from kayjs-ui's marker module: a call that is true while the prop is there to be written, and that a browser build replaces with `true` or `false` once it has read the props the files of the project write at their call sites. See `specializedSource`.
 const USES_CALL = /\buses\(\s*'(\w+)'(\s*,\s*true)?\s*\)/y
 const KAY_IMPORT = /^import\s+(\w+)\s+from\s+(["'])([^"'\n]+\.kay)\2/gm
+// Whether a file imports a `.kay` component, one that may hand its rest props on to a component with features.
+const HAS_KAY_IMPORT = /^import\s+\w+\s+from\s+(["'])[^"'\n]+\.kay\1/m
 // A component the compiler imports lazily, `KayLazy(key, () => import("./it.kay"))`.
 const LAZY_IMPORT = /\bimport\(\s*(["'])([^"'\n]+\.kay)\1\s*\)/g
 const USES_IMPORT = /^import\s*\{[^}]*\buses\b[^}]*\}\s*from\s*(["'])([^"'\n]+)\1/m
@@ -20,6 +23,7 @@ const FENCE = /^---(?:\s|$)/
 const USES_IF = /^([ \t]*)((?:else )?if) (.*\buses\(.*)$/
 const IDENTIFIER_CHAR = /[\w$.]/
 const BACKSLASH = /\\/g
+const COMMENT_LINE = /^[ \t]*\/\/.*$/gm
 
 // The suffix an import of a variant carries: the features, joined by dashes (a dot would end the stem of the file name the bundler gives an entry), the call sites of the project use.
 // `~` and the props the call sites write follow when the project reads them all: the props a spread may carry are not known.
@@ -176,14 +180,18 @@ function replaceCalls(text: string, answer: (feature: string, onByDefault: boole
 interface Declared {
   names: string[]
   defaults: ReadonlySet<string>
+  // Whether the file imports a `.kay` component, so its callers' props may reach a feature through it.
+  imports?: boolean
 }
 
 const NONE: Declared = { names: [], defaults: new Set() }
 const featuresOf = new Map<string, { stamp: number, declared: Promise<Declared> }>()
 
 function usesIn(source: string, file: string): Declared {
+  const imports = HAS_KAY_IMPORT.test(source)
+
   if (file !== '' && !importsMarker(source, file))
-    return NONE
+    return imports ? { ...NONE, imports } : NONE
 
   const found = new Set<string>()
   const defaults = new Set<string>()
@@ -197,7 +205,7 @@ function usesIn(source: string, file: string): Declared {
     return ''
   })
 
-  return { names: [...found], defaults }
+  return { names: [...found], defaults, imports }
 }
 
 // The features a text names: the `uses('x')` of a file importing the marker, none otherwise.
@@ -466,12 +474,18 @@ export function specializedSource(source: string, present: ReadonlySet<string>, 
 // Stands for every prop of a component: it is called with a spread or read as a value, so any may be written.
 export const ANY = Symbol('any')
 
+// Stands in a call's props for a spread of the file's own rest props: what the file's callers write reaches the component, minus the props the file takes by name.
+const PASSED = '...'
+// Starts what stands in the props for `name={prop}`, `prop` a prop the file takes by name with no default: `name` is written when the file's callers write `prop`.
+const FORWARDED = '>'
+
 // What stands for a call that leaves a feature on by default (`uses('x', true)`) on: the prop left out or written with anything but a literal `false`.
 const ON_PREFIX = '+'
 const PROP_NAME = /^\w+$/
 
 // The props the call sites of each `.kay` component a file imports write, by the name the file gives it; `defaults` names, by local, the features on when the prop is left out, which a call keeps on by adding `+name`.
-export function propsWritten(source: string, locals: readonly string[], defaults: ReadonlyMap<string, ReadonlySet<string>> = new Map()): Map<string, Set<string> | typeof ANY> {
+// A spread of `rest.name`, the file's own rest props, hands its callers' props on instead of any: `PASSED` stands in the props for it. An attribute written as a prop `rest.forwards` names is written when that prop is.
+export function propsWritten(source: string, locals: readonly string[], defaults: ReadonlyMap<string, ReadonlySet<string>> = new Map(), rest?: Pick<Rest, 'name' | 'forwards'>): Map<string, Set<string> | typeof ANY> {
   const { file } = parseExpanded(source)
   const written = new Map<string, Set<string>>()
   const calls = new Map<string, number>()
@@ -488,10 +502,17 @@ export function propsWritten(source: string, locals: readonly string[], defaults
     written.set(element.name, props)
 
     const off = new Set<string>()
+    let passed = false
 
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread') {
-        open.delete(element.name)
+        if (rest !== undefined && source.slice(attribute.expression.start, attribute.expression.end).trim() === rest.name) {
+          props.add(PASSED)
+          passed = true
+        }
+        else {
+          open.delete(element.name)
+        }
 
         continue
       }
@@ -506,14 +527,18 @@ export function propsWritten(source: string, locals: readonly string[], defaults
         continue
       }
 
-      props.add(name)
+      const value = attribute.kind === 'expression' ? source.slice(attribute.expression.start, attribute.expression.end).trim() : undefined
+      const forwarded = value === undefined ? undefined : rest?.forwards.get(value)
 
-      if (attribute.kind === 'expression' && source.slice(attribute.expression.start, attribute.expression.end).trim() === 'false')
+      props.add(forwarded === undefined ? name : `${FORWARDED}${name}=${forwarded}`)
+
+      if (value === 'false')
         off.add(name)
     }
 
     for (const feature of defaults.get(element.name) ?? []) {
-      if (!off.has(feature))
+      // A spread may bring the prop back on, whatever was written before it.
+      if (passed || !off.has(feature))
         props.add(ON_PREFIX + feature)
     }
 
@@ -522,13 +547,40 @@ export function propsWritten(source: string, locals: readonly string[], defaults
     }
   }
 
+  // A comment line naming the component is no read of it.
+  const code = source.replace(COMMENT_LINE, '')
+
   for (const local of locals) {
     // The import names it once, each call once more.
-    if ((source.match(new RegExp(`\\b${local}\\b`, 'g'))?.length ?? 0) !== 1 + (calls.get(local) ?? 0))
+    if ((code.match(new RegExp(`\\b${local}\\b`, 'g'))?.length ?? 0) !== 1 + (calls.get(local) ?? 0))
       open.delete(local)
   }
 
   return new Map(locals.map(local => [local, open.has(local) ? written.get(local) ?? new Set<string>() : ANY]))
+}
+
+// The name of a file's rest props (none when it has none), the props it takes by name (which its spread of the rest does not hand on) and, of those with no default, the key by the name the file reads it as.
+interface Rest {
+  name: string
+  taken: Set<string>
+  forwards: Map<string, string>
+}
+
+function restOf(source: string): Rest | undefined {
+  try {
+    const { file } = parseExpanded(source)
+    const { props } = analyzeScript(file.source, file.script, [], file.module)
+
+    if (props === undefined)
+      return undefined
+
+    const forwards = new Map(props.bindings.filter(binding => binding.fallback === undefined).map(binding => [file.source.slice(binding.local.start, binding.local.end), binding.key]))
+
+    return { name: props.rest === undefined ? '' : file.source.slice(props.rest.start, props.rest.end), taken: new Set(props.bindings.map(binding => binding.key)), forwards }
+  }
+  catch {
+    return undefined
+  }
 }
 
 interface Candidate {
@@ -539,8 +591,8 @@ interface Candidate {
   defaults: ReadonlySet<string>
 }
 
-// The `.kay` components a file imports that name features.
-async function candidatesOf(code: string, file: string): Promise<Candidate[]> {
+// The `.kay` components a file imports that name features, and with `passing` those importing a component too, whose callers may reach a feature through them.
+async function candidatesOf(code: string, file: string, passing = false): Promise<Candidate[]> {
   const found: Candidate[] = []
 
   for (const [local, specifier] of [...code.matchAll(KAY_IMPORT).map(([, name, , from]) => [name!, from!] as const), ...code.matchAll(LAZY_IMPORT).map(([, , from]) => ['', from!] as const)]) {
@@ -553,9 +605,9 @@ async function candidatesOf(code: string, file: string): Promise<Candidate[]> {
       continue
     }
 
-    const { names: features, defaults } = await declaredFeatures(path)
+    const { names: features, defaults, imports } = await declaredFeatures(path)
 
-    if (features.length > 0)
+    if (features.length > 0 || (passing && imports === true))
       found.push({ local, specifier, path, features, defaults })
   }
 
@@ -565,6 +617,8 @@ async function candidatesOf(code: string, file: string): Promise<Candidate[]> {
 // What the `.kay` files of a project write of each component with features, all of them together: a component has one variant, so the chunks of two islands using a Table share it.
 export class VariantIndex {
   private readonly union = new Map<string, Set<string> | typeof ANY>()
+  // The files handing their rest props on to a component, by its path: what their own callers write reaches it.
+  private readonly through = new Map<string, { from: string, taken: ReadonlySet<string>, forwards: [name: string, key: string][] }[]>()
   private readonly indexed = new Map<string, Promise<void>>()
   private scan: Promise<void> | undefined
 
@@ -594,15 +648,16 @@ export class VariantIndex {
   }
 
   private async read(file: string, source: string): Promise<void> {
-    const candidates = (await candidatesOf(source, file)).filter(candidate => candidate.local !== '')
+    const candidates = (await candidatesOf(source, file, true)).filter(candidate => candidate.local !== '')
 
     if (candidates.length === 0)
       return
 
     let written: ReturnType<typeof propsWritten>
+    const rest = restOf(source)
 
     try {
-      written = propsWritten(source, candidates.map(candidate => candidate.local), new Map(candidates.map(candidate => [candidate.local, candidate.defaults])))
+      written = propsWritten(source, candidates.map(candidate => candidate.local), new Map(candidates.map(candidate => [candidate.local, candidate.defaults])), rest)
     }
     catch {
       written = new Map(candidates.map(candidate => [candidate.local, ANY]))
@@ -612,13 +667,61 @@ export class VariantIndex {
       const props = written.get(local) ?? new Set<string>()
       const before = this.union.get(path)
 
+      if (props !== ANY && rest !== undefined) {
+        const forwards = [...props].filter(name => name.startsWith(FORWARDED)).map(name => name.slice(1).split('=') as [string, string])
+
+        for (const name of [...props].filter(name => name.startsWith(FORWARDED)))
+          props.delete(name)
+
+        if (props.delete(PASSED) || forwards.length > 0)
+          this.through.set(path, [...this.through.get(path) ?? [], { from: realFile(file), taken: rest.taken, forwards }])
+      }
+
       this.union.set(path, before === ANY || props === ANY ? ANY : new Set([...before ?? [], ...props]))
     }
   }
 
+  // What the call sites of a component write, the ones handing their rest props on counted by what their own callers write.
+  private writtenOf(path: string, seen = new Set<string>()): Set<string> | typeof ANY {
+    const own = this.union.get(path)
+
+    if (own === ANY)
+      return ANY
+
+    const links = this.through.get(path)
+
+    if (links === undefined || seen.has(path))
+      return own ?? new Set<string>()
+
+    const all = new Set(own)
+
+    seen.add(path)
+
+    for (const { from, taken, forwards } of links) {
+      const outer = this.writtenOf(from, seen)
+
+      if (outer === ANY)
+        return ANY
+
+      for (const [name, key] of forwards) {
+        if (outer.has(key))
+          all.add(name)
+      }
+
+      for (const name of outer) {
+        if (!name.startsWith(ON_PREFIX) && !taken.has(name))
+          all.add(name)
+      }
+    }
+
+    seen.delete(path)
+
+    return all
+  }
+
   // The query of a variant: its features, then the props written.
   private usedOf(path: string, features: string[], defaults: ReadonlySet<string>): string {
-    const props = this.union.get(path) ?? new Set<string>()
+    const props = this.writtenOf(path)
 
     if (props === ANY)
       return [...features].sort().join('-')
@@ -658,6 +761,16 @@ export class VariantIndex {
     }
 
     return result
+  }
+}
+
+// A file by the path its importers resolve it to.
+function realFile(file: string): string {
+  try {
+    return Bun.resolveSync(file, dirname(file))
+  }
+  catch {
+    return file
   }
 }
 

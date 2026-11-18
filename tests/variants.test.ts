@@ -252,3 +252,51 @@ describe('a component imported lazily', () => {
     await rm(dir, { recursive: true, force: true })
   })
 })
+
+describe('a component handing its rest props on', () => {
+  const dialog = join(import.meta.dir, '../packages/ui/src/dialog.kay')
+  const outer = (call: string) => `---\nimport Dialog from '${dialog}'\nconst { level, header, ...rest } = props<{ level?: number, header?: string, [key: string]: unknown }>()\n---\n// A Dialog under it, with what its callers write.\n${call}\n`
+  const caller = (props: string) => `---\nimport Outer from './outer.kay'\n---\nOuter(${props})\n`
+
+  // The features of Dialog's variant, and none when the project's call sites leave the props unknown.
+  const features = async (files: Record<string, string>) => {
+    const dir = await scratchDir('variants-')
+    const paths = await Promise.all(Object.entries(files).map(async ([name, source]) => {
+      const path = join(dir, name)
+
+      await Bun.write(path, source)
+
+      return path
+    }))
+    const query = usesOf(await new VariantIndex(paths).entry(dialog))
+
+    await rm(dir, { recursive: true, force: true })
+
+    return query.includes('~') ? query.slice(0, query.indexOf('~')).split('-').filter(Boolean) : undefined
+  }
+
+  it('counts what its callers write, and a comment line naming the component is no read of it', async () => {
+    const call = 'Dialog({...rest} title="t" level={level} header={header})'
+
+    expect(await features({ 'outer.kay': outer(call), 'page.kay': caller('title="a"') })).toEqual([])
+    expect(await features({ 'outer.kay': outer(call), 'page.kay': caller('title="a" level={3}') })).toEqual(['level'])
+    expect(await features({ 'outer.kay': outer(call), 'page.kay': caller('title="a" header="h"') })).toEqual(['header'])
+  })
+
+  it('counts a prop it takes by name only once a caller writes it, and one with a default always', async () => {
+    const named = outer('Dialog({...rest} title="t" level={level})')
+
+    expect(await features({ 'outer.kay': named, 'page.kay': caller('header="h"') })).toEqual([])
+    expect(await features({ 'outer.kay': named.replace('level, header', 'level = 2, header'), 'page.kay': caller('title="a"') })).toEqual(['level'])
+  })
+
+  it('counts every prop of a spread that is not its own rest props', async () => {
+    expect(await features({ 'outer.kay': outer('Dialog({...other} title="t")'), 'page.kay': caller('title="a"') })).toBeUndefined()
+  })
+
+  it('follows a chain of components handing their rest props on', async () => {
+    const middle = `---\nimport Outer from './outer.kay'\nconst { ...rest } = props<{ [key: string]: unknown }>()\n---\nOuter({...rest} title="m")\n`
+
+    expect(await features({ 'outer.kay': outer('Dialog({...rest} title="t" level={level})'), 'middle.kay': middle, 'page.kay': `---\nimport Middle from './middle.kay'\n---\nMiddle(level={4})\n` })).toEqual(['level'])
+  })
+})

@@ -79,6 +79,46 @@ describe('Dialog', () => {
 
     expect(root.querySelector('#dialog')?.getAttribute('closedby')).toBe('none')
   })
+
+  test('closes by a plain button with a close part, which a dirty dialog locks but leaves a tab stop', async () => {
+    const root = await dialogs()
+
+    click(root.querySelector('#open'))
+    await settle()
+
+    const close = root.querySelector<HTMLButtonElement>('#dialog [data-part=close]')!
+
+    expect(close.tagName).toBe('BUTTON')
+    expect(close.getAttribute('type')).toBe('button')
+    expect(close.getAttribute('aria-label')).toBe('Close')
+    expect(close.getAttribute('data-tooltip')).toBe('Close')
+    expect(close.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
+    expect(close.hasAttribute('aria-disabled')).toBe(false)
+
+    click(close)
+    await settle()
+
+    expect(root.querySelector<HTMLDialogElement>('#dialog')?.open).toBe(false)
+    expect(closes).toBe(1)
+  })
+
+  test('leaves a dirty dialog open when its close is pressed', async () => {
+    const root = await dialogs(undefined, true)
+
+    click(root.querySelector('#open'))
+    await settle()
+
+    const close = root.querySelector<HTMLButtonElement>('#dialog [data-part=close]')!
+
+    expect(close.getAttribute('aria-disabled')).toBe('true')
+    expect(close.disabled).toBe(false)
+
+    click(close)
+    await settle()
+
+    expect(root.querySelector<HTMLDialogElement>('#dialog')?.open).toBe(true)
+    expect(closes).toBe(0)
+  })
 })
 
 describe('ConfirmDelete', () => {
