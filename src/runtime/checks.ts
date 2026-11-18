@@ -350,7 +350,7 @@ type PropsOf<Tag> = Tag extends keyof JSX.IntrinsicElements ? JSX.IntrinsicEleme
 type PartsOf<Component> = Component extends (props: infer Props) => unknown ? 'parts' extends keyof Props ? NonNullable<Props['parts' & keyof Props]> : never : never
 
 // What a part that is a call of this component takes, as the component types it: a string or an array for its root, or its `parts` object of its own parts.
-export type PartClass<Component> = Component extends (props: infer Props) => unknown ? ('class' extends keyof Props ? Extract<NonNullable<Props['class' & keyof Props]>, string | readonly unknown[]> : never) | ('parts' extends keyof Props ? NonNullable<Props['parts' & keyof Props]> : never) : never
+export type PartClass<Component> = Component extends (props: infer Props) => unknown ? ('class' extends keyof Props ? Extract<NonNullable<Props['class' & keyof Props]>, string | readonly unknown[]> : never) | PartsOf<Component> : never
 
 // The type of the part `Name` of a component, which a call of it receives from the part of the same name this component hands on: its `parts` entry for it.
 export type HandedPart<Component, Name extends string> = PartsOf<Component> extends infer Parts ? Parts extends object ? Name extends keyof Parts ? Parts[Name] : never : never : never

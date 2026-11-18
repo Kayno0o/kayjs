@@ -403,6 +403,7 @@ describe('kay check on parts', () => {
     expect(partClass({ class: { head: 'p-6' } }, 'head')).toBeUndefined()
     expect(partClass({ class: 'mt-4', parts: { root: 'p-2', head: { root: 'p-6' } } }, 'root')).toEqual(['p-2', 'mt-4'])
     expect(partClass({ parts: { head: { root: 'p-6' } } }, 'head')).toEqual({ root: 'p-6' })
+    expect(partClass({ class: 'mt-4', parts: { root: { icon: 'x' } } }, 'root')).toEqual({ icon: 'x', root: [undefined, 'mt-4'] })
   })
 
   it('hands a call its classes as class, or as the root of its parts once it hands parts on', () => {

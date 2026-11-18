@@ -46,7 +46,7 @@ A call read as its data (`const list = await call(notes, '/')` then `list.items`
 `rateLimit()`'s `enforce(ctx, message?)` is gone: write `check(ctx, message?)`; `limiter().enforce(key)` keeps its name. The `deprecated-rate-enforce` lint is gone.
 ### The parts object of `class` is gone
 
-A component's parts are its `parts` attribute: `Card(class={{ head: 'p-6' }})` is `Card(parts={{ head: 'p-6' }})`, as `kay upgrade` on 1.108 wrote it. `class` is a string, an array or an object of conditions, so `{ head: 'p-6' }` in it is the class `head` and a type error on a component with parts. The `deprecated-parts-class` lint is gone with it.
+A component's parts are its `parts` attribute: `Card(class={{ head: 'p-6' }})` is `Card(parts={{ head: 'p-6' }})`, as `kay upgrade` on 1.108 wrote it. `class` is a string, an array or an object of conditions, so `{ head: 'p-6' }` in it is the class `head`: a type error on a component with parts, unreported when a shorthand or a spread sits beside it. The `deprecated-parts-class` lint is gone with it.
 
 ## 1.108.0
 

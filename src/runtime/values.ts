@@ -263,13 +263,16 @@ function taggedParts(parts: Record<string, unknown>): Parts {
 
 // What a component's `class` and `parts` props give a part, `class` winning: a `class` string, array or object of conditions is the root's, and `parts` holds one entry per part, its own object when that part is a component.
 export function partClass(props: unknown, part: string): unknown {
-  const { class: root, parts } = (props ?? {}) as { class?: unknown, parts?: unknown }
+  const { parts } = (props ?? {}) as { parts?: unknown }
   const entry = typeof parts === 'object' && parts !== null && !Array.isArray(parts) && Object.hasOwn(parts, part) ? (parts as Record<string, unknown>)[part] : undefined
   const added = entryParts(entry)
-  const given = part === 'root' ? root : undefined
+  const given = part === 'root' ? (props as { class?: unknown } | undefined)?.class : undefined
 
   if (given === undefined || added === undefined)
     return added ?? given
+
+  if (isParts(added) && joinable(given))
+    return taggedParts({ ...added, root: [added.root, given] })
 
   return joinable(given) && joinable(added) ? [added, given] : given
 }

@@ -125,13 +125,11 @@ section.rounded.border
 
 `Card(title="Hi" class="mt-4")` styles the root, `Card(title="Hi" parts={{ root: 'mt-4', head: 'p-6' }})` the root and the head. A part renders `data-part="head"`, for selectors and `data-[part=head]:` utilities, and one name may sit on several elements.
 
-A part that is a component, `Button(part="action")`, hands its entry to that component, a string or an object of its parts: `parts={{ action: { icon: 'size-5' } }}`. Names after the first, `Busy(part="root spinner")`, hand the entries of those parts of this component on too, under the same names. A parts object cannot sit beside a shorthand or a spread on the call, `Card.mt-4(parts={{ head: 'p-6' }})`: `kay check` reports it, so write the root's classes as `root`.
+A part that is a component, `Button(part="action")`, hands its entry to that component, a string or an object of its parts: `parts={{ action: { icon: 'size-5' } }}`. Names after the first, `Busy(part="root spinner")`, hand the entries of those parts of this component on too, under the same names.
 
 `kay check` reports a handed part the called component does not name, and a page or a layout, which has no class to hand from, refuses them.
 
 `parts` can sit beside a shorthand, a spread and `class` on the call, `Card.mt-4(parts={{ head: 'p-6' }})`. Before 1.105 the parts were an object given as `class`, which is conditions now.
-
-In that literal the keys are words, and each value is a string, a template, a choice between those, an array of those, or a literal of its own for a part that is a component. Any other object in `class` is conditions, so an object held in a variable, or one with another kind of value, is a type error that names `parts`.
 
 `kay check` reports a part named by an expression, an unknown part at a call, a string `class` for a template with several top elements and no `part="root"`, and a component with parts that also destructures `class`, as the compiler owns that prop. A page or a layout has no `class` prop: its parts render `data-part` only.
 
