@@ -1,0 +1,6 @@
+---
+import ClientRead from '../components/client-read.kay'
+---
+h1 Other
+a.home(href="/") Home
+ClientRead

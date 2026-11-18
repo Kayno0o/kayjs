@@ -1,0 +1,10 @@
+---
+import ClientRead from '../components/client-read.kay'
+import ServerRead from '../components/server-read.kay'
+---
+h1 Home
+a.one(href="?x=1") One
+a.two(href="?x=2") Two
+a.other(href="/other") Other
+ClientRead
+ServerRead

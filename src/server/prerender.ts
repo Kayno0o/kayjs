@@ -46,6 +46,23 @@ import { setupPages } from './setup'
 import { STAMP_HOLE } from './stamp'
 
 const PARTS = new Intl.ListFormat('en-GB')
+// An island the render marked as reading the query, whose markup is the default query's.
+const QUERY_ISLAND = /<slot data-component="[^"]*"[^>]*? data-query[ >]/g
+
+// What the page reads with `live: true` in its own render, which the build runs once.
+function warnUnfollowed(path: string, keys: string[] | undefined): void {
+  if (keys !== undefined)
+    kayLog('warn', `${path} reads ${keys.slice(0, 5).map(key => `'${key}'`).join(', ')}${keys.length > 5 ? ' and more' : ''} with \`live: true\` in its own render, which the build runs once: what the page shows of it itself goes stale and only its server islands follow, so drop \`prerender\` from \`export const page\` if the page shows it`)
+}
+
+// A page kept on its own reads no query, so only one asked for can hold such an island.
+function warnQueryIslands(path: string, html: string, auto: boolean): void {
+  const count = auto ? 0 : [...html.matchAll(QUERY_ISLAND)].length
+
+  if (count > 0)
+    kayLog('warn', `${path} holds ${count === 1 ? 'an island' : `${count} islands`} reading a query param, drawn here at the default query: the browser draws ${count === 1 ? 'it' : 'them'} again when the page is opened with a query, so the markup before that, and with no JavaScript, is the default's`)
+}
+
 const LINE_BREAK = /[\r\n]/
 const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
 // The pages of a route rendering at once: a render waiting on a database, a CMS or a file lets the next ones run, while each page is still judged and written in turn, as one at a time would. Bounded, so the build holds no more pages than this.
@@ -390,8 +407,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         if (islands.includes('defer') && client.entry === undefined)
           throw new KayError('export-server-render', `kay: it defers a server island, which kay's browser entry fetches, and with no island and \`navigation: false\` the build has none; mark it \`server\` to render it inline instead`)
 
-        if (unfollowed !== undefined)
-          kayLog('warn', `${copy.path} reads ${unfollowed.keys.slice(0, 5).map(key => `'${key}'`).join(', ')}${unfollowed.keys.length > 5 ? ' and more' : ''} with \`live: true\` in its own render, which the build runs once: what the page shows of it itself goes stale and only its server islands follow, so drop \`prerender\` from \`export const page\` if the page shows it`)
+        warnUnfollowed(copy.path, unfollowed?.keys)
+        warnQueryIslands(copy.path, html, auto)
 
         const name = `${copy.key === '/' ? 'index' : copy.key.slice(1)}.html`
         const taken = reserved.get(name) ?? paths.get(name)

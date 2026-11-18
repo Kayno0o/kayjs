@@ -40,6 +40,12 @@ List the values of a page with params in the `prerender` setting of its `page`, 
 
 <ReadMore href="/llms/prerendering#static-export">The full list of what cannot be exported, and how redirects become pages.</ReadMore>
 
+## Pages that read the query
+
+A page is built once, at the default query, and a host serves that file at every query: `/page?tab=b` is `page.html`. An island that reads `queryParam` is drawn again in the browser from the address when the page is opened with a query, so `Tabs(param="tab")` in an island shows tab b at `?tab=b` with nothing to configure.
+
+What the build wrote is the default's: the island before its JavaScript runs, and anything outside an island that depends on the query. Read the query in an island. The build warns naming each page holding such an island.
+
 ## Mount the site under a path
 
 `base` mounts the site under a path of its host. Pages does this under `/<owner>/<repo>`.

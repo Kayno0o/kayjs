@@ -12,7 +12,7 @@ import { mergeHead, runnable, scriptMarkup, swapRoot } from './swap-head'
 import { checkKept, heldLate, holding, swapBody } from './swap-kept'
 import { MISSING } from './swap-morph'
 import { transitioned, viewTransitions } from './swap-transition'
-import { addressChanged } from './with-query'
+import { addressChanged, followAddress } from './with-query'
 
 export { HTML, PAGE_TIMEOUT_MS, prefetch } from './swap-fetch'
 export { CHUNK_TIMEOUT_MS } from './swap-flight'
@@ -452,6 +452,7 @@ async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: 
 
     forgetPageData()
     writeHistory(policy, target)
+    followAddress()
     addressChanged()
 
     if (pageKey(target) !== navigation.shown)

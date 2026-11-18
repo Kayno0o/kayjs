@@ -1,0 +1,6 @@
+---
+import Tabs from '../components/tabs.kay'
+---
+h1 Tabs
+a.b(href="?x=b") B
+Tabs

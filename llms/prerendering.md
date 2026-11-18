@@ -158,3 +158,4 @@ export const pageWeight: KayExtension = {
 - With `i18n.mode: 'always'`, each unprefixed path sends the browser to the default locale's copy.
 - Locales by domain need a server.
 - The directory is cleared first, only when the last export wrote it: kay refuses one holding other files, and the project itself.
+- A page is rendered once, at the default query, and served at every query (`/page?tab=b` is `page.html`). An island reading a `queryParam` is marked `data-query` by that render: the browser draws it again from the address when the page is opened with a query, rather than claiming markup made for the default one, so it shows `?tab=b` with no mismatch. The page's own markup outside islands stays the default's, as does the island's before its JavaScript runs, so read the query in an island, never in the page, and the build warns naming each page holding such an island. The same holds for any `prerender: true` page.

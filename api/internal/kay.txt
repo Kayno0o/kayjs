@@ -853,6 +853,9 @@ function lazyNote<P>(key: string, component: () => (props: P) => unknown): (prop
 [./island] noteMessage
 function noteMessage(key: string): void
 
+[./island] noteQuery
+function noteQuery(): void
+
 [./island] RenderedIslands
 interface RenderedIslands
   actions?: string | undefined

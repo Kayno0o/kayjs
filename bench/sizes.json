@@ -1,46 +1,46 @@
 {
   "static": {
-    "gzip": 9586,
+    "gzip": 9607,
     "files": 3,
     "packages": {
       "app": 493,
-      "kay": 22605
+      "kay": 22653
     }
   },
   "i18n-links": {
-    "gzip": 17359,
+    "gzip": 17369,
     "files": 2,
     "packages": {
       "app": 1020,
-      "kay": 56237
+      "kay": 56302
     }
   },
   "live-values": {
-    "gzip": 15265,
+    "gzip": 15285,
     "files": 4,
     "packages": {
       "app": 854,
-      "kay": 34215
+      "kay": 34263
     }
   },
   "bench-products": {
-    "gzip": 11109,
+    "gzip": 11123,
     "files": 2,
     "packages": {
       "app": 433,
-      "kay": 26615
+      "kay": 26663
     }
   },
   "bench-table": {
-    "gzip": 13456,
+    "gzip": 13471,
     "files": 2,
     "packages": {
       "app": 2688,
-      "kay": 29463
+      "kay": 29511
     }
   },
   "form-only": {
-    "gzip": 2838,
+    "gzip": 2836,
     "files": 1,
     "packages": {
       "app": 51,
@@ -48,13 +48,13 @@
     }
   },
   "ui-list": {
-    "gzip": 67439,
+    "gzip": 67560,
     "files": 43,
     "packages": {
       "app": 6062,
       "icons": 2608,
-      "kay": 56713,
-      "kayjs-ui": 92116
+      "kay": 56787,
+      "kayjs-ui": 92225
     }
   }
 }

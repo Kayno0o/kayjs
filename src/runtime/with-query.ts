@@ -21,6 +21,15 @@ export function setCurrentUrl(read: () => URL | undefined): void {
   serverUrl = read
 }
 
+// The signals kept in the query, each reading its param again from the address when a swap or a traversal changed it under them: a signal made outside a component, which an app shares between its islands, outlives the page that read it first.
+export const followers = new Set<() => void>()
+
+// Reads every signal kept in the query again from the address the page was swapped or traversed to.
+export function followAddress(): void {
+  for (const reread of followers)
+    reread()
+}
+
 // Tells the links built by `withQuery` in the browser that the address changed, a swap or a query written in place.
 export function addressChanged(): void {
   if (built !== location.pathname + location.search)

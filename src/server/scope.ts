@@ -4,6 +4,7 @@ import type { LoadScope, ServerScope } from '../runtime/reactive'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { setRequestOutcome } from '../runtime/action'
 import { setEndedEntryNote } from '../runtime/ended-entry'
+import { noteQuery } from '../runtime/island.server'
 import { readParam } from '../runtime/query-param'
 import { setRequestCookieScope, setServerScope } from '../runtime/reactive'
 import { setCurrentUrl } from '../runtime/with-query'
@@ -51,7 +52,14 @@ export function inServerScope<T>(request: Request, report: (error: unknown) => v
 
   const url = requestUrl(request)
 
-  return store.run({ request, values: new WeakMap(), cookie, param: name => readParam(rules, name, url.searchParams), report, path: url.pathname }, run)
+  // A render of an island notes that it read the query, which a page rendered once cannot show.
+  const param = (name: string) => {
+    noteQuery()
+
+    return readParam(rules, name, url.searchParams)
+  }
+
+  return store.run({ request, values: new WeakMap(), cookie, param, report, path: url.pathname }, run)
 }
 
 // The request the render being run answers.

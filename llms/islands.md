@@ -64,6 +64,8 @@ const q = queryParam('q', { default: '' })
 input(type="search" bind:value={q} aria-label="Search")
 ```
 
+A link or a component navigating to the same path with another query (`a(href="?tab=b")`, `Segmented(param="range")`), Back and Forward all reach every `queryParam` signal, one shared by islands included, whether its island is rendered on the server or in the browser.
+
 ### Hydrate an island later
 
 `hydrate="visible"` waits until it scrolls near the viewport, `hydrate="idle"` until the browser is idle, `hydrate="interaction"` until the first pointer, focus, key or touch event inside it, and `hydrate="media(max-width: 40rem)"` until the media query matches, at once when it does and later when it starts to:

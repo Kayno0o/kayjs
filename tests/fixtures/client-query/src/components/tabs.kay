@@ -1,0 +1,11 @@
+---
+import { signal } from 'kay'
+import { shared } from '../state'
+
+const clicks = signal(0)
+---
+button.count(onClick={() => clicks++}) Clicked {clicks()}
+if shared() === 'b'
+  p.tab Tab b
+else
+  p.tab Tab a

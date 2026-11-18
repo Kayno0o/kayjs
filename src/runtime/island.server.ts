@@ -9,7 +9,7 @@ import { BUTTON_FORM_KEY } from './button-form'
 import { escapeAttribute, quotedAttribute } from './escape'
 import { withFieldMarks } from './fields'
 import { headMark, setsIslandTitle } from './head'
-import { child, omit } from './html'
+import { child, omit, prerendering } from './html'
 import { noteLives } from './live-value'
 import { localeState } from './locale-state'
 import { TITLED_ATTRIBUTE } from './markers'
@@ -103,6 +103,14 @@ export function collectIslands<T>(render: () => T, salt?: string, chunks?: Recor
   finally {
     rendered = undefined
   }
+}
+
+// Whether the island being rendered, or a page outside any, read a query param.
+let queried = false
+
+// A query param was read: the island rendering it depends on the address, which a page rendered once at build time cannot show.
+export function noteQuery(): void {
+  queried = true
 }
 
 // The keys of the components the island being rendered draws that load on their own in the browser.
@@ -241,8 +249,10 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     const keys = new Set<string>()
     const outer = drawn
+    const outerQuery = queried
 
     drawn = keys
+    queried = false
 
     try {
       // Detached, as in the browser, where an island reads nothing the page's components provide.
@@ -254,13 +264,16 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       const marked = waits || when === 'load' ? ` data-hydrate="${escapeAttribute(when!)}"` : ''
       const chunk = rendered?.chunks?.[id]
       const lazies = lazyAttribute(keys, waits)
-      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazies}${cause === undefined ? '' : ` data-why=${quotedAttribute(cause)}`}${marked}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
+      // A page rendered once is shown at every query: the browser draws this island afresh from the address it is opened at, rather than claiming markup made for the default one.
+      const byQuery = queried && prerendering() && !browserOnly ? ' data-query' : ''
+      const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${lazies}${cause === undefined ? '' : ` data-why=${quotedAttribute(cause)}`}${marked}${titled}${shipped}${browserOnly ? ' data-client' : ''}${byQuery}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
 
       return markup as unknown as JSX.Element
     }
     finally {
       depth--
       drawn = outer
+      queried = outerQuery || queried
     }
   }
 

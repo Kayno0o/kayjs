@@ -1,0 +1,9 @@
+---
+island({ render: 'client' })
+import { queryParam } from 'kay'
+import { shared } from '../state'
+
+const own = queryParam('x', { default: 'none' })
+---
+p.client x={own()}
+p.shared x={shared()}

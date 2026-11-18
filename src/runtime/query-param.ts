@@ -3,7 +3,7 @@ import { historyState, navigation, pageKey } from './navigation'
 import { pageData } from './page-data'
 import { keep } from './persist'
 import { onCleanup } from './reactive'
-import { addressChanged } from './with-query'
+import { addressChanged, followAddress, followers } from './with-query'
 
 // What the server sends of one param of the page's `query` schema, enough to read its text as the schema does without the schema itself.
 export interface ParamRule {
@@ -80,9 +80,6 @@ function fromText(rule: ParamRule, text: string): unknown {
   return rule.enum === undefined || rule.enum.includes(value) ? value : REFUSED
 }
 
-// The signals kept in the query, each reading its param again from the address a traversal reached between entries kay wrote.
-const followed = new Set<() => void>()
-
 // What `queryParam` reads and keeps, around the signal's own `read`: the server reads the request's param, the browser the page's address once, then each write takes the current history entry's place.
 // A param left out reads as the signal's own value, `fallback` for `persisted.query(name, fallback)`, which writing it leaves out too.
 // A value outside `values` reads as the param left out.
@@ -98,8 +95,8 @@ export function keepParam<T>(name: string, read: () => T, write: (value: T) => v
       write(now.found ? now.value : fallback as T)
     }
 
-    followed.add(reread)
-    onCleanup(() => followed.delete(reread))
+    followers.add(reread)
+    onCleanup(() => followers.delete(reread))
 
     if (push)
       watch()
@@ -169,9 +166,7 @@ function traversed(state: unknown): boolean {
   retrying = false
   navigation.shown = pageKey(new URL(location.href))
 
-  for (const reread of followed)
-    reread()
-
+  followAddress()
   addressChanged()
 
   return true

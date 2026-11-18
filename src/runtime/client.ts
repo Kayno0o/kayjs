@@ -267,8 +267,8 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
 
   const draw = () => render(() => withIds(ids, () => component(props)), element)
 
-  // A client-only island has no server markup to claim, only the fallback it renders over.
-  if (element.dataset.client !== undefined) {
+  // A client-only island has no server markup to claim, only the fallback it renders over, and so has one the build drew at the default query when the page is opened at another.
+  if (element.dataset.client !== undefined || (element.dataset.query !== undefined && location.search !== '')) {
     renderOver(element, id, draw, false)
   }
   else {
