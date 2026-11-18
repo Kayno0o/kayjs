@@ -3,6 +3,7 @@ import type { Mode, Project } from '../project'
 import type { ApiModule } from './api-modules'
 import type { Bundle } from './bundle'
 import type { ClientBuild } from './client'
+import type { ContextReads } from './context-record'
 import type { Endpoint, Route, RouteMount, SpecialPages } from './routes'
 import type { ToolOutputs } from './tool-outputs'
 import { existsSync } from 'node:fs'
@@ -56,6 +57,21 @@ export interface ProjectSource {
   toolOutputs: (root: string, output: string) => ToolOutputs
 }
 
+// Read once per project, as the routes, the fallback pages and the endpoints each scan from it.
+const records = new WeakMap<Project['paths'], Promise<ContextReads | undefined>>()
+
+async function recordOf({ root, mode, paths }: Pick<Project, 'root' | 'mode' | 'paths'>): Promise<ContextReads | undefined> {
+  if (!mode.prebuilt)
+    return undefined
+
+  let held = records.get(paths)
+
+  if (held === undefined)
+    records.set(paths, held = readContextRecord(paths.output, root))
+
+  return held
+}
+
 const DISK: ProjectSource = {
   embedded: false,
   mode: options => modeOf(options),
@@ -94,11 +110,11 @@ const DISK: ProjectSource = {
     await (await import('./loader')).registerLoader(root, settings)
   },
   has: file => existsSync(file),
-  routes: async ({ root, mode, paths }, mounts) => scanRoutes(paths.routes, mounts, mode.prebuilt ? await readContextRecord(paths.output, root) : undefined),
-  fallback: async ({ root, mode, paths }, mounts) => specialPagesOf(routeTrees(paths.routes, mounts), '', mode.prebuilt ? await readContextRecord(paths.output, root) : undefined),
+  routes: async (project, mounts) => scanRoutes(project.paths.routes, mounts, await recordOf(project)),
+  fallback: async (project, mounts) => specialPagesOf(routeTrees(project.paths.routes, mounts), '', await recordOf(project)),
   // Imported as it is asked for, as the API modules' actions read the locales, which read this.
   api: async (root, config) => (await import('./api-modules')).projectApi(root, config),
-  endpoints: async ({ root, mode, paths }, mounts) => scanEndpoints(paths.routes, mounts, mode.prebuilt ? await readContextRecord(paths.output, root) : undefined),
+  endpoints: async (project, mounts) => scanEndpoints(project.paths.routes, mounts, await recordOf(project)),
   plugins: root => pluginFiles(root),
   jobs: root => jobFiles(root),
   extensionCatalogs: (_, files) => files.filter(file => existsSync(file)),

@@ -287,6 +287,19 @@ describe('a production server started from disk', () => {
     expect(compiled.loaded).toBeGreaterThan(0)
   }, 120_000)
 
+  it('serves an endpoint behind a guard from the build, beside a layout reaching files and a special page', async () => {
+    const { root, options } = await project([{ name: 'values', layout: { file: 'lib/toast/_layout.kay', reaching: ['lib/gate.kay'] } } as { name: string }])
+
+    await Promise.all([
+      Bun.write(join(root, 'lib/toast/_layout.kay'), 'slot\n'),
+      Bun.write(join(root, 'src/routes/a/_404.kay'), 'p missing\n'),
+      Bun.write(join(root, 'src/routes/a/b/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(() => ({}))\n'),
+      Bun.write(join(root, 'src/routes/a/b/x.txt.ts'), 'export function GET() {\n  return new Response(\'x\')\n}\n'),
+    ])
+    await build(options)
+    expect(await get(options, '/a/b/x.txt')).toEqual({ status: 200, html: 'x' })
+  }, 120_000)
+
   it('takes the record over the templates, and the templates when the build recorded none', async () => {
     const { root, options } = await project([EXTENSION])
 
