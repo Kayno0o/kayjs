@@ -62,7 +62,10 @@ it('reads its state at first paint without the code that runs a call, counts a c
   expect(greet.pending()).toBe(true)
   expect(greet.status()).toBe('loading')
 
-  await Bun.sleep(50)
+  await Bun.sleep(10)
+
+  for (let waited = 0; posts.length < 4 && waited < 200; waited++)
+    await Bun.sleep(10)
 
   expect(loads).toBe(1)
   // The calls made before the load go on in the order they were made: each starts in turn, a serial call posts once the one before it is done, and a later `latest` call aborts the earlier one.

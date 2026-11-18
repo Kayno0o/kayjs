@@ -165,12 +165,15 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
     called(start.page, null)
 
     let code: typeof import('./action-run')
+    let attempt: typeof loading
 
     try {
-      code = running ?? await (loading ??= runCode())
+      code = running ?? await (attempt = loading ??= runCode())
     }
     catch (error) {
-      loading = undefined
+      if (loading === attempt)
+        loading = undefined
+
       shift(-1)
 
       if (host.latest(start.turn))
