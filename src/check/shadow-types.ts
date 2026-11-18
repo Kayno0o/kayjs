@@ -11,11 +11,11 @@ import type { Endpoint, Route, RouteMount } from '../server/routes'
 import type { ShadowFile, ShadowOptions, ShadowSettings } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
 import { lstat, mkdir, readdir, readlink, rm, symlink, unlink } from 'node:fs/promises'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { readCacheEntry, writeCacheEntry } from '../build/cache'
 import { findKayFiles, inWalkScope, treeEntries, writeIfChanged } from '../build/files'
 import { iconTypes } from '../build/icons'
-import { findKayLibraries, libraryOf, packageRoot, reachableLibraryFiles, throughNodeModules } from '../build/libraries'
+import { extensionPackages, findKayLibraries, libraryOf, reachableLibraryFiles, throughNodeModules } from '../build/libraries'
 import { packageContextModule } from '../build/manifests'
 import { isPageFile, mountedPageDirs } from '../build/page-dirs'
 import { importedSignals } from '../build/signals'
@@ -543,20 +543,6 @@ async function linkDependencies(root: string, { dir, realDir }: KayLibrary, own:
       await tree.link(join(folder, name), join(modules, name))
     }))
   }
-}
-
-// The package holding each of `extensionDirs`, an extension's routes or its editor's directory, that no kay library holds, the nearest directory above them with a package.json, as a library: its components are shadowed and reached as one's are.
-async function extensionPackages(root: string, libraries: KayLibrary[], extensionDirs: string[]): Promise<KayLibrary[]> {
-  const dirs = new Set(extensionDirs.filter(dir => libraryOf(libraries, join(dir, 'page.kay')) === undefined).map(packageRoot))
-
-  const realRoot = realpathSync(root)
-
-  return Promise.all([...dirs].map(async (dir) => {
-    // Left out: the app itself, when the package holds it as a fixture; the other projects inside it, to their own checks; a kay library's files, to the library. A package linked into `node_modules` goes by that path, as the app imports it.
-    const files = (await findKayFiles(dir, { project: true, ownOnly: true, ownKayOnly: true })).filter(file => !realpathSync(file).startsWith(realRoot + sep) && libraryOf(libraries, file) === undefined)
-
-    return { name: basename(dir), dir, realDir: realpathSync(dir), files, specifiers: new Map<string, string>(), exports: undefined, extension: true as const }
-  }))
 }
 
 // The pages, public files, API modules and endpoints, with the locale settings, each with the reason the server would refuse it reported.

@@ -1,7 +1,7 @@
 import type { Manifest } from './manifests'
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
 import { findKayFiles, KAY_FILE, readSource, scoped, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
@@ -220,6 +220,20 @@ export function packageRoot(dir: string): string {
     if (at === dirname(at))
       return dir
   }
+}
+
+// The package holding each of `extensionDirs`, an extension's routes or its editor's directory, that no kay library holds, the nearest directory above them with a package.json, as a library: its components are shadowed and reached as one's are.
+export async function extensionPackages(root: string, libraries: KayLibrary[], extensionDirs: string[]): Promise<KayLibrary[]> {
+  const dirs = new Set(extensionDirs.filter(dir => libraryOf(libraries, join(dir, 'page.kay')) === undefined).map(packageRoot))
+
+  const realRoot = realpathSync(root)
+
+  return Promise.all([...dirs].map(async (dir) => {
+    // Left out: the app itself, when the package holds it as a fixture; the other projects inside it, to their own checks; a kay library's files, to the library. A package linked into `node_modules` goes by that path, as the app imports it.
+    const files = (await findKayFiles(dir, { project: true, ownOnly: true, ownKayOnly: true })).filter(file => !realpathSync(file).startsWith(realRoot + sep) && libraryOf(libraries, file) === undefined)
+
+    return { name: basename(dir), dir, realDir: realpathSync(dir), files, specifiers: new Map<string, string>(), exports: undefined, extension: true as const }
+  }))
 }
 
 // The library holding `file`, by its path under `node_modules` or its real one: the deepest, for a library installed inside another's `node_modules`.

@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - An island ships only the kayjs-ui icons it can draw: with kayjs-ui in the app's dependencies the default registry is cut to the slots the project writes as strings, about 8 KB minified off an island drawing a Dialog, and a slot named from a variable in the app keeps it whole; the app's own icon settings stay whole ([kayjs-ui setup](../packages/ui/llms/setup.md))
 - A component of an island that leaves a feature out (kayjs-ui's `Table` with no filter, selection, paging or detail rows) no longer ships the markers and the effects of the blocks it never draws, and an `aria-` or `data-` attribute of such a feature is not bound: a plain `Table` island carries 1.7 KB less of kayjs-ui's code, 9.9 KB in all, as any component declaring `uses()` features carries less.
+- An extension's own islands, as kayjs-ui's toaster, tooltip host and confirm host, hydrate when the library resolves outside the project root (a workspace link, or a folder above it) and the app lists no dependency on it ([component libraries](component-libraries.md)).
 
 ## 1.107.0
 

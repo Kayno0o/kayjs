@@ -1,9 +1,10 @@
 import type { KayExtension } from '../config'
 import type { ImportGraph, KayLibrary } from './libraries'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
+import { dirname, relative, sep } from 'node:path'
 import { extensionEditor, routeMounts } from '../server/routes'
 import { findKayFiles } from './files'
-import { findKayLibraries, reachableLibraryFiles } from './libraries'
+import { extensionPackages, findKayLibraries, reachableLibraryFiles } from './libraries'
 
 export interface BuildFiles {
   // The project's own components, the pages of the libraries it mounts and the components of the libraries it reaches, in that order.
@@ -24,7 +25,11 @@ export async function buildFiles(root: string, extensions: KayExtension[] | unde
   // The pages of the libraries the app mounts, which it reaches through its config rather than an import.
   const mountedFiles = (await Promise.all(routeMounts(root, extensions).map(async mount => existsSync(mount.dir) ? findKayFiles(mount.dir) : []))).flat()
   const mounted = [...new Set([...mountedFiles, ...editor === undefined ? [] : [editor]])].filter(file => !ownFiles.has(file))
-  const libraries = await findKayLibraries(root)
+  const installed = await findKayLibraries(root)
+  // An extension reached with no dependency on it, as a workspace link or a folder above the root, is a library whose islands the pages it wraps still render.
+  const outside = (dir: string) => relative(root, dir).startsWith('..') && !realpathSync(dir).split(sep).includes('node_modules')
+  const mountDirs = routeMounts(root, extensions).filter(mount => mount.reaching !== 'context' && existsSync(mount.dir) && outside(mount.dir)).map(mount => mount.dir)
+  const libraries = [...installed, ...await extensionPackages(root, installed, [...mountDirs, ...editor === undefined || !outside(editor) ? [] : [dirname(editor)]])]
   const fromLibraries = await reachableLibraryFiles(root, libraries, [...own, ...mounted], graph)
 
   return { files: [...own, ...mounted, ...fromLibraries.components], own, mounted, editor, libraries, fromLibraries }
