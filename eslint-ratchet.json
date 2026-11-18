@@ -218,7 +218,7 @@
   },
   "src/server/prerender.ts": {
     "max-lines-per-function": 267,
-    "complexity": 110
+    "complexity": 109
   },
   "src/server/protection.ts": {
     "max-lines": 729,
