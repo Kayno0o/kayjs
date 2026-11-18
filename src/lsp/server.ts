@@ -22,6 +22,7 @@ import { CONFIG_FILE } from '../config'
 import { loadConfigWithin } from '../config-loader'
 import { tailwindSorter } from '../format/tailwind'
 import { projectPaths, projectRootOf } from '../project'
+import { forgetEnvCalls } from '../server/env-state'
 import { routeMounts } from '../server/routes'
 import { codeActions } from './code-actions'
 import { completion, resolveCompletion } from './completions'
@@ -444,6 +445,8 @@ export class KayLanguageServer implements LspHost {
     for (const path of Object.keys(require.cache)) {
       if (path.startsWith(root) && !path.startsWith(OWN_MODULES) && !path.split(sep).includes('node_modules'))
         delete require.cache[path]
+
+      forgetEnvCalls(path)
     }
 
     const config = await projectConfig(project.root)

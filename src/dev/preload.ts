@@ -9,6 +9,7 @@ import { projectPaths } from '../project'
 import { forgetIdleApps, listenIdleApps } from '../server/auto-listen'
 import { forgetModules } from '../server/bundle'
 import { announceReload, stopRunning } from '../server/dev'
+import { forgetEnvCalls } from '../server/env-state'
 import { registerEarlyLoader } from '../server/loader'
 import { disposeOwned, onReload } from '../server/reload'
 import { loopbackTaken } from './loopback'
@@ -394,8 +395,10 @@ async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Pro
 
     forgetModules()
 
-    for (const file of plan.evict)
+    for (const file of plan.evict) {
       delete require.cache[file]
+      forgetEnvCalls(file)
+    }
 
     run++
     calls = 0

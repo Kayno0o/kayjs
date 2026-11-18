@@ -2,7 +2,8 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { listEnv } from '../src/commands/env'
-import { buildingWithoutEnv, listingEnv, recordEnv } from '../src/server/env-state'
+import { forgetModules } from '../src/server/bundle'
+import { buildingWithoutEnv, forgetEnvCalls } from '../src/server/env-state'
 import { scratchDir } from './scratch'
 
 const dirs: string[] = []
@@ -58,22 +59,37 @@ describe('the variables of one project\'s listing', () => {
     expect(await names(second)).not.toContain('INNER_ONLY')
   })
 
-  it('drop a call a module made again at the same place with another schema', () => {
+  it('keep every schema of a wrapper called twice and of a loop', async () => {
     buildingWithoutEnv()
-    listingEnv().length = 0
 
-    let calls = 0
-    // Not a tail call, which the engine leaves out of the stack.
-    const declare = (name: string) => {
-      recordEnv({ properties: { [name]: {} } }, declare)
-      calls++
-    }
+    const root = await project({
+      'kay.config.ts': 'export default { assets: { favicon: false } }\n',
+      'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nconst declare = (name: string) => defineEnv(s.Object({ [name]: s.String() }))\n\nexport const envs = [declare(\'WRAPPED_A\'), declare(\'WRAPPED_B\')]\n\nfor (const name of [\'LOOPED_A\', \'LOOPED_B\'])\n  defineEnv(s.Object({ [name]: s.String() }))\n',
+    })
+    const names = (await listEnv(root)).variables.map(variable => variable.name)
 
-    for (const name of ['OLD_NAME', 'NEW_NAME'])
-      declare(name)
+    expect(names).toEqual(expect.arrayContaining(['WRAPPED_A', 'WRAPPED_B', 'LOOPED_A', 'LOOPED_B']))
+  })
 
-    expect(calls).toBe(2)
-    expect(listingEnv().map(({ schema }) => Object.keys(schema.properties))).toEqual([['NEW_NAME']])
+  it('list only what a module declares once it is read again with another schema', async () => {
+    buildingWithoutEnv()
+
+    const root = await project({ 'kay.config.ts': 'export default { assets: { favicon: false } }\n', 'src/env.ts': env('OLD_NAME') })
+    const file = join(root, 'src/env.ts')
+    const names = async () => (await listEnv(root)).variables.map(variable => variable.name)
+
+    expect(await names()).toContain('OLD_NAME')
+
+    await Bun.write(file, env('NEW_NAME'))
+    // What `kay dev` and the editor do to read a module again.
+    forgetModules()
+    delete require.cache[file]
+    forgetEnvCalls(file)
+
+    const after = await names()
+
+    expect(after).toContain('NEW_NAME')
+    expect(after).not.toContain('OLD_NAME')
   })
 })
 

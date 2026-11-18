@@ -28,7 +28,9 @@ export function loading(): boolean {
 }
 
 // The caller's file in a stack frame such as `at /app/src/env.ts:3:20` or `at env (file:///app/src/env.ts:3:20)`.
-const FRAME_FILE = /^at (?:.*? \()?(?:file:\/\/)?(\/[^():]+):(\d+:\d+)\)?$/
+const FRAME_FILE = /^at (?:.*? \()?(?:file:\/\/)?(\/[^():]+):\d+:\d+\)?$/
+// A module imported under a query to read it again is the file before it.
+const QUERY = /\?.*$/
 // A library of kay declares its variables for the app that builds it, so the app's module is the one to list them under.
 const KAY_LIBRARY = /^@kayjs\/(?!kay(?:\/|$))/
 const libraries = new Map<string, boolean>()
@@ -40,8 +42,6 @@ export interface DeclaredEnv {
   schema: EnvSchemaRecord
   // The file that called `defineEnv`, a library's call counted as its caller's, when the stack tells.
   file?: string | undefined
-  // The call's place, the stack's `file:line:column` frames: a module read again declares at the same place, and its call replaces the earlier one.
-  site?: string | undefined
 }
 
 // Every call of `defineEnv` since a command began building without the environment, the config's own imports included, as `kay env` cannot import a module the config already loaded again. The listing takes the calls of its project and reads the modules calling `defineEnv` that are left.
@@ -57,34 +57,33 @@ export function recordEnv(schema: EnvSchemaRecord, declaredBy: (...args: never[]
   if (found === undefined)
     return
 
-  const { file, site } = callerFrame(declaredBy)
-  const earlier = site === undefined ? -1 : found.findIndex(call => call.site === site)
+  found.push({ schema, file: callerFile(declaredBy) })
+}
 
-  if (earlier === -1)
-    found.push({ schema, file, site })
-  else
-    found[earlier] = { schema, file, site }
+// A module read again declares afresh: what it declared before is dropped, whatever the stack of each load.
+export function forgetEnvCalls(file: string): void {
+  const found = (globalThis as { [LISTED]?: DeclaredEnv[] })[LISTED]
+
+  if (found === undefined)
+    return
+
+  const path = file.replace(QUERY, '')
+
+  for (let index = found.length - 1; index >= 0; index--) {
+    if (found[index]!.file === path)
+      found.splice(index, 1)
+  }
 }
 
 // The file that called `declaredBy`, a library of kay's call counted as its caller's: the frames above `declaredBy` are left out, so the first one left is whoever called it.
 export function callerFile(declaredBy: (...args: never[]) => unknown): string | undefined {
-  return callerFrame(declaredBy).file
-}
-
-function callerFrame(declaredBy: (...args: never[]) => unknown): { file?: string, site?: string } {
   const holder: { stack?: string } = {}
 
   Error.captureStackTrace(holder, declaredBy)
 
-  const frames = (holder.stack ?? '').split('\n').flatMap((line) => {
-    const [, file, position] = FRAME_FILE.exec(line.trim()) ?? []
+  const files = (holder.stack ?? '').split('\n').map(line => FRAME_FILE.exec(line.trim())?.[1])
 
-    return file === undefined ? [] : [{ file, place: `${file}:${position}` }]
-  })
-  const file = frames.find(frame => !inLibrary(frame.file))?.file
-
-  // The whole stack, so a helper wrapping `defineEnv` and called for several schemas gives each its own place.
-  return file === undefined ? {} : { file, site: frames.map(({ place }) => place).join(' < ') }
+  return files.find(file => file !== undefined && !inLibrary(file))?.replace(QUERY, '')
 }
 
 // Whether `file` belongs to a package of kay's libraries, by the name in the nearest package.json.
