@@ -203,6 +203,7 @@ export default defineMessages({
       selectAll: 'Tout sélectionner',
       selectRow: 'Sélectionner {row}',
       selected: { one: '{count} sélectionnée', other: '{count} sélectionnées' },
+      sortBy: 'Trier par',
     },
     themeToggle: { dark: 'Sombre', label: 'Thème', light: 'Clair', system: 'Système' },
     timeline: { empty: 'Aucun événement.' },
