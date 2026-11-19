@@ -1,0 +1,8 @@
+---
+import { cut, recipe } from '../styles'
+---
+head
+  style {recipe}
+  style {cut(11)}
+h1 Reversed
+p.box(class="pad") reversed

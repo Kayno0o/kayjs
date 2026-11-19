@@ -1,0 +1,11 @@
+---
+import Counter from '../components/counter.kay'
+---
+nav
+  a#to-a(href="/a") A
+  a#to-b(href="/b") B
+  a#to-c(href="/c") C
+  a#to-reversed(href="/reversed") Reversed
+  a#to-linked(href="/linked") Linked
+Counter
+slot

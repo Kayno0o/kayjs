@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - A page's `Table` that renders as plain markup passes `kay check` with its columns typed `Column<Row>[]` or holding a function `sortValue`, and renders: a use turning no interactive prop on sends nothing, so a function in the data it is given is called by the server and no `island-prop` ([islands](islands.md#make-a-component-interactive)).
+- A page swap leaves the head's styles and stylesheets in the order the next page serves them, the ones both pages share included, so a shared block declaring an `@layer` no longer comes before the page's own cut and flips the layer order, which dropped Tailwind utilities until a reload ([navigation](navigation.md)).
 
 ## 1.112.0
 

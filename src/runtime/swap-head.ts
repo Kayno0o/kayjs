@@ -144,14 +144,13 @@ export function mergeHead(next: Document, scoped = false): { loaded: Promise<unk
 
     return known
   }
-  const take = (key: string | undefined, of: (element: Element) => string | undefined = html) => {
+  const take = (key: string | undefined, of: (element: Element) => string | undefined = html): Element | undefined => {
     const at = key === undefined ? -1 : incoming.findIndex(element => of(element) === key)
 
-    if (at !== -1)
-      incoming.splice(at, 1)
-
-    return at !== -1
+    return at === -1 ? undefined : incoming.splice(at, 1)[0]
   }
+  // The next head's styles and stylesheets in the order it serves them, each with the element standing for it here once the merge is done.
+  const sheets = new Map(incoming.filter(isSheet).map(element => [element, undefined as Element | undefined]))
   const stale: HeadElement[] = []
   // Taken once every element served as it stands found its copy, so a script's meta never takes the copy of a served one of the same name.
   const named: Element[] = []
@@ -170,11 +169,16 @@ export function mergeHead(next: Document, scoped = false): { loaded: Promise<unk
     if (key !== html(element)) {
       const same = take(html(element))
 
-      if (!take(key) && !same)
+      if (take(key) === undefined && same === undefined)
         named.push(element)
     }
-    else if (!take(key) && element.tagName !== 'TITLE' && !ranAlready(element)) {
-      stale.push(element)
+    else {
+      const match = take(key)
+
+      if (match !== undefined && sheets.has(match))
+        sheets.set(match, element)
+      else if (match === undefined && element.tagName !== 'TITLE' && !ranAlready(element))
+        stale.push(element)
     }
   }
 
@@ -194,6 +198,12 @@ export function mergeHead(next: Document, scoped = false): { loaded: Promise<unk
     else if (added instanceof HTMLLinkElement && added.rel === 'stylesheet')
       loading.push(loaded(added))
 
+    if (sheets.has(element)) {
+      sheets.set(element, added)
+
+      continue
+    }
+
     // The shared stylesheet comes last, so a rule it holds that a page's own styles also write keeps the place it had in the whole stylesheet.
     const rest = added.matches(REST_LINK) ? null : document.head.querySelector(REST_LINK)
 
@@ -202,6 +212,8 @@ export function mergeHead(next: Document, scoped = false): { loaded: Promise<unk
     else
       document.head.append(added)
   }
+
+  orderSheets([...sheets.values()])
 
   return {
     loaded: Promise.all(loading),
@@ -212,6 +224,47 @@ export function mergeHead(next: Document, scoped = false): { loaded: Promise<unk
           element.remove()
       }
     },
+  }
+}
+
+function isSheet(element: Element): boolean {
+  return element.tagName === 'STYLE' || (element instanceof HTMLLinkElement && (element.rel === 'stylesheet' || element.matches(REST_LINK)))
+}
+
+// Stands the next head's styles and stylesheets in the order it serves them, the ones kept and the ones added alike: the layer order and the cascade of a page loaded afresh follow it, and a shared block declaring a layer must not come before the page's own `@layer` order. The shared stylesheet still comes last when nothing kept follows an added one.
+function orderSheets(order: (Element | undefined)[]): void {
+  const sheets = order.filter(element => element !== undefined).map(element => ({ element, added: !element.isConnected }))
+  let last: Element | undefined
+  let moved = false
+
+  for (const [at, { element, added }] of sheets.entries()) {
+    if (last !== undefined) {
+      if (added || !(last.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+        last.after(element)
+        moved ||= !added
+      }
+    }
+    else if (added) {
+      const kept = sheets.slice(at).find(each => !each.added)
+      const rest = element.matches(REST_LINK) ? null : document.head.querySelector(REST_LINK)
+
+      if (kept !== undefined)
+        kept.element.before(element)
+      else if (rest !== null)
+        rest.before(element)
+      else
+        document.head.append(element)
+    }
+
+    last = element
+  }
+
+  // Chrome keeps the layer order it had when a style moved, so each style is put back where it stands for it to be worked out again.
+  if (moved) {
+    for (const { element } of sheets) {
+      if (element instanceof HTMLStyleElement)
+        element.after(element)
+    }
   }
 }
 

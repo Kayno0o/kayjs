@@ -1,0 +1,8 @@
+---
+import { recipe } from '../styles'
+---
+head
+  link(rel="stylesheet" href="/linked.css")
+  style {recipe}
+h1 Linked
+p.box(class="pad") linked

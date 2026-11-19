@@ -1,0 +1,8 @@
+---
+import { cut, recipe } from '../styles'
+---
+head
+  style {cut(11)}
+  style {recipe}
+h1 A
+p.box(class="pad") a
