@@ -47,6 +47,12 @@ describe('an island that lists the props making it interactive', () => {
     expect(() => drawn({ sortable: false, selectable: true, rows } as never)).toThrow(IslandPropsError)
   })
 
+  it('is plain markup when one object holding a function is given twice', () => {
+    const column = { key: 'a', sortValue: (row: number) => -row }
+
+    expect(drawn({ sortable: false, rows: [column, column] } as never)).not.toContain('<slot')
+  })
+
   it('is an island for an action in a prop it does not list, which is sent to the browser', () => {
     const action = Object.assign(() => undefined, { [ACTION]: true, url: '/_kay/action/pick' })
 

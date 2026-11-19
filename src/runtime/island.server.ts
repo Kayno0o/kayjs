@@ -338,25 +338,35 @@ function isThenable(value: unknown): boolean {
 }
 
 // The value with the functions in it left out and a class instance read as the object of its fields, which a use rendered on the server calls and never sends: a `Column[]` whose `sortValue` is a function.
-function withoutFunctions(value: unknown, seen = new WeakSet<object>()): unknown {
+// An object met again, shared or in a cycle, gets the copy made the first time.
+function withoutFunctions(value: unknown, copies = new Map<object, unknown>()): unknown {
   if (typeof value === 'function')
     return undefined
 
-  if (typeof value !== 'object' || value === null || seen.has(value))
+  if (typeof value !== 'object' || value === null)
     return value
 
-  if (Array.isArray(value)) {
-    seen.add(value)
-
-    return value.map(item => withoutFunctions(item, seen))
-  }
+  if (copies.has(value))
+    return copies.get(value)
 
   if (value instanceof Date || value instanceof Map || value instanceof Set || value instanceof URL || value instanceof RegExp || value instanceof Blob)
     return value
 
-  seen.add(value)
+  if (Array.isArray(value)) {
+    const copy: unknown[] = []
 
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, withoutFunctions(item, seen)]))
+    copies.set(value, copy)
+    for (const item of value) copy.push(withoutFunctions(item, copies))
+
+    return copy
+  }
+
+  const copy: Record<string, unknown> = {}
+
+  copies.set(value, copy)
+  for (const [key, item] of Object.entries(value)) copy[key] = withoutFunctions(item, copies)
+
+  return copy
 }
 
 // Whether the props, the functions in them aside, could cross to the browser, so a use that an island would refuse is still told of it.
