@@ -45,7 +45,7 @@ describe('controls in a container narrower than their text', () => {
 describe('count pills of the navigation components', () => {
   it('hold their number inside vertical padding, as Badge does', async () => {
     await using page = await site.open('/count-pills')
-    const pills = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('[data-part="badge"]')].map(pill => ({ id: pill.closest('[id]')?.id, top: Number.parseFloat(getComputedStyle(pill).paddingTop), bottom: Number.parseFloat(getComputedStyle(pill).paddingBottom) })))
+    const pills = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('[data-part="badge"]')].map(pill => ({ top: Number.parseFloat(getComputedStyle(pill).paddingTop), bottom: Number.parseFloat(getComputedStyle(pill).paddingBottom) })))
 
     // TabNav, Tabs, SideNav and SiteNav each draw one.
     expect(pills.length).toBeGreaterThanOrEqual(4)
