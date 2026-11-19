@@ -19,7 +19,8 @@ const look = recipe({
     search: 'flex shrink-0 items-center gap-2 border-b border-border px-4',
     // The icon of the search line and of an option.
     icon: 'size-5 shrink-0 text-[var(--color-muted)]',
-    input: 'h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-[var(--color-muted)] focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:[outline-offset:-2px]',
+    // 16px on a touch screen or a narrow window, as theme.css gives the fields: iOS zooms the page in on less.
+    input: 'h-11 min-w-0 flex-1 bg-transparent text-sm max-[40rem]:text-base pointer-coarse:text-base text-foreground outline-none placeholder:text-[var(--color-muted)] focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:[outline-offset:-2px]',
     list: 'min-h-0 flex-1 overflow-y-auto py-1',
     heading: 'px-4 pt-2 pb-1',
     // The tint alone is too faint to find, so an accent bar marks the option Enter opens; forced colours drop both and paint the transparent outline instead. One holding a section the site search found writes data-snippet, taller than the others.
