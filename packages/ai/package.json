@@ -64,7 +64,7 @@
     }
   },
   "dependencies": {
-    "@kaynooo/utils": "^3.1.0"
+    "@kaynooo/utils": "^3.2.0"
   },
   "devDependencies": {
     "@kayjs/ui": "workspace:~",

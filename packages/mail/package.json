@@ -57,7 +57,7 @@
     "kay": "~1.110.0"
   },
   "dependencies": {
-    "@kaynooo/utils": "^3.1.0",
+    "@kaynooo/utils": "^3.2.0",
     "nodemailer": "^10.2.1"
   },
   "devDependencies": {

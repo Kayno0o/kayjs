@@ -391,7 +391,7 @@ export function pgAuth(db: Database): AuthStore {
       grants: {
         get: async (userId, clientId) => toOAuthGrant(await oauthGrants.read.findOne({ user_id: userId, client_id: clientId })),
         async upsert(grant) {
-          await oauthGrants.write.upsertOne({ user_id: grant.userId, client_id: grant.clientId, client_name: grant.clientName, scopes: grant.scopes, created_at: grant.createdAt, last_used_at: grant.lastUsedAt }, ['user_id', 'client_id'], ['client_name', 'scopes', 'last_used_at'])
+          await oauthGrants.write.upsertOne({ user_id: grant.userId, client_id: grant.clientId, client_name: grant.clientName, scopes: grant.scopes, created_at: grant.createdAt, last_used_at: grant.lastUsedAt }, ['user_id', 'client_id'], { update: ['client_name', 'scopes', 'last_used_at'] })
         },
         async touch(userId, clientId, at) {
           await oauthGrants.write.updateMany({ last_used_at: at }, { user_id: userId, client_id: clientId }, { pk: true })

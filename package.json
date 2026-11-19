@@ -262,7 +262,7 @@
   },
   "peerDependencies": {
     "@happy-dom/global-registrator": "^20.14.6 || ^21.0.3",
-    "@kaynooo/pg-orm": "^7.0.0 || ^8.0.0",
+    "@kaynooo/pg-orm": "^7.0.0 || ^8.0.0 || ^9.0.0",
     "@types/bun": "^1.4.4",
     "axe-core": "^4.14.0",
     "happy-dom": "^20.14.6 || ^21.0.3",
@@ -287,8 +287,8 @@
   },
   "dependencies": {
     "@jsquash/avif": "2.1.1",
-    "@kaynooo/cli-kit": "0.46.2",
-    "@kaynooo/utils": "^3.1.0",
+    "@kaynooo/cli-kit": "0.47.0",
+    "@kaynooo/utils": "^3.2.0",
     "@resvg/resvg-js": "^2.6.2",
     "devalue": "^6.0.3",
     "elysia": "^1.4.31",
@@ -310,7 +310,7 @@
     "@kayjs/mail": "workspace:*",
     "@kayjs/ui": "workspace:*",
     "@kaynooo/eslint": "^8.0.3",
-    "@kaynooo/pg-orm": "^8.1.4",
+    "@kaynooo/pg-orm": "^9.0.0",
     "@oxc-parser/binding-wasm32-wasip1": "0.155.0",
     "@types/babel__traverse": "^7.28.0",
     "@types/bun": "^1.4.4",

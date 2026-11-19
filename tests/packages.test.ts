@@ -1,6 +1,8 @@
+import type { FloorTable } from '../scripts/utils-floor'
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { breakingRefused } from '../scripts/breaking'
+import { floorOf, libraryImports, missingFrom, utilsImports } from '../scripts/utils-floor'
 import { archiveOldest, capNewest, capPage, capUnreleased, failedPageTests, indexArchive, lateLines, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, restoreTree, stampUnreleased, trimArchive } from '../scripts/whats-new'
 import { scratchDir } from './scratch'
 
@@ -76,15 +78,34 @@ describe('kay\'s libraries', () => {
     expect(importers.sort()).toEqual(['src/server/pg-orm.ts', 'src/test/database.ts'])
   })
 
-  // CI installs pg-orm 8 alone, so nothing else would notice a peer range dropping the 7 that apps still run (#2604).
-  it('peer on pg-orm 7 as well as 8, wherever they ask for it', () => {
+  // CI installs one pg-orm, so nothing else would notice kay's peer range dropping a major apps still run (#2604); kayjs-auth asks for 9 alone, as its upsert takes the options object only 9 reads (#3418).
+  it('peer on pg-orm 7, 8 and 9 in kay, and 9 in kayjs-auth', () => {
     const peers = [root, ...libraries.map(({ manifest }) => manifest)].flatMap(({ name, peerDependencies }) => {
       const range = peerDependencies?.['@kaynooo/pg-orm']
 
       return range === undefined ? [] : [{ name, range }]
     })
 
-    expect(peers.filter(({ range }) => !['7.2.0', '8.0.0'].every(version => Bun.semver.satisfies(version, range)))).toEqual([])
+    expect(peers.filter(({ name, range }) => !(name === root.name ? ['7.2.0', '8.0.0', '9.0.0'] : ['9.0.0']).every(version => Bun.semver.satisfies(version, range)))).toEqual([])
+  })
+
+  // An app's lockfile keeps the lowest @kaynooo/utils a range allows, so an import of a module or a name added later fails in the app's `kay check` alone (#3446). tests/utils-floor.json holds that version's exports, read from the registry by `bun scripts/utils-floor.ts --update`.
+  it('import from @kaynooo/utils only what the lowest version its range allows exports', async () => {
+    const table = await Bun.file('tests/utils-floor.json').json() as FloorTable
+    const libraries = await libraryImports()
+
+    expect(libraries.filter(({ floor }) => floor !== undefined && table[floor] === undefined).map(({ library, floor }) => `${library}: run bun scripts/utils-floor.ts --update for ${floor}`)).toEqual([])
+    expect(libraries.flatMap(({ floor, imports }) => floor === undefined || table[floor] === undefined ? [] : missingFrom(table[floor], imports))).toEqual([])
+  })
+
+  it('reads the names an import takes from @kaynooo/utils', () => {
+    expect(floorOf('^3.2.0')).toBe('3.2.0')
+    expect(utilsImports('a.kay', `import { copyToClipboard, type ClipboardEntry as Entry } from '@kaynooo/utils/browser/clipboard'\nimport {\n  sleep,\n} from '@kaynooo/utils'\nawait import('@kaynooo/utils/text')`)).toEqual([
+      { file: 'a.kay', module: 'browser/clipboard', names: ['copyToClipboard', 'ClipboardEntry'] },
+      { file: 'a.kay', module: '', names: ['sleep'] },
+      { file: 'a.kay', module: 'text', names: [] },
+    ])
+    expect(missingFrom({ 'browser/clipboard': ['copyToClipboard'] }, [{ file: 'a.kay', module: 'browser/clipboard', names: ['readClipboardEntries'] }, { file: 'b.ts', module: 'text', names: [] }])).toEqual(['a.kay: @kaynooo/utils/browser/clipboard has no readClipboardEntries', 'b.ts: @kaynooo/utils/text does not exist'])
   })
 
   // An app installs only these fields of kay and of a library, so a bare import of a published file naming a devDependency fails in the app alone: cli-kit did so from 1.98 to 1.102 (#3276).

@@ -66,7 +66,7 @@
   },
   "peerDependencies": {
     "@kayjs/ui": "workspace:~",
-    "@kaynooo/pg-orm": "^7.1.2 || ^8.0.0",
+    "@kaynooo/pg-orm": "^9.0.0",
     "elysia": "^1.4.31",
     "kay": "~1.110.0"
   },
@@ -76,14 +76,14 @@
     }
   },
   "dependencies": {
-    "@kaynooo/utils": "^3.1.0",
+    "@kaynooo/utils": "^3.2.0",
     "jose": "^6.2.13"
   },
   "devDependencies": {
     "@kayjs/mail": "workspace:~",
     "@kayjs/ui": "workspace:~",
     "@kaynooo/eslint": "^8.0.3",
-    "@kaynooo/pg-orm": "^8.1.4",
+    "@kaynooo/pg-orm": "^9.0.0",
     "@types/bun": "^1.4.4",
     "elysia": "^1.4.31",
     "typescript": "^6.0.3"
