@@ -342,7 +342,8 @@ describe('the confirmation link', () => {
 
     expect(answer).toContain('Subscription confirmed')
     expect(answer).not.toContain('is now subscribed')
-    expect(answer).not.toContain('system-ui,sans-serif')
+    expect(answer).not.toContain('max-width:32rem')
+    expect(answer).toContain('Segoe UI')
     expect(await mail.list().count()).toBe(count)
     expect((await mail.list().subscribers()).filter(row => row.email === email)).toHaveLength(1)
   })
