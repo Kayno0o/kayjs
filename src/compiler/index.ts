@@ -469,6 +469,7 @@ function takeBlock(file: KayFile, filename: string, options: CompileOptions, scr
     return undefined
 
   file.template.splice(index, 1)
+  file.facts = undefined
 
   let lineStart = block.start
   const written = file.source.slice(block.start, block.end).split('\n').map((text) => {

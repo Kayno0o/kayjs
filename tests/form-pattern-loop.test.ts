@@ -40,3 +40,19 @@ describe('a form in a file with a loop over a pattern', () => {
     expect(tsx).toMatch(/import \{[^}]*formHere as KayFormHere[^}]*\} from 'kay\/internal'/)
   })
 })
+
+describe('the root part of a component with a loop over a pattern', () => {
+  const recipe = '---\nimport { recipe } from \'kay\'\nconst card = recipe({ parts: { root: \'rounded\' } })\nconst { xs } = props<{ xs: [string][] }>()\n---\n'
+  const single = '---\nconst { xs } = props<{ xs: [string][] }>()\n---\n'
+
+  for (const [name, source] of [['a single top element', single], ['a recipe', recipe]] as const) {
+    it(`is kept with ${name}, as beside a plain loop`, () => {
+      const body = (loop: string) => `section\n  ${loop}\n    p {a}\n`
+      const pattern = compileKay(`${source}${body('for [a] of xs key={a}')}`, 'src/card.kay', { output: 'html' }).tsx
+      const plain = compileKay(`${source}${body('for a of xs key={a}')}`, 'src/card.kay', { output: 'html' }).tsx
+
+      expect(pattern.includes('KayPartClass')).toBe(plain.includes('KayPartClass'))
+      expect(pattern.match(/<section[^>]*/)?.[0]).toBe(plain.match(/<section[^>]*/)?.[0])
+    })
+  }
+})
