@@ -1,2 +1,0 @@
-ai [./chat-launcher.kay] default
-ai [./chat.kay] default
