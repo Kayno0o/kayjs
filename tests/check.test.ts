@@ -4174,11 +4174,12 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('measures a literal title in the seo.titleTemplate as the build does, unless it is raw', async () => {
+  // Seven checks of one project ran near the 90 s bound under CI's load, so the cases run as three tests, each on its own copy.
+  const WRAPPED = ' | A Site Of Twenty-One'
+  const titleProject = async () => {
     const head = (lines: string[]) => `--- server\nexport const page = { prerender: true }\n---\nhead\n${lines.map(line => `  ${line}`).join('\n')}\nh1 Hi\n`
     const description = 'meta(name="description" content="Fine")'
-    const wrapped = ' | A Site Of Twenty-One'
-    const room = TITLE_LENGTH - wrapped.length
+    const room = TITLE_LENGTH - WRAPPED.length
     const root = await scratchProject({
       'src/routes/short.kay': head(['title Short', description]),
       'src/routes/exact.kay': head([`title ${'b'.repeat(room)}`, description]),
@@ -4190,23 +4191,32 @@ describe.concurrent('kay check, unused code', () => {
     const options = { site: 'https://example.com', assets: { favicon: false as const }, lints: { 'unsized-share-image': 'allow', 'duplicate-title': 'allow' } as const }
     const found = async (titleTemplate: string | Record<string, string> | undefined, over: Partial<CheckOptions> = {}) => (await check(root, { ...options, ...over, seo: { description: 'The site', image: '/og.png', titleTemplate } })).filter(d => d.code === 'long-title').map(d => basename(d.file))
 
-    try {
-      // Without a template the literal alone is measured, and a `raw` title or one that may be marked so is never wrapped.
-      expect(await found(undefined)).toEqual([])
-      expect(await found('')).toEqual([])
-      expect(await found(`%s${wrapped}`)).toEqual(['over.kay'])
-      expect(await found(`%s${wrapped}!`)).toEqual(['exact.kay', 'over.kay'])
-      // A template without `%s` replaces the title: its own length counts.
-      expect(await found('x'.repeat(TITLE_LENGTH + 1))).toEqual(['exact.kay', 'over.kay', 'short.kay'])
-      // A record reads the default locale's.
-      const i18n = (defaultLocale: string) => ({ i18n: { locales: ['en', 'fr'], default: defaultLocale } })
+    return { found, [Symbol.asyncDispose]: async () => rm(root, { recursive: true, force: true }) }
+  }
 
-      expect(await found({ en: `%s${wrapped}`, fr: '%s' }, i18n('en'))).toEqual(['over.kay'])
-      expect(await found({ en: `%s${wrapped}`, fr: '%s' }, i18n('fr'))).toEqual([])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+  it('measures a literal title alone without a titleTemplate', async () => {
+    await using project = await titleProject()
+
+    expect(await project.found(undefined)).toEqual([])
+    expect(await project.found('')).toEqual([])
+  })
+
+  it('measures a literal title in the seo.titleTemplate as the build does, unless it is raw', async () => {
+    await using project = await titleProject()
+
+    // A `raw` title, or one that may be marked so, is never wrapped.
+    expect(await project.found(`%s${WRAPPED}`)).toEqual(['over.kay'])
+    expect(await project.found(`%s${WRAPPED}!`)).toEqual(['exact.kay', 'over.kay'])
+    // A template without `%s` replaces the title: its own length counts.
+    expect(await project.found('x'.repeat(TITLE_LENGTH + 1))).toEqual(['exact.kay', 'over.kay', 'short.kay'])
+  })
+
+  it('measures a literal title in the default locale\'s titleTemplate of a record', async () => {
+    await using project = await titleProject()
+    const i18n = (defaultLocale: string) => ({ i18n: { locales: ['en', 'fr'], default: defaultLocale } })
+
+    expect(await project.found({ en: `%s${WRAPPED}`, fr: '%s' }, i18n('en'))).toEqual(['over.kay'])
+    expect(await project.found({ en: `%s${WRAPPED}`, fr: '%s' }, i18n('fr'))).toEqual([])
   })
 
   it('reports a chain among the redirects of the config, at its line, without a build', async () => {
