@@ -12,7 +12,7 @@ const PACKAGE = '@kaynooo/utils'
 const IMPORT = /\b(?:import|export)\b([^'";]*?\s)from\s*['"]@kaynooo\/utils(?:\/([^'"]+))?['"]/g
 const BRACES = /\{([^}]*)\}/
 const DYNAMIC_IMPORT = /import\(\s*['"]@kaynooo\/utils(?:\/([^'"]+))?['"]\s*\)/g
-const DECLARATION = /^export\s+declare\s+(?:abstract\s+)?(?:async\s+)?(?:function|const|let|var|class|enum|namespace)\s+([\w$]+)|^export\s+(?:interface|type)\s+([\w$]+)|^export\s+declare\s+(?:interface|type)\s+([\w$]+)/gm
+const DECLARATION = /^export\s+declare\s+(?:abstract\s+)?(?:async\s+)?(?:function|const\s+enum|const|let|var|class|enum|namespace)\s+([\w$]+)|^export\s+(?:interface|type)\s+([\w$]+)|^export\s+declare\s+(?:interface|type)\s+([\w$]+)/gm
 const REEXPORT = /^export\s+(?:type\s+)?\{([^}]*)\}(?:\s*from\s*['"]([^'"]+)['"])?|^export\s+\*\s+from\s*['"]([^'"]+)['"]/gm
 const VERSION = /\d+\.\d+\.\d+/
 const INDEX_DECLARATION = /\/index\.d\.ts$/
@@ -69,7 +69,12 @@ export async function libraryImports(): Promise<{ library: string, floor: string
     for (const file of await Array.fromAsync(new Glob('src/**/*.{ts,tsx,kay}').scan(join(ROOT, dir))))
       imports.push(...utilsImports(`${dir}/${file}`, await Bun.file(join(ROOT, dir, file)).text()))
 
-    result.push({ library: dir, floor: range === undefined ? undefined : floorOf(range), imports })
+    const floor = range === undefined ? undefined : floorOf(range)
+
+    if (imports.length > 0 && floor === undefined)
+      throw new Error(`${dir} imports ${PACKAGE} and its range ${range ?? '(none)'} names no x.y.z floor`)
+
+    result.push({ library: dir, floor, imports })
   }
 
   return result
