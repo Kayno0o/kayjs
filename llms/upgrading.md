@@ -8,6 +8,9 @@ What each release breaks, and what an app changes to move to it. kay and its lib
 
 kayjs-auth's Postgres store writes an OAuth grant with `insertOne`'s `skipConflicts`, which pg-orm 7 lacks, so its peer range is `^8.0.0 || ^9.0.0`. An app on pg-orm 7 moves to 8 or 9 with it (`bun add @kaynooo/pg-orm@^8.0.0`, then pg-orm's `MIGRATION_v8.0.0.md`); kay's own `kay/pg-orm` still takes 7.
 
+### kayjs-ai's Chat is flat and its controls are kayjs-ui's
+
+The panel and the launcher have no shadow by default (`--kai-chat-shadow` still sets one). The suggestions, the edit's Save and Cancel, Try again, Allow and Deny and the conversation list's links are kayjs-ui `Button`s, and a conversation's delete is `ConfirmDelete` asking inline, so the parts `deleteConfirm` and `confirm` are gone: restyle `delete` (the trigger) instead. A `restyle` rule on the chat's own buttons now reaches kayjs-ui's classes. `labels.allowed` and `labels.denied` lose their colon (`Allowed add_note …`), a model prompt reading the old `Allowed:` start needs the new one, and the failure text ends on what to do, `The reply failed. Send your message again.`: set `labels.error` to keep yours.
 
 ### A block's or a snippet's plain parameter is read-only in a component that renders again
 

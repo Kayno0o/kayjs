@@ -44,7 +44,7 @@ export interface ChatLabels {
   failed?: string | undefined
   arguments?: string | undefined
   result?: string | undefined
-  // A tool that changes something waits for the visitor: the line naming it (`Needs your approval`), its two buttons, and the start of the message each posts (`Allowed:` then the tool and its arguments, `Denied:` then the tool).
+  // A tool that changes something waits for the visitor: the line naming it (`Needs your approval`), its two buttons, and the start of the message each posts (`Allowed` then the tool and its arguments, `Denied` then the tool).
   approval?: string | undefined
   allow?: string | undefined
   deny?: string | undefined

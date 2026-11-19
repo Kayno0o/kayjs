@@ -327,7 +327,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await replied(page)
 
     expect(done).toEqual([])
-    expect(await page.text('.kai-chat-approval-text')).toContain('add_note {"title":"Milk"}')
+    expect(await page.text('.kai-chat-approval-text')).toContain('add_note: title: "Milk"')
     expect(await page.text('[role="status"]')).toContain('add_note: Needs your approval')
     expect(await page.text(`${turn} .kai-chat-call-status`)).toBe('Needs your approval')
 
@@ -353,7 +353,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await replied(page)
 
     expect(done).toEqual(['addNote:Milk'])
-    expect(fakeAi.last()?.messages.at(-1)?.content).toStartWith('Denied: add_note')
+    expect(fakeAi.last()?.messages.at(-1)?.content).toStartWith('Denied add_note')
     expect(page.errors).toEqual([])
   })
 

@@ -419,6 +419,7 @@ it('names the field apart from the log, and each approval button by its tool, an
   expect(await page.evaluate(() => [document.querySelector('.kai-chat-log')?.getAttribute('aria-label'), document.querySelector('.kai-chat-form textarea')?.getAttribute('aria-label')])).toEqual(['Assistant', 'Message'])
   expect(await page.evaluate(() => [...document.querySelectorAll('.kai-chat-approval button')].map(button => button.getAttribute('aria-label')))).toEqual(['Allow: add_note', 'Deny: add_note'])
   expect(await focused(page)).toBe('button.kui-btn|Allow: add_note')
+  expect(await page.evaluate(() => document.querySelector('.kai-chat-approval-text')?.textContent)).toBe('add_note: title: "Milk"')
   expect(page.errors).toEqual([])
 }, 120_000)
 

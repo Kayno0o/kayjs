@@ -36,7 +36,7 @@ function status(call: AiToolCall) {
 
 const iconOf = (name: string) => icons?.[name] as IconProps | undefined
 
-// Each tool once with its count: `Searched the docs x2`, `read_page`.
+// Each tool once with its count: `Searched the docs ×2`, `read_page`.
 function tools() {
   const counts = new Map<string, number>()
   const labelled = new Map<string, string>()
@@ -48,7 +48,7 @@ function tools() {
       labelled.set(call.name, call.label)
   }
 
-  return [...counts].map(([name, count]) => ({ name, text: `${labels[name] ?? labelled.get(name) ?? name}${count > 1 ? ` x${count}` : ''}` }))
+  return [...counts].map(([name, count]) => ({ name, text: `${labels[name] ?? labelled.get(name) ?? name}${count > 1 ? ` ×${count}` : ''}` }))
 }
 
 // What ends the line: the status of what is not done.
@@ -65,7 +65,7 @@ function ending() {
   return held ? ` (${approvalLabel})` : ''
 }
 
-// The calls in one line: `Searched the docs x2, read_page (Failed)`.
+// The calls in one line: `Searched the docs ×2, read_page (Failed)`.
 const summary = () => tools().map(tool => tool.text).join(', ') + ending()
 
 // Whether the line is drawn tool by tool, as it holds an icon.

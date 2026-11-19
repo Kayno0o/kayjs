@@ -45,7 +45,7 @@ function panelStyle() {
   const width = large() ? 'var(--kai-chat-width-large, 56rem)' : 'var(--kai-chat-width, 36rem)'
   const height = large() ? 'var(--kai-chat-height-large, 100dvh)' : 'var(--kai-chat-height, 40rem)'
 
-  return `position: fixed; box-sizing: border-box; padding: 0; z-index: 40; inset: auto max(1rem, env(safe-area-inset-right)) calc(5.25rem + var(--kay-dev-inset-bottom, 0px)) auto; width: min(${width}, calc(100vw - 2rem)); height: min(${height}, calc(100dvh - 7.5rem)); max-width: none; max-height: none; border: 1px solid var(--color-border); border-radius: calc(var(--kai-chat-radius, 0.75rem) + 0.25rem); background-color: var(--color-background); box-shadow: var(--kai-chat-shadow, 0 0.75rem 2.5rem rgb(0 0 0 / 22%), 0 0 0 1px light-dark(transparent, rgb(255 255 255 / 6%))); transition: none; translate: none`
+  return `position: fixed; box-sizing: border-box; padding: 0; z-index: 40; inset: auto max(1rem, env(safe-area-inset-right)) calc(5.25rem + var(--kay-dev-inset-bottom, 0px)) auto; width: min(${width}, calc(100vw - 2rem)); height: min(${height}, calc(100dvh - 7.5rem)); max-width: none; max-height: none; border: 1px solid var(--color-border); border-radius: calc(var(--kai-chat-radius, 0.75rem) + 0.25rem); background-color: var(--color-background); box-shadow: var(--kai-chat-shadow, none); transition: none; translate: none`
 }
 
 const dialog = () => root?.querySelector('dialog') ?? null
@@ -175,7 +175,7 @@ effect(() => {
 })
 ---
 div(part="root" ref={element => { root = element }})
-  SidePanel(id={panelId} open={open()} onOpenChange={changed} modal={false} keep title={label} closeLabel={closeLabel} launcher={openLabel} launcherLayer={40} launcherButton={{ openLabel: closeLabel, size: 'lg', variant: 'solid', tone: 'accent', tooltip: 'left' }} style={panelStyle()} data-large={large()} parts={{ root: 'kai-launcher-panel', launcher: 'kai-launcher-button size-13 rounded-full border-0 bg-[var(--kai-chat-accent,var(--color-accent))] text-accent-foreground shadow-[0_0.25rem_1rem_rgb(0_0_0/25%)] hover:bg-accent-hover', body: 'kai-launcher-body flex flex-col px-4 pt-2 pb-3', head: 'px-4 py-2', title: 'text-[0.9375rem]' }})
+  SidePanel(id={panelId} open={open()} onOpenChange={changed} modal={false} keep title={label} closeLabel={closeLabel} launcher={openLabel} launcherLayer={40} launcherButton={{ openLabel: closeLabel, size: 'lg', variant: 'solid', tone: 'accent', tooltip: 'left' }} style={panelStyle()} data-large={large()} parts={{ root: 'kai-launcher-panel', launcher: 'kai-launcher-button size-13 rounded-full border-0 bg-[var(--kai-chat-accent,var(--color-accent))] text-accent-foreground shadow-[var(--kai-chat-shadow,none)] hover:bg-accent-hover', body: 'kai-launcher-body flex flex-col px-4 pt-2 pb-3', head: 'px-4 py-2', title: 'text-[0.9375rem]' }})
     @actions
       BareIconButton(part="new" label={newLabel} size="md" variant="ghost" tone="neutral" data-tooltip-placement="bottom span-left" onClick={startOver})
         | {newIcon}

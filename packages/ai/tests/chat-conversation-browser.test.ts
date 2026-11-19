@@ -93,7 +93,7 @@ it('lists the conversations, follows a link of the list, renames one and deletes
   await page.waitFor('.kai-chat-conversation[data-current] .kai-chat-conversation-link', { text: 'Trains' })
 
   await page.click('.kai-chat-conversation[data-current] button[aria-label^="Delete the conversation"]')
-  await page.click('.kai-chat-delete-confirm .kui-btn-danger')
+  await page.click('.kai-chat-conversation[data-current] .kui-btn-danger')
   await page.waitUntil(() => document.querySelectorAll('.kai-chat-turn').length === 0 && !location.search.includes('conversation'))
   expect(await page.count(`.kai-chat-conversation-link[href*="${trains}"]`)).toBe(0)
   // The row and its buttons went, so the focus lands on New conversation rather than the page.

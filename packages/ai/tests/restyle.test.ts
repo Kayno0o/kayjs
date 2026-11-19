@@ -56,7 +56,6 @@ describe('restyling the chat from src/ui.ts', () => {
   test.each([
     'kai-chat rounded-xl',
     'kai-chat-greeting italic',
-    'kai-chat-suggestion uppercase',
     'kai-chat-turn text-base',
     'kai-chat-log max-h-96',
     'kai-chat-calls-summary font-bold',
@@ -67,6 +66,11 @@ describe('restyling the chat from src/ui.ts', () => {
     'kai-chat-source-link underline',
   ])('draws class="%s"', (classes) => {
     expect(html).toContain(`class="${classes}"`)
+  })
+
+  // A suggestion is a kayjs-ui Button, which draws its own classes around the chat's.
+  test('a suggestion keeps the app\'s class beside the Button\'s', () => {
+    expect(html).toMatch(/class="[^"]*kai-chat-suggestion[^"]*uppercase"/)
   })
 
   test('a class string joins the root after src/ui.ts, and a variant of src/ui.ts applies to its value', () => {

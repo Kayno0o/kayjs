@@ -50,7 +50,7 @@ Chat(action={reply} conversations fill)
 ### Words and parts
 
 - Words, the keys of `labels` and of `ai.chat.<key>`: `conversations` (`Conversations`, names the list), `untitled` (`Untitled conversation`, a conversation opened on files alone), `rename` (`Rename the conversation`) and `delete` (`Delete the conversation`), each button followed by the conversation's title, `deleteConfirm` (`Delete for good?`), `conflict` (`This conversation changed in another tab, so it was reloaded.`), `loadFailed` (`The conversation could not be loaded.`), `changeFailed` (`The change could not be saved.`) and `signedOut` (`You are signed out, so this conversation is no longer saved.`); the New conversation link reads `new`. kayjs-ai ships the French.
-- Parts: `conversations` (the `nav`), `newConversation`, `conversationList`, `conversation` (a row, `data-current` on the shown one), `conversationLink`, `renameField`, `rename`, `delete`, `deleteConfirm` and `confirm`, restyled as the rest of `Chat`'s ([Restyle](chat.md#restyle)).
+- Parts: `conversations` (the `nav`), `newConversation`, `conversationList`, `conversation` (a row, `data-current` on the shown one), `conversationLink`, `renameField`, `rename` and `delete` (kayjs-ui's `ConfirmDelete`, asking inline), restyled as the rest of `Chat`'s ([Restyle](chat.md#restyle)).
 
 ### The store
 

@@ -51,29 +51,9 @@
     list-style: none;
   }
 
+  /* A suggestion is a kayjs-ui Button that holds a sentence, so it wraps and keeps its radius (the parts set both). */
   .kai-chat-suggestion {
-    max-width: 100%;
-    padding: 0.375rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: 9999px;
-    background-color: transparent;
-    color: var(--color-foreground);
-    font: inherit;
-    font-size: 0.8125rem;
     line-height: 1.4;
-    text-align: start;
-    cursor: pointer;
-    transition: background-color 0.15s, border-color 0.15s;
-  }
-
-  .kai-chat-suggestion:hover {
-    border-color: var(--kai-chat-accent, var(--color-accent));
-    background-color: var(--color-hover);
-  }
-
-  .kai-chat-suggestion:focus-visible {
-    outline: 2px solid var(--kai-chat-accent, var(--color-accent));
-    outline-offset: 2px;
   }
 
   .kai-chat-turn {
@@ -180,38 +160,11 @@
     margin: 0;
   }
 
-  /* Three pulsing dots in place of the thinking label, which stays for screen readers in the status line. */
+  /* The first words are awaited behind a still line, which the status line also says for screen readers. */
   .kai-chat-thinking {
     margin: 0;
     padding-block: 0.25rem;
-    font-size: 0;
-  }
-
-  .kai-chat-thinking::before {
-    content: '';
-    display: block;
-    width: 0.4375rem;
-    height: 0.4375rem;
-    border-radius: 9999px;
-    background-color: var(--color-muted);
-    box-shadow: 0.875rem 0 var(--color-muted), 1.75rem 0 var(--color-muted);
-    animation: kai-chat-dot 1.2s ease-in-out infinite;
-  }
-
-  @keyframes kai-chat-dot {
-    0%, 100% {
-      opacity: 0.3;
-    }
-
-    50% {
-      opacity: 1;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .kai-chat-thinking::before {
-      animation: none;
-    }
+    color: var(--color-muted);
   }
 
   .kai-chat-note {
@@ -614,33 +567,6 @@
     }
   }
 
-  .kai-chat-conversation-new {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.375rem 0.5rem;
-    border-radius: 0.5rem;
-    color: var(--color-foreground);
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  /* A chat named by the browser lists buttons rather than links. */
-  :is(button.kai-chat-conversation-new, button.kai-chat-conversation-link) {
-    border: 0;
-    background: none;
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
-    text-align: start;
-    cursor: pointer;
-  }
-
-  .kai-chat-conversation-new .kui-icon {
-    width: 1rem;
-    height: 1rem;
-  }
-
   .kai-chat-conversation-list {
     display: flex;
     flex-direction: column;
@@ -659,42 +585,17 @@
     border-radius: 0.5rem;
   }
 
-  .kai-chat-conversation-new:hover,
   .kai-chat-conversation:hover,
   .kai-chat-conversation[data-current] {
     background-color: var(--color-hover);
-  }
-
-  .kai-chat-conversation-link {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    padding: 0.375rem 0.5rem;
-    color: var(--color-foreground);
-    text-decoration: none;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .kai-chat-conversation-link[aria-current] {
     font-weight: 600;
   }
 
-  :is(.kai-chat-conversation-new, .kai-chat-conversation-link):focus-visible {
-    outline: 2px solid var(--kai-chat-accent, var(--color-accent));
-    outline-offset: -2px;
-  }
-
   .kai-chat-rename-field {
     flex: 1;
     min-width: 0;
-  }
-
-  .kai-chat-delete-confirm {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.375rem 0.5rem;
   }
 }

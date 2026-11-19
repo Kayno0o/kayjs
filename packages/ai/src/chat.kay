@@ -5,6 +5,8 @@ import type { ByteSize } from 'kay/library'
 import type { AiToolCall, ChatFailure, ChatIconName, ChatIcons, ChatIconValue, ChatLabels, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source } from './types'
 import { composing, durationMs, effect, escapeHtml, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
 import BareIconButton from '@kayjs/ui/bare-icon-button.kay'
+import Button from '@kayjs/ui/button.kay'
+import ConfirmDelete from '@kayjs/ui/confirm-delete.kay'
 import Icon from '@kayjs/ui/icon.kay'
 import Notice from '@kayjs/ui/notice.kay'
 import Textarea from '@kayjs/ui/textarea.kay'
@@ -19,6 +21,7 @@ import { citedAsWritten, linkAsWritten, linkSources, mayLeave, opensApart, REL_A
 import { conversationKey, filesOf, POSTED_CHARACTERS } from './chat-history'
 import { createAttachments, fileKey, fileSizeLimit } from './chat-attachments'
 import { chatIcon } from './chat-icon'
+import { inputSummary } from './chat-summary'
 import type { SpeakAction } from './chat-reader'
 import { createReader, spokenText } from './chat-reader'
 import { createChatSession } from './chat-session'
@@ -31,7 +34,7 @@ import './chat.css'
 
 // The chat's own classes are its parts, so an app restyles them from src/ui.ts or a `class` object. The table of a reply is built as a string and keeps its class.
 const look = recipe({
-  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text kui-prose', thinking: 'kai-chat-text kai-chat-thinking', reasoning: 'kai-chat-reasoning', reasoningText: 'kai-chat-reasoning-text', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', editField: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', actions: 'kai-chat-actions', regenerate: 'kai-chat-action', edit: 'kai-chat-action', play: 'kai-chat-action kai-chat-play', save: 'kai-chat-save kui-btn', cancel: 'kai-chat-cancel kui-btn', send: 'kai-chat-send', new: 'kai-chat-new', retry: 'kui-btn', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kui-btn', deny: 'kui-btn', attach: 'kai-chat-attach', files: 'kai-chat-files', file: 'kai-chat-file', remove: 'kai-chat-file-remove', record: 'kai-chat-record', recordSpinner: 'animate-spin motion-reduce:animate-none', conversations: 'kai-chat-conversations', newConversation: 'kai-chat-conversation-new', conversationList: 'kai-chat-conversation-list', conversation: 'kai-chat-conversation', conversationLink: 'kai-chat-conversation-link', renameField: 'kai-chat-rename-field', rename: 'kai-chat-action', delete: 'kai-chat-action', deleteConfirm: 'kai-chat-delete-confirm', confirm: 'kui-btn kui-btn-danger' },
+  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion h-auto max-w-full text-start font-normal whitespace-normal rounded-lg', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text kui-prose', thinking: 'kai-chat-text kai-chat-thinking', reasoning: 'kai-chat-reasoning', reasoningText: 'kai-chat-reasoning-text', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', editField: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', actions: 'kai-chat-actions', regenerate: 'kai-chat-action', edit: 'kai-chat-action', play: 'kai-chat-action kai-chat-play', save: 'kai-chat-save', cancel: 'kai-chat-cancel', send: 'kai-chat-send', new: 'kai-chat-new', retry: 'kai-chat-retry', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kai-chat-allow', deny: 'kai-chat-deny', attach: 'kai-chat-attach', files: 'kai-chat-files', file: 'kai-chat-file', remove: 'kai-chat-file-remove', record: 'kai-chat-record', recordSpinner: 'animate-spin motion-reduce:animate-none', conversations: 'kai-chat-conversations', newConversation: 'kai-chat-conversation-new w-full justify-start font-semibold', conversationList: 'kai-chat-conversation-list', conversation: 'kai-chat-conversation', conversationLink: 'kai-chat-conversation-link min-w-0 flex-1 justify-start overflow-hidden text-ellipsis', renameField: 'kai-chat-rename-field', rename: 'kai-chat-action', delete: 'kai-chat-action' },
   variants: {
     // The structure: `bubble` frames the visitor's messages, `plain` draws them as bare text.
     layout: { bubble: '', plain: '' },
@@ -180,8 +183,8 @@ const resultLabel = labels.result ?? wording('ai.chat.result', 'Result')
 const approvalLabel = labels.approval ?? wording('ai.chat.approval', 'Needs your approval')
 const allowLabel = labels.allow ?? wording('ai.chat.allow', 'Allow')
 const denyLabel = labels.deny ?? wording('ai.chat.deny', 'Deny')
-const allowedLabel = labels.allowed ?? wording('ai.chat.allowed', 'Allowed:')
-const deniedLabel = labels.denied ?? wording('ai.chat.denied', 'Denied:')
+const allowedLabel = labels.allowed ?? wording('ai.chat.allowed', 'Allowed')
+const deniedLabel = labels.denied ?? wording('ai.chat.denied', 'Denied')
 const attachLabel = labels.attach ?? wording('ai.chat.attach', 'Attach a file')
 const removeLabel = labels.remove ?? wording('ai.chat.remove', 'Remove')
 const attachRefusedLabel = labels.attachRefused ?? wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.')
@@ -233,7 +236,7 @@ const session = createChatSession({
   get keep() { return lastMessages ?? 20 },
   get maxChars() { return maxChars },
   get remember() { return remember },
-  get errorMessage() { return labels.error ?? wording('ai.chat.error', 'The reply failed.') },
+  get errorMessage() { return labels.error ?? wording('ai.chat.error', 'The reply failed. Send your message again.') },
   attachments,
   say: call => `${call.name}: ${call.approval === undefined ? statuses[call.status] : approvalLabel}`,
   focus: () => field?.focus(),
@@ -514,6 +517,15 @@ function reset() {
   refocus = undefined
 }
 
+// The tool as the visitor knows it, by the label the app or the call gave it, and what the row says of a call held for the visitor's yes: that name and a line of its input.
+const toolName = (call: AiToolCall) => toolLabels[call.name] ?? call.label ?? call.name
+
+function approvalText(call: AiToolCall) {
+  const summary = inputSummary(call.input)
+
+  return summary === '' ? toolName(call) : `${toolName(call)}: ${summary}`
+}
+
 // The visitor's answer to a held tool call is their next message: the allowance carries the ticket the server issued for that very call.
 function decide(call: AiToolCall, allowed: boolean) {
   if (!allowed)
@@ -735,12 +747,11 @@ function keyDown(event: KeyboardEvent) {
   }
 }
 
-// The listed conversation being renamed and what its field holds, the one whose delete waits for a confirm, and why the last change failed.
+// The listed conversation being renamed and what its field holds, and why the last change failed.
 const renaming = signal<string | undefined>(undefined)
 const renameDraft = signal('')
-const deleting = signal<string | undefined>(undefined)
 const listProblem = signal<string | undefined>(undefined)
-// The button whose rename or delete just closed (`<id>:rename`, `<id>:delete`), which takes the focus back once it is drawn.
+// The button whose rename just closed (`<id>:rename`), which takes the focus back once it is drawn.
 let listFocus: string | undefined
 // Takes the focus once a delete took its row away, as the row's buttons went with it.
 let newConversation: HTMLElement | undefined
@@ -748,7 +759,6 @@ let newConversation: HTMLElement | undefined
 const titled = (title: string) => title === '' ? untitledLabel : title
 
 function startRename(id: string, title: string) {
-  deleting = undefined
   renaming = id
   renameDraft = title
   listProblem = undefined
@@ -757,17 +767,6 @@ function startRename(id: string, title: string) {
 function closeRename(id: string) {
   renaming = undefined
   listFocus = `${id}:rename`
-}
-
-function startDelete(id: string) {
-  renaming = undefined
-  deleting = id
-  listProblem = undefined
-}
-
-function cancelDelete(id: string) {
-  deleting = undefined
-  listFocus = `${id}:delete`
 }
 
 // A blank title keeps the one it had; the list shows the new one once the server took it.
@@ -803,8 +802,8 @@ function renameKey(event: KeyboardEvent, id: string) {
   }
 }
 
-async function confirmDelete(id: string) {
-  deleting = undefined
+// What ConfirmDelete runs once the visitor confirmed: it never throws, so the pair closes either way and a refusal shows as the list's notice.
+async function removeConversation(id: string) {
   queueMicrotask(() => newConversation?.focus())
 
   try {
@@ -817,14 +816,7 @@ async function confirmDelete(id: string) {
   }
 }
 
-function deleteKey(event: KeyboardEvent, id: string) {
-  if (event.key === 'Escape' && !event.isComposing) {
-    cancelDelete(id)
-    leaveEscape(event)
-  }
-}
-
-// Takes the focus when this button's rename or delete just closed.
+// Takes the focus when this button's rename just closed.
 function listTakeFocus(element: HTMLElement, button: string) {
   if (listFocus !== button)
     return
@@ -838,13 +830,9 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
   if conversations
     nav(part="conversations" aria-label={conversationsLabel})
       if inBrowser
-        button(part="newConversation" type="button" ref={element => newConversation = element} onClick={() => shownParam?.set(undefined)})
-          Icon(icon="plus")
-          | {newLabel}
+        Button(part="newConversation" variant="ghost" size="sm" icon="plus" label={newLabel} ref={element => newConversation = element} onClick={() => shownParam?.set(undefined)})
       else
-        a(part="newConversation" href={withQuery({ conversation: null })} ref={element => newConversation = element})
-          Icon(icon="plus")
-          | {newLabel}
+        Button(part="newConversation" variant="ghost" size="sm" icon="plus" label={newLabel} href={withQuery({ conversation: null })} ref={(element: HTMLElement) => newConversation = element})
       if listProblem()
         Notice(tone="danger") {listProblem()}
       ul(part="conversationList")
@@ -852,20 +840,14 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
           li(part="conversation" data-current={shownParam?.() === item.id ? '' : undefined})
             if renaming() === item.id
               TextInput(part="renameField" maxlength="120" ref={element => { queueMicrotask(() => element.focus()) }} value={renameDraft()} onInput={({ value }) => { renameDraft = value }} aria-label={`${renameLabel}: ${titled(item.title)}`} onKeyDown={event => renameKey(event, item.id)} onBlur={() => { if (renaming() === item.id) void saveRename(item.id) }})
-            else if deleting() === item.id
-              div(part="deleteConfirm" role="group" aria-label={`${deleteLabel}: ${titled(item.title)}`} onKeyDown={event => deleteKey(event, item.id)})
-                span {titled(item.title)}: {deleteConfirmLabel}
-                button(part="confirm" type="button" data-size="sm" ref={element => { queueMicrotask(() => element.focus()) }} onClick={() => { void confirmDelete(item.id) }}) {deleteLabel}
-                button(part="cancel" type="button" data-variant="ghost" data-size="sm" onClick={() => cancelDelete(item.id)}) {cancelLabel}
             else
               if inBrowser
-                button(part="conversationLink" type="button" aria-current={shownParam?.() === item.id ? 'true' : undefined} data-tooltip={titled(item.title)} onClick={() => shownParam?.set(item.id)}) {titled(item.title)}
+                Button(part="conversationLink" variant="ghost" size="sm" label={titled(item.title)} aria-current={shownParam?.() === item.id ? 'true' : undefined} data-tooltip={titled(item.title)} onClick={() => shownParam?.set(item.id)})
               else
-                a(part="conversationLink" href={withQuery({ conversation: item.id })} aria-current={shownParam?.() === item.id ? 'page' : undefined} data-tooltip={titled(item.title)}) {titled(item.title)}
+                Button(part="conversationLink" variant="ghost" size="sm" label={titled(item.title)} href={withQuery({ conversation: item.id })} aria-current={shownParam?.() === item.id ? 'page' : undefined} data-tooltip={titled(item.title)})
               BareIconButton(part="rename" variant="inline" size="xs" label={`${renameLabel}: ${titled(item.title)}`} ref={element => listTakeFocus(element, `${item.id}:rename`)} onClick={() => startRename(item.id, item.title)})
                 Icon(icon="edit")
-              BareIconButton(part="delete" variant="inline" size="xs" label={`${deleteLabel}: ${titled(item.title)}`} ref={element => listTakeFocus(element, `${item.id}:delete`)} onClick={() => startDelete(item.id)})
-                Icon(icon="delete")
+              ConfirmDelete(part="delete" ask="inline" variant="inline" size="xs" label={`${deleteLabel}: ${titled(item.title)}`} message={`${titled(item.title)}: ${deleteConfirmLabel}`} confirmLabel={deleteLabel} cancelLabel={cancelLabel} onConfirm={() => removeConversation(item.id)})
   if history().length === 0 && !busy() && !session.opening()
     div(part="empty")
       slot empty({ send: ask })
@@ -874,7 +856,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
           ul(part="suggestions")
             for question of offered() key={question}
               li
-                button(part="suggestion" type="button" onClick={() => suggest(question)}) {question}
+                Button(part="suggestion" size="sm" label={question} onClick={() => suggest(question)})
   // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word. The status line says the thinking label, then each tool call as it starts and ends, and the log is busy while a conversation held on the server is read.
   div(part="log" role="log" aria-label={label} aria-busy={session.loading() ? 'true' : undefined} tabindex="0" ref={element => log = element})
     for turn, index of history() key={turn.id}
@@ -888,15 +870,15 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
           if editProblem()
             Notice(tone="danger") {editProblem()}
           div(part="actions" onKeyDown={event => actionsKey(event, turn.id)})
-            button(part="save" type="button" data-variant="solid" data-size="sm" disabled={busy()} onClick={saveEdit}) {saveLabel}
-            button(part="cancel" type="button" data-variant="ghost" data-size="sm" onClick={() => cancelEdit(turn.id)}) {cancelLabel}
+            Button(part="save" size="sm" label={saveLabel} disabled={busy()} onClick={saveEdit})
+            Button(part="cancel" variant="ghost" size="sm" label={cancelLabel} onClick={() => cancelEdit(turn.id)})
         else
           snippet approvals(entry: Turn)
             for call of waitingFor(entry) key={call.id}
               div(part="approval" role="group" aria-label={`${call.name}: ${approvalLabel}`})
-                span(part="approvalText") {call.name} {JSON.stringify(call.input)} - {approvalLabel}
-                button(part="allow" type="button" data-variant="solid" data-size="sm" aria-label={`${allowLabel}: ${call.name}`} ref={element => askedFor(element, call.id)} onClick={() => decide(call, true)}) {allowLabel}
-                button(part="deny" type="button" data-variant="ghost" data-size="sm" aria-label={`${denyLabel}: ${call.name}`} onClick={() => decide(call, false)}) {denyLabel}
+                span(part="approvalText") {approvalText(call)}
+                Button(part="allow" size="sm" label={allowLabel} aria-label={`${allowLabel}: ${toolName(call)}`} ref={element => askedFor(element, call.id)} onClick={() => decide(call, true)})
+                Button(part="deny" variant="ghost" size="sm" label={denyLabel} aria-label={`${denyLabel}: ${toolName(call)}`} onClick={() => decide(call, false)})
           slot turn(viewOf(turn), index)
             if turn.role === 'user'
               if turn.content !== ''
@@ -967,7 +949,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
       | {failure()}
       |
       if !busy() && !takenBack() && history().at(-1)?.role === 'user'
-        button(part="retry" type="button" data-variant="solid" data-size="md" onClick={() => { void session.retry() }}) {retryLabel}
+        Button(part="retry" label={retryLabel} onClick={() => { void session.retry() }})
   if disclosure !== ''
     p(part="disclosure") {disclosure}
   if attachProblem()

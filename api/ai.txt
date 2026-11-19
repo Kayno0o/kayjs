@@ -955,7 +955,17 @@ component default
   parts?: undefined | {
   root?: string | undefined;
   conversations?: string | undefined;
-  newConversation?: string | undefined;
+  newConversation?: readonly unknown[] | string | undefined | {
+    root?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+      spinner?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+    };
+  };
   conversationList?: string | undefined;
   conversation?: string | undefined;
   renameField?: readonly unknown[] | string | undefined | {
@@ -965,20 +975,54 @@ component default
       root?: string | undefined;
     };
   };
-  deleteConfirm?: string | undefined;
-  confirm?: string | undefined;
-  cancel?: string | undefined;
-  conversationLink?: string | undefined;
+  conversationLink?: readonly unknown[] | string | undefined | {
+    root?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+      spinner?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+    };
+  };
   rename?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   delete?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
+    root?: readonly unknown[] | string | undefined | {
+      root?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+        spinner?: readonly unknown[] | string | undefined | {
+          root?: string | undefined;
+        };
+      };
+      spinner?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    } | {
+      root?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    armed?: string | undefined;
+    message?: string | undefined;
+    details?: string | undefined;
   };
   empty?: string | undefined;
   greeting?: string | undefined;
   suggestions?: string | undefined;
-  suggestion?: string | undefined;
+  suggestion?: readonly unknown[] | string | undefined | {
+    root?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+      spinner?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+    };
+  };
   log?: string | undefined;
   turn?: string | undefined;
   editField?: readonly unknown[] | string | undefined | {
@@ -987,51 +1031,32 @@ component default
   files?: string | undefined;
   file?: string | undefined;
   actions?: string | undefined;
-  save?: string | undefined;
+  save?: readonly unknown[] | string | undefined | {
+    root?: readonly unknown[] | string | undefined | { ...#2fff3004 (10 lines)
+  cancel?: readonly unknown[] | string | undefined | { ...#59b0f224 (11 lines)
   approval?: string | undefined;
   approvalText?: string | undefined;
-  allow?: string | undefined;
-  deny?: string | undefined;
+  allow?: readonly unknown[] | string | undefined | { ...#68958c18 (11 lines)
+  deny?: readonly unknown[] | string | undefined | { ...#109efc90 (11 lines)
   text?: string | undefined;
   reasoning?: string | undefined;
   reasoningText?: string | undefined;
   note?: string | undefined;
-  edit?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  regenerate?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  play?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
+  edit?: readonly unknown[] | string | undefined | { ...#be5d4d84 (3 lines)
+  regenerate?: readonly unknown[] | string | undefined | { ...#30b38163 (3 lines)
+  play?: readonly unknown[] | string | undefined | { ...#ffda9ea5 (3 lines)
   thinking?: string | undefined;
   status?: string | undefined;
-  retry?: string | undefined;
+  retry?: readonly unknown[] | string | undefined | { ...#9f3ff298 (11 lines)
   disclosure?: string | undefined;
-  remove?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
+  remove?: readonly unknown[] | string | undefined | { ...#aff98133 (3 lines)
   form?: string | undefined;
-  new?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  attach?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  field?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  record?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  recordSpinner?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  send?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-}
+  new?: readonly unknown[] | string | undefined | { ...#550067de (3 lines)
+  attach?: readonly unknown[] | string | undefined | { ...#5c0aeb29 (3 lines)
+  field?: readonly unknown[] | string | undefined | { ...#b9588976 (3 lines)
+  record?: readonly unknown[] | string | undefined | { ...#58e28eb1 (3 lines)
+  recordSpinner?: readonly unknown[] | string | undefined | { ...#6d678d34 (3 lines)
+  send?: readonly unknown[] | string | undefined | { ...#e01f9f0e (4 lines)
   placeholder?: string | undefined
   regenerate?: boolean | undefined
   remember?: string | undefined
@@ -1130,7 +1155,17 @@ component default
   parts?: undefined | {
   root?: string | undefined;
   conversations?: string | undefined;
-  newConversation?: string | undefined;
+  newConversation?: readonly unknown[] | string | undefined | {
+    root?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+      spinner?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+    };
+  };
   conversationList?: string | undefined;
   conversation?: string | undefined;
   renameField?: readonly unknown[] | string | undefined | {
@@ -1140,20 +1175,54 @@ component default
       root?: string | undefined;
     };
   };
-  deleteConfirm?: string | undefined;
-  confirm?: string | undefined;
-  cancel?: string | undefined;
-  conversationLink?: string | undefined;
+  conversationLink?: readonly unknown[] | string | undefined | {
+    root?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+      spinner?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+    };
+  };
   rename?: readonly unknown[] | string | undefined | {
     root?: string | undefined;
   };
   delete?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
+    root?: readonly unknown[] | string | undefined | {
+      root?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+        spinner?: readonly unknown[] | string | undefined | {
+          root?: string | undefined;
+        };
+      };
+      spinner?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    } | {
+      root?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    armed?: string | undefined;
+    message?: string | undefined;
+    details?: string | undefined;
   };
   empty?: string | undefined;
   greeting?: string | undefined;
   suggestions?: string | undefined;
-  suggestion?: string | undefined;
+  suggestion?: readonly unknown[] | string | undefined | {
+    root?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+      spinner?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+    };
+  };
   log?: string | undefined;
   turn?: string | undefined;
   editField?: readonly unknown[] | string | undefined | {
@@ -1162,51 +1231,32 @@ component default
   files?: string | undefined;
   file?: string | undefined;
   actions?: string | undefined;
-  save?: string | undefined;
+  save?: readonly unknown[] | string | undefined | {
+    root?: readonly unknown[] | string | undefined | { ...#2fff3004 (10 lines)
+  cancel?: readonly unknown[] | string | undefined | { ...#59b0f224 (11 lines)
   approval?: string | undefined;
   approvalText?: string | undefined;
-  allow?: string | undefined;
-  deny?: string | undefined;
+  allow?: readonly unknown[] | string | undefined | { ...#68958c18 (11 lines)
+  deny?: readonly unknown[] | string | undefined | { ...#109efc90 (11 lines)
   text?: string | undefined;
   reasoning?: string | undefined;
   reasoningText?: string | undefined;
   note?: string | undefined;
-  edit?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  regenerate?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  play?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
+  edit?: readonly unknown[] | string | undefined | { ...#be5d4d84 (3 lines)
+  regenerate?: readonly unknown[] | string | undefined | { ...#30b38163 (3 lines)
+  play?: readonly unknown[] | string | undefined | { ...#ffda9ea5 (3 lines)
   thinking?: string | undefined;
   status?: string | undefined;
-  retry?: string | undefined;
+  retry?: readonly unknown[] | string | undefined | { ...#9f3ff298 (11 lines)
   disclosure?: string | undefined;
-  remove?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
+  remove?: readonly unknown[] | string | undefined | { ...#aff98133 (3 lines)
   form?: string | undefined;
-  new?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  attach?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  field?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  record?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  recordSpinner?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-  send?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
-}
+  new?: readonly unknown[] | string | undefined | { ...#550067de (3 lines)
+  attach?: readonly unknown[] | string | undefined | { ...#5c0aeb29 (3 lines)
+  field?: readonly unknown[] | string | undefined | { ...#b9588976 (3 lines)
+  record?: readonly unknown[] | string | undefined | { ...#58e28eb1 (3 lines)
+  recordSpinner?: readonly unknown[] | string | undefined | { ...#6d678d34 (3 lines)
+  send?: readonly unknown[] | string | undefined | { ...#e01f9f0e (4 lines)
   placeholder?: string | undefined
   regenerate?: boolean | undefined
   remember?: string | undefined
