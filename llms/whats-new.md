@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.112.0
 
 - kayjs-ui's `starfield` utility is removed with `@kayjs/ui/starfield.css` and its `--color-star*` tokens, and `kay new` no longer puts stars behind the page: the fixed layer kept the GPU compositing and made pages lag on a machine short of video memory ([upgrading](upgrading.md)).
 
