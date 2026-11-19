@@ -165,6 +165,9 @@ interface GroupedAvatar
   status?: AvatarStatus | undefined
   statusLabel?: string | undefined
 
+[./lib/bar-scroll] centerInBar
+function centerInBar(bar: HTMLElement, item: Element, vertical: boolean): void
+
 [./lib/bell] bellItem
 function bellItem<InboxItem | Item extends BellItem>(item: Item): Item & { key: string; label: string; href?: string | undefined; }
 
