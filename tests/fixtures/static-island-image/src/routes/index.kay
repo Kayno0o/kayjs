@@ -1,6 +1,8 @@
 ---
 import Browser from '../components/browser.kay'
+import Cards from '../components/cards.kay'
 import Loaded from '../components/loaded.kay'
 ---
 Loaded(hydrate="load")
 Browser
+Cards(hydrate="load")

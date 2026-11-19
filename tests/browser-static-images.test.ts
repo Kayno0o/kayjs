@@ -8,7 +8,7 @@ import { fixtureCopy, scratchDir } from './scratch'
 
 const path = browserPath()
 const ROOT = 'tests/fixtures/static-island-image'
-const IMAGES = ['img.loaded', 'img.loaded-crop', 'img.browser', 'img.browser-crop', 'img.browser-small']
+const IMAGES = ['img.loaded', 'img.loaded-crop', 'img.browser', 'img.browser-crop', 'img.browser-small', 'img.card']
 
 // A plain file server, as a static host is, mounted at `base` and keeping the requests it saw.
 function serveDirectory(dir: string, base: string, seen: string[]): ReturnType<typeof Bun.serve> {

@@ -1,0 +1,8 @@
+---
+island({ render: 'client' })
+import poster from '../assets/poster.jpg'
+
+const items = ['a', 'b']
+---
+for item of items
+  img.card(src={poster} sizes="(min-width: 800px) 33vw, 100vw" alt={item})
