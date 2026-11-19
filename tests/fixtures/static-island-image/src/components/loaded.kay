@@ -1,0 +1,9 @@
+---
+import { queryParam } from 'kay'
+import cover from '../cover.png'
+
+const filter = queryParam('filter', { default: 'all' })
+---
+p.filter {filter()}
+img.loaded(src={cover} sizes="50vw" alt="Loaded")
+img.loaded-crop(src={cover} sizes="50vw" aspect="1/1" quality={90} alt="Cropped")

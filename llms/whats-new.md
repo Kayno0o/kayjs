@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- On a static export an island that draws an imported image in the browser links the variant files the build wrote, as the server HTML does, instead of the image route, which a static host answers with a 404 ([images](images.md)).
+
 ## 1.110.0
 
 - kayjs-ui's `Checkbox`, `RadioGroup` choices and `Toggle` rows are at least 24px tall, the tap target of WCAG 2.5.8, whatever the label's line height.

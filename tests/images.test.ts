@@ -157,13 +157,18 @@ describe('image()', () => {
 
     await Bun.write(entry, `import { image, imageSource } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/image.ts'))}\nconsole.log(image, imageSource)\n`)
 
-    const build = await Bun.build({ entrypoints: [entry], target: 'browser', minify: true })
+    const build = await Bun.build({ entrypoints: [entry], target: 'browser', minify: true, define: { KAY_STATIC_EXPORT: 'undefined' } })
     const code = await build.outputs[0]!.text()
 
     expect(code).toContain('/_kay/images')
 
     for (const serverOnly of ['images.remote', 'images.aspects', 'remote-', '/_kay/images/'])
       expect(code).not.toContain(serverOnly)
+
+    // Only a static export's bundle links the files, as it has no route.
+    const exported = await Bun.build({ entrypoints: [entry], target: 'browser', minify: true, define: { KAY_STATIC_EXPORT: 'true' } })
+
+    expect(await exported.outputs[0]!.text()).toContain('/_kay/images/')
   })
 })
 

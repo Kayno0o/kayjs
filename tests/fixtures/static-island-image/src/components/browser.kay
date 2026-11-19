@@ -1,0 +1,6 @@
+---
+island({ render: 'client' })
+import cover from '../cover.png'
+---
+img.browser(src={cover} sizes="50vw" alt="Browser")
+img.browser-crop(src={cover} sizes="50vw" aspect="1/1" quality={90} alt="Cropped")
