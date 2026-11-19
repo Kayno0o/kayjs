@@ -33,8 +33,9 @@ export { head } from './head'
 export { loadScope } from './load-scope'
 export { memo, param, untrack } from './reactive'
 export { html, isRendered } from './rendered'
-
 export type { Html } from './rendered'
+
+export { rowKey } from './row-key'
 export { checkedMarkup, componentClass, handParts, merge, omit, partClass, partHanded, partProps, spreadWith } from './values'
 
 // Leads the markup of a `try` block the server rendered its `catch` block for.
@@ -572,7 +573,7 @@ export function show<T>(value: T, render: (value: () => Truthy<T>) => string, fa
 
 // A `for`: each row's markup, or the fallback's when there is nothing to list.
 // In an island a row reads its item, and a keyed row its index, through functions, as the browser build of the same template does.
-export function loop<T>(each: Iterable<T> | null | undefined | false, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: () => string, accessors?: 'keyed' | 'positional', key?: Keyed<T>): string {
+export function loop<T>(each: Iterable<T> | null | undefined | false, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: () => string, accessors?: 'keyed' | 'positional', key?: (item: T, index: number) => unknown): string {
   if (each == null || each === false)
     return fallback?.() ?? ''
 
@@ -587,20 +588,21 @@ export function loop<T>(each: Iterable<T> | null | undefined | false, render: (i
   return fieldMarks.marking === undefined ? rows(list, render, accessors, key) : markedList(each, rows(list, render, accessors, key))
 }
 
-type Keyed<T> = (item: T, index: number) => unknown
-
 // The keys of the keyed loops being drawn, outermost first, where an island with no `key` or `id` of its own takes its identity from, so a swap pairs it with its own copy when a sibling row goes.
 const loopKeys: (string | undefined)[] = []
 
 export function loopIdentity(): string | undefined {
-  return loopKeys.length === 0 || loopKeys.includes(undefined) ? undefined : loopKeys.join('\0')
+  if (loopKeys.length === 0 || loopKeys.includes(undefined))
+    return undefined
+
+  return loopKeys.length === 1 ? loopKeys[0] : JSON.stringify(loopKeys)
 }
 
 function drawRow<T>(render: (item: T | (() => T), index: number | (() => number)) => string, accessors: 'keyed' | 'positional' | undefined, item: T, index: number): string {
   return accessors === undefined ? render(item, index) : render(() => item, accessors === 'keyed' ? () => index : index)
 }
 
-function rows<T>(each: readonly T[], render: (item: T | (() => T), index: number | (() => number)) => string, accessors?: 'keyed' | 'positional', key?: Keyed<T>): string {
+function rows<T>(each: readonly T[], render: (item: T | (() => T), index: number | (() => number)) => string, accessors?: 'keyed' | 'positional', key?: (item: T, index: number) => unknown): string {
   let markup = ''
 
   for (let index = 0; index < each.length; index++) {

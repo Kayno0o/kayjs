@@ -591,7 +591,7 @@ function localHref(href: unknown): unknown
 function localLinks(markup: string): string
 
 [./html] loop
-function loop<T>(each: Iterable<T> | false | null | undefined, render: (item: (() => T) | T, index: (() => number) | number) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined, key?: Keyed<T> | undefined): string
+function loop<T>(each: Iterable<T> | false | null | undefined, render: (item: (() => T) | T, index: (() => number) | number) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined, key?: ((item: T, index: number) => unknown) | undefined): string
 
 [./html] loopIdentity
 function loopIdentity(): string | undefined
@@ -646,6 +646,9 @@ function refillOptions(posted: string | undefined, markup: string, value?: (() =
 
 [./html] reportRenderFailure
 function reportRenderFailure(error: unknown): void
+
+[./html] rowKey
+function rowKey(item: unknown): unknown
 
 [./html] schemaFill
 function schemaFill(target: unknown, name: string, value: (type: string | undefined) => string, checked: () => string): string

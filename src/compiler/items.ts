@@ -356,10 +356,10 @@ export function addKeyParameters(b: CodeBuilder, node: ForNode, src: string): vo
   b.add(')')
 }
 
-// What follows the fallback in the server's `loop` call: how an island's rows read their item, then the key of a keyed loop, which an island in a row with no `key` or `id` of its own takes its identity from.
-export function addLoopTail(b: CodeBuilder, node: ForNode, src: string, accessorLoops: boolean): void {
+// What follows the fallback in the server's `loop` call: how an island's rows read their item, or, in a page or a static component, the key of a keyed loop (`rowKey` when it names none), which an island in a row with no `key` or `id` of its own takes its identity from.
+export function addLoopTail(b: CodeBuilder, node: ForNode, src: string, accessorLoops: boolean, rowKey: string): void {
   const keying = rowKeying(node, src)
-  const keyed = keying.kind === 'expression'
+  const keyed = !accessorLoops && keying.kind !== 'positional'
 
   if (!node.fallback && (accessorLoops || keyed))
     b.add(', undefined')
@@ -369,10 +369,17 @@ export function addLoopTail(b: CodeBuilder, node: ForNode, src: string, accessor
   else if (keyed)
     b.add(', undefined')
 
+  if (!keyed)
+    return
+
+  b.add(', ')
+
   if (keying.kind === 'expression') {
-    b.add(', ')
     addKeyParameters(b, node, src)
     b.add(' => (').addSource(keying.key).add(')')
+  }
+  else {
+    b.add(rowKey)
   }
 }
 

@@ -338,7 +338,7 @@ export class HtmlTemplate extends TemplateWriter {
         this.markup(node.fallback)
       }
 
-      addLoopTail(b, node, this.src, this.options.accessorLoops === true)
+      addLoopTail(b, node, this.src, this.options.accessorLoops === true, helperName('rowKey'))
       b.add(')')
     })
   }
