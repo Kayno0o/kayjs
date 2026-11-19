@@ -1,11 +1,11 @@
 import type { DevRequest } from '../server/dev'
 import type { DevTab, DevTool } from './dev-tool'
+import { REQUEST } from './dev-tool-constants'
 
 // The Env tab's code, fetched at once as its badge counts the variables that look like secrets, with the tool's shared helpers from `tool.kit`.
 const ENV_URL = '/_kay/env.js'
 const MODULE_START = 'export default '
 const BUILT_EVENT = 'kay:dev-built'
-const REQUEST = 'kay-dev-request'
 
 // Names a variable of a secret goes by, and the shapes of the values of one: a URL carrying a password, a token with a well-known prefix, a long run of random-looking characters.
 const SECRET_NAME = /SECRET|PASSW(?:OR)?D|PRIVATE|TOKEN|CREDENTIAL|AUTH_?(?:KEY|TOKEN|SECRET)|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
@@ -56,6 +56,16 @@ export default function envTab(tool: DevTool, tab: DevTab): () => void {
   const { copyButton, entry, filterable, ownFetch, signal, toolbar } = tool.kit
   const win = tool.root.ownerDocument.defaultView!
   let reread: () => void = () => undefined
+  // False only when the page's request block says so; a page with none, or an unreadable one, is asked.
+  const served = (): boolean => {
+    try {
+      return (JSON.parse(win.document.getElementById(REQUEST)?.textContent ?? 'null') as DevRequest | null)?.publicEnv !== false
+    }
+    catch {
+      return true
+    }
+  }
+  let knew = served()
   const content = tool.make('div', 'stack')
   const bar = toolbar('Filter by name or value', () => bar.apply(content))
   let asked = 0
@@ -66,8 +76,9 @@ export default function envTab(tool: DevTool, tab: DevTab): () => void {
 
     try {
       // The route is there only when a field is `s.Public`, which the page's request block says: asking an app without one logs a 404.
-      const served = (JSON.parse(win.document.getElementById(REQUEST)?.textContent ?? 'null') as DevRequest | null)?.publicEnv !== false
-      const response = served ? await ownFetch(win, ENV_URL, { cache: 'no-store' }) : undefined
+      knew = served()
+
+      const response = knew ? await ownFetch(win, ENV_URL, { cache: 'no-store' }) : undefined
 
       // Any answer but a 404 is a failure to read it.
       if (response && response.status !== 404) {
@@ -133,6 +144,15 @@ export default function envTab(tool: DevTool, tab: DevTab): () => void {
   reread = () => void read()
   tab.panel.append(bar.element, content)
   win.document.addEventListener(BUILT_EVENT, reread, { signal })
+
+  // A restart that adds or drops the first or last public field brings the page a new block once it is patched in, after the built event.
+  const blocks = new MutationObserver(() => {
+    if (served() !== knew)
+      reread()
+  })
+
+  blocks.observe(win.document.head, { childList: true })
+  signal.addEventListener('abort', () => blocks.disconnect())
   reread()
 
   return () => reread()

@@ -1602,9 +1602,16 @@ describe('the dev tool', () => {
       await eventually(() => expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('sends no public env'))
 
       expect(asked).not.toContain('/_kay/env.js')
+
+      // A restart that gives the app its first public field brings a new block, patched in after the built event.
+      const next = script.cloneNode() as HTMLScriptElement
+
+      next.textContent = script.textContent.replace('"publicEnv":false', '"publicEnv":true')
+      script.replaceWith(next)
+      await eventually(() => expect(asked).toContain('/_kay/env.js'))
     }
     finally {
-      script.remove()
+      document.getElementById('kay-dev-request')?.remove()
       fetching.mockRestore()
       happyDOM.setURL(href)
     }
