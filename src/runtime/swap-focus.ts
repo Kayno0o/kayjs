@@ -22,9 +22,28 @@ export function placeOf(element: Element | null | undefined): number | undefined
   return name === '' || !element?.isConnected ? undefined : Array.from<Element>(document.getElementsByName(name)).indexOf(element)
 }
 
-// The id of the nearest ancestor of the element having one, its row in a list, read before a swap removes the element: a row no longer on the page is a field removed, not one rendered afresh. A list whose rows carry no id, or whose nearest id is a container that stays, tells the two apart no better than before.
+// What a form is by: its id, else its action with the hidden fields it posts, which a row's form carries its key in.
+function formKey(form: HTMLFormElement): string | undefined {
+  const id = form.getAttribute('id')
+
+  if (id !== null && id !== '')
+    return `#${id}`
+
+  const hidden = Array.from(form.querySelectorAll<HTMLInputElement>('input[type=hidden]'), input => `${input.name}=${input.value}`)
+
+  return hidden.length === 0 ? undefined : `${form.getAttribute('action')}?${hidden.join('&')}`
+}
+
+// The element's row in a list, read before a swap removes it: its form's key, else the id of its nearest ancestor having one. A row no longer on the page is a field removed, not one rendered afresh. A row with neither tells the two apart no better than before.
 export function rowOf(element: Element | null | undefined): string | undefined {
-  return element?.parentElement?.closest('[id]:not([id=""])')?.getAttribute('id') ?? undefined
+  const form = element?.closest('form')
+  const id = element?.parentElement?.closest('[id]:not([id=""])')?.getAttribute('id')
+
+  return (form ? formKey(form) : undefined) ?? (id !== null && id !== undefined && id !== '' ? `#${id}` : undefined)
+}
+
+function rowKept(row: string): boolean {
+  return row.startsWith('#') ? document.getElementById(row.slice(1)) !== null : Array.from(document.forms).some(form => formKey(form) === row)
 }
 
 // The field of the name nearest to where the removed one was: the one now at its place, else the last. None without a place.
@@ -62,7 +81,7 @@ export async function moveFocus(swap: Swap, policy: Policy, hash: string): Promi
       again.focus({ preventScroll: true })
 
       // The text of a field removed with its row is no one else's.
-      if (swap.row === undefined || document.getElementById(swap.row))
+      if (swap.row === undefined || rowKept(swap.row))
         carryCaret(before, again, swap.held)
     }
 

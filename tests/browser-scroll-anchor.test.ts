@@ -77,20 +77,23 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a refresh 
     })
   }
 
-  async function refreshWhileTyping(page: TestPage, typedRow: number, droppedRow: number, text: string) {
+  // A row is its form, by `kind`: with an id of its own, or told only by its hidden field in a list that stays.
+  async function refreshWhileTyping(page: TestPage, typedRow: number, droppedRow: number, text: string, kind: 'id' | 'plain' = 'id') {
     await hold(page)
-    await page.evaluate((id, dropped) => {
-      document.querySelector<HTMLInputElement>(`#row-${id} input[name=note]`)!.focus({ preventScroll: true })
-      document.querySelector<HTMLFormElement>(`#row-${dropped}`)!.requestSubmit()
-    }, typedRow, droppedRow)
+    await page.evaluate((id, dropped, plain) => {
+      const row = (at: number) => plain ? `[data-row="${at}"]` : `#row-${at}`
+
+      document.querySelector<HTMLInputElement>(`${row(id)} input[name=note]`)!.focus({ preventScroll: true })
+      document.querySelector<HTMLFormElement>(row(dropped))!.requestSubmit()
+    }, typedRow, droppedRow, kind === 'plain')
     await page.waitUntil(() => (window as unknown as { fetched: boolean }).fetched, { timeout: '5s' })
     await page.type(text)
     await page.evaluate(() => (window as unknown as { release: () => void }).release())
-    await page.waitUntil(id => document.querySelector(`#row-${id}`) === null, { timeout: '5s' }, droppedRow)
+    await page.waitUntil((id, plain) => document.querySelector(plain ? `[data-row="${id}"]` : `#row-${id}`) === null, { timeout: '5s' }, droppedRow, kind === 'plain')
     await Bun.sleep(200)
   }
 
-  const notes = async (page: TestPage) => page.evaluate(() => [...document.querySelectorAll<HTMLInputElement>('input[name=note]')].filter(field => field.value !== '').map(field => field.closest('form')!.getAttribute('id')))
+  const notes = async (page: TestPage) => page.evaluate(() => [...document.querySelectorAll<HTMLInputElement>('input[name=note]')].filter(field => field.value !== '').map(field => field.closest('form')!.getAttribute('id') ?? field.closest('form')!.getAttribute('data-row')))
 
   it('carries the text typed into the row it drops nowhere', async () => {
     const site = await testSite({ root: 'tests/fixtures/scroll-anchor', browser: { path } })
@@ -100,6 +103,22 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a refresh 
 
       await page.evaluate(() => scrollTo(0, 1800))
       await refreshWhileTyping(page, 33, 33, 'lost')
+
+      expect(await notes(page)).toEqual([])
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+
+  it('carries the text typed into a dropped row with no id, in a list that stays, nowhere', async () => {
+    const site = await testSite({ root: 'tests/fixtures/scroll-anchor', browser: { path } })
+
+    try {
+      const page = await site.open('/plain')
+
+      await refreshWhileTyping(page, 20, 20, 'lost', 'plain')
 
       expect(await notes(page)).toEqual([])
       expect(page.errors).toEqual([])
