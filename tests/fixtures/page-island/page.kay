@@ -1,8 +1,7 @@
 --- server
 const big = Array.from({ length: 50 }, (_, index) => index)
 const total = big.reduce((sum, value) => sum + value, 0)
----
----
+--- script
 let count = 0
 ---
 button(onClick={() => count++}) {total}
