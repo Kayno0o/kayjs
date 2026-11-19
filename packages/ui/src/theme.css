@@ -1589,6 +1589,23 @@ html[data-kui-dock='bottom'] body {
   padding-bottom: var(--kui-dock-bottom);
 }
 
+/* Outside the layers, so it holds over the size utilities a TextInput, a Select and a Textarea draw (`text-sm`, a `sm` size's `text-xs`): iOS zooms the page in on a field whose text is under 16px, which a touch screen has no way to undo. The field height variables follow, so a button beside a field stays as tall. A wide window with a fine pointer keeps the compact sizes. */
+@media (pointer: coarse), (max-width: 40rem) {
+  :where(
+    .kui-field-input,
+    .kui-form-field
+      :where(
+        input:not([type='hidden'], [type='checkbox'], [type='radio'], [type='color'], [type='range'], [type='file']),
+        select,
+        textarea
+      )
+  ) {
+    --_field-text: var(--text-base);
+    --_field-line: var(--text-base--line-height);
+    font-size: var(--text-base);
+  }
+}
+
 /* A row of tabs wider than its box fades out at the edge that holds more, so a clipped tab reads as one to scroll to, and a row that fits is left whole. The two fade widths are animated by the row's own scroll position, so no script runs: both stay 0 where the browser has no scroll-driven animations, and where the row does not scroll. */
 @property --_fade-start {
   syntax: '<length>';
