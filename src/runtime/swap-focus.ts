@@ -22,7 +22,7 @@ export function placeOf(element: Element | null | undefined): number | undefined
   return name === '' || !element?.isConnected ? undefined : Array.from<Element>(document.getElementsByName(name)).indexOf(element)
 }
 
-// The id of the nearest ancestor of the element having one, its row in a list, read before a swap removes the element: a row no longer on the page is a field removed, not one rendered afresh.
+// The id of the nearest ancestor of the element having one, its row in a list, read before a swap removes the element: a row no longer on the page is a field removed, not one rendered afresh. A list whose rows carry no id, or whose nearest id is a container that stays, tells the two apart no better than before.
 export function rowOf(element: Element | null | undefined): string | undefined {
   return element?.parentElement?.closest('[id]:not([id=""])')?.getAttribute('id') ?? undefined
 }
