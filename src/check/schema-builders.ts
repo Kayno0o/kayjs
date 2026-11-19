@@ -168,6 +168,69 @@ function addOptions(call: Call, base: number, added: string[]): Edit | undefined
   return { start: open, end: open + 1, text: options.properties.length === 0 ? `{ ${text} ` : `{ ${text},` }
 }
 
+type Program = Parameters<typeof importsOf>[0]
+type Report = (start: number, end: number, message: string, help: string, edits: Edit[] | null) => void
+
+// The `s` an app imported and no longer reads once a fix has taken `dropped` of its uses away: its import goes too, or the file would fail its own unused-name check.
+function dropUnreadImport(ast: Program, receivers: Set<string>, dropped: number, span: { base: number, text: string }, report: Report): void {
+  for (const statement of ast.body) {
+    if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || !KAY.test(statement.source.value))
+      continue
+
+    const index = statement.specifiers.findIndex(specifier => specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type' && (specifier.imported as { name?: string }).name === 's' && receivers.has(specifier.local.name))
+
+    if (index < 0)
+      continue
+
+    const specifier = statement.specifiers[index]!
+    let references = 0
+
+    walk(ast, (node) => {
+      if (node.type === 'Identifier' && receivers.has(node.name) && (node.start < specifier.start || node.end > specifier.end))
+        references++
+    })
+
+    if (references > dropped)
+      return
+
+    const only = statement.specifiers.length === 1
+    const next = statement.specifiers[index + 1]
+    const previous = statement.specifiers[index - 1]
+    const lineEnd = span.text[statement.end] === '\n' ? statement.end + 1 : statement.end
+    // The whole line when it is the only name, else the name and the comma beside it.
+    let [from, to] = [previous?.end ?? specifier.start, specifier.end]
+
+    if (only)
+      [from, to] = [statement.start, lineEnd]
+    else if (next)
+      [from, to] = [specifier.start, next.start]
+
+    const edit = { start: span.base + from, end: span.base + to, text: '' }
+
+    report(span.base + specifier.start, span.base + specifier.end, '`s` is no longer read once its builders are written as a record, so its import goes', 'drop the import of `s`', [edit])
+
+    return
+  }
+}
+
+// `defineEnv(s.Object({ ... }))`: an env reads only the names its schema declares, so the record changes nothing. True when it reported one.
+function envRecord(node: Node, records: Set<string>, receivers: Set<string>, base: number, taken: Set<Node>, report: Report): boolean {
+  if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || !records.has(node.callee.name))
+    return false
+
+  const [schema] = node.arguments
+  const inner = schema === undefined ? undefined : builderCall(schema, receivers)
+  const shape = inner?.node.arguments[0]
+
+  if (!schema || inner?.name !== 'Object' || inner.node.arguments.length !== 1 || shape?.type !== 'ObjectExpression')
+    return false
+
+  taken.add(schema)
+  report(base + schema.start, base + schema.end, 'a plain record of fields is the schema of a defineEnv since 1.106, `s.Object` being the PascalCase builder it replaces; the old form works until 2.0', 'write the record of fields', [{ start: base + schema.start, end: base + shape.start, text: '' }, { start: base + shape.end, end: base + schema.end, text: '' }])
+
+  return true
+}
+
 // The PascalCase builders of `s`, which kay 1.106 replaces with its own lowercase ones, and the `'2m'` sizes of a file field, which are `'2mb'` as every size is.
 // Found on the `s` a file imports from `kay`, in the TypeScript files and the fences of `.kay` files. `s.Optional(x)` of one of these builders is `optional: true` in its options; an `s.Array` takes `max: Number.MAX_SAFE_INTEGER` and an `s.Object` `extra: 'strip'`, which keeps what they did.
 export async function schemaBuilders(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
@@ -175,20 +238,27 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
     return []
 
   return scan(root, options, 'deprecated-schema-builders', NEEDLE, ({ parsed, report }) => {
-    for (const { ast, base } of parsed) {
+    for (const { ast, base, text } of parsed) {
       const receivers = importsOf(ast, source => KAY.test(source), 's').locals
+      const records = importsOf(ast, source => KAY.test(source), 'defineEnv').locals
 
       if (receivers.size === 0)
         continue
 
       // What an `s.Optional(...)` has taken over, so the call inside is not reported on its own.
       const taken = new Set<Node>()
+      // The uses of `s` a fix takes away: an `s.Object(` of an env record.
+      let dropped = 0
 
       walk(ast, (node) => {
         const call = builderCall(node, receivers)
 
-        if (call === undefined)
+        if (call === undefined) {
+          if (envRecord(node, records, receivers, base, taken, report))
+            dropped++
+
           return
+        }
 
         if (call.name === 'Optional') {
           const [inner, ...others] = call.node.arguments
@@ -277,6 +347,9 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
           report(base + entry.value.start, base + entry.value.end, `a size is written \`'${entry.value.value}b'\`, with its unit, as every size of kay is`, 'write the size with its `b`', [{ start: end, end, text: 'b' }])
         }
       })
+
+      if (dropped > 0)
+        dropUnreadImport(ast, receivers, dropped, { base, text }, report)
     }
   })
 }

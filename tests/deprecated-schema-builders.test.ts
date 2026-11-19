@@ -52,6 +52,16 @@ describe('deprecated-schema-builders', () => {
     expect(text).toBe(`${head}export const a = {\n  one: s.string({ optional: true }),\n  two: s.string({ optional: true, max: 4 }),\n  three: s.list(s.string(), { optional: true, max: Number.MAX_SAFE_INTEGER }),\n  four: s.literal('a', { optional: true }),\n  five: s.object({ x: s.int() }, { optional: true, extra: 'strip' }),\n  six: s.object({}, { optional: true, extra: 'strip' }),\n}\n`)
   })
 
+  it('writes the record of an s.Object that is the schema of a defineEnv, and drops the import of s once it is unread', async () => {
+    const read = await fixed(`${head}export const env = defineEnv(s.Object({ PORT: s.Integer({ default: 3000 }) }))\n`)
+
+    expect(read.text).toBe(`${head}export const env = defineEnv({ PORT: s.int({ default: 3000 }) })\n`)
+
+    const sole = await fixed('import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({}))\n')
+
+    expect(sole.text).toBe('import { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv({})\n')
+  })
+
   it('leaves an s.Optional around anything but a builder of s, which has no optional option to write', async () => {
     const { text, found } = await fixed(`${head}const own = s.Any()\n\nexport const a = { one: s.Optional(own), two: s.Optional(s.Nullable(s.String())) }\n`)
 
