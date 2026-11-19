@@ -86,6 +86,7 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
   const body = document.adoptNode(next.body)
   const old = document.body
   const focused = heldFocus()
+  const release = holdScroll(policy)
 
   const kept = new Set<Element>()
   // What the server left to the page as it is, found by its id by the caller before anything moved.
@@ -162,8 +163,6 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
       script.replaceWith(runnable(script, markup))
   }
 
-  const release = holdScroll(policy)
-
   // The server writes `<body>` bare, so every attribute it holds is a script's.
   try {
     scoped.on = left !== undefined
@@ -219,10 +218,14 @@ function holdScroll(policy: Policy): () => void {
   root.style.overflowAnchor = 'none'
 
   return () => {
+    // Reading the scroll forces the layout while anchoring is still off, which is what keeps it from adjusting.
     if (policy.scroll === 'keep' && (scrollX !== x || scrollY !== y))
       scrollTo({ left: x, top: y, behavior: 'instant' })
 
-    root.style.overflowAnchor = anchoring
+    if (anchoring === '')
+      root.style.removeProperty('overflow-anchor')
+    else
+      root.style.overflowAnchor = anchoring
   }
 }
 

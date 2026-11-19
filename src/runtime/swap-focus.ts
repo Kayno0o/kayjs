@@ -25,9 +25,13 @@ export function placeOf(element: Element | null | undefined): number | undefined
 // The field of the name nearest to where the removed one was: the one now at its place, else the last. None without a place.
 function byName(element: Element | null, place: number | undefined): Element | null {
   const name = element?.getAttribute('name') ?? ''
-  const fields = name === '' || place === undefined ? [] : document.getElementsByName(name)
 
-  return fields[Math.min(place!, fields.length - 1)] ?? null
+  if (name === '' || place === undefined)
+    return null
+
+  const fields = document.getElementsByName(name)
+
+  return fields[Math.max(0, Math.min(place, fields.length - 1))] ?? null
 }
 
 // The element focused before, found again on a refreshed page or on Back and Forward between entries of one path; on a new page, the element its hash points at, else its autofocus field, its heading or its main, so a screen reader starts there, the title announced. Back and Forward skip the autofocus field, which the visitor left already, and a position an entry saved leaves the hash alone, as it does the scroll.
