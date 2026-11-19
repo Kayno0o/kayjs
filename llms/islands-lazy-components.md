@@ -2,6 +2,11 @@
 
 The rest of [Islands](islands.md).
 
+## Common tasks
+
+- Keep a large component out of the page's first load: draw it in a branch (`if`, `else`, a `match` case, a closed `Dialog`), and it loads when it first draws, with no declaration.
+- Keep a component eager: draw it once outside a branch, or read it as a `snippet` value.
+
 ## Reference
 
 ### Components that load when they first draw
