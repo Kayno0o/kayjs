@@ -1,9 +1,10 @@
 import type { TestPage } from '../src/test'
+import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
 import { kayBuild } from './check-helper'
-import { scratchDir } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const path = browserPath()
 const ROOT = 'tests/fixtures/static-island-image'
@@ -87,4 +88,44 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
       }, 60_000)
     })
   }
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island drawing an imported image on a static export with its own widths', () => {
+  const seen: string[] = []
+  let files: ReturnType<typeof Bun.serve>
+
+  beforeAll(async () => {
+    const root = await fixtureCopy('static-island-image')
+    const outdir = await scratchDir('static-images-widths-')
+
+    await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ site: 'https://x.example', assets: { images: { widths: [400, 800] } } })\n`)
+
+    const built = await kayBuild([root, '--no-check', '--static', '--outdir', outdir], { NODE_ENV: 'production' })
+
+    expect(built.code).toBe(0)
+    files = serveDirectory(outdir, '', seen)
+  }, 120_000)
+
+  afterAll(async () => {
+    await files?.stop(true)
+  })
+
+  it('links the files of that ladder, and never the route', async () => {
+    const view = await browse(`${files.url.origin}/`, { path })
+
+    await view.waitFor('img.browser')
+
+    const widths = await view.evaluate(() => document.querySelector('img.browser')!.getAttribute('srcset')!.split(',').map(entry => entry.trim().replace(/^\S+ /, '')))
+
+    // The ladder, then the image's own width.
+    expect(widths).toEqual(['400w', '800w', '1000w'])
+
+    for (const selector of IMAGES) {
+      for (const url of await linked(view, selector))
+        expect((await fetch(`${files.url.origin}${url}`)).status, url).toBe(200)
+    }
+
+    expect(seen.filter(url => url.includes('/_kay/images?'))).toEqual([])
+    expect(view.errors).toEqual([])
+  }, 60_000)
 })
