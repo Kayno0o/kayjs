@@ -100,6 +100,9 @@ describe('scanIslandImages', () => {
       'img(src={cover} alt="")',
       'img({...image(post.cover, { width: 800, height: 600 })} alt="")',
       'img({...image(\'https://cms.example/a.jpg\', { width: 800, height: 600, aspect: \'16/9\' })} alt="")',
+      'img({...image(\'https://other.example/b.jpg\', { width: 800, height: 600 })} alt="")',
+      'img({...image(\'https://cms.example/c.jpg\', { width: post.w, height: 600 })} alt="")',
+      'img(src={cover} aspect={post.cover} alt="")',
       '',
     ].join('\n'))
 
@@ -109,8 +112,20 @@ describe('scanIslandImages', () => {
       { file: join(dir, 'a.png'), options: { sizes: '95px' } },
       { file: join(dir, 'a.png'), options: { aspect: '1/1', quality: 90 } },
     ])
-    expect(found.remote).toEqual([{ src: 'https://cms.example/a.jpg', options: { width: 800, height: 600, aspect: '16/9' } }])
-    expect(found.dynamic).toHaveLength(1)
-    expect(dynamicImageLints(found, 'warn')[0]).toMatchObject({ code: 'static-remote-image', severity: 'warning', file, line: 10 })
+    expect(found.remote.map(({ src, options }) => ({ src, options }))).toEqual([
+      { src: 'https://cms.example/a.jpg', options: { width: 800, height: 600, aspect: '16/9' } },
+      { src: 'https://other.example/b.jpg', options: { width: 800, height: 600 } },
+    ])
+    expect(found.dynamic.map(({ reason, line }) => ({ reason, line }))).toEqual([
+      { reason: 'option', line: 14 },
+      { reason: 'source', line: 10 },
+      { reason: 'size', line: 13 },
+    ])
+
+    // The host `images.remote` does not list, a size and an option no literal, and a source no literal, each on its own line.
+    const lints = dynamicImageLints(found, 'warn', src => src.startsWith('https://cms.example/'))
+
+    expect(lints.map(({ line }) => line).toSorted((a, b) => a - b)).toEqual([10, 12, 13, 14])
+    expect(lints[0]).toMatchObject({ code: 'static-remote-image', severity: 'warning', file })
   })
 })

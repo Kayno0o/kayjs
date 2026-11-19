@@ -83,6 +83,14 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
         // Only the island draws that crop and quality, so the build wrote them from its source.
         expect((await linked(view, 'img.browser-crop')).every(url => url.includes('-4x3-q75'))).toBe(true)
+        // An upload, which the build does not resize, keeps its own URL, under the base as the server puts a page's.
+        const uploads = await linked(view, 'img.browser-upload')
+
+        expect(uploads.length).toBeGreaterThan(0)
+
+        for (const url of uploads)
+          expect(url).toStartWith(`${base}/uploads/photo.png`)
+
         expect(seen.filter(url => url.includes('/_kay/images?'))).toEqual([])
         expect(view.errors).toEqual([])
       }, 60_000)

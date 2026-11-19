@@ -14,7 +14,7 @@ export const ROUTE_LINTS = {
     level: 'warn',
     group: 'performance',
     site: true,
-    summary: 'On a `kay build --static` export, an island\'s `image(source, { width, height })` whose source is neither an imported image nor a literal URL: the export has no image route, so the browser links the original image, not resized files. Give `image()` the URL as a literal, on a host `assets.images.remote` lists, and the build fetches and resizes it; any other source is drawn at full size. Reported by `kay build --static`.',
+    summary: 'On a `kay build --static` export, an island image the build cannot write files for: an `image(source, { width, height })` whose source is neither an imported image nor a literal URL, a literal URL on a host `assets.images.remote` does not list, a width or height that is no number literal, or an `aspect`, `quality` or `sizes` that is no literal. The export has no image route, so the browser links the original image, or asks for a file that does not exist. Give `image()` the URL as a literal on a listed host, with its size and options as literals, and the build fetches and resizes it. A best-effort read of the island\'s source. Reported by `kay build --static`.',
     wrong: 'img({...image(post.cover, { width: 1200, height: 800 })} alt="")',
     right: 'img({...image(\'https://cms.example.com/cover.jpg\', { width: 1200, height: 800 })} alt="")',
   },

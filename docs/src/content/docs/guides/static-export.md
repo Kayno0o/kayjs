@@ -30,7 +30,7 @@ An image an island draws in the browser links the same files the page does. The 
 
 A remote image the island names as a literal URL, with its `width` and `height`, on a host `assets.images.remote` lists, is downloaded at build time and linked as files. The build fails naming the URL when the host does not answer in time.
 
-Any other remote image or upload keeps its own address, and the build warns of an `image()` call whose source it cannot read (`static-remote-image`).
+Any other remote image or upload keeps its own address, and the build warns of an island image whose source, size, crop or quality it cannot read, or whose host `images.remote` does not list (`static-remote-image`).
 
 The site is written to a folder beside the output, `dist.kay-staging`, and renamed over `dist` once it is complete. A server pointed at `dist` keeps serving the last export until the new one is in place and never finds the folder empty, and an export that fails leaves the last one as it was.
 

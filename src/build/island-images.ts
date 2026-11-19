@@ -24,16 +24,20 @@ export interface IslandImage {
 }
 
 // An `image(url, { width, height, ... })` of an image on another host, its URL a literal.
-export interface RemoteIslandImage {
+export interface RemoteIslandImage extends Position {
   src: string
   options: ImageOptions
 }
 
-// An `image()` whose source is neither an import nor a literal, written with a size, so a remote image: a static export cannot resize it in the browser.
-export interface DynamicIslandImage {
+interface Position {
   file: string
   line: number
   column: number
+}
+
+// An image of an island that a static export cannot write files for, and why: its source is neither an import nor a literal (a remote image the build cannot fetch), its size is no number literal, or its crop, quality or sizes is no literal.
+export interface DynamicIslandImage extends Position {
+  reason: 'source' | 'size' | 'option'
 }
 
 export interface IslandImages {
@@ -71,6 +75,13 @@ function optionsOf(read: (name: string) => string | undefined): ImageOptions {
     ...typeof width === 'number' && { width },
     ...typeof height === 'number' && { height },
   }
+}
+
+// The options `read` finds written but `optionsOf` could not take, as a value computed.
+function unreadOptions(read: (name: string) => string | undefined): boolean {
+  const options = optionsOf(read)
+
+  return (['sizes', 'aspect', 'quality'] as const).some(name => read(name) !== undefined && options[name] === undefined)
 }
 
 function fieldOf(text: string, name: string): string | undefined {
@@ -133,6 +144,9 @@ export function scanIslandImages(files: Iterable<string>): IslandImages {
         if (imported !== undefined && (options.aspect !== undefined || options.quality !== undefined || options.sizes !== undefined))
           found.imported.push({ file: imported, options })
 
+        if (imported !== undefined && unreadOptions(value))
+          found.dynamic.push({ file, ...positionAt(source, node.start), reason: 'option' })
+
         return undefined
       })
     }
@@ -144,16 +158,21 @@ export function scanIslandImages(files: Iterable<string>): IslandImages {
       const [, , url, name, written] = match
       const options = optionsOf(field => written === undefined ? undefined : fieldOf(written, field))
 
-      if (url !== undefined) {
-        if (options.width !== undefined && options.height !== undefined)
-          found.remote.push({ src: url, options })
-      }
-      else if (imports.has(name!)) {
+      const at = { file, ...positionAt(source, match.index) }
+      const read = (field: string) => written === undefined ? undefined : fieldOf(written, field)
+      const sized = options.width !== undefined && options.height !== undefined
+
+      if (url !== undefined && sized)
+        found.remote.push({ src: url, options, ...at })
+      else if (url !== undefined && (read('width') !== undefined || read('height') !== undefined))
+        found.dynamic.push({ ...at, reason: 'size' })
+      else if (imports.has(name!))
         found.imported.push({ file: imports.get(name!)!, options })
-      }
-      else if (written !== undefined && fieldOf(written, 'width') !== undefined && fieldOf(written, 'height') !== undefined) {
-        found.dynamic.push({ file, ...positionAt(source, match.index) })
-      }
+      else if (url === undefined && read('width') !== undefined && read('height') !== undefined)
+        found.dynamic.push({ ...at, reason: 'source' })
+
+      if ((url !== undefined || imports.has(name!)) && unreadOptions(read))
+        found.dynamic.push({ ...at, reason: 'option' })
     }
   }
 
@@ -234,10 +253,19 @@ export async function recordIslandImages(clientDir: string, images: IslandImages
 
   const level = lintLevel('static-remote-image', lints)
 
-  return checking && level !== 'allow' ? dynamicImageLints(images, level) : []
+  return checking && level !== 'allow' ? dynamicImageLints(images, level, allowed) : []
 }
 
-// The `image()` calls of an island on a source that is no import and no literal, drawn with a size: on a static export they link the original, as the build cannot know which images to fetch.
-export function dynamicImageLints(images: IslandImages, level: 'warn' | 'deny'): CheckDiagnostic[] {
-  return images.dynamic.map(({ file, line, column }) => ({ file, line, column, code: 'static-remote-image', severity: level === 'warn' ? 'warning' : 'error', message: 'This `image()` of an island takes a source the build cannot read, so a static export, which has no image route, links the original image instead of resized files', help: 'give `image()` the image\'s URL as a literal in the island, on a host `images.remote` lists, so the build fetches and resizes it, or draw the image where the server renders it' }))
+const UNREAD = {
+  source: { message: 'This `image()` of an island takes a source the build cannot read, so a static export, which has no image route, links the original image instead of resized files', help: 'give `image()` the image\'s URL as a literal in the island, on a host `images.remote` lists, so the build fetches and resizes it, or draw the image where the server renders it' },
+  size: { message: 'This `image()` of an island takes a width or a height that is no number literal, so the build cannot fetch and resize the image and a static export links the original', help: 'write the width and the height as numbers' },
+  option: { message: 'This island image takes a crop, a quality or sizes that is no literal, so a static export, which writes the files it reads from the source, has none for it and the browser asks for a file that does not exist', help: 'write `aspect`, `quality` and `sizes` as literals in the island' },
+  host: { message: 'This `image()` URL is on a host `images.remote` does not list, so a static export links the original image instead of resized files', help: 'list the host in `images.remote`, so the build fetches and resizes it' },
+} as const
+
+// What `kay check` says of the island images a static export cannot write files for: they keep their own URL, or ask the browser for a file that is not there.
+export function dynamicImageLints(images: IslandImages, level: 'warn' | 'deny', allowed: (src: string) => boolean = () => true): CheckDiagnostic[] {
+  const unlisted = images.remote.filter(({ src }) => !allowed(src)).map(({ file, line, column }) => ({ file, line, column, reason: 'host' as const }))
+
+  return [...images.dynamic, ...unlisted].map(({ file, line, column, reason }) => ({ file, line, column, code: 'static-remote-image', severity: level === 'warn' ? 'warning' : 'error', ...UNREAD[reason] }))
 }
