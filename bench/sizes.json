@@ -1,6 +1,6 @@
 {
   "static": {
-    "gzip": 9930,
+    "gzip": 9933,
     "files": 3,
     "packages": {
       "app": 493,
@@ -8,7 +8,7 @@
     }
   },
   "i18n-links": {
-    "gzip": 17818,
+    "gzip": 17817,
     "files": 2,
     "packages": {
       "app": 1020,
@@ -16,7 +16,7 @@
     }
   },
   "live-values": {
-    "gzip": 15611,
+    "gzip": 15616,
     "files": 4,
     "packages": {
       "app": 855,
@@ -24,7 +24,7 @@
     }
   },
   "bench-products": {
-    "gzip": 11430,
+    "gzip": 11428,
     "files": 2,
     "packages": {
       "app": 433,
@@ -32,7 +32,7 @@
     }
   },
   "bench-table": {
-    "gzip": 13775,
+    "gzip": 13773,
     "files": 2,
     "packages": {
       "app": 2688,
@@ -40,7 +40,7 @@
     }
   },
   "form-only": {
-    "gzip": 2936,
+    "gzip": 2935,
     "files": 1,
     "packages": {
       "app": 51,
@@ -48,7 +48,7 @@
     }
   },
   "ui-list": {
-    "gzip": 68587,
+    "gzip": 68560,
     "files": 43,
     "packages": {
       "app": 6165,
