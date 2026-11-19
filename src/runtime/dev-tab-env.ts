@@ -1,9 +1,10 @@
 import type { DevRequest } from '../server/dev'
 import type { DevTab, DevTool } from './dev-tool'
-import { REQUEST } from './dev-tool-constants'
 
 // The Env tab's code, fetched at once as its badge counts the variables that look like secrets, with the tool's shared helpers from `tool.kit`.
 const ENV_URL = '/_kay/env.js'
+// Copied from dev-tool-constants.ts, as a tab module imports nothing.
+const REQUEST = 'kay-dev-request'
 const MODULE_START = 'export default '
 const BUILT_EVENT = 'kay:dev-built'
 
