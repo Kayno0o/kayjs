@@ -830,7 +830,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
   if conversations
     nav(part="conversations" aria-label={conversationsLabel})
       if inBrowser
-        Button(part="newConversation" variant="ghost" size="sm" icon="plus" label={newLabel} ref={element => newConversation = element} onClick={() => shownParam?.set(undefined)})
+        Button(part="newConversation" variant="ghost" size="sm" icon="plus" label={newLabel} ref={(element: HTMLElement) => newConversation = element} onClick={() => shownParam?.set(undefined)})
       else
         Button(part="newConversation" variant="ghost" size="sm" icon="plus" label={newLabel} href={withQuery({ conversation: null })} ref={(element: HTMLElement) => newConversation = element})
       if listProblem()
