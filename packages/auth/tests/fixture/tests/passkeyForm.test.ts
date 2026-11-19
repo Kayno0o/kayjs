@@ -55,7 +55,8 @@ test('the passkey form labels its proof field with the authenticator code once t
   await page.click('form[action$="/enable"] button')
   await page.waitFor('#kauth-recovery-codes')
   await page.goto('/auth/account/security')
-  await page.waitFor('input[name="code"][autocomplete="one-time-code"]')
+  // The passkey form's own field: the two-factor form beside it also has a one-time-code field, rendered before the island.
+  await page.waitFor('form:has(input[name="name"]):not(:has(input[name="id"])) input[name="code"][autocomplete="one-time-code"]')
 
   const labels = await passkeyField(page)
 
