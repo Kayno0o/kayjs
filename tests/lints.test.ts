@@ -89,6 +89,8 @@ describe('lint levels', () => {
     expect(fixedSource(`// kay-allow deprecated-ctx-fail, missing-alt\n${img}`)).toEqual({ text: `// kay-allow missing-alt\n${img}`, warnings: 1 })
     expect(fixedSource(`// kay-allow missing-alt, deprecated-ctx-fail, deprecated-deny-call\n${img}`)).toEqual({ text: `// kay-allow missing-alt\n${img}`, warnings: 2 })
     expect(fixedSource(`// kay-allow deprecated-ctx-fail, missing-alt, deprecated-deny-call -- why\n${img}`)).toEqual({ text: `// kay-allow missing-alt -- why\n${img}`, warnings: 2 })
+    expect(fixedSource(`// kay-allow deprecated-ctx-fail\r\n${img}`)).toEqual({ text: img, warnings: 1 })
+    expect(fixedSource(`${img}p x // kay-allow deprecated-ctx-fail\n`)).toEqual({ text: `${img}p x\n`, warnings: 1 })
     expect(fixedSource(`// kay-allow missing-alts\n${img}`)).toEqual({ text: `// kay-allow missing-alts\n${img}`, warnings: 0 })
   })
 

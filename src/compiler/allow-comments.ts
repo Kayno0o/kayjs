@@ -48,7 +48,8 @@ export function unknownNames(comment: AllowComment, source: string, known: (name
   const lastKept = comment.names.findLastIndex(({ name }) => !removed.has(name))
   const lineStart = source.lastIndexOf('\n', comment.start - 1) + 1
   const whole = source.slice(lineStart, comment.start).trim() === ''
-  const after = source[comment.end] === '\n' ? comment.end + 1 : comment.end
+  const after = comment.end + (source.startsWith('\r\n', comment.end) ? 2 : Number(source[comment.end] === '\n'))
+  const before = comment.start - (/[ \t]*$/.exec(source.slice(lineStart, comment.start))?.[0].length ?? 0)
   const last = comment.names.at(-1)!
 
   return unknown.map(({ name, start }): Diagnostic => {
@@ -65,7 +66,7 @@ export function unknownNames(comment: AllowComment, source: string, known: (name
       return diagnostic
 
     const kept = comment.names[lastKept]
-    const dropped = whole ? { start: lineStart, end: after } : { start: comment.start, end: comment.end }
+    const dropped = whole ? { start: lineStart, end: after } : { start: before, end: comment.end }
     const tail = kept ? { start: kept.start + kept.name.length, end: last.start + last.name.length } : dropped
     const edit = position > lastKept ? tail : { start, end: comment.names[position + 1]!.start }
 
