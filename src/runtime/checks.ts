@@ -329,11 +329,14 @@ type NotSerializable<Value> = [FunctionPaths<Value>] extends [never]
     : { kayLint: 'island-prop', kayPath: FunctionPaths<Value>, kayError: Unsendable }
 
 // Props a static parent passes to an island are serialized for the browser, so they must survive it, and are public, so they should hold no secret-looking field. `kay check` reports the second as the `secret-prop` lint.
+// What a use rendered as plain markup takes: functions in a value (a class instance's methods included) are called by the server, so only a value holding what is neither data nor a function, a symbol, is refused.
+type PlainUse<Value> = [IsSerializable<Value>] extends [true] ? unknown : [FunctionPaths<Value>] extends [never] ? NotSerializable<Value> : unknown
+
 // `Names` is the props the use writes: a use turning none of an island's interactive props on renders as plain markup, which sends nothing, so it takes any value.
-export type IslandProp<Component, Value, Names extends object = Record<string, unknown>> = Component extends IslandBrand ? true extends StaysPlain<Component, keyof Names> ? unknown : [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value> : unknown
+export type IslandProp<Component, Value, Names extends object = Record<string, unknown>> = Component extends IslandBrand ? true extends StaysPlain<Component, keyof Names> ? PlainUse<Value> : [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value> : unknown
 
 // What a static parent sends an island for a name its script declares as plain data written out: it serializes whatever type the declaration gives it, such as a `Column<Row>[]` whose `sortValue` could have been a function.
-export type PlainIslandProp<Component, Value, Names extends object = Record<string, unknown>> = Component extends IslandBrand ? true extends StaysPlain<Component, keyof Names> ? unknown : SecretProp<Value> : unknown
+export type PlainIslandProp<Component, Value, Names extends object = Record<string, unknown>> = Component extends IslandBrand ? true extends StaysPlain<Component, keyof Names> ? PlainUse<Value> : SecretProp<Value> : unknown
 
 // The block a component reads with `slot name(a, b)`, called with values its template does not type for the caller.
 // eslint-disable-next-line ts/no-explicit-any -- the arguments are whatever the component's template passes

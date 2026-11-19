@@ -157,10 +157,10 @@ describe('island-prop, decided by the types of what is passed', () => {
       'src/components/client-use.kay': component('import Client from \'./client.kay\'', 'Client(label={row => String(row)})'),
       'src/components/widened.kay': '---\nisland({ interactive: { selectable: false } })\nconst { label } = props<{ label?: (row: number) => string }>()\n---\np {String(label)}\n',
       'src/components/widened-use.kay': component('import Widened from \'./widened.kay\'', 'Widened(label={row => String(row)})\nWidened(selectable label={row => String(row)})'),
-      'src/components/nested.kay': component('import Listed from \'./listed.kay\'', 'Listed(data={[{ run() { return 1 } }]})'),
+      'src/components/nested.kay': component('import Listed from \'./listed.kay\'', 'Listed(data={[{ run() { return 1 } }]})\nListed(data={[{ run() { return 1 } }]} selectable)'),
       'src/components/default-on.kay': component('import On from \'./on.kay\'', 'On(label={row => String(row)})'),
       'src/components/spreads.kay': component('import Listed from \'./listed.kay\'\nconst more = {}', 'Listed({...more} label={row => String(row)})'),
-      'src/components/columns.kay': component('import Listed from \'./listed.kay\'\ntype Column = { key: string, sortValue?: ((row: number) => number) | true }\nconst columns: Column[] = [{ key: \'a\', sortValue: true }]\nconst computed = [{ key: \'a\', sortValue: (row: number) => -row }]', 'Listed(data={columns})\nListed(data={computed})\nListed(data={columns} selectable)\nListed(data={computed} selectable)'),
+      'src/components/columns.kay': component('import Listed from \'./listed.kay\'\ntype Column = { key: string, sortValue?: ((row: number) => number) | true }\nconst key = String(Math.random())\nconst columns: Column[] = [{ key, sortValue: true }]\nconst computed = [{ key, sortValue: (row: number) => -row }]', 'Listed(data={columns})\nListed(data={computed})\nListed(data={columns} selectable)\nListed(data={columns} hydrate="visible")'),
       'src/components/generic-block.kay': component('import Generic from \'./generic.kay\'', 'Generic(rows={[{ id: 1 }]})\n  @cell(row)\n    p {row.id}\n\nGeneric(rows={[{ id: 1 }]} selectable)\n  @cell(row)\n    p {row.id}\n'),
     })
 
@@ -168,9 +168,10 @@ describe('island-prop, decided by the types of what is passed', () => {
       expect(lints(await check(root), root)).toEqual([
         ['components/client-use.kay', 'island-prop', 5],
         ['components/columns.kay', 'island-prop', 11],
+        ['components/columns.kay', 'island-prop', 12],
         ['components/default-on.kay', 'island-prop', 5],
         ['components/generic-block.kay', 'island-prop', 10],
-        ['components/nested.kay', 'island-prop', 5],
+        ['components/nested.kay', 'island-prop', 6],
         ['components/spreads.kay', 'island-prop', 6],
         ['components/turned-on.kay', 'island-prop', 5],
         ['components/turned-on.kay', 'island-prop', 7],

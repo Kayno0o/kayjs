@@ -337,13 +337,35 @@ function isThenable(value: unknown): boolean {
   return typeof value === 'object' && value !== null && typeof Reflect.get(value, 'then') === 'function'
 }
 
-// Whether the props, a function aside, could cross to the browser, so a use that an island would refuse is still told of it.
+// The value with the functions in it left out and a class instance read as the object of its fields, which a use rendered on the server calls and never sends: a `Column[]` whose `sortValue` is a function.
+function withoutFunctions(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (typeof value === 'function')
+    return undefined
+
+  if (typeof value !== 'object' || value === null || seen.has(value))
+    return value
+
+  if (Array.isArray(value)) {
+    seen.add(value)
+
+    return value.map(item => withoutFunctions(item, seen))
+  }
+
+  if (value instanceof Date || value instanceof Map || value instanceof Set || value instanceof URL || value instanceof RegExp || value instanceof Blob)
+    return value
+
+  seen.add(value)
+
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, withoutFunctions(item, seen)]))
+}
+
+// Whether the props, the functions in them aside, could cross to the browser, so a use that an island would refuse is still told of it.
 function sendable(props: object): boolean {
   const plain: Record<string, unknown> = {}
 
   for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(props))) {
     if (!descriptor.get && typeof descriptor.value !== 'function')
-      plain[key] = descriptor.value
+      plain[key] = withoutFunctions(descriptor.value)
   }
 
   try {

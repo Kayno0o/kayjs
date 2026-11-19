@@ -1214,7 +1214,7 @@ describe('generic components', () => {
   it('checks a method in a literal prop a page sends as a function given to the component', () => {
     const code = compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[{ run() { return 1 } }]})', '_layout.kay', { check: true }).tsx
 
-    expect(code).toContain('<List {...KayFunctionProp(List)(0)} items={[{ run() { return 1 } }]} />')
+    expect(code).toContain('<List {...KayFunctionProp(List, { "items": 0 })(0)} items={[{ run() { return 1 } }]} />')
 
     // Beside a getter, which keeps the object whole, the check of the object covering it.
     expect(compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[{ get n() { return 1 }, run() { return 1 } }]})', '_layout.kay', { check: true }).tsx).toContain('<List items={[KayProp(List, { "items": 0 })(({ get n() { return 1 }, run() { return 1 } }))]} />')

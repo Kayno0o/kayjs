@@ -32,6 +32,21 @@ describe('an island that lists the props making it interactive', () => {
     expect(called).toBe(1)
   })
 
+  it('is plain markup with a function nested in data it is given, which the server calls', () => {
+    class Money {
+      cents = 1
+
+      convert() {
+        return this.cents
+      }
+    }
+
+    const rows = [{ key: 'a', sortValue: (row: number) => -row }, new Money()]
+
+    expect(drawn({ sortable: false, rows } as never)).not.toContain('<slot')
+    expect(() => drawn({ sortable: false, selectable: true, rows } as never)).toThrow(IslandPropsError)
+  })
+
   it('is an island for an action in a prop it does not list, which is sent to the browser', () => {
     const action = Object.assign(() => undefined, { [ACTION]: true, url: '/_kay/action/pick' })
 
