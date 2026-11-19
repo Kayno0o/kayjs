@@ -17,6 +17,6 @@ main(style="width: 100%; padding: 0")
   article#hours
     BarChart(label="Hours" labels={hours} xLabels series={[{ name: 'Runs', values: hours.map((_, index) => index % 5 + 1) }]})
   article#few
-    BarChart(label="Days" labels={['Wednesday morning shift', 'Thursday afternoon shift', 'Friday evening shift']} xLabels series={[{ name: 'Runs', values: [1, 2, 3] }]})
+    BarChart(label="Days" labels={['Wednesday morning shift', 'Thursday afternoon and evening shift with overtime hours', 'Fri']} xLabels series={[{ name: 'Runs', values: [1, 2, 3] }]})
   article#week
     BarChart(label="Days" labels={['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']} xLabels series={[{ name: 'Runs', values: [1, 2, 3, 4, 5, 6, 7] }]})

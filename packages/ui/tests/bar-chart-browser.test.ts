@@ -75,10 +75,10 @@ describe('BarChart at phone width', () => {
     expect(found.right).toBeGreaterThanOrEqual(-0.5)
   })
 
-  it('keeps the first and last labels of 3 wide labels and hides the middle one that would overlap them', async () => {
+  // The middle label is twice as wide as the first and the last is short, so the middle meets the first and the edges stay apart in any font from 0.6 to 1.7 times the width of Noto Sans (6px to 17px measured).
+  it('keeps the first and last labels and hides a wide middle one that would overlap them', async () => {
     await using page = await site.open('/bar-density', { viewport: 'phone' })
 
-    // The collision pass runs once the island hydrates, which a loaded runner reaches after the page opens.
     await page.waitFor('#few [data-part="axisLabel"][data-collides]')
     const shown = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('#few [data-part="axisLabel"]')].filter(item => !item.hasAttribute('data-collides')).map(item => ({ edge: item.dataset.edge ?? 'middle', left: item.getBoundingClientRect().left, right: item.getBoundingClientRect().right }))) as { edge: string, left: number, right: number }[]
 
