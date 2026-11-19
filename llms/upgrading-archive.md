@@ -1,6 +1,36 @@
 # Upgrading, older releases
 
-What each minor release before 1.106 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.108 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.107.0
+
+### `TSchema` is gone from `kay/library`
+
+Import `Schema` from `kay/library` instead, kay's own name for what `s` builds; `kay upgrade` on 1.106 rewrote the import and its uses. The `deprecated-schema-type` lint is gone with it.
+
+### `--- script` opening a file is an error
+
+A file opens its script with `---`; `--- script` is only for a script that follows a `--- server`, `--- module` or `--- style` fence. The `deprecated-script-fence` lint is gone, and `--- script` first in a file is a `fence-invalid` error whose safe fix `kay check --fix` applies.
+
+### `action({ input, ...options }, handler)`
+
+An action takes its options first, with its input in them, as an API route does: `action({ input: { title: s.string() }, maxSize: '1mb' }, handler)`. `action(schema, handler, options)` and `action(handler, options)` work until 2.0; `kay upgrade` rewrites them (`deprecated-action-options`).
+
+### One validation for every input
+
+Actions, API routes, sockets and `defineEnv` read their input through one `validate(schema, value, { source })`. Text sources (a form, a query, path params, the environment) are read as the numbers, booleans and lists they spell, and a JSON body never is: an action called from an island, a socket message and an API route's JSON body that sent `'3'` for an int, or `'true'` for a boolean, are refused where Elysia's schemas let them by. An object refuses a key its shape lacks in JSON (`extra: 'strip'` drops it, as `s.Object` of the old builders still does); a query, the headers and the cookies of a request still drop theirs. A form post drops the fields the schema does not name (a named submit button, a widget), as a browser sends controls the app does not own. `validate` answers `{ errors: [{ path, key, params, message }], status: 422 }` worded in the request's locale and independent of `NODE_ENV`; an action's or API route's answer still carries `errors` as a `{ field: message }` map. An API route's refusal reaches an `onError` as an error with code `VALIDATION` whose `all` lists `path`, `message` and `summary`. No lint can find the app that sends such a key or such a JSON value, as it depends on what a request carries.
+
+## 1.106.0
+
+### `s` is kay's own builder, in lowercase
+
+`s.string({ min, max })`, `s.int()`, `s.enum()`, `s.object()` and the rest replace the PascalCase builders of Elysia, each taking the same field options (`optional: true`, `default`, `error`, `label`, `description`, `example`); `s.Optional(field)` is `optional: true` in the field's options, `s.UnionEnum` and `s.UnionKeys` are `s.enum`, `s.Numeric` is `s.number`, and `s.typebox` is gone: `s` builds a schema of its own, over TypeBox, and a schema built with Elysia's `t` is still taken. The old names work until 2.0, and `kay upgrade` rewrites them (`deprecated-schema-builders`, [schemas](schemas.md#schemas)). A file size of a file field is `'2mb'`, never `'2m'`. Two things differ in the new builders: `s.object` refuses a key its shape lacks, where `s.Object` let it by (`{ extra: 'strip' }` keeps the old way; see [schemas](schemas.md#schemas) for where it refuses), and `s.list` is at most 1,000 items unless `max` says more; the fix of 1.109 writes both options, the one of 1.106 to 1.108 did not. An unknown key of a query, the headers or the cookies is dropped, whatever the schema says, as a link or a proxy adds some; `s.Object` of a collection's frontmatter now refuses a key its shape lacks, so an entry with an extra key fails the build until the schema says `{ extra: 'strip' }`. An `action` or a `defineEnv` takes a record of fields, which refuses a key its shape lacks: `s.object(shape, { extra: 'strip' })` keeps the old way.
+### `@kaynooo/eslint` 8
+
+kay and `kay new` use `@kaynooo/eslint` 8, which has no formatters (Prettier, oxfmt and dprint, about 30 MB, are no longer installed): run `bun add -d @kaynooo/eslint@^8`, and drop a `formatters` option from `eslint.config.ts` if it sets one. `kay fmt` formats as before.
+### `sanitizeHtml` keeps only `language-*` classes on `code`
+
+A call with `attributes: { code: ['class'] }` now keeps a `code` element's class only when it is `language-` and a language name (`language-ts`, `language-c++`); any other class is dropped. Style the element by its parent or by `[class^='language-']` instead of a class of your own on `code`.
 
 ## 1.105.0
 
