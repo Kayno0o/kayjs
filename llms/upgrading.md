@@ -6,7 +6,7 @@ What each release breaks, and what an app changes to move to it. kay and its lib
 
 ### kay needs Bun 1.4.5
 
-Bun 1.4.5 fixes security issues in HTTP/3, HTTP/1.1, TLS, DNS and Zstandard, which reach `Bun.serve`, `fetch` and `Bun.dns`, so kay and its libraries ask for `bun >=1.4.5` and refuse 1.4.4. Run `bun upgrade` (or `bun update bun` where the project pins it), and move CI and images to 1.4.5: `kay upgrade`'s last `kay check --fix` moves a root Dockerfile's `oven/bun` tag (`old-bun-image`).
+Bun 1.4.5 fixes security issues in HTTP/3, HTTP/1.1, TLS, DNS and Zstandard, which reach `Bun.serve`, `fetch` and `Bun.dns`, so kay and its libraries ask for `bun >=1.4.5` and refuse 1.4.4. Run `bun upgrade`, then `bun update bun` in a project on `bun-plugin-tailwind`, whose peer installs the npm `bun` package that package scripts run ahead of the system Bun, and move CI and images to 1.4.5: `kay upgrade`'s last `kay check --fix` moves a root Dockerfile's `oven/bun` tag (`old-bun-image`).
 
 ### kayjs-auth no longer takes `@kaynooo/pg-orm` 7
 
