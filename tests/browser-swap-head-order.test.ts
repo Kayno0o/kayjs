@@ -40,17 +40,17 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a swap l
     for (const id of ids) {
       await page.evaluate((target: string) => (document.querySelector(`#to-${target}`) as HTMLElement).click(), id)
       await page.waitUntil((target: string) => document.querySelector('h1')?.textContent?.toLowerCase() === target, { timeout: '10s' }, id)
-      // The stale styles go once the new ones loaded.
-      await Bun.sleep(200)
       expect(await page.evaluate(() => (window as unknown as { swapped?: boolean }).swapped)).toBe(true)
 
-      const swapped = await cascade(page)
-      const path = await page.path()
-
-      await using fresh = await site.open(path, { strict: false })
+      await using fresh = await site.open(await page.path(), { strict: false })
 
       await fresh.waitFor('button.count')
-      expect(swapped).toEqual(await cascade(fresh))
+
+      const wanted = await cascade(fresh)
+
+      // The stale styles go once the new ones loaded.
+      await page.waitUntil((order: (string | null)[]) => JSON.stringify([...document.head.querySelectorAll('style,link[rel=stylesheet]')].map(each => each.getAttribute('href') ?? each.textContent)) === JSON.stringify(order), { timeout: '10s' }, wanted.order)
+      expect(await cascade(page)).toEqual(wanted)
       // The dev diagnostics name classes this fixture's cuts hold no rule for.
       expect(page.errors.filter(error => !error.startsWith('[kay] the class'))).toEqual([])
     }

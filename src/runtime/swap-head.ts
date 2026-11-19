@@ -167,10 +167,12 @@ export function mergeHead(next: Document, scoped = false): { loaded: Promise<unk
     const key = element._$s
 
     if (key !== html(element)) {
-      const same = take(html(element))
+      const match = take(html(element)) ?? take(key)
 
-      if (take(key) === undefined && same === undefined)
+      if (match === undefined)
         named.push(element)
+      else if (sheets.has(match))
+        sheets.set(match, element)
     }
     else {
       const match = take(key)
@@ -231,7 +233,7 @@ function isSheet(element: Element): boolean {
   return element.tagName === 'STYLE' || (element instanceof HTMLLinkElement && (element.rel === 'stylesheet' || element.matches(REST_LINK)))
 }
 
-// Stands the next head's styles and stylesheets in the order it serves them, the ones kept and the ones added alike: the layer order and the cascade of a page loaded afresh follow it, and a shared block declaring a layer must not come before the page's own `@layer` order. The shared stylesheet still comes last when nothing kept follows an added one.
+// Stands the next head's styles and stylesheets in the order it serves them, the ones kept and the ones added alike: the layer order and the cascade of a page loaded afresh follow it, and a shared block declaring a layer must not come before the page's own `@layer` order.
 function orderSheets(order: (Element | undefined)[]): void {
   const sheets = order.filter(element => element !== undefined).map(element => ({ element, added: !element.isConnected }))
   let last: Element | undefined
@@ -246,12 +248,9 @@ function orderSheets(order: (Element | undefined)[]): void {
     }
     else if (added) {
       const kept = sheets.slice(at).find(each => !each.added)
-      const rest = element.matches(REST_LINK) ? null : document.head.querySelector(REST_LINK)
 
       if (kept !== undefined)
         kept.element.before(element)
-      else if (rest !== null)
-        rest.before(element)
       else
         document.head.append(element)
     }
@@ -259,7 +258,7 @@ function orderSheets(order: (Element | undefined)[]): void {
     last = element
   }
 
-  // Chrome keeps the layer order it had when a style moved, so each style is put back where it stands for it to be worked out again.
+  // Chrome keeps the layer order it had when a style moved, so each style is put back where it stands for it to be worked out again, the ones that did not move too as the order is worked out from all of them.
   if (moved) {
     for (const { element } of sheets) {
       if (element instanceof HTMLStyleElement)
