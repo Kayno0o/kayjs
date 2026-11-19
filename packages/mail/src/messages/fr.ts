@@ -58,7 +58,6 @@ export default defineMessages({
       },
       page: {
         confirmedTitle: 'Abonnement confirmé',
-        confirmed: 'Merci, votre adresse est maintenant abonnée.',
         invalidTitle: 'Ce lien ne fonctionne pas',
         invalid: 'Ce lien n\'est pas valable, ou a déjà servi. Pour vous abonner, utilisez de nouveau le formulaire.',
         laterTitle: 'Ce lien ne peut pas être traité pour le moment',
@@ -70,7 +69,6 @@ export default defineMessages({
         askConfirm: 'Voulez-vous recevoir ces mails à cette adresse ?',
         askConfirmButton: 'Confirmer mon abonnement',
         unsubscribedTitle: 'Vous êtes désabonné',
-        unsubscribed: 'Vous ne recevrez plus ces mails.',
       },
       footer: 'Vous recevez ce mail parce que vous êtes abonné aux mails de {site}.',
       unsubscribe: 'Se désabonner',

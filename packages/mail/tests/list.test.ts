@@ -338,7 +338,11 @@ describe('the confirmation link', () => {
     const { email, confirm } = await subscribed()
     const count = await mail.list().count()
 
-    expect(await page(confirm)).toContain('Subscription confirmed')
+    const answer = await page(confirm)
+
+    expect(answer).toContain('Subscription confirmed')
+    expect(answer).not.toContain('is now subscribed')
+    expect(answer).not.toContain('system-ui,sans-serif')
     expect(await mail.list().count()).toBe(count)
     expect((await mail.list().subscribers()).filter(row => row.email === email)).toHaveLength(1)
   })
@@ -423,7 +427,10 @@ describe('unsubscribing', () => {
     const second = await post()
 
     expect(first.status).toBe(200)
-    expect(await first.text()).toContain('You are unsubscribed')
+    const answer = await first.text()
+
+    expect(answer).toContain('You are unsubscribed')
+    expect(answer).not.toContain('any more')
     expect(await second.text()).toContain('You are unsubscribed')
     expect((await mail.list().subscribers()).map(row => row.email)).not.toContain(email)
   })

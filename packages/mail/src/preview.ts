@@ -52,7 +52,7 @@ const GMAIL_CLIP_BYTES = 102 * 1024
 const PHONE_WIDTH = 375
 
 const STYLE = `
-body{margin:0;font:14px/1.5 system-ui,sans-serif;color:#1a1a1a;background:#f6f6f4}
+body{margin:0;font:14px/1.5 Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;background:#f6f6f4}
 main{max-width:1100px;margin:0 auto;padding:24px 16px}
 h1{font-size:20px;margin:0 0 16px}
 a{color:#1d4ed8}
