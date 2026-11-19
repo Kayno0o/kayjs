@@ -91,6 +91,27 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a swap k
     expect(page.errors).toEqual([])
   })
 
+  it('pairs the islands of a keyed loop by the loop\'s key when the first one goes, with no id on them', async () => {
+    await using page = await ready('/keyed')
+
+    await page.evaluate(() => (document.querySelectorAll('.pick .toggle')[1] as HTMLButtonElement).click())
+    await page.evaluate(() => (document.querySelector('.pick .drop') as HTMLButtonElement).click())
+    await page.waitUntil(() => document.querySelectorAll('.pick').length === 2, { timeout: '10s' })
+    expect(await page.evaluate(() => [...document.querySelectorAll('.pick')].map(pick => `${pick.querySelector('.name')?.textContent} ${pick.querySelector('.open')?.textContent}`))).toEqual(['b open', 'c closed'])
+    expect(page.errors).toEqual([])
+  })
+
+  it('keeps a details the person closed on the first load, though the server serves it open', async () => {
+    await using page = await site.open('/rows')
+
+    await page.waitFor('details.always')
+    await page.evaluate(() => ((document.querySelector('details.always summary')) as HTMLElement).click())
+    await page.waitUntil(() => !(document.querySelector('details.always') as HTMLDetailsElement).open)
+    await page.evaluate(() => (document.querySelector('.card button.bump') as HTMLButtonElement).click())
+    await page.waitUntil(() => [...document.querySelectorAll('.label')].some(each => each.textContent === 'rows 1'), { timeout: '10s' })
+    expect(await page.evaluate(() => (document.querySelector('details.always') as HTMLDetailsElement).open)).toBe(false)
+  })
+
   it('keeps a nested island in its parent and gives a standalone one its own state on a refresh', async () => {
     await using page = await ready('/nest')
 

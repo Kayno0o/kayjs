@@ -341,6 +341,26 @@ export function addKeyParameters(b: CodeBuilder, node: ForNode, src: string): vo
   b.add(')')
 }
 
+// What follows the fallback in the server's `loop` call: how an island's rows read their item, then the key of a keyed loop, which an island in a row with no `key` or `id` of its own takes its identity from.
+export function addLoopTail(b: CodeBuilder, node: ForNode, src: string, accessorLoops: boolean): void {
+  const keying = rowKeying(node, src)
+  const keyed = keying.kind === 'expression'
+
+  if (!node.fallback && (accessorLoops || keyed))
+    b.add(', undefined')
+
+  if (accessorLoops)
+    b.add(keying.kind === 'positional' ? ', "positional"' : ', "keyed"')
+  else if (keyed)
+    b.add(', undefined')
+
+  if (keying.kind === 'expression') {
+    b.add(', ')
+    addKeyParameters(b, node, src)
+    b.add(' => (').addSource(keying.key).add(')')
+  }
+}
+
 // Whether an expression names `name` as a variable: not as a property after a dot, nor inside a longer name.
 function readsName(expression: string, name: string): boolean {
   return new RegExp(`(?<![\\w$.])${name.replaceAll('$', '\\$')}(?![\\w$])`).test(expression)

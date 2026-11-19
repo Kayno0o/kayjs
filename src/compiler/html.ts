@@ -12,7 +12,7 @@ import { valuesOf } from './form-info'
 import { addClassAttribute, addFieldFill, addSchemaOptions, listsFromSchema, schemaTypeCall } from './html-fields'
 import { addInitial } from './html-initial'
 import { Markup } from './html-parts'
-import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, fixedSource, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
+import { addLoopTail, addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, fixedSource, isDeclaration, slotValue, soleDynamic } from './items'
 import { END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
 import { addGroupChecked, BEHAVIOUR, checkedContent, describedValue, fieldAriaOf, groupValue } from './plan'
@@ -338,9 +338,7 @@ export class HtmlTemplate extends TemplateWriter {
         this.markup(node.fallback)
       }
 
-      if (this.options.accessorLoops)
-        b.add(`${node.fallback ? '' : ', undefined'}${rowKeying(node, this.src).kind === 'positional' ? ', "positional"' : ', "keyed"'}`)
-
+      addLoopTail(b, node, this.src, this.options.accessorLoops === true)
       b.add(')')
     })
   }

@@ -13,6 +13,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The count badge of kayjs-ui's `TabNav`, `Tabs`, `SideNav` and `SiteNav` has the vertical padding of a `Badge`, so its number no longer touches the pill's top and bottom ([TabNav](/ui/tab-nav)).
 - A block's item stays the real item when it follows a replacement under the same key: the `row` of a Table's `@cell` and `@detail` is the object in `rows`, so `rows.indexOf(row)` and `row === selected` hold in it and a class instance with private fields works, while its nodes and a field's focus still stay (the 1.110 view of the row, compared by key, is gone). A block or a snippet reads its plain parameters where they are used, `followed(read, draw)` from `kay` draws a call once for the item under its key, and `slot name(item, index)` called with names or paths does it for its first argument, so Tabs, TabNav, Breadcrumb, SiteNav, SideNav and Carousel keep the nodes of the entry blocks across a refresh as the other item blocks do ([templates](templates-elements-slots-snippets.md), [effects](effects.md), [Table](../packages/ui/llms/table.md)).
 
+- An island drawn in a keyed `for` is paired by the loop's key across a refresh, with no `id` or `persist` on it, so deleting the first row leaves each other island its own state; the server writes the key as the island's `data-key`. A `details` of the first load takes the server's value as its baseline, as one a swap brings does ([Navigation](navigation.md#islands-kept-across-pages)).
+
 ## 1.110.0
 
 - kayjs-ui's `Checkbox`, `RadioGroup` choices and `Toggle` rows are at least 24px tall, the tap target of WCAG 2.5.8, whatever the label's line height.

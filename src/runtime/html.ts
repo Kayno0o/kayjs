@@ -572,7 +572,7 @@ export function show<T>(value: T, render: (value: () => Truthy<T>) => string, fa
 
 // A `for`: each row's markup, or the fallback's when there is nothing to list.
 // In an island a row reads its item, and a keyed row its index, through functions, as the browser build of the same template does.
-export function loop<T>(each: Iterable<T> | null | undefined | false, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: () => string, accessors?: 'keyed' | 'positional'): string {
+export function loop<T>(each: Iterable<T> | null | undefined | false, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: () => string, accessors?: 'keyed' | 'positional', key?: Keyed<T>): string {
   if (each == null || each === false)
     return fallback?.() ?? ''
 
@@ -584,16 +584,44 @@ export function loop<T>(each: Iterable<T> | null | undefined | false, render: (i
     return fieldMarks.marking === undefined ? markup : markedList(each, markup)
   }
 
-  return fieldMarks.marking === undefined ? rows(list, render, accessors) : markedList(each, rows(list, render, accessors))
+  return fieldMarks.marking === undefined ? rows(list, render, accessors, key) : markedList(each, rows(list, render, accessors, key))
 }
 
-function rows<T>(each: readonly T[], render: (item: T | (() => T), index: number | (() => number)) => string, accessors?: 'keyed' | 'positional'): string {
+type Keyed<T> = (item: T, index: number) => unknown
+
+// The keys of the keyed loops being drawn, outermost first, where an island with no `key` or `id` of its own takes its identity from, so a swap pairs it with its own copy when a sibling row goes.
+const loopKeys: (string | undefined)[] = []
+
+export function loopIdentity(): string | undefined {
+  return loopKeys.length === 0 || loopKeys.includes(undefined) ? undefined : loopKeys.join('\0')
+}
+
+function drawRow<T>(render: (item: T | (() => T), index: number | (() => number)) => string, accessors: 'keyed' | 'positional' | undefined, item: T, index: number): string {
+  return accessors === undefined ? render(item, index) : render(() => item, accessors === 'keyed' ? () => index : index)
+}
+
+function rows<T>(each: readonly T[], render: (item: T | (() => T), index: number | (() => number)) => string, accessors?: 'keyed' | 'positional', key?: Keyed<T>): string {
   let markup = ''
 
   for (let index = 0; index < each.length; index++) {
     const item = each[index]!
 
-    markup += accessors === undefined ? render(item, index) : render(() => item, accessors === 'keyed' ? () => index : index)
+    if (key === undefined) {
+      markup += drawRow(render, accessors, item, index)
+
+      continue
+    }
+
+    const value = key(item, index)
+
+    loopKeys.push(typeof value === 'string' || typeof value === 'number' ? String(value) : undefined)
+
+    try {
+      markup += drawRow(render, accessors, item, index)
+    }
+    finally {
+      loopKeys.pop()
+    }
   }
 
   return markup

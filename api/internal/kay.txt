@@ -591,7 +591,10 @@ function localHref(href: unknown): unknown
 function localLinks(markup: string): string
 
 [./html] loop
-function loop<T>(each: Iterable<T> | false | null | undefined, render: (item: (() => T) | T, index: (() => number) | number) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined): string
+function loop<T>(each: Iterable<T> | false | null | undefined, render: (item: (() => T) | T, index: (() => number) | number) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined, key?: Keyed<T> | undefined): string
+
+[./html] loopIdentity
+function loopIdentity(): string | undefined
 
 [./html] memo
 function memo<T>(fn: () => T, options?: SignalOptions<T> | undefined): () => T

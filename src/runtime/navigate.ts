@@ -73,6 +73,11 @@ export function startNavigation(given: NavigationHooks): void {
   ;(document as { _$kf?: typeof onClick })._$kf = onClick
   document.addEventListener('focusin', onFocus)
   document.addEventListener('toggle', onToggle, true)
+
+  // What each `details` of the first load shows is what the server served, as a swap records it for the ones it brings.
+  for (const details of document.querySelectorAll('details'))
+    navigation.opened.set(details, details.open)
+
   window.addEventListener('popstate', onPopState)
   // `pagehide` saves the scroll for a full load only: back or forward between entries of this document fires `popstate` once the entry already changed, too late to save the one left, so the entry is kept up to date as the page scrolls.
   window.addEventListener('scroll', onScroll, { passive: true })

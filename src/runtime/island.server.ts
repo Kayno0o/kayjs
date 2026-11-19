@@ -9,7 +9,7 @@ import { BUTTON_FORM_KEY } from './button-form'
 import { escapeAttribute, quotedAttribute } from './escape'
 import { withFieldMarks } from './fields'
 import { headMark, setsIslandTitle } from './head'
-import { child, omit, prerendering } from './html'
+import { child, loopIdentity, omit, prerendering } from './html'
 import { noteLives } from './live-value'
 import { localeState } from './locale-state'
 import { TITLED_ATTRIBUTE } from './markers'
@@ -183,7 +183,7 @@ function persistKey(wanted: IslandOptions['persist'], id: string): string | unde
   return wanted === false || wanted === '' ? undefined : wanted
 }
 
-// What tells an island from the others of its component when no `persist` does: the `key` or `id` its use gives, a string or a number, so a swap pairs it with its own copy when a sibling goes away.
+// What tells an island from the others of its component when no `persist` does: the `key` or `id` its use gives, a string or a number, else the key of the keyed loop it is drawn in, so a swap pairs it with its own copy when a sibling goes away.
 function identityOf(persist: string | undefined, props: object): string | undefined {
   for (const name of persist === undefined ? ['key', 'id'] as const : []) {
     const value = (props as Record<string, unknown>)[name]
@@ -192,7 +192,7 @@ function identityOf(persist: string | undefined, props: object): string | undefi
       return String(value)
   }
 
-  return undefined
+  return persist === undefined ? loopIdentity() : undefined
 }
 
 // Whether a `hydrate` makes the island wait, `media(...)` needing a query to wait for.

@@ -1,0 +1,17 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import Pick from '../components/pick.kay'
+import { state } from '../state'
+
+export const drop = action(t.Object({ id: t.String() }), ({ id }) => {
+  state.rows = state.rows.filter(row => row !== id)
+
+  return 'done'
+})
+---
+head
+  title Keyed
+h1 Keyed
+for name of state.rows key={name}
+  Pick(name={name} drop={drop})

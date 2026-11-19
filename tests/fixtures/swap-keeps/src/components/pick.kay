@@ -1,0 +1,12 @@
+---
+import type { Action } from 'kay'
+import { signal } from 'kay'
+
+const { name, drop } = props<{ name: string, drop: Action<{ id: string }, string> }>()
+const open = signal(false)
+---
+div.pick
+  button.toggle(type="button" onClick={() => open.set(value => !value)}) Toggle
+  p.open {open() ? 'open' : 'closed'}
+  p.name {name}
+  button.drop(type="button" onClick={() => void drop({ id: name })}) Drop
