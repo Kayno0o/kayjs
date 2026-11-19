@@ -123,6 +123,25 @@ describe('deprecated-schema-builders', () => {
     expect(unsure.text).toBe(`${head}export const a = other(s.object({ text: ${MAX} }, { extra: 'strip' }))\nexport const b = app.post('/x', () => 1, { query: s.object({ q: ${MAX} }, { extra: 'strip' }) })\n`)
   })
 
+  it('follows a schema held in a const to its uses, and takes only a route builder\'s body for an API body', async () => {
+    const MAX = 's.string({ max: Number.MAX_SAFE_INTEGER })'
+    const action = await fixed(`${head}const input = s.Object({ text: s.String() })\nconst shape = s.Object({ text: s.String() })\n\nexport const add = action(input, () => 1)\nexport const api = app.post('/x', () => 1, { body: shape })\n`)
+
+    expect(action.text).toBe(`${head}const input = s.object({ text: s.string() }, { extra: 'strip' })\nconst shape = s.object({ text: s.string() }, { extra: 'strip' })\n\nexport const add = action(input, () => 1)\nexport const api = app.post('/x', () => 1, { body: shape })\n`)
+
+    const shared = await fixed(`${head}const input = s.Object({ text: s.String() })\n\nexport const add = action(input, () => 1)\nexport const job = defineJob(input, () => 1)\n`)
+
+    expect(shared.text).toContain(`const input = s.object({ text: ${MAX} }, { extra: 'strip' })`)
+
+    const exported = await fixed(`${head}export const input = s.Object({ text: s.String() })\n\nexport const add = action(input, () => 1)\n`)
+
+    expect(exported.text).toContain(`s.object({ text: ${MAX} }`)
+
+    const client = await fixed(`${head}export const send = () => client.post(url, { body: s.Object({ text: s.String() }) })\n`)
+
+    expect(client.text).toContain(`s.object({ text: ${MAX} }`)
+  })
+
   it('keeps the shorthand of a renamed option', async () => {
     const { text } = await fixed(`${head}const minLength = 3\nexport const a = s.String({ minLength })\n`)
 

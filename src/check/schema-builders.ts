@@ -148,10 +148,46 @@ function keptOptions(call: Call, bounded: boolean): string[] | undefined {
 
 const BODY_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete'])
 
-// The nodes of the schemas kay caps an unbounded string in at 10,000 characters already: an action's input, and the `body` of an API route. What it cannot tell is left out, so the fix writes the bound that keeps the old behaviour there.
+// The schemas that are the `const` of a file at its top level, by name, and the names the file exports, whose uses beyond it are unknown.
+function topLevelSchemas(ast: Program): { bound: Map<string, Node>, exported: Set<string> } {
+  const bound = new Map<string, Node>()
+  const exported = new Set<string>()
+
+  for (const statement of ast.body) {
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+
+    if (statement.type === 'ExportNamedDeclaration') {
+      for (const specifier of statement.specifiers)
+        exported.add((specifier.local as { name?: string }).name ?? '')
+    }
+
+    if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const')
+      continue
+
+    for (const entry of declaration.declarations) {
+      if (entry.id.type !== 'Identifier' || !entry.init)
+        continue
+
+      bound.set(entry.id.name, entry.init)
+
+      if (statement.type === 'ExportNamedDeclaration')
+        exported.add(entry.id.name)
+    }
+  }
+
+  return { bound, exported }
+}
+
+// The nodes of the schemas kay caps an unbounded string in at 10,000 characters already: an action's input, and the `body` of an API route (a call of a method taking a path literal first, which leaves out `client.post(url, { body })`). A schema held in a top-level `const` is capped when every use of the name is one of those and the file does not export it. What it cannot tell is left out, so the fix writes the bound that keeps the old behaviour there.
 function cappedByKay(ast: Program, actions: Set<string>): Set<Node> {
   const capped = new Set<Node>()
-  const take = (schema: Node) => walk(schema, node => capped.add(node))
+  const uses = new Set<Node>()
+  const take = (schema: Node) => {
+    if (schema.type === 'Identifier')
+      uses.add(schema)
+    else
+      walk(schema, node => capped.add(node))
+  }
 
   walk(ast, (node) => {
     if (node.type !== 'CallExpression')
@@ -165,6 +201,9 @@ function cappedByKay(ast: Program, actions: Set<string>): Set<Node> {
     if (node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier' || !BODY_METHODS.has(node.callee.property.name))
       return
 
+    if (first?.type !== 'Literal' || typeof first.value !== 'string' || !first.value.startsWith('/'))
+      return
+
     for (const argument of rest) {
       if (argument.type !== 'ObjectExpression')
         continue
@@ -175,6 +214,33 @@ function cappedByKay(ast: Program, actions: Set<string>): Set<Node> {
       }
     }
   })
+
+  const { bound, exported } = topLevelSchemas(ast)
+  const declared = new Set<Node>()
+
+  for (const statement of ast.body) {
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+
+    if (declaration?.type === 'VariableDeclaration') {
+      for (const entry of declaration.declarations)
+        declared.add(entry.id)
+    }
+  }
+
+  const references = new Map<string, number>()
+
+  walk(ast, (node) => {
+    if (node.type === 'Identifier' && bound.has(node.name) && !declared.has(node))
+      references.set(node.name, (references.get(node.name) ?? 0) + 1)
+  })
+
+  for (const [name, init] of bound) {
+    const total = references.get(name) ?? 0
+    const cappedUses = [...uses].filter(use => use.type === 'Identifier' && use.name === name).length
+
+    if (total > 0 && total === cappedUses && !exported.has(name))
+      walk(init, node => capped.add(node))
+  }
 
   return capped
 }
