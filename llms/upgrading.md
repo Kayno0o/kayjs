@@ -4,6 +4,10 @@ What each release breaks, and what an app changes to move to it. kay and its lib
 
 ## 1.111.0
 
+### kay needs Bun 1.4.5
+
+Bun 1.4.5 fixes security issues in HTTP/3, HTTP/1.1, TLS, DNS and Zstandard, which reach `Bun.serve`, `fetch` and `Bun.dns`, so kay and its libraries ask for `bun >=1.4.5` and refuse 1.4.4. Run `bun upgrade` (or `bun update bun` where the project pins it), and move CI and images to 1.4.5: `kay upgrade`'s last `kay check --fix` moves a root Dockerfile's `oven/bun` tag (`old-bun-image`).
+
 ### kayjs-auth no longer takes `@kaynooo/pg-orm` 7
 
 kayjs-auth's Postgres store writes an OAuth grant with `insertOne`'s `skipConflicts`, which pg-orm 7 lacks, so its peer range is `^8.0.0 || ^9.0.0`. An app on pg-orm 7 moves to 8 or 9 with it (`bun add @kaynooo/pg-orm@^8.0.0`, then pg-orm's `MIGRATION_v8.0.0.md`); kay's own `kay/pg-orm` still takes 7.

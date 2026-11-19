@@ -4,7 +4,7 @@ order: 3
 description: Scaffold a project with kay new and start the dev server.
 ---
 
-You need [Bun](https://bun.sh) 1.4.4 or later. kay is published as `@kayjs/kay` on npm, and its libraries as `@kayjs/ui`, `@kayjs/auth`, `@kayjs/mail`, `@kayjs/cms` and `@kayjs/ai`. Everything a new project installs comes from npm too, so there is nothing to configure first. kay's own Forgejo registry carries the same packages as a mirror.
+You need [Bun](https://bun.sh) 1.4.5 or later. kay is published as `@kayjs/kay` on npm, and its libraries as `@kayjs/ui`, `@kayjs/auth`, `@kayjs/mail`, `@kayjs/cms` and `@kayjs/ai`. Everything a new project installs comes from npm too, so there is nothing to configure first. kay's own Forgejo registry carries the same packages as a mirror.
 
 A project depends on kay under the name `kay`, so imports read `kay` and `kay/server`. `kay new` writes the line `"kay": "npm:@kayjs/kay@~<version>"` in `package.json` for you: a tilde, which takes patches only, as a 1.x minor may break an app. From 2.0.0 it is a caret, as a breaking change is then a major.
 
@@ -71,7 +71,7 @@ An editor or highlighter that takes a TextMate grammar can use `kay/kay.tmLangua
 
 ## Troubleshooting
 
-kay refuses a Bun older than 1.4.4 and says how to update it.
+kay refuses a Bun older than 1.4.5 and says how to update it.
 
 If the old Bun is the npm `bun` package that a dependency installed, run `bun update bun` in the project. Package scripts run that copy ahead of the system Bun.
 

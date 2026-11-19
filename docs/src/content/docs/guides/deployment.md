@@ -79,7 +79,7 @@ For a host with no server, `kay build --static --outdir dist` writes the whole s
 `kay new` writes this `Dockerfile`, on the Bun version it ran under. One stage builds the executable with `bun run compile`, and a small image runs it.
 
 ```dockerfile
-FROM oven/bun:1.4.4 AS build
+FROM oven/bun:1.4.5 AS build
 WORKDIR /app
 COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile

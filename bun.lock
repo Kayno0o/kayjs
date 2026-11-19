@@ -45,7 +45,7 @@
       },
       "peerDependencies": {
         "@happy-dom/global-registrator": "^20.14.6 || ^21.0.3",
-        "@kaynooo/pg-orm": "^7.0.0 || ^8.0.0",
+        "@kaynooo/pg-orm": "^7.0.0 || ^8.0.0 || ^9.0.0",
         "@types/bun": "^1.4.4",
         "axe-core": "^4.14.0",
         "happy-dom": "^20.14.6 || ^21.0.3",
@@ -105,7 +105,7 @@
       },
       "peerDependencies": {
         "@kayjs/ui": "workspace:~",
-        "@kaynooo/pg-orm": "^7.1.2 || ^8.0.0",
+        "@kaynooo/pg-orm": "^8.0.0 || ^9.0.0",
         "elysia": "^1.4.31",
         "kay": "~1.110.0",
       },

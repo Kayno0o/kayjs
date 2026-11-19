@@ -233,7 +233,7 @@
     "types"
   ],
   "engines": {
-    "bun": ">=1.4.4"
+    "bun": ">=1.4.5"
   },
   "scripts": {
     "check": "$npm_execpath check && $npm_execpath src/tsgo.ts --noEmit -p tsconfig.consumer.json",
