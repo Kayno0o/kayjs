@@ -57,8 +57,8 @@ export interface KayConfig extends AppHooks {
   robots?: RobotsConfig | boolean | undefined
   // How `/sitemap.xml` is kept, or `false` to serve none (and name none in `/robots.txt`).
   sitemap?: SitemapConfig | boolean | undefined
-  // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
-  head?: HeadTag[] | undefined
+  // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `props.children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
+  head?: (HeadTag & { children?: never })[] | undefined
   // The most a page may load, compressed: `{ js: '20kb', css: '10kb' }` for its scripts and stylesheets, `weight: '500kb'` for the whole page and `grade: 'C'` for the worst EcoIndex grade it may have. `kay build` reports each page over it with `over-budget`, naming the modules weighing most for `js` and `css`; a key left out sets no limit, and with none nothing is checked.
   budget?: BudgetConfig | undefined
   // The server entry, relative to the root, `src/server.ts` by default: what `kay dev`, `start`, `render`, `check` and `build` run and type against, unless `--entry` names another. With no file there, kay's own server of the pages.

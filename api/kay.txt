@@ -3183,7 +3183,7 @@ interface KayConfig extends AppHooks
   envFiles?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   guards?: GuardsConfig | undefined
-  head?: HeadTag[] | undefined
+  head?: (HeadTag & { children?: never; })[] | undefined
   i18n?: I18nConfig | undefined
   lang?: string | undefined
   librarySettings?: Record<string, string> | undefined

@@ -27,6 +27,11 @@ describe('config values checked once at load', () => {
     expect(invalidConfigValues({ assets: { images: { guards: 'no' } } })).toHaveLength(1)
   })
 
+  it('refuses a head entry whose text sits in `children` beside `props`, naming `props.children`', () => {
+    expect(invalidConfigValues({ head: [{ tag: 'meta', props: {} }, { tag: 'script', props: {}, children: 'console.log(1)' }] })).toEqual(['`head[1].children` is ignored: a tag\'s text goes in `props.children`'])
+    expect(invalidConfigValues({ head: [{ tag: 'script', props: { children: 'console.log(1)' } }] })).toEqual([])
+  })
+
   it('accepts Infinity where it is documented, reads it back in a message, and shortens or hides what it prints', () => {
     expect(invalidConfigValues({ assets: { images: { maxDensity: Infinity } } })).toEqual([])
     expect(invalidConfigValues({ assets: { images: { maxDensity: NaN } } })).toEqual(['`assets.images.maxDensity` is NaN, expected a number'])

@@ -138,6 +138,8 @@ export default defineConfig({
 })
 ```
 
+An inline script's or style's text goes in `props.children`: `{ tag: 'script', props: { children: 'window.dataLayer = []' } }`. A `children` beside `props` is refused by `kay check`.
+
 An analytics script that needs the visitor's consent goes in an island instead, loaded once they agreed. [Privacy](/guides/privacy) shows how.
 
 <ReadMore href="/llms/sitemap-search-fonts">The manifest of a locale, a site that serves its own manifest, and the OpenAPI title.</ReadMore>

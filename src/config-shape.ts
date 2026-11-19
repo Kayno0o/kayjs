@@ -76,7 +76,10 @@ const CONFIG: Record<keyof ConfigInput, Rule> = {
   seo: bag(SEO),
   robots: either(bool, bag(ROBOTS)),
   sitemap: either(bool, bag(SITEMAP)),
-  head: list(obj),
+  head: list(bag({ tag: str, props: obj }, (entry, path, out) => {
+    if ('children' in entry)
+      out.push(`\`${path}.children\` is ignored: a tag's text goes in \`props.children\``)
+  })),
   budget: bag(BUDGET),
   entry: str,
   security: either(bool, bag(SECURITY_KEYS)),
