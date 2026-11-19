@@ -36,7 +36,7 @@ The twenty-four lints that reported them are gone too. `kay upgrade` on 1.108 re
 
 The lints only saw the forms written inline, so an app that reported nothing on 1.108 can still hold these; `kay check` on 1.109 shows each as a type error, and each is a hand edit.
 
-- A removed lint named in `lints` (`'deprecated-package-names': 'allow'`, any `deprecated-*` of 1.105 to 1.108, `unreturned-fail`, `uncaught-await`) is accepted: `kay check` warns that the lint is gone and the entry changes nothing, so delete it when convenient.
+- A removed lint named in `lints` (`'deprecated-package-names': 'allow'`, any `deprecated-*` of 1.105 to 1.108, `unreturned-fail`, `uncaught-await`) is accepted: `kay check` warns that the lint is gone and the entry changes nothing, so delete it when convenient; a `// kay-allow` comment naming one gets the same warning, and `kay check --fix` drops the name (the comment when it was the only one).
 - `.rows()` of an `infiniteList(...)`, in a template or a script, is `.data()`, wherever the list was built; and `site.refusal(action, input)` in a test is `site.expectRefused(action, input)`.
 - `ctx.deny(status, message)` with the message in a variable (`ctx.deny(503, failure.message)`) is `ctx.deny(503, { message: failure.message })`.
 - `maxAge` in the options handed to `files.url(key, { maxAge: '1d' })` is `ttl`.
@@ -53,7 +53,7 @@ The `deprecated-page-island`, `deprecated-island-fence`, `deprecated-island-attr
 - `--- island`, `--- client` and `--- static` are unknown fences, and `export const island = { ... }` in a `--- module` fence is a `fence-invalid` error: write `island({ render, hydrate, persist, interactive })` first in the component's script.
 - `hydrate="client"` on a use is `render="client"`, and `server="defer"` is `server defer`: `server="defer"` is a `server-island-invalid` error and `hydrate="client"` an `attribute-invalid` one.
 - `data-keep-scroll`, `data-no-transition` and `data-no-prefetch` are read by nothing and are an `unknown-link-flag` error: write `data-scroll="keep"`, `data-transition="false"` and `data-prefetch="false"`.
-- A `// kay-allow uncaught-await` comment and a `lints: { 'uncaught-await': ... }` entry are an unknown lint, and `defineConfig` types no such `lints` key: remove them.
+- A `// kay-allow uncaught-await` comment and a `lints: { 'uncaught-await': ... }` entry name a removed lint: `kay check` warns, and `--fix` drops the name from the comment, which allows nothing now.
 - `listen(window, ...)` is `listen(() => window, ...)`: `listen` takes a function returning its target, and a value is a type error, and in a `.kay` file a server read of `window`.
 - Import `mount`, `Mounted`, `s`, `RateLimit` and `RateLimitRefusal` from `kay` and `sqliteCache` from `kay/cache`: `kay/mount` is no entry any more and `kay/server` no longer exports them.
 - `defineContext` is imported from `kay/server`: `kay/library` no longer exports it.

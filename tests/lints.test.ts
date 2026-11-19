@@ -72,6 +72,24 @@ describe('lint levels', () => {
     expect(diagnostics.map(d => [d.message, d.code])).toEqual([['Unknown lint `missing-alts`', 'unknown-lint']])
   })
 
+  it('warns about a `// kay-allow` naming a lint kay removed, with a fix dropping the name, or the comment when it was the only one', () => {
+    function fixedSource(source: string): { text: string, warnings: number } {
+      const diagnostics = compileKay(source, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'unknown-lint')
+      const edits = diagnostics.flatMap(d => d.fixes?.flatMap(fix => fix.safe === true ? fix.edits : []) ?? []).sort((a, b) => b.start - a.start)
+      const text = edits.reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
+
+      return { text, warnings: diagnostics.filter(d => d.severity === 'warning').length }
+    }
+
+    const img = 'img(src="/a.png" width="1" height="1")\n'
+
+    expect(fixedSource(`// kay-allow deprecated-ctx-fail\n${img}`)).toEqual({ text: img, warnings: 1 })
+    expect(fixedSource(`// kay-allow-file deprecated-ctx-fail, deprecated-deny-call -- why\n${img}`)).toEqual({ text: img, warnings: 2 })
+    expect(fixedSource(`// kay-allow missing-alt, deprecated-ctx-fail\n${img}`)).toEqual({ text: `// kay-allow missing-alt\n${img}`, warnings: 1 })
+    expect(fixedSource(`// kay-allow deprecated-ctx-fail, missing-alt\n${img}`)).toEqual({ text: `// kay-allow missing-alt\n${img}`, warnings: 1 })
+    expect(fixedSource(`// kay-allow missing-alts\n${img}`)).toEqual({ text: `// kay-allow missing-alts\n${img}`, warnings: 0 })
+  })
+
   it('reports a `// kay-allow` naming no lint, listing the ones there are', () => {
     const diagnostics = compileKay('// kay-allow missing-alt, missing-alts\nimg(src="/a.png" width="1" height="1")\n', 'list.kay', { check: true }).diagnostics
 

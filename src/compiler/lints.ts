@@ -3,7 +3,7 @@ import type { Diagnostic, ElementNode, ForNode, KayFile, TextChunk } from './ast
 import type { RemovedLintName } from './removed-lints'
 import type { Scope } from './template-scopes'
 import { accessibilityLints, MARKUP_LINTS } from './a11y'
-import { allowComments, honoured, refusedComments } from './allow-comments'
+import { allowComments, honoured, refusedComments, unknownNames } from './allow-comments'
 import { keyedByPosition, walkNodes } from './ast'
 import { DEPRECATED_LINTS } from './deprecated-lints'
 import { I18N_LINTS } from './i18n-lints'
@@ -775,7 +775,7 @@ export function applyLints(diagnostics: Diagnostic[], source: string, levels: Li
 }
 
 function unknownLints(source: string): Diagnostic[] {
-  return allowComments(source).flatMap(comment => comment.names.filter(({ name }) => !isLint(name)).map(({ name, start }): Diagnostic => ({ start, end: start + name.length, code: 'unknown-lint', message: `Unknown lint \`${name}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })))
+  return allowComments(source).flatMap(comment => unknownNames(comment, source, isLint, `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`))
 }
 
 // The template's own lints: what it can say from the markup alone.

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { loadConfig } from '../src/config-loader'
+import { loadConfig, withConfig } from '../src/config-loader'
 import { problem } from '../src/config-rules'
 import { invalidConfigValues, unknownConfigKeys } from '../src/config-shape'
 import { scratchDir } from './scratch'
@@ -127,5 +127,17 @@ describe('config values checked once at load', () => {
     const error = await load('export default { extensions: [{ name: \'lib\', config: { lang: 5 } }] } as never\n')
 
     expect(String(error)).toContain('the config of the extension lib has a value of the wrong kind: `lang` is 5')
+  })
+
+  it('loads a `lints` entry naming a lint kay removed, as `pages()`, `testSite()` and `kay build` read the config', async () => {
+    const loaded = await load('export default { lints: { \'deprecated-package-names\': \'allow\', \'missing-alt\': \'warn\' } }\n') as { lints?: Record<string, string> }
+    const root = await scratchDir('config-values-')
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { lints: { \'deprecated-package-names\': \'allow\' } }\n')
+
+    expect(loaded.lints).toEqual({ 'deprecated-package-names': 'allow', 'missing-alt': 'warn' })
+    expect((await withConfig(root, {})).lints).toEqual({ 'deprecated-package-names': 'allow' })
+    expect(unknownConfigKeys({ lints: { 'deprecated-package-names': 'allow' } })).toEqual([])
+    expect(invalidConfigValues({ lints: { 'deprecated-package-names': 'allow' } })).toEqual([])
   })
 })

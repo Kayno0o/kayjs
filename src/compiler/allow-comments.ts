@@ -1,5 +1,6 @@
 import type { Diagnostic } from './ast'
 import { positionAt } from './mapping'
+import { REMOVED_LINTS } from './removed-lints'
 
 // What `lints.comments` in kay.config.ts asks of a `// kay-allow` comment: a comment that fails one of these allows nothing and is reported.
 export interface AllowRules {
@@ -22,8 +23,9 @@ export interface AllowComment {
   file: boolean
   // The line it allows: its own when it ends a line of code, the next when it is alone on its line; unused for a file comment.
   line: number
-  // The offset of the comment's `//`.
+  // The offset of the comment's `//`, and of the end of what it holds.
   start: number
+  end: number
   // Whether a reason follows the names.
   reasoned: boolean
 }
@@ -35,7 +37,33 @@ export function allowComments(source: string): AllowComment[] {
     const names = Array.from(comment[2]!.matchAll(LINT_NAME), name => ({ name: name[0], start: listStart + name.index }))
 
     // A comment alone on its line allows the next one; one ending a line of code allows that line.
-    return { names, file: comment[1] === 'kay-allow-file', line: source.slice(comment.index - column + 1, comment.index).trim() === '' ? line + 1 : line, start: comment.index, reasoned: REASON.test(comment[3]!) }
+    return { names, file: comment[1] === 'kay-allow-file', line: source.slice(comment.index - column + 1, comment.index).trim() === '' ? line + 1 : line, start: comment.index, end: comment.index + comment[0].length, reasoned: REASON.test(comment[3]!) }
+  })
+}
+
+// The names a comment holds that `known` does not know: a lint kay removed is a warning with a fix that drops the name, or the comment (its line when it stands alone) when it was the only one left, and any other name is the error `unknown-lint`.
+export function unknownNames(comment: AllowComment, source: string, known: (name: string) => boolean, help: string): Diagnostic[] {
+  const unknown = comment.names.filter(({ name }) => !known(name))
+  const removed = new Set<string>(REMOVED_LINTS)
+  const alone = comment.names.every(({ name }) => removed.has(name))
+  const lineStart = source.lastIndexOf('\n', comment.start - 1) + 1
+  const whole = source.slice(lineStart, comment.start).trim() === ''
+  const after = source[comment.end] === '\n' ? comment.end + 1 : comment.end
+
+  return unknown.map(({ name, start }, index): Diagnostic => {
+    const end = start + name.length
+
+    if (!removed.has(name))
+      return { start, end, code: 'unknown-lint', message: `Unknown lint \`${name}\``, help, checkOnly: true }
+
+    const position = comment.names.findIndex(other => other.start === start)
+    const next = comment.names[position + 1]
+    const previous = comment.names[position - 1]
+    const span = next ? { start, end: next.start } : { start: previous ? previous.start + previous.name.length : start, end }
+    const dropped = whole ? { start: lineStart, end: after } : { start: comment.start, end: comment.end }
+    const edit = alone ? dropped : span
+
+    return { start, end, code: 'unknown-lint', severity: 'warning', message: `\`${name}\` is a lint kay has removed`, help: 'remove it from the comment: it allows nothing', checkOnly: true, ...!alone || index === 0 ? { fixes: [{ title: alone ? 'remove the comment' : `remove \`${name}\``, safe: true, edits: [{ ...edit, text: '' }] }] } : {} }
   })
 }
 
