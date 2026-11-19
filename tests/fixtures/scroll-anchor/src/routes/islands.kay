@@ -1,0 +1,18 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ q: s.Optional(s.String()) }) }
+
+const [row, ...text] = (ctx.query.q ?? '').split(':')
+
+// The round trip outlasts the visitor's next keys.
+await Bun.sleep(ctx.query.q === undefined ? 0 : 600)
+--- script
+import NoteField from '../components/note-field.kay'
+---
+head
+  title Notes
+h1 Notes
+for id of [1, 2, 3, 4]
+  div(key={id})
+    NoteField(row={id} value={Number(row) === id ? text.join(':') : ''})

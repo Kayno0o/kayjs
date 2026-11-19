@@ -22,6 +22,11 @@ export function placeOf(element: Element | null | undefined): number | undefined
   return name === '' || !element?.isConnected ? undefined : Array.from<Element>(document.getElementsByName(name)).indexOf(element)
 }
 
+// The id of the nearest ancestor of the element having one, its row in a list, read before a swap removes the element: a row no longer on the page is a field removed, not one rendered afresh.
+export function rowOf(element: Element | null | undefined): string | undefined {
+  return element?.parentElement?.closest('[id]:not([id=""])')?.getAttribute('id') ?? undefined
+}
+
 // The field of the name nearest to where the removed one was: the one now at its place, else the last. None without a place.
 function byName(element: Element | null, place: number | undefined): Element | null {
   const name = element?.getAttribute('name') ?? ''
@@ -55,7 +60,10 @@ export async function moveFocus(swap: Swap, policy: Policy, hash: string): Promi
 
     if (again instanceof HTMLElement) {
       again.focus({ preventScroll: true })
-      carryCaret(before, again, swap.held)
+
+      // The text of a field removed with its row is no one else's.
+      if (swap.row === undefined || document.getElementById(swap.row))
+        carryCaret(before, again, swap.held)
     }
 
     return
@@ -107,6 +115,7 @@ function carryCaret(from: Element | null, to: HTMLElement, held: string | undefi
 // The island hears the kept keys once it has hydrated, by this field's own listener so that no path of the swap can drop them: the text is put back if hydration wrote the server's over it, and `input` fires either way. The latest text typed meanwhile is the one kept, and the bound of 30 s ends the wait for an island that never hydrates.
 function replayOnHydrate(field: Field, island: Island): void {
   let typed = noteOf(field)
+  const place = placeOf(field)
   const heard = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
   const end = () => {
@@ -125,7 +134,7 @@ function replayOnHydrate(field: Field, island: Island): void {
     end()
 
     if (island.isConnected)
-      putBack(found(field), { ...typed, replay: true })
+      putBack(found(field, place), { ...typed, replay: true })
   }, { signal: heard.signal, once: true })
 }
 
@@ -185,8 +194,8 @@ function putBack(now: Element | null, typed: Typed | undefined): void {
 }
 
 // The field itself, or the one hydration put in its place.
-function found(field: Field, id = field.id): Element | null {
-  return field.isConnected ? field : (id === '' ? null : document.getElementById(id)) ?? byName(field, 0)
+function found(field: Field, place: number | undefined, id = field.id): Element | null {
+  return field.isConnected ? field : (id === '' ? null : document.getElementById(id)) ?? byName(field, place)
 }
 
 // Keys typed into an island's field after the swap and before the island hydrated land in the server's markup, which hydration then writes its own value over. Called as the swap hands the body to hydration, it notes them as they come into the focused field and puts them back once its island has hydrated, however late a `visible` or `idle` one is, with `input` fired so the island hears them, the caret after them. A newer swap, or a bound of 30 s (an island that never hydrates, or whose hydration failed, as the event fires only on success), ends the watch with nothing restored.
@@ -202,6 +211,7 @@ export function watchTyped(): void {
     return
 
   const id = field.id
+  const place = placeOf(field)
   let typed: Typed | undefined
   const note = (event: Event) => {
     if (event.target === field)
@@ -221,7 +231,7 @@ export function watchTyped(): void {
   timer = setTimeout(end, WATCH_BOUND_MS)
   island.addEventListener(HYDRATED, () => {
     end()
-    putBack(found(field, id), typed)
+    putBack(found(field, place, id), typed)
   }, { once: true, signal: heard.signal })
 }
 
@@ -229,6 +239,7 @@ export function watchTyped(): void {
 export function keepTyped(part: ParentNode): void {
   for (const island of part.querySelectorAll<Island>(ISLAND)) {
     let field: Field | undefined
+    let place: number | undefined
     let typed: Typed | undefined
     const heard = new AbortController()
     const timer = setTimeout(() => heard.abort(), WATCH_BOUND_MS)
@@ -237,13 +248,14 @@ export function keepTyped(part: ParentNode): void {
     island.addEventListener('input', (event) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         field = event.target
+        place = placeOf(field)
         typed = noteOf(field)
       }
     }, { ...options, capture: true })
     island.addEventListener(HYDRATED, () => {
       clearTimeout(timer)
       heard.abort()
-      putBack(field ? found(field) : null, typed)
+      putBack(field ? found(field, place) : null, typed)
     }, { ...options, once: true })
   }
 }

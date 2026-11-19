@@ -55,6 +55,8 @@ export interface Swap {
   focused?: Element | null
   // Where the focused element sat among the fields of its name before the swap, set as it begins, for the nearest one to take the focus when the swap removes it.
   place?: number | undefined
+  // The id of the focused element's nearest ancestor having one, so a row the swap removes is told from a field rendered afresh: the removed one's typed text goes nowhere.
+  row?: string | undefined
   // What the focused text field held when the swap began, so the keys typed in it while the page was fetched are told from the text the server rendered.
   held?: string | undefined
   // A form the server refused a post of, and the control focused in it, by their index among the page's forms and the form's controls.

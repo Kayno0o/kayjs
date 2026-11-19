@@ -1,0 +1,15 @@
+---
+import { navigate } from 'kay'
+
+const { row, value } = props<{ row: number, value: string }>()
+let timer: ReturnType<typeof setTimeout> | undefined
+
+// Searches as you type, the value coming back from the URL, so each swap hydrates the field afresh.
+const search = (event: Event) => {
+  const { value: typed } = event.currentTarget as HTMLInputElement
+
+  clearTimeout(timer)
+  timer = setTimeout(() => void navigate.query({ q: `${row}:${typed}` }, { replace: true }), 150)
+}
+---
+input.field(name="note" data-row={row} aria-label={`Note ${row}`} value={value} onInput={search})
