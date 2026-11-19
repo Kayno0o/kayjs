@@ -36,7 +36,8 @@ const look = recipe({
     table: 'aria-busy:opacity-60 w-full border-collapse text-sm group-data-[narrow=stack]/table:[overflow-wrap:anywhere] @max-[30rem]/table:block',
     // Below 30rem of width the rows of a stacked table become cards and its headers one row of sort buttons, the only part of the head that stays. Each card draws its own top line instead of the row's bottom border, so an app dropping the row borders of the wide table still sees the cards apart.
     head: '@max-[30rem]/table:has-[[data-part=sortButton]]:block @max-[30rem]/table:group-data-virtual/table:sticky @max-[30rem]/table:group-data-virtual/table:top-0 @max-[30rem]/table:group-data-virtual/table:z-2 @max-[30rem]/table:group-data-virtual/table:bg-surface @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
-    headRow: '@max-[30rem]/table:flex @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:border-solid @max-[30rem]/table:border-b-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
+    // The row of sort buttons opens with the words `Sort by`, drawn from the row's `data-sort-label` so no element sits beside the headers in the table.
+    headRow: '@max-[30rem]/table:flex @max-[30rem]/table:items-center @max-[30rem]/table:before:text-xs @max-[30rem]/table:before:text-muted @max-[30rem]/table:before:[font-family:var(--font-label,inherit)] @max-[30rem]/table:before:[text-transform:var(--label-case)] @max-[30rem]/table:before:content-[attr(data-sort-label)] @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:border-solid @max-[30rem]/table:border-b-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     body: '@max-[30rem]/table:block',
     headCell: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:z-2 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:bg-surface data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static',
     selectText: 'sr-only',
@@ -465,7 +466,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
     if label
       caption(part="caption") {label}
     thead(part="head")
-      tr(part="headRow" aria-rowindex={(uses('virtual') && virtual) ? 1 : undefined})
+      tr(part="headRow" aria-rowindex={(uses('virtual') && virtual) ? 1 : undefined} data-sort-label={uses('sortable', true) && columns().some(column => column.sortValue) ? wording('ui.table.sortBy', 'Sort by') : undefined})
         if uses('expandable') && expandable
           th(part="toggleHead" scope="col")
             span(part="selectText") {wording('ui.table.details', 'Details')}
@@ -509,7 +510,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 Checkbox(checked={select!.chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => wording('ui.table.selectRow', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={({ checked }) => select!.pick(rowKeyOf(row, rowKey), checked)})
           for column, columnIndex of shownColumns() key={column.key}
             td(part="cell" class={column.class} style={columnStyle(column)} data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined} data-sticky={column.sticky})
-              if narrow === 'stack' && column.header
+              if narrow === 'stack' && column.header && shownColumns().length > 1
                 span(part="cellLabel") {column.header}
               div(part="cellBody")
                 if uses('cell') && cell && drawnByBlock(column, given)

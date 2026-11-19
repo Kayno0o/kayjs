@@ -1,0 +1,15 @@
+---
+import Table from '@kayjs/ui/table.kay'
+import '../app.css'
+
+const planets = [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: 'Earth', moons: 1 }]
+const sortable = [{ key: 'name', header: 'Name', sortValue: true as const }, { key: 'moons', header: 'Moons', align: 'end' as const }]
+const lone = [{ key: 'name', header: 'Name' }]
+---
+main
+  #sorted
+    Table(columns={sortable} rows={planets} rowKey="id")
+  #unsorted
+    Table(columns={[{ key: 'name', header: 'Name' }, { key: 'moons', header: 'Moons' }]} rows={planets} rowKey="id")
+  #lone
+    Table(columns={lone} rows={planets} rowKey="id")

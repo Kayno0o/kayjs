@@ -82,7 +82,7 @@ The choice is made once, when the table is made, and the server draws the first 
 
 ## Narrow screens
 
-Below 30rem of width, `narrow` is `stack` by default: rows stack as cards labelled by their headers. Set `narrow="scroll"` to scroll the table sideways instead.
+Below 30rem of width, `narrow` is `stack` by default: rows stack as cards labelled by their headers, and the sortable headers become a row of sort buttons opening with the words "Sort by". A table with one column draws its cards with no label. Set `narrow="scroll"` to scroll the table sideways instead.
 
 ## Columns
 
