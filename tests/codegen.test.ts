@@ -1526,3 +1526,21 @@ describe('the props the rest object leaves out', () => {
     expect(omitted(new Set())).toBe('')
   })
 })
+
+describe('what a page island hands over', () => {
+  const handed = (source: string) => (/return \{ ?([^}]*?) ?\}\n\}\n/).exec(compileKay(source, 'src/routes/index.kay', { output: 'html', hydratable: true, page: true }).tsx)![1]
+
+  it('hands the island only the server values its script or template read', () => {
+    const page = '--- server\nconst big = Array.from({ length: 5000 }, (_, i) => i)\nconst total = big.length\nconst rows = [1]\nconst label = \'x\'\n---\n---\nconst shout = () => label.toUpperCase()\n---\np {total}\nbutton(onClick={() => shout()}) go\nfor row of rows key={row}\n  p {row}'
+
+    expect(handed(page)).toBe('total, rows, label')
+  })
+
+  it('keeps a value only the template of the island part reads', () => {
+    expect(handed('--- server\nconst only = 1\nconst big = [1, 2]\n---\n---\nlet n = 0\n---\nbutton(onClick={() => n++}) go\np {only}')).toBe('only')
+  })
+
+  it('leaves a page that is no island with every value', () => {
+    expect(handed('--- server\nconst a = 1\nconst b = 2\n---\np {a}')).toBe('a, b')
+  })
+})

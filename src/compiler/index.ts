@@ -17,6 +17,7 @@ import { wrapActionButtons } from './button-forms'
 import { generate, isInteractive, islandCause, lineOf } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
 import { openRedirects } from './fence-redirects'
+import { handedServer } from './handed-data'
 import { cwd, scopeStorage } from './host'
 import { ignoredIslandExport, islandMessages, withAlertKeys } from './island-arguments'
 import { describeCause } from './island-cause'
@@ -342,7 +343,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const found = findRewrites({ code: analysis.builder.code, map: analysis.builder.map(), sites: analysis.sites, values, dom: options.output === 'dom', source, templateStart: file.templateStart, imported, component: componentName(filename), check: options.check, fixedPage: routeFile })
   const fences = [file.script, file.server, file.module].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   const name = freeName(componentName(filename), fences, found.findings.globalReads)
-  const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, writes: found.plan.writes, values: found.plan.values })
+  const final = generate(file, script, handedServer(island !== undefined, script, server, found.findings.unread), { ...generateOptions, name, rewrites: found.plan.rewrites, writes: found.plan.writes, values: found.plan.values })
   // A fence that did not parse at all reaches the code unanalysed, so what the rewrites say of its names is only noise beside its syntax error.
   const unparsed = script.unparsed !== undefined || server?.unparsed !== undefined
   const diagnostics = [

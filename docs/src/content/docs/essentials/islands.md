@@ -106,7 +106,7 @@ A static parent can pass an island objects, arrays, strings, numbers, booleans, 
 
 A `const` written out as literals in the page's script is sent whatever type declares it, so a `Column<Row>[]` of `sortValue: true` passes to a `Table`. A value from an import or a call is checked by its type, and `kay check` names the function field it holds.
 
-They travel in the page as JSON in an attribute. Every byte counts on every page, so pass an island what it reads rather than a whole object it picks from.
+They travel in the page as JSON in an attribute. Every byte counts on every page, so pass an island what it reads rather than a whole object it picks from. A page that is an island itself sends only the `--- server` values its script or template read; a value only the fence reads, such as a long list it sums, stays on the server.
 
 Children render on the server with the page. The island shows them where its template has `slot`, and an island among them hydrates on its own.
 
