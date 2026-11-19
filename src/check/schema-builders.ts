@@ -112,23 +112,28 @@ function renames(call: Call, base: number): Edit[] {
   return edits
 }
 
-// The options the lowercase builder needs to read as the PascalCase one did: a list takes `max` where it had none (the lowercase one stops at 1,000 items, except a list of files), and an object `extra: 'strip'` (the lowercase one refuses a key its shape lacks). Undefined when the options are not an object literal of known keys, which the fix cannot add to.
-function keptOptions(call: Call): string[] | undefined {
+// The options the lowercase builder needs to read as the PascalCase one did: a string takes `max` where it had none, as the lowercase one stops at 10,000 characters, unless it is in an action's input or an API body, which capped it there already; a list takes `max` where it had none (the lowercase one stops at 1,000 items, except a list of files), and an object `extra: 'strip'` (the lowercase one refuses a key its shape lacks). Undefined when the options are not an object literal of known keys, which the fix cannot add to.
+function keptOptions(call: Call, bounded: boolean): string[] | undefined {
   const index = BUILDERS[call.name]!.options
   const options = call.node.arguments[index]
   const keys = new Set<string>()
+  // The builders whose old behaviour the fix must write an option for; a string only outside the contexts that capped it already.
+  const writes = call.name === 'Array' || call.name === 'Object' || (call.name === 'String' && !bounded)
 
   if (options !== undefined && options.type !== 'ObjectExpression')
-    return call.name === 'Array' || call.name === 'Object' ? undefined : []
+    return writes ? undefined : []
 
   for (const entry of options?.properties ?? []) {
     const name = keyName(entry)
 
     if (name === undefined)
-      return call.name === 'Array' || call.name === 'Object' ? undefined : []
+      return writes ? undefined : []
 
     keys.add(name)
   }
+
+  if (call.name === 'String')
+    return bounded || keys.has('max') || keys.has('maxLength') ? [] : ['max: Number.MAX_SAFE_INTEGER']
 
   if (call.name === 'Object')
     return keys.has('extra') ? [] : ['extra: \'strip\'']
@@ -139,6 +144,39 @@ function keptOptions(call: Call): string[] | undefined {
   const [item] = call.node.arguments
 
   return keys.has('max') || keys.has('maxItems') || (item && FILES.has(builderCallName(item))) ? [] : ['max: Number.MAX_SAFE_INTEGER']
+}
+
+const BODY_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete'])
+
+// The nodes of the schemas kay caps an unbounded string in at 10,000 characters already: an action's input, and the `body` of an API route. What it cannot tell is left out, so the fix writes the bound that keeps the old behaviour there.
+function cappedByKay(ast: Program, actions: Set<string>): Set<Node> {
+  const capped = new Set<Node>()
+  const take = (schema: Node) => walk(schema, node => capped.add(node))
+
+  walk(ast, (node) => {
+    if (node.type !== 'CallExpression')
+      return
+
+    const [first, ...rest] = node.arguments
+
+    if (node.callee.type === 'Identifier' && actions.has(node.callee.name) && first)
+      take(first)
+
+    if (node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier' || !BODY_METHODS.has(node.callee.property.name))
+      return
+
+    for (const argument of rest) {
+      if (argument.type !== 'ObjectExpression')
+        continue
+
+      for (const entry of argument.properties) {
+        if (entry.type === 'Property' && keyName(entry) === 'body')
+          take(entry.value)
+      }
+    }
+  })
+
+  return capped
 }
 
 function builderCallName(node: Node): string {
@@ -232,7 +270,7 @@ function envRecord(node: Node, records: Set<string>, receivers: Set<string>, bas
 }
 
 // The PascalCase builders of `s`, which kay 1.106 replaces with its own lowercase ones, and the `'2m'` sizes of a file field, which are `'2mb'` as every size is.
-// Found on the `s` a file imports from `kay`, in the TypeScript files and the fences of `.kay` files. `s.Optional(x)` of one of these builders is `optional: true` in its options; an `s.Array` takes `max: Number.MAX_SAFE_INTEGER` and an `s.Object` `extra: 'strip'`, which keeps what they did.
+// Found on the `s` a file imports from `kay`, in the TypeScript files and the fences of `.kay` files. `s.Optional(x)` of one of these builders is `optional: true` in its options; an `s.Array`, and an `s.String` with no bound outside an action's input and an API body, takes `max: Number.MAX_SAFE_INTEGER`, and an `s.Object` `extra: 'strip'`, which keeps what they did.
 export async function schemaBuilders(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-schema-builders', options.lints) === 'allow')
     return []
@@ -241,6 +279,7 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
     for (const { ast, base, text } of parsed) {
       const receivers = importsOf(ast, source => KAY.test(source), 's').locals
       const records = importsOf(ast, source => KAY.test(source), 'defineEnv').locals
+      const capped = cappedByKay(ast, importsOf(ast, source => KAY.test(source), 'action').locals)
 
       if (receivers.size === 0)
         continue
@@ -264,7 +303,7 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
           const [inner, ...others] = call.node.arguments
           const wrapped = inner === undefined ? undefined : builderCall(inner, receivers)
           const known = wrapped && wrapped.name !== 'Public' && BUILDERS[wrapped.name] && !taken.has(inner!)
-          const kept = known ? keptOptions(wrapped) : undefined
+          const kept = known ? keptOptions(wrapped, capped.has(wrapped.node)) : undefined
           const edit = known && kept ? addOptions(wrapped, base, ['optional: true', ...kept]) : undefined
 
           // Anything but a builder of `s`, such as the `imageField()` of kay/content, has no `optional` option to write yet.
@@ -311,12 +350,12 @@ export async function schemaBuilders(root: string, options: CheckOptions): Promi
         }
 
         if (builder && !taken.has(node)) {
-          const kept = keptOptions(call)
+          const kept = keptOptions(call, capped.has(node))
           const edit = kept && kept.length > 0 ? addOptions(call, base, kept) : undefined
           const object = call.name === 'Object' ? 'unknown keys are refused by `s.object` where kay reads the schema itself, where `s.Object` let them by, so the fix writes `extra: \'strip\'` to keep the old way' : ''
           const message = call.name === 'UnionKeys' || call.name === 'UnionEnum'
             ? '`s.enum()` takes the values, or a record whose keys are the values, since 1.106, in place of `s.UnionEnum` and `s.UnionKeys`; the old forms work until 2.0'
-            : `\`s.${call.name}\` is \`s.${builder.name}\` since 1.106, kay's own lowercase builders with short options (\`min\`, \`max\`, \`optional\`) replacing the PascalCase ones of TypeBox${object ? `; ${object}` : ''}; the old form works until 2.0${call.name === 'Array' ? '; `s.list` is at most 1,000 items where `s.Array` had no limit, so the fix writes `max: Number.MAX_SAFE_INTEGER`' : ''}`
+            : `\`s.${call.name}\` is \`s.${builder.name}\` since 1.106, kay's own lowercase builders with short options (\`min\`, \`max\`, \`optional\`) replacing the PascalCase ones of TypeBox${object ? `; ${object}` : ''}; the old form works until 2.0${call.name === 'Array' ? '; `s.list` is at most 1,000 items where `s.Array` had no limit, so the fix writes `max: Number.MAX_SAFE_INTEGER`' : ''}${call.name === 'String' ? '; `s.string` is at most 10,000 characters where `s.String` had no limit, which an action\'s input and an API body already had, so the fix writes `max: Number.MAX_SAFE_INTEGER` anywhere else' : ''}`
 
           // Without the option that keeps the old behaviour the rename would change it, so the fix is left to the app.
           const keeps = kept !== undefined && (kept.length === 0 || edit !== undefined)

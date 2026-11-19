@@ -28,13 +28,13 @@ describe('deprecated-schema-builders', () => {
   it('renames a builder and the options that changed', async () => {
     const { text } = await fixed(`${head}export const a = [s.String({ minLength: 2, maxLength: 5 }), s.Integer({ minimum: 1 }), s.Array(s.String(), { maxItems: 3 }), s.Boolean(), s.Numeric({ title: 'Age' })]\n`)
 
-    expect(text).toBe(`${head}export const a = [s.string({ min: 2, max: 5 }), s.int({ min: 1 }), s.list(s.string(), { max: 3 }), s.boolean(), s.number({ label: 'Age' })]\n`)
+    expect(text).toBe(`${head}export const a = [s.string({ min: 2, max: 5 }), s.int({ min: 1 }), s.list(s.string({ max: Number.MAX_SAFE_INTEGER }), { max: 3 }), s.boolean(), s.number({ label: 'Age' })]\n`)
   })
 
   it('keeps the old behaviour of a list and an object: no limit on the list, extra keys stripped', async () => {
     const { text } = await fixed(`${head}export const a = [s.Array(s.String()), s.Array(s.String(), { minItems: 1 }), s.Array(s.String(), { maxItems: 3 }), s.Array(s.File()), s.Object({ x: s.Integer() }), s.Object({ x: s.Integer() }, { title: 'T' }), s.Object({}, { extra: 'refuse' })]\n`)
 
-    expect(text).toBe(`${head}export const a = [s.list(s.string(), { max: Number.MAX_SAFE_INTEGER }), s.list(s.string(), { max: Number.MAX_SAFE_INTEGER, min: 1 }), s.list(s.string(), { max: 3 }), s.list(s.file()), s.object({ x: s.int() }, { extra: 'strip' }), s.object({ x: s.int() }, { extra: 'strip', label: 'T' }), s.object({}, { extra: 'refuse' })]\n`)
+    expect(text).toBe(`${head}export const a = [s.list(s.string({ max: Number.MAX_SAFE_INTEGER }), { max: Number.MAX_SAFE_INTEGER }), s.list(s.string({ max: Number.MAX_SAFE_INTEGER }), { max: Number.MAX_SAFE_INTEGER, min: 1 }), s.list(s.string({ max: Number.MAX_SAFE_INTEGER }), { max: 3 }), s.list(s.file()), s.object({ x: s.int() }, { extra: 'strip' }), s.object({ x: s.int() }, { extra: 'strip', label: 'T' }), s.object({}, { extra: 'refuse' })]\n`)
   })
 
   it('reports and leaves a list or an object whose options it cannot add to', async () => {
@@ -43,13 +43,13 @@ describe('deprecated-schema-builders', () => {
 
     // The inner s.String renames on its own, the others are reported alone (the Optional and the Object inside it each).
     expect(found).toBe(7)
-    expect(text).toBe(source.replaceAll('s.String()', 's.string()'))
+    expect(text).toBe(source.replaceAll('s.String()', 's.string({ max: Number.MAX_SAFE_INTEGER })'))
   })
 
   it('writes optional: true in the options of the field s.Optional wrapped', async () => {
     const { text } = await fixed(`${head}export const a = {\n  one: s.Optional(s.String()),\n  two: s.Optional(s.String({ maxLength: 4 })),\n  three: s.Optional(s.Array(s.String())),\n  four: s.Optional(s.Literal('a')),\n  five: s.Optional(s.Object({ x: s.Integer() })),\n  six: s.Optional(s.Object({})),\n}\n`)
 
-    expect(text).toBe(`${head}export const a = {\n  one: s.string({ optional: true }),\n  two: s.string({ optional: true, max: 4 }),\n  three: s.list(s.string(), { optional: true, max: Number.MAX_SAFE_INTEGER }),\n  four: s.literal('a', { optional: true }),\n  five: s.object({ x: s.int() }, { optional: true, extra: 'strip' }),\n  six: s.object({}, { optional: true, extra: 'strip' }),\n}\n`)
+    expect(text).toBe(`${head}export const a = {\n  one: s.string({ optional: true, max: Number.MAX_SAFE_INTEGER }),\n  two: s.string({ optional: true, max: 4 }),\n  three: s.list(s.string({ max: Number.MAX_SAFE_INTEGER }), { optional: true, max: Number.MAX_SAFE_INTEGER }),\n  four: s.literal('a', { optional: true }),\n  five: s.object({ x: s.int() }, { optional: true, extra: 'strip' }),\n  six: s.object({}, { optional: true, extra: 'strip' }),\n}\n`)
   })
 
   it('writes the record of an s.Object that is the schema of a defineEnv, and drops the import of s once it is unread', async () => {
@@ -68,7 +68,7 @@ describe('deprecated-schema-builders', () => {
     // Only the s.String inside the Nullable, which renames on its own.
     expect(found).toBe(1)
     expect(text).toContain('s.Optional(own)')
-    expect(text).toContain('s.Optional(s.Nullable(s.string()))')
+    expect(text).toContain('s.Optional(s.Nullable(s.string({ max: Number.MAX_SAFE_INTEGER })))')
   })
 
   it('renames s.UnionEnum and s.UnionKeys to s.enum', async () => {
@@ -107,9 +107,25 @@ describe('deprecated-schema-builders', () => {
     expect(other.found).toBe(0)
   })
 
+  it('keeps an unbounded string unbounded, but where kay caps it at 10,000 already: an action\'s input and an API body', async () => {
+    const MAX = 's.string({ max: Number.MAX_SAFE_INTEGER })'
+    const job = await fixed(`${head}export const a = s.Object({ text: s.String(), note: s.Optional(s.String()), titled: s.String({ title: 'T' }), short: s.String({ maxLength: 5 }), also: s.String({ max: 7 }) })\n`)
+
+    expect(job.text).toBe(`${head}export const a = s.object({ text: ${MAX}, note: s.string({ optional: true, max: Number.MAX_SAFE_INTEGER }), titled: s.string({ max: Number.MAX_SAFE_INTEGER, label: 'T' }), short: s.string({ max: 5 }), also: s.string({ max: 7 }) }, { extra: 'strip' })\n`)
+
+    const bounded = await fixed(`${head}export const add = action(s.Object({ text: s.String(), note: s.Optional(s.String()) }), () => 1)\nexport const api = app.post('/x', () => 1, { body: s.Object({ text: s.String() }) })\n`)
+
+    expect(bounded.text).toBe(`${head}export const add = action(s.object({ text: s.string(), note: s.string({ optional: true }) }, { extra: 'strip' }), () => 1)\nexport const api = app.post('/x', () => 1, { body: s.object({ text: s.string() }, { extra: 'strip' }) })\n`)
+
+    // A context it cannot tell is the unbounded one, which keeps the old behaviour.
+    const unsure = await fixed(`${head}export const a = other(s.Object({ text: s.String() }))\nexport const b = app.post('/x', () => 1, { query: s.Object({ q: s.String() }) })\n`)
+
+    expect(unsure.text).toBe(`${head}export const a = other(s.object({ text: ${MAX} }, { extra: 'strip' }))\nexport const b = app.post('/x', () => 1, { query: s.object({ q: ${MAX} }, { extra: 'strip' }) })\n`)
+  })
+
   it('keeps the shorthand of a renamed option', async () => {
     const { text } = await fixed(`${head}const minLength = 3\nexport const a = s.String({ minLength })\n`)
 
-    expect(text).toBe(`${head}const minLength = 3\nexport const a = s.string({ min: minLength })\n`)
+    expect(text).toBe(`${head}const minLength = 3\nexport const a = s.string({ max: Number.MAX_SAFE_INTEGER, min: minLength })\n`)
   })
 })
