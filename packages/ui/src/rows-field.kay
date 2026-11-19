@@ -169,7 +169,7 @@ function drawCell(id: number, column: { key: string, label: string, name?: strin
     get id() { return issueOf(id) === undefined ? undefined : `${issuesBase}_${id}` },
   }
 
-  return followed(() => rowOf(id), row => cell!({ key: column.key, label: column.label, name: postName(column), size }, row, () => placeOf(id), text => edit(placeOf(id), column.key, text), issue))
+  return followed(() => rowOf(id), row => row && cell!({ key: column.key, label: column.label, name: postName(column), size }, row, () => placeOf(id), text => edit(placeOf(id), column.key, text), issue))
 }
 const full = () => max !== undefined && current().length >= max
 const removeName = (index: number) => removeLabel === undefined ? wording('ui.rowsField.remove', 'Remove row {n}', { n: index + 1 }) : labelText(removeLabel, { n: index + 1, index }, index)

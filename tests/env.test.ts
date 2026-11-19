@@ -928,7 +928,7 @@ describe('kay check --fix on raw environment reads', () => {
     const root = await project({ ...config, 'src/config.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({\n  OLD: s.Optional(s.String()),\n}))\n', 'src/deep/lib.ts': 'export const a = process.env.FOO ?? \'bar\'\n' })
 
     await kay(['check', '--fix'], root)
-    expect(await read(root, 'src/config.ts')).toContain('{\n  FOO: s.string({ default: \'bar\' }),\n  OLD: s.string({ optional: true }),\n})')
+    expect(await read(root, 'src/config.ts')).toContain('{\n  FOO: s.string({ default: \'bar\' }),\n  OLD: s.string({ optional: true, max: Number.MAX_SAFE_INTEGER }),\n})')
     expect(await read(root, 'src/deep/lib.ts')).toBe('import { env } from \'../config\'\n\nexport const a = env.FOO\n')
     expect(Bun.file(join(root, 'src/env.ts')).size).toBe(0)
   })
