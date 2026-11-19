@@ -213,6 +213,7 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
 function holdScroll(policy: Policy): () => void {
   const root = document.documentElement
   const anchoring = root.style.overflowAnchor
+  const styled = root.hasAttribute('style')
   const { scrollX: x, scrollY: y } = window
 
   root.style.overflowAnchor = 'none'
@@ -222,10 +223,14 @@ function holdScroll(policy: Policy): () => void {
     if (policy.scroll === 'keep' && (scrollX !== x || scrollY !== y))
       scrollTo({ left: x, top: y, behavior: 'instant' })
 
-    if (anchoring === '')
-      root.style.removeProperty('overflow-anchor')
-    else
+    if (anchoring !== '')
       root.style.overflowAnchor = anchoring
+    else
+      root.style.removeProperty('overflow-anchor')
+
+    // An emptied style still leaves `style=""`, which the next swap reads as a script's change to <html>.
+    if (!styled && root.getAttribute('style') === '')
+      root.removeAttribute('style')
   }
 }
 
