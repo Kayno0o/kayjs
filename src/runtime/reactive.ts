@@ -884,14 +884,16 @@ function follow<Drawn>(reads: (() => unknown)[], draw: (...values: never[]) => D
   following = { args, next: 0 }
 
   try {
-    return untrack(() => draw(...values as never[]))
+    const drawn = untrack(() => draw(...values as never[]))
+
+    // What the block did not read through its parameters is its value as of the draw, so the block is drawn again when that changes. A draw that throws is the error, whatever these reads do.
+    for (const arg of args.filter(one => !one.taken))
+      arg.read()
+
+    return drawn
   }
   finally {
     following = outer
-
-    // What the block did not read through its parameters is its value as of the draw, so the block is drawn again when that changes.
-    for (const arg of args.filter(one => !one.taken))
-      arg.read()
   }
 }
 

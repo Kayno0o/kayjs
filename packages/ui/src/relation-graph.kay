@@ -1,7 +1,7 @@
 ---
 import type { JSX, Snippet } from 'kay'
 import type { RelationNeighbour, RelationNode } from './relation-graph'
-import { recipe } from 'kay'
+import { followed, recipe } from 'kay'
 import { wording } from 'kay/words'
 import { colorStyle } from './color'
 import { loadOptions } from './options-source'
@@ -64,7 +64,7 @@ const place = (index: number) => `left: ${spot(index).x}%; top: ${spot(index).y}
 ---
 snippet middle(node: RelationNode)
   if drawMiddle
-    | {drawMiddle(node)}
+    | {followed(() => node, node => drawMiddle!(node))}
   else
     | {node.label}
 snippet name(item: RelationNeighbour, index: number)
@@ -79,10 +79,10 @@ div(part="root" {...rest} role="group" aria-label={label} aria-busy={source.load
         line(part="line" x1="50" y1="50" x2={spot(index).x} y2={spot(index).y} vector-effect="non-scaling-stroke" data-tone={toneOf(item, 'neutral')} data-missing={item.missing === true ? '' : undefined} style={colorStyle('--node-color', item.color)})
     if centre.href !== undefined
       a(part="centre" href={centre.href} {...tabOf(centre.href, centre.newTab)} data-tone={toneOf(centre, 'accent')} style={colorStyle('--node-color', centre.color)})
-        {middle(centre)}
+        {followed(() => centre, centre => middle(centre))}
     else
       span(part="centre" data-tone={toneOf(centre, 'accent')} style={colorStyle('--node-color', centre.color)})
-        {middle(centre)}
+        {followed(() => centre, centre => middle(centre))}
     ol(part="list")
       for item, index of shown() key={item.key}
         li(part="item" style={place(index)})

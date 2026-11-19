@@ -1,7 +1,7 @@
 ---
 import type { JSX, Snippet } from 'kay'
 import type { LeafletApi, LeafletGroup, LeafletLayer, LeafletPath, LeafletView, MapMarker, MapPoint } from './map-view'
-import { effect, mediaQuery, onCleanup, onMount, recipe, reducedMotion, signal, untrack } from 'kay'
+import { effect, followed, mediaQuery, onCleanup, onMount, recipe, reducedMotion, signal, untrack } from 'kay'
 import { comesIntoView, drawnPoints, OSM_ATTRIBUTION, OSM_TILES, validPoint } from './map-view'
 import { steppedPoint } from './plot'
 
@@ -373,4 +373,4 @@ div(part="root" {...rest} role="region" aria-label={label})
           | {entry.name}
           if popup
             div(part="popup" ref={element => bodies.set(entry.index, element)})
-              | {popup(entry.marker, entry.index)}
+              | {followed(() => entry.marker, (marker, index) => popup!(marker, index), () => entry.index)}

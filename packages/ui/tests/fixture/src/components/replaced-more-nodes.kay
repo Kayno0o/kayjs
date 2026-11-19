@@ -1,0 +1,17 @@
+---
+import { signal } from 'kay'
+import MapView from '@kayjs/ui/map-view.kay'
+import RelationGraph from '@kayjs/ui/relation-graph.kay'
+
+// Each list is built again, its items copies under the same keys, whenever the counter moves.
+const version = signal(0)
+const centre = () => ({ key: 'c', label: `Centre${version()}` })
+const markers = () => [{ at: [1, 1] as [number, number], label: `Marker${version()}` }]
+---
+button#bump(type="button" onClick={() => version++}) Bump
+RelationGraph(centre={centre()} items={[{ key: 'n', label: 'Near' }]} label="Graph")
+  @middle(node)
+    input(data-block="middle" aria-label="middle" value={node.label})
+MapView(markers={markers()} label="Map")
+  @popup(marker, index)
+    input(data-block="popup" aria-label="popup" value={`${marker.label}:${index}`})

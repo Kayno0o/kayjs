@@ -142,6 +142,19 @@ describe('a slot called with more than the item', () => {
     expect(read!()).toBe(3)
   })
 
+  it('lets the error of a draw win over the error of a read made after it', () => {
+    const item = signal<Item>({ id: 1, name: 'a' })
+    let reads = 0
+    const broken = () => {
+      if (reads++ > 0)
+        throw new Error('read')
+    }
+
+    expect(() => root(() => slotCall(() => {
+      throw new Error('draw')
+    }, item, broken))).toThrow('draw')
+  })
+
   it('finds the item wherever the block takes it', () => {
     const item = signal<Item>({ id: 1, name: 'a' })
     let read: (() => Item) | undefined
