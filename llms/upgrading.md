@@ -4,9 +4,6 @@ What each release breaks, and what an app changes to move to it. kay and its lib
 
 ## 1.111.0
 
-### kayjs-auth needs `@kaynooo/pg-orm` 9
-
-kayjs-auth's Postgres store calls `upsertOne` with the options object pg-orm 9 takes (`{ update: [...] }`), which 7 and 8 read as a column list, so its peer range is `^9.0.0`. An app on pg-orm 7 or 8 moves to 9 with kayjs-auth (`bun add @kaynooo/pg-orm@^9.0.0`, then pg-orm's [9.0.0 notes](https://git.kaynooo.fr/kaynooo/pg-orm/releases/tag/v9.0.0) for its own calls); kay's own `kay/pg-orm` still takes 7, 8 and 9.
 
 ### A block's or a snippet's plain parameter is read-only in a component that renders again
 

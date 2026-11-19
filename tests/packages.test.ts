@@ -78,15 +78,15 @@ describe('kay\'s libraries', () => {
     expect(importers.sort()).toEqual(['src/server/pg-orm.ts', 'src/test/database.ts'])
   })
 
-  // CI installs one pg-orm, so nothing else would notice kay's peer range dropping a major apps still run (#2604); kayjs-auth asks for 9 alone, as its upsert takes the options object only 9 reads (#3418).
-  it('peer on pg-orm 7, 8 and 9 in kay, and 9 in kayjs-auth', () => {
+  // CI installs one pg-orm, so nothing else would notice kay's peer range dropping a major apps still run (#2604); kayjs-auth's grant write needs `skipConflicts`, which 7 lacks, and its upsert would take 9's options object only (#3418).
+  it('peer on pg-orm 7, 8 and 9 in kay, and 8 and 9 in kayjs-auth', () => {
     const peers = [root, ...libraries.map(({ manifest }) => manifest)].flatMap(({ name, peerDependencies }) => {
       const range = peerDependencies?.['@kaynooo/pg-orm']
 
       return range === undefined ? [] : [{ name, range }]
     })
 
-    expect(peers.filter(({ name, range }) => !(name === root.name ? ['7.2.0', '8.0.0', '9.0.0'] : ['9.0.0']).every(version => Bun.semver.satisfies(version, range)))).toEqual([])
+    expect(peers.filter(({ name, range }) => !(name === root.name ? ['7.2.0', '8.0.0', '9.0.0'] : ['8.0.0', '9.0.0']).every(version => Bun.semver.satisfies(version, range)))).toEqual([])
   })
 
   // An app's lockfile keeps the lowest @kaynooo/utils a range allows, so an import of a module or a name added later fails in the app's `kay check` alone (#3446). tests/utils-floor.json holds that version's exports, read from the registry by `bun scripts/utils-floor.ts --update`.

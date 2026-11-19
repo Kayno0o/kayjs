@@ -17,7 +17,7 @@ bun add @kayjs/auth
 
 It installs from npm as `@kayjs/auth`, and the Forgejo registry carries the same package as a mirror.
 
-kay, Elysia and kayjs-ui are peers (Elysia is an implementation detail of kay: you name `KayPlugin` and `Schema`, never its types), as its pages use kayjs-ui's components. `@kaynooo/pg-orm` 9 is a peer too, for the Postgres store. kayjs-auth is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
+kay, Elysia and kayjs-ui are peers (Elysia is an implementation detail of kay: you name `KayPlugin` and `Schema`, never its types), as its pages use kayjs-ui's components. `@kaynooo/pg-orm` 8 or 9 is a peer too, for the Postgres store. kayjs-auth is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 
 
 ## Setup

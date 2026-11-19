@@ -200,6 +200,8 @@ type UserRow = InferEntity<typeof AuthUsers>
 // A client that registered itself and that nobody approved is dropped after this long.
 const UNUSED_CLIENT_MS = 24 * 60 * 60 * 1000
 
+const grantRepo = (db: Database) => db.repo(AuthOAuthGrants)
+
 // kayjs-auth's data in the app's Postgres or SQLite database, through pg-orm: list `authTables` in the database's tables.
 export function pgAuth(db: Database): AuthStore {
   if (typeof (db as Partial<Database> | null)?.repo !== 'function')
@@ -218,7 +220,7 @@ export function pgAuth(db: Database): AuthStore {
   const invitations = db.repo(AuthInvitations)
   const attempts = db.repo(AuthAttempts)
   const oauthClients = db.repo(AuthOAuthClients)
-  const oauthGrants = db.repo(AuthOAuthGrants)
+  const oauthGrants = grantRepo(db)
   const oauthCodes = db.repo(AuthOAuthCodes)
   const oauthRefresh = db.repo(AuthOAuthRefresh)
 
@@ -390,9 +392,7 @@ export function pgAuth(db: Database): AuthStore {
       },
       grants: {
         get: async (userId, clientId) => toOAuthGrant(await oauthGrants.read.findOne({ user_id: userId, client_id: clientId })),
-        async upsert(grant) {
-          await oauthGrants.write.upsertOne({ user_id: grant.userId, client_id: grant.clientId, client_name: grant.clientName, scopes: grant.scopes, created_at: grant.createdAt, last_used_at: grant.lastUsedAt }, ['user_id', 'client_id'], { update: ['client_name', 'scopes', 'last_used_at'] })
-        },
+        upsert: async grant => upsertGrant(oauthGrants, grant),
         async touch(userId, clientId, at) {
           await oauthGrants.write.updateMany({ last_used_at: at }, { user_id: userId, client_id: clientId }, { pk: true })
         },
@@ -650,6 +650,18 @@ function toBearerToken(row: InferEntity<typeof AuthBearerTokens> | null): Bearer
 
 function toOAuthClient(row: InferEntity<typeof AuthOAuthClients> | null): OAuthClientRecord | undefined {
   return row ? { id: row.id, name: row.name, redirectUris: row.redirect_uris, createdAt: row.created_at } : undefined
+}
+
+// An update, then an insert that skips a clash: upsertOne takes its update list in a different argument in pg-orm 8 and 9, and these two keep one signature in both. A writer inserting the row between the two is the clash, and the update runs again.
+async function upsertGrant(repo: ReturnType<typeof grantRepo>, grant: OAuthGrantRecord): Promise<void> {
+  const where = { user_id: grant.userId, client_id: grant.clientId }
+  const set = { client_name: grant.clientName, scopes: grant.scopes, last_used_at: grant.lastUsedAt }
+
+  if ((await repo.write.updateMany(set, where, { pk: true })).length > 0)
+    return
+
+  if (await repo.write.insertOne({ ...where, ...set, created_at: grant.createdAt }, { skipConflicts: ['user_id', 'client_id'], pk: true }) === null)
+    await repo.write.updateMany(set, where, { pk: true })
 }
 
 function toOAuthGrant(row: InferEntity<typeof AuthOAuthGrants> | null): OAuthGrantRecord | undefined {
