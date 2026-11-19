@@ -1,4 +1,4 @@
-import type { ExtensionApp, PluginInput } from 'kay/server'
+import type { ExtensionApp, ExtensionProblem, PluginInput } from 'kay/server'
 import type { AuthOptions, authCore as CreateAuth } from './auth'
 import type { AuthSessionData, OAuthApp } from './core'
 import type { EmailOptions } from './email'
@@ -280,6 +280,28 @@ const builtFor = new WeakMap<Bun.CookieMap, OwnTest>()
 
 export function builtOwn(site: { cookies: Bun.CookieMap }): OwnTest | undefined {
   return builtFor.get(site.cookies)
+}
+
+// Whether `@kaynooo/pg-orm` resolves from here, where `buildOwn` imports it from.
+function pgOrmInstalled(): boolean {
+  try {
+    import.meta.resolve('@kaynooo/pg-orm')
+
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+// What `kay check` reports for an `auth()` whose users go through pg-orm, a SQLite file included, when the app has not installed it: the server would stop at start. A `store` given as an AuthStore or a function builds no pg-orm database.
+export function storeProblems(options: Pick<OwnOptions, 'store'>, installed: () => boolean = pgOrmInstalled): ExtensionProblem[] {
+  const { store } = options
+
+  if (typeof store === 'function' || (store !== undefined && isStore(store)) || installed())
+    return []
+
+  return [{ message: 'auth() keeps its users through @kaynooo/pg-orm (a SQLite file by default), and @kaynooo/pg-orm is not installed, so the server stops at start', severity: 'error', help: 'bun add @kaynooo/pg-orm' }]
 }
 
 /** The `authCore` an `auth()` with no module makes as the server starts: kay's session, the store, the mailer and the hooks found, the pages on. */

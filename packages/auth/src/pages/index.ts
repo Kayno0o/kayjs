@@ -10,7 +10,7 @@ import type { LinkType } from '../store'
 import { resolve } from 'node:path'
 import { appModules, checkOptionKeys, configError, KayError } from 'kay/library'
 import { pickLocale } from '../locale'
-import { buildOwn, MAIL_EXTENSION, ownEnv } from '../own'
+import { buildOwn, MAIL_EXTENSION, ownEnv, storeProblems } from '../own'
 
 export interface AuthPagesOptions {
   // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`. `authCore` reads it when `auth()` loads it with `module`.
@@ -293,6 +293,7 @@ function ownAuth(options: OwnOptions): AuthPages {
     name: '@kayjs/auth',
     appFiles: APP_FILES,
     server: async app => (await build(app)).plugin,
+    check: () => storeProblems(options),
     ...options.pages !== false && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
     ...viewerExtension(options.viewer),
     env: ownEnv(options),

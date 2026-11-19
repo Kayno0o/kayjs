@@ -120,6 +120,7 @@ kay lint --cache
 
 - `typescript7`, which `kay check` and the type checks of `kay dev`, `kay build` and the editor server run on, and `axe-core`, which `kay a11y`, `page.a11y()` and the dev tool's a11y warnings run on, are optional peers of kay: the app lists both in `devDependencies`, as `kay new` writes them, so a production install carries neither.
 - Without `typescript7` those commands stop at once with `bun add -d typescript7@npm:typescript@^7.0.2`, without `axe-core` the a11y ones with `bun add -d axe-core@^4.14.0`; `kay dev` says so once at start and goes on without type checks, and `kay build --no-check` needs neither. `kay doctor`'s `peers` fails for the first and warns for the second.
+- An optional peer of a kay library is reported by `kay check` when the app's configuration needs it: `auth()` with no `store` function or `AuthStore`, a SQLite file included, needs `@kaynooo/pg-orm`, and the check fails with `bun add @kaynooo/pg-orm`.
 - `kay upgrade` adds both to an app coming from a kay before 1.97, in the first `kay check` it runs (`bun add --dev`).
 
 ### Linting
