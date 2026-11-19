@@ -50,9 +50,9 @@ export function utilsImports(file: string, text: string): UtilsImport[] {
 // The `name as alias` entries of a braces list, as [name, alias].
 function listed(list: string): [string, string][] {
   return list.split(',').map(entry => entry.trim().replace(TYPE_PREFIX, '')).filter(Boolean).map((entry) => {
-    const [name, alias = name] = entry.split(ALIAS)
+    const [name = '', alias = name] = entry.split(ALIAS)
 
-    return [name!, alias]
+    return [name, alias]
   })
 }
 
