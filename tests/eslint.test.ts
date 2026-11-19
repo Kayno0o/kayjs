@@ -925,7 +925,7 @@ describe('kay/eslint without Bun', () => {
     const bundled = await nodeProcessor()
     const components: [string, string, string][] = [
       ['navigation/src/components/probe.kay', '---\nimport { added } from \'../shared\'\nimport { theme } from \'../shared.js\'\n---\np {added} {theme}\n', '__values.theme'],
-      ['icons/src/components/probe.kay', '---\nimport home from \'~icons/tabler/home\'\nimport Child from \'./child.kay\'\n---\nChild(icon={home})\n', 'KayProp(Child)((home))'],
+      ['icons/src/components/probe.kay', '---\nimport home from \'~icons/tabler/home\'\nimport Child from \'./child.kay\'\n---\nChild(icon={home})\n', 'KayProp(Child, { "icon": 0 })((home))'],
     ]
 
     for (const [file, text, kept] of components) {
