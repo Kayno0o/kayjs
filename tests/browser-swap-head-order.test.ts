@@ -85,6 +85,37 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a swap l
         await visit(await opened(), start('/a'), ['reversed', 'a', 'reversed'])
       }, 120_000)
 
+      // The sheets are served from the root, which a base does not reach.
+      it.skipIf(options.config?.base !== undefined)('keeps the styles of a linked sheet that moves applied through the swap', async () => {
+        await using page = await (await opened()).open(start('/onetwo'), { strict: false })
+
+        await page.waitFor('button.count')
+        // Records the computed styles of every frame and every head change until the swap is over.
+        await page.evaluate(() => {
+          const seen: string[] = []
+          const read = () => {
+            const style = getComputedStyle(document.querySelector('.box')!)
+
+            seen.push(`${style.borderTopWidth} ${style.marginLeft}`)
+          }
+
+          Object.assign(window, { seen })
+          new MutationObserver(read).observe(document.head, { childList: true, subtree: true })
+
+          const frame = () => {
+            read()
+            requestAnimationFrame(frame)
+          }
+
+          frame()
+        })
+        await page.evaluate(() => (document.querySelector('#to-twoone') as HTMLElement).click())
+        await page.waitUntil(() => document.querySelector('h1')?.textContent === 'Twoone', { timeout: '10s' })
+        await page.waitUntil(() => [...document.head.querySelectorAll('link[rel=stylesheet]')].map(each => each.getAttribute('href')).join().endsWith('/two.css,/one.css'), { timeout: '10s' })
+        await Bun.sleep(300)
+        expect(await page.evaluate(() => [...new Set((window as unknown as { seen: string[] }).seen)])).toEqual(['5px 7px'])
+      }, 120_000)
+
       it('holds it for a linked sheet and an inlined block', async () => {
         await visit(await opened(), start('/a'), ['linked', 'b', 'linked', 'reversed'])
       }, 120_000)

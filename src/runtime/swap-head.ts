@@ -215,7 +215,7 @@ export function mergeHead(next: Document, scoped = false): { loaded: Promise<unk
       document.head.append(added)
   }
 
-  orderSheets([...sheets.values()])
+  orderSheets([...sheets.values()], loading, stale)
 
   return {
     loaded: Promise.all(loading),
@@ -234,14 +234,29 @@ function isSheet(element: Element): boolean {
 }
 
 // Stands the next head's styles and stylesheets in the order it serves them, the ones kept and the ones added alike: the layer order and the cascade of a page loaded afresh follow it, and a shared block declaring a layer must not come before the page's own `@layer` order.
-function orderSheets(order: (Element | undefined)[]): void {
+function orderSheets(order: (Element | undefined)[], loading: Promise<unknown>[], stale: HeadElement[]): void {
   const sheets = order.filter(element => element !== undefined).map(element => ({ element, added: !element.isConnected }))
   let last: Element | undefined
   let moved = false
 
-  for (const [at, { element, added }] of sheets.entries()) {
+  for (const [at, { element: found, added }] of sheets.entries()) {
+    let element = found
+
     if (last !== undefined) {
       if (added || !(last.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+        // A kept link taken out and put back would leave the page unstyled until it loaded again: its copy takes the place, and the link goes with the page's stale elements once the copy loaded.
+        if (!added && element instanceof HTMLLinkElement) {
+          const original: HeadElement = element
+          const copy = element.cloneNode() as HTMLLinkElement & HeadElement
+
+          if (original._$s !== undefined)
+            copy._$s = original._$s
+
+          stale.push(original)
+          loading.push(loaded(copy))
+          element = copy
+        }
+
         last.after(element)
         moved ||= !added
       }

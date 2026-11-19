@@ -7,5 +7,7 @@ nav
   a#to-c(href="/c") C
   a#to-reversed(href="/reversed") Reversed
   a#to-linked(href="/linked") Linked
+  a#to-onetwo(href="/onetwo") Onetwo
+  a#to-twoone(href="/twoone") Twoone
 Counter
 slot
