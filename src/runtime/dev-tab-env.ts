@@ -1,9 +1,11 @@
+import type { DevRequest } from '../server/dev'
 import type { DevTab, DevTool } from './dev-tool'
 
 // The Env tab's code, fetched at once as its badge counts the variables that look like secrets, with the tool's shared helpers from `tool.kit`.
 const ENV_URL = '/_kay/env.js'
 const MODULE_START = 'export default '
 const BUILT_EVENT = 'kay:dev-built'
+const REQUEST = 'kay-dev-request'
 
 // Names a variable of a secret goes by, and the shapes of the values of one: a URL carrying a password, a token with a well-known prefix, a long run of random-looking characters.
 const SECRET_NAME = /SECRET|PASSW(?:OR)?D|PRIVATE|TOKEN|CREDENTIAL|AUTH_?(?:KEY|TOKEN|SECRET)|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
@@ -63,10 +65,12 @@ export default function envTab(tool: DevTool, tab: DevTab): () => void {
     let failure: string | undefined
 
     try {
-      const response = await ownFetch(win, ENV_URL, { cache: 'no-store' })
+      // The route is there only when a field is `s.Public`, which the page's request block says: asking an app without one logs a 404.
+      const served = (JSON.parse(win.document.getElementById(REQUEST)?.textContent ?? 'null') as DevRequest | null)?.publicEnv !== false
+      const response = served ? await ownFetch(win, ENV_URL, { cache: 'no-store' }) : undefined
 
-      // The route is there only when a field is `s.Public`; any other answer is a failure to read it.
-      if (response.status !== 404) {
+      // Any answer but a 404 is a failure to read it.
+      if (response && response.status !== 404) {
         if (!response.ok)
           throw new Error(`the server answered ${response.status}`)
 

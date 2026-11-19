@@ -1,5 +1,5 @@
 import type { Context } from 'elysia'
-import type { KayConfig } from '../config'
+import type { LoadedConfig } from '../config'
 import type { RenderConfigKey } from '../project'
 import type { CardPageContext, ErrorPageContext, Locals, PageContext, PageError } from '../runtime'
 import type { Action, Outcome } from '../runtime/action'
@@ -136,7 +136,7 @@ export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | '
   cut?: CutIslands | undefined
 }
 
-export interface RenderOptions extends Pick<KayConfig, RenderConfigKey> {
+export interface RenderOptions extends Pick<LoadedConfig, RenderConfigKey | 'publicEnv'> {
   // Shows thrown errors with their stack instead of a generic message.
   dev?: boolean | undefined
   // Loads the dev tool's scripts, which the dev routes serve.

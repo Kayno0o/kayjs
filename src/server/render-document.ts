@@ -119,7 +119,7 @@ function pageClassesBlock(client: ClientBuild, files: string[]): string {
 }
 
 // What the dev tool's Request tab shows: the route matched, the files that rendered, the params, the status, and how long each load took, the matched route's when another page shows its error.
-function requestBlock(files: string[], rendering: Rendering, base: string): string {
+function requestBlock(files: string[], rendering: Rendering, base: string, publicEnv: boolean): string {
   const { loads } = rendering
   const state = localeState()
   // A host of its own is a protocol-relative address, which the base does not prefix.
@@ -141,6 +141,7 @@ function requestBlock(files: string[], rendering: Rendering, base: string): stri
     ...rendering.slow,
     locale: rendering.ctx.locale,
     locales,
+    publicEnv,
     status: rendering.status,
     error: (rendering.ctx as Partial<ErrorPageContext>).error?.message,
     loads: loads ? loads.files.flatMap((file, index) => loads.modules[index]!.load ? [{ file: projectPath(file), ms: loads.timings?.[index] }] : []) : [],
@@ -523,7 +524,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const sheets = stylesheets(client, styled)
   // The nearest-`data-prefetch` selector is needed once the page holds the attribute or may gain it later: a streamed part, an island, or a server island spliced into a prerendered page.
   const mayPrefetchPerLink = shipsEntry || streamed || (scan?.modes.length ?? 0) > 0 || [markup, head.html, head.root].some(html => DATA_PREFETCH.test(html))
-  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${buttonFormRule(markup, streamed, islands.messages)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${shipsEntry && client.navigation === true ? prefetchMeta(options.client?.prefetch) : pageSpeculation(options, mayPrefetchPerLink)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.client?.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${buttonFormRule(markup, streamed, islands.messages)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${shipsEntry && client.navigation === true ? prefetchMeta(options.client?.prefetch) : pageSpeculation(options, mayPrefetchPerLink)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.client?.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '', options.publicEnv === true)) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 

@@ -1578,6 +1578,50 @@ describe('the dev tool', () => {
     }
   })
 
+  it('asks for no public env when the page says the app serves none, and says so', async () => {
+    const script = document.createElement('script')
+    const asked: string[] = []
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
+      asked.push(url)
+
+      return new Response(null, { status: 404 })
+    }) as unknown as typeof window.fetch)
+
+    happyDOM.setURL('http://localhost/')
+    script.type = 'application/json'
+    script.id = 'kay-dev-request'
+    script.textContent = JSON.stringify({ page: 'src/routes/index.kay', layouts: [], params: {}, locale: 'en', status: 200, loads: [], id: 'x', guards: [], publicEnv: false })
+    document.head.append(script)
+
+    try {
+      tool = startDevTool(document, loadTab)
+      await turn()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-env')!.click()
+      await eventually(() => expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('sends no public env'))
+
+      expect(asked).not.toContain('/_kay/env.js')
+    }
+    finally {
+      script.remove()
+      fetching.mockRestore()
+      happyDOM.setURL(href)
+    }
+  })
+
+  it('tells the page whether the app serves a public env, as its request block', async () => {
+    const block = async (publicEnv: boolean) => {
+      const site = await pages({ root: 'tests/fixtures/timeouts', prebuilt: false, config: { security: false }, dev: true, publicEnv })
+      const html = await (await site.handle(new Request('http://localhost/slow', { headers: { accept: 'text/html' } }))).text()
+
+      return JSON.parse((/id="kay-dev-request">([^<]*)</).exec(html)![1]!.replaceAll('\\u003c', '<')) as { publicEnv?: boolean }
+    }
+
+    expect((await block(false)).publicEnv).toBe(false)
+    expect((await block(true)).publicEnv).toBe(true)
+  })
+
   it('lists the images of the page with the variant and format each got, the size served against the size drawn, the largest paint and what is wrong with each, and outlines one on hover', async () => {
     const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
     const { href } = location

@@ -670,6 +670,8 @@ export interface DevRequest {
   prerender?: 'page' | 'listed' | 'server islands' | undefined
   // The page in each locale of a site with `i18n` that serves more than one, where a language switcher links to: the locale and the address, under the base.
   locales?: { locale: string, href: string }[] | undefined
+  // Whether the app serves `/_kay/env.js`, which the Env tab asks for only then.
+  publicEnv?: boolean | undefined
 }
 
 // What the server recorded of one response, for the Request tab to ask for once the page is in view.
