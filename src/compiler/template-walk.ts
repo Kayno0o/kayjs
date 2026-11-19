@@ -68,5 +68,6 @@ export function nameDestructuredRows(file: KayFile): KayFile {
     node.children.unshift({ kind: 'const', ...node.item, pattern: node.item, value: at, row })
   })
 
-  return { ...file, template }
+  // The facts cached on the file name its old nodes, so the clone gets its own.
+  return { ...file, template, facts: undefined }
 }
