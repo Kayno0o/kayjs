@@ -594,5 +594,5 @@ function exportedVariantUrl(src: string, variant: ImageVariant): string | undefi
   if (src.startsWith(IMPORTED))
     return variantFile(importedName(src), variant)
 
-  return REMOTE.test(src) && KAY_STATIC_REMOTE?.includes(src) === true ? `${VARIANTS}${remoteVariantName(src, variant)}` : src
+  return REMOTE.test(src) && typeof KAY_STATIC_REMOTE !== 'undefined' && KAY_STATIC_REMOTE.includes(src) ? `${VARIANTS}${remoteVariantName(src, variant)}` : src
 }

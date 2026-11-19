@@ -769,7 +769,7 @@ export async function writeRemoteVariants(clientDir: string, remote: RemoteImage
     const original = await remote(src)
 
     if ('status' in original)
-      throw new KayError('image-invalid', `kay: a page links ${src}, which the build could not download: ${original.message}`)
+      throw new KayError('image-invalid', `kay: a page or an island links ${src}, which the build could not download: ${original.message}`)
 
     await imageSize(Bun.file(original.path))
     await writeVariant(original.path, variant, target, variantLevel(variant, 'webp', quality, DEFAULT_AVIF_QUALITY))

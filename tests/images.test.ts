@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 
 import { Elysia } from 'elysia'
 import { testWorker } from '../src/build/assets'
 import { cacheDir } from '../src/project'
-import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setImageWidths, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
+import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, remoteVariantName, setAspects, setImageWidths, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { imageSize, processImage } from '../src/server'
 import { AVIF_ENCODER, AVIF_SPEED, AVIF_WORKER_SOURCE, encodeAvif, setAvifTaskTimeout } from '../src/server/avif'
@@ -169,6 +169,34 @@ describe('image()', () => {
     const exported = await Bun.build({ entrypoints: [entry], target: 'browser', minify: true, define: { KAY_STATIC_EXPORT: 'true' } })
 
     expect(await exported.outputs[0]!.text()).toContain('/_kay/images/')
+  })
+
+  it('links a remote image as files in a static export only when the build fetches it', async () => {
+    const dir = await scratchDir('image-remote-bundle-')
+    const entry = join(dir, 'entry.ts')
+    const result = () => (globalThis as unknown as { result: ReturnType<typeof image>[] }).result
+    const listed = 'https://cdn.example/listed.png'
+    const unlisted = 'https://cdn.example/unlisted.png'
+
+    await Bun.write(entry, `import { image } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/image.ts'))}\nconst options = { width: 1000, height: 600 }\nglobalThis.result = [image(${JSON.stringify(listed)}, options), image(${JSON.stringify(unlisted)}, options)]\n`)
+
+    // Without KAY_STATIC_REMOTE defined, nothing is linked as a file and nothing throws.
+    const bare = await Bun.build({ entrypoints: [entry], target: 'browser', define: { KAY_STATIC_EXPORT: 'true' } })
+
+    await Bun.write(join(dir, 'bare.js'), await bare.outputs[0]!.text())
+    await import(join(dir, 'bare.js'))
+    expect(result()[0]!.src).toBe(listed)
+
+    const build = await Bun.build({ entrypoints: [entry], target: 'browser', define: { KAY_STATIC_EXPORT: 'true', KAY_STATIC_REMOTE: JSON.stringify([listed]) } })
+
+    await Bun.write(join(dir, 'linked.js'), await build.outputs[0]!.text())
+    await import(`${join(dir, 'linked.js')}?linked`)
+
+    const [linked, other] = result()
+
+    expect(linked!.srcset).toContain(`/_kay/images/${remoteVariantName(listed, { width: 320 })}`)
+    expect(other!.src).toBe(unlisted)
+    expect(other!.srcset).not.toContain('/_kay/images/')
   })
 })
 

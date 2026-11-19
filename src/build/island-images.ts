@@ -44,7 +44,7 @@ export interface IslandImages {
 
 const IMAGE_IMPORT = /^import\s+(\w+)\s+from\s+(["'])(\.[^"'\n]*\.(?:png|jpe?g|webp|gif|avif))\2/gm
 const KAY_IMAGE_IMPORT = /import\s*\{[^}]*\bimage\b[^}]*\}\s*from\s*["']kay\/image["']/
-const IMAGE_CALL = /\bimage\(\s*(?:(["'])(https?:\/\/[^"'\n]+)\1|([\w$.]+)\s*(?=[,)]))\s*(?:,\s*\{([^{}]*)\})?/g
+const IMAGE_CALL = /(?<![\w$])(?<!(?<!\.\.)\.)image\(\s*(?:(["'])(https?:\/\/[^"'\n]+)\1|([\w$.]+)\s*(?=[,)]))\s*(?:,\s*\{([^{}]*)\})?/g
 const NUMBER = /^\d+(?:\.\d+)?$/
 const STRING = /^(["'])(.*)\1$/s
 const SCANNED = /\.(?:kay|[cm]?[jt]sx?)$/
