@@ -1,0 +1,21 @@
+---
+import Segmented from '@kayjs/ui/segmented.kay'
+import TabNav from '@kayjs/ui/tab-nav.kay'
+import StripTabs from '../components/strip-tabs.kay'
+import '../app.css'
+
+const names = ['Overview', 'Traffic', 'Revenue', 'Conversions', 'Retention', 'Acquisition', 'Referrals']
+const links = names.map(name => ({ href: `/${name.toLowerCase()}`, label: name }))
+const options = names.map(name => ({ value: name.toLowerCase(), label: name }))
+---
+main
+  #nav
+    TabNav(links={links} current="/overview" label="Reports")
+  #navLast
+    TabNav(links={links} current="/referrals" label="More reports")
+  #tabs
+    StripTabs
+  #segmented
+    Segmented(label="Range" options={options} value="overview")
+  #short
+    TabNav(links={links.slice(0, 2)} current="/overview" label="Few")

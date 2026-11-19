@@ -1,0 +1,9 @@
+---
+island()
+import Tabs from '@kayjs/ui/tabs.kay'
+
+const tabs = ['Overview', 'Traffic', 'Revenue', 'Conversions', 'Retention', 'Acquisition', 'Referrals'].map(name => ({ value: name.toLowerCase(), label: name }))
+---
+Tabs(items={tabs} value="referrals" label="Sections")
+  @panel(value)
+    p {value}

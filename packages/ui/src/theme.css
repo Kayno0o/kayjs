@@ -1588,3 +1588,47 @@ html[data-kui-dock='right'] body {
 html[data-kui-dock='bottom'] body {
   padding-bottom: var(--kui-dock-bottom);
 }
+
+/* A row of tabs wider than its box fades out at the edge that holds more, so a clipped tab reads as one to scroll to, and a row that fits is left whole. The two fade widths are animated by the row's own scroll position, so no script runs: both stay 0 where the browser has no scroll-driven animations, and where the row does not scroll. */
+@property --_fade-start {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --_fade-end {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes kui-scroll-fade {
+  0% {
+    --_fade-start: 0px;
+    --_fade-end: 1.5rem;
+  }
+
+  4%,
+  96% {
+    --_fade-start: 1.5rem;
+    --_fade-end: 1.5rem;
+  }
+
+  100% {
+    --_fade-start: 1.5rem;
+    --_fade-end: 0px;
+  }
+}
+
+@supports (animation-timeline: scroll(self inline)) {
+  .kui-scroll-fade:not([data-orientation='vertical']) {
+    --_fade-to: to right;
+    mask-image: linear-gradient(var(--_fade-to), transparent, #000 var(--_fade-start), #000 calc(100% - var(--_fade-end)), transparent);
+    animation: kui-scroll-fade linear both;
+    animation-timeline: scroll(self inline);
+
+    &:dir(rtl) {
+      --_fade-to: to left;
+    }
+  }
+}

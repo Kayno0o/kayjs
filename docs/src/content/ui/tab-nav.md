@@ -16,7 +16,7 @@ TabNav(links={[{ href: '/settings', label: 'Profile' }, { href: '/settings/keys'
 
 ## A long bar
 
-When the bar scrolls, the current tab is centred in it, without moving the page.
+When the bar scrolls, the current tab is centred in it, without moving the page, and the edge that holds more tabs fades out. `Tabs` and `Segmented` fade the same way, and `Tabs` also centres the shown tab.
 
 <Demo name="tab-nav/scroll" />
 

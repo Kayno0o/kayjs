@@ -2,6 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { NavItem } from './nav-item'
 import { effect, queryParam, recipe, signal, uid, untrack } from 'kay'
+import { centerInBar } from './bar-scroll'
 import { stepIndex } from './cycle'
 import { loadOptions } from './options-source'
 import type { OptionsSource } from './options-source'
@@ -25,7 +26,7 @@ const FLIPPED: Partial<Record<string, string>> = { ArrowLeft: 'ArrowRight', Arro
 const look = recipe({
   parts: {
     root: 'kui-tabs group/tabs flex flex-col data-[orientation=vertical]:flex-row',
-    list: 'flex gap-1 overflow-x-auto border-b border-border pb-px data-[orientation=vertical]:flex-col data-[orientation=vertical]:overflow-x-visible data-[orientation=vertical]:overflow-y-auto data-[orientation=vertical]:border-b-0 data-[orientation=vertical]:border-e data-[orientation=vertical]:pb-0',
+    list: 'kui-scroll-fade flex gap-1 overflow-x-auto border-b border-border pb-px data-[orientation=vertical]:flex-col data-[orientation=vertical]:overflow-x-visible data-[orientation=vertical]:overflow-y-auto data-[orientation=vertical]:border-b-0 data-[orientation=vertical]:border-e data-[orientation=vertical]:pb-0',
     tab: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground inline-flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted aria-selected:border-accent aria-selected:text-accent group-data-[orientation=vertical]/tabs:-me-px group-data-[orientation=vertical]/tabs:mb-0 group-data-[orientation=vertical]/tabs:border-b-0 group-data-[orientation=vertical]/tabs:border-e-2',
     icon: 'size-3.5 shrink-0',
     badge: 'rounded-full bg-surface-strong px-1.5 py-px text-xs tabular-nums text-muted',
@@ -102,6 +103,16 @@ const active = () => {
 
   return tabs().some(tab => tab.value === wanted && !tab.disabled) ? wanted : tabs().find(tab => !tab.disabled)?.value
 }
+
+// A tab list wider than a phone scrolls, so the shown tab is centred in it rather than left off screen, again when the tabs arrive after the first render.
+effect(() => {
+  tabs()
+
+  const shownTab = list?.querySelector('[aria-selected="true"]')
+
+  if (list && shownTab)
+    centerInBar(list, shownTab, orientation === 'vertical')
+})
 
 // Once a tab has been shown, its panel stays drawn under `lazy`.
 effect(() => {
