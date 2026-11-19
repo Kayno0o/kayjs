@@ -122,14 +122,23 @@ describe('suggester', () => {
     expect(suggest('/about')).toBeUndefined()
   })
 
-  it('stays bounded when asked for many near misses', () => {
+  // Counted rather than timed: CI shares its host, so a wall-clock bound fails under load.
+  it('stays bounded when asked for many near misses: 20 fuzzy searches a second', () => {
     const many = suggester(Array.from({ length: 5000 }, (_, index) => `/p/item-${index}`))
-    const start = performance.now()
 
-    for (let index = 0; index < 200; index++)
-      many(`/p/itm-${index}x`)
+    try {
+      setSystemTime(new Date('2026-01-01T00:00:00Z'))
 
-    expect(performance.now() - start).toBeLessThan(2000)
+      const found = Array.from({ length: 200 }, (_, index) => many(`/p/itm-${index}`)).filter(item => item?.reason === 'similar')
+
+      expect(found).toHaveLength(20)
+      expect(found[0]).toEqual({ target: '/p/item-0', reason: 'similar' })
+      setSystemTime(new Date('2026-01-01T00:00:01.001Z'))
+      expect(many('/p/itm-150')).toEqual({ target: '/p/item-150', reason: 'similar' })
+    }
+    finally {
+      setSystemTime()
+    }
   })
 })
 
