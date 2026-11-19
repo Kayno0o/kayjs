@@ -1640,7 +1640,11 @@ html[data-kui-dock='bottom'] body {
 @supports (animation-timeline: scroll(self inline)) {
   .kui-scroll-fade:not([data-orientation='vertical']) {
     --_fade-to: to right;
-    mask-image: linear-gradient(var(--_fade-to), transparent, #000 var(--_fade-start), #000 calc(100% - var(--_fade-end)), transparent);
+    /* Three mask layers: the fade over the padding box, plus a ring (the border box less the padding box, by `exclude`) that stays opaque, so the row's own border is never faded. */
+    mask-image: linear-gradient(var(--_fade-to), transparent, #000 var(--_fade-start), #000 calc(100% - var(--_fade-end)), transparent), linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+    mask-origin: padding-box, padding-box, border-box;
+    mask-repeat: no-repeat;
+    mask-composite: add, exclude, add;
     animation: kui-scroll-fade linear both;
     animation-timeline: scroll(self inline);
 

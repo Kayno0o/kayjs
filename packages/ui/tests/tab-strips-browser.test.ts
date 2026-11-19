@@ -57,3 +57,31 @@ describe('a tab strip wider than a phone', () => {
     expect(found).toEqual({ nav: true, tabs: true })
   })
 })
+
+describe('the border of a strip that fades', () => {
+  // The mean color of a 6px piece of the strip's border row, from a screenshot of just that piece.
+  async function border(page: Awaited<ReturnType<typeof site.open>>, selector: string, side: 'start' | 'end', row: 'top' | 'bottom') {
+    const clip = await page.evaluate(async (selector, side, row) => {
+      const strip = document.querySelector<HTMLElement>(selector)!
+
+      strip.scrollLeft = 0
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+      const box = strip.getBoundingClientRect()
+
+      return { x: side === 'start' ? box.left + 1 : box.right - 7, y: row === 'top' ? box.top : box.bottom - 1, width: 6, height: 1, scale: 1 }
+    }, selector, side, row)
+    const shot = await page.cdp<{ data: string }>('Page.captureScreenshot', { format: 'png', clip })
+
+    return new Bun.Image(Buffer.from(shot.data, 'base64')).placeholder()
+  }
+
+  it('is drawn at the faded edge as along the rest of the strip', async () => {
+    await using page = await site.open('/tab-strips', { viewport: 'phone' })
+    const segmented = { start: await border(page, '#segmented [role="radiogroup"]', 'start', 'top'), end: await border(page, '#segmented [role="radiogroup"]', 'end', 'top') }
+    const tabs = { start: await border(page, '#tabs [role="tablist"]', 'start', 'bottom'), end: await border(page, '#tabs [role="tablist"]', 'end', 'bottom') }
+
+    expect(segmented.end).toBe(segmented.start)
+    expect(tabs.end).toBe(tabs.start)
+  })
+})
