@@ -21,7 +21,8 @@ export async function hoverOver(page: { hover: (selector: string) => Promise<unk
   await page.hover(selector)
   await page.waitUntil(target => document.querySelector(target)?.matches(':hover'), undefined, selector)
   await page.evaluate(async () => {
-    for (const animation of document.getAnimations()) {
+    // A scroll-driven animation (a tab strip's edge fade) runs for as long as the page does.
+    for (const animation of document.getAnimations().filter(running => running.timeline instanceof DocumentTimeline)) {
       try {
         await animation.finished
       }

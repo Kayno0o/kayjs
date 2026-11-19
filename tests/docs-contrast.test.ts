@@ -66,8 +66,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
         await page.evaluate((picked: string) => {
           document.documentElement.dataset.theme = picked
         }, scheme)
-        // The colours ease into the scheme picked, and axe-core reads them as they stand.
-        await page.waitUntil(() => document.getAnimations().every(animation => animation.playState !== 'running'))
+        // The colours ease into the scheme picked, and axe-core reads them as they stand; a scroll-driven animation (a tab strip's edge fade) runs as long as the page does.
+        await page.waitUntil(() => document.getAnimations().every(animation => animation.playState !== 'running' || !(animation.timeline instanceof DocumentTimeline)))
 
         for (const violation of await page.a11y()) {
           if (violation.id === 'color-contrast')
@@ -80,7 +80,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
 
         await page.click('.kai-launcher-button')
         await page.waitFor('.kai-launcher-panel:not([hidden]) .kai-chat-form')
-        await page.waitUntil(() => document.getAnimations().every(animation => animation.playState !== 'running'))
+        await page.waitUntil(() => document.getAnimations().every(animation => animation.playState !== 'running' || !(animation.timeline instanceof DocumentTimeline)))
 
         for (const violation of await page.a11y()) {
           if (violation.id === 'color-contrast')
