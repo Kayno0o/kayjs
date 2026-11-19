@@ -396,3 +396,14 @@ describe('islands', () => {
     expect(document.querySelector('.bad')!.innerHTML).toBe('')
   })
 })
+
+describe('a page that is an island', () => {
+  it('writes only the server values it reads into data-props', async () => {
+    const page = await import(join(import.meta.dir, 'fixtures/page-island/page.kay')) as { load: (ctx: unknown) => Promise<Record<string, unknown>>, default: (props: unknown) => unknown }
+    const html = child(page.default(await page.load({})))
+
+    expect(html).toContain('1225')
+    expect(html).not.toMatch(/\[0,1,2,3/)
+    expect(await page.load({})).toEqual({ total: 1225 })
+  })
+})

@@ -1545,6 +1545,23 @@ describe('what a page island hands over', () => {
     expect(handed('--- server\nconst speed = 5\nconst big = [1]\n---\n---\nlet n = 0\n---\nbutton(onClick={() => n++}) go\np(transition:fade={{ duration: speed }}) x')).toBe('speed')
   })
 
+  it('keeps what a destructured fence, a name starting with an underscore, a bind, an innerHTML or a loop key reads', () => {
+    const head = '--- server\n'
+    const island = '---\n---\nlet n = 0\n---\nbutton(onClick={() => n++}) go\n'
+
+    expect(handed(`${head}const { a, b } = { a: 1, b: 2 }\n${island}p {a}`)).toBe('a')
+    expect(handed(`${head}const _kept = 1\nconst _gone = 2\n${island}p {_kept}`)).toBe('_kept')
+    expect(handed(`${head}const text = 'x'\nconst big = [1]\n---\n---\nlet value = ''\n---\ninput(bind:value={value} placeholder={text})\nbutton(onClick={() => value = ''}) go`)).toBe('text')
+    expect(handed(`${head}import { trustHtml } from 'kay'\nconst markup = trustHtml('<b>x</b>')\nconst big = [1]\n${island}div(innerHTML={markup})`)).toBe('markup')
+    expect(handed(`${head}const rows = [{ id: 1 }]\nconst prefix = 'r'\nconst big = [1]\n${island}for row of rows key={prefix + row.id}\n  p x`)).toBe('rows, prefix')
+  })
+
+  it('hands a layout\'s island the values it reads', () => {
+    const { tsx } = compileKay('--- server\nconst menu = [1]\nconst big = [1]\n---\n---\nlet n = 0\n---\nbutton(onClick={() => n++}) {menu.length}\nslot', 'src/routes/_layout.kay', { output: 'html', hydratable: true })
+
+    expect((/return \{ ?([^}]*?) ?\}\n\}\n/).exec(tsx)![1]).toBe('menu')
+  })
+
   it('leaves a page that is no island with every value', () => {
     expect(handed('--- server\nconst a = 1\nconst b = 2\n---\np {a}')).toBe('a, b')
   })

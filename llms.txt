@@ -46,6 +46,7 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Images and icons](llms/images.md): imported and responsive images, share cards, icons
 - [Runtime and remote images](llms/images-runtime-and-remote.md): uploaded and remote images
 - [Islands](llms/islands.md): props, hydration
+- [Islands: lazy components](llms/islands-lazy-components.md): components an island loads when first drawn
 - [Islands: state to ids](llms/islands-state-to-ids.md): shared state, transitions, context
 - [Browser-only code](llms/browser-only.md): browser globals on the server, server globals in the browser
 - [Navigation](llms/navigation.md): in-place navigation, islands kept across pages
