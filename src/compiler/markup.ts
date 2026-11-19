@@ -15,7 +15,7 @@ import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
 import { closeHandParts, handedItem, handsEntry, openClassList, writesTogether, writtenParts } from './hand-parts'
 import { IMAGE_OPTIONS, imageDefaults as imageDefaultsOf, imageOptions, placeholderOff, writeImageArguments } from './image-attributes'
-import { accessorParameters, contentOf, readingParameters } from './items'
+import { accessorParameters, addParameterReads, contentOf } from './items'
 import { controlId, fieldAttribute, inheritedAttributes, inheritedField } from './markup-fields'
 import { PROPS } from './names'
 import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, shapeOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
@@ -362,7 +362,7 @@ export abstract class TemplateWriter {
   }
 
   private readingParameters(params: Span, render: () => void): void {
-    readingParameters(this.b, this.accessorBlocks ? accessorParameters(this.source(params)) : undefined, helperName('param'), render)
+    addParameterReads(this.b, this.accessorBlocks ? accessorParameters(this.source(params)) : undefined, helperName('param'), render)
   }
 
   // A component's props: its attributes, then its slots and children, each read through a getter or a function so it renders where the component puts it.

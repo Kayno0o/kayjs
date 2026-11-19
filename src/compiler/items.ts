@@ -174,6 +174,17 @@ export function parameterNames(pattern: string): string[] {
 const PLAIN_PARAMETER = /^([\p{ID_Start}$_][\p{ID_Continue}$]*)(?:\s*\?)?\s*(?::|$)/u
 const OPENING = '([{<'
 const CLOSING = ')]}>'
+const QUOTES = '"\'`'
+
+function skipString(text: string, from: number): number {
+  const quote = text[from]!
+  let index = from + 1
+
+  while (index < text.length && text[index] !== quote)
+    index += text[index] === '\\' ? 2 : 1
+
+  return index
+}
 
 // The parameters of a block or a snippet that are plain names, typed or not, which one of a component that renders again reads through an accessor, so a caller handing it the item a `followed` draw follows gets the current one read each time. A pattern, a rest or a default stays as written. None when the list has no such name.
 export function accessorParameters(params: string): string[] | undefined {
@@ -197,6 +208,10 @@ export function accessorParameters(params: string): string[] | undefined {
 
     if (char === '=' && params[index + 1] === '>') {
       index++
+    }
+    else if (QUOTES.includes(char)) {
+      // A string in a type or a default, whose commas and brackets are no part of the list.
+      index = skipString(params, index)
     }
     else if (OPENING.includes(char)) {
       depth++
@@ -222,7 +237,7 @@ const CHAINS = new RegExp(String.raw`^\s*${CHAIN}(?:\s*,\s*${CHAIN})*\s*$`, 'u')
 const COMMA = /,/g
 
 // The spans of the arguments of a `slot` call when each is a name or a path of names, which the runtime reads one by one: the first as the item the block follows, the others where they change. None for any other argument.
-export function simpleArguments(src: string, args: Span): Span[] | undefined {
+function simpleArguments(src: string, args: Span): Span[] | undefined {
   const text = src.slice(args.start, args.end)
 
   if (!CHAINS.test(text))
@@ -277,7 +292,7 @@ export function addBlockParameters(sites: Sites, b: CodeBuilder, src: string, pa
 }
 
 // What a block or a snippet renders, its plain parameters read where they are used (`param` is the helper), so one a `followed` draw follows gives the current item.
-export function readingParameters(b: CodeBuilder, names: string[] | undefined, param: string, render: () => void): void {
+export function addParameterReads(b: CodeBuilder, names: string[] | undefined, param: string, render: () => void): void {
   if (names)
     b.add(`(${names.map(name => `${name} = ${param}(${name}), `).join('')}`)
 

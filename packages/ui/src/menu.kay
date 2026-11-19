@@ -5,7 +5,7 @@ import type { IconSlot } from './defaults'
 import type { MenuAction, MenuCheckbox, MenuEntry, MenuItem, MenuRadio, MenuSource, MenuTriggerProps } from './menu'
 import type { Placement, PopoverPanelProps } from './popover'
 import type { Snippet } from 'kay'
-import { memo, recipe, signal, uid } from 'kay'
+import { followed, memo, recipe, signal, uid } from 'kay'
 import { wording } from 'kay/words'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
@@ -329,7 +329,7 @@ Popover({...panelProps} id={menuId} placement={placement ?? (at ? 'bottom-start'
           @trigger(attributes)
             button({...attributes} id={`${menuId}-item-${index}`} part="item" type="button" role="menuitem" tabindex="-1" disabled={submenu.disabled} data-label={submenu.label} data-tone={submenu.tone})
               if item
-                | {item(submenu)}
+                | {followed(() => submenu, submenu => item?.(submenu))}
               else
                 if submenu.icon
                   Icon(icon={submenu.icon} part="icon")
@@ -339,7 +339,7 @@ Popover({...panelProps} id={menuId} placement={placement ?? (at ? 'bottom-start'
         button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitemcheckbox" aria-checked={isChecked(box, index) ? 'true' : 'false'} tabindex="-1" disabled={box.disabled} data-label={box.label} data-tone={box.tone} onClick={() => toggle(box, index)})
           span(part="indicator" aria-hidden="true") {isChecked(box, index) ? '✓' : ''}
           if item
-            | {item(box)}
+            | {followed(() => box, box => item?.(box))}
           else
             if box.icon
               Icon(icon={box.icon} part="icon")
@@ -352,7 +352,7 @@ Popover({...panelProps} id={menuId} placement={placement ?? (at ? 'bottom-start'
         button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitemradio" aria-checked={isChecked(radio, index) ? 'true' : 'false'} tabindex="-1" disabled={radio.disabled} data-label={radio.label} data-tone={radio.tone} onClick={() => choose(radio, index)})
           span(part="indicator" aria-hidden="true") {isChecked(radio, index) ? '●' : ''}
           if item
-            | {item(radio)}
+            | {followed(() => radio, radio => item?.(radio))}
           else
             if radio.icon
               Icon(icon={radio.icon} part="icon")
@@ -363,7 +363,7 @@ Popover({...panelProps} id={menuId} placement={placement ?? (at ? 'bottom-start'
         if action.href !== undefined && !action.disabled
           a(part="item" id={`${menuId}-item-${index}`} href={action.href} {...tabOf(action.href, action.newTab)} role="menuitem" tabindex="-1" data-label={action.label} data-tone={action.tone} onClick={() => select(action)})
             if item
-              | {item(action)}
+              | {followed(() => action, action => item?.(action))}
             else
               if action.icon
                 Icon(icon={action.icon} part="icon")
@@ -373,7 +373,7 @@ Popover({...panelProps} id={menuId} placement={placement ?? (at ? 'bottom-start'
         else
           button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitem" tabindex="-1" disabled={action.disabled} data-label={action.label} data-tone={action.tone} onClick={() => select(action)})
             if item
-              | {item(action)}
+              | {followed(() => action, action => item?.(action))}
             else
               if action.icon
                 Icon(icon={action.icon} part="icon")

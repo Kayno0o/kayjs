@@ -2,6 +2,12 @@
 
 What each release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a version missing here broke nothing. Through 1.x a breaking change ships in a minor; from 2.0.0 it ships in a major, and a minor or a patch breaks nothing.
 
+## 1.111.0
+
+### A block's or a snippet's plain parameter is read-only in a component that renders again
+
+A `@cell(row)` block or a `snippet show(item)` of an island or a component reads its plain parameters through an accessor, so a block drawn once per key follows the item that replaces it. Writing to one (`item = null` in a handler) is the ``item` is read-only here`` error a loop's row already gives: keep the value in a `signal` of the component and write that. A page or a static component, whose parameters are plain values, is unchanged. `kay check` cannot tell a write meant for the parameter from one meant for a variable of the same name, so no lint rewrites it.
+
 ## 1.110.0
 
 ### A swap keeps an island whose props changed

@@ -237,7 +237,7 @@ describe('control flow', () => {
     expect(out).toBe('<ul><KayLoopFor each={todos} keyed={(todo) => (todo.id)}>{(todo, i) => <li data-i={i}>{todo.title}</li>}</KayLoopFor></ul>')
   })
 
-  it('hands a loop\'s key function the index after the item, in the browser and the checked output, the server matching no rows', () => {
+  it('hands a loop\'s key function the index after the item, in the browser, the checked output and the server\'s loop', () => {
     const plain = 'for item, position of items key={item.id ?? position}\n  li {item.name}'
     const pattern = 'for { id }, i of rows key={`${id}-${i}`}\n  li {id}'
     const nested = 'for row, i of rows key={row.id}\n  for cell, i of row.cells key={cell.id ?? i}\n    li {i}'
@@ -246,7 +246,7 @@ describe('control flow', () => {
     expect(compileKay(pattern, 'test.kay', { output: 'dom' }).tsx).toContain('({ id }, i) => (`${id}-${i}`), (')
     expect(compileKay(nested, 'test.kay', { output: 'dom' }).tsx).toContain('(row) => (row.id), (')
     expect(compileKay(nested, 'test.kay', { output: 'dom' }).tsx).toContain('(cell, i) => (cell.id ?? i), (')
-    expect(compileKay(plain, 'test.kay', { output: 'html' }).tsx).not.toContain('item.id ?? position')
+    expect(compileKay(plain, 'test.kay', { output: 'html' }).tsx).toContain('(item, position) => (item.id ?? position)))')
     expect(compileKay(plain, 'test.kay', { output: 'html' }).diagnostics).toEqual([])
     expect(jsx(plain)).toContain('keyed={(item, position) => (item.id ?? position)}')
     expect(jsx(pattern)).toContain('keyed={({ id }, i) => (`${id}-${i}`)}')
@@ -366,6 +366,14 @@ describe('control flow', () => {
       expect(writes(component('row'), 'src/comp.kay', check)).toEqual(['`row` is read-only here', '`i` is read-only here'])
       expect(writes(component('i'), 'src/comp.kay', check)).toEqual(['`row` is read-only here'])
     }
+  })
+
+  it('reports a write to the plain parameter of a block or a snippet in a component that renders again, which reads the current item, and leaves a page its plain value', () => {
+    const body = 'snippet show(item: number)\n  p {item = 2}\n{show(1)}\n'
+    const component = `---\nconst { rows } = props<{ rows: number[] }>()\n---\n${body}`
+
+    expect(compileKay(component, 'src/comp.kay', { check: true }).diagnostics.map(d => d.message)).toEqual(['`item` is read-only here'])
+    expect(compileKay(`--- server\nconst limit = 1\n---\np {limit}\n${body}`, 'src/routes/index.kay', { check: true, page: true }).diagnostics.map(d => d.message)).toEqual([])
   })
 
   it('reads the loops of a page or a layout without a server fence as static in the check build, as the build does', () => {
