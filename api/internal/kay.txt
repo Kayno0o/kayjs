@@ -346,7 +346,7 @@ function omit(props: object, ...keys: string[]): Record<string, unknown>
 function outside<T>(element: Element, href: T, ownRel?: boolean): T
 
 [./dom] param
-function param<Value>(value: Value): () => Value
+function param<Value>(value: Value, place?: number): () => Value
 
 [./dom] part
 function part(render: () => unknown): Unit | null
@@ -575,6 +575,9 @@ function innerMarkup(value: unknown): string
 [./html] isRendered
 function isRendered(value: object): value is Html
 
+[./html] keepLoopKeys
+function keepLoopKeys(): <T>(render: () => T) => T
+
 [./html] leadingNewline
 function leadingNewline(markup: string): string
 
@@ -618,7 +621,7 @@ function outsideLink(href: unknown, ownRel?: boolean): string
 function outsideLinks(markup: string): string
 
 [./html] param
-function param<Value>(value: Value): () => Value
+function param<Value>(value: Value, place?: number): () => Value
 
 [./html] partClass
 function partClass(props: unknown, part: string): unknown

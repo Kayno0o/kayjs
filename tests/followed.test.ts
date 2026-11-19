@@ -106,18 +106,88 @@ describe('followed', () => {
   })
 })
 
+const names = (params: string) => accessorParameters(params)?.map(({ name }) => name)
+
+describe('a slot called with more than the item', () => {
+  it('reads the other arguments in place for a block that takes them through param, by their place', () => {
+    const item = signal<Item>({ id: 1, name: 'a' })
+    const index = signal(0)
+    let draws = 0
+    let reads: [() => Item, () => number] | undefined
+
+    root(() => effect(() => {
+      slotCall((card: Item, at: number) => {
+        draws++
+        reads = [param(card), param(at, 1)]
+      }, item, index)
+    }))
+    flush()
+    index.set(1)
+    item.set({ id: 1, name: 'b' })
+    flush()
+    expect(draws).toBe(1)
+    expect([reads![0]().name, reads![1]()]).toEqual(['b', 1])
+  })
+
+  it('finds the item wherever the block takes it', () => {
+    const item = signal<Item>({ id: 1, name: 'a' })
+    let read: (() => Item) | undefined
+
+    root(() => followed(item, (card) => {
+      read = param(card, 1)
+    }))
+    item.set({ id: 1, name: 'b' })
+    expect(read!().name).toBe('b')
+  })
+
+  it('draws the block again when an argument it did not take through param changes', () => {
+    const item = signal<Item>({ id: 1, name: 'a' })
+    const index = signal(0)
+    const seen: number[] = []
+
+    root(() => effect(() => {
+      slotCall((_card: Item, at: number) => {
+        seen.push(at)
+      }, item, index)
+    }))
+    flush()
+    index.set(1)
+    flush()
+    expect(seen).toEqual([0, 1])
+  })
+
+  it('leaves a block drawn inside the block with its own arguments, the same value at the same place included', () => {
+    const item = signal<Item>({ id: 1, name: 'a' })
+    const index = signal(1)
+    let inner: (() => number) | undefined
+
+    root(() => slotCall((card: Item, at: number) => {
+      param(card)
+      param(at, 1)
+      inner = param(1, 1)
+    }, item, index))
+    index.set(2)
+    expect(inner!()).toBe(1)
+  })
+})
+
 describe('accessorParameters', () => {
+  it('gives each name its place in the list, a pattern keeping its own', () => {
+    expect(accessorParameters('card, i')).toEqual([{ name: 'card', position: 0 }, { name: 'i', position: 1 }])
+    expect(accessorParameters('{ id }, rest')).toEqual([{ name: 'rest', position: 1 }])
+  })
+
   it('names the plain parameters, typed or not, and leaves patterns, rests and defaults as written', () => {
-    expect(accessorParameters('row, column')).toEqual(['row', 'column'])
-    expect(accessorParameters('row: Row<Item>, index?: number')).toEqual(['row', 'index'])
-    expect(accessorParameters('{ id }, rest: (a: number, b: number) => void')).toEqual(['rest'])
-    expect(accessorParameters('row, ...others')).toEqual(['row'])
-    expect(accessorParameters('row = 1, other')).toEqual(['other'])
-    expect(accessorParameters('{ id }')).toBeUndefined()
+    expect(names('row, column')).toEqual(['row', 'column'])
+    expect(names('row: Row<Item>, index?: number')).toEqual(['row', 'index'])
+    expect(names('{ id }, rest: (a: number, b: number) => void')).toEqual(['rest'])
+    expect(names('row, ...others')).toEqual(['row'])
+    expect(names('row = 1, other')).toEqual(['other'])
+    expect(names('{ id }')).toBeUndefined()
   })
 
   it('reads a comma or a bracket in a string of a type as no part of the list', () => {
-    expect(accessorParameters('a: \'x, y: z\', b')).toEqual(['a', 'b'])
-    expect(accessorParameters('a: "<(", b')).toEqual(['a', 'b'])
+    expect(names('a: \'x, y: z\', b')).toEqual(['a', 'b'])
+    expect(names('a: "<(", b')).toEqual(['a', 'b'])
   })
 })

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
+import { Await, collectDeferred } from '../src/runtime/await.server'
 import { loop, loopIdentity, rowKey } from '../src/runtime/html'
 
 const draw = <T>(items: T[], key?: (item: T, index: number) => unknown, inner?: () => string) => loop(items, () => `[${loopIdentity() ?? '-'}${inner?.() ?? ''}]`, undefined, undefined, key)
@@ -28,6 +29,16 @@ describe('the identity an island takes from the keyed loop it is drawn in', () =
     }
 
     expect(() => loop([1], failing, undefined, undefined, key => key)).toThrow('row')
+    expect(loopIdentity()).toBeUndefined()
+  })
+})
+
+describe('the identity an island takes in an await block of a keyed row', () => {
+  it('is the key of the row the block was drawn in, though the block settles after the row was drawn', async () => {
+    const { deferred } = collectDeferred(() => loop([{ id: 'a' }, { id: 'b' }], () => String(Await({ value: Promise.resolve(1), pending: () => '', ready: () => `<${loopIdentity() ?? '-'}>` })), undefined, undefined, item => item.id))
+
+    expect(deferred).toHaveLength(2)
+    expect(deferred.map(block => block.ready(undefined as never))).toEqual(['<a>', '<b>'])
     expect(loopIdentity()).toBeUndefined()
   })
 })

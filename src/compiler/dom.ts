@@ -157,7 +157,8 @@ export class DomTemplate extends TemplateWriter {
             b.add(`${helperName(this.scoping)}((`).addSource(form).add('), () => ')
 
             if (item.node.outlet) {
-              slotValue(b, item.node)
+              if (!addSlotCall(b, this.src, item.node, helperName('slotCall')))
+                slotValue(b, item.node)
             }
             else {
               b.add('{ const KayC = ')

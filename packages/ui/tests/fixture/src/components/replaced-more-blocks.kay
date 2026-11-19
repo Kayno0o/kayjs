@@ -1,0 +1,30 @@
+---
+import { signal } from 'kay'
+import Steps from '@kayjs/ui/steps.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
+import TreeView from '@kayjs/ui/tree-view.kay'
+import VirtualList from '@kayjs/ui/virtual-list.kay'
+import { toast } from '@kayjs/ui'
+
+// Each list is built again, its items copies under the same keys, whenever the counter moves.
+const version = signal(0)
+const nodes = () => [{ key: 'n', label: `Node${version()}` }]
+const steps = () => [{ key: 's', label: `Step${version()}` }]
+const rows = () => [{ id: 'r', name: `Row${version()}` }]
+const id = toast.info('Toast0', { duration: false })
+---
+button#bump(type="button" onClick={() => { version++; toast.update(id, { message: `Toast${version()}` }) }}) Bump
+TreeView(nodes={nodes()} label="Tree")
+  @row(node)
+    input(data-block="tree" aria-label="tree" value={node.label})
+  @actions(node)
+    input(data-block="actions" aria-label="actions" value={node.label})
+Steps(items={steps()} current="s" label="Steps")
+  @step(step)
+    input(data-block="step" aria-label="step" value={step.label})
+VirtualList(items={rows()} itemKey={row => row.id} label="Rows" estimate={20})
+  @item(row)
+    input(data-block="virtual" aria-label="virtual" value={row.name})
+Toaster
+  @toast(item)
+    input(data-block="toast" aria-label="toast" value={String(item.message)})

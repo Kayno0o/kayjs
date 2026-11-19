@@ -4,7 +4,7 @@ import type { JSX } from './jsx'
 import type { Html } from './rendered'
 import { AWAIT_FAILED, AWAIT_FAILED_KEY } from './await-failed'
 import { escape } from './escape'
-import { awaitNotes, child } from './html'
+import { awaitNotes, child, keepLoopKeys } from './html'
 import { insideIsland } from './island.server'
 import { getOwner, runWithOwner } from './reactive'
 import { html } from './rendered'
@@ -195,10 +195,12 @@ export function Await<T>(props: AwaitChannel<T>): JSX.Element {
   // Rendered once the value settles, under the component that declared it, for what it provided.
   const parent = getOwner()
   const failed = props.failed
+  const inLoop = keepLoopKeys()
+  const resume = <R>(render: () => R) => inLoop(() => following(notes, render))
 
   const fallback = props.fallback
 
-  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => following(notes, () => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => following(notes, () => failed(error)))), fallback: fallback && (error => runWithOwner(parent, () => following(notes, () => fallback(error)))), alert: props.alert ? error => runWithOwner(parent, () => following(notes, () => props.alert!(error))) : awaitFailed, site: failed ? undefined : new Error('await') })
+  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => resume(() => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => resume(() => failed(error)))), fallback: fallback && (error => runWithOwner(parent, () => resume(() => fallback(error)))), alert: props.alert ? error => runWithOwner(parent, () => resume(() => props.alert!(error))) : awaitFailed, site: failed ? undefined : new Error('await') })
   // The streamed block replaces this one whole, so an `await` inside it renders its own pending block and streams nothing.
   deferred = undefined
 

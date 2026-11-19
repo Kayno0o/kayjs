@@ -598,6 +598,22 @@ export function loopIdentity(): string | undefined {
   return loopKeys.length === 1 ? loopKeys[0] : JSON.stringify(loopKeys)
 }
 
+// Renders again, later, with the keyed loops it is drawn in: an `await` block settles after its row was drawn, and an island in it still takes the row's key as its identity.
+export function keepLoopKeys(): <T>(render: () => T) => T {
+  const kept = [...loopKeys]
+
+  return (render) => {
+    const outer = loopKeys.splice(0, loopKeys.length, ...kept)
+
+    try {
+      return render()
+    }
+    finally {
+      loopKeys.splice(0, loopKeys.length, ...outer)
+    }
+  }
+}
+
 function drawRow<T>(render: (item: T | (() => T), index: number | (() => number)) => string, accessors: 'keyed' | 'positional' | undefined, item: T, index: number): string {
   return accessors === undefined ? render(item, index) : render(() => item, accessors === 'keyed' ? () => index : index)
 }

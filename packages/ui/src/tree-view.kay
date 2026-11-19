@@ -4,7 +4,7 @@ import type { JSX, Snippet } from 'kay'
 import type { MenuEntry } from './menu'
 import { tabOf } from './outside'
 import type { TreeId, TreeNode, TreeRow } from './tree'
-import { effect, memo, recipe, signal, untrack, withQuery } from 'kay'
+import { effect, followed, memo, recipe, signal, untrack, withQuery } from 'kay'
 import Icon from './icon.kay'
 import Menu from './menu.kay'
 import { ORIGIN } from './tab-nav'
@@ -306,10 +306,10 @@ else
           if row.node.href !== undefined
             a(part="link" href={row.node.href} {...tabOf(row.node.href, row.node.newTab)} tabindex="-1" aria-current={row.node.key === current() ? 'page' : undefined})
               span(part="body")
-                | {content(row.node)}
+                | {followed(() => row.node, node => content!(node))}
           else
             span(part="body")
-              | {content(row.node)}
+              | {followed(() => row.node, node => content!(node))}
         else
           if row.node.icon
             Icon(icon={row.node.icon} part="icon")
@@ -322,6 +322,6 @@ else
           button(part="retry" type="button") {retryLabel}
         if actions
           span(part="trailing" data-shown={trailingShown ? '' : undefined})
-            | {actions(row.node)}
+            | {followed(() => row.node, node => actions!(node))}
   if hasMenu()
     Menu(items={menu()?.items ?? []} label={menu()?.name ?? label} at={menu()?.at ?? { x: 0, y: 0 }} open={menu() !== undefined} onOpenChange={({ open: shown }) => { if (!shown) menu = undefined }})

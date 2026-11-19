@@ -186,18 +186,21 @@ function skipString(text: string, from: number): number {
   return index
 }
 
-// The parameters of a block or a snippet that are plain names, typed or not, which one of a component that renders again reads through an accessor, so a caller handing it the item a `followed` draw follows gets the current one read each time. A pattern, a rest or a default stays as written. None when the list has no such name.
-export function accessorParameters(params: string): string[] | undefined {
-  const names: string[] = []
+// The parameters of a block or a snippet that are plain names, typed or not, with their place in the list, which one of a component that renders again reads through an accessor, so a caller handing it what a `followed` draw follows gets the current value read each time. A pattern, a rest or a default stays as written. None when the list has no such name.
+export function accessorParameters(params: string): { name: string, position: number }[] | undefined {
+  const names: { name: string, position: number }[] = []
   let depth = 0
   let from = 0
   let defaulted = false
+  let position = 0
 
   const close = (to: number) => {
     const name = defaulted ? undefined : PLAIN_PARAMETER.exec(params.slice(from, to).trim())?.[1]
 
     if (name !== undefined)
-      names.push(name)
+      names.push({ name, position })
+
+    position++
 
     from = to + 1
     defaulted = false
@@ -292,9 +295,9 @@ export function addBlockParameters(sites: Sites, b: CodeBuilder, src: string, pa
 }
 
 // What a block or a snippet renders, its plain parameters read where they are used (`param` is the helper), so one a `followed` draw follows gives the current item.
-export function addParameterReads(b: CodeBuilder, names: string[] | undefined, param: string, render: () => void): void {
+export function addParameterReads(b: CodeBuilder, names: { name: string, position: number }[] | undefined, param: string, render: () => void): void {
   if (names)
-    b.add(`(${names.map(name => `${name} = ${param}(${name}), `).join('')}`)
+    b.add(`(${names.map(({ name, position }) => `${name} = ${param}(${name}${position === 0 ? '' : `, ${position}`}), `).join('')}`)
 
   render()
 

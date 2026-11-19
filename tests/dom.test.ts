@@ -2028,7 +2028,41 @@ describe('a slot called with the item of a keyed loop', () => {
 
       swap([{ id: 2, name: 'b' }, { id: 1, name: 'a!' }])
       await settle()
-      expect(root.querySelector<HTMLInputElement>('input[name="n1"]')!.value).toBe('1:a!')
+      expect(root.querySelector('input[name="n1"]')).toBe(first)
+      expect(first.value).toBe('1:a!')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
+describe('a slot called with the item of a keyed loop inside a form', () => {
+  const PAGE = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String() }), ({ title }) => title)\n---\np Page\n'
+  const mountForm = site({
+    'page.kay': PAGE,
+    'card.kay': '---\nimport type { JSX } from \'kay\'\nimport { add } from \'./page.kay\'\n\nconst { items, row } = props<{ items: { id: number, name: string }[], row?: (item: { id: number, name: string }, index: number) => JSX.Element }>()\n---\nform(action={add})\n  for item, i of items key={item.id}\n    p\n      slot row(item, i)\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Card from \'./card.kay\'\n\nconst list = signal([{ id: 1, name: \'a\' }, { id: 2, name: \'b\' }])\n;(globalThis as { swap?: (next: { id: number, name: string }[]) => void }).swap = next => list.set(next)\n---\nCard(items={list()})\n  @row(item, i)\n    input(name={`n${item.id}`} value={`${i}:${item.name}`})\n',
+  })
+
+  it('keeps the nodes of the block when the item is replaced under its key, and when its place changes', async () => {
+    const { root, dispose } = await mountForm()
+    const swap = (globalThis as unknown as { swap: (next: { id: number, name: string }[]) => void }).swap
+
+    try {
+      const first = root.querySelector<HTMLInputElement>('input[name="n1"]')!
+
+      first.focus()
+      swap([{ id: 1, name: 'a!' }, { id: 2, name: 'b' }])
+      await settle()
+      expect(root.querySelector('input[name="n1"]')).toBe(first)
+      expect(document.activeElement).toBe(first)
+      expect(first.value).toBe('0:a!')
+
+      swap([{ id: 2, name: 'b' }, { id: 1, name: 'a!' }])
+      await settle()
+      expect(root.querySelector('input[name="n1"]')).toBe(first)
+      expect(first.value).toBe('1:a!')
     }
     finally {
       await dispose()

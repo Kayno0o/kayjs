@@ -3,7 +3,7 @@ import type { JSX, Snippet } from 'kay'
 import type { IconSlot } from './defaults'
 import type { Toast } from './toast'
 import type { Tone } from './tone'
-import { effect, onMount, recipe, shortcut, signal } from 'kay'
+import { effect, followed, onMount, recipe, shortcut, signal } from 'kay'
 import { claim } from './claim'
 import { startRef } from './form-reset'
 import Button from './button.kay'
@@ -182,7 +182,7 @@ if owns()
     for item of listed() key={item.id}
       div(part="toast" data-id={item.id} data-tone={item.tone} onKeyDown={dismissed})
         if toast
-          | {toast(item, () => dismissToast(item.id, 'user'))}
+          | {followed(() => item, item => toast!(item, () => dismissToast(item.id, 'user')))}
         else
           Icon(icon={item.loading ? 'spinner' : ICONS[item.tone]} part="icon" data-loading={item.loading ? '' : undefined})
           div(part="content")

@@ -5,7 +5,7 @@ import { wording } from 'kay/words'
 import { stepHref } from './steps'
 import { loadOptions } from './options-source'
 import type { OptionsSource } from './options-source'
-import { recipe } from 'kay'
+import { followed, recipe } from 'kay'
 import Icon from './icon.kay'
 
 // 'kui-steps' stays as the component's name for an app's CSS. A numbered row, the current step marked by aria-current and the ones behind it links.
@@ -75,34 +75,35 @@ function pick(event: MouseEvent, key: string) {
     event.preventDefault()
 }
 ---
-snippet body(step: StepItem, index: number, shown: 'current' | 'done' | 'upcoming')
+// `index` and `shown` are read where they are used, so a step moving or changing state updates the body, and `step` is the real step the loop's `followed` gives. A block redraws as the state changes, as it reads it, and keeps its nodes when the step is replaced under its key.
+snippet body(step: StepItem, index: () => number, shown: () => 'current' | 'done' | 'upcoming')
   span(part="marker" aria-hidden="true")
     if step.icon
       Icon(icon={step.icon} part="icon")
     else
-      | {index + 1}
+      | {index() + 1}
   span(part="label")
     if drawStep
-      | {drawStep(step, shown)}
+      | {shown() && followed(() => step, step => drawStep!(step, shown()))}
     else if stepLabel
-      | {stepLabel(step, shown)}
+      | {shown() && followed(() => step, step => stepLabel!(step, shown()))}
     else
       | {step.label}
-  if spoken(step, shown)
-    span(part="state") {spoken(step, shown)}
+  if spoken(step, shown())
+    span(part="state") {spoken(step, shown())}
 nav(part="root" {...rest} aria-label={label} aria-busy={source.loading() ? 'true' : undefined})
   ol(part="list")
     for step, index of steps() key={step.key}
       li(part="item" data-step={state(index, step.key)} data-outcome={step.state})
         if reached(step, index) && target(step)
           a(part="link" {...target(step)} onClick={event => pick(event, step.key)})
-            {body(step, index, state(index, step.key))}
+            {followed(() => step, step => body(step, () => index, () => state(index, step.key)))}
         else if reached(step, index) && onSelect
           button(part="link" type="button" onClick={() => void onSelect?.({ key: step.key })})
-            {body(step, index, state(index, step.key))}
+            {followed(() => step, step => body(step, () => index, () => state(index, step.key)))}
         else
           span(part="link" aria-current={step.key === current ? 'step' : undefined})
-            {body(step, index, state(index, step.key))}
+            {followed(() => step, step => body(step, () => index, () => state(index, step.key)))}
   if source.loading()
     p(part="status" role="status") {loadingLabel}
   if source.failed()

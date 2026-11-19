@@ -854,49 +854,72 @@ export function withSetter<T>(read: () => T, write: (value: T) => void): Signal<
   return Object.assign(read, { set })
 }
 
-interface Following {
-  item: object
+interface Argument {
+  value: unknown
   read: () => unknown
+  taken: boolean
 }
 
-// The item being drawn by `followed`, which a block's parameter takes while the block runs.
+interface Following {
+  args: Argument[]
+  // The first place in the block's arguments not read yet: a block takes its arguments in order, so one drawn inside it finds them taken.
+  next: number
+}
+
+// The arguments being drawn by `followed`, which a block's parameters take while the block runs.
 let following: Following | undefined
 
-// kept: free, a call of the page's own draw.
-// Draws what a block shows for one item of a keyed list once, though the item is replaced by a copy under the same key: the block gets the item as it is, and what it reads of its parameter, where it is used, is the current item each time, so its nodes keep, and a field in them its focus.
-// A call made from a template would track the item it is handed and draw the block again on each replacement. Anything but an object is drawn as a call is, again when it changes.
-export function followed<Item, Drawn>(read: () => Item, draw: (item: Item) => Drawn): Drawn {
-  const first = untrack(read)
+function follow<Drawn>(reads: (() => unknown)[], draw: (...values: never[]) => Drawn): Drawn {
+  const values = untrack(() => reads.map(read => read()))
+  const first = values[0]
 
   if (typeof first !== 'object' || first === null)
-    return draw(read())
+    return draw(...reads.map(read => read()) as never[])
 
   const outer = following
 
   // An item that leaves while the block still reads it is read as it was.
-  following = { item: first, read: () => read() ?? first }
+  const args = values.map((value, place): Argument => ({ value, read: place === 0 ? () => reads[0]!() ?? first : reads[place]!, taken: false }))
+
+  following = { args, next: 0 }
 
   try {
-    return untrack(() => draw(first))
+    return untrack(() => draw(...values as never[]))
   }
   finally {
     following = outer
+
+    // What the block did not read through its parameters is its value as of the draw, so the block is drawn again when that changes.
+    for (const arg of args.filter(one => !one.taken))
+      arg.read()
   }
 }
 
-// A block's parameter as an accessor, which the compiled block reads through: the current item when `followed` gave it, else the value it was called with.
-export function param<Value>(value: Value): () => Value {
-  const at = following
-
-  return at !== undefined && at.item === value ? at.read as () => Value : () => value
+// kept: free, a call of the page's own draw.
+// Draws what a block shows for one item of a keyed list once, though the item is replaced by a copy under the same key: the block gets the item as it is, and what it reads of its parameter, where it is used, is the current item each time, so its nodes keep, and a field in them its focus.
+// A call made from a template would track the item it is handed and draw the block again on each replacement. Anything but an object is drawn as a call is, again when it changes, and so is a block that reads its parameter as it was handed.
+export function followed<Item, Drawn>(read: () => Item, draw: (item: Item) => Drawn): Drawn {
+  return follow([read], draw as (...values: never[]) => Drawn)
 }
 
-// A `slot` called with names or paths: the block, when the component was given one, draws once for the item of the first argument, and again when another argument changes.
+// A block's parameter as an accessor, which the compiled block reads through: the current value when `followed` gave it at this place in the arguments, else the value it was called with.
+export function param<Value>(value: Value, place = 0): () => Value {
+  const at = following
+  // The item is found by what it is wherever the block takes it; the other arguments by their place, once each.
+  const arg = at?.args.find((one, at0) => at0 === 0 ? one.value === value : at0 === place && at0 >= at.next && Object.is(one.value, value))
+
+  if (arg === undefined)
+    return () => value
+
+  if (arg !== at!.args[0])
+    at!.next = place + 1
+
+  arg.taken = true
+
+  return arg.read as () => Value
+}
+
+// A `slot` called with names or paths: the block, when the component was given one, draws once for the item of the first argument, each of the others read in place by a block that takes it through `param`, and drawn again when one it does not takes changes.
 export function slotCall(block: ((...args: never[]) => unknown) | undefined, first: () => unknown, ...rest: (() => unknown)[]): unknown {
-  if (block === undefined)
-    return undefined
-
-  const others = rest.map(read => read())
-
-  return followed(first, item => (block as (...args: unknown[]) => unknown)(item, ...others))
+  return block === undefined ? undefined : follow([first, ...rest], block)
 }
