@@ -868,7 +868,7 @@ export class JsxTemplate {
     const { start, end } = attribute.expression
 
     if (this.options.plain.has(this.src.slice(start, end).trim())) {
-      this.attributeName(attribute).add('={KayPlainProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
+      this.attributeName(attribute).add('={KayPlainProp(').addSource(element.tag).add(usedProps(element, span => this.text(span))).add(')((').addSource(attribute.expression).add('))}')
 
       return true
     }
@@ -884,7 +884,7 @@ export class JsxTemplate {
     this.attributeName(attribute).add('={')
 
     for (const part of sent.parts) {
-      b.addSource({ start: at, end: start + part.start }).add('KayProp(').addSource(element.tag).add(')((').addSource({ start: start + part.start, end: start + part.end }).add('))')
+      b.addSource({ start: at, end: start + part.start }).add('KayProp(').addSource(element.tag).add(usedProps(element, span => this.text(span))).add(')((').addSource({ start: start + part.start, end: start + part.end }).add('))')
       at = start + part.end
     }
 

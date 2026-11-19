@@ -898,7 +898,7 @@ describe('check-only assertions', () => {
 
     expect(checked).toContain('<a href={KayHref("/docs")}>')
     expect(checked).toContain('<input name={KayField((save), "title")} />')
-    expect(checked).toContain('<Island when={KayProp(Island)((today))} />')
+    expect(checked).toContain('<Island when={KayProp(Island, { "when": 0 })((today))} />')
     expect(checked).toContain('<Island {...KayProp(Island)((rest))} />')
   })
 
@@ -1203,12 +1203,12 @@ describe('generic components', () => {
   it('checks the parts of a literal prop a page sends, not the literal, so a generic component types it', () => {
     const check = (value: string) => (/<List items=\{(.*)\} \/>/).exec(compileKay(`---\nimport List from './list.kay'\n---\nList(items={${value}})`, '_layout.kay', { check: true }).tsx)?.[1]
 
-    expect(check('[\'a\', [x, `b`], ...rest, { n: 1, m: y, ...more }]')).toBe('[\'a\', [KayProp(List)((x)), `b`], ...KayProp(List)((rest)), { n: 1, m: KayProp(List)((y)), ...KayProp(List)((more)) }]')
-    expect(check('[ok ? [\'a\'] : z]')).toBe('[ok ? [\'a\'] : KayProp(List)((z))]')
+    expect(check('[\'a\', [x, `b`], ...rest, { n: 1, m: y, ...more }]')).toBe('[\'a\', [KayProp(List, { "items": 0 })((x)), `b`], ...KayProp(List, { "items": 0 })((rest)), { n: 1, m: KayProp(List, { "items": 0 })((y)), ...KayProp(List, { "items": 0 })((more)) }]')
+    expect(check('[ok ? [\'a\'] : z]')).toBe('[ok ? [\'a\'] : KayProp(List, { "items": 0 })((z))]')
     // An operand of `&&` keeps what it narrows, so the operation is checked whole.
-    expect(check('[a && a.b]')).toBe('[KayProp(List)((a && a.b))]')
+    expect(check('[a && a.b]')).toBe('[KayProp(List, { "items": 0 })((a && a.b))]')
     // A shorthand property, a getter or a setter has no value of its own to wrap.
-    expect(check('[{ x }, { get y() { return 1 } }, { set z(v: number) {} }]')).toBe('[KayProp(List)(({ x })), KayProp(List)(({ get y() { return 1 } })), KayProp(List)(({ set z(v: number) {} }))]')
+    expect(check('[{ x }, { get y() { return 1 } }, { set z(v: number) {} }]')).toBe('[KayProp(List, { "items": 0 })(({ x })), KayProp(List, { "items": 0 })(({ get y() { return 1 } })), KayProp(List, { "items": 0 })(({ set z(v: number) {} }))]')
   })
 
   it('checks a method in a literal prop a page sends as a function given to the component', () => {
@@ -1217,7 +1217,7 @@ describe('generic components', () => {
     expect(code).toContain('<List {...KayFunctionProp(List)(0)} items={[{ run() { return 1 } }]} />')
 
     // Beside a getter, which keeps the object whole, the check of the object covering it.
-    expect(compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[{ get n() { return 1 }, run() { return 1 } }]})', '_layout.kay', { check: true }).tsx).toContain('<List items={[KayProp(List)(({ get n() { return 1 }, run() { return 1 } }))]} />')
+    expect(compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[{ get n() { return 1 }, run() { return 1 } }]})', '_layout.kay', { check: true }).tsx).toContain('<List items={[KayProp(List, { "items": 0 })(({ get n() { return 1 }, run() { return 1 } }))]} />')
   })
 })
 

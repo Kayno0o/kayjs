@@ -160,12 +160,14 @@ describe('island-prop, decided by the types of what is passed', () => {
       'src/components/nested.kay': component('import Listed from \'./listed.kay\'', 'Listed(data={[{ run() { return 1 } }]})'),
       'src/components/default-on.kay': component('import On from \'./on.kay\'', 'On(label={row => String(row)})'),
       'src/components/spreads.kay': component('import Listed from \'./listed.kay\'\nconst more = {}', 'Listed({...more} label={row => String(row)})'),
+      'src/components/columns.kay': component('import Listed from \'./listed.kay\'\ntype Column = { key: string, sortValue?: ((row: number) => number) | true }\nconst columns: Column[] = [{ key: \'a\', sortValue: true }]\nconst computed = [{ key: \'a\', sortValue: (row: number) => -row }]', 'Listed(data={columns})\nListed(data={computed})\nListed(data={columns} selectable)\nListed(data={computed} selectable)'),
       'src/components/generic-block.kay': component('import Generic from \'./generic.kay\'', 'Generic(rows={[{ id: 1 }]})\n  @cell(row)\n    p {row.id}\n\nGeneric(rows={[{ id: 1 }]} selectable)\n  @cell(row)\n    p {row.id}\n'),
     })
 
     try {
       expect(lints(await check(root), root)).toEqual([
         ['components/client-use.kay', 'island-prop', 5],
+        ['components/columns.kay', 'island-prop', 11],
         ['components/default-on.kay', 'island-prop', 5],
         ['components/generic-block.kay', 'island-prop', 10],
         ['components/nested.kay', 'island-prop', 5],
@@ -243,8 +245,8 @@ describe('island({ render: \'static\' }), and a component with no pin, both left
   })
 
   it('types what it passes an island as a static component, pinned or not', () => {
-    expect(compileKay(passing('island({ render: \'static\' })'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker)')
-    expect(compileKay(passing('---'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker)')
+    expect(compileKay(passing('island({ render: \'static\' })'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker, ')
+    expect(compileKay(passing('---'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker, ')
     expect(compileKay('---\nisland({ render: \'static\' })\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker, ')
     expect(compileKay('---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker, ')
   })

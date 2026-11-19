@@ -55,7 +55,7 @@ interface IslandAsked<Interactive extends Readonly<Record<string, boolean>>>
 interface IslandBrand
 
 [.] PlainIslandProp
-type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> : unknown
+type PlainIslandProp<Component, Value, Names extends object = Record<string, unknown>> = Component extends IslandBrand ? true extends StaysPlain<Component, keyof Names> ? unknown : SecretProp<Value> : unknown
 
 [.] SlotCall
 type SlotCall = (...args: any[]) => JSX.Element

@@ -647,7 +647,7 @@ interface IslandOptions
   render?: unknown
 
 [.] IslandProp
-type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value> : unknown
+type IslandProp<Component, Value, Names extends object = Record<string, unknown>> = Component extends IslandBrand ? true extends StaysPlain<Component, keyof Names> ? unknown : [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value> : unknown
 
 [.] Issue
 interface Issue

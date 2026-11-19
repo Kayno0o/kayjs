@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- A page's `Table` that renders as plain markup passes `kay check` with its columns typed `Column<Row>[]`, or holding a function `sortValue`, instead of `island-prop`: a use turning no interactive prop on sends nothing, so the type of a variable it is given is no longer read as data ([islands](islands.md#make-a-component-interactive)).
+
 ## 1.112.0
 
 - kayjs-ui's `starfield` utility is removed with `@kayjs/ui/starfield.css` and its `--color-star*` tokens, and `kay new` no longer puts stars behind the page: the fixed layer kept the GPU compositing and made pages lag on a machine short of video memory ([upgrading](upgrading.md)).
