@@ -10,7 +10,7 @@ import { toast } from '@kayjs/ui'
 const version = signal(0)
 const nodes = () => [{ key: 'n', label: `Node${version()}` }]
 const steps = () => [{ key: 's', label: `Step${version()}` }]
-const rows = () => [{ id: 'r', name: `Row${version()}` }]
+const rows = () => [...version() === 0 ? [] : [{ id: 'p', name: 'Pushed' }], { id: 'r', name: `Row${version()}` }]
 const id = toast.info('Toast0', { duration: false })
 ---
 button#bump(type="button" onClick={() => { version++; toast.update(id, { message: `Toast${version()}` }) }}) Bump
@@ -23,8 +23,8 @@ Steps(items={steps()} current="s" label="Steps")
   @step(step)
     input(data-block="step" aria-label="step" value={step.label})
 VirtualList(items={rows()} itemKey={row => row.id} label="Rows" estimate={20})
-  @item(row)
-    input(data-block="virtual" aria-label="virtual" value={row.name})
+  @item(row, index)
+    input(data-block="virtual" aria-label="virtual" value={row.name} data-index={String(index)})
 Toaster
   @toast(item)
     input(data-block="toast" aria-label="toast" value={String(item.message)})

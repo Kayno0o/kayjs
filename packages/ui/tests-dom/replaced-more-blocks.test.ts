@@ -29,7 +29,7 @@ describe('Tree, steps, virtual list and toaster blocks, the items replaced with 
 
     const { root } = mounted
     const kinds = ['tree', 'actions', 'step', 'virtual', 'toast']
-    const find = (kind: string) => root.querySelector<HTMLInputElement>(`input[data-block=${kind}]`)
+    const find = (kind: string) => [...root.querySelectorAll<HTMLInputElement>(`input[data-block=${kind}]`)].at(-1)
     const before = kinds.map(find)
 
     expect(kinds.filter((_, index) => !before[index])).toEqual([])
@@ -38,6 +38,7 @@ describe('Tree, steps, virtual list and toaster blocks, the items replaced with 
     await settle()
 
     expect(kinds.filter((kind, index) => find(kind) !== before[index])).toEqual([])
+    expect(find('virtual')!.dataset.index).toBe('1')
     expect(kinds.map(kind => find(kind)!.value.slice(-1))).toEqual(['1', '1', '1', '1', '1'])
   })
 })

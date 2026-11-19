@@ -898,8 +898,8 @@ function follow<Drawn>(reads: (() => unknown)[], draw: (...values: never[]) => D
 // kept: free, a call of the page's own draw.
 // Draws what a block shows for one item of a keyed list once, though the item is replaced by a copy under the same key: the block gets the item as it is, and what it reads of its parameter, where it is used, is the current item each time, so its nodes keep, and a field in them its focus.
 // A call made from a template would track the item it is handed and draw the block again on each replacement. Anything but an object is drawn as a call is, again when it changes, and so is a block that reads its parameter as it was handed.
-export function followed<Item, Drawn>(read: () => Item, draw: (item: Item) => Drawn): Drawn {
-  return follow([read], draw as (...values: never[]) => Drawn)
+export function followed<Item, Drawn, Rest extends unknown[] = []>(read: () => Item, draw: (item: Item, ...rest: Rest) => Drawn, ...others: { [Place in keyof Rest]: () => Rest[Place] }): Drawn {
+  return follow([read, ...others], draw as unknown as (...values: never[]) => Drawn)
 }
 
 // A block's parameter as an accessor, which the compiled block reads through: the current value when `followed` gave it at this place in the arguments, else the value it was called with.

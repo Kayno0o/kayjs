@@ -129,6 +129,19 @@ describe('a slot called with more than the item', () => {
     expect([reads![0]().name, reads![1]()]).toEqual(['b', 1])
   })
 
+  it('hands the reads after the draw to the block as its other arguments', () => {
+    const item = signal<Item>({ id: 1, name: 'a' })
+    const index = signal(0)
+    let read: (() => number) | undefined
+
+    root(() => followed(item, (card, at: number) => {
+      param(card)
+      read = param(at, 1)
+    }, index))
+    index.set(3)
+    expect(read!()).toBe(3)
+  })
+
   it('finds the item wherever the block takes it', () => {
     const item = signal<Item>({ id: 1, name: 'a' })
     let read: (() => Item) | undefined
