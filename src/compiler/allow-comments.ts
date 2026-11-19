@@ -15,6 +15,7 @@ export interface AllowRules {
 // A lint's name starts with a letter, so the `--` of a reason is never read as one: `// kay-allow a, b -- why`.
 const ALLOW_COMMENT = /\/\/[ \t]*(kay-allow(?:-file)?)[ \t]+(\w[\w-]*(?:[ \t]*,[ \t]*\w[\w-]*)*)([^\n]*)/g
 const LINT_NAME = /[\w-]+/g
+const BLANK_END = /[ \t]*$/
 const REASON = /^[ \t]*--[ \t]*\S/
 
 export interface AllowComment {
@@ -49,7 +50,7 @@ export function unknownNames(comment: AllowComment, source: string, known: (name
   const lineStart = source.lastIndexOf('\n', comment.start - 1) + 1
   const whole = source.slice(lineStart, comment.start).trim() === ''
   const after = comment.end + (source.startsWith('\r\n', comment.end) ? 2 : Number(source[comment.end] === '\n'))
-  const before = comment.start - (/[ \t]*$/.exec(source.slice(lineStart, comment.start))?.[0].length ?? 0)
+  const before = comment.start - (BLANK_END.exec(source.slice(lineStart, comment.start))?.[0].length ?? 0)
   const last = comment.names.at(-1)!
 
   return unknown.map(({ name, start }): Diagnostic => {
