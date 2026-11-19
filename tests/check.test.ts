@@ -4550,6 +4550,19 @@ describe.concurrent('kay check, unused code', () => {
     })
   })
 
+  it('warns about a lint kay removed in the config, without refusing it', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p a\n', 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lints: { \'deprecated-package-names\': \'allow\' } })\n' })
+
+    try {
+      expect((await check(root, { lints: { 'deprecated-package-names': 'allow' } })).map(d => [basename(d.file), d.severity, d.message, d.help])).toEqual([
+        ['kay.config.ts', 'warning', '`lints` names `deprecated-package-names`, a lint kay has removed with the form it reported', 'remove the entry: it changes nothing'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a lint or a level the config names that kay does not have', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n' })
 

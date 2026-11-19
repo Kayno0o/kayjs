@@ -1,5 +1,6 @@
 import type { AllowRules } from './allow-comments'
 import type { Diagnostic, ElementNode, ForNode, KayFile, TextChunk } from './ast'
+import type { RemovedLintName } from './removed-lints'
 import type { Scope } from './template-scopes'
 import { accessibilityLints, MARKUP_LINTS } from './a11y'
 import { allowComments, honoured, refusedComments } from './allow-comments'
@@ -686,8 +687,8 @@ export const LINTS = {
 export type LintName = keyof typeof LINTS
 
 // `satisfied` is set by kay from the extensions' `satisfies`, never written in `kay.config.ts`: the lints an extension answers for a place it fills in by itself.
-// `comments` is no lint's level: it sets what a `// kay-allow` comment must hold to count.
-export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>> & { satisfied?: LintName[] | undefined, comments?: AllowRules | undefined }
+// `comments` is no lint's level: it sets what a `// kay-allow` comment must hold to count. A removed lint is still accepted, warned about by `kay check`.
+export type LintLevels = Partial<Record<LintName | LintGroup | RemovedLintName, LintLevel>> & { satisfied?: LintName[] | undefined, comments?: AllowRules | undefined }
 
 export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
 
@@ -716,8 +717,6 @@ export function isLint(code: string | undefined): code is LintName {
 export const UPGRADE_FROM = 'KAY_UPGRADE_FROM'
 
 export { DEPRECATION_MINORS } from './deprecated-lints'
-
-export { minorAfter, minorOf } from './minor'
 
 export function isLintGroup(name: string | undefined): name is LintGroup {
   return name !== undefined && Object.hasOwn(LINT_GROUPS, name)

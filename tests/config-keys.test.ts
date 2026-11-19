@@ -42,6 +42,10 @@ describe('the grouped config keys', () => {
 })
 
 describe('the unknown keys defineConfig refuses by type', () => {
+  it('takes the name of a lint kay removed, which `kay check` warns of', () => {
+    expect(defineConfig({ lints: { 'deprecated-package-names': 'allow' } })).toBeDefined()
+  })
+
   it('checks every option bag of the config, at any depth, with no list of them', () => {
     // @ts-expect-error a mistyped key of a bag the type once left unchecked
     expect(defineConfig({ assets: { images: { widht: 1 } } })).toBeDefined()

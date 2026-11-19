@@ -19,6 +19,7 @@ import { importedSignals } from '../build/signals'
 import { browserRole, onceReadChecks } from '../compiler'
 import { moduleChecks, turnsCaptchaOff } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
+import { REMOVED_LINTS } from '../compiler/removed-lints'
 import { CONFIG_FILE } from '../config'
 import { EXTENSIONS_MARKER, FEEDS_MARKER, PROBLEMS_MARKER, ROUTES_MARKER, USES_MARKER } from '../content/claims'
 import { projectPaths } from '../project'
@@ -294,6 +295,9 @@ function lintConfigProblems(root: string, lints: LintLevels = {}): CheckDiagnost
 
   return levelEntries(lints).flatMap(([name, level]) => {
     const at = { file, ...locate(['lints', name]) }
+
+    if ((REMOVED_LINTS as readonly string[]).includes(name))
+      return [{ ...at, severity: 'warning' as const, message: `\`lints\` names \`${name}\`, a lint kay has removed with the form it reported`, help: 'remove the entry: it changes nothing' }]
 
     if (!isLint(name) && !isLintGroup(name))
       return [{ ...at, message: `\`lints\` names \`${name}\`, which is no lint or group`, help: '`kay explain` lists them' }]
