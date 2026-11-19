@@ -53,6 +53,8 @@ bun run dev
 kay new my-app --template app --without docker
 ```
 
+The folder has to be new or empty. A fresh clone of a new repo works too, as `kay new .` in it: `.git` stays, so does the `origin` that picks the CI host, and a `README.md`, a licence file or a `.gitattributes` the forge made are kept. The forge's `.gitignore` is replaced by the project's. Any other file stops `kay new`, which names the first ones in the way.
+
 | Option | Effect |
 | --- | --- |
 | `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with kayjs-auth sign-in and a websocket island |

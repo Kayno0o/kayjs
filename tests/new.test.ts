@@ -663,10 +663,43 @@ describe('kay command line', () => {
 
       expect(await Promise.all([kay(['new', 'afile'], dir), kay(['new', 'full'], dir)])).toEqual([
         { stdout: '', stderr: 'kay: afile is not a directory\n', code: 1 },
-        { stdout: '', stderr: 'kay: full is not empty\n', code: 1 },
+        { stdout: '', stderr: 'kay: full is not empty: keep.txt in the way\n', code: 1 },
       ])
       expect(await Bun.file(join(dir, 'afile')).text()).toBe('x')
       expect(await readdir(join(dir, 'full'))).toEqual(['keep.txt'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('kay new in a fresh clone', () => {
+  it('scaffolds in place over what a fresh forge repo holds, keeping .git, the README and the licence', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-clone-'))
+
+    try {
+      await Promise.all([Bun.write(join(dir, '.git/HEAD'), 'ref: refs/heads/main\n'), Bun.write(join(dir, 'README.md'), '# mine\n'), Bun.write(join(dir, 'LICENSE'), 'MIT\n'), Bun.write(join(dir, '.gitignore'), 'old\n')])
+
+      expect(await createProject(dir, { features: PRESETS.site.features, kay: '^1.0.0' })).toContain('package.json')
+      expect(await Bun.file(join(dir, '.git/HEAD')).text()).toBe('ref: refs/heads/main\n')
+      expect(await Bun.file(join(dir, 'README.md')).text()).toBe('# mine\n')
+      expect(await Bun.file(join(dir, 'LICENSE')).text()).toBe('MIT\n')
+      expect(await Bun.file(join(dir, '.gitignore')).text()).toContain('node_modules')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('refuses a folder with anything else beside .git, naming the first entries in the way, and writes nothing', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-clone-'))
+
+    try {
+      await Promise.all([Bun.write(join(dir, '.git/HEAD'), 'x'), ...['a', 'b', 'c', 'd', 'e', 'f'].map(async name => Bun.write(join(dir, name), name))])
+
+      await expect(createProject(dir, { features: PRESETS.site.features, kay: '^1.0.0' })).rejects.toThrow('is not empty: a, b, c, d, e, and 1 more in the way')
+      expect((await readdir(dir)).sort()).toEqual(['.git', 'a', 'b', 'c', 'd', 'e', 'f'])
     }
     finally {
       await rm(dir, { recursive: true, force: true })

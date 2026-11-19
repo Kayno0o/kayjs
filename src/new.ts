@@ -130,15 +130,27 @@ export async function originHost(dir: string): Promise<Host | undefined> {
   }
 }
 
-// Refuses a target `kay new` would write over: a file, or a directory that already holds files.
+// What a fresh clone of a new forge repo holds besides `.git`: a folder with only these is scaffolded in place. A file the template writes too (`.gitignore`) is replaced, one it does not (`README.md`, the licence) is kept.
+const FRESH_REPO_ENTRY = /^(?:\.git|README(?:\.\w+)?|LICENSE(?:[-.].+)?|\.gitignore|\.gitattributes)$/i
+
+// Refuses a target `kay new` would write over: a file, or a directory that holds anything but what a fresh clone does.
 export async function refuseTarget(target: string): Promise<void> {
   const dir = resolve(target)
 
-  if (existsSync(dir) && !statSync(dir).isDirectory())
+  if (!existsSync(dir))
+    return
+
+  if (!statSync(dir).isDirectory())
     throw new Error(`kay: ${target} is not a directory`)
 
-  if (existsSync(dir) && (await readdir(dir)).length > 0)
-    throw new Error(`kay: ${target} is not empty`)
+  const inTheWay = (await readdir(dir)).filter(entry => !FRESH_REPO_ENTRY.test(entry)).sort()
+
+  if (inTheWay.length === 0)
+    return
+
+  const shown = inTheWay.slice(0, 5).join(', ')
+
+  throw new Error(`kay: ${target} is not empty: ${shown}${inTheWay.length > 5 ? `, and ${inTheWay.length - 5} more` : ''} in the way`)
 }
 
 // Whether `kay new` adds the feature through `kay add` after scaffolding: a library's, but for a templated one whose files the templates write.
