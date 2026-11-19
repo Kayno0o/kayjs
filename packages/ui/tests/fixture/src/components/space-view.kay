@@ -11,7 +11,7 @@ import Select from '@kayjs/ui/select.kay'
 const kinds = [{ value: 'post', label: 'Post' }, { value: 'page', label: 'Page' }]
 ---
 //- The space skin over the controls it redraws, for the browser test to read and axe to check.
-main.starfield.flex.flex-col.items-start.gap-4.p-8
+main.bg-background.flex.flex-col.items-start.gap-4.p-8
   h1 Space skin
   Checkbox(inputProps={{ id: 'ticked' }} label="Ticked" checked)
   Checkbox(inputProps={{ id: 'plain' }} label="Plain")

@@ -1,4 +1,3 @@
-import { dirname, resolve } from 'node:path'
 import { describe, expect, test } from 'bun:test'
 import { compileKay } from 'kay/compiler'
 import { compile } from 'tailwindcss'
@@ -265,18 +264,9 @@ function blockOf(css: string, selector: string): string | undefined {
   return undefined
 }
 
-// Tailwind's theme for every import, except the starfield stylesheet a skin imports, which is the file itself.
+// Tailwind's theme for every import.
 function sheets(tailwind: string) {
-  return async (id: string, base: string) => {
-    const path = id.endsWith('starfield.css') ? `${ROOT}src/starfield.css` : tailwind
-
-    return { path, base, content: await Bun.file(path).text() }
-  }
-}
-
-// A skin's text with its starfield import written out, as the tests join skins after the theme, where an @import is no longer first.
-async function inlined(skin: string): Promise<string> {
-  return skin.replace('@import \'../starfield.css\';', () => '').concat(await Bun.file(`${ROOT}src/starfield.css`).text())
+  return async (_id: string, base: string) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() })
 }
 
 // The CSS the utilities generate beyond the theme's own rules, which hold the same declarations for the old kui- classes.
@@ -809,13 +799,12 @@ describe('theme.css', () => {
     expect(await built(await Bun.file(`${ROOT}src/skins/brutalist.css`).text())).toContain('--font-label: var(--font-mono)')
   })
 
-  test('ships the space skin as one scheme with a starfield utility, keys, drawn checkboxes and themed selects, each overridable after it', async () => {
+  test('ships the space skin as one scheme with keys, drawn checkboxes and themed selects, each overridable after it', async () => {
     const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${await inlined(skin)}\n@theme { --color-accent: red; }\n@tailwind utilities;`, { base: ROOT, loadStylesheet: sheets(tailwind) })
-    const css = compiler.build(['starfield'])
+    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}\n@theme { --color-accent: red; }\n@tailwind utilities;`, { base: ROOT, loadStylesheet: sheets(tailwind) })
+    const css = compiler.build([])
 
-    expect(css).toMatch(/\.starfield \{[\s\S]*?background-size: 173px 173px, 173px 173px, 173px 173px, 241px 241px[^;]*461px 461px/)
     expect(css).toMatch(/data-theme=.light.\][^{]*\{\s*color-scheme: dark/)
     expect(skin).toContain('--font-sans: \'Space Grotesk\'')
     expect(css).toContain('--color-accent: red')
@@ -858,87 +847,11 @@ describe('theme.css', () => {
     expect(sourceOf('card')).toMatch(/border-\[length:var\(--border-width\)\]/)
   })
 
-  test('scatters the starfield with random() only inside @supports, reading the star tokens, and leaves the tiles as they are outside it', async () => {
-    const sky = await Bun.file(`${ROOT}src/starfield.css`).text()
-    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${sky}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: sheets(tailwind) })
-    const css = compiler.build(['starfield'])
-    const start = sky.indexOf('@supports (top: random(0px, 1px))')
-    const scatter = sky.slice(start)
-    const tiles = sky.slice(0, sky.lastIndexOf('/*', start))
-
-    expect(start).toBeGreaterThan(0)
-    expect(css).toContain('@supports (top: random(0px, 1px))')
-    // One box-shadow list of about 270 stars on a 1px fixed box, with no tiles.
-    expect(scatter).toMatch(/background-image: none/)
-    expect(scatter).toMatch(/width: 1px;\s*height: 1px/)
-    expect(scatter).toMatch(/box-shadow: var\(--w64\), var\(--w64\), var\(--w64\),/)
-    for (const token of ['--color-star)', '--color-star-cool)', '--color-star-warm)']) expect(scatter).toContain(`var(${token}`)
-    expect(scatter).not.toMatch(/rgb\(|#[0-9a-f]{3,6}/i)
-    expect(scatter.match(/random\(/g)!.length).toBeGreaterThan(16)
-
-    // Outside the block: the eleven tiled dots over four prime sizes, and nothing of the scatter.
-    expect(tiles.match(/radial-gradient\(/g)).toHaveLength(11)
-    expect(tiles).toMatch(/background-size:\s*173px 173px,\s*173px 173px,\s*173px 173px,\s*241px 241px,\s*241px 241px,\s*241px 241px,\s*337px 337px,\s*337px 337px,\s*337px 337px,\s*461px 461px,\s*461px 461px;/)
-    expect(tiles).not.toContain('random(')
-    expect(tiles).not.toContain('box-shadow')
-  })
-
-  test('ships the starfield alone, its dots reading --color-star tokens that follow the scheme and stand off the ground in both', async () => {
-    const sky = await Bun.file(`${ROOT}src/starfield.css`).text()
-    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${sky}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: sheets(tailwind) })
-    const css = compiler.build(['starfield'])
-    const stars = withSkin(sky)
-
-    expect(css).toMatch(/\.starfield \{[^}]*&::before \{[^}]*position: fixed/)
-    expect(css).toContain('var(--color-star-cool)')
-    expect(css).toContain('var(--color-star-warm)')
-    expect(css).toContain('--color-star: light-dark(')
-    expect(sky).not.toContain('color-scheme')
-    expect(sky).not.toMatch(/glow|drop-shadow/)
-    expect(sky).not.toMatch(/rgb\(/)
-
-    for (const scheme of [0, 1] as const) {
-      for (const name of ['star', 'star-cool', 'star-warm']) {
-        for (const ground of ['background', 'surface']) {
-          const under = colour(ground, scheme, undefined, stars)
-
-          expect(contrast(colour(name, scheme, under, stars), under), `${name} on ${ground} (${scheme})`).toBeGreaterThanOrEqual(4.5)
-        }
-      }
-    }
-
-    // The space skin imports it and keeps its dark ground.
-    const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
-
-    expect(skin).toContain('@import \'../starfield.css\'')
-    expect(skin).not.toContain('@utility starfield')
-  })
-
-  test('builds the starfield once for an app importing both its stylesheet and the space skin', async () => {
-    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-    const both = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n@import './src/starfield.css';\n@import './src/skins/space.css';\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (id, base) => {
-      const path = id === 'tailwindcss/theme.css' ? tailwind : resolve(base, id)
-
-      return { path, base: dirname(path), content: await Bun.file(path).text() }
-    } })
-    const css = both.build(['starfield'])
-
-    expect(css.split('.starfield {').length - 1).toBe(1)
-    expect(css.split('--color-star: light-dark(').length - 1).toBe(1)
-  })
-
-  test('lets an app\'s plain class beat the space skin, and gives its starfield a ground and a fixed ::before layer and its checkbox a hover', async () => {
+  test('lets an app\'s plain class beat the space skin, and gives its checkbox a hover', async () => {
     const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${await inlined(skin)}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: sheets(tailwind) })
-    const css = compiler.build(['starfield'])
-
-    expect(css).toMatch(/\.starfield \{[^}]*background-color: var\(--color-background\)/)
-    expect(css).toMatch(/\.starfield \{[^}]*isolation: isolate/)
-    expect(css).toMatch(/\.starfield \{[^}]*&::before \{[^}]*position: fixed;[^}]*inset: 0;[^}]*z-index: -1;[^}]*pointer-events: none/)
-    expect(skin).not.toContain('background-attachment')
+    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${skin}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: sheets(tailwind) })
+    const css = compiler.build([])
 
     // Every selector of the skin as compiled, nested rules (option states, checkbox, picker) resolved against their parents: one class at most, two for the key's hover as the theme's own.
     const selectors = resolvedSelectors(css.replaceAll(/\/\*[\s\S]*?\*\//g, '')).filter(selector => selector.includes('.kui-') || selector.includes('select'))

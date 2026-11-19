@@ -65,7 +65,7 @@ Set them on `:root` or `html`, as `@theme` does: a seed set on one element does 
 
 Labels, headings and table heads are uppercase unless `--label-case` is `none`, and `--font-label` sets their font. Three skins ship, `@kayjs/ui/skins/brutalist.css` (which sets the three shadow tokens below), `soft.css` and `space.css`, imported after `theme.css`; an app importing none keeps the default theme, and your own `@theme` after one wins.
 
-The space skin is dark only: a near-black background, a starlight accent, red kept for errors, and every box framed by a 1px hairline over a lifted fill, with no shadows. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, selects are themed, and the `starfield` class paints tiled dots behind a page or a section. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
+The space skin is dark only: a near-black background, a starlight accent, red kept for errors, and every box framed by a 1px hairline over a lifted fill, with no shadows. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, and selects are themed. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
 
 Besides its colours, the space skin sets these, so an override of yours knows what it changes:
 
@@ -80,18 +80,7 @@ Soft sets `--label-case`, `--tracking-label` and `--shadow-raised`. Brutalist se
 
 A skin's rules sit at one class of specificity or none, so a rule of yours with one class in `@layer components` beats them. Unlayered CSS and the classes of `src/ui.ts` already did. The key's hover is the one exception, at two classes like the theme's own.
 
-`starfield` sets `--color-background` and `isolation: isolate` on the element and draws eleven dots in three tints on its `::before`, a fixed layer behind the content, so an app that styles `.starfield::before` knows. `class="starfield bg-surface"` changes the ground. Where the browser supports `random()`, the sky is about 270 stars scattered over the viewport, as one `box-shadow` list on a 1px `::before` painted once, instead of tiles.
-
-A `background-image` list of your own on `.starfield::before` belongs in `@supports not (top: random(0px, 1px))`, or it paints onto that 1px box.
-
-The utility also works without the space skin, in light and dark. Import `@kayjs/ui/starfield.css` after the theme and put `class="starfield"` on `body`: your fonts and `color-scheme` stay, and the dots follow the scheme, white by night and ink by day. They read `--color-star`, `--color-star-cool` and `--color-star-warm`, so a `@theme` of yours retints the sky without restyling `::before`.
-
-```css
-@import '@kayjs/ui/theme.css';
-@import '@kayjs/ui/starfield.css';
-```
-
-Add the one line to `src/app.css`, after the theme import (an app using `ui()` has the theme already, so it goes after `@import 'tailwindcss'`):
+Import the space skin in `src/app.css`, after the theme import (an app using `ui()` has the theme already, so it goes after `@import 'tailwindcss'`):
 
 ```css
 @import '@kayjs/ui/skins/space.css';

@@ -2,6 +2,12 @@
 
 What each release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a version missing here broke nothing. Through 1.x a breaking change ships in a minor; from 2.0.0 it ships in a major, and a minor or a patch breaks nothing.
 
+## 1.112.0
+
+### kayjs-ui's `starfield` utility is removed
+
+`@kayjs/ui/starfield.css`, the `starfield` class and the `--color-star`, `--color-star-cool` and `--color-star-warm` tokens are gone, and the space skin no longer draws stars: its fixed full-viewport layer kept the GPU compositing on every scroll and made pages lag on a machine short of video memory. Tailwind now stops the build with `Cannot apply unknown utility class starfield`: delete the `@import '@kayjs/ui/starfield.css'` line, and replace `starfield` with `bg-background` wherever a class list or an `@apply` names it, such as the `body` rule a `kay new` app with `ui` has in `src/app.css`. The space skin keeps its near-black ground.
+
 ## 1.111.0
 
 ### kay needs Bun 1.4.5

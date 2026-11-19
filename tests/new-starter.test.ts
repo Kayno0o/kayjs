@@ -30,7 +30,6 @@ describe('the starter', () => {
       expect(files['src/app.css']).toContain('@import \'@kayjs/ui/skins/space.css\';')
       expect(files['src/app.css']).toContain('--color-background: #090a10;')
       expect(files['src/app.css']).toContain('--color-foreground: #d8dbe6;')
-      expect(files['src/app.css']).toMatch(/body \{\s*@apply starfield /)
       expect(files['src/app.css']).not.toContain('body::before')
       // A static export holds no extension's API routes, so a site imports the theme where a server mounts it.
       expect(files['kay.config.ts']!.includes('ui()')).toBe(preset.features.includes('server'))
@@ -42,7 +41,7 @@ describe('the starter', () => {
     }
   })
 
-  it('paints the starfield on the body through the utility of kayjs-ui, as built CSS', async () => {
+  it('builds the stylesheet of the starter over the space skin of kayjs-ui, its body on the skin\'s ground', async () => {
     const files = await projectFiles('/x/app', new Set<Feature>(PRESETS.app.features), '^1.0.0')
     const root = new URL('..', import.meta.url).pathname
     const compiler = await compile(files['src/app.css']!, {
@@ -55,9 +54,8 @@ describe('the starter', () => {
     })
     const css = compiler.build([])
 
-    expect(css).toMatch(/body \{[^}]*isolation: isolate/)
-    expect(css).toMatch(/body \{[\s\S]*?&::before \{[^}]*position: fixed/)
-    expect(css).toContain('var(--color-star')
+    expect(css).toMatch(/body \{[^}]*background-color: var\(--color-background\)/)
+    expect(css).toContain('--color-background: #090a10')
   })
 
   // `text-base` is also the 1rem font size, so a colour named like a size paints text that colour (#3294).

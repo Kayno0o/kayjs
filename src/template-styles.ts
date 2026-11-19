@@ -47,7 +47,7 @@ const ACCENT_COLOURS = {
   coral: '#f27b72',
 }
 
-// The look of orbit's apps: kayjs-ui's space skin over a near-black palette, a hairline on every box, kayjs-ui's `starfield` behind the page, and an accent the picker in the header changes.
+// The look of orbit's apps: kayjs-ui's space skin over a near-black palette, a hairline on every box, and an accent the picker in the header changes.
 // The colours carry kayjs-ui's names (`background`, `foreground`, `border`), none of them one of Tailwind's own utilities such as `text-base`.
 export function tailwindCss({ has }: Setup): string {
   const ui = has('ui')
@@ -83,7 +83,7 @@ ${has('accents') ? '\n  /* The accent picker sets --accent on the page. */\n  --
 }`,
     `@layer base {
   body {
-    @apply ${ui ? 'starfield ' : ''}flex min-h-screen flex-col bg-background font-sans text-foreground;
+    @apply flex min-h-screen flex-col bg-background font-sans text-foreground;
   }
 
   a {
