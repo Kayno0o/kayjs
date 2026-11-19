@@ -128,6 +128,23 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a refresh 
     }
   }, 60_000)
 
+  it('keeps the text typed into a row with no id whose form carries a time stamp that changes on each render', async () => {
+    const site = await testSite({ root: 'tests/fixtures/scroll-anchor', browser: { path } })
+
+    try {
+      const page = await site.open('/stamped')
+
+      await Bun.sleep(1100)
+      await refreshWhileTyping(page, 10, 35, 'kept', 'plain')
+
+      expect(await notes(page)).toEqual(['10'])
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+
   it('keeps the text typed into a row the refresh renders afresh', async () => {
     const site = await testSite({ root: 'tests/fixtures/scroll-anchor', browser: { path } })
 

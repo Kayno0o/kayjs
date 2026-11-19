@@ -22,6 +22,9 @@ export function placeOf(element: Element | null | undefined): number | undefined
   return name === '' || !element?.isConnected ? undefined : Array.from<Element>(document.getElementsByName(name)).indexOf(element)
 }
 
+// The time stamp kay writes into a form of an action with `minTime`, new on every render, so it tells no row apart (`STAMP_FIELD` in action-form.ts, kept apart as form-protect.ts does).
+const STAMP_FIELD = 'kay_since'
+
 // What a form is by: its id, else its action with the hidden fields it posts, which a row's form carries its key in.
 function formKey(form: HTMLFormElement): string | undefined {
   const id = form.getAttribute('id')
@@ -29,7 +32,7 @@ function formKey(form: HTMLFormElement): string | undefined {
   if (id !== null && id !== '')
     return `#${id}`
 
-  const hidden = Array.from(form.querySelectorAll<HTMLInputElement>('input[type=hidden]'), input => `${input.name}=${input.value}`)
+  const hidden = Array.from(form.querySelectorAll<HTMLInputElement>(`input[type=hidden]:not([name="${STAMP_FIELD}"])`), input => `${input.name}=${input.value}`)
 
   return hidden.length === 0 ? undefined : `${form.getAttribute('action')}?${hidden.join('&')}`
 }

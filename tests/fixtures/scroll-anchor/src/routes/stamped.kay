@@ -1,0 +1,20 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+const rows = Array.from({ length: 40 }, (_, at) => at + 1)
+
+// A row posted is dropped from the list; the form carries the time stamp of `minTime`, new on every render.
+export const sort = action({ input: t.Object({ id: t.String() }), protect: { minTime: '1ms' } }, ({ id }) => {
+  rows.splice(rows.indexOf(Number(id)), 1)
+})
+---
+head
+  title Stamped rows
+h1 Stamped rows
+ul#list
+  for id of rows
+    li(key={id})
+      form(data-row={id} action={sort} style="display: block; height: 56px; margin: 0")
+        input(type="hidden" name="id" value={id})
+        input(type="text" name="note" class={`n${rows.length}`} aria-label={`Note ${id}`})
