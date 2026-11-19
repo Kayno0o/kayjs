@@ -446,7 +446,7 @@ a(href="/logout" data-prefetch="false") Sign out
 
 ### Forms and a full load
 
-A form posting to an action posts without a reload and shows the page the post leads to. A refused post keeps the scroll and the typed values.
+A form posting to an action posts without a reload and shows the page the post leads to. A refused post keeps the scroll and the typed values, and so does a post back to the same page, even when it drops the row it was sent from. The focus then goes to the field of the same name that took the dropped one's place.
 
 With `client: { navigation: false }` in `kay.config.ts`, every page loads fully and only pages with islands ship a script. A form then posts as the browser would, and names its page in a `kay_back` query parameter. A refused post renders that page again with the message, and one that goes through goes back to it.
 

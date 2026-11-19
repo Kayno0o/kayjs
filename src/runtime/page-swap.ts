@@ -7,7 +7,7 @@ import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
 import { abandon, HTML, ownOrigin, pageFor, pageTimeout } from './swap-fetch'
 import { bounded, CHUNK_TIMEOUT_MS, ENTRY_SCRIPT, inFlight, LATE, policyOf } from './swap-flight'
-import { keepTyped, moveFocus, watchTyped } from './swap-focus'
+import { keepTyped, moveFocus, placeOf, watchTyped } from './swap-focus'
 import { mergeHead, runnable, scriptMarkup, swapRoot } from './swap-head'
 import { checkKept, heldLate, holding, swapBody } from './swap-kept'
 import { MISSING } from './swap-morph'
@@ -440,6 +440,8 @@ async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: 
     root()
     head.commit()
     inFlight.typing = swap.intent === 'refresh' || (process.env.NODE_ENV !== 'production' && navigation.typed === true)
+
+    swap.place = placeOf(swap.focused)
 
     try {
       swapBody(next, policy, held, left)

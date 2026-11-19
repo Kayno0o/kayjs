@@ -162,6 +162,8 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
       script.replaceWith(runnable(script, markup))
   }
 
+  const release = holdScroll(policy)
+
   // The server writes `<body>` bare, so every attribute it holds is a script's.
   try {
     scoped.on = left !== undefined
@@ -177,6 +179,8 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
   finally {
     scoped.on = false
     parking?.remove()
+
+    release()
   }
 
   for (const [element, [left, top]] of scrolls) {
@@ -203,6 +207,22 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
   if (policy.scroll === 'top') {
     for (let parent = (document.querySelector('[autofocus]') ?? document.querySelector('h1'))?.parentElement; parent && parent !== document.body; parent = parent.parentElement)
       parent.scrollTo(0, 0)
+  }
+}
+
+// Chrome's scroll anchoring follows an anchor node the morph moves or drops, and lands the window elsewhere, the end of a list of rows for one: it is off while the morph runs, and a position a refresh keeps is put back after, which the returned function does.
+function holdScroll(policy: Policy): () => void {
+  const root = document.documentElement
+  const anchoring = root.style.overflowAnchor
+  const { scrollX: x, scrollY: y } = window
+
+  root.style.overflowAnchor = 'none'
+
+  return () => {
+    if (policy.scroll === 'keep' && (scrollX !== x || scrollY !== y))
+      scrollTo({ left: x, top: y, behavior: 'instant' })
+
+    root.style.overflowAnchor = anchoring
   }
 }
 

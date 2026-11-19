@@ -15,10 +15,19 @@ interface Typed { value: string, start: number | null, end: number | null, direc
 
 const noteOf = (field: Field): Typed => ({ value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection ?? 'none' })
 
-function byName(element: Element | null): Element | null {
+// The element's place in document order among the fields of its name, read before a swap removes it.
+export function placeOf(element: Element | null | undefined): number | undefined {
   const name = element?.getAttribute('name') ?? ''
 
-  return name === '' ? null : document.getElementsByName(name)[0] ?? null
+  return name === '' || !element?.isConnected ? undefined : Array.from<Element>(document.getElementsByName(name)).indexOf(element)
+}
+
+// The field of the name nearest to where the removed one was: the one now at its place, else the last. None without a place.
+function byName(element: Element | null, place: number | undefined): Element | null {
+  const name = element?.getAttribute('name') ?? ''
+  const fields = name === '' || place === undefined ? [] : document.getElementsByName(name)
+
+  return fields[Math.min(place!, fields.length - 1)] ?? null
 }
 
 // The element focused before, found again on a refreshed page or on Back and Forward between entries of one path; on a new page, the element its hash points at, else its autofocus field, its heading or its main, so a screen reader starts there, the title announced. Back and Forward skip the autofocus field, which the visitor left already, and a position an entry saved leaves the hash alone, as it does the scroll.
@@ -38,7 +47,7 @@ export async function moveFocus(swap: Swap, policy: Policy, hash: string): Promi
     if (before?.isConnected)
       return
 
-    const again = before?.id !== undefined && before.id !== '' ? document.getElementById(before.id) : byName(before)
+    const again = before?.id !== undefined && before.id !== '' ? document.getElementById(before.id) : byName(before, swap.place)
 
     if (again instanceof HTMLElement) {
       again.focus({ preventScroll: true })
@@ -173,7 +182,7 @@ function putBack(now: Element | null, typed: Typed | undefined): void {
 
 // The field itself, or the one hydration put in its place.
 function found(field: Field, id = field.id): Element | null {
-  return field.isConnected ? field : (id === '' ? null : document.getElementById(id)) ?? byName(field)
+  return field.isConnected ? field : (id === '' ? null : document.getElementById(id)) ?? byName(field, 0)
 }
 
 // Keys typed into an island's field after the swap and before the island hydrated land in the server's markup, which hydration then writes its own value over. Called as the swap hands the body to hydration, it notes them as they come into the focused field and puts them back once its island has hydrated, however late a `visible` or `idle` one is, with `input` fired so the island hears them, the caret after them. A newer swap, or a bound of 30 s (an island that never hydrates, or whose hydration failed, as the event fires only on success), ends the watch with nothing restored.

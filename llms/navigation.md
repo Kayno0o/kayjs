@@ -96,7 +96,7 @@ A handler of your own on Enter in a text field starts with `if (composing(event)
 ### Forms posting in place
 
 - A form posting to an action posts without a reload, then shows the page the post leads to, as the browser would: `form.failed()` and `data()` of an action read as after a full post.
-- A post going back to the same page, or refused and rendering it again, keeps the scroll position and the focused field.
+- A post going back to the same page, or refused and rendering it again, keeps the scroll position and the focused field: the swap turns off Chrome's scroll anchoring while it morphs, so a list whose rows move or drop around the one in view leaves the window where it was. A focused field the swap removed (the posting row's) gives the focus to the field of that name now at its place in the document, else the last, never the first of the page.
 - A refused post moves focus to the form's first field marked `aria-invalid`, which a screen reader reads with the message describing it (see [Actions](actions.md)).
 - With no field marked, the message describing the form itself is announced and the control that posted it, such as a submit button, is focused again.
 - A refused post focusing its field reveals it as `focusInvalid` does.
