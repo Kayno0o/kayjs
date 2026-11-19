@@ -687,7 +687,7 @@ describe('kay build --static', () => {
     }
   })
 
-  it('runs again into the directory an export failing halfway left', async () => {
+  it('runs again into an empty directory after an export failed', async () => {
     const fixture = await fixtureCopy('static')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
     const endpoint = join(fixture, 'src/routes/llms.txt.ts')

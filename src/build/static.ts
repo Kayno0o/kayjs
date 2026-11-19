@@ -308,7 +308,17 @@ async function swapIn(out: string): Promise<void> {
   if (existsSync(out))
     await rename(out, aside)
 
-  await rename(stagingOf(out), out)
+  try {
+    await rename(stagingOf(out), out)
+  }
+  catch (error) {
+    // The last export goes back, so a failed move leaves it in place.
+    if (existsSync(aside))
+      await rename(aside, out)
+
+    throw error
+  }
+
   await rm(aside, { recursive: true, force: true })
 }
 
