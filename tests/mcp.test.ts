@@ -92,6 +92,8 @@ beforeAll(async () => {
   await Bun.write(join(root, 'tsconfig.json'), tsconfig)
   await Bun.write(join(root, 'src/routes/index.kay'), 'img(src="/a.png")\n')
   await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
+  // Written before any test, as the tests of a concurrent describe all read it.
+  await Bun.write(join(root, 'package.json'), '{ "name": "mcp-app", "type": "module", "dependencies": { "kay": "*" } }\n')
   agent = new Agent(root, true)
 })
 
@@ -546,9 +548,6 @@ describe.concurrent('kay mcp', () => {
 
   it('checks the formatting and previews a generated file without writing', async () => {
     const formatted = (await agent.request('tools/call', { name: 'fmt', arguments: { paths: ['src/routes/about.kay'] } })).result
-
-    await Bun.write(join(root, 'package.json'), '{ "name": "mcp-app", "type": "module", "dependencies": { "kay": "*" } }\n')
-
     const generated = (await agent.request('tools/call', { name: 'generate', arguments: { kind: 'page', name: 'contact' } })).result
 
     expect(formatted?.structuredContent).toMatchObject({ written: false, changed: [] })
