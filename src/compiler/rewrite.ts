@@ -539,9 +539,11 @@ class RewriteFinder {
 
   // A loop's row and index and an `if`'s alias track the current value, so code that runs reads them through a call.
   private rows(path: Path<ArrowFunctionExpression>) {
+    const block = this.input.sites.blocks.has(path.node.params[0]?.start ?? -1)
+
     for (const [index, param] of path.node.params.entries()) {
-      if (param.type === 'Identifier' && this.input.sites.rows.has(param.start))
-        this.rowBinding(path.scope, param.name, index === 0 ? loopKey(path, param.name) : undefined)
+      if (param.type === 'Identifier' && (block || this.input.sites.rows.has(param.start)))
+        this.rowBinding(path.scope, param.name, index === 0 && !block ? loopKey(path, param.name) : undefined)
     }
   }
 

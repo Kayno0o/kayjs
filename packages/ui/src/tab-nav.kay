@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { NavItem } from './nav-item'
 import type { TabEntry, TabLink } from './tab-nav'
-import { effect, recipe, withQuery } from 'kay'
+import { effect, followed, recipe, withQuery } from 'kay'
 import Icon from './icon.kay'
 import { tabOf } from './outside'
 import { currentTab, keptHref } from './tab-nav'
@@ -140,7 +140,7 @@ if items().length > 0
     for item of items() key={item.key}
       if item.entry.disabled
         span(part="link" aria-disabled="true")
-          | {inside(item)}
+          | {followed(() => item, item => inside(item))}
       else
         a(part="link" data-scroll={item.scrolls ? undefined : 'keep'} href={item.to} {...tabOf(item.to, item.entry.newTab)} aria-current={item.on ? 'page' : undefined})
-          | {inside(item)}
+          | {followed(() => item, item => inside(item))}

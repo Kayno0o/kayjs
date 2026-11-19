@@ -1,8 +1,7 @@
 --- <Item extends DescriptionItem>
 import type { JSX, Snippet } from 'kay'
-import { followedRow } from './followed-row'
 import type { DescriptionItem } from './description-list'
-import { recipe } from 'kay'
+import { followed, recipe } from 'kay'
 import { wording } from 'kay/words'
 
 // 'kui-description-list' stays as the component's name for an app's CSS. The list is a container named `dl` that its items read: narrower than 24rem, its own width and not the screen's, each label sits above its value.
@@ -41,7 +40,7 @@ else
         dt(part="term") {item.label}
         dd(part="detail")
           if item.value === undefined && value
-            | {followedRow(() => item, view => value!(view))}
+            | {followed(() => item, item => value!(item))}
           else if item.value === undefined
             | -
           else

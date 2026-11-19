@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { NavLink } from './defaults'
 import type { SideNavGroup } from './side-nav'
-import { memo, onMount, persisted, recipe, signal, uid } from 'kay'
+import { followed, memo, onMount, persisted, recipe, signal, uid } from 'kay'
 import { navAddresses, navMark } from './nav-current'
 import { tabOf } from './outside'
 import Icon from './icon.kay'
@@ -166,7 +166,7 @@ function setOpen(next: boolean) {
 }
 
 // Following a link of the panel closes it: the page swap keeps the island, so it would stay over the new page.
-function followed(event: MouseEvent) {
+function followLink(event: MouseEvent) {
   if ((event.target as Element).closest('a'))
     setOpen(false)
 }
@@ -188,10 +188,10 @@ snippet inside(entry: NavLink)
 snippet destination(entry: NavLink, inPanel: boolean)
   if entry.disabled
     span(part="link" aria-disabled="true" data-hint={folded() && !inPanel ? entry.label : undefined})
-      | {inside(entry)}
+      | {followed(() => entry, entry => inside(entry))}
   else
     a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={navMark(entry.href, current, siblings())} data-tooltip={folded() && !inPanel ? entry.label : undefined})
-      | {inside(entry)}
+      | {followed(() => entry, entry => inside(entry))}
 snippet lists(inPanel: boolean)
   nav(part="nav" id={inPanel ? `${navId}-panel` : navId} aria-label={label} data-collapsed={folded() && !inPanel ? '' : undefined} data-panel={panel && !inPanel ? '' : undefined})
     if pending()
@@ -210,12 +210,12 @@ snippet lists(inPanel: boolean)
         ul(part="list" aria-labelledby={group.label === undefined ? undefined : `${navId}-${inPanel ? 'p' : 'n'}${index}`})
           for entry of group.links key={entry.href}
             li(part="item")
-              | {destination(entry, inPanel)}
+              | {followed(() => entry, entry => destination(entry, inPanel))}
               if entry.children && entry.children.length > 0
                 ul(part="children")
                   for child of entry.children key={child.href}
                     li(part="item")
-                      | {destination(child, inPanel)}
+                      | {followed(() => child, child => destination(child, inPanel))}
     if collapsible && !inPanel
       button.kui-icon-btn(part="toggle" type="button" aria-label={folded() ? expandLabel : collapseLabel} aria-expanded={folded() ? 'false' : 'true'} aria-controls={navId} data-tooltip={folded() ? expandLabel : collapseLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={fold})
         Icon(icon="chevron" part="toggleIcon")
@@ -232,7 +232,7 @@ div(part="root" {...rest})
       Icon(icon="menu")
     SidePanel(open={panelOpen()} title={label} onOpenChange={({ open }) => setOpen(open)})
       // kay-allow unreachable-click -- the click comes from a link inside, which the keyboard follows
-      div(part="panel" onClick={followed})
+      div(part="panel" onClick={followLink})
         | {lists(true)}
   if footer
     div(part="footer")

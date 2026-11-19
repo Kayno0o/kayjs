@@ -20,6 +20,7 @@ A name is imported where it is used, in a `.kay` file and in a `.ts` file alike;
 | Export | Is |
 | --- | --- |
 | `signal`, `memo`, `effect`, `batch`, `untrack`, `onMount`, `onCleanup` | Reactivity |
+| `followed` | Draws a block for an item of a keyed list once, whatever copy replaces the item. See [Templates](/essentials/templates) |
 | `store`, `snapshot` | State mutated in place, tracked per property, and its plain deep copy. See [State mutated in place](/essentials/components#state-mutated-in-place) |
 | `root` | An owner of its own, so effects created inside live until its `dispose` is called. See [Islands](/essentials/islands#effects-outside-a-component) |
 | `live` | A value the server changes and every page showing it follows. See [Live and realtime](/guides/live-and-realtime#values-the-server-changes) |

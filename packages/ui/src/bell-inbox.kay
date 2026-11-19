@@ -1,11 +1,10 @@
 --- <Item extends BellItem>
 import type { JSX, Snippet } from 'kay'
-import { followedRow } from './followed-row'
 import type { BellItem, BellItems, BellTriggerProps, InboxItem } from './bell'
 import { bellItem } from './bell'
 
 import type { Placement, PopoverLookButtonProps, PopoverPanelProps, PopoverTriggerProps } from './popover'
-import { call, effect, memo, recipe, resource, signal } from 'kay'
+import { call, effect, followed, memo, recipe, resource, signal } from 'kay'
 import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
 import { setAppBadge } from './app-badge'
@@ -144,7 +143,7 @@ span(part="root" {...rest})
         if linked(note.href) then url
           a(part="item" href={url} {...tabOf(url, note.newTab)} onClick={() => send(note.key)})
             if drawRow
-              | {followedRow(() => note, view => drawRow!(view))}
+              | {followed(() => note, note => drawRow!(note))}
             else
               span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
               span(part="title") {note.label}
@@ -153,7 +152,7 @@ span(part="root" {...rest})
         else
           button(part="item" type="button" onClick={() => send(note.key)})
             if drawRow
-              | {followedRow(() => note, view => drawRow!(view))}
+              | {followed(() => note, note => drawRow!(note))}
             else
               span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
               span(part="title") {note.label}

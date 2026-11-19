@@ -10,6 +10,8 @@ export type Rewrites = Map<number, Rewrite & { end: number }>
 export interface Sites {
   // Arrow parameters, and the index a loop declares in its block, that code which runs reads through a call: a loop's row and index, an `if`'s alias.
   rows: Set<number>
+  // The start of the parameters of a slot block whose plain names are read through accessors, as a loop's row is.
+  blocks: Set<number>
   // A template `const`'s pattern, true when code that runs reads its names as memos.
   consts: Map<number, boolean>
   // The `consts` among them that destructure a loop's item, which behave as the item of a plain loop does.

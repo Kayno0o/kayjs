@@ -1974,6 +1974,68 @@ describe('slots with parameters', () => {
   })
 })
 
+describe('a block drawn once per key', () => {
+  const mountFollowed = site({
+    'rows.kay': '--- <T extends { id: number }>\nimport type { JSX } from \'kay\'\nimport { followed } from \'kay\'\n\nconst { items, row } = props<{ items: T[], row: (item: T) => JSX.Element }>()\n---\nul\n  for item of items key={item.id}\n    li\n      | {followed(() => item, row)}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Rows from \'./rows.kay\'\n\nconst list = signal([{ id: 1, name: \'a\' }, { id: 2, name: \'b\' }])\n;(globalThis as { replace?: () => void }).replace = () => list.set(list().map(item => ({ ...item, name: `${item.name}!` })))\n---\nRows(items={list()})\n  @row(item)\n    input(name={`n${item.id}`} value={item.name} data-found={String(list().indexOf(item))} onInput={() => { (globalThis as { picked?: unknown }).picked = item }})\n',
+  })
+
+  it('hands the block the real item, still the one in the list after a replacement under the same key, and keeps its nodes', async () => {
+    const { root, dispose } = await mountFollowed()
+    const replace = (globalThis as unknown as { replace: () => void }).replace
+
+    try {
+      const second = root.querySelector<HTMLInputElement>('input[name="n2"]')!
+
+      second.focus()
+      expect(second.dataset.found).toBe('1')
+      replace()
+      await settle()
+
+      expect(root.querySelector('input[name="n2"]')).toBe(second)
+      expect(document.activeElement).toBe(second)
+      expect(second.value).toBe('b!')
+      expect(second.dataset.found).toBe('1')
+      second.dispatchEvent(new Event('input', { bubbles: true }))
+      expect((globalThis as unknown as { picked: { name: string } }).picked.name).toBe('b!')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
+describe('a slot called with the item of a keyed loop', () => {
+  const mountSlot = site({
+    'card.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: { id: number, name: string }[], row?: (item: { id: number, name: string }, index: number) => JSX.Element }>()\n---\nul\n  for item, i of items key={item.id}\n    li\n      slot row(item, i)\n        | {item.name}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Card from \'./card.kay\'\n\nconst list = signal([{ id: 1, name: \'a\' }, { id: 2, name: \'b\' }])\n;(globalThis as { swap?: (next: { id: number, name: string }[]) => void }).swap = next => list.set(next)\n---\nCard(items={list()})\n  @row(item, i)\n    input(name={`n${item.id}`} value={`${i}:${item.name}`} data-found={String(list().indexOf(item))})\n',
+  })
+
+  it('draws the block once for the item under its key, reading the new item and index in place', async () => {
+    const { root, dispose } = await mountSlot()
+    const swap = (globalThis as unknown as { swap: (next: { id: number, name: string }[]) => void }).swap
+
+    try {
+      const first = root.querySelector<HTMLInputElement>('input[name="n1"]')!
+
+      first.focus()
+      swap([{ id: 1, name: 'a!' }, { id: 2, name: 'b' }])
+      await settle()
+      expect(root.querySelector('input[name="n1"]')).toBe(first)
+      expect(document.activeElement).toBe(first)
+      expect(first.value).toBe('0:a!')
+      expect(first.dataset.found).toBe('0')
+
+      swap([{ id: 2, name: 'b' }, { id: 1, name: 'a!' }])
+      await settle()
+      expect(root.querySelector<HTMLInputElement>('input[name="n1"]')!.value).toBe('1:a!')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('snippets', () => {
   const mountA = site({
     'main.kay': [

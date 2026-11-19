@@ -31,6 +31,7 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   flush: 'browser',
   focusInvalid: 'browser',
   followLog: 'browser',
+  followed: 'shared',
   formErrors: 'shared',
   guard: 'browser',
   guardLeave: 'browser',

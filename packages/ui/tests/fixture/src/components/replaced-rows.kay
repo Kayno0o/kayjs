@@ -13,6 +13,6 @@ function patch(id: number, key: 'days' | 'risk', value: string) {
 ---
 Table(columns={columns} rows={lines()} rowKey="id" sortable={false} expandable)
   @cell(line, column)
-    TextInput(aria-label={`${column.header} ${line.id}`} value={line[column.key as 'days' | 'risk']} onInput={({ value }) => patch(line.id, column.key as 'days' | 'risk', value)})
+    TextInput(aria-label={`${column.header} ${line.id}`} value={line[column.key as 'days' | 'risk']} data-found={String(lines().indexOf(line))} data-first={line === lines()[0] ? 'yes' : 'no'} onInput={({ value }) => patch(line.id, column.key as 'days' | 'risk', value)})
   @detail(line)
     p.note {line.days} days at risk {line.risk}

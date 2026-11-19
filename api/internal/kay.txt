@@ -345,6 +345,9 @@ function omit(props: object, ...keys: string[]): Record<string, unknown>
 [./dom] outside
 function outside<T>(element: Element, href: T, ownRel?: boolean): T
 
+[./dom] param
+function param<Value>(value: Value): () => Value
+
 [./dom] part
 function part(render: () => unknown): Unit | null
 
@@ -405,6 +408,9 @@ function setClass(element: Element, value: unknown): void
 
 [./dom] setStyle
 function setStyle(element: Element, value: unknown, props?: readonly (readonly [string, unknown])[] | undefined): void
+
+[./dom] slotCall
+function slotCall(block: ((...args: never[]) => unknown) | undefined, first: () => unknown, ...rest: (() => unknown)[]): unknown
 
 [./dom] spreadAttributes
 function spreadAttributes<T>(source: T): T
@@ -607,6 +613,9 @@ function outsideLink(href: unknown, ownRel?: boolean): string
 
 [./html] outsideLinks
 function outsideLinks(markup: string): string
+
+[./html] param
+function param<Value>(value: Value): () => Value
 
 [./html] partClass
 function partClass(props: unknown, part: string): unknown

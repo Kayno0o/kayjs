@@ -853,3 +853,50 @@ export function withSetter<T>(read: () => T, write: (value: T) => void): Signal<
 
   return Object.assign(read, { set })
 }
+
+interface Following {
+  item: object
+  read: () => unknown
+}
+
+// The item being drawn by `followed`, which a block's parameter takes while the block runs.
+let following: Following | undefined
+
+// kept: free, a call of the page's own draw.
+// Draws what a block shows for one item of a keyed list once, though the item is replaced by a copy under the same key: the block gets the item as it is, and what it reads of its parameter, where it is used, is the current item each time, so its nodes keep, and a field in them its focus.
+// A call made from a template would track the item it is handed and draw the block again on each replacement. Anything but an object is drawn as a call is, again when it changes.
+export function followed<Item, Drawn>(read: () => Item, draw: (item: Item) => Drawn): Drawn {
+  const first = untrack(read)
+
+  if (typeof first !== 'object' || first === null)
+    return draw(read())
+
+  const outer = following
+
+  // An item that leaves while the block still reads it is read as it was.
+  following = { item: first, read: () => read() ?? first }
+
+  try {
+    return untrack(() => draw(first))
+  }
+  finally {
+    following = outer
+  }
+}
+
+// A block's parameter as an accessor, which the compiled block reads through: the current item when `followed` gave it, else the value it was called with.
+export function param<Value>(value: Value): () => Value {
+  const at = following
+
+  return at !== undefined && at.item === value ? at.read as () => Value : () => value
+}
+
+// A `slot` called with names or paths: the block, when the component was given one, draws once for the item of the first argument, and again when another argument changes.
+export function slotCall(block: ((...args: never[]) => unknown) | undefined, first: () => unknown, ...rest: (() => unknown)[]): unknown {
+  if (block === undefined)
+    return undefined
+
+  const others = rest.map(read => read())
+
+  return followed(first, item => (block as (...args: unknown[]) => unknown)(item, ...others))
+}

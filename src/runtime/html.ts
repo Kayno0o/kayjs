@@ -31,7 +31,7 @@ export { formKey } from './action'
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
 export { loadScope } from './load-scope'
-export { memo, untrack } from './reactive'
+export { memo, param, untrack } from './reactive'
 export { html, isRendered } from './rendered'
 
 export type { Html } from './rendered'

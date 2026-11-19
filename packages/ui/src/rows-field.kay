@@ -2,13 +2,12 @@
 import type { JSX, Snippet } from 'kay'
 import { announce } from './announce'
 import { defaultKept, onFormReset, startRef } from './form-reset'
-import { effect, flush, formErrors, postedValues, recipe, signal, uid, untrack } from 'kay'
+import { effect, flush, followed, formErrors, postedValues, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import type { FieldSize } from './field-look'
 import { FIELD_MESSAGE, LABEL_TEXT } from './field-look'
 import { linkChoice } from './choice-link'
 import { formIssues } from './form-context'
-import { followedRow } from './followed-row'
 import { labelText } from './label-text'
 import Button from './button.kay'
 import IconButton from './icon-button.kay'
@@ -170,7 +169,7 @@ function drawCell(id: number, column: { key: string, label: string, name?: strin
     get id() { return issueOf(id) === undefined ? undefined : `${issuesBase}_${id}` },
   }
 
-  return followedRow(() => rowOf(id), view => cell!({ key: column.key, label: column.label, name: postName(column), size }, view, () => placeOf(id), text => edit(placeOf(id), column.key, text), issue))
+  return followed(() => rowOf(id), row => cell!({ key: column.key, label: column.label, name: postName(column), size }, row, () => placeOf(id), text => edit(placeOf(id), column.key, text), issue))
 }
 const full = () => max !== undefined && current().length >= max
 const removeName = (index: number) => removeLabel === undefined ? wording('ui.rowsField.remove', 'Remove row {n}', { n: index + 1 }) : labelText(removeLabel, { n: index + 1, index }, index)

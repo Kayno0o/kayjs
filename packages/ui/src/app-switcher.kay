@@ -1,6 +1,5 @@
 ---
 import type { JSX } from 'kay'
-import { followedRow } from './followed-row'
 import type { IconProps } from 'kay/icons'
 import type { Snippet } from 'kay'
 import type { MenuTriggerProps } from './menu'
@@ -9,7 +8,7 @@ import type { IconSlot } from './defaults'
 import { isExternal } from './outside'
 import type { NewTab } from './outside'
 import type { Placement, PopoverPanelProps } from './popover'
-import { recipe } from 'kay'
+import { followed, recipe } from 'kay'
 import { wording } from 'kay/words'
 import { colorStyle } from './color'
 import { stepIndex } from './cycle'
@@ -123,13 +122,13 @@ Popover({...panelProps} id={id} placement={placement} role="none" open={open} pa
     for app of apps key={app.key}
       a(part="tile" href={app.href} {...attributesOf(app)} aria-current={app.key === current ? 'true' : undefined} data-tooltip={app.description} data-color={appColor(app) === undefined ? undefined : ''} style={appColor(app)})
         if appIcon
-          | {followedRow(() => app, view => appIcon!(view))}
+          | {followed(() => app, app => appIcon!(app))}
         else if app.icon
           Icon(icon={app.icon} part="icon")
         else
           span(part="initial" aria-hidden="true" data-color={appColor(app) === undefined ? undefined : ''}) {app.label.slice(0, 1)}
         span(part="name")
           if tile
-            | {followedRow(() => app, view => tile!(view))}
+            | {followed(() => app, app => tile!(app))}
           else
             | {app.label}

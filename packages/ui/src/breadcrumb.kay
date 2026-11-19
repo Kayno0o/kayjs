@@ -1,5 +1,5 @@
 ---
-import { recipe } from 'kay'
+import { followed, recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 import type { NavItem } from './nav-item'
 import { tabOf } from './outside'
@@ -60,7 +60,7 @@ nav(part="root" {...rest} aria-label={label})
       li(part="item" data-middle={collapses() && index > 0 && index < last() - 1 ? '' : undefined})
         if index < last() && crumb.href !== undefined
           a(part="link" href={crumb.href} {...tabOf(crumb.href, crumb.newTab)})
-            | {inside(crumb)}
+            | {followed(() => crumb, crumb => inside(crumb))}
         else
           span(part="text" aria-current={index === last() ? 'page' : undefined})
-            | {inside(crumb)}
+            | {followed(() => crumb, crumb => inside(crumb))}

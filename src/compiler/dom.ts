@@ -11,7 +11,7 @@ import { FormHere } from './dom-here'
 import { propertyBindings } from './dom-property'
 import { addHandler, listenerOptions } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
-import { addKeyParameters, addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
+import { addKeyParameters, addRowItem, addSlotCall, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
 import { addBindWrite, bindRead, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 import { addGroupChecked, checksMarkup, groupValue, staticAttributeText } from './plan'
@@ -167,7 +167,7 @@ export class DomTemplate extends TemplateWriter {
 
             b.add(')')
           }
-          else {
+          else if (!addSlotCall(b, this.src, item.node, helperName('slotCall'))) {
             slotValue(b, item.node)
           }
 

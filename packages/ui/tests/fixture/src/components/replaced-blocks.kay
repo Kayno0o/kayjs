@@ -3,9 +3,14 @@ import { signal } from 'kay'
 import AvatarGroup from '@kayjs/ui/avatar-group.kay'
 import ChipGroup from '@kayjs/ui/chip-group.kay'
 import DescriptionList from '@kayjs/ui/description-list.kay'
+import Breadcrumb from '@kayjs/ui/breadcrumb.kay'
+import Carousel from '@kayjs/ui/carousel.kay'
 import Masonry from '@kayjs/ui/masonry.kay'
 import RadioGroup from '@kayjs/ui/radio-group.kay'
 import Segmented from '@kayjs/ui/segmented.kay'
+import SideNav from '@kayjs/ui/side-nav.kay'
+import SiteNav from '@kayjs/ui/site-nav.kay'
+import TabNav from '@kayjs/ui/tab-nav.kay'
 
 // Each list is built again, its items copies under the same keys, whenever the counter moves.
 const version = signal(0)
@@ -13,6 +18,9 @@ const options = () => [{ value: 'x', label: `X${version()}` }, { value: 'y', lab
 const people = () => [{ key: 'a', name: `Ann${version()}` }]
 const terms = () => [{ key: 't', label: 'Term', note: `Note${version()}` }]
 const tiles = () => [{ id: 'm', text: `Tile${version()}` }]
+const links = () => [{ href: '/a', label: `A${version()}` }, { href: '/b', label: 'B' }]
+const crumbs = () => [{ label: `Home${version()}`, href: '/' }, { label: 'Here' }]
+const slides = () => [{ key: 's', title: `Slide${version()}` }]
 ---
 button#bump(type="button" onClick={() => version++}) Bump
 ChipGroup(options={options()} label="Chips")
@@ -33,3 +41,18 @@ AvatarGroup(items={people()})
 Masonry(items={tiles()} key={tile => tile.id})
   @tile(item)
     input(data-block="tile" aria-label="tile" value={item.text})
+Carousel(items={slides()} label="Slides")
+  @slide(card)
+    input(data-block="slide" aria-label="slide" value={card.title})
+SiteNav(items={links()} label="Site" current="/a")
+  @link(link)
+    input(data-block="site" aria-label="site" value={link.label})
+SideNav(items={links()} label="Side" current="/a")
+  @link(link)
+    input(data-block="side" aria-label="side" value={link.label})
+TabNav(links={links()} label="Tabs" current="/a")
+  @tab(tab)
+    input(data-block="tabnav" aria-label="tabnav" value={tab.label})
+Breadcrumb(items={crumbs()} label="Trail")
+  @item(crumb)
+    input(data-block="crumb" aria-label="crumb" value={crumb.label})

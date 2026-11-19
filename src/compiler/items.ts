@@ -1,5 +1,6 @@
 import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, Node, PendingNode, SnippetNode, Span, TextExpression, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
+import type { Sites } from './rewrite-types'
 import { isHead, isSlot, keyedByPosition } from './ast'
 import { PROPS } from './names'
 import { parsedBindingNames } from './pattern-names'
@@ -168,6 +169,122 @@ export function constDeclaration(b: CodeBuilder, node: ConstNode, src: string, m
 // The names a destructuring pattern or a parameter list declares, in order.
 export function parameterNames(pattern: string): string[] {
   return parsedBindingNames(pattern) ?? []
+}
+
+const PLAIN_PARAMETER = /^([\p{ID_Start}$_][\p{ID_Continue}$]*)(?:\s*\?)?\s*(?::|$)/u
+const OPENING = '([{<'
+const CLOSING = ')]}>'
+
+// The parameters of a block or a snippet that are plain names, typed or not, which one of a component that renders again reads through an accessor, so a caller handing it the item a `followed` draw follows gets the current one read each time. A pattern, a rest or a default stays as written. None when the list has no such name.
+export function accessorParameters(params: string): string[] | undefined {
+  const names: string[] = []
+  let depth = 0
+  let from = 0
+  let defaulted = false
+
+  const close = (to: number) => {
+    const name = defaulted ? undefined : PLAIN_PARAMETER.exec(params.slice(from, to).trim())?.[1]
+
+    if (name !== undefined)
+      names.push(name)
+
+    from = to + 1
+    defaulted = false
+  }
+
+  for (let index = 0; index < params.length; index++) {
+    const char = params[index]!
+
+    if (char === '=' && params[index + 1] === '>') {
+      index++
+    }
+    else if (OPENING.includes(char)) {
+      depth++
+    }
+    else if (CLOSING.includes(char)) {
+      depth--
+    }
+    else if (char === ',' && depth === 0) {
+      close(index)
+    }
+    else if (char === '=' && depth === 0) {
+      defaulted = true
+    }
+  }
+
+  close(params.length)
+
+  return depth === 0 && names.length > 0 ? names : undefined
+}
+
+const CHAIN = String.raw`[\p{ID_Start}$_][\p{ID_Continue}$]*(?:\.[\p{ID_Start}$_][\p{ID_Continue}$]*)*`
+const CHAINS = new RegExp(String.raw`^\s*${CHAIN}(?:\s*,\s*${CHAIN})*\s*$`, 'u')
+const COMMA = /,/g
+
+// The spans of the arguments of a `slot` call when each is a name or a path of names, which the runtime reads one by one: the first as the item the block follows, the others where they change. None for any other argument.
+export function simpleArguments(src: string, args: Span): Span[] | undefined {
+  const text = src.slice(args.start, args.end)
+
+  if (!CHAINS.test(text))
+    return undefined
+
+  const spans: Span[] = []
+  let from = 0
+
+  for (const cut of [...[...text.matchAll(COMMA)].map(match => match.index), text.length]) {
+    const piece = text.slice(from, cut)
+    const lead = piece.length - piece.trimStart().length
+
+    spans.push({ start: args.start + from + lead, end: args.start + from + piece.trimEnd().length })
+    from = cut + 1
+  }
+
+  return spans
+}
+
+// A `slot` called with names or paths, which draws its block once for the item under its key, so a replacement leaves its nodes and their focus. False, and nothing written, for any other call.
+export function addSlotCall(b: CodeBuilder, src: string, slot: ElementNode, helper: string): boolean {
+  const spans = slot.outlet?.args && simpleArguments(src, slot.outlet.args)
+
+  if (!slot.outlet || !spans)
+    return false
+
+  b.add(`${helper}(${PROPS}.`).addSource(slot.outlet.name)
+
+  for (const span of spans)
+    b.add(', () => ').addSource(span)
+
+  b.add(')')
+
+  return true
+}
+
+// The parameters of a block or a snippet about to be written, which the rewrite reads through accessors where a component renders again.
+export function markBlock(sites: Sites, b: CodeBuilder, src: string, params: Span, staticLoops?: boolean): void {
+  if (!staticLoops && accessorParameters(src.slice(params.start, params.end)))
+    sites.blocks.add(b.code.length)
+}
+
+const BARE_PARAMETER = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
+
+// A block's parameters and its arrow: one plain name is written bare, so a rule about the parentheses around it, which kay would otherwise be the one to write, has none to report.
+export function addBlockParameters(sites: Sites, b: CodeBuilder, src: string, params: Span, staticLoops?: boolean): void {
+  const bare = BARE_PARAMETER.test(src.slice(params.start, params.end))
+
+  b.add(bare ? '' : '(')
+  markBlock(sites, b, src, params, staticLoops)
+  b.addSource(params).add(bare ? ' => ' : ') => ')
+}
+
+// What a block or a snippet renders, its plain parameters read where they are used (`param` is the helper), so one a `followed` draw follows gives the current item.
+export function readingParameters(b: CodeBuilder, names: string[] | undefined, param: string, render: () => void): void {
+  if (names)
+    b.add(`(${names.map(name => `${name} = ${param}(${name}), `).join('')}`)
+
+  render()
+
+  if (names)
+    b.add(')')
 }
 
 // What a `slot` renders: the component's children, or the block prop it names, called with its arguments when it has some.

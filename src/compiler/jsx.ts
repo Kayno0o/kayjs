@@ -4,7 +4,7 @@ import type { ElementShape } from './plan'
 import type { Sites } from './rewrite-types'
 import { bindsOwnProp, failedBlockOf, handedParts, isSlot, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
-import { addConstValue, addKeyParameters, addRowItem, contentOf, rowKeying, slotValue, usedProps } from './items'
+import { addBlockParameters, addConstValue, addKeyParameters, addRowItem, contentOf, markBlock, rowKeying, slotValue, usedProps } from './items'
 import { addMergedClass, addShorthandClass, quoteAttribute } from './jsx-class'
 import { addFieldName, addInheritedName, addWrittenField } from './jsx-field'
 import { DYNAMIC_TAG } from './mapping'
@@ -40,7 +40,6 @@ const JSX_TEXT_ESCAPES = /[{}<>]|[ \t]{2,}/g
 // Attributes rendered as markup rather than text.
 const MARKUP_ATTRIBUTES = new Set(['innerHTML', 'srcdoc'])
 const EVENT_HANDLER = /^on[A-Z]/
-const PLAIN_PARAMETER = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A template as JSX: what the analysis pass reads for scope, and `kay check` type-checks.
 export class JsxTemplate {
@@ -179,7 +178,9 @@ export class JsxTemplate {
     b.wrap(node, () => {
       b.add('const ')
       this.sites.snippets.add(b.code.length)
-      b.addSource(node.name).add(' = (').addSource(node.params).add('): KayJSX.Element => (')
+      b.addSource(node.name).add(' = (')
+      markBlock(this.sites, b, this.src, node.params, this.options.staticLoops)
+      b.addSource(node.params).add('): KayJSX.Element => (')
       this.emitRoot(node.children)
       b.add(');')
     })
@@ -630,11 +631,8 @@ export class JsxTemplate {
 
         b.add(' ').addSource(slot.name).add('={')
 
-        // One plain name is written bare, so a rule about the parentheses around it, which kay would otherwise be the one to write, has none to report.
-        if (slot.params && PLAIN_PARAMETER.test(this.src.slice(slot.params.start, slot.params.end)))
-          b.addSource(slot.params).add(' => ')
-        else if (slot.params)
-          b.add('(').addSource(slot.params).add(') => ')
+        if (slot.params)
+          addBlockParameters(this.sites, b, this.src, slot.params, this.options.staticLoops)
 
         this.emitRoot(slot.children)
         b.add('}')

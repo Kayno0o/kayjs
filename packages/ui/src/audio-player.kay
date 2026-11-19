@@ -1,8 +1,7 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { followedRow } from './followed-row'
 import type { AudioChapter, AudioCue } from './audio'
-import { effect, memo, onCleanup, onMount, recipe, signal } from 'kay'
+import { effect, followed, memo, onCleanup, onMount, recipe, signal } from 'kay'
 import { chapterAt, clock, cueAt, cuesByChapter, lockScreen, previousStart, waveform } from './audio'
 import CollapsibleSection from './collapsible-section.kay'
 import IconButton from './icon-button.kay'
@@ -393,7 +392,7 @@ div(part="root" {...rest})
         li(part="chapter")
           if lead
             span(part="lead")
-              | {followedRow(() => chapter, view => lead!(view, index))}
+              | {followed(() => chapter, chapter => lead!(chapter, index))}
           button(part="jump" type="button" aria-current={index === current() ? 'true' : undefined} onClick={() => void seek(chapter.start, true)})
             span(part="start") {clock(chapter.start)}
             span(part="text")
@@ -404,7 +403,7 @@ div(part="root" {...rest})
             IconButton(href={href} {...tabOf(href, chapter.newTab)} icon="external" label={linkLabel.replaceAll('{title}', chapter.label)} variant="ghost" size="sm")
           if actions
             span(part="actions")
-              | {followedRow(() => chapter, view => actions!(view, index))}
+              | {followed(() => chapter, chapter => actions!(chapter, index))}
   if cues.length > 0
     CollapsibleSection(title={transcriptLabel} open={false} onToggle={event => { if (event.currentTarget.open) follow() }})
       div(part="transcript" ref={watch} onPointerDown={event => { if (event.target === event.currentTarget) scrolledByHand() }} onKeyDown={between})

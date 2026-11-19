@@ -962,6 +962,22 @@ describe('Table rows replaced with the same keys', () => {
     expect(field('Days 1').value).toBe('9')
   })
 
+  test('hand a cell the row itself, found in the rows and equal to the one the page holds', async () => {
+    mounted = await mountComponent(ReplacedRows, {})
+
+    const { root } = mounted
+    const field = (label: string) => root.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!
+    const days = field('Days 1')
+
+    expect([field('Days 1'), field('Days 2')].map(input => input.dataset.found)).toEqual(['0', '1'])
+    days.value = '9'
+    days.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+
+    expect([field('Days 1'), field('Days 2')].map(input => input.dataset.found)).toEqual(['0', '1'])
+    expect([field('Days 1'), field('Days 2')].map(input => input.dataset.first)).toEqual(['yes', 'no'])
+  })
+
   test('draw a detail again with the new values, in the same node', async () => {
     mounted = await mountComponent(ReplacedRows, {})
 
@@ -989,10 +1005,10 @@ describe('Components drawing a block per item, the items replaced with the same 
     mounted = await mountComponent(ReplacedBlocks, {})
 
     const { root } = mounted
-    const kinds = ['chip', 'segment', 'radio', 'term', 'avatar', 'tile']
+    const kinds = ['chip', 'segment', 'radio', 'term', 'avatar', 'tile', 'slide', 'site', 'side', 'tabnav', 'crumb']
     const before = kinds.map(kind => root.querySelector<HTMLInputElement>(`input[data-block=${kind}]`))
 
-    expect(before.every(Boolean)).toBe(true)
+    expect(kinds.filter((_, index) => !before[index])).toEqual([])
 
     click(root.querySelector('#bump'))
     await settle()

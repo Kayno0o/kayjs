@@ -6,14 +6,13 @@ import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import type { RowsSource } from './source'
 import type { Column, FilterField, RowFilter, RowKey, RowKeyValue, SortState } from './table'
-import { effect, memo, onCleanup, onMount, queryParam, recipe, signal, uid, withQuery } from 'kay'
+import { effect, followed, memo, onCleanup, onMount, queryParam, recipe, signal, uid, withQuery } from 'kay'
 import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import LoadMore from './load-more.kay'
 import Pagination from './pagination.kay'
-import { followedRow } from './followed-row'
 import { followList } from './table-list'
 import { paging } from './table-page'
 import { selection } from './table-select'
@@ -514,7 +513,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 span(part="cellLabel") {column.header}
               div(part="cellBody")
                 if uses('cell') && cell && drawnByBlock(column, given)
-                  | {followedRow(() => row, view => cell!(view, column))}
+                  | {followed(() => row, row => cell!(row, column))}
                 else
                   | {cellText(row, column)}
               if (uses('rowHref') || uses('onRowClick')) && columnIndex === 0 && linked()
@@ -525,7 +524,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
         if uses('expandable') && expandable && detail && expansion!.openSet().has(rowKeyOf(row, rowKey))
           tr(part="detailRow" id={expansion!.detailId(row)})
             td(part="detailCell" colspan={columnCount()})
-              | {followedRow(() => row, view => detail!(view))}
+              | {followed(() => row, row => detail!(row))}
       else
         if skeleton()
           for index of skeletonIndexes() key={index}

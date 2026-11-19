@@ -15,7 +15,7 @@ import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
 import { closeHandParts, handedItem, handsEntry, openClassList, writesTogether, writtenParts } from './hand-parts'
 import { IMAGE_OPTIONS, imageDefaults as imageDefaultsOf, imageOptions, placeholderOff, writeImageArguments } from './image-attributes'
-import { contentOf } from './items'
+import { accessorParameters, contentOf, readingParameters } from './items'
 import { controlId, fieldAttribute, inheritedAttributes, inheritedField } from './markup-fields'
 import { PROPS } from './names'
 import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, shapeOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
@@ -159,6 +159,9 @@ export abstract class TemplateWriter {
   // Whether a component's slots and children are handed over as a function building them: in the browser, so a slot read in an attribute, a test or a ternary builds nothing and claims no server markup while an island hydrates.
   // The server hands over the markup itself, which an island reads its static slots off, and so draws a slot's ids once per read where the browser draws them once per insert; the browser sets the ids it binds, so they agree.
   protected readonly lazySlots: boolean = false
+
+  // Whether a block's plain parameters are accessors: where the analysis read them as a loop's row is read, which a component that renders again does and a static one does not.
+  protected accessorBlocks = true
 
   // The helper scoping a form's content: the server's also lets the fields in it refill, the browser's only gives them the form's messages.
   protected readonly scoping: 'formScope' | 'issueScope' = 'formScope'
@@ -353,9 +356,13 @@ export abstract class TemplateWriter {
 
     b.wrap(node, () => {
       b.add('const ').addSource(node.name).add(' = (').addSource(node.params).add(') => ')
-      this.childrenValue(node.children)
+      this.readingParameters(node.params, () => this.childrenValue(node.children))
       b.add('; ')
     })
+  }
+
+  private readingParameters(params: Span, render: () => void): void {
+    readingParameters(this.b, this.accessorBlocks ? accessorParameters(this.source(params)) : undefined, helperName('param'), render)
   }
 
   // A component's props: its attributes, then its slots and children, each read through a getter or a function so it renders where the component puts it.
@@ -376,7 +383,7 @@ export abstract class TemplateWriter {
 
       if (slot.params) {
         b.add(`${JSON.stringify(this.source(slot.name))}: (`).addSource(slot.params).add(') => ')
-        this.childrenValue(slot.children)
+        this.readingParameters(slot.params, () => this.childrenValue(slot.children))
       }
       else {
         b.add(`get ${JSON.stringify(this.source(slot.name))}() { return `)

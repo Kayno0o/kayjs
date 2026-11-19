@@ -538,6 +538,9 @@ function flush(): void
 [.] focusInvalid
 function focusInvalid(root?: ParentNode | undefined): Promise<boolean>
 
+[.] followed
+function followed<Item, Drawn>(read: () => Item, draw: (item: Item) => Drawn): Drawn
+
 [.] followLog
 function followLog(container: (() => Element | null | undefined) | Element, options?: FollowLogOptions): FollowLog
 

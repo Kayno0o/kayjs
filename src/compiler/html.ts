@@ -74,6 +74,7 @@ export class HtmlTemplate extends TemplateWriter {
 
   constructor(b: CodeBuilder, src: string, facts: TemplateFacts, ownMarkup: (name: string, at: number) => boolean, private readonly options: HtmlOptions = {}) {
     super(b, src, facts, ownMarkup)
+    this.accessorBlocks = options.accessorLoops === true
     this.mergesAtRuntime = options.classMerge === true
   }
 
@@ -336,12 +337,9 @@ export class HtmlTemplate extends TemplateWriter {
         b.add(', () => ')
         this.markup(node.fallback)
       }
-      else if (this.options.accessorLoops) {
-        b.add(', undefined')
-      }
 
       if (this.options.accessorLoops)
-        b.add(rowKeying(node, this.src).kind === 'positional' ? ', "positional"' : ', "keyed"')
+        b.add(`${node.fallback ? '' : ', undefined'}${rowKeying(node, this.src).kind === 'positional' ? ', "positional"' : ', "keyed"'}`)
 
       b.add(')')
     })

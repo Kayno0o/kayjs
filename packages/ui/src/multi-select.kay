@@ -2,11 +2,10 @@
 import type { FieldSize } from './field-look'
 import { fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import type { JSX, Snippet } from 'kay'
-import { followedRow } from './followed-row'
 import type { OptionsSource } from './options-source'
 import type { MultiSelectOption } from './multi-select'
 import type { Placement, PopoverButtonProps, PopoverPanelProps } from './popover'
-import { effect, postedValues, recipe, signal } from 'kay'
+import { effect, followed, postedValues, recipe, signal } from 'kay'
 import { stepIndex } from './cycle'
 import { afterPause, isRemote, searchOptions } from './options-source'
 import { defaultKept, onFormReset, startRef } from './form-reset'
@@ -267,7 +266,7 @@ div(part="root" {...rest} ref={ref} data-posted={sent === undefined ? undefined 
           input(part="checkbox" type="checkbox" checked={picked().includes(option.value)} disabled={option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => set(toggledValue(pool(), picked(), option.value))})
           if drawRow
             span(part="label")
-              | {followedRow(() => option, view => drawRow!(view))}
+              | {followed(() => option, option => drawRow!(option))}
           else
             if option.icon
               Icon(icon={option.icon} part="icon")

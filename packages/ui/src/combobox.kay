@@ -2,9 +2,8 @@
 import type { FieldSize } from './field-look'
 import { FIELD_ICON, FIELD_ICON_PAD, fieldInvalid, fieldSize, keepInvalid, LABEL_TEXT } from './field-look'
 import type { JSX, Snippet } from 'kay'
-import { followedRow } from './followed-row'
 import type { ComboboxOption, ComboboxOptions } from './combobox'
-import { composing, effect, postedValue, recipe, signal, uid, untrack } from 'kay'
+import { composing, effect, followed, postedValue, recipe, signal, uid, untrack } from 'kay'
 import { afterPause, isRemote, searchOptions } from './options-source'
 import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
 import { defaultKept, fieldRef, onFormReset } from './form-reset'
@@ -418,7 +417,7 @@ snippet box()
       for option, index of rows() key={option.value}
         li(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} aria-label={drawRow ? option.label : undefined} aria-labelledby={!drawRow && described(option) ? `${optionId(index)}-label` : undefined} aria-describedby={!drawRow && described(option) ? `${optionId(index)}-description` : undefined} data-picked={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)})
           if drawRow
-            | {followedRow(() => option, view => drawRow!(view))}
+            | {followed(() => option, option => drawRow!(option))}
           else if described(option)
             span(part="optionLabel" id={`${optionId(index)}-label`}) {option.label}
             span(part="optionDescription" id={`${optionId(index)}-description`}) {described(option)}

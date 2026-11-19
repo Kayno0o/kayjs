@@ -19,7 +19,7 @@ declare const KAY_BROWSER: true | undefined
 declare const KAY_FRENCH: true | undefined
 
 export { holdSubmits, listenSubmit, listenSubmitWith, listenWith } from './form-hold'
-export { renderEffect as effect, memo, untrack } from './reactive'
+export { renderEffect as effect, memo, param, slotCall, untrack } from './reactive'
 export { transition } from './transition'
 export { checkedMarkup, componentClass, handParts, merge, omit, partClass, partHanded, partProps, spreadAttributes, spreadWith } from './values'
 

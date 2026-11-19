@@ -31,6 +31,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   flush: 'free',
   focusInvalid: 'free',
   followLog: 'free',
+  followed: 'free',
   formErrors: 'free',
   guard: 'request',
   guardLeave: 'free',

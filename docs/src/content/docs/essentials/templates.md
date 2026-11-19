@@ -210,7 +210,7 @@ snippet item(name: string, i: number)
 List(items={['Milk', 'Eggs']} row={item})
 ```
 
-A snippet called with a loop row, `{show(row)}`, is drawn again whenever a new copy of the row replaces the old one, where a component updates the same nodes in place. Make per-row markup that is replaced often, or animated, a component.
+A snippet called with a loop row, `{show(row)}`, is drawn again whenever a new copy of the row replaces the old one, where a component updates the same nodes in place. Make per-row markup that is replaced often, or animated, a component, or draw the call once for the row under its key with `followed(() => row, row => show(row))`, from `kay`. A block a component draws with `slot row(item)` under a keyed `for` is drawn that way already.
 
 A snippet is for markup used in one file. Markup used by several files is a component.
 
