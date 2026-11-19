@@ -22,7 +22,7 @@ const look = recipe({
     item: 'lg:flex lg:items-center',
     link: 'block px-3 py-2 text-sm text-muted transition-colors hover:text-foreground aria-[current]:text-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:text-muted has-[[data-part=icon]]:flex has-[[data-part=icon]]:items-center has-[[data-part=icon]]:gap-2',
     icon: 'size-4 shrink-0',
-    badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted',
+    badge: 'rounded-full bg-surface-strong px-1.5 py-px text-xs tabular-nums text-muted',
     // The chevron beside a link with `children` opens them from lg; below it they are always shown, nested in the list.
     expand: 'inline-flex items-center px-1 py-2 text-muted hover:text-foreground max-lg:hidden',
     expandIcon: 'size-3.5 shrink-0',

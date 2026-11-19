@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check --fix` of `deprecated-schema-builders` keeps an unbounded `s.String()` unbounded, writing `max: Number.MAX_SAFE_INTEGER`, except in an action's input and an API route's `body`, which capped it at 10,000 characters already ([deprecated lints](deprecated-lints.md)).
 - A `head` entry in `kay.config.ts` with `children` beside `props` is refused at load and by `kay check`, naming `props.children`, where it used to render an empty tag; the config type refuses it too ([Head](head.md)).
 - kayjs-ui's `SiteNav`, `SideNav` and `TabNav` no longer mark every `/#section` link as the current page on that page: a link with a hash is current only when `current` carries the same hash ([TabNav](/ui/tab-nav)).
+- The count badge of kayjs-ui's `TabNav`, `Tabs`, `SideNav` and `SiteNav` has the vertical padding of a `Badge`, so its number no longer touches the pill's top and bottom ([TabNav](/ui/tab-nav)).
 
 ## 1.110.0
 

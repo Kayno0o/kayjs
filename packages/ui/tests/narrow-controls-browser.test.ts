@@ -41,3 +41,14 @@ describe('controls in a container narrower than their text', () => {
     expect(found).toEqual({ segmented: true, segmentedWhole: true, badge: true, badgeWraps: true, chips: true, chipsWhole: true, toggle: true, tabs: true, page: true })
   })
 })
+
+describe('count pills of the navigation components', () => {
+  it('hold their number inside vertical padding, as Badge does', async () => {
+    await using page = await site.open('/count-pills')
+    const pills = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('[data-part="badge"]')].map(pill => ({ id: pill.closest('[id]')?.id, top: Number.parseFloat(getComputedStyle(pill).paddingTop), bottom: Number.parseFloat(getComputedStyle(pill).paddingBottom) })))
+
+    // TabNav, Tabs, SideNav and SiteNav each draw one.
+    expect(pills.length).toBeGreaterThanOrEqual(4)
+    expect(pills.filter(pill => pill.top <= 0 || pill.bottom <= 0)).toEqual([])
+  })
+})

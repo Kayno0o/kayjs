@@ -24,7 +24,7 @@ const look = recipe({
     icon: 'size-4 shrink-0',
     initial: 'hidden size-4 shrink-0 text-center group-data-[collapsed]/side:inline-block',
     text: 'min-w-0 flex-1 truncate group-data-[collapsed]/side:sr-only',
-    badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted group-data-[collapsed]/side:hidden',
+    badge: 'rounded-full bg-surface-strong px-1.5 py-px text-xs tabular-nums text-muted group-data-[collapsed]/side:hidden',
     // The links under a link, shown whether or not the link is the page on screen; a rail leaves them out.
     children: 'flex flex-col gap-1 ps-4 group-data-[collapsed]/side:hidden',
     footer: 'mt-auto min-w-0 overflow-hidden px-3',

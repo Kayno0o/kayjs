@@ -28,7 +28,7 @@ const look = recipe({
     list: 'flex gap-1 overflow-x-auto border-b border-border pb-px data-[orientation=vertical]:flex-col data-[orientation=vertical]:overflow-x-visible data-[orientation=vertical]:overflow-y-auto data-[orientation=vertical]:border-b-0 data-[orientation=vertical]:border-e data-[orientation=vertical]:pb-0',
     tab: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground inline-flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted aria-selected:border-accent aria-selected:text-accent group-data-[orientation=vertical]/tabs:-me-px group-data-[orientation=vertical]/tabs:mb-0 group-data-[orientation=vertical]/tabs:border-b-0 group-data-[orientation=vertical]/tabs:border-e-2',
     icon: 'size-3.5 shrink-0',
-    badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted',
+    badge: 'rounded-full bg-surface-strong px-1.5 py-px text-xs tabular-nums text-muted',
     status: 'm-0 pt-2 text-xs text-muted',
     retry: 'cursor-pointer self-start text-xs text-accent underline',
     // A hidden panel is hidden until found, which keeps its box with its content skipped: it takes no room.

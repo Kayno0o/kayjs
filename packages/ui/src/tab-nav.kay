@@ -14,7 +14,7 @@ const look = recipe({
     root: 'kui-tab-nav group/tab-nav flex overflow-x-auto data-[orientation=vertical]:flex-col data-[orientation=vertical]:overflow-x-visible data-[orientation=vertical]:overflow-y-auto',
     link: 'shrink-0 text-muted transition-colors hover:text-foreground inline-flex items-center gap-1 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:text-muted',
     icon: 'size-3.5 shrink-0',
-    badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted',
+    badge: 'rounded-full bg-surface-strong px-1.5 py-px text-xs tabular-nums text-muted',
   },
   variants: {
     // `underline` (the default) marks the current tab by a line beside it; `segmented` is a tray of keys with the current one filled, as Segmented draws it, but links: a page per tab, `aria-current` on the current one.

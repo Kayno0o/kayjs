@@ -1,0 +1,12 @@
+---
+import '../app.css'
+import SideNav from '@kayjs/ui/side-nav.kay'
+import SiteNav from '@kayjs/ui/site-nav.kay'
+import NavParts from '../components/nav-parts.kay'
+
+const links = [{ href: '/a', label: 'Overview' }, { href: '/b', label: 'Inbox', badge: 3 }]
+---
+main
+  NavParts
+  SideNav(items={links} current="/a" label="Side" panel={false})
+  SiteNav(items={links} current="/a" label="Site")
