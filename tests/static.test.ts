@@ -647,6 +647,46 @@ describe('kay build --static', () => {
     }
   })
 
+  it('leaves the last export whole until the next one is in place, and untouched when it fails', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+    // In the project, which git ignores here as it does a `dist`, so the build leaves the last export in place.
+    const out = join(fixture, 'dist')
+    const endpoint = join(fixture, 'src/routes/llms.txt.ts')
+    const served = await Bun.file(endpoint).text()
+    // Written while the export is running: what the old folder still holds at that moment.
+    const seen = join(elsewhere, 'seen.txt')
+    const watching = `import { readFileSync, writeFileSync } from 'node:fs'\n\nexport function GET() {\n  writeFileSync(${JSON.stringify(seen)}, readFileSync(${JSON.stringify(join(out, 'old.txt'))}, 'utf8'))\n\n  return 'new'\n}\n`
+
+    try {
+      expect((await exportSite(out, fixture)).code).toBe(0)
+      await Bun.write(join(out, 'old.txt'), 'the last export')
+
+      await Bun.write(endpoint, watching)
+
+      const replaced = await exportSite(out, fixture)
+
+      expect([replaced.code, await Bun.file(seen).text(), await Bun.file(join(out, 'llms.txt')).text(), existsSync(join(out, 'old.txt'))]).toEqual([0, 'the last export', 'new', false])
+
+      await Bun.write(join(out, 'old.txt'), 'the last export')
+      await Bun.write(endpoint, 'export function GET() {\n  throw new Error("down")\n}\n')
+
+      const failed = await exportSite(out, fixture)
+
+      expect(failed.code).toBe(1)
+      expect(await Bun.file(join(out, 'old.txt')).text()).toBe('the last export')
+      expect(await Bun.file(join(out, 'llms.txt')).text()).toBe('new')
+      expect([existsSync(`${out}.kay-staging`), existsSync(`${out}.kay-old`)]).toEqual([false, false])
+
+      await Bun.write(endpoint, served)
+      expect((await exportSite(out, fixture)).code).toBe(0)
+    }
+    finally {
+      await rm(fixture, { recursive: true, force: true })
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
   it('runs again into the directory an export failing halfway left', async () => {
     const fixture = await fixtureCopy('static')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
@@ -658,7 +698,9 @@ describe('kay build --static', () => {
 
       const failed = await exportSite(elsewhere, fixture)
 
-      expect([failed.code, existsSync(join(elsewhere, 'index.html'))]).toEqual([1, true])
+      expect(failed.code).toBe(1)
+      // The staged export of the failed run is gone.
+      expect(existsSync(`${elsewhere}.kay-staging`)).toBe(false)
 
       await Bun.write(endpoint, served)
 

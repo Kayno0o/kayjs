@@ -28,7 +28,9 @@ The security headers a server would send are written as `_headers`, which Netlif
 
 An image an island draws in the browser links the same files the page does. A crop, a quality or a small width that only a browser-rendered island draws has no file unless the same image is drawn somewhere the server renders.
 
-<ReadMore href="/llms/prerendering#static-export">Images, redirects, locales and how the output directory is cleared.</ReadMore>
+The site is written to a folder beside the output, `dist.kay-staging`, and renamed over `dist` once it is complete. A server pointed at `dist` keeps serving the last export until the new one is in place and never finds the folder empty, and an export that fails leaves the last one as it was.
+
+<ReadMore href="/llms/prerendering#static-export">Images, redirects, locales and how the output directory is replaced.</ReadMore>
 
 The build never opens the `store` of your config. A `pgData` database is not connected to, and gets no tables, while you export.
 

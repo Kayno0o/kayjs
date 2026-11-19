@@ -3,7 +3,7 @@ import type { Project } from '../project'
 import type { ClientBuild } from '../server/client'
 import type { Redirects } from '../server/redirects'
 import { existsSync } from 'node:fs'
-import { cp, mkdir, readdir, rm } from 'node:fs/promises'
+import { cp, mkdir, readdir, rename, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -71,14 +71,36 @@ function inside(out: string, name: string): string {
   return file
 }
 
-// Writes the whole site to `outdir`, as any static host serves it: every prerendered page, the browser build under `/_kay/`, the public files, the sitemap, feeds and favicons, `404.html`, and a page for each redirect.
+// Writes the whole site to a folder beside `outdir` and moves it over `outdir` once it is complete, so a host serving `outdir` always finds a whole export: the last one until the new one is in place, and still the last one when the export fails.
+// The site is what any static host serves: every prerendered page, the browser build under `/_kay/`, the public files, the sitemap, feeds and favicons, `404.html`, and a page for each redirect.
 // Each page goes in as `about.html` and `about/index.html`, which every host finds for `/about` and `/about/` alike, beside the compressed copies a host may send as they are.
 export async function exportStatic(project: Project, client: ClientBuild, outdir: string): Promise<StaticExport> {
-  const { root, config, paths: { public: publicDir, output } } = project
+  // Files still being written when one fails, which finish before the staged folder is removed.
+  const pending = new Set<Promise<unknown>>()
   const out = resolve(outdir)
 
-  refuseStaticConfig(config)
-  await clear(root, out)
+  refuseStaticConfig(project.config)
+  await checkOutput(project.root, out)
+  await removeLeftovers(out)
+  await mkdir(stagingOf(out), { recursive: true })
+  // Marked first, so the folder is one an export wrote once it is in place, and a later export may clear it.
+  await Bun.write(join(stagingOf(out), MARKER), '')
+
+  try {
+    const site = await writeSite(project, client, stagingOf(out), pending)
+
+    await swapIn(out)
+
+    return site
+  }
+  finally {
+    await Promise.allSettled(pending)
+    await rm(stagingOf(out), { recursive: true, force: true })
+  }
+}
+
+async function writeSite(project: Project, client: ClientBuild, out: string, pending: Set<Promise<unknown>>): Promise<StaticExport> {
+  const { root, config, paths: { public: publicDir, output } } = project
 
   const pagesDir = join(output, PRERENDERED_DIR)
   const built = [...client.pages]
@@ -90,19 +112,25 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   const limit = limiter(FILES_AT_ONCE)
   let failed = false
   // The first failure stops the files still waiting for their turn, as a loop stopped at it.
-  const writing = async <T>(task: () => Promise<T>): Promise<T | undefined> => limit(async () => {
-    if (failed)
-      return undefined
+  const writing = async <T>(task: () => Promise<T>): Promise<T | undefined> => {
+    const running = limit(async () => {
+      if (failed)
+        return undefined
 
-    try {
-      return await task()
-    }
-    catch (error) {
-      failed = true
+      try {
+        return await task()
+      }
+      catch (error) {
+        failed = true
 
-      throw error
-    }
-  })
+        throw error
+      }
+    })
+
+    pending.add(running)
+
+    return running
+  }
 
   await Promise.all(built.flatMap(([path, page]) => pageFiles(path).flatMap(target => ['', ...COPIES].map(async copy => writing(async () => {
     const source = join(pagesDir, `${page.file}${copy}`)
@@ -236,24 +264,61 @@ function overProject(root: string, out: string): boolean {
   return out === root || root.startsWith(out + sep) || out.startsWith(join(root, 'src') + sep) || out === join(root, 'src')
 }
 
-// The last export, which a build removes first so its pages, still in the folder, are no source of the stylesheets: only a folder an export wrote.
+// Where an export is written before it replaces `out`, and where the last one waits to be removed: beside it, so the move is a rename on one filesystem.
+function stagingOf(out: string): string {
+  return `${out}.kay-staging`
+}
+
+function asideOf(out: string): string {
+  return `${out}.kay-old`
+}
+
+// What an export killed halfway left beside `out`.
+async function removeLeftovers(out: string): Promise<void> {
+  await Promise.all([stagingOf(out), asideOf(out)].map(async folder => rm(folder, { recursive: true, force: true })))
+}
+
+// Whether git ignores the folder, which Tailwind then leaves out of its scan of the project.
+async function ignoredByGit(root: string, out: string): Promise<boolean> {
+  try {
+    const check = Bun.spawn(['git', '-C', root, 'check-ignore', '-q', '--', `${out}/`], { stdout: 'ignore', stderr: 'ignore', stdin: 'ignore' })
+
+    return await check.exited === 0
+  }
+  catch {
+    return false
+  }
+}
+
+// The last export, which a build removes first when Tailwind would scan its pages as sources of the stylesheets: only a folder an export wrote, and none git ignores, which stays for a host to serve until the new export replaces it.
 export async function removeLastExport(root: string, out: string): Promise<void> {
-  if (!overProject(root, out) && existsSync(join(out, MARKER)))
+  if (overProject(root, out))
+    return
+
+  await removeLeftovers(out)
+
+  if (existsSync(join(out, MARKER)) && !await ignoredByGit(root, out))
     await rm(out, { recursive: true, force: true })
 }
 
+// The staged export in place of the last one: that one moved aside, the new one renamed in, the old one removed.
+async function swapIn(out: string): Promise<void> {
+  const aside = asideOf(out)
+
+  if (existsSync(out))
+    await rename(out, aside)
+
+  await rename(stagingOf(out), out)
+  await rm(aside, { recursive: true, force: true })
+}
+
 // A directory kay may write to: never the project or what holds it, and one with files in it only when an export wrote them.
-async function clear(root: string, out: string): Promise<void> {
+async function checkOutput(root: string, out: string): Promise<void> {
   if (overProject(root, out))
     throw new KayError('export-output-dir', `kay: a static export into ${relative(process.cwd(), out) || '.'} would write over the project; give it a directory of its own, such as dist`)
 
   if (existsSync(out) && (await readdir(out)).length > 0 && !existsSync(join(out, MARKER)))
     throw new KayError('export-output-dir', `kay: ${relative(process.cwd(), out)} holds files a static export did not write; empty it or give another directory`)
-
-  await rm(out, { recursive: true, force: true })
-  await mkdir(out, { recursive: true })
-  // Marked first, so an export failing halfway leaves a directory the next one may clear.
-  await Bun.write(join(out, MARKER), '')
 }
 
 // The files a page path is written to: `/` as `index.html`, any other both ways.
