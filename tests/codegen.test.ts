@@ -1540,6 +1540,11 @@ describe('what a page island hands over', () => {
     expect(handed('--- server\nconst only = 1\nconst big = [1, 2]\n---\n---\nlet n = 0\n---\nbutton(onClick={() => n++}) go\np {only}')).toBe('only')
   })
 
+  it('keeps a value only a handler, a transition or a loop key of the template reads', () => {
+    expect(handed('--- server\nconst step = 5\nconst big = [1]\n---\n---\nlet n = 0\n---\nbutton(onClick={() => n += step}) go')).toBe('step')
+    expect(handed('--- server\nconst speed = 5\nconst big = [1]\n---\n---\nlet n = 0\n---\nbutton(onClick={() => n++}) go\np(transition:fade={{ duration: speed }}) x')).toBe('speed')
+  })
+
   it('leaves a page that is no island with every value', () => {
     expect(handed('--- server\nconst a = 1\nconst b = 2\n---\np {a}')).toBe('a, b')
   })
