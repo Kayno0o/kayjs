@@ -51,6 +51,19 @@ describe('navMark', () => {
     expect(navMark('/settings', page, entries('https://other.com/settings?tab=1'))).toBe('page')
   })
 
+  test('marks a link with a hash only when the page carries that hash, never as a section', () => {
+    const sections = entries('/#projets', '/#actualite', '/#a-propos')
+
+    for (const [href] of [['/#projets'], ['/#actualite'], ['/#a-propos']])
+      expect(navMark(href!, '/', sections)).toBeUndefined()
+
+    expect(navMark('/#projets', new URL('http://x/'), sections)).toBeUndefined()
+    expect(navMark('/#projets', '/#projets', sections)).toBe('page')
+    expect(navMark('/#actualite', '/#projets', sections)).toBeUndefined()
+    expect(navMark('/docs#setup', '/docs/guide')).toBeUndefined()
+    expect(navMark('/docs', '/docs#setup')).toBe('page')
+  })
+
   test('never marks a malformed href', () => {
     expect(navMark('http://', '/')).toBeUndefined()
     expect(navMark('http://', new URL('http://x/'))).toBeUndefined()

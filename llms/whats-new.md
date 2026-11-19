@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check` reports an `auth()` whose users go through `@kaynooo/pg-orm`, a SQLite file by default, when the app has not installed it, with `bun add @kaynooo/pg-orm`, where the server stopped only at start ([checks](checks.md#peer-packages)).
 - `kay check --fix` of `deprecated-schema-builders` keeps an unbounded `s.String()` unbounded, writing `max: Number.MAX_SAFE_INTEGER`, except in an action's input and an API route's `body`, which capped it at 10,000 characters already ([deprecated lints](deprecated-lints.md)).
 - A `head` entry in `kay.config.ts` with `children` beside `props` is refused at load and by `kay check`, naming `props.children`, where it used to render an empty tag; the config type refuses it too ([Head](head.md)).
+- kayjs-ui's `SiteNav`, `SideNav` and `TabNav` no longer mark every `/#section` link as the current page on that page: a link with a hash is current only when `current` carries the same hash ([TabNav](/ui/tab-nav)).
 
 ## 1.110.0
 

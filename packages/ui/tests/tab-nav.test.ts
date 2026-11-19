@@ -27,6 +27,11 @@ describe('currentTab', () => {
     expect(currentTab(links('/settings'), '/settings?tab=1')).toBeUndefined()
   })
 
+  test('matches a link with a hash only on a page carrying that hash', () => {
+    expect(currentTab(links('/#projets', '/#actualite'), new URL('https://example.com/'))).toBeUndefined()
+    expect(currentTab(links('/#projets', '/#actualite'), new URL('https://example.com/#actualite'))).toBe('/#actualite')
+  })
+
   test('reads a trailing slash on the address as the same page', () => {
     expect(currentTab(links('/settings', '/settings/keys'), new URL('https://example.com/settings/keys/'))).toBe('/settings/keys')
   })

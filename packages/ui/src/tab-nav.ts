@@ -94,7 +94,7 @@ function isCurrentTab(href: string, current: string | URL): boolean {
 
   const target = parseAddress(href)
 
-  return target !== undefined && onSite(target, current) && trimmed(target.pathname) === trimmed(current.pathname) && [...target.searchParams].every(([name, value]) => current.searchParams.getAll(name).includes(value))
+  return target !== undefined && onSite(target, current) && (target.hash === '' || target.hash === current.hash) && trimmed(target.pathname) === trimmed(current.pathname) && [...target.searchParams].every(([name, value]) => current.searchParams.getAll(name).includes(value))
 }
 
 // `href` carrying each param `keep` names from `current`, unless the link sets that param itself; a relative `href` stays relative.
