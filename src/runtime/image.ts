@@ -96,7 +96,7 @@ const requestedRemote = new Map<string, Map<string, ImageVariant>>()
 let remoteListed: ((src: string) => boolean) | undefined
 // Whether it leaves out the host of an image on another host, which then keeps its own URL, set with it.
 let unlistedCheck: ((src: string, caller: string) => boolean) | undefined
-// Set on the server, which records the variants pages ask for and links the files a static export wrote: the browser asks the route.
+// Set on the server, which records the variants pages ask for and links the files a static export wrote: the browser asks the route, except in a static export's bundle, which links the files itself (`exportedVariantUrl`).
 let serverVariantUrl: typeof recordedVariantUrl | undefined
 // Whether `images.resolve` looks sources up, which the browser reads off the page.
 let resolved: boolean | undefined
@@ -552,7 +552,7 @@ export function imageUrl(src: string, width: number, aspect?: Aspect, quality?: 
 function variantUrl(src: string, variant: ImageVariant): string {
   const query = variant === 'card' ? 'card' : `w=${variant.width}${variant.aspect ? `&crop=${aspectKey(variant.aspect)}` : ''}${variant.quality === undefined ? '' : `&q=${variant.quality}`}`
 
-  return serverVariantUrl?.(src, variant) ?? (typeof KAY_STATIC_EXPORT === 'undefined' ? undefined : exportedVariantUrl(src, variant)) ?? `${IMAGE_ROUTE}?src=${encodeURIComponent(src)}&${query}`
+  return serverVariantUrl?.(src, variant) ?? exportedVariantUrl(src, variant) ?? `${IMAGE_ROUTE}?src=${encodeURIComponent(src)}&${query}`
 }
 
 // The file of a variant a static export wrote, recording the variants pages ask for beyond the ladder; nothing where the route serves it.
@@ -590,5 +590,5 @@ function variantFile(name: string, variant: ImageVariant): string {
 
 // In the browser of a static export, which has no route: the file the build wrote of an imported image, the one the server HTML links. Only the export's bundle holds it, a server-rendered app's does not.
 function exportedVariantUrl(src: string, variant: ImageVariant): string | undefined {
-  return src.startsWith(IMPORTED) ? variantFile(importedName(src), variant) : undefined
+  return typeof KAY_STATIC_EXPORT !== 'undefined' && src.startsWith(IMPORTED) ? variantFile(importedName(src), variant) : undefined
 }

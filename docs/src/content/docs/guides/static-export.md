@@ -96,8 +96,6 @@ export default defineConfig({
 
 Under `always`, canonical links, the sitemap and the links in search results end in a slash too. An API route, an endpoint and an image keep the spelling that was sent.
 
-An image an island draws in the browser links the same files the page does. A crop, a quality or a small width that only a browser-rendered island draws has no file unless the same image is drawn somewhere the server renders.
-
 A static export writes both `about.html` and `about/index.html`, so any value works on a plain file host. Set `trailingSlash` to the one your host redirects to.
 
 <ReadMore href="/llms/prerendering#prerendering">How kept pages read `ctx.url.pathname` under each value.</ReadMore>
