@@ -48,9 +48,9 @@ export interface IslandImages {
 
 const IMAGE_IMPORT = /^import\s+(\w+)\s+from\s+(["'])(\.[^"'\n]*\.(?:png|jpe?g|webp|gif|avif))\2/gm
 const KAY_IMAGE_IMPORT = /import\s*\{[^}]*\bimage\b[^}]*\}\s*from\s*["']kay\/image["']/
-const IMAGE_CALL = /(?<![\w$])(?<!(?<!\.\.)\.)image\(\s*(?:(["'])(https?:\/\/[^"'\n]+)\1|([\w$.]+)\s*(?=[,)]))\s*(?:,\s*\{([^{}]*)\})?/g
-const NUMBER = /^\d+(?:\.\d+)?$/
-const STRING = /^(["'])(.*)\1$/s
+const IMAGE_CALL = /(?<![\w$])(?<!(?<!\.\.)\.)image\(\s*(?:(["'])(https?:\/\/[^"'\n]+)\1|([\w$.]+)\s*(?=[,)]))\s*(?:,\s*\{((?:[^{}]|\$\{[^}]*\})*)\})?/g
+const NUMBER = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i
+const STRING = /^(["'`])(.*)\1$/s
 const SCANNED = /\.(?:kay|[cm]?[jt]sx?)$/
 const REMOTE = /^https?:\/\//i
 
@@ -58,7 +58,13 @@ const REMOTE = /^https?:\/\//i
 function literal(text: string): string | number | undefined {
   const written = text.trim()
 
-  return NUMBER.test(written) ? Number(written) : STRING.exec(written)?.[2]
+  if (NUMBER.test(written))
+    return Number(written)
+
+  const inner = STRING.exec(written)?.[2]
+
+  // A template literal is read when nothing is interpolated.
+  return written.startsWith('`') && inner?.includes('${') === true ? undefined : inner
 }
 
 function optionsOf(read: (name: string) => string | undefined): ImageOptions {
@@ -85,7 +91,7 @@ function unreadOptions(read: (name: string) => string | undefined): boolean {
 }
 
 function fieldOf(text: string, name: string): string | undefined {
-  const found = new RegExp(`(?:^|[,{\\s])${name}(?:\\s*:\\s*("[^"]*"|'[^']*'|[^,}\\s]+)|(?=\\s*(?:[,}]|$)))`).exec(text)
+  const found = new RegExp(`(?:^|[,{\\s])${name}(?:\\s*:\\s*("[^"]*"|'[^']*'|\x60[^\x60]*\x60|[^,}\\s]+)|(?=\\s*(?:[,}]|$)))`).exec(text)
 
   // A shorthand property holds a variable, written by its name.
   return found === null ? undefined : found[1] ?? name
@@ -164,7 +170,7 @@ export function scanIslandImages(files: Iterable<string>): IslandImages {
 
       if (url !== undefined && sized)
         found.remote.push({ src: url, options, ...at })
-      else if (url !== undefined && (read('width') !== undefined || read('height') !== undefined))
+      else if (url !== undefined)
         found.dynamic.push({ ...at, reason: 'size' })
       else if (imports.has(name!))
         found.imported.push({ file: imports.get(name!)!, options })

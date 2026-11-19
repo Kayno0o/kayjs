@@ -103,6 +103,9 @@ describe('scanIslandImages', () => {
       'img({...image(\'https://other.example/b.jpg\', { width: 800, height: 600 })} alt="")',
       'img({...image(\'https://cms.example/c.jpg\', { width: post.w, height: 600 })} alt="")',
       'img(src={cover} aspect={post.cover} alt="")',
+      'img({...image(\'https://cms.example/d.jpg\')} alt="")',
+      'img({...image(cover, { aspect: `4/3`, quality: 8e1, sizes: `50vw` })} alt="")',
+      'img({...image(cover, { sizes: `${post.cover}vw` })} alt="")',
       '',
     ].join('\n'))
 
@@ -111,6 +114,9 @@ describe('scanIslandImages', () => {
     expect(found.imported).toEqual([
       { file: join(dir, 'a.png'), options: { sizes: '95px' } },
       { file: join(dir, 'a.png'), options: { aspect: '1/1', quality: 90 } },
+      // A template literal with nothing interpolated and an exponent number are literals.
+      { file: join(dir, 'a.png'), options: { aspect: '4/3', quality: 80, sizes: '50vw' } },
+      { file: join(dir, 'a.png'), options: {} },
     ])
     expect(found.remote.map(({ src, options }) => ({ src, options }))).toEqual([
       { src: 'https://cms.example/a.jpg', options: { width: 800, height: 600, aspect: '16/9' } },
@@ -120,12 +126,14 @@ describe('scanIslandImages', () => {
       { reason: 'option', line: 14 },
       { reason: 'source', line: 10 },
       { reason: 'size', line: 13 },
+      { reason: 'size', line: 15 },
+      { reason: 'option', line: 17 },
     ])
 
-    // The host `images.remote` does not list, a size and an option no literal, and a source no literal, each on its own line.
+    // The host `images.remote` does not list, a size missing or no literal, an option no literal or interpolated, and a source no literal, each on its own line.
     const lints = dynamicImageLints(found, 'warn', src => src.startsWith('https://cms.example/'))
 
-    expect(lints.map(({ line }) => line).toSorted((a, b) => a - b)).toEqual([10, 12, 13, 14])
+    expect(lints.map(({ line }) => line).toSorted((a, b) => a - b)).toEqual([10, 12, 13, 14, 15, 17])
     expect(lints[0]).toMatchObject({ code: 'static-remote-image', severity: 'warning', file })
   })
 })
