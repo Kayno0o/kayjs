@@ -135,6 +135,7 @@ Each lint has a level. `deny` is an error (the seven that ship a broken page, su
 | `unsized-image` | warn | performance | An `img` with no `width` and `height`, unless its classes or `style` reserve the box, as `aspect-video w-full` |
 | `serial-awaits` | warn | performance | Two or more consecutive `const x = await ...` statements in a `--- server` fence that read none of each other's names, so each waits for the one before; the editor offers one `Promise.all` as an unsafe fix, which `--fix` leaves, as a guard must stay first |
 | `large-public-image` | warn | performance | An `img`, a CSS `url()` or `image-set()` string, a social card `meta`, `seo.image`, or a Markdown image, HTML `img` or frontmatter `image:` using a public image over 256 KiB, as a path or an address under `site` |
+| `static-remote-image` | warn | performance | On a static export, an island's `image(source, { width, height })` whose source is neither an import nor a literal URL, so the browser links the original image |
 | `missing-site` | warn | seo | `seo` with no `site`, on a static export |
 | `missing-description` | warn | seo | No `seo.description` |
 | `missing-share-image` | warn | seo | No share image on any page |

@@ -8,7 +8,7 @@ import { fixtureCopy, scratchDir } from './scratch'
 
 const path = browserPath()
 const ROOT = 'tests/fixtures/static-island-image'
-const IMAGES = ['img.loaded', 'img.loaded-crop', 'img.browser', 'img.browser-crop']
+const IMAGES = ['img.loaded', 'img.loaded-crop', 'img.browser', 'img.browser-crop', 'img.browser-small']
 
 // A plain file server, as a static host is, mounted at `base` and keeping the requests it saw.
 function serveDirectory(dir: string, base: string, seen: string[]): ReturnType<typeof Bun.serve> {
@@ -81,8 +81,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
           }
         }
 
-        // The browser draws the same files the server HTML links.
-        expect(await linked(view, 'img.browser-crop')).toEqual(await linked(view, 'img.server-crop'))
+        // Only the island draws that crop and quality, so the build wrote them from its source.
+        expect((await linked(view, 'img.browser-crop')).every(url => url.includes('-4x3-q75'))).toBe(true)
         expect(seen.filter(url => url.includes('/_kay/images?'))).toEqual([])
         expect(view.errors).toEqual([])
       }, 60_000)

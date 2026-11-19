@@ -207,7 +207,7 @@ export function writesFrench(config: Pick<KayConfig, 'lang' | 'i18n' | 'client'>
 }
 
 // The browser build a config asks for. `kay build`'s (`build` given) minifies unless the config says not to; one a server or a test makes on demand does only when the config says so.
-export function clientOptionsOf(config: LoadedConfig, mode: Pick<Mode, 'dev' | 'underKayDev'>, build?: Pick<ClientOptions, 'exported' | 'report'>): ClientOptions {
+export function clientOptionsOf(config: LoadedConfig, mode: Pick<Mode, 'dev' | 'underKayDev'>, build?: Pick<ClientOptions, 'exported' | 'staticImages' | 'report'>): ClientOptions {
   return {
     ...pickConfig(config, CLIENT_BUILD_KEYS),
     minify: config.minify ?? build !== undefined,

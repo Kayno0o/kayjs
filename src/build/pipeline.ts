@@ -38,7 +38,7 @@ import { avifQuality, webpQuality, writeImageVariants, writeRemoteVariants } fro
 import { setImageColors } from '../server/image-color'
 import { assetFiles, hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
-import { remoteImages, remotePatterns } from '../server/remote'
+import { remoteAllowed, remoteImages, remotePatterns } from '../server/remote'
 import { contextReadsOf, routeMounts, slashedPath } from '../server/routes'
 import { configuredFiles, linkStoredFiles } from '../server/storage'
 import { budgetLints, checkBudget, footprintLints } from './budget'
@@ -49,6 +49,7 @@ import { cachedCopies, cachedDictionaryCopies, pruneCopies, pruneDictionaryCopie
 import { writeCachedFavicons } from './favicons'
 import { inWalkScope } from './files'
 import { routeFootprints } from './footprint'
+import { recordIslandImages } from './island-images'
 import { restoreKept, setAsideKept } from './kept'
 import { codecWarnings, iconSetPackages, iconSetWarnings, NOTICES_FILE, packagesOf, thirdPartyNotices } from './licenses'
 import { readStoredReport, storedReport, writeStoredReport } from './report'
@@ -403,7 +404,8 @@ async function bundleStage(project: Project, exported: boolean, analyze: boolean
   if (exported)
     refuseStaticConfig(config)
 
-  const client = await buildClient(root, clientOptionsOf(config, project.mode, { exported, report: analyze || (project.config.budget?.js !== undefined && lintLevel('over-budget', project.config.lints) !== 'allow') ? 'modules' : 'sizes' }))
+  const patterns = exported ? await remotePatterns(config.assets?.images?.remote?.hosts) : []
+  const client = await buildClient(root, clientOptionsOf(config, project.mode, { exported, ...exported && { staticImages: { allowed: (src: string) => remoteAllowed(src, patterns) } }, report: analyze || (project.config.budget?.js !== undefined && lintLevel('over-budget', project.config.lints) !== 'allow') ? 'modules' : 'sizes' }))
 
   // A static host cannot pick a format by `Accept`, so an export links WebP alone.
   const avif = exported ? undefined : avifQuality(config.assets?.images)
@@ -475,11 +477,15 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   // Read to point a redirect's lint at its line, only when there is one to point at.
   const configSource = checking && config.redirects !== undefined && await Bun.file(configFile).exists() ? await Bun.file(configFile).text() : undefined
 
+  const imagePatterns = await remotePatterns(config.assets?.images?.remote?.hosts)
+  // The pages recorded the variants they link, and the islands' own, which no page rendered, go in beside them.
+  const islandImageLints = await recordIslandImages(client.dir, client.islandImages, src => remoteAllowed(src, imagePatterns), { checking, lints: config.lints })
+
   // The heads are the check's to read, so a build without checking skips them with it.
-  const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...siteSeoLints(config, rendered, others, { configFile, configSource, exported, unseen: hasUnseenPages(routes, rendered, others, exported, paths.routes), skipConfigChains: true }), ...unkeptPageLints(config, [...stops.values()]), ...pageStructureLints(config, rendered)] : [], ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
+  const linted = [...checking ? [...pageSeoLints(config, rendered, exported), ...siteSeoLints(config, rendered, others, { configFile, configSource, exported, unseen: hasUnseenPages(routes, rendered, others, exported, paths.routes), skipConfigChains: true }), ...unkeptPageLints(config, [...stops.values()]), ...pageStructureLints(config, rendered)] : [], ...islandImageLints, ...budgetLints(config.budget, config.lints, sizes, routes, client.report)]
 
   // Remote originals are kept between builds, revalidated as the image route does.
-  const remote = remoteImages(cacheDir(root, 'remote'), await remotePatterns(config.assets?.images?.remote?.hosts), undefined, undefined, remoteLimits(config.assets?.images))
+  const remote = remoteImages(cacheDir(root, 'remote'), imagePatterns, undefined, undefined, remoteLimits(config.assets?.images))
 
   await writeImageVariants(client.dir, webpQuality(config.assets?.images), cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.assets?.images), onImage: imageProgress(report) })
   report({ step: 'writing images, cards and favicons' })

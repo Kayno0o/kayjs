@@ -4,6 +4,7 @@ import { textHash } from './text-hash'
 
 declare const KAY_BROWSER: true | undefined
 declare const KAY_STATIC_EXPORT: true | undefined
+declare const KAY_STATIC_REMOTE: readonly string[] | undefined
 
 // The widths an image is resized to unless `images.widths` says otherwise, the only ones the image route makes: a fixed ladder keeps how many files one image can turn into bounded.
 export const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560] as const
@@ -552,7 +553,7 @@ export function imageUrl(src: string, width: number, aspect?: Aspect, quality?: 
 function variantUrl(src: string, variant: ImageVariant): string {
   const query = variant === 'card' ? 'card' : `w=${variant.width}${variant.aspect ? `&crop=${aspectKey(variant.aspect)}` : ''}${variant.quality === undefined ? '' : `&q=${variant.quality}`}`
 
-  return serverVariantUrl?.(src, variant) ?? exportedVariantUrl(src, variant) ?? `${IMAGE_ROUTE}?src=${encodeURIComponent(src)}&${query}`
+  return serverVariantUrl?.(src, variant) ?? (typeof KAY_STATIC_EXPORT === 'undefined' ? undefined : exportedVariantUrl(src, variant)) ?? `${IMAGE_ROUTE}?src=${encodeURIComponent(src)}&${query}`
 }
 
 // The file of a variant a static export wrote, recording the variants pages ask for beyond the ladder; nothing where the route serves it.
@@ -588,7 +589,10 @@ function variantFile(name: string, variant: ImageVariant): string {
   return `${VARIANTS}${encodeURIComponent(`${name.replace(EXTENSION, '')}${variantSuffix(variant)}`)}`
 }
 
-// In the browser of a static export, which has no route: the file the build wrote of an imported image, the one the server HTML links. Only the export's bundle holds it, a server-rendered app's does not.
+// In the browser of a static export, which has no route: the file the build wrote of an imported image, the one the server HTML links, and of a remote image whose URL the build fetched. Any other image keeps its own URL. Only the export's bundle holds it, a server-rendered app's does not.
 function exportedVariantUrl(src: string, variant: ImageVariant): string | undefined {
-  return typeof KAY_STATIC_EXPORT !== 'undefined' && src.startsWith(IMPORTED) ? variantFile(importedName(src), variant) : undefined
+  if (src.startsWith(IMPORTED))
+    return variantFile(importedName(src), variant)
+
+  return REMOTE.test(src) && KAY_STATIC_REMOTE?.includes(src) === true ? `${VARIANTS}${remoteVariantName(src, variant)}` : src
 }

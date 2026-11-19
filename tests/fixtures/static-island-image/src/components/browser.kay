@@ -3,4 +3,5 @@ island({ render: 'client' })
 import cover from '../cover.png'
 ---
 img.browser(src={cover} sizes="50vw" alt="Browser")
-img.browser-crop(src={cover} sizes="50vw" aspect="1/1" quality={90} alt="Cropped")
+img.browser-crop(src={cover} sizes="50vw" aspect="4/3" quality={75} alt="Cropped")
+img.browser-small(src={cover} sizes="95px" alt="Small")

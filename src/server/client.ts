@@ -1,4 +1,5 @@
 import type { ClientOptions } from '../build/client'
+import type { IslandImages } from '../build/island-images'
 import type { SizeReport } from '../build/report'
 import type { StyleUses, UnresolvedClass } from '../build/style-uses'
 import type { Node } from '../build/supports'
@@ -130,6 +131,8 @@ export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages' | '
   report?: SizeReport | undefined
   // The directories of the packages its modules and stylesheets come from, for the notices file.
   packages?: string[] | undefined
+  // A static export's: the images its islands draw that no page renders.
+  islandImages?: IslandImages | undefined
 }
 
 // Quoted, spaces included, or bare.

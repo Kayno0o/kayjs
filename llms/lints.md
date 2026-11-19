@@ -91,7 +91,7 @@ The table of lints is split by group, each page holding its rows (the `deprecate
 
 ### Performance lints
 
-The `performance` group (`unsized-image`, `large-public-image`, `serial-awaits`) has its own page, which holds its rows: [Performance lints](performance-lints.md).
+The `performance` group (`unsized-image`, `large-public-image`, `static-remote-image`, `serial-awaits`) has its own page, which holds its rows: [Performance lints](performance-lints.md).
 
 ### SEO lints
 

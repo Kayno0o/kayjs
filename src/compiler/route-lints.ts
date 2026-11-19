@@ -10,6 +10,14 @@ export const ROUTE_LINTS = {
   ...LOOP_LINTS,
   ...LINK_LINTS,
   ...SCHEMA_LINTS,
+  'static-remote-image': {
+    level: 'warn',
+    group: 'performance',
+    site: true,
+    summary: 'On a `kay build --static` export, an island\'s `image(source, { width, height })` whose source is neither an imported image nor a literal URL: the export has no image route, so the browser links the original image, not resized files. Give `image()` the URL as a literal, on a host `assets.images.remote` lists, and the build fetches and resizes it; any other source is drawn at full size. Reported by `kay build --static`.',
+    wrong: 'img({...image(post.cover, { width: 1200, height: 800 })} alt="")',
+    right: 'img({...image(\'https://cms.example.com/cover.jpg\', { width: 1200, height: 800 })} alt="")',
+  },
   'text-size-colour': {
     level: 'warn',
     group: 'code',

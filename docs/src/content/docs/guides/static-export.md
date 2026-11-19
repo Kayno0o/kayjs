@@ -26,7 +26,11 @@ Compressible files also get a `.br` and a `.gz` copy beside them, for a server t
 
 The security headers a server would send are written as `_headers`, which Netlify and Cloudflare Pages read, and as `headers.nginx.conf`, a list of `add_header` lines for nginx to `include`. A `security` setting on a single page is not carried there, and the build warns naming those pages. A `public/_headers` of your own keeps its rules: kay's block follows them, without a header your file already names.
 
-An image an island draws in the browser links the same files the page does. A crop, a quality or a small width that only a browser-rendered island draws has no file unless the same image is drawn somewhere the server renders.
+An image an island draws in the browser links the same files the page does. The build reads the islands' own `img` and `image()` calls, so a crop, a quality or a small width that only a browser-rendered island asks for has its files too.
+
+A remote image the island names as a literal URL, with its `width` and `height`, on a host `assets.images.remote` lists, is downloaded at build time and linked as files. The build fails naming the URL when the host does not answer in time.
+
+Any other remote image or upload keeps its own address, and the build warns of an `image()` call whose source it cannot read (`static-remote-image`).
 
 The site is written to a folder beside the output, `dist.kay-staging`, and renamed over `dist` once it is complete. A server pointed at `dist` keeps serving the last export until the new one is in place and never finds the folder empty, and an export that fails leaves the last one as it was.
 

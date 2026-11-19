@@ -1,9 +1,6 @@
 ---
 import Browser from '../components/browser.kay'
 import Loaded from '../components/loaded.kay'
-import cover from '../cover.png'
 ---
-// The server draws the crop the browser-only island draws, which is what writes its files.
-img.server-crop(src={cover} sizes="50vw" aspect="1/1" quality={90} alt="Cropped")
 Loaded(hydrate="load")
 Browser
