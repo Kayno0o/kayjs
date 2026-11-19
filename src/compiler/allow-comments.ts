@@ -45,25 +45,31 @@ export function allowComments(source: string): AllowComment[] {
 export function unknownNames(comment: AllowComment, source: string, known: (name: string) => boolean, help: string): Diagnostic[] {
   const unknown = comment.names.filter(({ name }) => !known(name))
   const removed = new Set<string>(REMOVED_LINTS)
-  const alone = comment.names.every(({ name }) => removed.has(name))
+  const lastKept = comment.names.findLastIndex(({ name }) => !removed.has(name))
   const lineStart = source.lastIndexOf('\n', comment.start - 1) + 1
   const whole = source.slice(lineStart, comment.start).trim() === ''
   const after = source[comment.end] === '\n' ? comment.end + 1 : comment.end
+  const last = comment.names.at(-1)!
 
-  return unknown.map(({ name, start }, index): Diagnostic => {
+  return unknown.map(({ name, start }): Diagnostic => {
     const end = start + name.length
 
     if (!removed.has(name))
       return { start, end, code: 'unknown-lint', message: `Unknown lint \`${name}\``, help, checkOnly: true }
 
     const position = comment.names.findIndex(other => other.start === start)
-    const next = comment.names[position + 1]
-    const previous = comment.names[position - 1]
-    const span = next ? { start, end: next.start } : { start: previous ? previous.start + previous.name.length : start, end }
-    const dropped = whole ? { start: lineStart, end: after } : { start: comment.start, end: comment.end }
-    const edit = alone ? dropped : span
+    const diagnostic: Diagnostic = { start, end, code: 'unknown-lint', severity: 'warning', message: `\`${name}\` is a lint kay has removed`, help: 'remove it from the comment: it allows nothing', checkOnly: true }
 
-    return { start, end, code: 'unknown-lint', severity: 'warning', message: `\`${name}\` is a lint kay has removed`, help: 'remove it from the comment: it allows nothing', checkOnly: true, ...!alone || index === 0 ? { fixes: [{ title: alone ? 'remove the comment' : `remove \`${name}\``, safe: true, edits: [{ ...edit, text: '' }] }] } : {} }
+    // The removed names after the last live one go in one edit, on the first of them, so no two edits overlap; the comment itself goes when no name is live.
+    if (position > lastKept && position !== lastKept + 1)
+      return diagnostic
+
+    const kept = comment.names[lastKept]
+    const dropped = whole ? { start: lineStart, end: after } : { start: comment.start, end: comment.end }
+    const tail = kept ? { start: kept.start + kept.name.length, end: last.start + last.name.length } : dropped
+    const edit = position > lastKept ? tail : { start, end: comment.names[position + 1]!.start }
+
+    return { ...diagnostic, fixes: [{ title: kept || position < lastKept ? `remove \`${name}\`` : 'remove the comment', safe: true, edits: [{ ...edit, text: '' }] }] }
   })
 }
 
