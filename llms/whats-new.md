@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - On a static export an island that draws an imported image in the browser links the variant files the build wrote, as the server HTML does, instead of the image route, which a static host answers with a 404 ([images](images.md)).
+- `kay check` resolves the imports of a library's own components from where Bun's isolated linker put the library's dependencies, so an app listing `@kayjs/ui` alone no longer lists `@kaynooo/utils` for the check to pass ([component libraries](component-libraries.md)).
 
 ## 1.110.0
 

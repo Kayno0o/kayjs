@@ -323,11 +323,11 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   })])
   const unreached = new Set<string>()
 
-  await Promise.all(followed.filter(library => library.extension).map(async (library) => {
+  await Promise.all(followed.map(async (library) => {
     const own = programs.some(program => program.library === library)
 
     // A link left from a run in which the package was a program of its own would take what is written under `node_modules` to that program's folder.
-    if (!own)
+    if (!own && library.extension)
       await dropLink(dirname(shadowPath(root, join(library.dir, 'x'))))
 
     await linkDependencies(root, library, own, tree)
@@ -423,7 +423,7 @@ async function dropLink(path: string) {
   catch {}
 }
 
-// A bare import climbs from the shadow, not from the package, so the dependencies the package installs are linked beside its shadows: its own `node_modules`, and the ones above it that the app's ancestors do not include.
+// A bare import climbs from the shadow, not from the package, so the dependencies the package installs are linked beside its shadows, under bun's isolated install, where they sit beside the package's real path in `node_modules/.bun` and not in the app's `node_modules`, so an app need not list them: its own `node_modules`, and the ones above it that the app's ancestors do not include.
 async function linkDependencies(root: string, { dir, realDir }: KayLibrary, own: boolean, tree: ShadowTree) {
   const types = projectPaths(root).types
   // The package of a program is shadowed beside its real path.
