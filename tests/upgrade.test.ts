@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
-import { dependencies as kayDependencies, peerDependencies } from '../package.json'
+import { engines, dependencies as kayDependencies, peerDependencies } from '../package.json'
 import { addMissingPeers } from '../src/commands/add-peers'
 import { registryDepsFor, steppingStones, stoneFallbacks, upgradeProject } from '../src/commands/upgrade'
 import { DEPRECATION_MINORS, LINTS } from '../src/compiler/lints'
@@ -1323,7 +1323,7 @@ describe('kay upgrade through the package manager', () => {
     const absent = await stub('exit 0')
 
     try {
-      for (const [{ root }, version] of [[stale, '1.4.3'], [fresh, '1.4.4']] as const) {
+      for (const [{ root }, version] of [[stale, '1.0.0'], [fresh, (/\d+\.\d+\.\d+/).exec(engines.bun)![0]]] as const) {
         await Bun.write(join(root, 'node_modules/bun/package.json'), JSON.stringify({ version }))
       }
 
