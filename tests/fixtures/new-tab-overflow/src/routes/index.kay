@@ -1,0 +1,3 @@
+//- A truncated outside link whose title runs far past its narrow box, as a search result list draws one.
+main(style="width: 300px")
+  a#far(href="https://example.com/a-long-title" style="display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis") {'A title long enough to run far past the box that holds it, '.repeat(30)}

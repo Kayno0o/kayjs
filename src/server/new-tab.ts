@@ -9,7 +9,7 @@ const ESCAPED: Record<string, string> = { '\\': '\\\\', '"': '\\"', '<': '\\3C '
 function styleOf(word: string): string {
   const text = word.replace(CSS_SPECIALS, character => ESCAPED[character]!)
 
-  return `<style>a[${NEW_TAB_ATTRIBUTE}]::after{content:"${text}";position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}</style>`
+  return `<style>a[${NEW_TAB_ATTRIBUTE}]::after{content:"${text}";position:absolute;top:0;inset-inline-start:0;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}</style>`
 }
 
 // The rule saying aloud that a link kay opens in a new tab does: the text is the page's locale's `kay.link.newTab`, clipped out of sight as a screen reader still reads it. A page whose markup holds no such link, and whose islands and streamed parts can add none, goes without it.

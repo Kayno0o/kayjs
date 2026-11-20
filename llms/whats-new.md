@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- An outside link that clips a long title (`truncate`) no longer widens the page: its hidden "(opens in a new tab)" label sits at a corner of its positioned ancestor rather than after the unclipped text ([navigation](navigation.md)).
+
 ## 1.112.1
 
 - A page's `Table` that renders as plain markup passes `kay check` with its columns typed `Column<Row>[]` or holding a function `sortValue`, and renders: a use turning no interactive prop on sends nothing, so a function in the data it is given is called by the server and no `island-prop` ([islands](islands.md#make-a-component-interactive)).
