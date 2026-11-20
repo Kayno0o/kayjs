@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.112.1
 
 - A page's `Table` that renders as plain markup passes `kay check` with its columns typed `Column<Row>[]` or holding a function `sortValue`, and renders: a use turning no interactive prop on sends nothing, so a function in the data it is given is called by the server and no `island-prop` ([islands](islands.md#make-a-component-interactive)).
 - A page swap leaves the head's styles and stylesheets in the order the next page serves them, the ones both pages share included, so a shared block declaring an `@layer` no longer comes before the page's own cut and flips the layer order, which dropped Tailwind utilities until a reload ([navigation](navigation.md)).
@@ -40,19 +40,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - An island drawn in a keyed `for` is paired by the loop's key across a refresh, with no `id` or `persist` on it, so deleting the first row leaves each other island its own state; the server writes the key as the island's `data-key`. A `details` of the first load takes the server's value as its baseline, as one a swap brings does ([Navigation](navigation.md#islands-kept-across-pages)).
 
-## 1.110.0
-
-- kayjs-ui's `Checkbox`, `RadioGroup` choices and `Toggle` rows are at least 24px tall, the tap target of WCAG 2.5.8, whatever the label's line height.
-- kayjs-ui's `Segmented` keeps each option's label on one line and scrolls sideways inside its container when the options do not fit, and a `Badge` wraps its text between words inside its parent, instead of overflowing it.
-- kayjs-ui's `BarChart` draws each shown x-axis label in a box as wide as its text, centred on its column, and no box for a column with no label, so a chart of many columns no longer has labels running past their own box.
-- A task list item (`- [ ] a`) inside `.kui-prose`, such as a MarkdownEditor preview, shows no bullet and a drawn box in the accent hanging where the bullet was, not the browser's dimmed checkbox; the space skin draws it too.
-- A component listing `island({ interactive })` takes a function or a block with parameters from a use turning none of those props on, so a page's `Table` with an `@cell(row, column)` block is plain markup with the block rendered by the server, and no longer an `island-prop` error ([islands](islands.md#make-a-component-interactive)).
-- A Table whose `rows` is replaced by copies under the same `rowKey` keeps the nodes its `@cell` and `@detail` blocks drew, so a field in a cell keeps the focus while it is edited; the block's `row` is a view of the current row, read by its fields where it is used, so compare rows by their key, not by identity (`rows.indexOf(row)` is `-1`); Masonry, AvatarGroup, BellInbox, ChipGroup, Segmented, RadioGroup, MultiSelect, Combobox, DescriptionList, AppSwitcher and AudioPlayer draw their item blocks the same way ([Table](../packages/ui/llms/table.md)).
-- A swap keeps what the visitor changed and applies what the server changed: an island stays on a refresh and takes its new props in place, its state kept, as do the islands a layout renders across a visit to a page with the same layout; a static `details` the visitor opened and a field they typed in keep their state through a refresh, in production as in `kay dev`, unless the server changed that value ([Navigation](navigation.md#islands-kept-across-pages), [Actions from islands](actions-from-islands.md)).
-- `signal-from-prop` (a warning in the `islands` group) flags a `signal(light)` seeded from a prop and never written, which keeps the first value now that an island stays through a refresh, and `kay check --fix` writes `linked(() => light)` ([lints](island-and-form-lints.md)).
-- kayjs-ui's `Dialog` closes with a plain button with a `close` part, so an island holding a Dialog no longer ships `IconButton` and the icon set for it (a plain Dialog island is 7 KB smaller in an app that has no other icon button), and it leaves out `level`, `header`, `handle`, `trigger` and `closeHref` when no call site of the project writes them; the close draws kayjs-ui's `x` icon, and a `close` block replaces it ([restyle](https://git.kaynooo.fr/kaynooo/kayjs/src/branch/main/packages/ui/llms/restyle.md)).
-- A kayjs-ui component handing its `...rest` props, or a prop it takes by name, on to a component with optional features (`FormDialog`, `SidePanel` and `ConfirmHost` into `Dialog`) counts by what its own callers write, no longer as every prop, so an island leaves out the features no call site uses.
-- A part handed on to a component (`Icon(part="spinner")`) writes its `class` and `parts` as one source, about 45 bytes less in each island per hand-off.
-- A `lints` entry in kay.config.ts naming a lint kay has removed (`'deprecated-package-names': 'allow'`) is accepted by the config type and warned about by `kay check`, instead of refused; `kay check --fix` writes `s.Union(Object.keys(R).map(key => s.Literal(key)))` as `s.enum(R)` and leaves any other mapped `s.Union` to the app, see [Upgrading](upgrading.md). The same fix writes `max: Number.MAX_SAFE_INTEGER` on an `s.Array` and `extra: 'strip'` on an `s.Object`, so a rewritten list or object keeps the old behaviour; an app rewritten before has lists capped at 1,000 and objects that refuse extra keys, [how to check](upgrading-archive.md).
-
-Releases before 1.110 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.111 are in [What's new, older releases](whats-new-archive.md).

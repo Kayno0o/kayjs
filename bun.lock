@@ -69,7 +69,7 @@
     },
     "packages/ai": {
       "name": "@kayjs/ai",
-      "version": "1.112.0",
+      "version": "1.112.1",
       "dependencies": {
         "@kaynooo/utils": "^3.2.0",
       },
@@ -89,7 +89,7 @@
     },
     "packages/auth": {
       "name": "@kayjs/auth",
-      "version": "1.112.0",
+      "version": "1.112.1",
       "dependencies": {
         "@kaynooo/utils": "^3.2.0",
         "jose": "^6.2.13",
@@ -115,7 +115,7 @@
     },
     "packages/cms": {
       "name": "@kayjs/cms",
-      "version": "1.112.0",
+      "version": "1.112.1",
       "dependencies": {
         "@kaynooo/utils": "^3.2.0",
       },
@@ -137,7 +137,7 @@
     },
     "packages/mail": {
       "name": "@kayjs/mail",
-      "version": "1.112.0",
+      "version": "1.112.1",
       "dependencies": {
         "@kaynooo/utils": "^3.2.0",
         "nodemailer": "^10.2.1",
@@ -155,7 +155,7 @@
     },
     "packages/ui": {
       "name": "@kayjs/ui",
-      "version": "1.112.0",
+      "version": "1.112.1",
       "dependencies": {
         "@kaynooo/utils": "^3.2.0",
       },
