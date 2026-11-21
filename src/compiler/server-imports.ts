@@ -2,6 +2,7 @@ import type { Diagnostic, KayFile } from './ast'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
 import type { ImportBinding } from './script-shared'
 import { templateExpressions } from './browser'
+import { visitNodes } from './template-walk'
 
 const NEEDS_ESCAPE = /['\\]/
 const WORD = /(?<![\w$.])[a-z_$][\w$]*/gi
@@ -43,7 +44,17 @@ function serverFenceReads(file: KayFile, script: ScriptAnalysis, server: ServerA
     }
   }
 
-  return found
+  // A component's tag reads its name too, `Card(...)` or `forms.Field(...)`.
+  visitNodes(file.template, (node) => {
+    const binding = node.kind === 'element' && node.component ? wanted.get(node.name.split('.')[0]!) : undefined
+
+    if (binding !== undefined && node.kind === 'element') {
+      wanted.delete(binding.local)
+      found.push({ binding, start: node.tag.start })
+    }
+  })
+
+  return found.sort((a, b) => a.start - b.start)
 }
 
 // The imports a page's browser module adds for what its template reads from a `.kay` module only the server fence imports, such as another route's action, which the browser takes as that module's stub.

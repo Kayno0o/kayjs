@@ -126,4 +126,18 @@ describe('a name the template reads that only the server fence imports', () => {
     expect(dom).not.toContain('import { formatFileSize }')
     expect(sized(page).map(found => slice(page, found))).toEqual(['formatFileSize'])
   })
+
+  it('keeps an alias, a default and a namespace import, leaves out one the template does not read or the script imports, and the server build as it was', () => {
+    const page = `--- server\nimport { keeping as kept } from './keeping.kay'\nimport Card from '../components/card.kay'\nimport * as edits from './edit.kay'\nimport { unread } from './other.kay'\nimport { shared } from './shared.kay'\n--- script\nimport { shared } from './shared.kay'\n---\nbutton(onClick={() => kept}) {edits.save}\nCard(action={shared})\n`
+    const dom = compileKay(page, route, { page: true, output: 'dom', includeServer: false }).tsx
+    const html = compileKay(page, route, { page: true }).tsx
+
+    expect(dom).toContain('import { keeping as kept } from \'./keeping.kay\'\n')
+    expect(dom).toContain('import Card from \'../components/card.kay\'\n')
+    expect(dom).toContain('import * as edits from \'./edit.kay\'\n')
+    expect(dom).not.toContain('unread')
+    expect(dom.match(/import \{ shared \}/g)).toHaveLength(1)
+    expect(html.match(/from '\.\/keeping\.kay'/g)).toHaveLength(1)
+    expect(sized(page)).toEqual([])
+  })
 })
