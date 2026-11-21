@@ -6,6 +6,8 @@ import { visitNodes } from './template-walk'
 
 const NEEDS_ESCAPE = /['\\]/
 const WORD = /(?<![\w$.])[a-z_$][\w$]*/gi
+// The import a tag names, `forms` of `forms.Field`.
+const TAG_ROOT = /^[^.]*/
 
 // The statement that brings a binding into the script fence.
 function importLine(binding: ImportBinding): string {
@@ -46,7 +48,7 @@ function serverFenceReads(file: KayFile, script: ScriptAnalysis, server: ServerA
 
   // A component's tag reads its name too, `Card(...)` or `forms.Field(...)`.
   visitNodes(file.template, (node) => {
-    const binding = node.kind === 'element' && node.component ? wanted.get(node.name.split('.')[0]!) : undefined
+    const binding = node.kind === 'element' && node.component ? wanted.get(TAG_ROOT.exec(node.name)![0]) : undefined
 
     if (binding !== undefined && node.kind === 'element') {
       wanted.delete(binding.local)
