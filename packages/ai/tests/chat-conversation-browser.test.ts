@@ -143,6 +143,23 @@ it('folds the list to one line on a phone, naming the conversation shown, opens 
   expect(page.errors).toEqual([])
 }, 120_000)
 
+it('lets the app open the folded list, and tells it when the visitor folds or opens it', async () => {
+  await using page = await site.open('/keeping-folded', { viewport: 'phone' })
+
+  const expanded = async () => page.evaluate(() => document.querySelector('.kai-chat-conversations-toggle')!.getAttribute('aria-expanded'))
+
+  await page.click('#open-list')
+  await page.waitUntil(() => document.querySelector('.kai-chat-conversations-toggle')?.getAttribute('aria-expanded') === 'true')
+  expect(await page.text('#heard')).toBe('')
+
+  await page.click('.kai-chat-conversations-toggle')
+  expect(await expanded()).toBe('false')
+  await page.click('.kai-chat-conversations-toggle')
+  expect(await expanded()).toBe('true')
+  expect(await page.text('#heard')).toBe('false,true')
+  expect(page.errors).toEqual([])
+}, 120_000)
+
 it('keeps the list open at the side on a wide screen, with no toggle', async () => {
   await using page = await site.open('/keeping')
 

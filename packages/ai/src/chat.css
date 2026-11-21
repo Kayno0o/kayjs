@@ -115,10 +115,12 @@
     position: absolute;
     inset-block-end: 0;
     inset-inline-end: 100%;
+    width: max-content;
     margin-top: 0;
     padding-inline-end: 0.25rem;
     opacity: 0;
   }
+
 
   .kai-chat-turn[data-role='user']:not([data-editing]):is(:hover, :focus-within) > .kai-chat-actions {
     opacity: 1;
@@ -527,6 +529,15 @@
     max-width: calc(100% - 2rem);
   }
 
+  /* Two or three buttons beside the message take more than the room it leaves, so it narrows for them, in either layout. */
+  .kai-chat .kai-chat-turn[data-role='user']:not([data-editing]):has(> .kai-chat-actions > :nth-child(2)) {
+    max-width: min(85%, 100% - 4.25rem);
+  }
+
+  .kai-chat .kai-chat-turn[data-role='user']:not([data-editing]):has(> .kai-chat-actions > :nth-child(3)) {
+    max-width: min(85%, 100% - 6.25rem);
+  }
+
   .kai-chat[data-size='sm'] :where(.kai-chat-turn, .kai-chat-suggestion) {
     font-size: 0.8125rem;
   }
@@ -566,7 +577,6 @@
   .kai-chat-conversations:not([data-open]) > .kai-chat-conversation-list {
     display: none;
   }
-
 
   .kai-chat-conversations[data-open] .kai-chat-conversations-toggle .kui-icon {
     rotate: 180deg;

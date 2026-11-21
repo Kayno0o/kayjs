@@ -48,6 +48,13 @@ it('adds the app\'s buttons to a finished turn after the chat\'s own, and a foot
   expect(await page.count('button[aria-label="Regenerate the reply"]')).toBe(1)
   expect(await page.evaluate(() => [...document.querySelectorAll('.kai-chat-turn[data-role=assistant] .kai-chat-actions button')].map(button => button.textContent?.trim() || button.getAttribute('aria-label')))).toEqual(['Regenerate the reply', 'Like'])
   expect(await page.evaluate(() => document.querySelector('.kai-chat-form + .footer')?.textContent)).toBe('Liked 0')
+  // On the visitor's message the app's button sits beside the bubble, inside the log, as the edit button does.
+  expect(await page.evaluate(() => {
+    const turn = document.querySelector('.kai-chat-turn[data-role=user]')!.getBoundingClientRect()
+    const like = document.querySelector('.kai-chat-turn[data-role=user] .like')!.getBoundingClientRect()
+
+    return like.right <= turn.left && like.left >= document.querySelector('.kai-chat-log')!.getBoundingClientRect().left
+  })).toBe(true)
 
   await page.click('.kai-chat-turn[data-role=assistant] .like')
   await page.waitFor('.footer', { text: 'Liked 1' })

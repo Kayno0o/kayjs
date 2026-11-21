@@ -1,0 +1,17 @@
+--- server
+import { ask, chatMessages } from '@kayjs/ai'
+import { action } from 'kay'
+
+export const keeping = action({ messages: chatMessages({ maxItems: 50 }) }, ({ messages }) => ask(messages, { key: 'visitor' }))
+--- script
+import Chat from '@kayjs/ai/chat.kay'
+import { signal } from 'kay'
+
+// The app holds the list's fold: its own button opens it, and it hears the visitor's toggles.
+const open = signal(false)
+const heard = signal<boolean[]>([])
+---
+h1 Keeping folded
+button#open-list(type="button" onClick={() => { open = true }}) Open the list
+output#heard {heard().join(',')}
+Chat(action={keeping} label="Assistant" conversations conversationsOpen={open()} onConversationsOpenChange={({ open: next }) => { open = next; heard = [...heard(), next] }})

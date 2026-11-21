@@ -918,6 +918,7 @@ component default
   call?: ((call: AiToolCall) => Element) | undefined
   class?: string | undefined
   conversations?: boolean | undefined
+  conversationsOpen?: boolean | undefined
   disclosure?: string | undefined
   editable?: boolean | undefined
   empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
@@ -938,6 +939,7 @@ component default
   maxSize?: ByteSize | undefined
   newTab?: "auto" | boolean | undefined
   note?: Element
+  onConversationsOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   onEdit?: ((event: { text: string; }) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
@@ -1128,6 +1130,7 @@ component default
   class?: Record<string, boolean | null | undefined> | readonly unknown[] | string | undefined
   conversationIn?: "address" | "browser" | undefined
   conversations?: boolean | undefined
+  conversationsOpen?: boolean | undefined
   disclosure?: string | undefined
   editable?: boolean | undefined
   empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
@@ -1147,6 +1150,7 @@ component default
   maxSize?: ByteSize | undefined
   newButton?: boolean | undefined
   newTab?: "auto" | boolean | undefined
+  onConversationsOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   onEdit?: ((event: { text: string; }) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
   onRegenerate?: (() => unknown) | undefined

@@ -64,7 +64,7 @@ const SANITIZED_LINK = /<a href="([^"]*)"(?: target="_blank")? rel="nofollow ugc
 // The images and documents a model reads.
 const ATTACHABLE = 'image/png,image/jpeg,image/gif,image/webp,application/pdf'
 
-const { action, initial = [], labels = {}, label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), showReasoning, history: lastMessages, maxChars = POSTED_CHARACTERS, toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], onSend, onReply, onStop, onError, onToolCall, onRegenerate, onEdit, onSuggestion, toolLabels = {}, toolIcons, icons, newButton = false, remember, newTab, images, attach = false, accept = ATTACHABLE, maxFiles = 4, maxSize, regenerate = false, editable = false, transcribe, speak, autoplay = true, speaking, onSpeak, onSpeakEnd, onSpeakFail, onSpeakingChange, fill = false, layout, variant, tone = 'accent', size = 'md', keepOnServer = false, conversations = false, conversationIn = 'address', turn: turnBlock, actions: actionsBlock, call: callBlock, source: sourceBlock, empty: emptyBlock, footer } = props<{
+const { action, initial = [], labels = {}, label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), showReasoning, history: lastMessages, maxChars = POSTED_CHARACTERS, toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], onSend, onReply, onStop, onError, onToolCall, onRegenerate, onEdit, onSuggestion, toolLabels = {}, toolIcons, icons, newButton = false, remember, newTab, images, attach = false, accept = ATTACHABLE, maxFiles = 4, maxSize, regenerate = false, editable = false, transcribe, speak, autoplay = true, speaking, onSpeak, onSpeakEnd, onSpeakFail, onSpeakingChange, fill = false, layout, variant, tone = 'accent', size = 'md', keepOnServer = false, conversations = false, conversationIn = 'address', conversationsOpen, onConversationsOpenChange, turn: turnBlock, actions: actionsBlock, call: callBlock, source: sourceBlock, empty: emptyBlock, footer } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.deny`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -149,6 +149,9 @@ const { action, initial = [], labels = {}, label = wording('ai.chat.label', 'Cha
   conversations?: boolean | undefined
   // Where the conversation shown is named: `address`, the page's `conversation` query param, which a link or a bookmark carries; `browser`, this browser's localStorage under the action's URL, for a chat on every page of the site, which `ChatLauncher` is, its list then made of buttons rather than links.
   conversationIn?: 'address' | 'browser' | undefined
+  // Whether the conversation list is open where it heads the chat folded to one line (a narrow screen, the launcher's panel), for the app to control; left out, its toggle keeps it and a pick folds it. `onConversationsOpenChange` hears the visitor open or close it, not the app's own change.
+  conversationsOpen?: boolean | undefined
+  onConversationsOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // Replaces what a turn shows with the app's own markup, given the turn as plain data and its place in the log; the turn being written is given too, its `content` growing. The log, the turn's element, the held tool calls' Allow and Deny buttons, the edit and regenerate buttons and the field that opens on an edit stay the chat's, so scrolling and screen-reader announcements work as for the default.
   turn?: Snippet<[turn: ChatTurnView, index: number]> | undefined
   // Adds markup to the row of buttons under a turn, after the regenerate and edit buttons, such as a copy button or thumbs; given a finished turn.
@@ -759,7 +762,25 @@ let newConversation: HTMLElement | undefined
 const titled = (title: string) => title === '' ? untitledLabel : title
 
 // Whether the list shows where it heads the chat, folded there to one line naming the conversation shown; a pick folds it again.
-const listOpen = signal(false)
+const listOpen = signal(conversationsOpen === true)
+
+// The visitor's own opening or folding of the list, which the app hears of.
+function openList(next: boolean) {
+  if (next === listOpen())
+    return
+
+  listOpen = next
+  onConversationsOpenChange?.({ open: next })
+}
+
+effect(() => {
+  const wanted = conversationsOpen
+
+  untrack(() => {
+    if (wanted !== undefined && wanted !== listOpen())
+      listOpen = wanted
+  })
+})
 
 function shownTitle() {
   const shown = shownParam?.()
@@ -768,9 +789,7 @@ function shownTitle() {
   return item ? titled(item.title) : conversationsLabel
 }
 
-watch(() => shownParam?.(), () => {
-  listOpen = false
-})
+watch(() => shownParam?.(), () => openList(false))
 
 function startRename(id: string, title: string) {
   renaming = id
@@ -844,7 +863,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
   if conversations
     nav(part="conversations" aria-label={conversationsLabel} data-open={listOpen() ? '' : undefined})
       div(part="conversationsHead")
-        Button(part="conversationsToggle" variant="ghost" size="sm" icon="chevron" label={shownTitle()} expanded={listOpen()} onClick={() => { listOpen = !listOpen() }})
+        Button(part="conversationsToggle" variant="ghost" size="sm" icon="chevron" label={shownTitle()} expanded={listOpen()} onClick={() => openList(!listOpen())})
         if inBrowser
           Button(part="newConversation" variant="ghost" size="sm" icon="plus" label={newLabel} ref={(element: HTMLElement) => newConversation = element} onClick={() => shownParam?.set(undefined)})
         else
