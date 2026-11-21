@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A page that hydrates can pass an action, or anything else, its `--- server` fence imports from another `.kay` module: the island imports it too, as that module's action stub, where it threw `ReferenceError` and `server-import-in-island` asked for a second import in the script fence ([components](components.md#file-layout)).
 - `Chat`'s edit button sits beside the visitor's message instead of on a row under it, shown on hover, on focus and always under a touch pointer ([kayjs-ai: regenerating and editing](../packages/ai/llms/chat-regenerate.md)).
 - `Chat`'s conversation list folds to one line naming the conversation shown on a narrow screen and in `ChatLauncher`'s panel, opening on demand, instead of taking the top of the screen ([kayjs-ai: conversations](../packages/ai/llms/chat-conversations.md)).
 

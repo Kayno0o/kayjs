@@ -157,6 +157,9 @@ it('lets the app open the folded list, and tells it when the visitor folds or op
   await page.click('.kai-chat-conversations-toggle')
   expect(await expanded()).toBe('true')
   expect(await page.text('#heard')).toBe('false,true')
+
+  // The action comes from another route's server fence, and posts from this island.
+  await send(page, 'about trains', 'read 1 after about trains')
   expect(page.errors).toEqual([])
 }, 120_000)
 

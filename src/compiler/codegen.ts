@@ -31,6 +31,7 @@ import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { restOmits } from './rest-omits'
 import { reactiveValue } from './script'
 import { kayCtxImport } from './script-shared'
+import { browserImports } from './server-imports'
 import { slotTypes } from './slot-types'
 import { shadowedBinds } from './template-reads'
 import { rowsJudged, typeParameterNames } from './type-parameters'
@@ -377,8 +378,7 @@ class ModuleShell {
       b.add(`import { ${[...new Set(kayHelpers)].map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/internal'\n`)
 
     if (server && !fence) {
-      for (const name of actions)
-        b.add(`export const ${name} = KayActionStub(${JSON.stringify(actionUrl(this.options.moduleId, name))})\n`)
+      b.add(actions.map(name => `export const ${name} = KayActionStub(${JSON.stringify(actionUrl(this.options.moduleId, name))})\n`).join('') + browserImports(this.file, script, server))
     }
 
     b.add(this.slotTypes().imports)

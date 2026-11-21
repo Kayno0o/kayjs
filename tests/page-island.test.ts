@@ -116,4 +116,14 @@ describe('a name the template reads that only the server fence imports', () => {
   it('covers a layout that hydrates, which a handler makes an island', () => {
     expect(sized(hydrating, 'src/routes/_layout.kay', { page: undefined })).toHaveLength(1)
   })
+
+  // Another route's action, imported by the server fence, reaches the island as that route's stub: the browser module imports it, and nothing is reported.
+  it('imports what a .kay module gives into the browser module, unreported', () => {
+    const page = `--- server\nimport { keeping } from './keeping.kay'\nimport { formatFileSize } from '@kaynooo/utils/format'\nconst n = 1\n${script}button(onClick={() => keeping}) {formatFileSize(n)}\nConfirmDelete(label="Delete" onConfirm={keeping})\n`
+    const dom = compileKay(page, route, { page: true, output: 'dom', includeServer: false }).tsx
+
+    expect(dom.match(/import \{ keeping \} from '\.\/keeping\.kay'/g)).toHaveLength(1)
+    expect(dom).not.toContain('import { formatFileSize }')
+    expect(sized(page).map(found => slice(page, found))).toEqual(['formatFileSize'])
+  })
 })

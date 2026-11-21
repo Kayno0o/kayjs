@@ -1,8 +1,6 @@
 --- server
-import { ask, chatMessages } from '@kayjs/ai'
-import { action } from 'kay'
-
-export const keeping = action({ messages: chatMessages({ maxItems: 50 }) }, ({ messages }) => ask(messages, { key: 'visitor' }))
+// Another route's action, which the island reaches as that route's stub.
+import { keeping } from './keeping.kay'
 --- script
 import Chat from '@kayjs/ai/chat.kay'
 import { signal } from 'kay'
