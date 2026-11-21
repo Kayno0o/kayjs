@@ -143,7 +143,7 @@ export const ERRORS = {
   },
   'server-import-in-island': {
     group: 'compile',
-    summary: 'A page whose template reads a name imported only in its `--- server` fence, where the page hydrates (a handler makes it an island): the browser runs the template without that fence, so the read throws and every island of the page stays inert. Reported by the type check, at the read; the fix, offered, imports it in the script fence too.',
+    summary: 'A page whose template reads a name imported only in its `--- server` fence, where the page hydrates (a handler makes it an island): the browser runs the template without that fence, so the read throws and every island of the page stays inert. Reported by the type check, at the read; the fix, offered, imports it in the script fence too. A name imported from a `.kay` module, such as another route\'s action, is not: the island imports it too.',
     fix: { file: 'llms/components.md', heading: 'File layout' },
   },
   'static-pin': {

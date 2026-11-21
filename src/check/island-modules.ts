@@ -36,14 +36,17 @@ export function scriptImportsOf(source: string): string[] {
 }
 
 function scanScriptImports(source: string): string[] {
-  const { script, module } = parseKay(source)
+  const { script, module, server } = parseKay(source)
   const fences = [script, module].filter(span => span !== undefined)
 
-  if (fences.length === 0)
+  if (fences.length === 0 && server === undefined)
     return []
 
+  const scan = (span: { start: number, end: number }) => transpilerFor('ts').scanImports(source.slice(span.start, span.end)).map(entry => entry.path)
+
   try {
-    return fences.flatMap(span => transpilerFor('ts').scanImports(source.slice(span.start, span.end)).map(entry => entry.path))
+    // A page's island imports what its server fence takes from a `.kay` module too.
+    return [...fences.flatMap(scan), ...server === undefined ? [] : scan(server).filter(path => path.endsWith('.kay'))]
   }
   catch {
     return []

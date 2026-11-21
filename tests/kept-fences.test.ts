@@ -29,4 +29,8 @@ describe('scriptImportsOf', () => {
     expect(scriptImportsOf(first)).toEqual(['./a'])
     expect(scriptImportsOf(second)).toEqual(['./c'])
   }))
+
+  it('counts what the server fence imports from a .kay module, which the island imports too', async () => inWalkScope(async () => {
+    expect(scriptImportsOf('---\nimport a from "./a"\n--- server\nimport { save } from "./edit.kay"\nimport b from "./b"\n---\ndiv\n')).toEqual(['./a', './edit.kay'])
+  }))
 })

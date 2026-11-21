@@ -32,6 +32,8 @@ li(class={size})
 
 `--- server` runs on the server for each request and never reaches the browser. Only a page or a layout has one: a component takes its values as props, which the page computes in its own `--- server`. A page that hydrates, which a handler in it makes it, runs its template in the browser without that fence, so a function the template calls and the server fence imports is the error `server-import-in-island`: import it in the script fence too, or move what reads it into a component.
 
+What the server fence imports from a `.kay` file, such as another route's action, the island imports too, so it needs nothing.
+
 `--- module` holds code that runs once per bundle rather than per render. What it exports, such as `export const visits = signal(0)` or `export function label(n: number)`, other files import from the `.kay` file with its types: `import { label } from './counter.kay'`. It takes no props and no default export, and a component declaring `island({ render: 'client' })` has none.
 
 `--- style` holds CSS scoped to the component. kay adds a `data-k-` attribute to each element the template writes and ends every selector on it, so `.card { color: red }` styles this file's `.card` alone. `:global(.x)` is the way out, and a list such as `:global(.a, .b) .card` is global in each of its entries.
