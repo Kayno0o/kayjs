@@ -32,7 +32,7 @@ Chat(action={reply} conversations fill)
 ```
 
 - Each row is a link to the conversation, titled by the opening words of its first message, with a rename button that turns it into a field (Enter or leaving the field saves, Escape cancels) and a delete button that asks before it deletes for good. The current one is `aria-current="page"`. The log is `aria-busy` while a conversation is read.
-- Below `48rem` the list heads the chat folded to one line: a toggle naming the conversation shown (`aria-expanded`, `Conversations` before the first message) beside New conversation, opening the list, which scrolls past `12rem` and folds again once a conversation is picked; wider, it takes the side, always open, with no toggle. In `ChatLauncher`'s panel it folds the same unless the panel is enlarged on a wide window. `conversationsOpen` sets whether the folded list is open, for an app holding it, and `onConversationsOpenChange({ open })` hears the visitor open or fold it, a pick included, not the app's own change.
+- Below `48rem` the list heads the chat folded to one line: a toggle naming the conversation shown (`aria-expanded`, `Conversations` before the first message) beside New conversation, opening the list, which scrolls past `12rem` and folds again once a conversation is picked; wider, it takes the side, always open, with no toggle. In `ChatLauncher`'s panel it folds the same unless the panel is enlarged on a wide window. `conversationsOpen` sets whether the folded list is open, for an app holding it, and `onConversationsOpenChange({ open })` hears the visitor open or fold it, a pick included, not the app's own change, so an app holding it writes that value back to its state.
 
 ### A chat on every page
 

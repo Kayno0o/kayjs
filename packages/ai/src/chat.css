@@ -121,7 +121,6 @@
     opacity: 0;
   }
 
-
   .kai-chat-turn[data-role='user']:not([data-editing]):is(:hover, :focus-within) > .kai-chat-actions {
     opacity: 1;
   }

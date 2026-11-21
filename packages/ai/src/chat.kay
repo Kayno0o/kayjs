@@ -149,7 +149,7 @@ const { action, initial = [], labels = {}, label = wording('ai.chat.label', 'Cha
   conversations?: boolean | undefined
   // Where the conversation shown is named: `address`, the page's `conversation` query param, which a link or a bookmark carries; `browser`, this browser's localStorage under the action's URL, for a chat on every page of the site, which `ChatLauncher` is, its list then made of buttons rather than links.
   conversationIn?: 'address' | 'browser' | undefined
-  // Whether the conversation list is open where it heads the chat folded to one line (a narrow screen, the launcher's panel), for the app to control; left out, its toggle keeps it and a pick folds it. `onConversationsOpenChange` hears the visitor open or close it, not the app's own change.
+  // Whether the conversation list is open where it heads the chat folded to one line (a narrow screen, the launcher's panel), for the app to control; left out, its toggle keeps it and a pick folds it. `onConversationsOpenChange` hears the visitor open or close it, not the app's own change: an app setting the prop writes that value back to it, or the visitor's fold stays until the prop changes.
   conversationsOpen?: boolean | undefined
   onConversationsOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // Replaces what a turn shows with the app's own markup, given the turn as plain data and its place in the log; the turn being written is given too, its `content` growing. The log, the turn's element, the held tool calls' Allow and Deny buttons, the edit and regenerate buttons and the field that opens on an edit stay the chat's, so scrolling and screen-reader announcements work as for the default.
