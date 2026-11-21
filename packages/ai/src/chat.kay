@@ -151,7 +151,7 @@ const { action, initial = [], labels = {}, label = wording('ai.chat.label', 'Cha
   conversationIn?: 'address' | 'browser' | undefined
   // Whether the conversation list is open where it heads the chat folded to one line (a narrow screen, the launcher's panel), for the app to control; left out, its toggle keeps it and a pick folds it. `onConversationsOpenChange` hears the visitor open or close it, not the app's own change: an app setting the prop writes that value back to it, or the visitor's fold stays until the prop changes.
   conversationsOpen?: boolean | undefined
-  onConversationsOpenChange?: ((event: { open: boolean }) => unknown) | undefined
+  onConversationsOpenChange?: ((event: { conversationsOpen: boolean }) => unknown) | undefined
   // Replaces what a turn shows with the app's own markup, given the turn as plain data and its place in the log; the turn being written is given too, its `content` growing. The log, the turn's element, the held tool calls' Allow and Deny buttons, the edit and regenerate buttons and the field that opens on an edit stay the chat's, so scrolling and screen-reader announcements work as for the default.
   turn?: Snippet<[turn: ChatTurnView, index: number]> | undefined
   // Adds markup to the row of buttons under a turn, after the regenerate and edit buttons, such as a copy button or thumbs; given a finished turn.
@@ -770,7 +770,7 @@ function openList(next: boolean) {
     return
 
   listOpen = next
-  onConversationsOpenChange?.({ open: next })
+  onConversationsOpenChange?.({ conversationsOpen: next })
 }
 
 effect(() => {

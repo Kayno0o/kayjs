@@ -939,7 +939,7 @@ component default
   maxSize?: ByteSize | undefined
   newTab?: "auto" | boolean | undefined
   note?: Element
-  onConversationsOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
+  onConversationsOpenChange?: ((event: { conversationsOpen: boolean; }) => unknown) | undefined
   onEdit?: ((event: { text: string; }) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
   onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
@@ -1150,7 +1150,7 @@ component default
   maxSize?: ByteSize | undefined
   newButton?: boolean | undefined
   newTab?: "auto" | boolean | undefined
-  onConversationsOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
+  onConversationsOpenChange?: ((event: { conversationsOpen: boolean; }) => unknown) | undefined
   onEdit?: ((event: { text: string; }) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
   onRegenerate?: (() => unknown) | undefined

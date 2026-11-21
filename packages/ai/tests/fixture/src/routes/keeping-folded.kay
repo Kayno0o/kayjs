@@ -14,4 +14,4 @@ const heard = signal<boolean[]>([])
 h1 Keeping folded
 button#open-list(type="button" onClick={() => { open = true }}) Open the list
 output#heard {heard().join(',')}
-Chat(action={keeping} label="Assistant" conversations conversationsOpen={open()} onConversationsOpenChange={({ open: next }) => { open = next; heard = [...heard(), next] }})
+Chat(action={keeping} label="Assistant" conversations conversationsOpen={open()} onConversationsOpenChange={({ conversationsOpen: next }) => { open = next; heard = [...heard(), next] }})
