@@ -8,7 +8,7 @@
 
 ### Regenerating and editing
 
-`regenerate` adds a button under the last reply that asks again for it, and `editable` one on each message of the visitor that turns it into a field to change and send again. Both are off by default.
+`regenerate` adds a button under the last reply that asks again for it, and `editable` one on each message of the visitor that turns it into a field to change and send again. Both are off by default. The edit button, and what `@actions` adds to a message of the visitor, sit beside the message's bubble rather than under it, shown while the pointer is on the message or the focus in it, and always under a touch pointer.
 
 ```kay
 Chat(action={reply} regenerate editable)

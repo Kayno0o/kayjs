@@ -106,6 +106,30 @@
     justify-content: flex-end;
   }
 
+  /* A message of the visitor adds no row for its buttons: they sit outside the bubble at its start edge, shown while the pointer is on the message or the focus in it, and always under a touch pointer. */
+  .kai-chat-turn[data-role='user']:not([data-editing]) {
+    position: relative;
+  }
+
+  .kai-chat-turn[data-role='user']:not([data-editing]) > .kai-chat-actions {
+    position: absolute;
+    inset-block-end: 0;
+    inset-inline-end: 100%;
+    margin-top: 0;
+    padding-inline-end: 0.25rem;
+    opacity: 0;
+  }
+
+  .kai-chat-turn[data-role='user']:not([data-editing]):is(:hover, :focus-within) > .kai-chat-actions {
+    opacity: 1;
+  }
+
+  @media (pointer: coarse) {
+    .kai-chat-turn[data-role='user']:not([data-editing]) > .kai-chat-actions {
+      opacity: 1;
+    }
+  }
+
   .kai-chat .kai-chat-action {
     display: inline-flex;
     align-items: center;
@@ -498,6 +522,11 @@
     font-weight: 600;
   }
 
+  /* A plain message takes the log's width, so it leaves room at its start for the buttons beside it. */
+  .kai-chat[data-layout='plain'] .kai-chat-turn[data-role='user']:has(> .kai-chat-actions) {
+    max-width: calc(100% - 2rem);
+  }
+
   .kai-chat[data-size='sm'] :where(.kai-chat-turn, .kai-chat-suggestion) {
     font-size: 0.8125rem;
   }
@@ -523,9 +552,43 @@
     font-size: 0.875rem;
   }
 
+  /* Heading the chat, the list folds to one line, the conversation shown beside New conversation, and its toggle opens it. */
+  .kai-chat-conversations-head {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .kai-chat-conversation-new {
+    flex-shrink: 0;
+  }
+
+  .kai-chat-conversations:not([data-open]) > .kai-chat-conversation-list {
+    display: none;
+  }
+
+
+  .kai-chat-conversations[data-open] .kai-chat-conversations-toggle .kui-icon {
+    rotate: 180deg;
+  }
+
   @media (min-width: 48rem) {
     .kai-chat:has(> .kai-chat-conversations) {
       padding-inline-start: 17.5rem;
+    }
+
+    /* At the side the list is always shown, under a New conversation as wide as it. */
+    .kai-chat-conversations-head {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .kai-chat-conversations-toggle {
+      display: none;
+    }
+
+    .kai-chat-conversations:not([data-open]) > .kai-chat-conversation-list {
+      display: flex;
     }
 
     .kai-chat-conversations {
@@ -560,6 +623,19 @@
       max-height: 8rem;
       border-bottom: 1px solid var(--color-border);
       border-inline-end: 0;
+    }
+
+    .kai-launcher-panel:not([data-large]) .kai-chat-conversations-head {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .kai-launcher-panel:not([data-large]) .kai-chat-conversations-toggle {
+      display: inline-flex;
+    }
+
+    .kai-launcher-panel:not([data-large]) .kai-chat-conversations:not([data-open]) > .kai-chat-conversation-list {
+      display: none;
     }
 
     .kai-launcher-panel[data-large] .kai-chat-conversations {

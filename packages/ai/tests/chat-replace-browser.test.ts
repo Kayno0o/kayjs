@@ -213,6 +213,41 @@ it('posts the same request again from Try again after a failed regenerate, and E
   expect(await log(page)).toEqual(['u:fail', 'a:regenerate:2 roles=u last=fail files=0'])
 }, 120_000)
 
+// How the visitor's last message lays out: the height its buttons add, whether they show, and whether they sit outside the bubble.
+async function editLook(page: Page) {
+  return page.evaluate(() => {
+    const turn = [...document.querySelectorAll('.kai-chat-turn[data-role=user]')].at(-1)!
+    const bubble = turn.getBoundingClientRect()
+    const text = turn.querySelector('.kai-chat-text')!.getBoundingClientRect()
+    const edit = turn.querySelector('button[aria-label^="Edit the message"]')!.getBoundingClientRect()
+    const actions = turn.querySelector('.kai-chat-actions')!
+
+    return { added: Math.round(bubble.height - text.height - 16), shown: getComputedStyle(actions).opacity === '1', beside: edit.right <= bubble.left && edit.bottom <= bubble.bottom }
+  })
+}
+
+it('draws the edit button beside the message, adding no row, shown on hover, on focus and on a touch screen', async () => {
+  await using page = await site.open('/replaceable')
+
+  await send(page, 'hi', 'fresh roles=u last=hi files=0')
+  await page.hover('h1')
+
+  expect(await editLook(page)).toEqual({ added: 0, shown: false, beside: true })
+
+  await page.hover('.kai-chat-turn[data-role=user] .kai-chat-text')
+  expect(await editLook(page)).toEqual({ added: 0, shown: true, beside: true })
+
+  await page.hover('h1')
+  await page.evaluate(() => document.querySelector<HTMLElement>('button[aria-label^="Edit the message"]')!.focus())
+  expect(await editLook(page)).toEqual({ added: 0, shown: true, beside: true })
+
+  await page.evaluate(() => document.querySelector<HTMLElement>('.kai-chat-form textarea')!.focus())
+  await page.cdp('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+  await page.waitUntil(() => matchMedia('(pointer: coarse)').matches)
+  expect(await editLook(page)).toEqual({ added: 0, shown: true, beside: true })
+  expect(page.errors).toEqual([])
+}, 120_000)
+
 it('names each edit button by the start of its message', async () => {
   await using page = await site.open('/replaceable')
 

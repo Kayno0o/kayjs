@@ -105,6 +105,57 @@ it('lists the conversations, follows a link of the list, renames one and deletes
   expect(page.errors).toEqual([])
 }, 120_000)
 
+it('folds the list to one line on a phone, naming the conversation shown, opens it on demand and closes it after a pick', async () => {
+  await using page = await site.open('/keeping', { viewport: 'phone' })
+
+  await send(page, 'about trains', 'read 1 after about trains')
+
+  const trains = await named(page)
+
+  await page.click('.kai-chat-conversation-new')
+  await page.waitUntil(() => document.querySelectorAll('.kai-chat-turn').length === 0)
+  await send(page, 'about boats', 'read 1 after about boats')
+
+  const fold = async () => page.evaluate(() => {
+    const top = document.querySelector('.kai-chat')!.getBoundingClientRect().top
+    const toggle = document.querySelector('.kai-chat-conversations-toggle')!
+    const list = document.querySelector('.kai-chat-conversation-list')!
+
+    return { head: Math.round(document.querySelector('.kai-chat-log')!.getBoundingClientRect().top - top), toggle: toggle.getBoundingClientRect().height, title: toggle.textContent.trim(), expanded: toggle.getAttribute('aria-expanded'), listed: list.getBoundingClientRect().height > 0 }
+  })
+
+  await page.waitUntil(() => document.querySelector('.kai-chat-conversations-toggle')?.textContent.trim() === 'about boats')
+
+  const folded = await fold()
+
+  // The log starts under the one line, its border and the chat's gap.
+  expect(folded.head).toBeLessThan(folded.toggle + 24)
+  expect(folded).toMatchObject({ title: 'about boats', expanded: 'false', listed: false })
+
+  await page.click('.kai-chat-conversations-toggle')
+  expect(await fold()).toMatchObject({ expanded: 'true', listed: true })
+  expect(await page.a11y('.kai-chat-conversations')).toEqual([])
+
+  await page.click(`.kai-chat-conversation-link[href*="${trains}"]`)
+  await page.waitFor('.kai-chat-turn[data-role=user] .kai-chat-text', { text: 'about trains' })
+  await page.waitUntil(() => document.querySelector('.kai-chat-conversations-toggle')?.textContent.trim() === 'about trains')
+  expect(await fold()).toMatchObject({ expanded: 'false', listed: false })
+  expect(page.errors).toEqual([])
+}, 120_000)
+
+it('keeps the list open at the side on a wide screen, with no toggle', async () => {
+  await using page = await site.open('/keeping')
+
+  await send(page, 'about trains', 'read 1 after about trains')
+  await page.waitFor('.kai-chat-conversation-link', { text: 'about trains' })
+
+  expect(await page.evaluate(() => ({
+    place: getComputedStyle(document.querySelector('.kai-chat-conversations')!).position,
+    toggle: getComputedStyle(document.querySelector('.kai-chat-conversations-toggle')!).display,
+    listed: document.querySelector('.kai-chat-conversation-list')!.getBoundingClientRect().height > 0,
+  }))).toEqual({ place: 'absolute', toggle: 'none', listed: true })
+}, 120_000)
+
 it('sends a message sent while a new conversation is still being read, once the read lands', async () => {
   await using page = await site.open('/keeping')
 

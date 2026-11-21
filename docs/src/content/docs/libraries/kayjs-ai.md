@@ -254,7 +254,7 @@ The server also keeps the tool calls of each reply and their results, and replay
 Chat(action={reply} conversations fill)
 ```
 
-`conversations` does the same and lists the visitor's conversations beside the chat, each with rename and delete, under a New conversation link. On a narrow screen the list sits above the chat.
+`conversations` does the same and lists the visitor's conversations beside the chat, each with rename and delete, under a New conversation link. On a narrow screen the list folds to one line above the chat, naming the conversation shown, and opens on a tap.
 
 A conversation belongs to the visitor your server names: the signed-in user kayjs-auth names, or the `key` you give `ai()` or the ask. The browser only says which of their own it shows. A guest, whom no one names, keeps the history in the page as without `keepOnServer`. A tab left open on a conversation another tab has since written to cannot write over it: its send is refused before the model is asked, the message goes back to the field and the conversation shows as stored.
 

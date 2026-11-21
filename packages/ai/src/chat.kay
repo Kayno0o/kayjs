@@ -3,7 +3,7 @@ import type { Action, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { Turn } from './chat-session'
 import type { ByteSize } from 'kay/library'
 import type { AiToolCall, ChatFailure, ChatIconName, ChatIcons, ChatIconValue, ChatLabels, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source } from './types'
-import { composing, durationMs, effect, escapeHtml, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
+import { composing, durationMs, effect, escapeHtml, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, watch, withQuery } from 'kay'
 import BareIconButton from '@kayjs/ui/bare-icon-button.kay'
 import Button from '@kayjs/ui/button.kay'
 import ConfirmDelete from '@kayjs/ui/confirm-delete.kay'
@@ -34,7 +34,7 @@ import './chat.css'
 
 // The chat's own classes are its parts, so an app restyles them from src/ui.ts or a `class` object. The table of a reply is built as a string and keeps its class.
 const look = recipe({
-  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion h-auto max-w-full text-start font-normal whitespace-normal rounded-lg', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text kui-prose', thinking: 'kai-chat-text kai-chat-thinking', reasoning: 'kai-chat-reasoning', reasoningText: 'kai-chat-reasoning-text', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', editField: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', actions: 'kai-chat-actions', regenerate: 'kai-chat-action', edit: 'kai-chat-action', play: 'kai-chat-action kai-chat-play', save: 'kai-chat-save', cancel: 'kai-chat-cancel', send: 'kai-chat-send', new: 'kai-chat-new', retry: 'kai-chat-retry', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kai-chat-allow', deny: 'kai-chat-deny', attach: 'kai-chat-attach', files: 'kai-chat-files', file: 'kai-chat-file', remove: 'kai-chat-file-remove', record: 'kai-chat-record', recordSpinner: 'animate-spin motion-reduce:animate-none', conversations: 'kai-chat-conversations', newConversation: 'kai-chat-conversation-new w-full justify-start font-semibold', conversationList: 'kai-chat-conversation-list', conversation: 'kai-chat-conversation', conversationLink: 'kai-chat-conversation-link min-w-0 flex-1 justify-start overflow-hidden text-ellipsis', renameField: 'kai-chat-rename-field', rename: 'kai-chat-action', delete: 'kai-chat-action' },
+  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion h-auto max-w-full text-start font-normal whitespace-normal rounded-lg', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text kui-prose', thinking: 'kai-chat-text kai-chat-thinking', reasoning: 'kai-chat-reasoning', reasoningText: 'kai-chat-reasoning-text', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', editField: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', actions: 'kai-chat-actions', regenerate: 'kai-chat-action', edit: 'kai-chat-action', play: 'kai-chat-action kai-chat-play', save: 'kai-chat-save', cancel: 'kai-chat-cancel', send: 'kai-chat-send', new: 'kai-chat-new', retry: 'kai-chat-retry', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kai-chat-allow', deny: 'kai-chat-deny', attach: 'kai-chat-attach', files: 'kai-chat-files', file: 'kai-chat-file', remove: 'kai-chat-file-remove', record: 'kai-chat-record', recordSpinner: 'animate-spin motion-reduce:animate-none', conversations: 'kai-chat-conversations', conversationsHead: 'kai-chat-conversations-head', conversationsToggle: 'kai-chat-conversations-toggle min-w-0 flex-1 justify-start overflow-hidden text-ellipsis', newConversation: 'kai-chat-conversation-new justify-start font-semibold', conversationList: 'kai-chat-conversation-list', conversation: 'kai-chat-conversation', conversationLink: 'kai-chat-conversation-link min-w-0 flex-1 justify-start overflow-hidden text-ellipsis', renameField: 'kai-chat-rename-field', rename: 'kai-chat-action', delete: 'kai-chat-action' },
   variants: {
     // The structure: `bubble` frames the visitor's messages, `plain` draws them as bare text.
     layout: { bubble: '', plain: '' },
@@ -758,6 +758,20 @@ let newConversation: HTMLElement | undefined
 
 const titled = (title: string) => title === '' ? untitledLabel : title
 
+// Whether the list shows where it heads the chat, folded there to one line naming the conversation shown; a pick folds it again.
+const listOpen = signal(false)
+
+function shownTitle() {
+  const shown = shownParam?.()
+  const item = shown === undefined ? undefined : session.conversations().find(entry => entry.id === shown)
+
+  return item ? titled(item.title) : conversationsLabel
+}
+
+watch(() => shownParam?.(), () => {
+  listOpen = false
+})
+
 function startRename(id: string, title: string) {
   renaming = id
   renameDraft = title
@@ -828,11 +842,13 @@ function listTakeFocus(element: HTMLElement, button: string) {
 section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-fill={fill ? '' : undefined} data-layout={(layout ?? variant) === 'plain' ? 'plain' : 'bubble'} data-tone={tone} data-size={size} ref={element => { element.addEventListener('kai:chat-new', reset); element.addEventListener('kai:chat-send', sendFrom); element.addEventListener('kai:chat-draft', draftFrom) }})
   // The visitor's conversations, each a link of the page, which the chat follows to show it, or a button for a chat named by the browser, which a page swap would leave.
   if conversations
-    nav(part="conversations" aria-label={conversationsLabel})
-      if inBrowser
-        Button(part="newConversation" variant="ghost" size="sm" icon="plus" label={newLabel} ref={(element: HTMLElement) => newConversation = element} onClick={() => shownParam?.set(undefined)})
-      else
-        Button(part="newConversation" variant="ghost" size="sm" icon="plus" label={newLabel} href={withQuery({ conversation: null })} ref={(element: HTMLElement) => newConversation = element})
+    nav(part="conversations" aria-label={conversationsLabel} data-open={listOpen() ? '' : undefined})
+      div(part="conversationsHead")
+        Button(part="conversationsToggle" variant="ghost" size="sm" icon="chevron" label={shownTitle()} expanded={listOpen()} onClick={() => { listOpen = !listOpen() }})
+        if inBrowser
+          Button(part="newConversation" variant="ghost" size="sm" icon="plus" label={newLabel} ref={(element: HTMLElement) => newConversation = element} onClick={() => shownParam?.set(undefined)})
+        else
+          Button(part="newConversation" variant="ghost" size="sm" icon="plus" label={newLabel} href={withQuery({ conversation: null })} ref={(element: HTMLElement) => newConversation = element})
       if listProblem()
         Notice(tone="danger") {listProblem()}
       ul(part="conversationList")

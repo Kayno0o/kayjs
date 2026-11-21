@@ -2,6 +2,11 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `Chat`'s edit button sits beside the visitor's message instead of on a row under it, shown on hover, on focus and always under a touch pointer ([kayjs-ai: regenerating and editing](../packages/ai/llms/chat-regenerate.md)).
+- `Chat`'s conversation list folds to one line naming the conversation shown on a narrow screen and in `ChatLauncher`'s panel, opening on demand, instead of taking the top of the screen ([kayjs-ai: conversations](../packages/ai/llms/chat-conversations.md)).
+
 ## 1.112.2
 
 - An outside link that clips a long title (`truncate`) no longer widens the page: its hidden "(opens in a new tab)" label sits at a corner of its positioned ancestor rather than after the unclipped text ([navigation](navigation.md)).

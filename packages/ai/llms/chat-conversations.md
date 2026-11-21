@@ -32,7 +32,7 @@ Chat(action={reply} conversations fill)
 ```
 
 - Each row is a link to the conversation, titled by the opening words of its first message, with a rename button that turns it into a field (Enter or leaving the field saves, Escape cancels) and a delete button that asks before it deletes for good. The current one is `aria-current="page"`. The log is `aria-busy` while a conversation is read.
-- Below `48rem` the list sits above the chat and scrolls past `12rem`; wider, it takes the side.
+- Below `48rem` the list heads the chat folded to one line: a toggle naming the conversation shown (`aria-expanded`, `Conversations` before the first message) beside New conversation, opening the list, which scrolls past `12rem` and folds again once a conversation is picked; wider, it takes the side, always open, with no toggle. In `ChatLauncher`'s panel it folds the same unless the panel is enlarged on a wide window.
 
 ### A chat on every page
 
@@ -50,7 +50,7 @@ Chat(action={reply} conversations fill)
 ### Words and parts
 
 - Words, the keys of `labels` and of `ai.chat.<key>`: `conversations` (`Conversations`, names the list), `untitled` (`Untitled conversation`, a conversation opened on files alone), `rename` (`Rename the conversation`) and `delete` (`Delete the conversation`), each button followed by the conversation's title, `deleteConfirm` (`Delete for good?`), `conflict` (`This conversation changed in another tab, so it was reloaded.`), `loadFailed` (`The conversation could not be loaded.`), `changeFailed` (`The change could not be saved.`) and `signedOut` (`You are signed out, so this conversation is no longer saved.`); the New conversation link reads `new`. kayjs-ai ships the French.
-- Parts: `conversations` (the `nav`), `newConversation`, `conversationList`, `conversation` (a row, `data-current` on the shown one), `conversationLink`, `renameField`, `rename` and `delete` (kayjs-ui's `ConfirmDelete`, asking inline), restyled as the rest of `Chat`'s ([Restyle](chat.md#restyle)).
+- Parts: `conversations` (the `nav`, `data-open` while the folded list is open), `conversationsHead` (the toggle and New conversation), `conversationsToggle`, `newConversation`, `conversationList`, `conversation` (a row, `data-current` on the shown one), `conversationLink`, `renameField`, `rename` and `delete` (kayjs-ui's `ConfirmDelete`, asking inline), restyled as the rest of `Chat`'s ([Restyle](chat.md#restyle)).
 
 ### The store
 

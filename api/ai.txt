@@ -955,6 +955,18 @@ component default
   parts?: undefined | {
   root?: string | undefined;
   conversations?: string | undefined;
+  conversationsHead?: string | undefined;
+  conversationsToggle?: readonly unknown[] | string | undefined | {
+    root?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+      spinner?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+    };
+  };
   newConversation?: readonly unknown[] | string | undefined | {
     root?: readonly unknown[] | string | undefined | {
       root?: string | undefined;
@@ -1020,19 +1032,14 @@ component default
       };
     };
     spinner?: readonly unknown[] | string | undefined | {
-      root?: string | undefined;
-    };
-  };
+      root?: string | undefined; ...#d1e5b0c2 (3 lines)
   log?: string | undefined;
   turn?: string | undefined;
-  editField?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
+  editField?: readonly unknown[] | string | undefined | { ...#49afb2df (3 lines)
   files?: string | undefined;
   file?: string | undefined;
   actions?: string | undefined;
-  save?: readonly unknown[] | string | undefined | {
-    root?: readonly unknown[] | string | undefined | { ...#2fff3004 (10 lines)
+  save?: readonly unknown[] | string | undefined | { ...#96626cb8 (11 lines)
   cancel?: readonly unknown[] | string | undefined | { ...#59b0f224 (11 lines)
   approval?: string | undefined;
   approvalText?: string | undefined;
@@ -1155,6 +1162,18 @@ component default
   parts?: undefined | {
   root?: string | undefined;
   conversations?: string | undefined;
+  conversationsHead?: string | undefined;
+  conversationsToggle?: readonly unknown[] | string | undefined | {
+    root?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+      spinner?: readonly unknown[] | string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: readonly unknown[] | string | undefined | {
+      root?: string | undefined;
+    };
+  };
   newConversation?: readonly unknown[] | string | undefined | {
     root?: readonly unknown[] | string | undefined | {
       root?: string | undefined;
@@ -1220,19 +1239,14 @@ component default
       };
     };
     spinner?: readonly unknown[] | string | undefined | {
-      root?: string | undefined;
-    };
-  };
+      root?: string | undefined; ...#d1e5b0c2 (3 lines)
   log?: string | undefined;
   turn?: string | undefined;
-  editField?: readonly unknown[] | string | undefined | {
-    root?: string | undefined;
-  };
+  editField?: readonly unknown[] | string | undefined | { ...#49afb2df (3 lines)
   files?: string | undefined;
   file?: string | undefined;
   actions?: string | undefined;
-  save?: readonly unknown[] | string | undefined | {
-    root?: readonly unknown[] | string | undefined | { ...#2fff3004 (10 lines)
+  save?: readonly unknown[] | string | undefined | { ...#96626cb8 (11 lines)
   cancel?: readonly unknown[] | string | undefined | { ...#59b0f224 (11 lines)
   approval?: string | undefined;
   approvalText?: string | undefined;
