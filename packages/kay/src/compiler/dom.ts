@@ -410,6 +410,14 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           continue
         }
 
+        if (rawName === 'innerHTML') {
+          if (attr.value?.type === 'Literal')
+            ops.push(`${use('setInnerHtml')}(${elVar}, ${JSON.stringify(String(attr.value.value))});`)
+          else if (attr.value?.type === 'JSXExpressionContainer')
+            ops.push(`${use('effect')}(() => ${use('setInnerHtml')}(${elVar}, ${compileExpression(attr.value.expression, scopeRewrites)}));`)
+          continue
+        }
+
         const eventMatch = EVENT_ATTR.exec(rawName)
         if (eventMatch !== null && attr.value?.type === 'JSXExpressionContainer') {
           const eventName = eventMatch[1]!.toLowerCase()

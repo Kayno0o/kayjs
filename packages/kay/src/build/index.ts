@@ -5,7 +5,7 @@
 
 import type { BunPlugin } from 'bun'
 import type { IslandBinding, ModuleAnalysis } from '../compiler/index'
-import type { KayPlugin } from '../plugins/index'
+import type { BuildPluginContext, KayPlugin } from '../plugins/index'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
@@ -50,6 +50,7 @@ export interface RouteManifestEntry {
 export interface BuildManifest {
   runtimeScript: string | undefined
   styles: string[]
+  headTags?: string[] | undefined
   routes: RouteManifestEntry[]
   errorFile?: string | undefined
   notFoundFile?: string | undefined
@@ -170,7 +171,12 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const assetPrefix = (options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const minify = options.minify ?? true
 
-  const pluginBunPlugins = plugins.flatMap(p => p.bunPlugins ?? [])
+  const pluginBunPlugins = plugins.flatMap((p) => {
+    const bp = p.bunPlugins
+    if (typeof bp === 'function')
+      return bp({ root, assetPrefix, minify })
+    return bp ?? []
+  })
   const pluginClientEntries = plugins.map(p => p.clientEntry).filter((e): e is string => Boolean(e))
   const pluginCssFiles = plugins
     .flatMap(p => p.css ?? [])
@@ -660,8 +666,8 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
 
   // Copy public/ static files into dist/public
   const publicFiles: string[] = []
+  const outPublicDir = join(outDir, 'public')
   if (existsSync(publicDir)) {
-    const outPublicDir = join(outDir, 'public')
     for (const abs of walkAllFiles(publicDir).sort()) {
       const rel = relative(publicDir, abs).replace(/\\/g, '/')
       publicFiles.push(rel)
@@ -671,9 +677,61 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     }
   }
 
+  // Run plugin build(ctx) hooks so plugins can emit hashed assets, public files, styles, or <head> tags
+  const headTags: string[] = []
+  const assetSet = new Set(nonEmptyAssets)
+  const publicSet = new Set(publicFiles)
+  const styleSet = new Set(styleUrls)
+
+  const buildPluginCtx: BuildPluginContext = {
+    root,
+    outDir,
+    assetPrefix,
+    minify,
+    routes: routeEntries,
+    emitAsset(relPath, content) {
+      const clean = relPath.replace(/^\/+/, '').replace(/\\/g, '/')
+      const dst = join(clientDir, clean)
+      mkdirSync(dirname(dst), { recursive: true })
+      writeFileSync(dst, content)
+      if (!assetSet.has(clean)) {
+        assetSet.add(clean)
+        nonEmptyAssets.push(clean)
+      }
+      return `${assetPrefix}/${clean}`
+    },
+    emitPublic(relPath, content) {
+      const clean = relPath.replace(/^\/+/, '').replace(/\\/g, '/')
+      const dst = join(outPublicDir, clean)
+      mkdirSync(dirname(dst), { recursive: true })
+      writeFileSync(dst, content)
+      if (!publicSet.has(clean)) {
+        publicSet.add(clean)
+        publicFiles.push(clean)
+      }
+      return `/${clean}`
+    },
+    addStyle(href) {
+      if (!styleSet.has(href)) {
+        styleSet.add(href)
+        styleUrls.push(href)
+      }
+    },
+    addHead(html) {
+      if (html !== '')
+        headTags.push(html)
+    },
+  }
+
+  for (const plugin of plugins) {
+    if (plugin.build !== undefined)
+      await plugin.build(buildPluginCtx)
+  }
+
   const manifest: BuildManifest = {
     runtimeScript,
     styles: styleUrls,
+    ...(headTags.length > 0 ? { headTags } : {}),
     routes: routeEntries,
     errorFile: hasErrorFile ? toOutRel(errorSrc) : undefined,
     notFoundFile: hasNotFoundFile ? toOutRel(notFoundSrc) : undefined,

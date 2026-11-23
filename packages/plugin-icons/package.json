@@ -1,0 +1,13 @@
+{
+  "name": "@kayjs/icons",
+  "version": "2.0.0-alpha.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./ambient": "./src/ambient.d.ts"
+  },
+  "peerDependencies": {
+    "kay": "^2.0.0-alpha.0"
+  }
+}

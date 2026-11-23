@@ -3,10 +3,27 @@
 // is built strictly through these public hooks — never hardcoded in @kay/core.
 
 import type { BunPlugin } from 'bun'
+import type { RouteManifestEntry } from '../build/index'
 import type { Middleware, RequestContext } from '../server/index'
 import type { SecurityHeadersOptions } from '../server/security'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+
+export interface BuildPluginContext {
+  readonly root: string
+  readonly outDir: string
+  readonly assetPrefix: string
+  readonly minify: boolean
+  readonly routes: readonly RouteManifestEntry[]
+  /** Emit an immutable build asset into dist/client/<relPath>; returns its public URL (`/_kay/<relPath>`). */
+  emitAsset(relPath: string, content: string | Uint8Array): string
+  /** Emit a static file into dist/public/<relPath> served at `/<relPath>`. */
+  emitPublic(relPath: string, content: string | Uint8Array): string
+  /** Add a stylesheet URL to <head> on every page. */
+  addStyle(href: string): void
+  /** Add raw HTML to <head> on every page (e.g. font preloads, default meta/OG, JSON-LD). */
+  addHead(html: string): void
+}
 
 export interface ServerPluginAPI {
   /** Register global middleware that runs before route handlers. */
@@ -21,10 +38,12 @@ export interface KayPlugin {
   name: string
   /** Register server routes, global middleware, or URL rewrites. */
   server?: (api: ServerPluginAPI) => void | Promise<void>
+  /** Build hook run after route compilation, before prerender / --static / --compile. */
+  build?: (ctx: BuildPluginContext) => void | Promise<void>
   /** Code transform run during client & server compilation. */
   transform?: (code: string, id: string, target: 'server' | 'client') => string | undefined | void
-  /** Native Bun.build plugins (e.g. bun-plugin-tailwind, MDX). */
-  bunPlugins?: BunPlugin[] | undefined
+  /** Native Bun.build plugins (e.g. bun-plugin-tailwind, images, icons). */
+  bunPlugins?: BunPlugin[] | ((info: { root: string, assetPrefix: string, minify: boolean }) => BunPlugin[]) | undefined
   /** Global CSS files to bundle and inject as <link rel="stylesheet"> in <head>. */
   css?: string[] | undefined
   /** Post-process rendered HTML before sending. */

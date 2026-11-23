@@ -189,6 +189,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     }
 
     parts.pushStatic(`<${tag}`)
+    let innerHtmlExpr: string | undefined
 
     for (const attr of node.openingElement.attributes as AstNode[]) {
       if (attr.type === 'JSXSpreadAttribute') {
@@ -198,6 +199,13 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       const rawName = jsxTagName(attr.name)
       if (rawName === 'key' || rawName === 'ref' || rawName === '$hydrate' || EVENT_ATTR.test(rawName))
         continue
+      if (rawName === 'innerHTML') {
+        if (attr.value?.type === 'Literal')
+          innerHtmlExpr = JSON.stringify(String(attr.value.value))
+        else if (attr.value?.type === 'JSXExpressionContainer')
+          innerHtmlExpr = `${use('ssrChild')}(${compileSubExpression(attr.value.expression)})`
+        continue
+      }
 
       const name = rawName === 'className' ? 'class' : rawName === 'htmlFor' ? 'for' : rawName
       if (attr.value === null) {
@@ -231,7 +239,10 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     if (VOID_ELEMENTS.has(tag))
       return
 
-    emitChildrenIntoBuffer(node.children as AstNode[], bufVar, parts, flushParts, pushStmt)
+    if (innerHtmlExpr !== undefined)
+      parts.pushExpr(innerHtmlExpr)
+    else
+      emitChildrenIntoBuffer(node.children as AstNode[], bufVar, parts, flushParts, pushStmt)
     parts.pushStatic(`</${tag}>`)
   }
 

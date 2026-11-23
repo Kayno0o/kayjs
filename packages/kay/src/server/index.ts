@@ -22,7 +22,7 @@ import { Router } from './router'
 import { applySecurityHeaders } from './security'
 
 export { defineConfig, definePlugin, loadConfig } from '../plugins/index'
-export type { KayConfig, KayPlugin, ServerPluginAPI } from '../plugins/index'
+export type { BuildPluginContext, KayConfig, KayPlugin, ServerPluginAPI } from '../plugins/index'
 export { action } from './action'
 export type { ActionContext, ActionResult, ServerAction } from './action'
 export type { CookieOptions, Cookies } from './cookies'
@@ -249,6 +249,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const hasIslands = entry.islandChunks.length > 0
     const shell = renderDocument({
       body: '\0',
+      headTags: manifest.headTags,
       lang,
       runtimeScript: manifest.runtimeScript,
       alwaysLoadRuntime,
@@ -379,6 +380,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       const shell = renderDocument({
         body: '\0',
         head: collectedHead,
+        headTags: manifest.headTags,
         lang,
         runtimeScript: manifest.runtimeScript,
         alwaysLoadRuntime,
@@ -416,6 +418,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       ? renderDocument({
           body,
           head: collectedHead,
+          headTags: manifest.headTags,
           lang,
           runtimeScript: manifest.runtimeScript,
           alwaysLoadRuntime,

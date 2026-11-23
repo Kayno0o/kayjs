@@ -161,6 +161,7 @@ export function ssrIsland(
 export interface DocumentOptions {
   body: string
   head?: string | undefined
+  headTags?: Iterable<string> | undefined
   lang?: string | undefined
   runtimeScript?: string | undefined
   alwaysLoadRuntime?: boolean | undefined
@@ -170,8 +171,13 @@ export interface DocumentOptions {
 }
 
 export function renderDocument(options: DocumentOptions): string {
-  const { body, head = '', lang = 'en', runtimeScript, alwaysLoadRuntime, preloadChunks, styles, hasIslands } = options
+  const { body, head = '', headTags, lang = 'en', runtimeScript, alwaysLoadRuntime, preloadChunks, styles, hasIslands } = options
   let headExtra = head
+
+  if (headTags !== undefined) {
+    for (const tag of headTags)
+      headExtra += tag
+  }
 
   if (styles !== undefined) {
     for (const href of styles)

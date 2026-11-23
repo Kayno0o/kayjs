@@ -141,6 +141,14 @@ export function setProp(el: Element, name: string, value: unknown): void {
   ;(el as unknown as Record<string, unknown>)[name] = value
 }
 
+export function setInnerHtml(el: Element, value: unknown): void {
+  const html = value == null || value === false
+    ? ''
+    : (typeof value === 'object' && '__html' in value ? String((value as { __html: string }).__html) : String(value))
+  if (el.innerHTML !== html)
+    el.innerHTML = html
+}
+
 export function setStyle(el: HTMLElement, value: unknown): void {
   if (value == null || value === false) {
     el.removeAttribute('style')
@@ -270,7 +278,9 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
         continue
       }
       const name = k === 'className' ? 'class' : k === 'htmlFor' ? 'for' : k
-      if (name === 'class')
+      if (name === 'innerHTML')
+        setInnerHtml(el, v)
+      else if (name === 'class')
         setClass(el, v)
       else if (name === 'style')
         setStyle(el as HTMLElement, v)
