@@ -4,6 +4,7 @@
 import { resolve } from 'node:path'
 import { build } from '../build/index'
 import { devServer } from '../dev/index'
+import { loadConfig } from '../plugins/index'
 import { createServer } from '../server/index'
 
 const args = Bun.argv.slice(2)
@@ -44,12 +45,23 @@ else if (cmd === 'dev') {
   await devServer({ root, port })
 }
 else {
-  console.log(`Usage: kay <command> [dir] [options]
+  // Check plugin-registered CLI commands from kay.config.ts
+  const config = await loadConfig(root)
+  const pluginCmd = cmd !== undefined
+    ? config.plugins?.flatMap(p => Object.entries(p.commands ?? {})).find(([name]) => name === cmd)?.[1]
+    : undefined
+
+  if (pluginCmd !== undefined) {
+    await pluginCmd(args.slice(1), root)
+  }
+  else {
+    console.log(`Usage: kay <command> [dir] [options]
 
 Commands:
   kay dev [dir] [--port 3000]          Run dev server with fast reload
   kay build [dir] [--static] [--compile [out]]
                                        Build production app, static site, or single executable
   kay start [dir] [--port 3000]        Serve the built production app`)
-  process.exit(cmd === '--help' || cmd === '-h' || cmd === undefined ? 0 : 1)
+    process.exit(cmd === '--help' || cmd === '-h' || cmd === undefined ? 0 : 1)
+  }
 }

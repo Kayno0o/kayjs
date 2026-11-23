@@ -64,8 +64,14 @@ class KayIsland extends HTMLElement {
   }
 
   disconnectedCallback(): void {
-    this._d?.()
-    this._d = undefined
+    // Defer disposal by a microtask so synchronous DOM moves (e.g. SPA persistent islands) stay alive!
+    queueMicrotask(() => {
+      if (!this.isConnected) {
+        this._d?.()
+        this._d = undefined
+        this._s = false
+      }
+    })
   }
 
   async _l(clientOnly: boolean): Promise<void> {

@@ -7,11 +7,13 @@
 
 import type { BuildManifest, RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
+import type { KayConfig, KayPlugin, ServerPluginAPI } from '../plugins/index'
 import type { ActionContext, ServerAction } from './action'
 import type { Cookies } from './cookies'
 import type { SecurityHeadersOptions } from './security'
 import { existsSync, readFileSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
+import { loadConfig } from '../plugins/index'
 import { createRenderContext, renderCollectedHead, runWithRenderContext, streamChunkScript } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
 import { executeAction, isServerAction } from './action'
@@ -19,6 +21,8 @@ import { CookieStore } from './cookies'
 import { Router } from './router'
 import { applySecurityHeaders } from './security'
 
+export { defineConfig, definePlugin, loadConfig } from '../plugins/index'
+export type { KayConfig, KayPlugin, ServerPluginAPI } from '../plugins/index'
 export { action } from './action'
 export type { ActionContext, ActionResult, ServerAction } from './action'
 export type { CookieOptions, Cookies } from './cookies'
@@ -34,6 +38,7 @@ export interface ServerOptions {
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
+  plugins?: KayPlugin[] | undefined
 }
 
 export interface RequestContext {
@@ -98,6 +103,7 @@ interface EmbeddedServerConfig {
   lang?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
+  plugins?: KayPlugin[] | undefined
 }
 
 function makeRequestContext(request: Request, params: Record<string, string>): { ctx: RequestContext, cookieStore: CookieStore } {
@@ -126,9 +132,44 @@ function finalizeResponse(res: Response, cookieStore: CookieStore, security: Sec
 }
 
 export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
-  const { manifest, modules, assets, prerendered, lang = 'en', security } = config
+  const { manifest, modules, assets, prerendered, lang = 'en', security, plugins = [] } = config
   const assetPrefix = (config.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const trustedOrigins = config.trustedOrigins ? new Set(config.trustedOrigins) : undefined
+  const alwaysLoadRuntime = plugins.some(p => Boolean(p.clientEntry))
+  const htmlTransformers = plugins
+    .map(p => p.transformHtml)
+    .filter((fn): fn is NonNullable<KayPlugin['transformHtml']> => typeof fn === 'function')
+
+  // Collect plugin server hooks synchronously (async setup supported in createServer)
+  const globalMiddlewares: Middleware[] = []
+  const pluginRewrites: ((pathname: string, ctx: RequestContext) => string | undefined)[] = []
+  const pluginRouter = new Router<Map<string, (ctx: RequestContext) => Response | Promise<Response>>>()
+  const pluginRouteEntries = new Map<string, Map<string, (ctx: RequestContext) => Response | Promise<Response>>>()
+
+  const pluginApi: ServerPluginAPI = {
+    use(mw) {
+      globalMiddlewares.push(mw)
+    },
+    route(method, path, handler) {
+      let byMethod = pluginRouteEntries.get(path)
+      if (byMethod === undefined) {
+        byMethod = new Map()
+        pluginRouteEntries.set(path, byMethod)
+        pluginRouter.add(path, byMethod)
+      }
+      byMethod.set(method.toUpperCase(), handler)
+    },
+    rewrite(fn) {
+      pluginRewrites.push(fn)
+    },
+  }
+
+  for (const plugin of plugins) {
+    if (plugin.server !== undefined)
+      void plugin.server(pluginApi)
+  }
+
+  const hasPluginRequestHooks = globalMiddlewares.length > 0 || pluginRewrites.length > 0 || htmlTransformers.length > 0 || pluginRouteEntries.size > 0
 
   // Asset table
   const assetMap = new Map<string, { body: Uint8Array<ArrayBuffer>, type: string }>()
@@ -185,15 +226,18 @@ export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
       body: '\0',
       lang,
       runtimeScript: manifest.runtimeScript,
+      alwaysLoadRuntime,
       preloadChunks: entry.islandChunks,
+      styles: manifest.styles,
       hasIslands,
     })
     const splitAt = shell.indexOf('\0')
     const docPrefix = shell.slice(0, splitAt)
     const docSuffix = shell.slice(splitAt + 1)
 
-    // Ultra-fast zero-overhead path when route is static, has no middleware, no <Head>/<Suspense>, and default page
-    const canFastPath = !entry.path.includes(':')
+    // Ultra-fast zero-overhead path when route is static, has no middleware, no <Head>/<Suspense>, no plugins
+    const canFastPath = !hasPluginRequestHooks
+      && !entry.path.includes(':')
       && !entry.path.includes('*')
       && middlewares.length === 0
       && !entry.usesRenderContext
@@ -312,7 +356,9 @@ export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
         head: collectedHead,
         lang,
         runtimeScript: manifest.runtimeScript,
+        alwaysLoadRuntime,
         preloadChunks: entry.islandChunks,
+        styles: manifest.styles,
         hasIslands,
       })
       const splitAt = shell.indexOf('\0')
@@ -341,16 +387,21 @@ export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
       return new Response(stream, { status: 200, headers })
     }
 
-    const html = collectedHead !== ''
+    let html = collectedHead !== ''
       ? renderDocument({
           body,
           head: collectedHead,
           lang,
           runtimeScript: manifest.runtimeScript,
+          alwaysLoadRuntime,
           preloadChunks: entry.islandChunks,
+          styles: manifest.styles,
           hasIslands,
         })
       : route.docPrefix + body + route.docSuffix
+
+    for (let i = 0; i < htmlTransformers.length; i++)
+      html = await htmlTransformers[i]!(html, ctx)
 
     const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
     cookieStore.applyTo(headers)
@@ -411,8 +462,8 @@ export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
       }
     }
 
-    // 3. Prerendered static HTML
-    if (request.method === 'GET' || request.method === 'HEAD') {
+    // 3. Prerendered static HTML (when no plugin request hooks intercept)
+    if (!hasPluginRequestHooks && (request.method === 'GET' || request.method === 'HEAD')) {
       const pre = prerenderedMap.get(pathname)
       if (pre !== undefined) {
         const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
@@ -429,22 +480,46 @@ export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
         return fast(request)
     }
 
-    // 5. Full Router + Middleware + Streaming/Head/Error pipeline
-    const matched = router.match(pathname)
-    const { ctx, cookieStore } = makeRequestContext(request, matched?.params ?? {})
+    // 5. Full Router + Plugin Rewrites + Plugin Routes + Middleware + Streaming/Head/Error pipeline
+    const { ctx, cookieStore } = makeRequestContext(request, {})
 
+    // Apply plugin URL rewrites (e.g. @kayjs/i18n stripping /fr prefix and setting ctx.locals.locale)
+    let effectivePath = pathname
+    for (let i = 0; i < pluginRewrites.length; i++) {
+      const nextPath = pluginRewrites[i]!(effectivePath, ctx)
+      if (nextPath !== undefined)
+        effectivePath = nextPath
+    }
+
+    // Check custom plugin routes first (e.g. GET /sitemap.xml, POST /auth/callback)
+    const pluginMatch = pluginRouter.match(effectivePath)
+    if (pluginMatch !== undefined) {
+      const methodHandler = pluginMatch.data.get(request.method.toUpperCase()) ?? pluginMatch.data.get('ALL')
+      if (methodHandler !== undefined) {
+        ctx.params = pluginMatch.params
+        const res = await methodHandler(ctx)
+        return finalizeResponse(res, cookieStore, security)
+      }
+    }
+
+    const matched = router.match(effectivePath)
     if (matched === undefined)
       return renderNotFound(cookieStore)
 
+    ctx.params = matched.params
     const route = matched.data
+    const allMiddlewares = globalMiddlewares.length > 0
+      ? [...globalMiddlewares, ...route.middlewares]
+      : route.middlewares
+
     try {
       let index = -1
       const dispatch = async (i: number): Promise<Response> => {
         if (i <= index)
           throw new Error('kay: middleware called next() multiple times')
         index = i
-        if (i < route.middlewares.length)
-          return route.middlewares[i]!(ctx, () => dispatch(i + 1))
+        if (i < allMiddlewares.length)
+          return allMiddlewares[i]!(ctx, () => dispatch(i + 1))
         return renderCompiledRoute(route, ctx, cookieStore)
       }
       const res = await dispatch(0)
@@ -492,7 +567,9 @@ export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
 
 export async function createServer(options: ServerOptions): Promise<KayApp> {
   const root = resolve(options.root)
-  const outDir = resolve(root, options.outDir ?? 'dist')
+  const fileConfig = await loadConfig(root)
+  const plugins = options.plugins ?? fileConfig.plugins ?? []
+  const outDir = resolve(root, options.outDir ?? fileConfig.outDir ?? 'dist')
   const clientDir = join(outDir, 'client')
   const manifestPath = join(outDir, 'manifest.json')
 
@@ -536,9 +613,10 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     modules,
     assets,
     prerendered,
-    assetPrefix: options.assetPrefix,
-    lang: options.lang,
-    security: options.security,
-    trustedOrigins: options.trustedOrigins,
+    assetPrefix: options.assetPrefix ?? fileConfig.assetPrefix,
+    lang: options.lang ?? fileConfig.lang,
+    security: options.security ?? fileConfig.security,
+    trustedOrigins: options.trustedOrigins ?? fileConfig.trustedOrigins,
+    plugins,
   })
 }

@@ -30,6 +30,7 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     outDir: options.outDir,
     minify: options.minify ?? false,
     assetPrefix: options.assetPrefix,
+    plugins: options.plugins,
   })
 
   const app = await createServer({
@@ -39,6 +40,7 @@ export async function testApp(options: TestAppOptions): Promise<TestApp> {
     lang: options.lang,
     security: options.security,
     trustedOrigins: options.trustedOrigins,
+    plugins: options.plugins,
   })
 
   const cookies = new Map<string, string>()

@@ -5,9 +5,11 @@
 
 import type { BunPlugin } from 'bun'
 import type { IslandBinding, ModuleAnalysis } from '../compiler/index'
+import type { KayPlugin } from '../plugins/index'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
+import { loadConfig } from '../plugins/index'
 import { actionHash } from '../server/action'
 
 export interface BuildOptions {
@@ -16,6 +18,7 @@ export interface BuildOptions {
   outDir?: string | undefined
   minify?: boolean | undefined
   assetPrefix?: string | undefined
+  plugins?: KayPlugin[] | undefined
   /** Export a static site into dist/static (prerenders all static + paths() routes). */
   static?: boolean | undefined
   /** Compile into a single standalone executable at this path (or true -> dist/server-bin). */
@@ -45,6 +48,7 @@ export interface RouteManifestEntry {
 
 export interface BuildManifest {
   runtimeScript: string | undefined
+  styles: string[]
   routes: RouteManifestEntry[]
   errorFile?: string | undefined
   notFoundFile?: string | undefined
@@ -141,12 +145,34 @@ interface IslandTarget {
 
 export async function build(options: BuildOptions): Promise<BuildManifest> {
   const root = resolve(options.root)
-  const routesDir = resolve(root, options.routesDir ?? 'src/routes')
-  const outDir = resolve(root, options.outDir ?? 'dist')
+  const fileConfig = await loadConfig(root)
+  const plugins: KayPlugin[] = options.plugins ?? fileConfig.plugins ?? []
+  const routesDir = resolve(root, options.routesDir ?? fileConfig.routesDir ?? 'src/routes')
+  const outDir = resolve(root, options.outDir ?? fileConfig.outDir ?? 'dist')
   const clientDir = join(outDir, 'client')
   const serverDir = join(outDir, 'server')
-  const assetPrefix = (options.assetPrefix ?? '/_kay').replace(/\/$/, '')
+  const assetPrefix = (options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const minify = options.minify ?? true
+
+  const pluginBunPlugins = plugins.flatMap(p => p.bunPlugins ?? [])
+  const pluginClientEntries = plugins.map(p => p.clientEntry).filter((e): e is string => Boolean(e))
+  const pluginCssFiles = plugins
+    .flatMap(p => p.css ?? [])
+    .map(c => resolve(root, c))
+    .filter(c => existsSync(c))
+
+  function applyTransforms(code: string, id: string, target: 'server' | 'client'): string {
+    let cur = code
+    for (let i = 0; i < plugins.length; i++) {
+      const fn = plugins[i]!.transform
+      if (fn !== undefined) {
+        const next = fn(cur, id, target)
+        if (typeof next === 'string')
+          cur = next
+      }
+    }
+    return cur
+  }
 
   rmSync(outDir, { recursive: true, force: true })
   mkdirSync(clientDir, { recursive: true })
@@ -242,12 +268,13 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       pageIslandBindings.set(file, bindings)
   }
 
-  // Step 1: Single-pass Client Build
+  // Step 1: Single-pass Client Build (runs when islands, plugin client entries, or CSS exist)
   const islandChunks = new Map<string, string>()
   const assetFiles: string[] = []
+  const styleUrls: string[] = []
   let runtimeScript: string | undefined
 
-  if (islandTargets.size > 0) {
+  if (islandTargets.size > 0 || pluginClientEntries.length > 0 || pluginCssFiles.length > 0) {
     const entriesDir = join(outDir, '.entries')
     mkdirSync(entriesDir, { recursive: true })
     const entryPoints: string[] = []
@@ -294,23 +321,31 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
 
     for (const [, target] of islandTargets) {
       const raw = sources.get(target.file) ?? readFileSync(target.file, 'utf8')
-      const compiled = compileDom(target.file, raw, { analysis: analyses.get(target.file) }).code
+      const compiled = applyTransforms(compileDom(target.file, raw, { analysis: analyses.get(target.file) }).code, target.file, 'client')
       compiledDomCache.set(target.file, compiled)
       collectUsedFrom(compiled)
     }
 
     const runtimeEntryPath = join(entriesDir, 'runtime.ts')
-    const runtimeLines = [
-      `import { defineIslandElement } from 'kay/island';`,
-      `export { hydrate${hasClientOnlyHydrate ? ', mount' : ''} } from 'kay/dom';`,
-    ]
-    if (usedDomExports.size > 0)
-      runtimeLines.push(`export { ${[...usedDomExports].sort().join(', ')} } from 'kay/dom';`)
-    if (usedCoreExports.size > 0)
-      runtimeLines.push(`export { ${[...usedCoreExports].sort().join(', ')} } from 'kay';`)
-    runtimeLines.push(`defineIslandElement();`)
-    writeFileSync(runtimeEntryPath, `${runtimeLines.join('\n')}\n`)
-    entryPoints.push(runtimeEntryPath)
+    if (islandTargets.size > 0 || pluginClientEntries.length > 0) {
+      const runtimeLines: string[] = []
+      if (islandTargets.size > 0) {
+        runtimeLines.push(`import { defineIslandElement } from 'kay/island';`)
+        runtimeLines.push(`export { hydrate${hasClientOnlyHydrate ? ', mount' : ''} } from 'kay/dom';`)
+        if (usedDomExports.size > 0)
+          runtimeLines.push(`export { ${[...usedDomExports].sort().join(', ')} } from 'kay/dom';`)
+        if (usedCoreExports.size > 0)
+          runtimeLines.push(`export { ${[...usedCoreExports].sort().join(', ')} } from 'kay';`)
+        runtimeLines.push(`defineIslandElement();`)
+      }
+      for (const pe of pluginClientEntries)
+        runtimeLines.push(`import ${JSON.stringify(pe)};`)
+      writeFileSync(runtimeEntryPath, `${runtimeLines.join('\n')}\n`)
+      entryPoints.push(runtimeEntryPath)
+    }
+
+    for (const cssFile of pluginCssFiles)
+      entryPoints.push(cssFile)
 
     for (const [, target] of islandTargets) {
       const entryPath = join(entriesDir, `${target.id}.ts`)
@@ -332,7 +367,6 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           const resolved = resolveKaySpecifier(args.path)
           return resolved !== undefined ? { path: resolved } : undefined
         })
-        // Replace server action modules with pure client stubs so server/DB code never enters client bundles!
         b.onLoad({ filter: /\.(?:ts|tsx)$/ }, (args) => {
           const actions = actionsByFile.get(args.path)
           if (actions !== undefined && !analyses.get(args.path)?.isInteractive) {
@@ -348,7 +382,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           let compiled = compiledDomCache.get(args.path)
           if (compiled === undefined) {
             const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
-            compiled = compileDom(args.path, raw, { analysis: analyses.get(args.path) }).code
+            compiled = applyTransforms(compileDom(args.path, raw, { analysis: analyses.get(args.path) }).code, args.path, 'client')
           }
           const rewritten = compiled.replace(CORE_IMPORT_RE, (full, specList: string) => {
             const shared: string[] = []
@@ -387,7 +421,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           KAY_DEFERRED: hasDeferredHydrate ? 'true' : 'false',
           KAY_CLIENT_ONLY: hasClientOnlyHydrate ? 'true' : 'false',
         },
-        plugins: [clientPlugin],
+        plugins: [clientPlugin, ...pluginBunPlugins],
       })
     }
     finally {
@@ -403,7 +437,10 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       const relFile = relative(clientDir, output.path).replace(/\\/g, '/')
       assetFiles.push(relFile)
       const url = `${assetPrefix}/${relFile}`
-      if (output.kind === 'entry-point') {
+      if (relFile.endsWith('.css')) {
+        styleUrls.push(url)
+      }
+      else if (output.kind === 'entry-point') {
         if (relFile.startsWith('runtime-')) {
           runtimeScript = url
         }
@@ -452,7 +489,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           islands: islandMap,
           isIsland: analysis?.isInteractive,
         })
-        return { contents: compiled.code, loader: 'tsx' }
+        return { contents: applyTransforms(compiled.code, args.path, 'server'), loader: 'tsx' }
       })
     },
   }
@@ -465,7 +502,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     format: 'esm',
     splitting: true,
     minify: false,
-    plugins: [serverPlugin],
+    plugins: [serverPlugin, ...pluginBunPlugins],
   })
 
   if (!serverResult.success) {
@@ -575,6 +612,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
 
   const manifest: BuildManifest = {
     runtimeScript,
+    styles: styleUrls,
     routes: routeEntries,
     errorFile: hasErrorFile ? toOutRel(errorSrc) : undefined,
     notFoundFile: hasNotFoundFile ? toOutRel(notFoundSrc) : undefined,
@@ -589,7 +627,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const prerenderRoutes = routeEntries.filter(r => r.prerender)
   if (prerenderRoutes.length > 0) {
     const { createServer } = await import('../server/index')
-    const app = await createServer({ root, outDir: relative(root, outDir), assetPrefix })
+    const app = await createServer({ root, outDir: relative(root, outDir), assetPrefix, plugins })
     const prerenderDir = join(outDir, options.static ? 'static' : 'prerendered')
     mkdirSync(prerenderDir, { recursive: true })
 

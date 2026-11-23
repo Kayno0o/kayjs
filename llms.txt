@@ -1,0 +1,22 @@
+# Kay v2 Reference (for humans & coding agents)
+
+> Kay v2 is a Bun-native TSX web framework with zero-directive automatic islands, `.value` fine-grained signals, flat-string SSR, unified Standard-Schema actions, and a composable plugin API.
+
+## Core Rules (everything fits on one page)
+
+- **Standard TSX**: `.tsx` files with `jsxImportSource: "kay"`. Use `class` or `className`. Standard `.map()` (with `key={...}`), `&&`, and ternaries compile automatically to fine-grained keyed DOM updates.
+- **Signals**: `const count = signal(0)`, `const doubled = computed(() => count.value * 2)`, `effect(() => ...)`, `batch(() => ...)`, `selector(() => id.value)`, `store(obj)`. Always read/write via `.value` (`count.value++`). To let a child mutate parent state, pass the signal directly (`<Modal open={isOpen} />`).
+- **Reactive props**: Destructuring props (`function Badge({ count = 0 }: Props)`) is compiler-safe and stays reactive.
+- **Automatic islands**: Any component using reactive primitives (`signal`, `computed`, `effect`, `onMount`, `store`, `selector`) or DOM handlers (`onClick`, `ref`) becomes an island automatically. Control hydration per call site with `$hydrate="load" | "visible" | "idle" | "interaction" | "media(...)" | "client"`, or component default `island(Comp, { hydrate: 'visible' })`.
+- **Routes (`src/routes/`)**:
+  - `export default async function Page({ params, locals, url })`: strictly server-only (`0 KB` JS; cannot use signals/handlers directly).
+  - Sync `export default function Page({ data })`: static or auto-island; optional `export async function load(ctx)` runs server-only.
+  - Special files: `_layout.tsx` (nested outer→inner), `_middleware.ts` (`(ctx, next) => Response`), `_error.tsx`, `_404.tsx`.
+  - Params: `[slug].tsx` → `params.slug`; `[...path].tsx` → `params.path`.
+  - API routes: `.ts` files exporting `GET`, `POST`, `PUT`, `PATCH`, `DELETE`.
+  - Prerendering: `export const prerender = true` (+ optional `export function paths() { return ['/posts/a'] }`).
+- **Streaming & Head**: `<Head><title>...</title></Head>` (innermost `<title>` wins); `<Suspense fallback={<p>Loading</p>}><AsyncComp /></Suspense>` streams resolved HTML with 0 KB external JS.
+- **Actions**: `export const fn = action(standardSchema, async (input, ctx) => ...)` from `kay/server`. Works as `<form action={fn} method="post">` and `await fn(data)` from islands (server code auto-stripped, CSRF checked automatically).
+- **Env**: `export const env = defineEnv(standardSchema)` from `kay/server`.
+- **Testing**: `import { testApp } from 'kay/test'` — in-process `app.get()`, `app.post()`, `app.submit()` with persistent cookie jar.
+- **Plugins (`kay.config.ts`)**: `export default defineConfig({ plugins: [...] })`. Plugin hooks: `server(api)` (`use`, `route`, `rewrite`), `transform`, `bunPlugins`, `css`, `transformHtml`, `clientEntry`, `commands`.

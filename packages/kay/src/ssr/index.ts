@@ -148,13 +148,14 @@ export interface DocumentOptions {
   head?: string | undefined
   lang?: string | undefined
   runtimeScript?: string | undefined
+  alwaysLoadRuntime?: boolean | undefined
   preloadChunks?: Iterable<string> | undefined
   styles?: Iterable<string> | undefined
   hasIslands?: boolean | undefined
 }
 
 export function renderDocument(options: DocumentOptions): string {
-  const { body, head = '', lang = 'en', runtimeScript, preloadChunks, styles, hasIslands } = options
+  const { body, head = '', lang = 'en', runtimeScript, alwaysLoadRuntime, preloadChunks, styles, hasIslands } = options
   let headExtra = head
 
   if (styles !== undefined) {
@@ -168,9 +169,10 @@ export function renderDocument(options: DocumentOptions): string {
       for (const href of preloadChunks)
         headExtra += `<link rel="modulepreload" href="${escAttr(href)}">`
     }
-    if (runtimeScript !== undefined)
-      headExtra += `<script type="module" src="${escAttr(runtimeScript)}"></script>`
   }
+
+  if (runtimeScript !== undefined && (hasIslands || alwaysLoadRuntime))
+    headExtra += `<script type="module" src="${escAttr(runtimeScript)}"></script>`
 
   return `<!DOCTYPE html><html lang="${escAttr(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${headExtra}</head><body>${body}</body></html>`
 }
