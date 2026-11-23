@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.kay/
+*.tsbuildinfo
+.DS_Store
