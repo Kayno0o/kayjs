@@ -20,7 +20,10 @@ export function scaffoldProject(targetDir: string, options: ScaffoldOptions = {}
   if (existsSync(root) && readdirSync(root).length > 0 && !options.force)
     throw new Error(`kay new: directory "${root}" is not empty (pass --force to overwrite)`)
 
-  const deps: Record<string, string> = { kay: kayVersion }
+  const kayDep = kayVersion.startsWith('npm:') || kayVersion.startsWith('file:') || kayVersion.startsWith('link:')
+    ? kayVersion
+    : `npm:@kayjs/kay@${kayVersion}`
+  const deps: Record<string, string> = { kay: kayDep }
   if (template === 'blog') {
     deps['@kayjs/content'] = kayVersion
     deps['@kayjs/seo'] = kayVersion

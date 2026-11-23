@@ -87,7 +87,7 @@ Core stays tiny (`~6.9k LOC`). Every optional capability plugs in cleanly throug
 
 | Package | Purpose | Notes |
 | :--- | :--- | :--- |
-| **`kay`** | Compiler, linked-list signals, DOM runtime, router, SSR/Suspense, actions, build/compile, `kay/test` | 1 runtime dep (`oxc-parser`) |
+| **`@kayjs/kay`** | Compiler, linked-list signals, DOM runtime, router, SSR/Suspense, actions, build/compile, `kay/test` (installed as `"kay": "npm:@kayjs/kay@alpha"`) | 1 runtime dep (`oxc-parser`) |
 | **`@kayjs/ui`** | Platform-first headless primitives + 5 structurally distinct pure CSS `@layer kui` Grammars (`editorial`, `workshop`, `console`, `soft`, `orbit`) + `kay ui-eject` | Zero JS recipe engine, zero Tailwind lock-in |
 | **`@kayjs/auth`** | Argon2id passwords, hashed DB sessions, magic links, OAuth 2.0 + PKCE (GitHub/Discord/Google), `auth.guard()`, `bun:sqlite` store | Zero external deps |
 | **`@kayjs/live`** | Typed real-time SSE rooms, microtask-coalesced presence, `useLive()` browser signal hook | Zero external deps |
@@ -115,7 +115,7 @@ cd examples/noticeboard && bun run dev
 ## CLI Commands
 
 ```sh
-kay new my-app [--template minimal|fullstack|blog|app]  # Scaffold a new project
+bunx @kayjs/kay@alpha new my-app [--template minimal|fullstack|blog|app]  # Scaffold a new project
 kay check                              # Validate routes, compiler rules & types
 kay dev                                # Fast rebuild + live reload
 kay build                              # Production client + server build

@@ -1,0 +1,49 @@
+name: Tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [v2, main]
+  pull_request:
+
+env:
+  BUN_INSTALL_CACHE_DIR: /tmp/bun-cache
+  CI: 'true'
+
+jobs:
+  verify:
+    runs-on: alpine
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install GNU tar
+        run: apk info -e tar >/dev/null || apk add --no-cache tar
+
+      - name: Cache bun packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ env.BUN_INSTALL_CACHE_DIR }}
+          key: bun-v2-${{ runner.os }}-${{ hashFiles('bun.lock', 'docs/bun.lock') }}
+          restore-keys: bun-v2-${{ runner.os }}-
+
+      - name: Install project deps
+        run: bun install --silent --frozen-lockfile
+
+      - name: Install Chromium
+        run: |
+          apk info -e chromium ttf-freefont >/dev/null || apk add --no-cache chromium ttf-freefont
+          echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
+
+      - name: Verify (typecheck, tests & bench-app)
+        run: bun run verify
+
+      - name: Build docs static site
+        run: |
+          cd docs
+          bun install --silent --prefer-offline
+          bun run build

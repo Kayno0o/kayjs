@@ -1,8 +1,9 @@
 {
-  "name": "kay",
+  "name": "@kayjs/kay",
   "version": "2.0.0-alpha.0",
   "description": "Bun-native TSX web framework with zero-directive automatic islands, fine-grained signals, and single-binary deploys",
   "license": "MIT",
+  "homepage": "https://kayjs.kaynooo.fr",
   "type": "module",
   "sideEffects": false,
   "bin": {
