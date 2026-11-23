@@ -1,10 +1,30 @@
-// Kay v2 native Bun.serve server + in-process request handler.
+// Kay v2 native Bun.serve server:
+// - Static + dynamic ([param], [...catchall]) Router
+// - Composable directory-scoped _middleware.ts chains + ctx.cookies + ctx.locals
+// - Unified Standard-Schema action() endpoint handling with CSRF verification
+// - <Head> collection + streaming <Suspense> (0-overhead fast path when unused)
+// - Hybrid prerendered HTML serving + embedded single-executable mode
 
 import type { BuildManifest, RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
+import type { ActionContext, ServerAction } from './action'
+import type { Cookies } from './cookies'
+import type { SecurityHeadersOptions } from './security'
 import { existsSync, readFileSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
+import { createRenderContext, renderCollectedHead, runWithRenderContext, streamChunkScript } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
+import { executeAction, isServerAction } from './action'
+import { CookieStore } from './cookies'
+import { Router } from './router'
+import { applySecurityHeaders } from './security'
+
+export { action } from './action'
+export type { ActionContext, ActionResult, ServerAction } from './action'
+export type { CookieOptions, Cookies } from './cookies'
+export { defineEnv } from './env'
+export type { SecurityHeadersOptions } from './security'
+export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
 
 export interface ServerOptions {
   root: string
@@ -12,13 +32,23 @@ export interface ServerOptions {
   assetPrefix?: string | undefined
   port?: number | undefined
   lang?: string | undefined
+  security?: SecurityHeadersOptions | false | undefined
+  trustedOrigins?: string[] | undefined
 }
 
 export interface RequestContext {
   request: Request
   url: URL
   params: Record<string, string>
+  cookies: Cookies
+  locals: Record<string, unknown>
+  json: (data: unknown, init?: ResponseInit) => Response
+  text: (body: string, init?: ResponseInit) => Response
+  redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => Response
+  deny: (status: number, message: string, fieldErrors?: Record<string, string>) => Response
 }
+
+export type Middleware = (ctx: RequestContext, next: () => Promise<Response>) => Response | Promise<Response>
 
 export interface KayApp {
   handle: (request: Request) => Promise<Response>
@@ -37,128 +67,321 @@ const MIME: Record<string, string> = {
 }
 
 interface LoadedPageModule {
-  default: (props: Record<string, unknown>) => Html | string | Promise<Html | string>
+  default?: (props: Record<string, unknown>) => Html | string | Promise<Html | string>
   load?: (ctx: RequestContext) => unknown | Promise<unknown>
   GET?: (ctx: RequestContext) => Response | Promise<Response>
   POST?: (ctx: RequestContext) => Response | Promise<Response>
+  PUT?: (ctx: RequestContext) => Response | Promise<Response>
+  PATCH?: (ctx: RequestContext) => Response | Promise<Response>
+  DELETE?: (ctx: RequestContext) => Response | Promise<Response>
+  [key: string]: unknown
 }
 
 interface LoadedLayoutModule {
   default: (props: { children: Html }) => Html | string | Promise<Html | string>
 }
 
-export async function createServer(options: ServerOptions): Promise<KayApp> {
-  const root = resolve(options.root)
-  const outDir = resolve(root, options.outDir ?? 'dist')
-  const clientDir = join(outDir, 'client')
-  const assetPrefix = (options.assetPrefix ?? '/_kay').replace(/\/$/, '')
-  const lang = options.lang ?? 'en'
+interface LoadedMiddlewareModule {
+  default: Middleware
+}
 
-  const manifestPath = join(outDir, 'manifest.json')
-  if (!existsSync(manifestPath))
-    throw new Error(`kay server: missing ${manifestPath}. Run build() first.`)
+interface LoadedErrorModule {
+  default: (props: { error: unknown }) => Html | string | Promise<Html | string>
+}
 
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as BuildManifest
+interface EmbeddedServerConfig {
+  manifest: BuildManifest
+  modules: Record<string, unknown>
+  assets: Record<string, Uint8Array<ArrayBuffer>>
+  prerendered: Record<string, string>
+  assetPrefix?: string | undefined
+  lang?: string | undefined
+  security?: SecurityHeadersOptions | false | undefined
+  trustedOrigins?: string[] | undefined
+}
 
-  // Preload static client assets into memory for zero-disk-I/O serving
-  const assetBytes = new Map<string, { body: Uint8Array<ArrayBuffer>, type: string }>()
-  for (const rel of manifest.assets) {
-    const abs = join(clientDir, rel)
-    if (existsSync(abs)) {
-      const body = new Uint8Array(readFileSync(abs))
-      const type = MIME[extname(rel)] ?? 'application/octet-stream'
-      assetBytes.set(`${assetPrefix}/${rel}`, { body, type })
+function makeRequestContext(request: Request, params: Record<string, string>): { ctx: RequestContext, cookieStore: CookieStore } {
+  const url = new URL(request.url)
+  const cookieStore = new CookieStore(request.headers.get('cookie'))
+  const ctx: RequestContext = {
+    request,
+    url,
+    params,
+    cookies: cookieStore,
+    locals: {},
+    json: (data, init) => Response.json(data, init),
+    text: (body, init) => new Response(body, { ...init, headers: { 'content-type': 'text/plain; charset=utf-8', ...init?.headers } }),
+    redirect: (location, status = 302) => new Response(null, { status, headers: { location } }),
+    deny: (status, message, fieldErrors) => Response.json({ ok: false, status, error: message, fieldErrors }, { status }),
+  }
+  return { ctx, cookieStore }
+}
+
+function finalizeResponse(res: Response, cookieStore: CookieStore, security: SecurityHeadersOptions | false | undefined): Response {
+  const headers = new Headers(res.headers)
+  cookieStore.applyTo(headers)
+  if (security !== false)
+    applySecurityHeaders(headers, security)
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+}
+
+export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
+  const { manifest, modules, assets, prerendered, lang = 'en', security } = config
+  const assetPrefix = (config.assetPrefix ?? '/_kay').replace(/\/$/, '')
+  const trustedOrigins = config.trustedOrigins ? new Set(config.trustedOrigins) : undefined
+
+  // Asset table
+  const assetMap = new Map<string, { body: Uint8Array<ArrayBuffer>, type: string }>()
+  for (const [rel, body] of Object.entries(assets)) {
+    assetMap.set(`${assetPrefix}/${rel}`, { body, type: MIME[extname(rel)] ?? 'application/octet-stream' })
+  }
+
+  // Register server actions and assign their live URLs
+  const actionHandlers = new Map<string, ServerAction<unknown, unknown>>()
+  for (const entry of manifest.actions) {
+    const mod = modules[entry.file] as Record<string, unknown> | undefined
+    const act = mod?.[entry.exportName]
+    if (isServerAction(act)) {
+      ;(act as { url: string }).url = entry.url
+      actionHandlers.set(entry.url, act)
     }
   }
 
-  // Pre-import layouts and route modules at boot
-  const layouts = new Map<string, LoadedLayoutModule>()
-  const pageHandlers = new Map<string, (req: Request) => Response | Promise<Response>>()
+  const errorMod = manifest.errorFile ? modules[manifest.errorFile] as LoadedErrorModule : undefined
+  const notFoundMod = manifest.notFoundFile ? modules[manifest.notFoundFile] as LoadedPageModule : undefined
 
-  async function loadLayout(rel: string): Promise<LoadedLayoutModule> {
-    const existing = layouts.get(rel)
-    if (existing !== undefined)
-      return existing
-    const mod = await import(join(outDir, rel)) as LoadedLayoutModule
-    layouts.set(rel, mod)
-    return mod
+  // Static prerendered pages table
+  const prerenderedMap = new Map<string, string>()
+  for (const route of manifest.routes) {
+    if (route.prerendered) {
+      for (const [urlPath, relHtml] of Object.entries(route.prerendered)) {
+        const html = prerendered[relHtml]
+        if (html !== undefined)
+          prerenderedMap.set(urlPath, html)
+      }
+    }
   }
+
+  interface CompiledRoute {
+    entry: RouteManifestEntry
+    mod: LoadedPageModule
+    layouts: LoadedLayoutModule[]
+    middlewares: Middleware[]
+    fastHandler: ((req: Request) => Response | Promise<Response>) | undefined
+    docPrefix: string
+    docSuffix: string
+  }
+
+  const router = new Router<CompiledRoute>()
+  const fastStaticPages = new Map<string, (req: Request) => Response | Promise<Response>>()
 
   for (const entry of manifest.routes) {
-    const mod = await import(join(outDir, entry.file)) as LoadedPageModule
-    const layout = entry.layout !== undefined ? await loadLayout(entry.layout) : undefined
-    pageHandlers.set(entry.path, makeRouteHandler(entry, mod, layout, manifest, lang))
-  }
+    const mod = modules[entry.file] as LoadedPageModule
+    const layouts = entry.layouts.map(l => modules[l] as LoadedLayoutModule)
+    const middlewares = entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default)
 
-  function makeRouteHandler(
-    entry: RouteManifestEntry,
-    mod: LoadedPageModule,
-    layout: LoadedLayoutModule | undefined,
-    manifestData: BuildManifest,
-    docLang: string,
-  ): (req: Request) => Response | Promise<Response> {
-    // Precompute static document prefix & suffix per route! Zero per-request head/script string building!
     const hasIslands = entry.islandChunks.length > 0
     const shell = renderDocument({
       body: '\0',
-      lang: docLang,
-      runtimeScript: manifestData.runtimeScript,
+      lang,
+      runtimeScript: manifest.runtimeScript,
       preloadChunks: entry.islandChunks,
       hasIslands,
     })
     const splitAt = shell.indexOf('\0')
     const docPrefix = shell.slice(0, splitAt)
     const docSuffix = shell.slice(splitAt + 1)
-    const htmlHeaders = { 'content-type': 'text/html; charset=utf-8' }
 
-    return (request: Request): Promise<Response> | Response => {
-      // Endpoint handler (.ts route exporting GET/POST)
-      const methodHandler = (mod as unknown as Record<string, ((c: RequestContext) => Response | Promise<Response>) | undefined>)[request.method]
-      if (typeof methodHandler === 'function')
-        return methodHandler({ request, url: new URL(request.url), params: {} })
+    // Ultra-fast zero-overhead path when route is static, has no middleware, no <Head>/<Suspense>, and default page
+    const canFastPath = !entry.path.includes(':')
+      && !entry.path.includes('*')
+      && middlewares.length === 0
+      && !entry.usesRenderContext
+      && typeof mod.default === 'function'
+      && mod.GET === undefined
 
-      const finish = (inner: string): Response | Promise<Response> => {
-        if (layout === undefined)
-          return new Response(docPrefix + inner + docSuffix, { status: 200, headers: htmlHeaders })
-        const wrapped = layout.default({ children: raw(inner) })
-        if (wrapped instanceof Promise)
-          return wrapped.then(w => new Response(docPrefix + ssrChild(w as Html) + docSuffix, { status: 200, headers: htmlHeaders }))
-        return new Response(docPrefix + ssrChild(wrapped as Html) + docSuffix, { status: 200, headers: htmlHeaders })
+    let fastHandler: ((req: Request) => Response | Promise<Response>) | undefined
+    if (canFastPath) {
+      const headers: Record<string, string> = { 'content-type': 'text/html; charset=utf-8' }
+      if (security !== false) {
+        const h = new Headers(headers)
+        applySecurityHeaders(h, security)
+        h.forEach((v, k) => { headers[k] = v })
       }
+      const singleLayout = layouts.length === 1 ? layouts[0]! : undefined
 
-      const renderPage = (pageProps: Record<string, unknown>): Response | Promise<Response> => {
-        if (entry.isIsland && entry.islandChunk !== undefined) {
-          const inner = ssrIsland(
-            entry.path,
-            entry.islandChunk,
-            () => ssrChild(mod.default(pageProps) as Html),
-            pageProps,
-            entry.islandHydrate as HydrateStrategy | undefined,
-          )
-          return finish(inner)
+      fastHandler = (request: Request): Response | Promise<Response> => {
+        const wrapLayouts = (inner: string): Response | Promise<Response> => {
+          if (layouts.length === 0)
+            return new Response(docPrefix + inner + docSuffix, { status: 200, headers })
+          if (singleLayout !== undefined) {
+            const w = singleLayout.default({ children: raw(inner) })
+            if (w instanceof Promise)
+              return w.then(x => new Response(docPrefix + ssrChild(x as Html) + docSuffix, { status: 200, headers }))
+            return new Response(docPrefix + ssrChild(w as Html) + docSuffix, { status: 200, headers })
+          }
+          return (async () => {
+            let cur = inner
+            for (let i = layouts.length - 1; i >= 0; i--)
+              cur = ssrChild(await layouts[i]!.default({ children: raw(cur) }) as Html)
+            return new Response(docPrefix + cur + docSuffix, { status: 200, headers })
+          })()
         }
-        const rendered = mod.default(pageProps)
-        if (rendered instanceof Promise)
-          return rendered.then(r => finish(ssrChild(r as Html)))
-        return finish(ssrChild(rendered as Html))
-      }
 
-      if (entry.hasLoad && typeof mod.load === 'function') {
-        const loaded = mod.load({ request, url: new URL(request.url), params: {} })
-        if (loaded instanceof Promise)
-          return loaded.then(data => renderPage(data !== undefined ? { data } : {}))
-        return renderPage(loaded !== undefined ? { data: loaded } : {})
-      }
+        const renderPage = (pageProps: Record<string, unknown>): Response | Promise<Response> => {
+          if (entry.isIsland && entry.islandChunk !== undefined) {
+            const inner = ssrIsland(
+              entry.path,
+              entry.islandChunk,
+              () => ssrChild(mod.default!(pageProps) as Html),
+              pageProps,
+              entry.islandHydrate as HydrateStrategy | undefined,
+            )
+            return wrapLayouts(inner)
+          }
+          const rendered = mod.default!(pageProps)
+          if (rendered instanceof Promise)
+            return rendered.then(r => wrapLayouts(ssrChild(r as Html)))
+          return wrapLayouts(ssrChild(rendered as Html))
+        }
 
-      return renderPage({})
+        if (entry.hasLoad && typeof mod.load === 'function') {
+          const { ctx } = makeRequestContext(request, {})
+          const loaded = mod.load(ctx)
+          if (loaded instanceof Promise)
+            return loaded.then(data => renderPage(data !== undefined ? { data } : {}))
+          return renderPage(loaded !== undefined ? { data: loaded } : {})
+        }
+        return renderPage({})
+      }
+      fastStaticPages.set(entry.path, fastHandler)
     }
+
+    router.add(entry.path, { entry, mod, layouts, middlewares, fastHandler, docPrefix, docSuffix })
+  }
+
+  async function renderCompiledRoute(route: CompiledRoute, ctx: RequestContext, cookieStore: CookieStore): Promise<Response> {
+    const { entry, mod, layouts } = route
+
+    // API route (.ts exporting GET/POST/etc.)
+    const methodHandler = mod[ctx.request.method]
+    if (typeof methodHandler === 'function') {
+      const res = await (methodHandler as (c: RequestContext) => Response | Promise<Response>)(ctx)
+      return finalizeResponse(res, cookieStore, security)
+    }
+
+    if (typeof mod.default !== 'function')
+      return finalizeResponse(new Response('Method Not Allowed', { status: 405 }), cookieStore, security)
+
+    const data = entry.hasLoad && typeof mod.load === 'function' ? await mod.load(ctx) : undefined
+    const pageProps: Record<string, unknown> = {
+      params: ctx.params,
+      locals: ctx.locals,
+      url: ctx.url,
+      ...(data !== undefined ? { data } : {}),
+    }
+
+    const rctx = createRenderContext()
+    const renderBody = async (): Promise<string> => {
+      let inner: string
+      if (entry.isIsland && entry.islandChunk !== undefined) {
+        inner = ssrIsland(
+          entry.path,
+          entry.islandChunk,
+          () => ssrChild(mod.default!(pageProps) as Html),
+          data !== undefined ? { data } : {},
+          entry.islandHydrate as HydrateStrategy | undefined,
+        )
+      }
+      else {
+        inner = ssrChild(await mod.default!(pageProps) as Html)
+      }
+      for (let i = layouts.length - 1; i >= 0; i--)
+        inner = ssrChild(await layouts[i]!.default({ children: raw(inner) }) as Html)
+      return inner
+    }
+
+    const body = await runWithRenderContext(rctx, renderBody)
+    const collectedHead = renderCollectedHead(rctx)
+    const hasIslands = entry.islandChunks.length > 0
+
+    // Streaming SSR path when <Suspense> boundaries are pending!
+    if (rctx.pending.length > 0) {
+      const shell = renderDocument({
+        body: '\0',
+        head: collectedHead,
+        lang,
+        runtimeScript: manifest.runtimeScript,
+        preloadChunks: entry.islandChunks,
+        hasIslands,
+      })
+      const splitAt = shell.indexOf('\0')
+      const headHtml = shell.slice(0, splitAt)
+      const tailHtml = shell.slice(splitAt + 1)
+      const encoder = new TextEncoder()
+
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          controller.enqueue(encoder.encode(headHtml + body))
+          await Promise.all(
+            rctx.pending.map(async (chunk) => {
+              const resolved = await chunk.promise
+              controller.enqueue(encoder.encode(streamChunkScript(chunk.id, resolved)))
+            }),
+          )
+          controller.enqueue(encoder.encode(tailHtml))
+          controller.close()
+        },
+      })
+
+      const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
+      cookieStore.applyTo(headers)
+      if (security !== false)
+        applySecurityHeaders(headers, security)
+      return new Response(stream, { status: 200, headers })
+    }
+
+    const html = collectedHead !== ''
+      ? renderDocument({
+          body,
+          head: collectedHead,
+          lang,
+          runtimeScript: manifest.runtimeScript,
+          preloadChunks: entry.islandChunks,
+          hasIslands,
+        })
+      : route.docPrefix + body + route.docSuffix
+
+    const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
+    cookieStore.applyTo(headers)
+    if (security !== false)
+      applySecurityHeaders(headers, security)
+    return new Response(html, { status: 200, headers })
+  }
+
+  async function renderError(error: unknown, cookieStore: CookieStore): Promise<Response> {
+    if (errorMod !== undefined) {
+      const body = ssrChild(await errorMod.default({ error }) as Html)
+      const html = renderDocument({ body, lang })
+      return finalizeResponse(new Response(html, { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } }), cookieStore, security)
+    }
+    return finalizeResponse(new Response('Internal Server Error', { status: 500 }), cookieStore, security)
+  }
+
+  async function renderNotFound(cookieStore: CookieStore): Promise<Response> {
+    if (notFoundMod?.default !== undefined) {
+      const body = ssrChild(await notFoundMod.default({}) as Html)
+      const html = renderDocument({ body, lang })
+      return finalizeResponse(new Response(html, { status: 404, headers: { 'content-type': 'text/html; charset=utf-8' } }), cookieStore, security)
+    }
+    return finalizeResponse(new Response('Not Found', { status: 404 }), cookieStore, security)
   }
 
   async function handle(request: Request): Promise<Response> {
-    const url = new URL(request.url)
-    const pathname = url.pathname
+    const pathname = new URL(request.url).pathname
 
-    const asset = assetBytes.get(pathname)
+    // 1. Static client assets
+    const asset = assetMap.get(pathname)
     if (asset !== undefined) {
       return new Response(asset.body, {
         status: 200,
@@ -169,17 +392,73 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
       })
     }
 
-    const routeHandler = pageHandlers.get(pathname)
-    if (routeHandler !== undefined)
-      return routeHandler(request)
+    // 2. Server actions (POST /_kay/action/<id>)
+    if (request.method === 'POST') {
+      const act = actionHandlers.get(pathname)
+      if (act !== undefined) {
+        const { ctx, cookieStore } = makeRequestContext(request, {})
+        const actionCtx: ActionContext = {
+          request: ctx.request,
+          url: ctx.url,
+          params: ctx.params,
+          cookies: ctx.cookies,
+          locals: ctx.locals,
+          redirect: ctx.redirect,
+          deny: ctx.deny,
+        }
+        const res = await executeAction(act, request, actionCtx, trustedOrigins)
+        return finalizeResponse(res, cookieStore, security)
+      }
+    }
 
-    return new Response('Not Found', { status: 404 })
+    // 3. Prerendered static HTML
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      const pre = prerenderedMap.get(pathname)
+      if (pre !== undefined) {
+        const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
+        if (security !== false)
+          applySecurityHeaders(headers, security)
+        return new Response(pre, { status: 200, headers })
+      }
+    }
+
+    // 4. Ultra-fast static route path
+    if (request.method === 'GET') {
+      const fast = fastStaticPages.get(pathname)
+      if (fast !== undefined)
+        return fast(request)
+    }
+
+    // 5. Full Router + Middleware + Streaming/Head/Error pipeline
+    const matched = router.match(pathname)
+    const { ctx, cookieStore } = makeRequestContext(request, matched?.params ?? {})
+
+    if (matched === undefined)
+      return renderNotFound(cookieStore)
+
+    const route = matched.data
+    try {
+      let index = -1
+      const dispatch = async (i: number): Promise<Response> => {
+        if (i <= index)
+          throw new Error('kay: middleware called next() multiple times')
+        index = i
+        if (i < route.middlewares.length)
+          return route.middlewares[i]!(ctx, () => dispatch(i + 1))
+        return renderCompiledRoute(route, ctx, cookieStore)
+      }
+      const res = await dispatch(0)
+      return finalizeResponse(res, cookieStore, security)
+    }
+    catch (error) {
+      return renderError(error, cookieStore)
+    }
   }
 
-  function serve(port = options.port ?? 3000) {
+  function serve(port = 3000) {
     const routes: Record<string, Response | ((req: Request) => Response | Promise<Response>)> = {}
 
-    for (const [path, asset] of assetBytes) {
+    for (const [path, asset] of assetMap) {
       routes[path] = new Response(asset.body, {
         status: 200,
         headers: {
@@ -189,8 +468,17 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
       })
     }
 
-    for (const [path, handler] of pageHandlers)
-      routes[path] = handler
+    for (const [path, pre] of prerenderedMap) {
+      const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
+      if (security !== false)
+        applySecurityHeaders(headers, security)
+      routes[path] = new Response(pre, { status: 200, headers })
+    }
+
+    for (const [path, handler] of fastStaticPages) {
+      if (!(path in routes))
+        routes[path] = handler
+    }
 
     return Bun.serve({
       port,
@@ -200,4 +488,57 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
   }
 
   return { handle, serve }
+}
+
+export async function createServer(options: ServerOptions): Promise<KayApp> {
+  const root = resolve(options.root)
+  const outDir = resolve(root, options.outDir ?? 'dist')
+  const clientDir = join(outDir, 'client')
+  const manifestPath = join(outDir, 'manifest.json')
+
+  if (!existsSync(manifestPath))
+    throw new Error(`kay server: missing ${manifestPath}. Run build() first.`)
+
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as BuildManifest
+  const modules: Record<string, unknown> = {}
+  const assets: Record<string, Uint8Array<ArrayBuffer>> = {}
+  const prerendered: Record<string, string> = {}
+
+  for (const rel of manifest.assets) {
+    const abs = join(clientDir, rel)
+    if (existsSync(abs))
+      assets[rel] = new Uint8Array(readFileSync(abs))
+  }
+
+  const loadMod = async (rel: string) => {
+    if (!(rel in modules))
+      modules[rel] = await import(join(outDir, rel))
+  }
+
+  for (const r of manifest.routes) {
+    await loadMod(r.file)
+    for (const l of r.layouts) await loadMod(l)
+    for (const m of r.middlewares) await loadMod(m)
+    if (r.prerendered) {
+      for (const [, relHtml] of Object.entries(r.prerendered)) {
+        const abs = join(outDir, relHtml)
+        if (existsSync(abs))
+          prerendered[relHtml] = readFileSync(abs, 'utf8')
+      }
+    }
+  }
+  if (manifest.errorFile) await loadMod(manifest.errorFile)
+  if (manifest.notFoundFile) await loadMod(manifest.notFoundFile)
+  for (const a of manifest.actions) await loadMod(a.file)
+
+  return createServerFromEmbedded({
+    manifest,
+    modules,
+    assets,
+    prerendered,
+    assetPrefix: options.assetPrefix,
+    lang: options.lang,
+    security: options.security,
+    trustedOrigins: options.trustedOrigins,
+  })
 }

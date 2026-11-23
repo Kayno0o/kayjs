@@ -405,6 +405,40 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       && !(c.type === 'JSXExpressionContainer' && c.expression.type === 'JSXEmptyExpression'),
     )
     const hasChildren = meaningfulChildren.length > 0
+
+    // Special case: <Suspense fallback={...}><AsyncComp /></Suspense> passes the raw component call/Promise!
+    if (tag === 'Suspense') {
+      if (meaningfulChildren.length === 1) {
+        const only = meaningfulChildren[0]!
+        if (only.type === 'JSXElement' && isComponentTag(jsxTagName(only.openingElement.name))) {
+          const innerTag = jsxTagName(only.openingElement.name)
+          const innerProps: string[] = []
+          for (const attr of only.openingElement.attributes as AstNode[]) {
+            if (attr.type === 'JSXAttribute') {
+              const n = jsxTagName(attr.name)
+              const k = /^[A-Za-z_$][\w$]*$/.test(n) ? n : JSON.stringify(n)
+              if (attr.value === null)
+                innerProps.push(`${k}: true`)
+              else if (attr.value.type === 'Literal')
+                innerProps.push(`${k}: ${JSON.stringify(attr.value.value)}`)
+              else if (attr.value.type === 'JSXExpressionContainer')
+                innerProps.push(`${k}: ${compileSubExpression(attr.value.expression)}`)
+            }
+          }
+          propEntries.push(`children: ${innerTag}({ ${innerProps.join(', ')} })`)
+        }
+        else if (only.type === 'JSXExpressionContainer') {
+          propEntries.push(`children: ${compileSubExpression(only.expression)}`)
+        }
+        else {
+          propEntries.push(`children: ${use('raw')}(${compileJsxToStringExpr(only)})`)
+        }
+      }
+      const propsObj = propEntries.length > 0 ? `{ ${propEntries.join(', ')} }` : '{}'
+      parts.pushExpr(`${use('ssrChild')}(${tag}(${propsObj}))`)
+      return
+    }
+
     const childExpr = hasChildren ? compileJsxToStringExpr({ type: 'JSXFragment', children: childNodes }) : '""'
 
     const islandInfo = !isIsland ? islands?.get(tag) : undefined

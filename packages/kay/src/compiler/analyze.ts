@@ -1,4 +1,4 @@
-// OXC-based static analysis for TSX files: automatic island detection, imports, and async route checks.
+// OXC-based static analysis for TSX/TS files: automatic island detection, actions, prerender, Head/Suspense.
 
 import { parseSync } from 'oxc-parser'
 
@@ -33,7 +33,11 @@ export interface ModuleAnalysis {
   hasAsyncDefault: boolean
   hasLoadExport: boolean
   hasJsx: boolean
+  hasPrerender: boolean
+  hasPaths: boolean
+  usesRenderContext: boolean
   defaultHydrate: string | undefined
+  exportedActions: string[]
   imports: ImportInfo[]
   exportedNames: string[]
 }
@@ -75,9 +79,14 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   let hasAsyncDefault = false
   let hasLoadExport = false
   let hasJsx = false
+  let hasPrerender = false
+  let hasPaths = false
+  let usesRenderContext = false
   let defaultHydrate: string | undefined
+  const exportedActions: string[] = []
   const imports: ImportInfo[] = []
   const exportedNames: string[] = []
+  let actionLocalName = 'action'
 
   const markInteractive = (reason: string) => {
     if (!isInteractive) {
@@ -100,6 +109,10 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
           specifiers.push({ local, imported })
           if ((source === 'kay' || source === '@kayjs/kay') && REACTIVE_IMPORTS.has(imported))
             markInteractive(`imports ${imported} from '${source}'`)
+          if ((source === 'kay' || source === '@kayjs/kay' || source === 'kay/ssr') && (imported === 'Head' || imported === 'Suspense'))
+            usesRenderContext = true
+          if ((source === 'kay/server' || source === '@kayjs/kay/server') && imported === 'action')
+            actionLocalName = local
         }
         else if (spec.type === 'ImportDefaultSpecifier') {
           specifiers.push({ local: spec.local.name as string, imported: 'default' })
@@ -118,7 +131,6 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
       if ((decl.type === 'FunctionDeclaration' || decl.type === 'FunctionExpression' || decl.type === 'ArrowFunctionExpression') && decl.async === true)
         hasAsyncDefault = true
 
-      // Detect `export default island(Comp, { hydrate: 'visible' })`
       if (decl.type === 'CallExpression' && decl.callee?.name === 'island') {
         markInteractive('island() wrapper')
         const opts = decl.arguments?.[1]
@@ -137,6 +149,8 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
         exportedNames.push(name)
         if (name === 'load')
           hasLoadExport = true
+        if (name === 'paths')
+          hasPaths = true
       }
       else if (decl?.type === 'VariableDeclaration') {
         for (const d of decl.declarations as AstNode[]) {
@@ -145,8 +159,14 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
             exportedNames.push(name)
             if (name === 'load')
               hasLoadExport = true
+            if (name === 'paths')
+              hasPaths = true
+            if (name === 'prerender' && d.init?.type === 'Literal' && d.init.value === true)
+              hasPrerender = true
             if (name === 'hydrate' && d.init?.type === 'Literal' && typeof d.init.value === 'string')
               defaultHydrate = d.init.value
+            if (d.init?.type === 'CallExpression' && d.init.callee?.type === 'Identifier' && d.init.callee.name === actionLocalName)
+              exportedActions.push(name)
           }
         }
       }
@@ -177,7 +197,11 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
     hasAsyncDefault,
     hasLoadExport,
     hasJsx,
+    hasPrerender,
+    hasPaths,
+    usesRenderContext,
     defaultHydrate,
+    exportedActions,
     imports,
     exportedNames,
   }

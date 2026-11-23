@@ -3,6 +3,9 @@
   "version": "2.0.0-alpha.0",
   "type": "module",
   "sideEffects": false,
+  "bin": {
+    "kay": "./src/cli/index.ts"
+  },
   "dependencies": {
     "oxc-parser": "^0.155.0"
   },
@@ -10,11 +13,14 @@
     ".": "./src/index.ts",
     "./dom": "./src/dom/index.ts",
     "./dom-loop": "./src/dom/loop.ts",
+    "./action": "./src/dom/action.ts",
     "./island": "./src/dom/island.ts",
     "./ssr": "./src/ssr/index.ts",
     "./server": "./src/server/index.ts",
     "./compiler": "./src/compiler/index.ts",
     "./build": "./src/build/index.ts",
+    "./dev": "./src/dev/index.ts",
+    "./test": "./src/test/index.ts",
     "./jsx-runtime": "./src/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx-runtime.ts"
   }

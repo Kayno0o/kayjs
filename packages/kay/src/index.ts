@@ -13,6 +13,7 @@ export type { Owner, ReadonlySignal, Signal } from './reactivity/index'
 export { selector } from './reactivity/selector'
 export type { Selector } from './reactivity/selector'
 export { snapshot, store } from './reactivity/store'
+export { Head, Suspense } from './ssr/context'
 export type { Component, Html, HydrateStrategy, KayChild } from './jsx-runtime'
 
 import type { Component, HydrateStrategy } from './jsx-runtime'

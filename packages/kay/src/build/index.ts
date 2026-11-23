@@ -1,10 +1,14 @@
-// Kay v2 single-pass builder: discovers routes & automatic islands, compiles client & server with Bun.build.
+// Kay v2 single-pass builder:
+// - Discovers file routes, nested _layout.tsx, _middleware.ts, _error.tsx, _404.tsx, actions, and automatic islands
+// - Builds client (1 pass, minimal runtime + island chunks + action stubs) and server (1 pass)
+// - Supports hybrid prerender, --static export, and --compile single-executable builds
 
 import type { BunPlugin } from 'bun'
 import type { IslandBinding, ModuleAnalysis } from '../compiler/index'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
+import { actionHash } from '../server/action'
 
 export interface BuildOptions {
   root: string
@@ -12,41 +16,62 @@ export interface BuildOptions {
   outDir?: string | undefined
   minify?: boolean | undefined
   assetPrefix?: string | undefined
+  /** Export a static site into dist/static (prerenders all static + paths() routes). */
+  static?: boolean | undefined
+  /** Compile into a single standalone executable at this path (or true -> dist/server-bin). */
+  compile?: string | boolean | undefined
+}
+
+export interface ActionManifestEntry {
+  url: string
+  file: string
+  exportName: string
 }
 
 export interface RouteManifestEntry {
   path: string
   file: string
-  layout?: string | undefined
+  layouts: string[]
+  middlewares: string[]
   hasLoad?: boolean | undefined
   isIsland?: boolean | undefined
   islandChunk?: string | undefined
   islandHydrate?: string | undefined
   islandChunks: string[]
+  usesRenderContext?: boolean | undefined
+  prerender?: boolean | undefined
+  prerendered?: Record<string, string> | undefined
 }
 
 export interface BuildManifest {
   runtimeScript: string | undefined
   routes: RouteManifestEntry[]
+  errorFile?: string | undefined
+  notFoundFile?: string | undefined
+  actions: ActionManifestEntry[]
   islands: Record<string, string>
   assets: string[]
 }
 
 const KAY_SRC_ROOT = resolve(import.meta.dir, '..')
 
-function resolveKaySpecifier(specifier: string): string | undefined {
+export function resolveKaySpecifier(specifier: string): string | undefined {
   if (specifier === 'kay' || specifier === '@kayjs/kay')
     return join(KAY_SRC_ROOT, 'index.ts')
   if (specifier === 'kay/dom' || specifier === '@kayjs/kay/dom')
     return join(KAY_SRC_ROOT, 'dom/index.ts')
   if (specifier === 'kay/dom-loop' || specifier === '@kayjs/kay/dom-loop')
     return join(KAY_SRC_ROOT, 'dom/loop.ts')
+  if (specifier === 'kay/action' || specifier === '@kayjs/kay/action')
+    return join(KAY_SRC_ROOT, 'dom/action.ts')
   if (specifier === 'kay/island' || specifier === '@kayjs/kay/island')
     return join(KAY_SRC_ROOT, 'dom/island.ts')
   if (specifier === 'kay/ssr' || specifier === '@kayjs/kay/ssr')
     return join(KAY_SRC_ROOT, 'ssr/index.ts')
   if (specifier === 'kay/server' || specifier === '@kayjs/kay/server')
     return join(KAY_SRC_ROOT, 'server/index.ts')
+  if (specifier === 'kay/test' || specifier === '@kayjs/kay/test')
+    return join(KAY_SRC_ROOT, 'test/index.ts')
   if (specifier === 'kay/jsx-runtime' || specifier === 'kay/jsx-dev-runtime')
     return join(KAY_SRC_ROOT, 'jsx-runtime.ts')
   return undefined
@@ -83,9 +108,28 @@ function fileToRoutePath(routesDir: string, file: string): string {
     return '/'
   const clean = rel.endsWith('/index') ? rel.slice(0, -'/index'.length) : rel
   const pattern = clean
-    .replace(/\[\.\.\.([^\]]+)\]/g, '*')
+    .replace(/\[\.\.\.([^\]]+)\]/g, '*$1')
     .replace(/\[([^\]]+)\]/g, ':$1')
   return `/${pattern}`
+}
+
+/** Finds all ancestor files named `specialName` from routesDir down to dirname(routeFile), outermost first. */
+function ancestorFiles(routesDir: string, routeFile: string, specialNames: string[]): string[] {
+  const result: string[] = []
+  const relDir = relative(routesDir, dirname(routeFile))
+  const parts = relDir === '' ? [] : relDir.split(/[/\\]/)
+  let cur = routesDir
+
+  for (let i = 0; i <= parts.length; i++) {
+    if (i > 0)
+      cur = join(cur, parts[i - 1]!)
+    for (const name of specialNames) {
+      const candidate = join(cur, name)
+      if (existsSync(candidate))
+        result.push(candidate)
+    }
+  }
+  return result
 }
 
 interface IslandTarget {
@@ -109,10 +153,14 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   mkdirSync(serverDir, { recursive: true })
 
   const allRouteFiles = walkRoutes(routesDir).sort()
-  const layoutFile = allRouteFiles.find(f => basename(f) === '_layout.tsx')
+  const specialFiles = allRouteFiles.filter(f => basename(f).startsWith('_'))
   const pageFiles = allRouteFiles.filter(f => !basename(f).startsWith('_'))
+  const errorSrc = join(routesDir, '_error.tsx')
+  const notFoundSrc = join(routesDir, '_404.tsx')
+  const hasErrorFile = existsSync(errorSrc)
+  const hasNotFoundFile = existsSync(notFoundSrc)
 
-  // Analyze every reachable .tsx file once
+  // Analyze every reachable .tsx and .ts file once
   const analyses = new Map<string, ModuleAnalysis>()
   const sources = new Map<string, string>()
 
@@ -126,20 +174,33 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     analyses.set(file, analysis)
     for (const imp of analysis.imports) {
       const target = resolveImportPath(file, imp.source)
-      if (target !== undefined && target.endsWith('.tsx'))
+      if (target !== undefined && (target.endsWith('.tsx') || target.endsWith('.ts')))
         loadAnalysis(target)
     }
     return analysis
   }
 
-  for (const f of allRouteFiles) {
-    if (f.endsWith('.tsx'))
-      loadAnalysis(f)
+  for (const f of allRouteFiles)
+    loadAnalysis(f)
+
+  // Discover all server actions (keyed by source file -> exportName -> action URL)
+  const actionsByFile = new Map<string, { exportName: string, url: string }[]>()
+  for (const [file, analysis] of analyses) {
+    if (analysis.exportedActions.length > 0) {
+      const rel = relative(root, file).replace(/\\/g, '/')
+      actionsByFile.set(
+        file,
+        analysis.exportedActions.map(exportName => ({
+          exportName,
+          url: `${assetPrefix}/action/${actionHash(rel, exportName)}`,
+        })),
+      )
+    }
   }
 
-  // Discover all island roots referenced from static pages/layouts (or sync interactive pages themselves)
-  const islandTargets = new Map<string, IslandTarget>() // key = `${file}#${exportName}`
-  const pageIslandBindings = new Map<string, Map<string, IslandTarget>>() // file -> (localName -> IslandTarget)
+  // Discover all island roots referenced from static pages/layouts/errors (or sync interactive pages themselves)
+  const islandTargets = new Map<string, IslandTarget>()
+  const pageIslandBindings = new Map<string, Map<string, IslandTarget>>()
 
   function registerIsland(file: string, exportName: string): IslandTarget {
     const key = `${file}#${exportName}`
@@ -156,8 +217,9 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   }
 
   for (const [file, analysis] of analyses) {
+    if (!file.endsWith('.tsx'))
+      continue
     if (analysis.isInteractive) {
-      // If a page itself is interactive, register its default export as an island
       if (pageFiles.includes(file))
         registerIsland(file, 'default')
       continue
@@ -180,8 +242,8 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       pageIslandBindings.set(file, bindings)
   }
 
-  // Step 1: Single-pass Client Build (if any islands exist)
-  const islandChunks = new Map<string, string>() // key -> chunk URL
+  // Step 1: Single-pass Client Build
+  const islandChunks = new Map<string, string>()
   const assetFiles: string[] = []
   let runtimeScript: string | undefined
 
@@ -190,7 +252,6 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     mkdirSync(entriesDir, { recursive: true })
     const entryPoints: string[] = []
 
-    // Pre-compile island modules once to discover exact core symbols used + whether deferred/client hydration is used
     const compiledDomCache = new Map<string, string>()
     const usedCoreExports = new Set<string>()
     const usedDomExports = new Set<string>()
@@ -238,8 +299,6 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       collectUsedFrom(compiled)
     }
 
-    // Build a single unified runtime entry exporting ONLY the used core/dom primitives + <kay-island>.
-    // Islands import shared core/dom symbols from this entry -> 2 JS files total per page (runtime + island), zero extra chunk!
     const runtimeEntryPath = join(entriesDir, 'runtime.ts')
     const runtimeLines = [
       `import { defineIslandElement } from 'kay/island';`,
@@ -266,7 +325,6 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       name: 'kay-v2-client',
       setup(b) {
         b.onResolve({ filter: /^(?:@kayjs\/)?kay(?:\/.*)?$/ }, (args) => {
-          // Route island imports of kay/dom to the unified runtime entry so Bun.build doesn't split an extra chunk
           if (args.importer !== runtimeEntryPath && !args.importer.startsWith(KAY_SRC_ROOT)) {
             if (args.path === 'kay/dom' || args.path === '@kayjs/kay/dom')
               return { path: runtimeEntryPath }
@@ -274,13 +332,24 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           const resolved = resolveKaySpecifier(args.path)
           return resolved !== undefined ? { path: resolved } : undefined
         })
-        b.onLoad({ filter: /\.tsx$/ }, (args) => {
+        // Replace server action modules with pure client stubs so server/DB code never enters client bundles!
+        b.onLoad({ filter: /\.(?:ts|tsx)$/ }, (args) => {
+          const actions = actionsByFile.get(args.path)
+          if (actions !== undefined && !analyses.get(args.path)?.isInteractive) {
+            const lines = [`import { actionStub } from 'kay/action';`]
+            for (const a of actions)
+              lines.push(`export const ${a.exportName} = actionStub(${JSON.stringify(a.url)});`)
+            return { contents: `${lines.join('\n')}\n`, loader: 'ts' }
+          }
+
+          if (!args.path.endsWith('.tsx'))
+            return undefined
+
           let compiled = compiledDomCache.get(args.path)
           if (compiled === undefined) {
             const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
             compiled = compileDom(args.path, raw, { analysis: analyses.get(args.path) }).code
           }
-          // Redirect core reactivity imports (signal, effect, etc.) from islands to runtimeEntryPath while keeping selector/store tree-shakable!
           const rewritten = compiled.replace(CORE_IMPORT_RE, (full, specList: string) => {
             const shared: string[] = []
             const separate: string[] = []
@@ -330,7 +399,6 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       throw new Error(`kay build (client) failed:\n${msgs}`)
     }
 
-    // Map entry outputs to runtimeScript and island chunk URLs
     for (const output of clientResult.outputs) {
       const relFile = relative(clientDir, output.path).replace(/\\/g, '/')
       assetFiles.push(relFile)
@@ -349,8 +417,11 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     }
   }
 
-  // Step 2: Single-pass Server Build (compiles all routes + layout to flat SSR JS)
-  const serverEntries = layoutFile !== undefined ? [layoutFile, ...pageFiles] : [...pageFiles]
+  // Step 2: Single-pass Server Build (routes + layouts + middlewares + error/404 + standalone action modules)
+  const standaloneActionFiles = [...actionsByFile.keys()].filter(f => !allRouteFiles.includes(f))
+  const serverEntries = [...specialFiles, ...pageFiles, ...standaloneActionFiles]
+  const serverRoot = standaloneActionFiles.length > 0 ? root : routesDir
+
   const serverPlugin: BunPlugin = {
     name: 'kay-v2-server',
     setup(b) {
@@ -389,7 +460,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const serverResult = await Bun.build({
     entrypoints: serverEntries,
     outdir: serverDir,
-    root: routesDir,
+    root: serverRoot,
     target: 'bun',
     format: 'esm',
     splitting: true,
@@ -402,17 +473,14 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     throw new Error(`kay build (server) failed:\n${msgs}`)
   }
 
-  const layoutOut = layoutFile !== undefined
-    ? relative(outDir, join(serverDir, relative(routesDir, layoutFile).replace(/\.tsx$/, '.js'))).replace(/\\/g, '/')
-    : undefined
+  const toOutRel = (srcFile: string): string =>
+    relative(outDir, join(serverDir, relative(serverRoot, srcFile).replace(/\.(tsx|ts)$/, '.js'))).replace(/\\/g, '/')
 
-  // Filter out 0-byte empty chunks from assets
   const nonEmptyAssets = assetFiles.filter((rel) => {
     const abs = join(clientDir, rel)
     return existsSync(abs) && readFileSync(abs).length > 0
   })
 
-  // Collect transitive island chunks reached by each route (and layout)
   function collectRouteIslands(file: string, seen = new Set<string>(), out = new Set<string>()): Set<string> {
     if (seen.has(file))
       return out
@@ -442,25 +510,64 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     return out
   }
 
-  const layoutIslands = layoutFile !== undefined ? collectRouteIslands(layoutFile) : new Set<string>()
+  function collectUsesRenderContext(file: string, seen = new Set<string>()): boolean {
+    if (seen.has(file))
+      return false
+    seen.add(file)
+    const analysis = analyses.get(file)
+    if (analysis === undefined)
+      return false
+    if (analysis.usesRenderContext)
+      return true
+    for (const imp of analysis.imports) {
+      const target = resolveImportPath(file, imp.source)
+      if (target !== undefined && target.endsWith('.tsx') && collectUsesRenderContext(target, seen))
+        return true
+    }
+    return false
+  }
 
   const routeEntries: RouteManifestEntry[] = pageFiles.map((file) => {
-    const relJs = relative(outDir, join(serverDir, relative(routesDir, file).replace(/\.(tsx|ts)$/, '.js'))).replace(/\\/g, '/')
     const analysis = analyses.get(file)
+    const layoutSrcs = ancestorFiles(routesDir, file, ['_layout.tsx'])
+    const middlewareSrcs = ancestorFiles(routesDir, file, ['_middleware.ts', '_middleware.tsx'])
+    const chunks = new Set<string>()
+    for (const lf of layoutSrcs)
+      collectRouteIslands(lf, new Set(), chunks)
+    collectRouteIslands(file, new Set(), chunks)
+
+    let usesRenderContext = collectUsesRenderContext(file)
+    if (!usesRenderContext) {
+      for (const lf of layoutSrcs) {
+        if (collectUsesRenderContext(lf)) {
+          usesRenderContext = true
+          break
+        }
+      }
+    }
+
     const islandKey = `${file}#default`
-    const chunk = islandChunks.get(islandKey)
-    const chunks = new Set<string>([...layoutIslands, ...collectRouteIslands(file)])
     return {
       path: fileToRoutePath(routesDir, file),
-      file: relJs,
-      layout: layoutOut,
+      file: toOutRel(file),
+      layouts: layoutSrcs.map(toOutRel),
+      middlewares: middlewareSrcs.map(toOutRel),
       hasLoad: analysis?.hasLoadExport,
       isIsland: analysis?.isInteractive,
-      islandChunk: chunk,
+      islandChunk: islandChunks.get(islandKey),
       islandHydrate: analysis?.defaultHydrate,
       islandChunks: [...chunks],
+      usesRenderContext,
+      prerender: analysis?.hasPrerender || options.static === true,
     }
   })
+
+  const actionEntries: ActionManifestEntry[] = []
+  for (const [srcFile, list] of actionsByFile) {
+    const outFile = toOutRel(srcFile)
+    for (const a of list)
+      actionEntries.push({ url: a.url, file: outFile, exportName: a.exportName })
+  }
 
   const islandsRecord: Record<string, string> = {}
   for (const [k, v] of islandChunks)
@@ -469,10 +576,147 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const manifest: BuildManifest = {
     runtimeScript,
     routes: routeEntries,
+    errorFile: hasErrorFile ? toOutRel(errorSrc) : undefined,
+    notFoundFile: hasNotFoundFile ? toOutRel(notFoundSrc) : undefined,
+    actions: actionEntries,
     islands: islandsRecord,
     assets: nonEmptyAssets,
   }
 
   writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
+
+  // Step 3: Hybrid Prerendering / Static Export
+  const prerenderRoutes = routeEntries.filter(r => r.prerender)
+  if (prerenderRoutes.length > 0) {
+    const { createServer } = await import('../server/index')
+    const app = await createServer({ root, outDir: relative(root, outDir), assetPrefix })
+    const prerenderDir = join(outDir, options.static ? 'static' : 'prerendered')
+    mkdirSync(prerenderDir, { recursive: true })
+
+    for (const route of prerenderRoutes) {
+      const mod = await import(join(outDir, route.file)) as { paths?: () => Promise<string[]> | string[] }
+      let urls: string[] = []
+      if (!route.path.includes(':') && !route.path.includes('*')) {
+        urls = [route.path]
+      }
+      else if (typeof mod.paths === 'function') {
+        urls = await mod.paths()
+      }
+
+      if (urls.length === 0)
+        continue
+
+      const map: Record<string, string> = {}
+      for (const u of urls) {
+        const res = await app.handle(new Request(`http://localhost${u}`))
+        if (res.status === 200) {
+          const html = await res.text()
+          const relHtml = u === '/' ? 'index.html' : `${u.replace(/^\//, '').replace(/\/$/, '')}/index.html`
+          const absHtml = join(prerenderDir, relHtml)
+          mkdirSync(dirname(absHtml), { recursive: true })
+          writeFileSync(absHtml, html)
+          map[u] = relative(outDir, absHtml).replace(/\\/g, '/')
+        }
+      }
+      route.prerendered = map
+    }
+
+    if (options.static) {
+      // Copy client assets into dist/static/_kay/...
+      const staticAssetDir = join(prerenderDir, assetPrefix.replace(/^\//, ''))
+      mkdirSync(staticAssetDir, { recursive: true })
+      for (const rel of nonEmptyAssets) {
+        const dst = join(staticAssetDir, rel)
+        mkdirSync(dirname(dst), { recursive: true })
+        writeFileSync(dst, readFileSync(join(clientDir, rel)))
+      }
+    }
+
+    writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
+  }
+
+  // Step 4: Single-Executable Compile (`kay build --compile [outfile]`)
+  if (options.compile) {
+    const outfile = typeof options.compile === 'string' ? resolve(root, options.compile) : join(outDir, 'server-bin')
+    await compileExecutable(outDir, clientDir, manifest, assetPrefix, outfile)
+  }
+
   return manifest
+}
+
+async function compileExecutable(
+  outDir: string,
+  clientDir: string,
+  manifest: BuildManifest,
+  assetPrefix: string,
+  outfile: string,
+): Promise<void> {
+  const entryPath = join(outDir, '__compile_entry.ts')
+  const imports: string[] = []
+  const modEntries: string[] = []
+  const seenFiles = new Set<string>()
+  let idx = 0
+
+  const addMod = (rel: string) => {
+    if (seenFiles.has(rel))
+      return
+    seenFiles.add(rel)
+    const v = `_m${idx++}`
+    imports.push(`import * as ${v} from ${JSON.stringify(join(outDir, rel))};`)
+    modEntries.push(`${JSON.stringify(rel)}: ${v}`)
+  }
+
+  for (const r of manifest.routes) {
+    addMod(r.file)
+    for (const l of r.layouts) addMod(l)
+    for (const m of r.middlewares) addMod(m)
+  }
+  if (manifest.errorFile) addMod(manifest.errorFile)
+  if (manifest.notFoundFile) addMod(manifest.notFoundFile)
+  for (const a of manifest.actions) addMod(a.file)
+
+  // Embed client assets and prerendered HTML directly as base64 buffers in the binary
+  const embeddedAssets: string[] = []
+  for (const rel of manifest.assets) {
+    const b64 = readFileSync(join(clientDir, rel)).toString('base64')
+    embeddedAssets.push(`${JSON.stringify(rel)}: Uint8Array.from(atob(${JSON.stringify(b64)}), c => c.charCodeAt(0))`)
+  }
+  const embeddedPrerendered: string[] = []
+  for (const r of manifest.routes) {
+    if (r.prerendered) {
+      for (const [, relHtml] of Object.entries(r.prerendered)) {
+        const html = readFileSync(join(outDir, relHtml), 'utf8')
+        embeddedPrerendered.push(`${JSON.stringify(relHtml)}: ${JSON.stringify(html)}`)
+      }
+    }
+  }
+
+  const code = [
+    `import { createServerFromEmbedded } from ${JSON.stringify(join(KAY_SRC_ROOT, 'server/index.ts'))};`,
+    ...imports,
+    `const manifest = ${JSON.stringify(manifest)};`,
+    `const modules = { ${modEntries.join(', ')} };`,
+    `const assets = { ${embeddedAssets.join(', ')} };`,
+    `const prerendered = { ${embeddedPrerendered.join(', ')} };`,
+    `const app = createServerFromEmbedded({ manifest, modules, assets, prerendered, assetPrefix: ${JSON.stringify(assetPrefix)} });`,
+    `const port = Number(process.env.PORT ?? 3000);`,
+    `const server = app.serve(port);`,
+    `console.log(\`kay server listening on http://localhost:\${server.port}\`);`,
+  ].join('\n')
+
+  writeFileSync(entryPath, code)
+  try {
+    const res = await Bun.build({
+      entrypoints: [entryPath],
+      compile: { outfile },
+      minify: true,
+    })
+    if (!res.success) {
+      const msgs = res.logs.map(l => l.message).join('\n')
+      throw new Error(`kay build --compile failed:\n${msgs}`)
+    }
+  }
+  finally {
+    rmSync(entryPath, { force: true })
+  }
 }
