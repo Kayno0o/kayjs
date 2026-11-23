@@ -67,7 +67,6 @@ export function Menu({ label, items, variant = 'outline', onSelect }: MenuProps)
     <div
       data-ui="menu"
       data-state={open.value ? 'open' : 'closed'}
-      style="position:relative;display:inline-block"
       ref={(el) => { rootEl = el as HTMLElement }}
     >
       <button
@@ -90,7 +89,6 @@ export function Menu({ label, items, variant = 'outline', onSelect }: MenuProps)
         <div
           data-part="content"
           role="menu"
-          style="position:absolute;inset-block-start:calc(100% + 4px);inset-inline-start:0;z-index:40"
         >
           {items.map((item, idx) => (
             <button

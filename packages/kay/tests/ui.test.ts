@@ -247,9 +247,11 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
       expect(await page.locator('#panel-two').isVisible()).toBe(true)
       expect(await page.locator('#tab-two').getAttribute('data-state')).toBe('active')
 
-      // 3. Menu open + click item closes menu
+      // 3. Menu open + has opaque surface background + click item closes menu
       await page.click('[data-ui="menu"] [data-part="trigger"]')
       expect(await page.locator('[data-ui="menu"] [role="menu"]').isVisible()).toBe(true)
+      const menuBg = await page.locator('[data-ui="menu"] [role="menu"]').evaluate(el => getComputedStyle(el).backgroundColor)
+      expect(menuBg).not.toBe('rgba(0, 0, 0, 0)')
       await page.click('[data-ui="menu"] [role="menuitem"]:first-child')
       expect(await page.locator('[data-ui="menu"] [role="menu"]').count()).toBe(0)
 

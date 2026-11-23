@@ -165,7 +165,7 @@
   }
 
   [data-ui="popover"][popover],
-  [data-ui="menu"] [data-part="content"][popover],
+  [data-ui="menu"] [data-part="content"],
   [data-ui="select"] [data-part="listbox"] {
     background: var(--ui-surface);
     color: var(--ui-ink);
