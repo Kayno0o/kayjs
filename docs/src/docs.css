@@ -4,6 +4,7 @@
 
 html {
   scroll-padding-top: 5rem;
+  background-color: var(--ui-paper);
 }
 
 body {
@@ -11,6 +12,8 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  color: var(--ui-ink);
+  font-family: var(--ui-font-body);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }

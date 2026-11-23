@@ -14,14 +14,23 @@ export function GrammarDemo() {
 
   const pick = (id: string) => {
     active.value = id
-    let link = document.getElementById('kui-live-grammar') as HTMLLinkElement | null
-    if (!link) {
-      link = document.createElement('link')
-      link.id = 'kui-live-grammar'
-      link.rel = 'stylesheet'
-      document.head.appendChild(link)
+    // Disable the bundled default Orbit grammar stylesheet so Bare/Editorial/Workshop/Soft/Console don't inherit Orbit rules
+    const baseOrbit = document.querySelector<HTMLLinkElement>('link[rel="stylesheet"][href*="/orbit-"]')
+    if (baseOrbit)
+      baseOrbit.disabled = id !== 'orbit'
+
+    let live = document.getElementById('kui-live-grammar') as HTMLLinkElement | null
+    if (id === 'orbit') {
+      live?.remove()
+      return
     }
-    link.href = `/grammars/${id}.css`
+    if (!live) {
+      live = document.createElement('link')
+      live.id = 'kui-live-grammar'
+      live.rel = 'stylesheet'
+      document.head.appendChild(live)
+    }
+    live.href = `/grammars/${id}.css`
   }
 
   return (
