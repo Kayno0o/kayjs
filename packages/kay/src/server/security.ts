@@ -16,12 +16,15 @@ export function verifyOrigin(request: Request, trustedOrigins?: ReadonlySet<stri
 
   const url = new URL(request.url)
   const expectedOrigin = url.origin
+  const fwdProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim()
+  const fwdHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() || request.headers.get('host')?.trim()
+  const forwardedOrigin = fwdProto && fwdHost ? `${fwdProto}://${fwdHost}` : undefined
   const origin = request.headers.get('origin')
 
   if (origin !== null) {
-    if (origin === expectedOrigin || trustedOrigins?.has(origin))
+    if (origin === expectedOrigin || (forwardedOrigin !== undefined && origin === forwardedOrigin) || trustedOrigins?.has(origin))
       return { ok: true }
-    return { ok: false, reason: `Cross-site request blocked: origin ${origin} does not match ${expectedOrigin}` }
+    return { ok: false, reason: `Cross-site request blocked: origin ${origin} does not match ${forwardedOrigin ?? expectedOrigin}` }
   }
 
   const fetchSite = request.headers.get('sec-fetch-site')

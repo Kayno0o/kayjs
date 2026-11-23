@@ -185,7 +185,9 @@ export function createAuth(options: AuthOptions = {}): Auth {
     providers.set(p.id, p)
 
   const isSecureCookie = (ctx: RequestContext): boolean =>
-    ctx.url.protocol === 'https:' || runtimeNodeEnv() === 'production'
+    ctx.url.protocol === 'https:'
+    || ctx.request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() === 'https'
+    || runtimeNodeEnv() === 'production'
 
   async function resolveRequestSession(ctx: RequestContext): Promise<{ user: PublicUser, session: AuthSession } | undefined> {
     if (ctx.locals.__kayAuthResolved === true) {

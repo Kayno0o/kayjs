@@ -35,9 +35,15 @@ const SAMPLE_ROWS = [
   { id: '6', pkg: '@kayjs/seo', loc: 230, role: 'Meta, JSON-LD, sitemap, self-hosted fonts' },
 ]
 
-export default async function ShowcasePage({ locals }: { locals?: { user?: { email: string } } }) {
+export default async function ShowcasePage({ locals, url }: { locals?: { user?: { email: string } }, url?: URL }) {
+  const blockedNext = !locals?.user ? url?.searchParams.get('next') : null
   return (
     <Stack gap="2rem">
+      {blockedNext && (
+        <Notice tone="warning" role="alert">
+          <strong>Guarded route blocked:</strong> <code>{blockedNext}</code> requires authentication via <code>auth.guard()</code>. Create an account below to enter.
+        </Notice>
+      )}
       <section>
         <Stack gap="0.75rem">
           <Cluster>

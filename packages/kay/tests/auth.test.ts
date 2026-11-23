@@ -305,5 +305,13 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     expect(r1.status).toBe(401)
     expect(r2.status).toBe(401)
     expect(r3.status).toBe(429)
+
+    // Reverse proxy HTTPS -> HTTP origin verification works with X-Forwarded-Proto
+    const proxied = await app.post('/auth/signup', { email: 'proxy@example.com', password: 'password123' }, {
+      'origin': 'https://3000.kevyn.fr',
+      'x-forwarded-proto': 'https',
+      'x-forwarded-host': '3000.kevyn.fr',
+    })
+    expect(proxied.status).toBe(201)
   })
 })
