@@ -139,9 +139,9 @@
     &[data-tone="accent"] {
       background: var(--ui-accent-fill);
       border-color: var(--ui-accent-fill);
-      color: #090c13;
+      color: light-dark(#ffffff, #090c13);
       font-weight: 600;
-      &:hover:not(:disabled) { background: var(--ui-accent-fill); border-color: var(--ui-accent-fill); color: #090c13; filter: brightness(1.06); }
+      &:hover:not(:disabled) { background: var(--ui-accent-fill); border-color: var(--ui-accent-fill); color: light-dark(#ffffff, #090c13); filter: brightness(1.06); }
     }
     &[data-tone="danger"] {
       background: color-mix(in srgb, var(--ui-danger) 15%, var(--ui-surface));

@@ -18,7 +18,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-a {
+a:not([data-ui]) {
   color: inherit;
   text-decoration-color: var(--ui-accent);
   text-underline-offset: 4px;

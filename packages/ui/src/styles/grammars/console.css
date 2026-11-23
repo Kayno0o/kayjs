@@ -41,8 +41,8 @@
     &[data-tone="accent"] {
       background: var(--ui-accent);
       border-color: var(--ui-accent);
-      color: #051018;
-      &:hover:not(:disabled) { background: var(--ui-accent); border-color: var(--ui-accent); color: #051018; filter: brightness(1.08); }
+      color: light-dark(#ffffff, #051018);
+      &:hover:not(:disabled) { background: var(--ui-accent); border-color: var(--ui-accent); color: light-dark(#ffffff, #051018); filter: brightness(1.08); }
     }
     &[data-tone="danger"] {
       background: color-mix(in srgb, var(--ui-danger) 18%, transparent);
