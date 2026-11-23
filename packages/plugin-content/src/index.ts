@@ -27,9 +27,28 @@ export interface ContentEntry<TData = Record<string, unknown>> {
 export type MarkdownComponent = (props: any) => unknown
 export type CodeHighlighter = (code: string, language: string | undefined) => string
 
+export interface MarkdownImageResult {
+  src: string
+  srcset?: string | undefined
+  sizes?: string | undefined
+  width?: number | undefined
+  height?: number | undefined
+  loading?: 'lazy' | 'eager' | undefined
+}
+
+export type MarkdownImageResolver = (src: string, file: string | undefined) => MarkdownImageResult | string | undefined
+
 export interface RenderMarkdownOptions {
   highlight?: CodeHighlighter | undefined
   components?: Record<string, MarkdownComponent> | undefined
+  /** Wrap h2-h6 headings in self-referencing `<a href="#id">` links. */
+  headingLinks?: boolean | undefined
+  /** Active locale passed into embedded components as `props.locale`. */
+  locale?: string | undefined
+  /** Optional image resolver for rewriting `<img src="...">` (e.g. relative `./img/*.png` via `@kayjs/images`). */
+  resolveImage?: MarkdownImageResolver | undefined
+  /** Source file path passed to `resolveImage`. */
+  file?: string | undefined
 }
 
 export interface CollectionOptions<TData = Record<string, unknown>> {
@@ -45,6 +64,10 @@ export interface CollectionOptions<TData = Record<string, unknown>> {
   highlight?: CodeHighlighter | undefined
   /** Embedded Kay TSX components usable directly inside Markdown (`<Note>`, `<BarChart rows={[...]} />`). */
   components?: Record<string, MarkdownComponent> | undefined
+  /** Wrap h2-h6 headings in self-referencing `<a href="#id">` links. */
+  headingLinks?: boolean | undefined
+  /** Optional image resolver for rewriting Markdown images (e.g. relative `./img/*.png` via `@kayjs/images`). */
+  resolveImage?: MarkdownImageResolver | undefined
   /** Include entries with `draft: true` (default: false). */
   includeDrafts?: boolean | undefined
   /** Custom comparator for `all()` (defaults to newest `date` first, then alphabetical `slug`). */
@@ -213,6 +236,7 @@ function expandComponents(
   components: Record<string, MarkdownComponent>,
   options: RenderMarkdownOptions,
   slots: string[],
+  slotPrefix: string,
 ): string {
   const names = Object.keys(components)
   if (names.length === 0)
@@ -279,10 +303,13 @@ function expandComponents(
       }
     }
 
+    if (options.locale !== undefined && props.locale === undefined)
+      props.locale = options.locale
+
     const renderedHtml = ssrRaw(components[tagName]!(props))
     const slotIdx = slots.length
     slots.push(renderedHtml)
-    out += `\n\n<div data-kay-md-slot="${slotIdx}"></div>\n\n`
+    out += `\n\n<div data-kay-md-slot="${slotPrefix}${slotIdx}"></div>\n\n`
     i = afterIndex
   }
 
@@ -290,6 +317,7 @@ function expandComponents(
 }
 
 const FENCE_RE = /^([`~]{3,})([^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm
+let slotBatchId = 0
 
 /** Renders Markdown via Bun's native Zig `Bun.markdown.html()`, with optional Shiki `highlight`, embedded TSX `components`, heading IDs, TOC, and reading time. */
 export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}): {
@@ -299,6 +327,7 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
   readingMinutes: number
 } {
   const slots: string[] = []
+  const slotPrefix = `b${++slotBatchId}-`
   let processed = body
 
   // 1. Extract fenced code blocks before component expansion so `<Tag>` inside ```code``` is never treated as a component
@@ -308,18 +337,18 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
         const lang = info.trim().split(/\s+/)[0] || undefined
         const idx = slots.length
         slots.push(options.highlight(code.replace(/\n$/, ''), lang))
-        return `\n\n<div data-kay-md-slot="${idx}"></div>\n\n`
+        return `\n\n<div data-kay-md-slot="${slotPrefix}${idx}"></div>\n\n`
       }
       // Protect code fences from component expansion when only components are configured
       const idx = slots.length
       slots.push(Bun.markdown.html(full, { tables: true, strikethrough: true, tasklists: true, autolinks: true }))
-      return `\n\n<div data-kay-md-slot="${idx}"></div>\n\n`
+      return `\n\n<div data-kay-md-slot="${slotPrefix}${idx}"></div>\n\n`
     })
   }
 
   // 2. Expand embedded TSX components
   if (options.components !== undefined)
-    processed = expandComponents(processed, options.components, options, slots)
+    processed = expandComponents(processed, options.components, options, slots, slotPrefix)
 
   // 3. Render remaining Markdown via native Zig Bun.markdown.html
   let html = Bun.markdown.html(processed, {
@@ -341,12 +370,45 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
     usedIds.set(base, count + 1)
     const id = count === 0 ? base : `${base}-${count}`
     headings.push({ level, id, text })
+    if (options.headingLinks && level >= 2)
+      return `<h${level} id="${id}"><a href="#${id}">${inner}</a></h${level}>`
     return `<h${level} id="${id}">${inner}</h${level}>`
   })
 
-  // 5. Splice highlighted code blocks & embedded TSX components back in
+  // 4b. Optional image rewriting (e.g. relative `./img/*.png` -> optimized responsive @kayjs/images)
+  if (options.resolveImage !== undefined) {
+    html = html.replace(/<img\b([^>]*?)>/gi, (full, attrs: string) => {
+      const srcMatch = /\bsrc="([^"]+)"/i.exec(attrs)
+      if (!srcMatch)
+        return full
+      const resolved = options.resolveImage!(srcMatch[1]!, options.file)
+      if (!resolved)
+        return full
+      const info: MarkdownImageResult = typeof resolved === 'string' ? { src: resolved } : resolved
+      const altMatch = /\balt="([^"]*)"/i.exec(attrs)
+      const alt = altMatch ? altMatch[1]! : ''
+      const parts = [`src="${escapeXml(info.src)}"`, `alt="${alt}"`]
+      if (info.srcset)
+        parts.push(`srcset="${escapeXml(info.srcset)}"`)
+      if (info.sizes)
+        parts.push(`sizes="${escapeXml(info.sizes)}"`)
+      if (info.width !== undefined && info.width > 0)
+        parts.push(`width="${info.width}"`)
+      if (info.height !== undefined && info.height > 0)
+        parts.push(`height="${info.height}"`)
+      parts.push(`loading="${info.loading ?? 'lazy'}"`, 'decoding="async"')
+      return `<img ${parts.join(' ')}>`
+    })
+  }
+
+  // 5. Splice this batch's highlighted code blocks & embedded TSX components back in (loop handles components wrapping code fences)
   if (slots.length > 0) {
-    html = html.replace(/<div data-kay-md-slot="(\d+)"><\/div>/g, (_m, idxStr: string) => slots[Number(idxStr)] ?? '')
+    const slotRe = new RegExp(`<div data-kay-md-slot="${slotPrefix}(\\d+)"><\\/div>`, 'g')
+    let prev = ''
+    while (prev !== html) {
+      prev = html
+      html = html.replace(slotRe, (_m, idxStr: string) => slots[Number(idxStr)] ?? '')
+    }
   }
 
   const words = body.trim().split(/\s+/).filter(Boolean).length
@@ -385,10 +447,12 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
   const renderOpts: RenderMarkdownOptions = {
     highlight: options.highlight,
     components: options.components,
+    headingLinks: options.headingLinks,
+    resolveImage: options.resolveImage,
   }
-  const cache = new Map<string, { mtimeMs: number, entry: ContentEntry<TData> }>()
+  const cache = new Map<string, { mtimeMs: number, entry: ContentEntry<TData> | null }>()
 
-  function loadFile(absFile: string, baseDir: string, entryLocale?: string): ContentEntry<TData> {
+  function loadFile(absFile: string, baseDir: string, entryLocale?: string): ContentEntry<TData> | null {
     const mtimeMs = statSync(absFile).mtimeMs
     const cached = cache.get(absFile)
     if (cached !== undefined && cached.mtimeMs === mtimeMs)
@@ -416,7 +480,12 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       data = rawData as TData
     }
 
-    const rendered = renderMarkdown(body, renderOpts)
+    if (!includeDrafts && (data as Record<string, unknown>).draft === true) {
+      cache.set(absFile, { mtimeMs, entry: null })
+      return null
+    }
+
+    const rendered = renderMarkdown(body, { ...renderOpts, locale: entryLocale, file: absFile })
     const entry: ContentEntry<TData> = {
       slug,
       ...(entryLocale !== undefined ? { locale: entryLocale } : {}),
@@ -439,7 +508,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     const entries: ContentEntry<TData>[] = []
     for (const f of files) {
       const entry = loadFile(f, scanDir, targetLocale)
-      if (!includeDrafts && (entry.data as Record<string, unknown>).draft === true)
+      if (entry === null)
         continue
       entries.push(entry)
     }

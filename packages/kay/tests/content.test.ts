@@ -238,6 +238,25 @@ const tag = '<BarChart title="inside code fence" />'
     expect(rendered.html).toContain('<aside data-note="warning"><p>Watch out for <strong>hydration</strong>!</p></aside>')
     expect(rendered.html).toContain('<pre data-lang="ts"><code>const tag = \'&lt;BarChart title="inside code fence" />\'</code></pre>')
 
+    // 1b. Nested components wrapping fenced code blocks, headingLinks, locale forwarding, and resolveImage
+    const nested = renderMarkdown(
+      `## Code Tabs\n\n![Demo](./img/demo.png)\n\n<Tabs>\n<Tab label="Kay">\n\n\`\`\`kay\nh1 Hello\n\`\`\`\n\n</Tab>\n</Tabs>\n`,
+      {
+        headingLinks: true,
+        locale: 'fr',
+        highlight: (code, lang) => `<pre data-lang="${lang}"><code>${code}</code></pre>`,
+        resolveImage: src => ({ src: src.replace('./img/', '/img/'), width: 800, height: 450, srcset: '/img/demo-640w.webp 640w' }),
+        components: {
+          Tabs: ({ children }: { children: { __html: string } }) => `<div class="tabs">${children.__html}</div>`,
+          Tab: ({ label, locale, children }: { label: string, locale: string, children: { __html: string } }) =>
+            `<section data-tab="${label}" data-locale="${locale}">${children.__html}</section>`,
+        },
+      },
+    )
+    expect(nested.html).toContain('<h2 id="code-tabs"><a href="#code-tabs">Code Tabs</a></h2>')
+    expect(nested.html).toContain('<img src="/img/demo.png" alt="Demo" srcset="/img/demo-640w.webp 640w" width="800" height="450" loading="lazy" decoding="async">')
+    expect(nested.html).toContain('<section data-tab="Kay" data-locale="fr"><pre data-lang="kay"><code>h1 Hello</code></pre></section>')
+
     // 2. i18n helpers
     expect(localizePath('/posts/hello', 'fr', 'en', ['en', 'fr'])).toBe('/fr/posts/hello')
     expect(localizePath('/fr/posts/hello', 'en', 'en', ['en', 'fr'])).toBe('/posts/hello')

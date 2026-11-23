@@ -184,7 +184,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
         ctx.emitAsset(rel, bytes)
       if (pruneCache && lastCacheRoot !== undefined && activeCacheFiles.size > 0 && existsSync(lastCacheRoot)) {
         for (const entry of readdirSync(lastCacheRoot)) {
-          if (entry.startsWith('og-'))
+          if (entry.startsWith('og-') || entry.startsWith('md-'))
             continue
           if (!activeCacheFiles.has(entry))
             rmSync(join(lastCacheRoot, entry), { force: true })
@@ -193,5 +193,105 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
       emittedAssets.clear()
       activeCacheFiles.clear()
     },
+  }
+}
+
+export interface OptimizeImageFileOptions {
+  outPublicDir?: string | undefined
+  cacheDir?: string | undefined
+  widths?: number[] | undefined
+  formats?: ('avif' | 'webp')[] | undefined
+  quality?: number | undefined
+  avifQuality?: number | undefined
+}
+
+/** Synchronously optimize a local image file (e.g. from Markdown) into `dist/public/img/` with disk caching. */
+export function optimizeImageFile(absPath: string, options: OptimizeImageFileOptions = {}): ImageAsset {
+  const widths = (options.widths ?? [640, 1280]).slice().sort((a, b) => a - b)
+  const formats = options.formats ?? ['webp']
+  const quality = options.quality ?? 80
+  const avifQuality = options.avifQuality ?? 55
+  const outPublicDir = resolve(options.outPublicDir ?? 'dist/public')
+  const imgOutDir = join(outPublicDir, 'img')
+  mkdirSync(imgOutDir, { recursive: true })
+
+  const rawBytes = new Uint8Array(readFileSync(absPath))
+  const hash = Bun.hash(`${Bun.hash(rawBytes)}:${widths.join(',')}:${formats.join(',')}:${quality}:${avifQuality}`).toString(36)
+  const stem = basename(absPath, extname(absPath)).toLowerCase().replace(/[^a-z0-9-_]/g, '-')
+
+  if (!hasMagick()) {
+    const fileName = `${stem}-${hash}${extname(absPath).toLowerCase()}`
+    writeFileSync(join(imgOutDir, fileName), rawBytes)
+    return { src: `/img/${fileName}`, width: 0, height: 0 }
+  }
+
+  const cacheRoot = resolve(options.cacheDir ?? '.kay-cache/images')
+  mkdirSync(cacheRoot, { recursive: true })
+  const metaPath = join(cacheRoot, `md-${stem}-${hash}.json`)
+  let meta: CachedImageMeta | undefined
+
+  if (existsSync(metaPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(metaPath, 'utf8')) as CachedImageMeta
+      if (parsed.files.every(f => existsSync(join(cacheRoot, `md-${basename(f.rel)}`))))
+        meta = parsed
+    }
+    catch {
+      meta = undefined
+    }
+  }
+
+  if (meta === undefined) {
+    const dims = identifyImage(absPath)
+    if (dims === undefined) {
+      const fileName = `${stem}-${hash}${extname(absPath).toLowerCase()}`
+      writeFileSync(join(imgOutDir, fileName), rawBytes)
+      return { src: `/img/${fileName}`, width: 0, height: 0 }
+    }
+
+    const targetWidths = widths.filter(w => w < dims.width)
+    targetWidths.push(dims.width)
+    const files: CachedImageMeta['files'] = []
+
+    for (const w of targetWidths) {
+      for (const fmt of formats) {
+        const fileName = `${stem}-${hash}-${w}w.${fmt}`
+        const cachedFile = join(cacheRoot, `md-${fileName}`)
+        const q = fmt === 'avif' ? avifQuality : quality
+        if (existsSync(cachedFile) || encodeVariant(absPath, cachedFile, w, q))
+          files.push({ rel: `img/${fileName}`, width: w, format: fmt })
+      }
+    }
+
+    meta = { width: dims.width, height: dims.height, files }
+    writeFileSync(metaPath, JSON.stringify(meta))
+  }
+
+  const webpEntries: string[] = []
+  const avifEntries: string[] = []
+  let fallbackSrc = ''
+
+  for (const f of meta.files) {
+    const fileName = basename(f.rel)
+    const cachedFile = join(cacheRoot, `md-${fileName}`)
+    writeFileSync(join(imgOutDir, fileName), readFileSync(cachedFile))
+    const url = `/img/${fileName}`
+    if (f.format === 'webp') {
+      webpEntries.push(`${url} ${f.width}w`)
+      fallbackSrc = url
+    }
+    else if (f.format === 'avif') {
+      avifEntries.push(`${url} ${f.width}w`)
+      if (fallbackSrc === '')
+        fallbackSrc = url
+    }
+  }
+
+  return {
+    src: fallbackSrc,
+    width: meta.width,
+    height: meta.height,
+    ...(webpEntries.length > 0 ? { webpSrcset: webpEntries.join(', ') } : {}),
+    ...(avifEntries.length > 0 ? { avifSrcset: avifEntries.join(', ') } : {}),
   }
 }

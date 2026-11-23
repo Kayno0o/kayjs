@@ -33,15 +33,16 @@ export interface SeoPluginOptions {
   site?: string | undefined
   name?: string | undefined
   titleTemplate?: string | undefined
-  description?: string | undefined
+  description?: string | Record<string, string> | undefined
   image?: string | undefined
   imageAlt?: string | undefined
   locale?: string | undefined
   jsonLd?: Record<string, unknown>[] | undefined
   sitemap?: boolean | undefined
   sitemapExclude?: string[] | undefined
+  extraUrls?: (() => string[]) | undefined
   redirects?: Record<string, RedirectTarget> | undefined
-  favicon?: string | undefined
+  favicon?: string | string[] | undefined
   manifest?: ManifestOptions | undefined
   fonts?: FontEntry[] | undefined
 }
@@ -89,7 +90,7 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
 
     build(ctx) {
       // 1. Default meta, OG, Twitter, and JSON-LD tags
-      if (options.description) {
+      if (typeof options.description === 'string') {
         ctx.addHead(`<meta name="description" content="${escAttr(options.description)}">`)
         ctx.addHead(`<meta property="og:description" content="${escAttr(options.description)}">`)
       }
@@ -109,25 +110,31 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
           ctx.addHead(serializeJsonLd(schema))
       }
 
-      // 2. Favicon
+      // 2. Favicon(s)
       if (options.favicon) {
-        const abs = resolveFileOrPkg(ctx.root, options.favicon)
-        if (abs !== undefined) {
-          const ext = extname(abs).toLowerCase()
-          const outName = ext === '.svg' ? 'favicon.svg' : ext === '.png' ? 'favicon.png' : 'favicon.ico'
-          const href = ctx.emitPublic(outName, new Uint8Array(readFileSync(abs)))
-          const type = ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : 'image/x-icon'
-          ctx.addHead(`<link rel="icon" href="${escAttr(href)}" type="${type}">`)
+        const favicons = Array.isArray(options.favicon) ? options.favicon : [options.favicon]
+        for (const fav of favicons) {
+          const abs = resolveFileOrPkg(ctx.root, fav)
+          if (abs !== undefined) {
+            const ext = extname(abs).toLowerCase()
+            const outName = ext === '.svg' ? 'favicon.svg' : ext === '.png' ? 'favicon.png' : 'favicon.ico'
+            const href = ctx.emitPublic(outName, new Uint8Array(readFileSync(abs)))
+            const type = ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : 'image/x-icon'
+            ctx.addHead(`<link rel="icon" href="${escAttr(href)}" type="${type}">`)
+          }
         }
       }
 
       // 3. Web App Manifest
       if (options.manifest) {
         const m = options.manifest
+        const defaultDesc = typeof options.description === 'string'
+          ? options.description
+          : (options.description ? Object.values(options.description)[0] : undefined)
         const body = JSON.stringify({
           name: m.name ?? options.name ?? '',
           short_name: m.shortName ?? m.name ?? options.name ?? '',
-          description: m.description ?? options.description,
+          description: m.description ?? defaultDesc,
           start_url: m.startUrl ?? '/',
           display: m.display ?? 'standalone',
           theme_color: m.themeColor,
@@ -182,6 +189,12 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
             urls.add(r.path)
           }
         }
+        if (options.extraUrls !== undefined) {
+          for (const u of options.extraUrls()) {
+            if (!excluded.has(u))
+              urls.add(u)
+          }
+        }
         const entries = [...urls].sort().map(u => `  <url><loc>${escAttr(`${site}${u === '/' ? '/' : u}`)}</loc></url>`).join('\n')
         const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries}\n</urlset>\n`
         ctx.emitPublic('sitemap.xml', xml)
@@ -203,6 +216,18 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
         }
         else if (options.name) {
           out = out.replace('</head>', `<title>${escAttr(options.name)}</title></head>`)
+        }
+      }
+
+      // Localized fallback description when page didn't emit its own <meta name="description">
+      if (options.description && typeof options.description === 'object' && !out.includes('name="description"')) {
+        const loc = typeof ctx.locals.locale === 'string' ? ctx.locals.locale : undefined
+        const desc = (loc && options.description[loc]) ?? Object.values(options.description)[0]
+        if (desc) {
+          out = out.replace(
+            '</head>',
+            `<meta name="description" content="${escAttr(desc)}"><meta property="og:description" content="${escAttr(desc)}"></head>`,
+          )
         }
       }
 

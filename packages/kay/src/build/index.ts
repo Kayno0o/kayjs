@@ -788,6 +788,10 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     }
 
     if (options.static) {
+      if (hasNotFoundFile) {
+        const notFoundRes = await app.handle(new Request('http://localhost/__kay_404__'))
+        writeFileSync(join(prerenderDir, '404.html'), await notFoundRes.text())
+      }
       // Copy client assets into dist/static/_kay/... and public/ files into dist/static/...
       const staticAssetDir = join(prerenderDir, assetPrefix.replace(/^\//, ''))
       mkdirSync(staticAssetDir, { recursive: true })
