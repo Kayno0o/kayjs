@@ -1,0 +1,14 @@
+# Run from the root of kay's repository (v2 branch):
+#   docker compose -f docs/compose.yaml up -d --build
+name: kay-v2-docs
+services:
+  docs:
+    build:
+      context: ..
+      dockerfile: docs/Dockerfile
+      args:
+        SITE_URL: ${SITE_URL:-https://v2.kayjs.kaynooo.fr}
+    restart: unless-stopped
+    # Loopback-only: reverse proxy (nginx/Caddy on host) terminates TLS and forwards here.
+    ports:
+      - 127.0.0.1:${DOCS_PORT:-3650}:8080

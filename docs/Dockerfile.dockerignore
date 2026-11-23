@@ -1,0 +1,10 @@
+.git
+node_modules
+docs/node_modules
+docs/dist
+docs/.kay-dev
+docs/.kay-cache
+bench-sites
+examples
+bench-app
+*.tgz

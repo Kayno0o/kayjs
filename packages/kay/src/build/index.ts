@@ -8,6 +8,7 @@ import type { IslandBinding, ModuleAnalysis } from '../compiler/index'
 import type { BuildPluginContext, KayPlugin } from '../plugins/index'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
+import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
 import { loadConfig } from '../plugins/index'
 import { actionHash } from '../server/action'
@@ -849,6 +850,21 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         const dst = join(prerenderDir, rel)
         mkdirSync(dirname(dst), { recursive: true })
         writeFileSync(dst, readFileSync(join(outDir, 'public', rel)))
+      }
+      // Emit precompressed .br and .gz sidecars for compressible static files (>= 128 B)
+      const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.svg', '.xml', '.json', '.txt', '.webmanifest'])
+      for (const abs of walkAllFiles(prerenderDir)) {
+        if (!COMPRESSIBLE.has(extname(abs).toLowerCase()))
+          continue
+        const raw = readFileSync(abs)
+        if (raw.byteLength < 128)
+          continue
+        const br = brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } })
+        if (br.byteLength < raw.byteLength)
+          writeFileSync(`${abs}.br`, br)
+        const gz = Bun.gzipSync(raw, { level: 9 })
+        if (gz.byteLength < raw.byteLength)
+          writeFileSync(`${abs}.gz`, gz)
       }
     }
 

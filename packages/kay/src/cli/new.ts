@@ -150,11 +150,12 @@ export function GET(ctx: RequestContext) {
   return ctx.json({ ok: true, runtime: 'bun' })
 }
 `
-    files['src/actions/greet.ts'] = `import { action } from 'kay/server'
+    files['src/actions/greet.ts'] = `import type { StandardSchemaV1 } from 'kay/server'
+import { action } from 'kay/server'
 
-const nameSchema = {
+const nameSchema: StandardSchemaV1<{ name: string }> = {
   '~standard': {
-    version: 1 as const,
+    version: 1,
     vendor: 'kay',
     validate(raw: unknown) {
       const name = String((raw as { name?: unknown })?.name ?? '').trim()

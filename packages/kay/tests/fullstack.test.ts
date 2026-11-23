@@ -373,9 +373,12 @@ describe('Kay v2 Milestone 2 full-stack features', () => {
     expect(Object.isFrozen(env)).toBe(true)
   })
 
-  test('static export (--static) writes static HTML and client assets', async () => {
+  test('static export (--static) writes static HTML, client assets, and .br/.gz sidecars', async () => {
     await build({ root: fixtureDir, outDir: 'dist-static', static: true })
-    expect(existsSync(join(fixtureDir, 'dist-static/static/index.html'))).toBe(true)
+    const homeHtmlPath = join(fixtureDir, 'dist-static/static/index.html')
+    expect(existsSync(homeHtmlPath)).toBe(true)
     expect(existsSync(join(fixtureDir, 'dist-static/static/posts/hello-world/index.html'))).toBe(true)
+    expect(existsSync(`${homeHtmlPath}.br`)).toBe(true)
+    expect(existsSync(`${homeHtmlPath}.gz`)).toBe(true)
   })
 })
