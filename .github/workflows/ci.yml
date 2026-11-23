@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [v2, main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Install Chromium for Playwright E2E
+        run: bunx playwright-core install chromium
+      - name: Typecheck, test suite & bench-app build
+        run: bun run verify
+      - name: Build docs static site
+        run: |
+          cd docs
+          bun install --prefer-offline
+          bun run build
+      - name: Pack all workspace packages
+        run: |
+          for pkg in packages/*; do
+            (cd "$pkg" && bun pm pack --quiet)
+          done

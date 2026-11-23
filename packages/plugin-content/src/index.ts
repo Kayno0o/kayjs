@@ -115,7 +115,14 @@ function slugifyHeading(text: string): string {
 }
 
 function stripTags(html: string): string {
-  return html.replace(/<[^>]+>/g, '').trim()
+  return html
+    .replace(/<[^>]+>/g, '')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', '\'')
+    .replaceAll('&amp;', '&')
+    .trim()
 }
 
 // Parse JSX-style attributes inside embedded Markdown components: title="hi" count={42} rows={[...]} flag

@@ -1,25 +1,38 @@
 # Kay v2 Reference (for humans & coding agents)
 
-> Kay v2 is a Bun-native TSX web framework with zero-directive automatic islands, `.value` fine-grained signals, flat-string SSR, unified Standard-Schema actions, and a composable plugin API.
+> Kay v2 (`v2.0.0-alpha.0`) is a Bun-native TSX web framework with zero-directive automatic islands, `.value` fine-grained signals, flat-string SSR, unified Standard-Schema actions, single-binary `--compile`, and a composable `KayPlugin` API.
 
 ## Core Rules (everything fits on one page)
 
 - **Standard TSX**: `.tsx` files with `jsxImportSource: "kay"`. Use `class` or `className`. Standard `.map()` (with `key={...}`), `&&`, ternaries, `{...spread}`, SVG elements, and CSS / `*.module.css` imports work natively.
-- **Signals**: `const count = signal(0)`, `const doubled = computed(() => count.value * 2)`, `effect(() => ...)`, `batch(() => ...)`, `selector(() => id.value)`, `store(obj)`. Always read/write via `.value` (`count.value++`). To let a child mutate parent state, pass the signal directly (`<Modal open={isOpen} />`).
+- **Signals (`kay`)**: `const count = signal(0)`, `const doubled = computed(() => count.value * 2)`, `effect(() => ...)`, `batch(() => ...)`, `untrack(() => ...)`, `root(dispose => ...)`, `onMount(() => ...)`, `onCleanup(() => ...)`, `selector(() => id.value)`, `store(obj)` + `snapshot(s)`. Always read/write via `.value` (`count.value++`). To let a child mutate parent state, pass the signal directly (`<Modal open={isOpen} />`).
 - **Reactive props**: Destructuring props (`function Badge({ count = 0, ...rest }: Props)`) is compiler-safe and stays reactive; server-rendered children inside islands are preserved via `<kay-slot>`.
 - **Automatic islands**: Any component using reactive primitives (`signal`, `computed`, `effect`, `onMount`, `store`, `selector`) or DOM handlers (`onClick`, `ref`) becomes an island automatically. Control hydration per call site with `$hydrate="load" | "visible" | "idle" | "interaction" | "media(...)" | "client"`, or component default `island(Comp, { hydrate: 'visible' })`.
 - **Routes (`src/routes/`)**:
   - `export default async function Page({ params, locals, url })`: strictly server-only (`0 KB` JS; cannot use signals/handlers directly).
-  - Sync `export default function Page({ data })`: static or auto-island; optional `export async function load(ctx)` runs server-only.
-  - Special files: `_layout.tsx` (nested outer→inner), `_middleware.ts` (`(ctx, next) => Response`), `_error.tsx`, `_404.tsx`.
+  - Sync `export default function Page({ data, params, locals, url })`: static or auto-island; optional `export async function load(ctx)` runs server-only and can return data or a `Response` (e.g. `404` / redirect).
+  - Special files: `_layout.tsx` (nested outer→inner, receives `{ children, params, locals, url }`), `_middleware.ts` (`(ctx, next) => Response`), `_error.tsx`, `_404.tsx` (also exported as `404.html` in `--static`).
   - Params: `[slug].tsx` → `params.slug`; `[...path].tsx` → `params.path`.
   - API routes: `.ts` files exporting `GET`, `POST`, `PUT`, `PATCH`, `DELETE`.
-  - Prerendering: `export const prerender = true` (+ optional `export function paths() { return ['/posts/a'] }`).
+  - Prerendering: `export const prerender = true` (+ optional `export function paths() { return ['/posts/a'] }`). Skipped in `kay dev` for fast on-demand reloads.
 - **Streaming & Head**: `<Head><title>...</title></Head>` (innermost `<title>` wins); `<Suspense fallback={<p>Loading</p>}><AsyncComp /></Suspense>` streams resolved HTML with 0 KB external JS.
-- **Actions**: `export const fn = action(standardSchema, async (input, ctx) => ...)` from `kay/server`. Works as `<form action={fn} method="post">` and `await fn(data)` from islands (server code auto-stripped, CSRF checked automatically).
-- **Env**: `export const env = defineEnv(standardSchema)` from `kay/server`.
-- **Static files & CSS**: Files in `public/` are served at `/` with ETag/`304` (and embedded in `--static` / `--compile`). Import `.css` or `*.module.css` directly from any component or layout.
-- **CLI**: `kay new <dir> [--template minimal|fullstack|blog|app]`, `kay check`, `kay dev`, `kay build [--static] [--compile [out]]`, `kay start`.
-- **Testing**: `import { testApp } from 'kay/test'` — in-process `app.get()`, `app.post()`, `app.submit()` with persistent cookie jar.
-- **Plugins (`kay.config.ts`)**: `export default defineConfig({ plugins: [...] })`. Plugin hooks: `server(api)` (`use`, `route`, `rewrite`), `build(ctx)` (`emitAsset`, `emitPublic`, `addStyle`, `addHead`, `routes`), `transform`, `bunPlugins` (array or `({ root, assetPrefix, minify }) => [...]`), `css`, `transformHtml`, `prerenderPaths`, `clientEntry`, `commands`. First-party plugins: `@kayjs/tailwind`, `@kayjs/spa`, `@kayjs/i18n` (localized prerender, `hreflang`, `localizePath`, `formatDate`/`formatNumber`), `@kayjs/icons` (`~icons/<set>/<name>` + `<Icon>`), `@kayjs/images` (AVIF/WebP + `image()`/`<Picture>` + `shareCard()`), `@kayjs/seo` (`titleTemplate`, JSON-LD, sitemap, redirects, self-hosted fonts), `@kayjs/mail` (Resend/custom transport + dev-only `/_kay/mail` outbox), `@kayjs/auth` (Argon2id passwords, hashed DB sessions, magic links, OAuth 2.0 + PKCE for GitHub/Discord/Google, `auth.guard()`, `bun:sqlite` store), `@kayjs/live` (typed SSE rooms, coalesced presence, `useLive()`), `@kayjs/content` (`Bun.markdown` + `Bun.YAML` nested frontmatter + Standard Schema, custom `highlight`, MDX-lite embedded TSX `components`, localized collections, TOC, RSS), `@kayjs/ui` (platform-first headless primitives + pure CSS `@layer kui` Grammars: `bare`, `editorial`, `workshop`, `console`, `soft`; `kay ui-eject <grammar>`). Plugins and `public/` assets are embedded natively (`with { type: "file" }`) in `--compile` binaries (`NODE_ENV` defaults to `production`).
-- **DOM bundle splitting**: Core DOM lives in `kay/dom`; optional helpers (`spread`, `omit`, `insert`, `show`, `setInnerHtml`) live in `kay/dom-extras`; keyed reconciler lives in `kay/dom-loop` (static constant `.map()` arrays use lightweight `eachStatic`).
+- **Actions (`kay/server`)**: `export const fn = action(standardSchema, async (input, ctx) => ...)`. Works as zero-JS `<form action={fn} method="post">` and `await fn(data)` from islands (server code auto-stripped; CSRF `Origin` checked automatically, honoring `X-Forwarded-Proto` / `X-Forwarded-Host`).
+- **Env (`kay/server`)**: `export const env = defineEnv(standardSchema)`.
+- **Static files & CSS**: Files in `public/` are served at `/` with ETag/`304` (and `Cache-Control: no-cache` + zero-copy direct streaming in `kay dev`; embedded in `--static` and `--compile`). Import `.css` or `*.module.css` directly from any component or layout.
+- **CLI**: `kay new <dir> [--template minimal|fullstack|blog|app]`, `kay check`, `kay dev`, `kay build [--static] [--compile [out]]`, `kay start`, `kay ui-eject <grammar> [dest]`.
+- **Testing (`kay/test`)**: `const app = await testApp({ root })` — in-process `app.get()`, `app.post()`, `app.submit()` with persistent cookie jar.
+- **Plugins (`kay.config.ts`)**: `export default defineConfig({ plugins: [...] })`.
+  - Hooks: `server(api)` (`use`, `route`, `rewrite`), `build(ctx)` (`emitAsset`, `emitPublic`, `addStyle`, `addHead`, `routes`), `transform`, `bunPlugins` (array or `({ root, assetPrefix, minify }) => [...]`), `css`, `transformHtml`, `prerenderPaths`, `clientEntry`, `commands`.
+  - First-party packages:
+    - `@kayjs/ui`: Platform-first headless primitives (`Button`, `Card`, `Badge`, `Notice`, `Field`, `Switch`, `Checkbox`, `RadioGroup`, `Accordion`, `Popover`, `Dialog`, `Drawer`, `Tabs`, `Menu`, `Select`, `CommandPalette`, `DataTable`, `Toaster` + `toast()`) & pure CSS `@layer kui` Style Grammars (`orbit`, `editorial`, `workshop`, `console`, `soft`, `bare`); `kay ui-eject <grammar>`.
+    - `@kayjs/auth`: Argon2id passwords, hashed DB sessions, magic links, OAuth 2.0 + PKCE (`github()`, `discord()`, `google()`, `oauthProvider()`), `auth.guard()`, per-IP rate limiting, `memoryAuthStore()` & `sqliteAuthStore()` (`bun:sqlite`).
+    - `@kayjs/content`: Zero-dep `Bun.markdown` + `Bun.YAML` nested frontmatter + Standard Schema, lazy memoized Markdown rendering + O(1) `get(slug)`, `highlight(code, lang)` hook (Shiki-ready), MDX-lite embedded TSX `components`, `headingLinks`, `resolveImage`, localized collections (`localized: true`), TOC, and RSS feeds (`contentPlugin`).
+    - `@kayjs/live`: Typed SSE rooms (`createRooms`), microtask-coalesced presence (`coalesce`), `useLive()` browser signal hook.
+    - `@kayjs/images`: Build-time AVIF/WebP pipeline + disk cache (`images()`, `image()`, `<Picture>`, `optimizeImageFile()`) + 1200×630 OG PNG `shareCard()`.
+    - `@kayjs/seo`: `titleTemplate`, localized `description`, multi-favicon, OG/Twitter/JSON-LD, `sitemap.xml` (`extraUrls`), redirects, self-hosted fonts (`@fontsource/*`).
+    - `@kayjs/i18n`: Locale URL rewriting, `<html lang>` + internal link prefixing, automatic `prerenderPaths` expansion, `hreflang` alternates, `localizePath()`, `formatDate()`, `formatNumber()`.
+    - `@kayjs/icons`: Virtual `~icons/<set>/<name>` inline SVG imports + `<Icon>`.
+    - `@kayjs/mail`: Resend HTTP transport, custom transports, dev-only `/_kay/mail` outbox preview.
+    - `@kayjs/tailwind`: Tailwind v4 via `bun-plugin-tailwind`.
+    - `@kayjs/spa`: Opt-in SPA navigation with persistent islands.
+- **Server builds & `--compile`**: Server `Bun.build` keeps npm dependencies external (`packages: 'external'`) while compiling `kay` / `@kayjs/*` TSX packages; `kay build --compile` bundles everything + `public/` assets (`with { type: "file" }`) into one standalone Bun executable (`NODE_ENV` defaults to `production`).

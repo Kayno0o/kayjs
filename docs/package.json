@@ -1,0 +1,26 @@
+{
+  "name": "kay-docs",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "kay dev",
+    "build": "kay build --static",
+    "start": "kay start",
+    "check": "kay check"
+  },
+  "dependencies": {
+    "kay": "file:../packages/kay",
+    "@kayjs/content": "file:../packages/plugin-content",
+    "@kayjs/icons": "file:../packages/plugin-icons",
+    "@kayjs/images": "file:../packages/plugin-images",
+    "@kayjs/seo": "file:../packages/plugin-seo",
+    "@kayjs/ui": "file:../packages/ui",
+    "@fontsource/chakra-petch": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "shiki": "^4.5.0"
+  },
+  "devDependencies": {
+    "@iconify-json/tabler": "^1.2.41"
+  }
+}
