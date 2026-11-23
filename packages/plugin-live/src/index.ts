@@ -196,7 +196,6 @@ export function createRooms<TMessage, TMember = undefined>(id?: string): Rooms<T
       headers: {
         'content-type': 'text/event-stream; charset=utf-8',
         'cache-control': 'no-cache, no-transform',
-        'connection': 'keep-alive',
         'x-accel-buffering': 'no',
       },
     })

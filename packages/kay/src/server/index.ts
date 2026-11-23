@@ -581,6 +581,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
     return Bun.serve({
       port,
+      idleTimeout: 0,
       routes,
       fetch: handle,
     })

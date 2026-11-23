@@ -79,8 +79,21 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   if (existsSync(configPath))
     watchers.push(watch(configPath, scheduleRebuild))
 
+  const pingChunk = encoder.encode(': ping\n\n')
+  const pingInterval = setInterval(() => {
+    for (const c of clients) {
+      try {
+        c.enqueue(pingChunk)
+      }
+      catch {
+        clients.delete(c)
+      }
+    }
+  }, 15_000)
+
   const server = Bun.serve({
     port,
+    idleTimeout: 0,
     async fetch(request) {
       const url = new URL(request.url)
 
@@ -91,6 +104,13 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
             ctrl = controller
             clients.add(controller)
             controller.enqueue(encoder.encode(': connected\n\n'))
+            request.signal.addEventListener('abort', () => {
+              clients.delete(controller)
+              try {
+                controller.close()
+              }
+              catch {}
+            }, { once: true })
           },
           cancel() {
             if (ctrl !== undefined)
@@ -99,9 +119,9 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
         })
         return new Response(stream, {
           headers: {
-            'content-type': 'text/event-stream',
-            'cache-control': 'no-cache',
-            'connection': 'keep-alive',
+            'content-type': 'text/event-stream; charset=utf-8',
+            'cache-control': 'no-cache, no-transform',
+            'x-accel-buffering': 'no',
           },
         })
       }
@@ -133,6 +153,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
     url,
     stop() {
       clearTimeout(timer)
+      clearInterval(pingInterval)
       for (const w of watchers)
         w.close()
       server.stop(true)
