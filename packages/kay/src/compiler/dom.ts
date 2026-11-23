@@ -11,6 +11,13 @@ const VOID_ELEMENTS = new Set([
   'link', 'meta', 'param', 'source', 'track', 'wbr',
 ])
 
+const SVG_CHILD_TAGS = new Set([
+  'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse',
+  'g', 'defs', 'use', 'text', 'tspan', 'clipPath', 'mask',
+  'linearGradient', 'radialGradient', 'stop', 'pattern', 'symbol',
+  'marker', 'filter', 'feGaussianBlur', 'foreignObject', 'animate',
+])
+
 const DELEGATED_EVENTS = new Set([
   'beforeinput', 'click', 'dblclick', 'focusin', 'focusout',
   'input', 'keydown', 'keyup', 'mousedown', 'mouseup',
@@ -202,7 +209,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   const editor = new SourceEditor(code)
   const used = new Set<string>()
-  const templates: { name: string, html: string }[] = []
+  const templates: { name: string, html: string, isSvg?: boolean }[] = []
   const delegatedEvents = new Set<string>()
   let varCounter = 0
 
@@ -389,8 +396,10 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       let html = `<${tag}`
 
       for (const attr of el.openingElement.attributes as AstNode[]) {
-        if (attr.type === 'JSXSpreadAttribute')
+        if (attr.type === 'JSXSpreadAttribute') {
+          ops.push(`${use('spread')}(${elVar}, () => (${compileExpression(attr.argument, scopeRewrites)}));`)
           continue
+        }
         const rawName = jsxTagName(attr.name)
         if (rawName === 'key' || rawName === '$hydrate')
           continue
@@ -520,17 +529,40 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
               const eachCode = compileExpression(expr.callee.object, scopeRewrites)
               const params = cb.params as AstNode[]
-              const itemParam = params[0]?.type === 'Identifier' ? params[0].name as string : '_item'
+              const firstParam = params[0]
               const idxParam = params[1]?.type === 'Identifier' ? params[1].name as string : undefined
               const keyAst = extractKeyExpr(cbBody)
-              const keyFn = keyAst !== undefined
-                ? `(${itemParam}${idxParam ? `, ${idxParam}` : ''}) => ${code.slice(keyAst.start, keyAst.end)}`
-                : `(${itemParam}) => ${itemParam}`
 
               const rowSig = freshVar('_r')
               const idxSig = idxParam !== undefined ? freshVar('_i') : undefined
               const rowRewrites = new Map(scopeRewrites)
-              rowRewrites.set(itemParam, `${rowSig}.value`)
+              let keyFn: string
+
+              if (firstParam?.type === 'ObjectPattern') {
+                const patCode = code.slice(firstParam.start, firstParam.end)
+                keyFn = keyAst !== undefined
+                  ? `(${patCode}${idxParam ? `, ${idxParam}` : ''}) => ${code.slice(keyAst.start, keyAst.end)}`
+                  : `(_item) => _item`
+                for (const prop of firstParam.properties as AstNode[]) {
+                  if (prop.type === 'Property' && prop.key?.type === 'Identifier') {
+                    const propKey = prop.key.name as string
+                    if (prop.value.type === 'Identifier') {
+                      rowRewrites.set(prop.value.name as string, `${rowSig}.value.${propKey}`)
+                    }
+                    else if (prop.value.type === 'AssignmentPattern' && prop.value.left?.type === 'Identifier') {
+                      const defCode = code.slice(prop.value.right.start, prop.value.right.end)
+                      rowRewrites.set(prop.value.left.name as string, `(${rowSig}.value.${propKey} === undefined ? ${defCode} : ${rowSig}.value.${propKey})`)
+                    }
+                  }
+                }
+              }
+              else {
+                const itemParam = firstParam?.type === 'Identifier' ? firstParam.name as string : '_item'
+                keyFn = keyAst !== undefined
+                  ? `(${itemParam}${idxParam ? `, ${idxParam}` : ''}) => ${code.slice(keyAst.start, keyAst.end)}`
+                  : `(${itemParam}) => ${itemParam}`
+                rowRewrites.set(itemParam, `${rowSig}.value`)
+              }
               if (idxParam !== undefined && idxSig !== undefined)
                 rowRewrites.set(idxParam, `${idxSig}.value`)
 
@@ -575,8 +607,21 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
             continue
           }
 
-          // Case 4: Dynamic text / expression binding
+          // Case 4: Dynamic children slot / Node insertion (`{children}` / `{props.children}`)
+          const isChildrenExpr = (expr.type === 'Identifier' && expr.name === 'children')
+            || (expr.type === 'MemberExpression' && !expr.computed && expr.property?.name === 'children')
           const exprCode = compileExpression(expr, scopeRewrites)
+          if (isChildrenExpr) {
+            const anchorVar = meaningful.length === 1 ? 'null' : requestChild(elVar, domIndex)
+            if (meaningful.length > 1) {
+              html += '<!---->'
+              domIndex++
+            }
+            ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, ${anchorVar});`)
+            continue
+          }
+
+          // Case 5: Dynamic text / expression binding
           if (meaningful.length === 1) {
             // Sole dynamic child: 0 comment markers!
             html += ' '
@@ -602,8 +647,9 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     }
 
     const html = buildHtml(rootEl, rootVar)
+    const rootTag = jsxTagName(rootEl.openingElement.name)
     const tmplName = `_t${templates.length}`
-    templates.push({ name: tmplName, html })
+    templates.push({ name: tmplName, html, isSvg: SVG_CHILD_TAGS.has(rootTag) })
 
     // Emit efficient parent->child sibling walks grouped by parentVar (breadth-first / parent-first order)
     const walkStmts: string[] = []
@@ -697,9 +743,13 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       const typeAnn = firstParam.typeAnnotation ? code.slice(firstParam.typeAnnotation.start, firstParam.typeAnnotation.end) : ''
       editor.replace(firstParam.start, firstParam.end, `${pVar}${typeAnn}`)
 
+      const extractedKeys: string[] = []
+      let restName: string | undefined
+
       for (const prop of firstParam.properties as AstNode[]) {
         if (prop.type === 'Property' && prop.key?.type === 'Identifier') {
           const propKey = prop.key.name as string
+          extractedKeys.push(propKey)
           if (prop.value.type === 'Identifier') {
             propRewrites.set(prop.value.name as string, `${pVar}.${propKey}`)
           }
@@ -708,7 +758,13 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
             propRewrites.set(prop.value.left.name as string, `(${pVar}.${propKey} === undefined ? ${defCode} : ${pVar}.${propKey})`)
           }
         }
+        else if (prop.type === 'RestElement' && prop.argument?.type === 'Identifier') {
+          restName = prop.argument.name as string
+        }
       }
+
+      if (restName !== undefined)
+        propRewrites.set(restName, `${use('omit')}(${pVar}, ${JSON.stringify(extractedKeys)})`)
     }
 
     // Rewrite prop reads in non-JSX statements of the function body, and compile JSX roots with propRewrites
@@ -783,7 +839,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       header += `import { loop as __loop } from 'kay/dom-loop';\n`
   }
   for (const t of templates)
-    header += `const ${t.name} = __template(${JSON.stringify(t.html)});\n`
+    header += `const ${t.name} = __template(${JSON.stringify(t.html)}${t.isSvg ? ', true' : ''});\n`
   if (delegatedEvents.size > 0)
     header += `__delegate(${JSON.stringify([...delegatedEvents].sort())});\n`
 

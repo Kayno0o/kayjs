@@ -83,9 +83,11 @@ export default defineConfig({
 ## Commands
 
 ```sh
-kay dev                              # Fast rebuild + live reload
-kay build                            # Production client + server build
-kay build --static                   # Pure static HTML export
-kay build --compile ./server         # Single standalone executable
-kay start                            # Serve built production app
+kay new my-app [--template fullstack]  # Scaffold a new project
+kay check                              # Validate routes, compiler rules & types
+kay dev                                # Fast rebuild + live reload
+kay build                              # Production client + server build
+kay build --static                     # Pure static HTML export
+kay build --compile ./server           # Single standalone executable
+kay start                              # Serve built production app
 ```

@@ -16,6 +16,7 @@ export interface BuildOptions {
   root: string
   routesDir?: string | undefined
   outDir?: string | undefined
+  publicDir?: string | undefined
   minify?: boolean | undefined
   assetPrefix?: string | undefined
   plugins?: KayPlugin[] | undefined
@@ -55,6 +56,7 @@ export interface BuildManifest {
   actions: ActionManifestEntry[]
   islands: Record<string, string>
   assets: string[]
+  publicFiles: string[]
 }
 
 const KAY_SRC_ROOT = resolve(import.meta.dir, '..')
@@ -106,6 +108,19 @@ function walkRoutes(dir: string, out: string[] = []): string[] {
   return out
 }
 
+function walkAllFiles(dir: string, out: string[] = []): string[] {
+  if (!existsSync(dir))
+    return out
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory())
+      walkAllFiles(full, out)
+    else if (entry.isFile())
+      out.push(full)
+  }
+  return out
+}
+
 function fileToRoutePath(routesDir: string, file: string): string {
   const rel = relative(routesDir, file).replace(/\\/g, '/').replace(/\.(tsx|ts)$/, '')
   if (rel === 'index')
@@ -149,6 +164,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const plugins: KayPlugin[] = options.plugins ?? fileConfig.plugins ?? []
   const routesDir = resolve(root, options.routesDir ?? fileConfig.routesDir ?? 'src/routes')
   const outDir = resolve(root, options.outDir ?? fileConfig.outDir ?? 'dist')
+  const publicDir = resolve(root, options.publicDir ?? fileConfig.publicDir ?? 'public')
   const clientDir = join(outDir, 'client')
   const serverDir = join(outDir, 'server')
   const assetPrefix = (options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay').replace(/\/$/, '')
@@ -268,13 +284,45 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       pageIslandBindings.set(file, bindings)
   }
 
+  // Collect component/page CSS & CSS Module imports from static modules (island CSS is bundled via island entrypoints)
+  const islandCssFiles = new Set<string>()
+  const collectIslandCss = (file: string, seen = new Set<string>()) => {
+    if (seen.has(file))
+      return
+    seen.add(file)
+    const analysis = analyses.get(file)
+    if (analysis === undefined)
+      return
+    for (const imp of analysis.imports) {
+      const target = resolveImportPath(file, imp.source)
+      if (target === undefined)
+        continue
+      if (target.endsWith('.css'))
+        islandCssFiles.add(target)
+      else if (target.endsWith('.tsx') || target.endsWith('.ts'))
+        collectIslandCss(target, seen)
+    }
+  }
+  for (const [, target] of islandTargets)
+    collectIslandCss(target.file)
+
+  const standaloneCssSet = new Set<string>(pluginCssFiles)
+  for (const [file, analysis] of analyses) {
+    for (const imp of analysis.imports) {
+      const target = resolveImportPath(file, imp.source)
+      if (target !== undefined && target.endsWith('.css') && !islandCssFiles.has(target))
+        standaloneCssSet.add(target)
+    }
+  }
+  const allStandaloneCss = [...standaloneCssSet]
+
   // Step 1: Single-pass Client Build (runs when islands, plugin client entries, or CSS exist)
   const islandChunks = new Map<string, string>()
   const assetFiles: string[] = []
   const styleUrls: string[] = []
   let runtimeScript: string | undefined
 
-  if (islandTargets.size > 0 || pluginClientEntries.length > 0 || pluginCssFiles.length > 0) {
+  if (islandTargets.size > 0 || pluginClientEntries.length > 0 || allStandaloneCss.length > 0) {
     const entriesDir = join(outDir, '.entries')
     mkdirSync(entriesDir, { recursive: true })
     const entryPoints: string[] = []
@@ -344,7 +392,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       entryPoints.push(runtimeEntryPath)
     }
 
-    for (const cssFile of pluginCssFiles)
+    for (const cssFile of allStandaloneCss)
       entryPoints.push(cssFile)
 
     for (const [, target] of islandTargets) {
@@ -610,6 +658,19 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   for (const [k, v] of islandChunks)
     islandsRecord[k] = v
 
+  // Copy public/ static files into dist/public
+  const publicFiles: string[] = []
+  if (existsSync(publicDir)) {
+    const outPublicDir = join(outDir, 'public')
+    for (const abs of walkAllFiles(publicDir).sort()) {
+      const rel = relative(publicDir, abs).replace(/\\/g, '/')
+      publicFiles.push(rel)
+      const dst = join(outPublicDir, rel)
+      mkdirSync(dirname(dst), { recursive: true })
+      writeFileSync(dst, readFileSync(abs))
+    }
+  }
+
   const manifest: BuildManifest = {
     runtimeScript,
     styles: styleUrls,
@@ -619,6 +680,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     actions: actionEntries,
     islands: islandsRecord,
     assets: nonEmptyAssets,
+    publicFiles,
   }
 
   writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
@@ -660,13 +722,18 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     }
 
     if (options.static) {
-      // Copy client assets into dist/static/_kay/...
+      // Copy client assets into dist/static/_kay/... and public/ files into dist/static/...
       const staticAssetDir = join(prerenderDir, assetPrefix.replace(/^\//, ''))
       mkdirSync(staticAssetDir, { recursive: true })
       for (const rel of nonEmptyAssets) {
         const dst = join(staticAssetDir, rel)
         mkdirSync(dirname(dst), { recursive: true })
         writeFileSync(dst, readFileSync(join(clientDir, rel)))
+      }
+      for (const rel of publicFiles) {
+        const dst = join(prerenderDir, rel)
+        mkdirSync(dirname(dst), { recursive: true })
+        writeFileSync(dst, readFileSync(join(outDir, 'public', rel)))
       }
     }
 
@@ -676,13 +743,14 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   // Step 4: Single-Executable Compile (`kay build --compile [outfile]`)
   if (options.compile) {
     const outfile = typeof options.compile === 'string' ? resolve(root, options.compile) : join(outDir, 'server-bin')
-    await compileExecutable(outDir, clientDir, manifest, assetPrefix, outfile)
+    await compileExecutable(root, outDir, clientDir, manifest, assetPrefix, outfile)
   }
 
   return manifest
 }
 
 async function compileExecutable(
+  root: string,
   outDir: string,
   clientDir: string,
   manifest: BuildManifest,
@@ -713,11 +781,21 @@ async function compileExecutable(
   if (manifest.notFoundFile) addMod(manifest.notFoundFile)
   for (const a of manifest.actions) addMod(a.file)
 
-  // Embed client assets and prerendered HTML directly as base64 buffers in the binary
+  const configPath = join(root, 'kay.config.ts')
+  const hasConfig = existsSync(configPath)
+  if (hasConfig)
+    imports.push(`import _kayConfig from ${JSON.stringify(configPath)};`)
+
+  // Embed client assets, public files, and prerendered HTML directly in the binary
   const embeddedAssets: string[] = []
   for (const rel of manifest.assets) {
     const b64 = readFileSync(join(clientDir, rel)).toString('base64')
     embeddedAssets.push(`${JSON.stringify(rel)}: Uint8Array.from(atob(${JSON.stringify(b64)}), c => c.charCodeAt(0))`)
+  }
+  const embeddedPublic: string[] = []
+  for (const rel of manifest.publicFiles) {
+    const b64 = readFileSync(join(outDir, 'public', rel)).toString('base64')
+    embeddedPublic.push(`${JSON.stringify(rel)}: Uint8Array.from(atob(${JSON.stringify(b64)}), c => c.charCodeAt(0))`)
   }
   const embeddedPrerendered: string[] = []
   for (const r of manifest.routes) {
@@ -729,14 +807,19 @@ async function compileExecutable(
     }
   }
 
+  const cfgSpread = hasConfig
+    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins`
+    : ''
+
   const code = [
     `import { createServerFromEmbedded } from ${JSON.stringify(join(KAY_SRC_ROOT, 'server/index.ts'))};`,
     ...imports,
     `const manifest = ${JSON.stringify(manifest)};`,
     `const modules = { ${modEntries.join(', ')} };`,
     `const assets = { ${embeddedAssets.join(', ')} };`,
+    `const publicAssets = { ${embeddedPublic.join(', ')} };`,
     `const prerendered = { ${embeddedPrerendered.join(', ')} };`,
-    `const app = createServerFromEmbedded({ manifest, modules, assets, prerendered, assetPrefix: ${JSON.stringify(assetPrefix)} });`,
+    `const app = await createServerFromEmbedded({ manifest, modules, assets, publicAssets, prerendered, assetPrefix: ${JSON.stringify(assetPrefix)}${cfgSpread} });`,
     `const port = Number(process.env.PORT ?? 3000);`,
     `const server = app.serve(port);`,
     `console.log(\`kay server listening on http://localhost:\${server.port}\`);`,
@@ -744,10 +827,20 @@ async function compileExecutable(
 
   writeFileSync(entryPath, code)
   try {
+    const kayResolvePlugin: BunPlugin = {
+      name: 'kay-v2-compile-resolve',
+      setup(b) {
+        b.onResolve({ filter: /^(?:@kayjs\/)?kay(?:\/.*)?$/ }, (args) => {
+          const resolved = resolveKaySpecifier(args.path)
+          return resolved !== undefined ? { path: resolved } : undefined
+        })
+      },
+    }
     const res = await Bun.build({
       entrypoints: [entryPath],
       compile: { outfile },
       minify: true,
+      plugins: [kayResolvePlugin],
     })
     if (!res.success) {
       const msgs = res.logs.map(l => l.message).join('\n')

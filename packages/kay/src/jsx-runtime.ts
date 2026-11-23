@@ -1,3 +1,4 @@
+/// <reference path="./ambient.d.ts" />
 // TypeScript JSX runtime types for Kay v2.
 // Standard TSX compiles away at build time; these types power full IDE autocomplete & type checking.
 

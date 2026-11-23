@@ -85,6 +85,9 @@ class KayIsland extends HTMLElement {
 
     const p = this.getAttribute('p')
     const props: Record<string, unknown> = p ? JSON.parse(p) : {}
+    const slot = this.querySelector('kay-slot')
+    if (slot !== null)
+      props.children = slot
     const render = () => mod.default(props)
     this._d = (typeof KAY_CLIENT_ONLY === 'undefined' || KAY_CLIENT_ONLY) && clientOnly
       ? mount(this, render)

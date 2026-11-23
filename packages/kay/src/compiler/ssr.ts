@@ -191,8 +191,10 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     parts.pushStatic(`<${tag}`)
 
     for (const attr of node.openingElement.attributes as AstNode[]) {
-      if (attr.type === 'JSXSpreadAttribute')
+      if (attr.type === 'JSXSpreadAttribute') {
+        parts.pushExpr(`${use('ssrSpread')}(${compileSubExpression(attr.argument)})`)
         continue
+      }
       const rawName = jsxTagName(attr.name)
       if (rawName === 'key' || rawName === 'ref' || rawName === '$hydrate' || EVENT_ATTR.test(rawName))
         continue

@@ -4,9 +4,9 @@
 
 ## Core Rules (everything fits on one page)
 
-- **Standard TSX**: `.tsx` files with `jsxImportSource: "kay"`. Use `class` or `className`. Standard `.map()` (with `key={...}`), `&&`, and ternaries compile automatically to fine-grained keyed DOM updates.
+- **Standard TSX**: `.tsx` files with `jsxImportSource: "kay"`. Use `class` or `className`. Standard `.map()` (with `key={...}`), `&&`, ternaries, `{...spread}`, SVG elements, and CSS / `*.module.css` imports work natively.
 - **Signals**: `const count = signal(0)`, `const doubled = computed(() => count.value * 2)`, `effect(() => ...)`, `batch(() => ...)`, `selector(() => id.value)`, `store(obj)`. Always read/write via `.value` (`count.value++`). To let a child mutate parent state, pass the signal directly (`<Modal open={isOpen} />`).
-- **Reactive props**: Destructuring props (`function Badge({ count = 0 }: Props)`) is compiler-safe and stays reactive.
+- **Reactive props**: Destructuring props (`function Badge({ count = 0, ...rest }: Props)`) is compiler-safe and stays reactive; server-rendered children inside islands are preserved via `<kay-slot>`.
 - **Automatic islands**: Any component using reactive primitives (`signal`, `computed`, `effect`, `onMount`, `store`, `selector`) or DOM handlers (`onClick`, `ref`) becomes an island automatically. Control hydration per call site with `$hydrate="load" | "visible" | "idle" | "interaction" | "media(...)" | "client"`, or component default `island(Comp, { hydrate: 'visible' })`.
 - **Routes (`src/routes/`)**:
   - `export default async function Page({ params, locals, url })`: strictly server-only (`0 KB` JS; cannot use signals/handlers directly).
@@ -18,5 +18,7 @@
 - **Streaming & Head**: `<Head><title>...</title></Head>` (innermost `<title>` wins); `<Suspense fallback={<p>Loading</p>}><AsyncComp /></Suspense>` streams resolved HTML with 0 KB external JS.
 - **Actions**: `export const fn = action(standardSchema, async (input, ctx) => ...)` from `kay/server`. Works as `<form action={fn} method="post">` and `await fn(data)` from islands (server code auto-stripped, CSRF checked automatically).
 - **Env**: `export const env = defineEnv(standardSchema)` from `kay/server`.
+- **Static files & CSS**: Files in `public/` are served at `/` with ETag/`304` (and embedded in `--static` / `--compile`). Import `.css` or `*.module.css` directly from any component or layout.
+- **CLI**: `kay new <dir> [--template minimal|fullstack]`, `kay check`, `kay dev`, `kay build [--static] [--compile [out]]`, `kay start`.
 - **Testing**: `import { testApp } from 'kay/test'` — in-process `app.get()`, `app.post()`, `app.submit()` with persistent cookie jar.
-- **Plugins (`kay.config.ts`)**: `export default defineConfig({ plugins: [...] })`. Plugin hooks: `server(api)` (`use`, `route`, `rewrite`), `transform`, `bunPlugins`, `css`, `transformHtml`, `clientEntry`, `commands`.
+- **Plugins (`kay.config.ts`)**: `export default defineConfig({ plugins: [...] })`. Plugin hooks: `server(api)` (`use`, `route`, `rewrite`), `transform`, `bunPlugins`, `css`, `transformHtml`, `clientEntry`, `commands`. Plugins are automatically embedded in `--compile` binaries.

@@ -1,7 +1,7 @@
 // Kay v2 minimal DOM & hydration core (loop lives in kay/dom-loop so non-loop islands ship 0 bytes of reconciler).
 
 import type { Owner } from '../reactivity/index'
-import { batch, createOwner, disposeOwner, effect, getOwner, runWithOwner, untrack } from '../reactivity/index'
+import { batch, createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, untrack } from '../reactivity/index'
 
 export { effect } from '../reactivity/index'
 
@@ -58,7 +58,7 @@ export function mount(container: Element, render: () => Node | DocumentFragment 
   return () => disposeOwner(owner)
 }
 
-export function template(html: string): () => Node {
+export function template(html: string, isSvg?: boolean): () => Node {
   let cached: Node | undefined
 
   return (): Node => {
@@ -70,8 +70,8 @@ export function template(html: string): () => Node {
 
     if (cached === undefined) {
       const t = document.createElement('template')
-      t.innerHTML = html
-      cached = t.content.firstChild!
+      t.innerHTML = isSvg ? `<svg>${html}</svg>` : html
+      cached = isSvg ? t.content.firstChild!.firstChild! : t.content.firstChild!
     }
     return cached.cloneNode(true)
   }
@@ -112,11 +112,19 @@ export function setText(node: Text, value: unknown): void {
 
 export function setClass(el: Element, value: unknown): void {
   const str = value == null || value === false ? '' : String(value)
-  if (el.className !== str) {
-    if (str === '')
-      el.removeAttribute('class')
-    else
-      el.className = str
+  if (typeof el.className === 'string') {
+    if (el.className !== str) {
+      if (str === '')
+        el.removeAttribute('class')
+      else
+        el.className = str
+    }
+  }
+  else if (str === '') {
+    el.removeAttribute('class')
+  }
+  else {
+    el.setAttribute('class', str)
   }
 }
 
@@ -183,6 +191,99 @@ export function on(el: Node, event: string, handler: (e: Event) => void): void {
   })
 }
 
+const SPREAD_EVENT_RE = /^on([A-Z]\w*)$/
+const SPREAD_DOM_PROPS = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
+
+export function omit(props: Record<string, unknown>, excluded: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  const skip = new Set(excluded)
+  for (const key of Object.keys(props)) {
+    if (skip.has(key))
+      continue
+    const desc = Object.getOwnPropertyDescriptor(props, key)
+    if (desc !== undefined)
+      Object.defineProperty(out, key, desc)
+  }
+  return out
+}
+
+export function spread(el: Element, getProps: () => Record<string, unknown> | null | undefined): void {
+  let prevKeys: string[] = []
+  const listeners = new Map<string, (e: Event) => void>()
+
+  const removeListener = (ev: string) => {
+    const fn = listeners.get(ev)
+    if (fn !== undefined) {
+      el.removeEventListener(ev, fn)
+      listeners.delete(ev)
+    }
+  }
+
+  onCleanup(() => {
+    for (const [ev, fn] of listeners)
+      el.removeEventListener(ev, fn)
+    listeners.clear()
+  })
+
+  effect(() => {
+    const props = getProps() ?? {}
+    const nextKeys = Object.keys(props)
+
+    for (let i = 0; i < prevKeys.length; i++) {
+      const k = prevKeys[i]!
+      if (k in props)
+        continue
+      const ev = SPREAD_EVENT_RE.exec(k)
+      if (ev !== null) {
+        removeListener(ev[1]!.toLowerCase())
+      }
+      else if (k === 'class' || k === 'className') {
+        setClass(el, '')
+      }
+      else if (k === 'style') {
+        setStyle(el as HTMLElement, null)
+      }
+      else if (k !== 'key' && k !== 'ref' && k !== '$hydrate' && k !== 'children') {
+        el.removeAttribute(k === 'htmlFor' ? 'for' : k)
+      }
+    }
+
+    for (let i = 0; i < nextKeys.length; i++) {
+      const k = nextKeys[i]!
+      if (k === 'key' || k === '$hydrate' || k === 'children')
+        continue
+      const v = props[k]
+      if (k === 'ref') {
+        if (typeof v === 'function')
+          (v as (node: Element) => void)(el)
+        continue
+      }
+      const ev = SPREAD_EVENT_RE.exec(k)
+      if (ev !== null) {
+        const type = ev[1]!.toLowerCase()
+        removeListener(type)
+        if (typeof v === 'function') {
+          const wrapped = (e: Event) => batch(() => (v as (ev: Event) => void)(e))
+          listeners.set(type, wrapped)
+          el.addEventListener(type, wrapped)
+        }
+        continue
+      }
+      const name = k === 'className' ? 'class' : k === 'htmlFor' ? 'for' : k
+      if (name === 'class')
+        setClass(el, v)
+      else if (name === 'style')
+        setStyle(el as HTMLElement, v)
+      else if (SPREAD_DOM_PROPS.has(name))
+        setProp(el, name, v)
+      else
+        setAttr(el, name, v)
+    }
+
+    prevKeys = nextKeys
+  })
+}
+
 // ---- Dynamic insertion & conditional show
 
 export function insert(parent: Node, value: () => unknown, marker: Node | null = null): void {
@@ -224,6 +325,10 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
     if (next instanceof Node) {
       if (current === next)
         return
+      if (current === null && next.parentNode === parent) {
+        current = next
+        return
+      }
       clearInserted(current)
       if (next.nodeType === 11) {
         const nodes = Array.from(next.childNodes)
@@ -234,6 +339,30 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
         parent.insertBefore(next, marker)
         current = next
       }
+      return
+    }
+
+    if (Array.isArray(next)) {
+      clearInserted(current)
+      const f = document.createDocumentFragment()
+      const nodes: Node[] = []
+      for (let i = 0; i < next.length; i++) {
+        const item = next[i]
+        if (item instanceof Node) {
+          if (item.nodeType === 11)
+            nodes.push(...Array.from(item.childNodes))
+          else
+            nodes.push(item)
+          f.appendChild(item)
+        }
+        else if (item != null && typeof item !== 'boolean') {
+          const t = document.createTextNode(String(item))
+          nodes.push(t)
+          f.appendChild(t)
+        }
+      }
+      parent.insertBefore(f, marker)
+      current = nodes
     }
   })
 }

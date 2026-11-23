@@ -75,6 +75,21 @@ export function ssrStyle(value: unknown): string {
   return ''
 }
 
+const SPREAD_EVENT_RE = /^on[A-Z]/
+
+export function ssrSpread(props: Record<string, unknown> | null | undefined): string {
+  if (props == null || typeof props !== 'object')
+    return ''
+  let out = ''
+  for (const [rawKey, value] of Object.entries(props)) {
+    if (rawKey === 'key' || rawKey === 'ref' || rawKey === '$hydrate' || rawKey === 'children' || SPREAD_EVENT_RE.test(rawKey))
+      continue
+    const name = rawKey === 'className' ? 'class' : rawKey === 'htmlFor' ? 'for' : rawKey
+    out += name === 'style' ? ssrStyle(value) : ssrAttr(name, value)
+  }
+  return out
+}
+
 export function ssrLoop<T>(items: Iterable<T> | null | undefined | false, render: (item: T, index: number) => string): string {
   if (!items)
     return ''
@@ -164,7 +179,7 @@ export function renderDocument(options: DocumentOptions): string {
   }
 
   if (hasIslands) {
-    headExtra += '<style>kay-island{display:contents}</style>'
+    headExtra += '<style>kay-island,kay-slot{display:contents}</style>'
     if (preloadChunks !== undefined) {
       for (const href of preloadChunks)
         headExtra += `<link rel="modulepreload" href="${escAttr(href)}">`

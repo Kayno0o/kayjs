@@ -39,6 +39,7 @@ export interface KayConfig {
   lang?: string | undefined
   routesDir?: string | undefined
   outDir?: string | undefined
+  publicDir?: string | undefined
   assetPrefix?: string | undefined
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined

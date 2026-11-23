@@ -1,8 +1,9 @@
 // kay dev: fast incremental rebuild (~5-10 ms) + in-place server hot swap + SSE browser live reload.
 
+import type { FSWatcher } from 'node:fs'
 import type { KayApp } from '../server/index'
-import { watch } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, rmSync, watch } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { build } from '../build/index'
 import { createServer } from '../server/index'
 
@@ -14,9 +15,20 @@ export interface DevServerOptions {
 
 const DEV_RELOAD_SCRIPT = `<script>(()=>{const s=new EventSource('/_kay/dev-events');s.onmessage=()=>location.reload();})();</script>`
 
+function renderErrorOverlay(errText: string): string {
+  const escaped = errText
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Kay Dev Error</title><style>body{margin:0;min-height:100vh;background:#0d1117;color:#e6edf3;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;display:grid;place-items:center;padding:2rem}main{max-width:56rem;width:100%;background:#161b22;border:1px solid #f85149;border-radius:10px;padding:1.5rem 2rem;box-shadow:0 16px 48px rgba(0,0,0,.45)}h1{margin:0 0 1rem;color:#ff7b72;font-size:1.15rem}pre{margin:0;white-space:pre-wrap;word-break:break-word;line-height:1.5;font-size:.9rem;color:#ffa198}p{margin:1rem 0 0;font-size:.8rem;color:#8b949e}</style></head><body><main><h1>Kay Dev Build Error</h1><pre>${escaped}</pre><p>Save a fix to auto-reload.</p></main>${DEV_RELOAD_SCRIPT}</body></html>`
+}
+
 export async function devServer(options: DevServerOptions): Promise<{ url: string, stop: () => void }> {
   const root = resolve(options.root)
   const srcDir = resolve(root, 'src')
+  const publicDir = resolve(root, 'public')
+  const configPath = join(root, 'kay.config.ts')
+  const devRoot = join(root, '.kay-dev')
   const port = options.port ?? 3000
   let buildNum = 0
   let currentApp: KayApp | undefined
@@ -25,12 +37,15 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   const encoder = new TextEncoder()
 
   async function rebuild(): Promise<void> {
-    const outDir = `.kay-dev/b${++buildNum}`
+    const n = ++buildNum
+    const outDir = `.kay-dev/b${n}`
     const t0 = performance.now()
     try {
       await build({ root, routesDir: options.routesDir, outDir, minify: false })
       currentApp = await createServer({ root, outDir })
       lastError = undefined
+      if (n > 2)
+        rmSync(join(devRoot, `b${n - 2}`), { recursive: true, force: true })
       console.log(`[kay dev] rebuilt in ${(performance.now() - t0).toFixed(1)} ms`)
       for (const c of clients) {
         try {
@@ -50,10 +65,18 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
   await rebuild()
 
   let timer: ReturnType<typeof setTimeout> | undefined
-  const watcher = watch(srcDir, { recursive: true }, () => {
+  const scheduleRebuild = () => {
     clearTimeout(timer)
     timer = setTimeout(() => void rebuild(), 40)
-  })
+  }
+
+  const watchers: FSWatcher[] = []
+  if (existsSync(srcDir))
+    watchers.push(watch(srcDir, { recursive: true }, scheduleRebuild))
+  if (existsSync(publicDir))
+    watchers.push(watch(publicDir, { recursive: true }, scheduleRebuild))
+  if (existsSync(configPath))
+    watchers.push(watch(configPath, scheduleRebuild))
 
   const server = Bun.serve({
     port,
@@ -83,10 +106,10 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
       }
 
       if (lastError !== undefined) {
-        return new Response(
-          `<!DOCTYPE html><html><body style="font-family:monospace;padding:2rem;background:#111;color:#f87171"><h1>Kay Dev Error</h1><pre>${lastError.replaceAll('<', '&lt;')}</pre>${DEV_RELOAD_SCRIPT}</body></html>`,
-          { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } },
-        )
+        return new Response(renderErrorOverlay(lastError), {
+          status: 500,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        })
       }
 
       const res = await currentApp!.handle(request)
@@ -109,8 +132,10 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
     url,
     stop() {
       clearTimeout(timer)
-      watcher.close()
+      for (const w of watchers)
+        w.close()
       server.stop(true)
+      rmSync(devRoot, { recursive: true, force: true })
     },
   }
 }

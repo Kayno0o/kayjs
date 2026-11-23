@@ -62,13 +62,30 @@ export interface KayApp {
 
 const MIME: Record<string, string> = {
   '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.avif': 'image/avif',
+  '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.pdf': 'application/pdf',
+  '.wasm': 'application/wasm',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.map': 'application/json',
 }
 
 interface LoadedPageModule {
@@ -98,6 +115,7 @@ interface EmbeddedServerConfig {
   manifest: BuildManifest
   modules: Record<string, unknown>
   assets: Record<string, Uint8Array<ArrayBuffer>>
+  publicAssets?: Record<string, Uint8Array<ArrayBuffer>> | undefined
   prerendered: Record<string, string>
   assetPrefix?: string | undefined
   lang?: string | undefined
@@ -131,8 +149,8 @@ function finalizeResponse(res: Response, cookieStore: CookieStore, security: Sec
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
 }
 
-export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
-  const { manifest, modules, assets, prerendered, lang = 'en', security, plugins = [] } = config
+export async function createServerFromEmbedded(config: EmbeddedServerConfig): Promise<KayApp> {
+  const { manifest, modules, assets, publicAssets = {}, prerendered, lang = 'en', security, plugins = [] } = config
   const assetPrefix = (config.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const trustedOrigins = config.trustedOrigins ? new Set(config.trustedOrigins) : undefined
   const alwaysLoadRuntime = plugins.some(p => Boolean(p.clientEntry))
@@ -140,7 +158,7 @@ export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
     .map(p => p.transformHtml)
     .filter((fn): fn is NonNullable<KayPlugin['transformHtml']> => typeof fn === 'function')
 
-  // Collect plugin server hooks synchronously (async setup supported in createServer)
+  // Collect plugin server hooks (supports both sync and async plugin setup)
   const globalMiddlewares: Middleware[] = []
   const pluginRewrites: ((pathname: string, ctx: RequestContext) => string | undefined)[] = []
   const pluginRouter = new Router<Map<string, (ctx: RequestContext) => Response | Promise<Response>>>()
@@ -166,15 +184,22 @@ export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
 
   for (const plugin of plugins) {
     if (plugin.server !== undefined)
-      void plugin.server(pluginApi)
+      await plugin.server(pluginApi)
   }
 
   const hasPluginRequestHooks = globalMiddlewares.length > 0 || pluginRewrites.length > 0 || htmlTransformers.length > 0 || pluginRouteEntries.size > 0
 
-  // Asset table
+  // Hashed build asset table (immutable cache)
   const assetMap = new Map<string, { body: Uint8Array<ArrayBuffer>, type: string }>()
   for (const [rel, body] of Object.entries(assets)) {
-    assetMap.set(`${assetPrefix}/${rel}`, { body, type: MIME[extname(rel)] ?? 'application/octet-stream' })
+    assetMap.set(`${assetPrefix}/${rel}`, { body, type: MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream' })
+  }
+
+  // Static public/ file table (ETag + 304 support)
+  const publicMap = new Map<string, { body: Uint8Array<ArrayBuffer>, type: string, etag: string }>()
+  for (const [rel, body] of Object.entries(publicAssets)) {
+    const etag = `W/"${Bun.hash(body).toString(36)}"`
+    publicMap.set(`/${rel}`, { body, type: MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream', etag })
   }
 
   // Register server actions and assign their live URLs
@@ -443,6 +468,23 @@ export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
       })
     }
 
+    // 1b. Static public/ files
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      const pub = publicMap.get(pathname)
+      if (pub !== undefined) {
+        if (request.headers.get('if-none-match') === pub.etag)
+          return new Response(null, { status: 304, headers: { 'etag': pub.etag, 'cache-control': 'public, max-age=3600' } })
+        return new Response(request.method === 'HEAD' ? null : pub.body, {
+          status: 200,
+          headers: {
+            'content-type': pub.type,
+            'etag': pub.etag,
+            'cache-control': 'public, max-age=3600',
+          },
+        })
+      }
+    }
+
     // 2. Server actions (POST /_kay/action/<id>)
     if (request.method === 'POST') {
       const act = actionHandlers.get(pathname)
@@ -543,6 +585,19 @@ export function createServerFromEmbedded(config: EmbeddedServerConfig): KayApp {
       })
     }
 
+    for (const [path, pub] of publicMap) {
+      if (!(path in routes)) {
+        routes[path] = new Response(pub.body, {
+          status: 200,
+          headers: {
+            'content-type': pub.type,
+            'etag': pub.etag,
+            'cache-control': 'public, max-age=3600',
+          },
+        })
+      }
+    }
+
     for (const [path, pre] of prerenderedMap) {
       const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
       if (security !== false)
@@ -579,12 +634,19 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as BuildManifest
   const modules: Record<string, unknown> = {}
   const assets: Record<string, Uint8Array<ArrayBuffer>> = {}
+  const publicAssets: Record<string, Uint8Array<ArrayBuffer>> = {}
   const prerendered: Record<string, string> = {}
 
   for (const rel of manifest.assets) {
     const abs = join(clientDir, rel)
     if (existsSync(abs))
       assets[rel] = new Uint8Array(readFileSync(abs))
+  }
+
+  for (const rel of manifest.publicFiles ?? []) {
+    const abs = join(outDir, 'public', rel)
+    if (existsSync(abs))
+      publicAssets[rel] = new Uint8Array(readFileSync(abs))
   }
 
   const loadMod = async (rel: string) => {
@@ -612,6 +674,7 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     manifest,
     modules,
     assets,
+    publicAssets,
     prerendered,
     assetPrefix: options.assetPrefix ?? fileConfig.assetPrefix,
     lang: options.lang ?? fileConfig.lang,
