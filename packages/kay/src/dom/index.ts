@@ -12,8 +12,11 @@ export function claimLoop(parent: Node, fn: () => void, skip = 0): boolean {
     return false
   const prevCursor = hydrateNode
   let cur = parent.firstChild
-  for (let i = 0; i < skip && cur !== null; i++)
+  for (let i = 0; i < skip && cur !== null; i++) {
     cur = cur.nextSibling
+    while (cur !== null && (cur as unknown as { __kayAnchor?: boolean }).__kayAnchor === true)
+      cur = cur.nextSibling
+  }
   hydrateNode = cur
   try {
     fn()
@@ -32,6 +35,7 @@ export function claimInsert<T>(parent: Node, marker: Node | null, fn: () => T): 
   let nextMarker = marker
   if (marker !== null && marker.nodeType !== 8) {
     const anchor = document.createComment('')
+    ;(anchor as unknown as { __kayAnchor?: boolean }).__kayAnchor = true
     parent.insertBefore(anchor, marker.nextSibling)
     nextMarker = anchor
   }
@@ -149,6 +153,12 @@ export function textAfter(marker: Node): Text {
   const text = document.createTextNode('')
   marker.parentNode!.insertBefore(text, next)
   return text
+}
+
+/** Advance past an optional SSR text node (`<!-->text<!-->` or `<!--><!-->`) to the closing comment marker. */
+export function skipText(marker: Node): Node | null {
+  const next = marker.nextSibling
+  return next !== null && next.nodeType === 3 ? next.nextSibling : next
 }
 
 export function setText(node: Text, value: unknown): void {

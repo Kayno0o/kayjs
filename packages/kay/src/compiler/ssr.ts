@@ -5,6 +5,10 @@ import type { AstNode, ModuleAnalysis } from './analyze'
 import { analyzeModule, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
 
+export function escapeStaticText(str: string): string {
+  return str.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+}
+
 const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
   'link', 'meta', 'param', 'source', 'track', 'wbr',
@@ -281,6 +285,12 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       else if (child.type === 'JSXExpressionContainer') {
         const expr = child.expression as AstNode
 
+        // Fold static string literal expressions like `{' '}` directly into static text
+        if (expr.type === 'Literal' && typeof expr.value === 'string') {
+          parts.pushStatic(escapeStaticText(expr.value))
+          continue
+        }
+
         // Inline `.map((item, idx?) => <jsx>)` directly into a flat `for` loop on `bufVar`!
         if (
           expr.type === 'CallExpression'
@@ -376,7 +386,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     const exprCode = compileSubExpression(expr)
     const rendered = `${use('esc')}(${exprCode})`
     if (isIsland && hasSiblings)
-      return `"<!---->" + ${rendered}`
+      return isLast ? `"<!---->" + ${rendered}` : `"<!---->" + ${rendered} + "<!---->"`
     return rendered
   }
 

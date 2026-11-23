@@ -1,0 +1,10 @@
+{
+  "name": "kay-v2-showcase",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun ../../packages/kay/src/cli/index.ts dev",
+    "build": "bun ../../packages/kay/src/cli/index.ts build",
+    "start": "bun ../../packages/kay/src/cli/index.ts start"
+  }
+}

@@ -4,7 +4,7 @@
 import type { AstNode, ModuleAnalysis } from './analyze'
 import { analyzeModule, parseTsx, walk } from './analyze'
 import { SourceEditor } from './patch'
-import { cleanJsxText } from './ssr'
+import { cleanJsxText, escapeStaticText } from './ssr'
 
 const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
@@ -399,6 +399,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     }
 
     const walkPlan: { parentVar: string, index: number, varName: string }[] = []
+    const dynamicTextSlots = new Set<string>() // "parentVar:textIndex" for optional SSR text between <!---->...<!---->
 
     function requestChild(parentVar: string, index: number): string {
       const key = `${parentVar}:${index}`
@@ -486,6 +487,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
       const meaningful = filterChildren(el.children as AstNode[])
       let domIndex = 0
+      let prevWasStaticText = false
 
       for (let i = 0; i < meaningful.length; i++) {
         const child = meaningful[i]!
@@ -493,9 +495,23 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
         if (child.type === 'JSXText') {
           html += cleanJsxText(child.value as string)
-          domIndex++
+          if (!prevWasStaticText) {
+            domIndex++
+            prevWasStaticText = true
+          }
           continue
         }
+
+        if (child.type === 'JSXExpressionContainer' && child.expression?.type === 'Literal' && typeof child.expression.value === 'string') {
+          html += escapeStaticText(child.expression.value)
+          if (!prevWasStaticText) {
+            domIndex++
+            prevWasStaticText = true
+          }
+          continue
+        }
+
+        prevWasStaticText = false
 
         if (child.type === 'JSXElement') {
           const childTag = jsxTagName(child.openingElement.name)
@@ -522,6 +538,13 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               for (let k = subWalkBefore; k < walkPlan.length; k++) {
                 if (walkPlan[k]!.parentVar === placeholderVar)
                   walkPlan[k]!.parentVar = realVar
+              }
+              const prefix = `${placeholderVar}:`
+              for (const slot of [...dynamicTextSlots]) {
+                if (slot.startsWith(prefix)) {
+                  dynamicTextSlots.delete(slot)
+                  dynamicTextSlots.add(`${realVar}:${slot.slice(prefix.length)}`)
+                }
               }
             }
             html += subHtml
@@ -594,10 +617,18 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               const rowRewrites = new Map(scopeRewrites)
               let keyFn: string
 
+              const keyRewrites = new Map(scopeRewrites)
+              for (const p of params) {
+                const names = new Set<string>()
+                collectPatternNames(p, names)
+                for (const n of names)
+                  keyRewrites.delete(n)
+              }
+
               if (firstParam?.type === 'ObjectPattern') {
                 const patCode = code.slice(firstParam.start, firstParam.end)
                 keyFn = keyAst !== undefined
-                  ? `(${patCode}${idxParam ? `, ${idxParam}` : ''}) => ${code.slice(keyAst.start, keyAst.end)}`
+                  ? `(${patCode}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyRewrites)}`
                   : `(_item) => _item`
                 for (const prop of firstParam.properties as AstNode[]) {
                   if (prop.type === 'Property' && prop.key?.type === 'Identifier') {
@@ -615,7 +646,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               else {
                 const itemParam = firstParam?.type === 'Identifier' ? firstParam.name as string : '_item'
                 keyFn = keyAst !== undefined
-                  ? `(${itemParam}${idxParam ? `, ${idxParam}` : ''}) => ${code.slice(keyAst.start, keyAst.end)}`
+                  ? `(${itemParam}${idxParam ? `, ${idxParam}` : ''}) => ${compileExpression(keyAst, keyRewrites)}`
                   : `(${itemParam}) => ${itemParam}`
                 rowRewrites.set(itemParam, `${rowSig}.value`)
               }
@@ -691,10 +722,17 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
             ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
           }
           else {
-            // Sibling dynamic child: comment marker + text node
+            // Sibling dynamic child: open comment + optional text (+ closing comment if followed by more siblings)
             const markerVar = requestChild(elVar, domIndex)
-            html += '<!----> '
-            domIndex += 2
+            if (isLast) {
+              html += '<!----> '
+              domIndex += 2
+            }
+            else {
+              html += '<!----> <!---->'
+              dynamicTextSlots.add(`${elVar}:${domIndex + 1}`)
+              domIndex += 3
+            }
             const txtVar = freshVar('_txt')
             ops.push(`const ${txtVar} = ${use('textAfter')}(${markerVar});`)
             ops.push(`${use('effect')}(() => ${use('setText')}(${txtVar}, ${exprCode}));`)
@@ -737,11 +775,24 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       let prevIdx = -1
       for (const { index, varName } of list) {
         let expr: string
+        let pos: number
         if (prevVar === undefined) {
-          expr = `${pVar}.firstChild${'.nextSibling'.repeat(index)}`
+          expr = `${pVar}.firstChild`
+          pos = 0
         }
         else {
-          expr = `${prevVar}${'.nextSibling'.repeat(index - prevIdx)}`
+          expr = prevVar
+          pos = prevIdx
+        }
+        while (pos < index) {
+          if (dynamicTextSlots.has(`${pVar}:${pos + 1}`) && pos + 2 <= index) {
+            expr = `${use('skipText')}(${expr})`
+            pos += 2
+          }
+          else {
+            expr = `${expr}.nextSibling`
+            pos += 1
+          }
         }
         walkStmts.push(`const ${varName} = ${expr};`)
         prevVar = varName

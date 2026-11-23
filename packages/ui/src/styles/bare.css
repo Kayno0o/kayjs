@@ -66,14 +66,101 @@
   }
 
   /* Native top-layer & overlay positioning */
-  dialog[data-ui="dialog"] {
+  dialog[data-ui="dialog"],
+  dialog[data-ui="command"] {
     margin: auto;
     max-inline-size: min(32rem, calc(100vw - 2rem));
     max-block-size: calc(100dvh - 2rem);
     overflow: auto;
   }
-  dialog[data-ui="dialog"]::backdrop {
+  dialog[data-ui="command"] {
+    inline-size: min(34rem, calc(100vw - 2rem));
+    margin-block-start: min(14vh, 6rem);
+  }
+  dialog[data-ui="drawer"] {
+    margin: 0;
+    max-block-size: 100dvh;
+    block-size: 100dvh;
+    inline-size: min(26rem, 90vw);
+    max-inline-size: 90vw;
+    overflow: auto;
+    &[data-side="right"] { margin-inline-start: auto; }
+    &[data-side="left"] { margin-inline-end: auto; }
+    &[data-side="bottom"] {
+      margin-block-start: auto;
+      inline-size: 100vw;
+      max-inline-size: 100vw;
+      block-size: auto;
+      max-block-size: 80dvh;
+    }
+  }
+  dialog[data-ui="dialog"]::backdrop,
+  dialog[data-ui="drawer"]::backdrop,
+  dialog[data-ui="command"]::backdrop {
     background: rgb(0 0 0 / 0.45);
+  }
+
+  /* Native Switch & Check controls */
+  [data-ui="checkbox"],
+  [data-ui="switch"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    cursor: pointer;
+    user-select: none;
+    &[data-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+  }
+  [data-ui="switch"] input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    inline-size: 1px;
+    block-size: 1px;
+    pointer-events: none;
+  }
+  [data-ui="switch"] [data-part="track"] {
+    position: relative;
+    display: inline-block;
+    inline-size: 2.25rem;
+    block-size: 1.25rem;
+    flex-shrink: 0;
+    &::after {
+      content: '';
+      position: absolute;
+      inset-block-start: 2px;
+      inset-inline-start: 2px;
+      inline-size: calc(1.25rem - 4px);
+      block-size: calc(1.25rem - 4px);
+      transition: transform 140ms ease;
+    }
+  }
+  [data-ui="switch"] input:checked + [data-part="track"]::after {
+    transform: translateX(1rem);
+  }
+  [data-ui="radio-group"] {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+  [data-ui="radio-group"] [data-part="options"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+  [data-ui="radio-group"] [data-part="option"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+
+  /* DataTable scroll container */
+  [data-ui="datatable"] [data-part="scroll"] {
+    overflow-x: auto;
+  }
+  table[data-ui="table"] {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
   }
 
   [data-ui="popover"][popover],

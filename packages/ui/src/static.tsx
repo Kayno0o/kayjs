@@ -130,6 +130,76 @@ export function Popover({ id, triggerLabel, triggerVariant = 'outline', children
   )
 }
 
+// ---- Zero-JS native form controls (`0 KB` client JS!) ----
+
+export interface CheckControlProps {
+  id?: string | undefined
+  name?: string | undefined
+  value?: string | undefined
+  label: string
+  checked?: boolean | undefined
+  disabled?: boolean | undefined
+  class?: string | undefined
+  [attr: string]: unknown
+}
+
+export function Checkbox({ id, name, value, label, checked, disabled, class: cls, ...rest }: CheckControlProps) {
+  return (
+    <label data-ui="checkbox" data-disabled={disabled ? 'true' : undefined} class={cls}>
+      <input id={id} type="checkbox" name={name} value={value} checked={checked} disabled={disabled} {...rest} />
+      <span data-part="label">{label}</span>
+    </label>
+  )
+}
+
+export function Switch({ id, name, value, label, checked, disabled, class: cls, ...rest }: CheckControlProps) {
+  return (
+    <label data-ui="switch" data-disabled={disabled ? 'true' : undefined} class={cls}>
+      <input id={id} type="checkbox" role="switch" name={name} value={value} checked={checked} disabled={disabled} {...rest} />
+      <span data-part="track" aria-hidden="true" />
+      <span data-part="label">{label}</span>
+    </label>
+  )
+}
+
+export interface RadioOption {
+  value: string
+  label: string
+  hint?: string | undefined
+  disabled?: boolean | undefined
+}
+
+export interface RadioGroupProps {
+  name: string
+  legend?: string | undefined
+  options: RadioOption[]
+  defaultValue?: string | undefined
+  class?: string | undefined
+}
+
+export function RadioGroup({ name, legend, options, defaultValue, class: cls }: RadioGroupProps) {
+  return (
+    <fieldset data-ui="radio-group" class={cls}>
+      {legend && <legend data-part="legend">{legend}</legend>}
+      <div data-part="options">
+        {options.map(opt => (
+          <label key={opt.value} data-part="option" data-disabled={opt.disabled ? 'true' : undefined}>
+            <input
+              type="radio"
+              name={name}
+              value={opt.value}
+              checked={defaultValue === opt.value ? true : undefined}
+              disabled={opt.disabled}
+            />
+            <span data-part="label">{opt.label}</span>
+            {opt.hint && <span data-part="hint">{opt.hint}</span>}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  )
+}
+
 // ---- Every Layout primitives (pure CSS, 0 KB JS) ----
 
 export function Stack({ gap, class: cls, children, ...rest }: { gap?: string | undefined, class?: string | undefined, children?: KayChild | undefined, [attr: string]: unknown }) {

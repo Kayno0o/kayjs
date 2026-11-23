@@ -29,7 +29,7 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
       import {
         Accordion, AccordionItem, Badge, Button, Card, CardBody, CardFooter, CardHeader,
-        Cluster, Field, Grid, Notice, Popover, Stack,
+        Checkbox, Cluster, Field, Grid, Notice, Popover, RadioGroup, Stack, Switch,
       } from ${JSON.stringify(UI_ENTRY)}
 
       export default async function Home() {
@@ -51,6 +51,9 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
             <Field id="email" label="Email" hint="Work email" required>
               <input id="email" name="email" type="email" />
             </Field>
+            <Switch name="dark" label="Dark mode" checked />
+            <Checkbox name="terms" label="Accept terms" />
+            <RadioGroup name="tier" legend="Tier" defaultValue="free" options={[{ value: 'free', label: 'Free' }, { value: 'pro', label: 'Pro' }]} />
             <Accordion>
               <AccordionItem title="Question 1" group="faq" open>Answer 1</AccordionItem>
               <AccordionItem title="Question 2" group="faq">Answer 2</AccordionItem>
@@ -72,6 +75,9 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
     expect(html).not.toContain('<script')
     expect(html).toContain('data-ui="button"')
     expect(html).toContain('data-ui="card"')
+    expect(html).toContain('data-ui="switch"')
+    expect(html).toContain('data-ui="checkbox"')
+    expect(html).toContain('data-ui="radio-group"')
     expect(html).toContain('data-ui="accordion"')
     expect(html).toContain('popovertarget="info-pop"')
     expect(html).toContain('data-layout="stack"')
@@ -136,7 +142,7 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
 
     writeFileSync(join(dir, 'src/routes/index.tsx'), `
       import { Head } from 'kay'
-      import { Card, CardBody, CardHeader, Dialog, Menu, Select, Tabs, Toaster } from ${JSON.stringify(UI_ENTRY)}
+      import { Card, CardBody, CardHeader, CommandPalette, DataTable, Dialog, Drawer, Menu, Select, Tabs, Toaster } from ${JSON.stringify(UI_ENTRY)}
       import { ToastDemo } from '../components/ToastDemo'
 
       export default async function Demo() {
@@ -152,6 +158,29 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
             <Dialog title="Confirm action" triggerLabel="Open dialog">
               <p>Are you sure?</p>
             </Dialog>
+            <Drawer title="Side panel" triggerLabel="Open drawer" side="right">
+              <p>Drawer body</p>
+            </Drawer>
+            <CommandPalette
+              triggerLabel="Open command"
+              items={[
+                { id: 'alpha', label: 'Alpha action', shortcut: 'A' },
+                { id: 'beta', label: 'Beta action', shortcut: 'B' },
+              ]}
+            />
+            <DataTable
+              pageSize={2}
+              selectable
+              rows={[
+                { id: '1', name: 'Charlie', score: 20 },
+                { id: '2', name: 'Alice', score: 50 },
+                { id: '3', name: 'Bob', score: 30 },
+              ]}
+              columns={[
+                { key: 'name', label: 'Name' },
+                { key: 'score', label: 'Score' },
+              ]}
+            />
             <Tabs
               defaultValue="one"
               items={[
@@ -236,6 +265,29 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
       expect(await page.locator('[data-ui="toast"] [data-part="title"]').textContent()).toBe('Saved!')
       await page.click('[data-ui="toast"] [data-part="close"]')
       expect(await page.locator('[data-ui="toast"]').count()).toBe(0)
+
+      // 5b. Drawer open + Escape close
+      await page.click('[data-ui="drawer-root"] [data-part="trigger"]')
+      expect(await page.locator('dialog[data-ui="drawer"]').evaluate(el => (el as HTMLDialogElement).open)).toBe(true)
+      await page.keyboard.press('Escape')
+      expect(await page.locator('dialog[data-ui="drawer"]').evaluate(el => (el as HTMLDialogElement).open)).toBe(false)
+
+      // 5c. CommandPalette open + live filter + Enter closes
+      await page.click('[data-ui="command-root"] [data-part="trigger"]')
+      expect(await page.locator('dialog[data-ui="command"]').evaluate(el => (el as HTMLDialogElement).open)).toBe(true)
+      await page.fill('dialog[data-ui="command"] [data-part="input"]', 'beta')
+      expect(await page.locator('dialog[data-ui="command"] [data-part="item"]').count()).toBe(1)
+      await page.keyboard.press('Enter')
+      expect(await page.locator('dialog[data-ui="command"]').evaluate(el => (el as HTMLDialogElement).open)).toBe(false)
+
+      // 5d. DataTable sort + filter + select
+      expect(await page.locator('[data-ui="datatable"] tbody tr').count()).toBe(2) // pageSize=2
+      await page.click('[data-ui="datatable"] thead th button[data-part="sort"]') // sort Name asc -> Alice first
+      expect(await page.locator('[data-ui="datatable"] tbody tr:first-child td:nth-child(2)').textContent()).toBe('Alice')
+      await page.fill('[data-ui="datatable"] [data-part="search"]', 'bob')
+      expect(await page.locator('[data-ui="datatable"] tbody tr').count()).toBe(1)
+      await page.click('[data-ui="datatable"] tbody tr:first-child input[type="checkbox"]')
+      expect(await page.locator('[data-ui="datatable"] [data-part="meta"]').first().textContent()).toContain('1 selected')
 
       // 6. Verify switching Pure CSS Grammars changes actual STRUCTURE (borders, shadows, fonts) on the exact same DOM!
       const readCardStyle = () => page.locator('#demo-card').evaluate((el) => {
