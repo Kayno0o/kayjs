@@ -41,25 +41,79 @@
     font-family: var(--ui-font-body);
   }
 
-  /* Fixed coprime-tiled starfield painted once on its own layer above the ground. */
+  /* Fixed non-repeating Poisson-scattered starfield painted once on its own layer above the ground. */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
     z-index: -1;
     pointer-events: none;
+    background-repeat: no-repeat;
     background-image:
-      radial-gradient(circle at 23px 41px, light-dark(rgb(20 27 43 / 0.32), rgb(255 255 255 / 0.40)) 0.85px, transparent 1.6px),
-      radial-gradient(circle at 131px 97px, light-dark(rgb(20 27 43 / 0.20), rgb(255 255 255 / 0.24)) 0.75px, transparent 1.4px),
-      radial-gradient(circle at 79px 157px, light-dark(rgb(40 60 120 / 0.26), rgb(200 212 255 / 0.32)) 0.8px, transparent 1.5px),
-      radial-gradient(circle at 211px 29px, light-dark(rgb(20 27 43 / 0.18), rgb(255 255 255 / 0.20)) 0.7px, transparent 1.3px),
-      radial-gradient(circle at 53px 223px, light-dark(rgb(120 80 20 / 0.28), rgb(255 230 196 / 0.34)) 0.85px, transparent 1.6px),
-      radial-gradient(circle at 167px 181px, light-dark(rgb(20 27 43 / 0.16), rgb(255 255 255 / 0.18)) 0.65px, transparent 1.3px),
-      radial-gradient(circle at 293px 113px, light-dark(rgb(40 60 120 / 0.30), rgb(200 212 255 / 0.36)) 0.95px, transparent 1.7px),
-      radial-gradient(circle at 37px 311px, light-dark(rgb(20 27 43 / 0.20), rgb(255 255 255 / 0.22)) 0.75px, transparent 1.4px),
-      radial-gradient(circle at 389px 359px, light-dark(rgb(20 27 43 / 0.36), rgb(255 255 255 / 0.46)) 1.05px, transparent 1.8px),
-      radial-gradient(circle at 101px 433px, light-dark(rgb(40 60 120 / 0.24), rgb(200 212 255 / 0.28)) 0.8px, transparent 1.5px);
-    background-size: 173px 173px, 197px 197px, 223px 223px, 241px 241px, 277px 277px, 311px 311px, 337px 337px, 389px 389px, 431px 431px, 461px 461px;
+      radial-gradient(circle at 89.3% 83.7%, light-dark(rgb(20 27 43 / 0.26), rgb(255 255 255 / 0.32)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 49.6% 39%, light-dark(rgb(20 27 43 / 0.31), rgb(255 255 255 / 0.38)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 48.4% 26.1%, light-dark(rgb(120 80 20 / 0.24), rgb(255 232 198 / 0.29)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 83.8% 54.5%, light-dark(rgb(40 60 120 / 0.15), rgb(200 214 255 / 0.18)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 34.9% 8.6%, light-dark(rgb(20 27 43 / 0.24), rgb(255 255 255 / 0.29)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 33.4% 36.6%, light-dark(rgb(120 80 20 / 0.2), rgb(255 232 198 / 0.24)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 41% 12.9%, light-dark(rgb(20 27 43 / 0.16), rgb(255 255 255 / 0.2)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 33.3% 59.4%, light-dark(rgb(20 27 43 / 0.42), rgb(255 255 255 / 0.51)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 80.9% 43.9%, light-dark(rgb(20 27 43 / 0.3), rgb(255 255 255 / 0.36)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 46.3% 64.2%, light-dark(rgb(20 27 43 / 0.2), rgb(255 255 255 / 0.24)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 73.9% 34.8%, light-dark(rgb(20 27 43 / 0.3), rgb(255 255 255 / 0.37)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 73.8% 17.4%, light-dark(rgb(20 27 43 / 0.43), rgb(255 255 255 / 0.52)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 31.2% 97.1%, light-dark(rgb(120 80 20 / 0.28), rgb(255 232 198 / 0.34)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 93.2% 7.1%, light-dark(rgb(20 27 43 / 0.37), rgb(255 255 255 / 0.45)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 17.5% 9.5%, light-dark(rgb(40 60 120 / 0.31), rgb(200 214 255 / 0.38)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 43.4% 85.9%, light-dark(rgb(20 27 43 / 0.4), rgb(255 255 255 / 0.49)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 51.3% 50.5%, light-dark(rgb(40 60 120 / 0.16), rgb(200 214 255 / 0.19)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 97.7% 46.1%, light-dark(rgb(40 60 120 / 0.23), rgb(200 214 255 / 0.28)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 67.4% 20.8%, light-dark(rgb(40 60 120 / 0.31), rgb(200 214 255 / 0.38)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 72.5% 58.8%, light-dark(rgb(20 27 43 / 0.2), rgb(255 255 255 / 0.24)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 82.4% 26.4%, light-dark(rgb(20 27 43 / 0.29), rgb(255 255 255 / 0.35)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 2% 91.6%, light-dark(rgb(20 27 43 / 0.34), rgb(255 255 255 / 0.41)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 18.2% 42.9%, light-dark(rgb(40 60 120 / 0.3), rgb(200 214 255 / 0.37)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 82.4% 35.7%, light-dark(rgb(40 60 120 / 0.25), rgb(200 214 255 / 0.31)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 9.2% 11.4%, light-dark(rgb(20 27 43 / 0.16), rgb(255 255 255 / 0.2)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 21.3% 86.5%, light-dark(rgb(20 27 43 / 0.16), rgb(255 255 255 / 0.2)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 1.7% 98.9%, light-dark(rgb(40 60 120 / 0.28), rgb(200 214 255 / 0.34)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 59.7% 17.2%, light-dark(rgb(20 27 43 / 0.28), rgb(255 255 255 / 0.34)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 3.9% 73.5%, light-dark(rgb(20 27 43 / 0.14), rgb(255 255 255 / 0.17)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 20.9% 19%, light-dark(rgb(40 60 120 / 0.18), rgb(200 214 255 / 0.22)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 50.6% 80.8%, light-dark(rgb(40 60 120 / 0.39), rgb(200 214 255 / 0.47)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 41.6% 73.5%, light-dark(rgb(20 27 43 / 0.23), rgb(255 255 255 / 0.28)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 39.7% 23.9%, light-dark(rgb(120 80 20 / 0.13), rgb(255 232 198 / 0.16)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 26.5% 91.8%, light-dark(rgb(120 80 20 / 0.2), rgb(255 232 198 / 0.24)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 18% 92.5%, light-dark(rgb(40 60 120 / 0.14), rgb(200 214 255 / 0.17)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 57.3% 74.5%, light-dark(rgb(20 27 43 / 0.36), rgb(255 255 255 / 0.44)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 38.6% 55%, light-dark(rgb(40 60 120 / 0.26), rgb(200 214 255 / 0.32)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 55.4% 3.3%, light-dark(rgb(20 27 43 / 0.3), rgb(255 255 255 / 0.36)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 15.5% 53.7%, light-dark(rgb(40 60 120 / 0.19), rgb(200 214 255 / 0.23)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 98.8% 31.4%, light-dark(rgb(20 27 43 / 0.4), rgb(255 255 255 / 0.49)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 90.1% 37.3%, light-dark(rgb(120 80 20 / 0.2), rgb(255 232 198 / 0.25)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 23.6% 34.6%, light-dark(rgb(40 60 120 / 0.34), rgb(200 214 255 / 0.42)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 30.9% 72.7%, light-dark(rgb(20 27 43 / 0.24), rgb(255 255 255 / 0.29)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 6.3% 30%, light-dark(rgb(120 80 20 / 0.35), rgb(255 232 198 / 0.43)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 15.3% 81.5%, light-dark(rgb(20 27 43 / 0.39), rgb(255 255 255 / 0.48)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 93% 74.4%, light-dark(rgb(40 60 120 / 0.41), rgb(200 214 255 / 0.5)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 38.5% 44.1%, light-dark(rgb(20 27 43 / 0.38), rgb(255 255 255 / 0.46)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 2.6% 61.3%, light-dark(rgb(120 80 20 / 0.19), rgb(255 232 198 / 0.23)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 28.9% 51.5%, light-dark(rgb(20 27 43 / 0.28), rgb(255 255 255 / 0.34)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 9.9% 20.5%, light-dark(rgb(40 60 120 / 0.26), rgb(200 214 255 / 0.32)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 2.2% 46.3%, light-dark(rgb(20 27 43 / 0.35), rgb(255 255 255 / 0.43)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 52.8% 17.1%, light-dark(rgb(120 80 20 / 0.25), rgb(255 232 198 / 0.3)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 31% 21.1%, light-dark(rgb(20 27 43 / 0.36), rgb(255 255 255 / 0.44)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 70.6% 89.6%, light-dark(rgb(120 80 20 / 0.15), rgb(255 232 198 / 0.18)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 75.4% 77.3%, light-dark(rgb(20 27 43 / 0.27), rgb(255 255 255 / 0.33)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 9% 3.6%, light-dark(rgb(20 27 43 / 0.41), rgb(255 255 255 / 0.5)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 22.5% 53.6%, light-dark(rgb(20 27 43 / 0.39), rgb(255 255 255 / 0.48)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 81.4% 12.2%, light-dark(rgb(20 27 43 / 0.22), rgb(255 255 255 / 0.27)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 61.1% 81.5%, light-dark(rgb(40 60 120 / 0.18), rgb(200 214 255 / 0.22)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 70.4% 66.3%, light-dark(rgb(40 60 120 / 0.16), rgb(200 214 255 / 0.19)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 20% 61%, light-dark(rgb(20 27 43 / 0.33), rgb(255 255 255 / 0.4)) 0.7px, transparent 1.4px),
+      radial-gradient(circle at 19.7% 2.8%, light-dark(rgb(20 27 43 / 0.32), rgb(255 255 255 / 0.39)) 0.9px, transparent 1.6px),
+      radial-gradient(circle at 91% 49.9%, light-dark(rgb(20 27 43 / 0.35), rgb(255 255 255 / 0.43)) 1.15px, transparent 1.85px),
+      radial-gradient(circle at 8.3% 48.9%, light-dark(rgb(120 80 20 / 0.16), rgb(255 232 198 / 0.2)) 0.7px, transparent 1.4px);
   }
 
   [data-ui="button"] {
