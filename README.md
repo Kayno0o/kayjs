@@ -88,7 +88,7 @@ Core stays tiny (`~6.9k LOC`). Every optional capability plugs in cleanly throug
 | Package | Purpose | Notes |
 | :--- | :--- | :--- |
 | **`kay`** | Compiler, linked-list signals, DOM runtime, router, SSR/Suspense, actions, build/compile, `kay/test` | 1 runtime dep (`oxc-parser`) |
-| **`@kayjs/ui`** | Platform-first headless primitives + 4 structurally distinct pure CSS `@layer kui` Grammars (`editorial`, `workshop`, `console`, `soft`) + `kay ui-eject` | Zero JS recipe engine, zero Tailwind lock-in |
+| **`@kayjs/ui`** | Platform-first headless primitives + 5 structurally distinct pure CSS `@layer kui` Grammars (`editorial`, `workshop`, `console`, `soft`, `orbit`) + `kay ui-eject` | Zero JS recipe engine, zero Tailwind lock-in |
 | **`@kayjs/auth`** | Argon2id passwords, hashed DB sessions, magic links, OAuth 2.0 + PKCE (GitHub/Discord/Google), `auth.guard()`, `bun:sqlite` store | Zero external deps |
 | **`@kayjs/live`** | Typed real-time SSE rooms, microtask-coalesced presence, `useLive()` browser signal hook | Zero external deps |
 | **`@kayjs/content`** | `Bun.markdown` GFM collections, YAML frontmatter + Standard Schema, heading TOC, `paths()` prerender, RSS XML | Zero external deps |
@@ -104,7 +104,7 @@ Core stays tiny (`~6.9k LOC`). Every optional capability plugs in cleanly throug
 
 ## Examples
 
-- **[`examples/showcase`](examples/showcase)** — Live `@kayjs/ui` Grammar Switcher (`editorial` / `workshop` / `console` / `soft` / `bare`), every UI primitive, and guarded `@kayjs/auth` routes.
+- **[`examples/showcase`](examples/showcase)** — Live `@kayjs/ui` Grammar Switcher (`editorial` / `workshop` / `console` / `soft` / `orbit` / `bare`), every UI primitive, and guarded `@kayjs/auth` routes.
 - **[`examples/noticeboard`](examples/noticeboard)** — Full-stack real-time app combining `@kayjs/auth`, `@kayjs/live` (SSE presence & live push), `@kayjs/mail`, `@kayjs/ui`, Standard-Schema `action()`, and `bun:sqlite`.
 
 ```sh

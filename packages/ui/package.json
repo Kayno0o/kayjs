@@ -15,7 +15,8 @@
     "./grammars/editorial.css": "./src/styles/grammars/editorial.css",
     "./grammars/workshop.css": "./src/styles/grammars/workshop.css",
     "./grammars/console.css": "./src/styles/grammars/console.css",
-    "./grammars/soft.css": "./src/styles/grammars/soft.css"
+    "./grammars/soft.css": "./src/styles/grammars/soft.css",
+    "./grammars/orbit.css": "./src/styles/grammars/orbit.css"
   },
   "engines": {
     "bun": ">=1.4.0"

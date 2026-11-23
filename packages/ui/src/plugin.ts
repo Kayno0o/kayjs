@@ -1,11 +1,11 @@
-// @kayjs/ui KayPlugin — wires a pure CSS Grammar (`editorial | workshop | console | soft | bare`)
+// @kayjs/ui KayPlugin — wires a pure CSS Grammar (`editorial | workshop | console | soft | orbit | bare`)
 // and adds `kay ui-eject <grammar> [dest]` so apps can copy & own the entire look in ONE ~200-line CSS file.
 
 import type { KayPlugin } from 'kay/server'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
-export type GrammarName = 'bare' | 'editorial' | 'workshop' | 'console' | 'soft'
+export type GrammarName = 'bare' | 'editorial' | 'workshop' | 'console' | 'soft' | 'orbit'
 
 const STYLES_DIR = join(import.meta.dir, 'styles')
 
@@ -47,7 +47,7 @@ export function ui(options: UiPluginOptions = {}): KayPlugin {
     commands: {
       'ui-eject': (args, root) => {
         const name = (args[0] ?? 'editorial') as GrammarName
-        const valid: GrammarName[] = ['bare', 'editorial', 'workshop', 'console', 'soft']
+        const valid: GrammarName[] = ['bare', 'editorial', 'workshop', 'console', 'soft', 'orbit']
         if (!valid.includes(name)) {
           console.error(`Unknown grammar "${name}". Choose one of: ${valid.join(', ')}`)
           process.exit(1)

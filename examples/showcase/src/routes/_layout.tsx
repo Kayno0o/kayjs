@@ -10,7 +10,8 @@ export default function Layout({ children, locals }: { children: KayChild, local
         <title>Kay v2 — @kayjs/ui Grammar Switcher & @kayjs/auth Showcase</title>
         <link id="kui-grammar" rel="stylesheet" href="/grammars/editorial.css" />
         <style>{`
-          body { margin: 0; background: var(--ui-paper, #fff); color: var(--ui-ink, #111); font-family: var(--ui-font-body, system-ui, sans-serif); transition: background 180ms ease, color 180ms ease; }
+          html { background: var(--ui-paper, #fff); transition: background 180ms ease; }
+          body { margin: 0; background: transparent; color: var(--ui-ink, #111); font-family: var(--ui-font-body, system-ui, sans-serif); transition: color 180ms ease; }
           .shell { max-width: 68rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
           .topbar { padding-bottom: 1.25rem; margin-bottom: 2rem; border-bottom: 1px solid var(--ui-line, #ddd); }
         `}</style>

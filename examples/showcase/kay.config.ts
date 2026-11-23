@@ -6,7 +6,7 @@ import { createAuth, memoryAuthStore } from '@kayjs/auth'
 import { grammarCssPath } from '@kayjs/ui/plugin'
 import { defineConfig } from 'kay/server'
 
-const GRAMMARS = ['editorial', 'workshop', 'console', 'soft', 'bare'] as const
+const GRAMMARS = ['editorial', 'workshop', 'console', 'soft', 'orbit', 'bare'] as const
 
 export const auth = createAuth({
   store: memoryAuthStore('showcase'),

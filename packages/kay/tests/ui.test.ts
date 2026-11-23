@@ -92,6 +92,13 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
     expect(css).toContain('[data-layout="stack"]')
     expect(css).toContain('Grammar: Workshop')
     expect(css).not.toContain("@import '../bare.css'")
+
+    const orbitOut = ejectGrammar(dir, 'orbit', 'src/styles/orbit.css')
+    const orbitCss = readFileSync(orbitOut, 'utf8')
+    expect(orbitCss).toContain('Grammar: Orbit')
+    expect(orbitCss).toContain('body::before')
+    expect(orbitCss).toContain('radial-gradient')
+    expect(orbitCss).not.toContain("@import '../bare.css'")
   })
 
   it('provides headless createDataTable() sorting, filtering, selection & pagination', () => {
