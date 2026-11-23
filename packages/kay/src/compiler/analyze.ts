@@ -25,6 +25,12 @@ export interface ImportInfo {
   end: number
 }
 
+export interface ReexportInfo {
+  exported: string
+  local: string
+  source: string
+}
+
 export interface ModuleAnalysis {
   filename: string
   program: AstNode
@@ -40,6 +46,7 @@ export interface ModuleAnalysis {
   deferredIslandTags: Set<string>
   exportedActions: string[]
   imports: ImportInfo[]
+  reexports: ReexportInfo[]
   exportedNames: string[]
 }
 
@@ -87,6 +94,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   const deferredIslandTags = new Set<string>()
   const exportedActions: string[] = []
   const imports: ImportInfo[] = []
+  const reexports: ReexportInfo[] = []
   const exportedNames: string[] = []
   let actionLocalName = 'action'
 
@@ -145,6 +153,19 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
       }
     }
     else if (stmt.type === 'ExportNamedDeclaration') {
+      if (stmt.source?.value && stmt.exportKind !== 'type') {
+        const src = stmt.source.value as string
+        for (const spec of (stmt.specifiers ?? []) as AstNode[]) {
+          if (spec.exportKind === 'type')
+            continue
+          const exported = (spec.exported?.name ?? spec.exported?.value) as string | undefined
+          const local = (spec.local?.name ?? spec.local?.value) as string | undefined
+          if (exported && local) {
+            exportedNames.push(exported)
+            reexports.push({ exported, local, source: src })
+          }
+        }
+      }
       const decl = stmt.declaration as AstNode | null
       if (decl?.type === 'FunctionDeclaration' && decl.id?.name) {
         const name = decl.id.name as string
@@ -215,6 +236,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
     deferredIslandTags,
     exportedActions,
     imports,
+    reexports,
     exportedNames,
   }
 }

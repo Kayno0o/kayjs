@@ -558,6 +558,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               (cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression')
               && (cbBody?.type === 'JSXElement' || cbBody?.type === 'JSXFragment')
             ) {
+              const loopSkip = domIndex
               const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
               if (!isLast) {
                 html += '<!---->'
@@ -568,6 +569,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               const params = cb.params as AstNode[]
               const firstParam = params[0]
               const idxParam = params[1]?.type === 'Identifier' ? params[1].name as string : undefined
+              const skipArg = loopSkip > 0 ? `, ${loopSkip}` : ''
 
               // Fast path: provably static constant array (e.g. `NAV.map(...)`) -> lightweight `eachStatic` (0 bytes of LIS reconciler!)
               const isStaticArr = expr.callee.object.type === 'Identifier' && !scopeRewrites.has(expr.callee.object.name as string)
@@ -581,7 +583,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
                     shadowed.delete(n)
                 }
                 const rowBody = compileRootJsx(cbBody, shadowed)
-                ops.push(`${use('eachStatic')}(${elVar}, ${anchorVar}, ${eachCode}, (${rawParams}) => ${rowBody});`)
+                ops.push(`${use('eachStatic')}(${elVar}, ${anchorVar}, ${eachCode}, (${rawParams}) => ${rowBody}${skipArg});`)
                 continue
               }
 
@@ -622,7 +624,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
               const rowBody = compileRootJsx(cbBody, rowRewrites)
               const rowParams = idxSig !== undefined ? `${rowSig}, ${idxSig}` : rowSig
-              ops.push(`${use('loop')}(${elVar}, ${anchorVar}, () => ${eachCode}, ${keyFn}, (${rowParams}) => ${rowBody});`)
+              ops.push(`${use('loop')}(${elVar}, ${anchorVar}, () => ${eachCode}, ${keyFn}, (${rowParams}) => ${rowBody}${skipArg});`)
               continue
             }
           }

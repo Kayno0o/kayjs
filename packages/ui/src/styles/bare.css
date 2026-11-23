@@ -1,0 +1,113 @@
+/* @kayjs/ui bare floor: behavior, layout primitives, accessibility & top-layer positioning only.
+ * Everything sits inside @layer kui so Tailwind utilities and user CSS always win without !important. */
+
+@layer kui {
+  [data-ui] *,
+  [data-ui] *::before,
+  [data-ui] *::after {
+    box-sizing: border-box;
+  }
+
+  .kui-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  [data-ui] :focus-visible,
+  [data-ui]:focus-visible {
+    outline: 2px solid var(--ui-accent, currentColor);
+    outline-offset: 2px;
+  }
+
+  /* Every Layout primitives (0 KB JS) */
+  [data-layout="stack"] {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-gap, 1rem);
+  }
+  [data-layout="cluster"] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ui-gap, 0.75rem);
+  }
+  [data-layout="grid"] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--ui-min, 16rem), 100%), 1fr));
+    gap: var(--ui-gap, 1rem);
+  }
+  [data-layout="sidebar"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ui-gap, 1.5rem);
+  }
+  [data-layout="sidebar"] > :first-child {
+    flex-basis: var(--ui-side, 16rem);
+    flex-grow: 1;
+  }
+  [data-layout="sidebar"] > :last-child {
+    flex-basis: 0;
+    flex-grow: 999;
+    min-inline-size: var(--ui-content-min, 60%);
+  }
+  [data-layout="split"] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ui-gap, 1rem);
+  }
+
+  /* Native top-layer & overlay positioning */
+  dialog[data-ui="dialog"] {
+    margin: auto;
+    max-inline-size: min(32rem, calc(100vw - 2rem));
+    max-block-size: calc(100dvh - 2rem);
+    overflow: auto;
+  }
+  dialog[data-ui="dialog"]::backdrop {
+    background: rgb(0 0 0 / 0.45);
+  }
+
+  [data-ui="popover"][popover],
+  [data-ui="menu"] [data-part="content"][popover] {
+    inset: auto;
+    margin: 0;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block, flip-inline;
+  }
+
+  [data-ui="select"] {
+    position: relative;
+    display: inline-block;
+  }
+  [data-ui="select"] [data-part="listbox"] {
+    position: absolute;
+    inset-block-start: calc(100% + 4px);
+    inset-inline-start: 0;
+    min-inline-size: 100%;
+    z-index: 40;
+  }
+
+  [data-ui="toaster"] {
+    position: fixed;
+    inset-block-end: 1rem;
+    inset-inline-end: 1rem;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-inline-size: min(24rem, calc(100vw - 2rem));
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+}

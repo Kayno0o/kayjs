@@ -22,6 +22,7 @@ export function loop<T>(
   each: () => readonly T[] | null | undefined | false,
   keyFn: (item: T, index: number) => unknown,
   renderRow: (item: Signal<T>, index?: Signal<number>) => Node,
+  skip = 0,
 ): void {
   const parentOwner = getOwner()
   const needsIndex = renderRow.length >= 2
@@ -48,7 +49,7 @@ export function loop<T>(
           return
         for (let i = 0; i < prevLen; i++)
           disposeOwner(rows[i]!.owner)
-        if (marker === null) {
+        if (marker === null && skip === 0) {
           ;(parent as Element).textContent = ''
         }
         else {
@@ -67,7 +68,7 @@ export function loop<T>(
             const item = next[i]!
             created[i] = makeRow(item, i, keyFn(item, i))
           }
-        })) {
+        }, skip)) {
           rows = created
           return
         }
@@ -192,7 +193,7 @@ export function loop<T>(
       }
 
       // Full replacement fast path (replace 1,000 rows)
-      if (reused === 0 && start === 0 && oldEnd === prevLen && marker === null) {
+      if (reused === 0 && start === 0 && oldEnd === prevLen && marker === null && skip === 0) {
         for (let i = 0; i < prevLen; i++)
           disposeOwner(rows[i]!.owner)
         ;(parent as Element).textContent = ''

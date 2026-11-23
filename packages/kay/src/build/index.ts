@@ -89,15 +89,32 @@ export function resolveKaySpecifier(specifier: string): string | undefined {
 }
 
 function resolveImportPath(fromFile: string, specifier: string): string | undefined {
-  if (!specifier.startsWith('.'))
+  if (specifier.startsWith('.')) {
+    const base = resolve(dirname(fromFile), specifier)
+    const candidates = [base, `${base}.tsx`, `${base}.ts`, join(base, 'index.tsx'), join(base, 'index.ts')]
+    for (const c of candidates) {
+      if (existsSync(c))
+        return c
+    }
     return undefined
-  const base = resolve(dirname(fromFile), specifier)
-  const candidates = [base, `${base}.tsx`, `${base}.ts`, join(base, 'index.tsx'), join(base, 'index.ts')]
-  for (const c of candidates) {
-    if (existsSync(c))
-      return c
   }
-  return undefined
+  if (
+    specifier === 'kay'
+    || specifier.startsWith('kay/')
+    || specifier.startsWith('@kayjs/kay')
+    || specifier.startsWith('node:')
+    || specifier.startsWith('bun')
+    || specifier.startsWith('~')
+  ) {
+    return undefined
+  }
+  try {
+    const resolved = Bun.resolveSync(specifier, dirname(fromFile))
+    return resolved.endsWith('.tsx') || resolved.endsWith('.ts') ? resolved : undefined
+  }
+  catch {
+    return undefined
+  }
 }
 
 function walkRoutes(dir: string, out: string[] = []): string[] {
@@ -229,7 +246,25 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       if (target !== undefined && (target.endsWith('.tsx') || target.endsWith('.ts')))
         loadAnalysis(target)
     }
+    for (const re of analysis.reexports) {
+      const target = resolveImportPath(file, re.source)
+      if (target !== undefined && (target.endsWith('.tsx') || target.endsWith('.ts')))
+        loadAnalysis(target)
+    }
     return analysis
+  }
+
+  function resolveExportTarget(file: string, exportName: string, depth = 0): { file: string, exportName: string } {
+    if (depth > 8)
+      return { file, exportName }
+    const analysis = loadAnalysis(file)
+    const re = analysis.reexports.find(r => r.exported === exportName)
+    if (re !== undefined) {
+      const next = resolveImportPath(file, re.source)
+      if (next !== undefined)
+        return resolveExportTarget(next, re.local, depth + 1)
+    }
+    return { file, exportName }
   }
 
   for (const f of allRouteFiles)
@@ -280,14 +315,17 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     const bindings = new Map<string, IslandTarget>()
     for (const imp of analysis.imports) {
       const resolved = resolveImportPath(file, imp.source)
-      if (resolved === undefined || !resolved.endsWith('.tsx'))
-        continue
-      const targetAnalysis = loadAnalysis(resolved)
-      if (!targetAnalysis.isInteractive)
+      if (resolved === undefined || (!resolved.endsWith('.tsx') && !resolved.endsWith('.ts')))
         continue
       for (const spec of imp.specifiers) {
-        if (spec.imported !== '*')
-          bindings.set(spec.local, registerIsland(resolved, spec.imported))
+        if (spec.imported === '*')
+          continue
+        const target = resolveExportTarget(resolved, spec.imported)
+        if (!target.file.endsWith('.tsx'))
+          continue
+        const targetAnalysis = loadAnalysis(target.file)
+        if (targetAnalysis.isInteractive)
+          bindings.set(spec.local, registerIsland(target.file, target.exportName))
       }
     }
     if (bindings.size > 0)

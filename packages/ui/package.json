@@ -1,0 +1,18 @@
+{
+  "name": "@kayjs/ui",
+  "version": "2.0.0-alpha.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./plugin": "./src/plugin.ts",
+    "./bare.css": "./src/styles/bare.css",
+    "./grammars/editorial.css": "./src/styles/grammars/editorial.css",
+    "./grammars/workshop.css": "./src/styles/grammars/workshop.css",
+    "./grammars/console.css": "./src/styles/grammars/console.css",
+    "./grammars/soft.css": "./src/styles/grammars/soft.css"
+  },
+  "peerDependencies": {
+    "kay": "^2.0.0-alpha.0"
+  }
+}

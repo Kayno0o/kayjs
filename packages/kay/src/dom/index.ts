@@ -7,11 +7,14 @@ export { effect } from '../reactivity/index'
 let hydrating = false
 let hydrateNode: Node | null = null
 
-export function claimLoop(parent: Node, fn: () => void): boolean {
+export function claimLoop(parent: Node, fn: () => void, skip = 0): boolean {
   if (!hydrating)
     return false
   const prevCursor = hydrateNode
-  hydrateNode = parent.firstChild
+  let cur = parent.firstChild
+  for (let i = 0; i < skip && cur !== null; i++)
+    cur = cur.nextSibling
+  hydrateNode = cur
   try {
     fn()
   }
@@ -114,13 +117,14 @@ export function eachStatic<T>(
   marker: Node | null,
   items: readonly T[] | null | undefined,
   render: (item: T, index: number) => Node,
+  skip = 0,
 ): void {
   if (!items || items.length === 0)
     return
   if (claimLoop(parent, () => {
     for (let i = 0; i < items.length; i++)
       render(items[i]!, i)
-  })) {
+  }, skip)) {
     return
   }
   const f = document.createDocumentFragment()
