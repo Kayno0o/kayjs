@@ -1,4 +1,5 @@
 import { Head } from 'kay'
+import { CopyCommand } from '../components/CopyCommand'
 import { highlight } from '../highlight'
 
 export const prerender = true
@@ -87,9 +88,7 @@ export default function HomePage() {
             <a data-ui="button" data-variant="outline" href="/grammars">Live UI Grammars</a>
             <a data-ui="button" data-variant="ghost" href="/docs/production/migrating-from-v1">v1 → v2 Migration</a>
           </div>
-          <div class="docs-cli">
-            <span><span class="docs-cli-prompt">$</span> bunx kay new my-app --template app</span>
-          </div>
+          <CopyCommand command="bunx kay new my-app --template app" $hydrate="idle" />
         </div>
 
         <div class="hero-code-card" role="group" aria-label="Kay v2 code examples">
