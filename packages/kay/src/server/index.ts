@@ -28,6 +28,7 @@ export type { ActionContext, ActionResult, ServerAction } from './action'
 export type { CookieOptions, Cookies } from './cookies'
 export { defineEnv } from './env'
 export type { EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOptions } from './http'
+export { verifyOrigin } from './security'
 export type { SecurityHeadersOptions } from './security'
 export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
 
@@ -412,21 +413,37 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
     }
 
-    // 2. Server actions (POST /_kay/action/<id>)
+    // 2. Server actions (POST /_kay/action/<id>) — run global plugin middlewares first so ctx.locals (e.g. auth user) is populated
     if (request.method === 'POST') {
       const act = actionHandlers.get(pathname)
       if (act !== undefined) {
         const { ctx, cookieStore } = makeRequestContext(request, {})
-        const actionCtx: ActionContext = {
-          request: ctx.request,
-          url: ctx.url,
-          params: ctx.params,
-          cookies: ctx.cookies,
-          locals: ctx.locals,
-          redirect: ctx.redirect,
-          deny: ctx.deny,
+        const runAction = async (): Promise<Response> => {
+          const actionCtx: ActionContext = {
+            request: ctx.request,
+            url: ctx.url,
+            params: ctx.params,
+            cookies: ctx.cookies,
+            locals: ctx.locals,
+            redirect: ctx.redirect,
+            deny: ctx.deny,
+          }
+          return executeAction(act, request, actionCtx, trustedOrigins)
         }
-        const res = await executeAction(act, request, actionCtx, trustedOrigins)
+        if (globalMiddlewares.length === 0) {
+          const res = await runAction()
+          return finalizeResponse(res, cookieStore, security)
+        }
+        let index = -1
+        const dispatch = async (i: number): Promise<Response> => {
+          if (i <= index)
+            throw new Error('kay: middleware called next() multiple times')
+          index = i
+          if (i < globalMiddlewares.length)
+            return globalMiddlewares[i]!(ctx, () => dispatch(i + 1))
+          return runAction()
+        }
+        const res = await dispatch(0)
         return finalizeResponse(res, cookieStore, security)
       }
     }
@@ -525,11 +542,13 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
     }
 
-    for (const [path, pre] of prerenderedMap) {
-      const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
-      if (security !== false)
-        applySecurityHeaders(headers, security)
-      routes[path] = new Response(pre, { status: 200, headers })
+    if (!hasPluginRequestHooks) {
+      for (const [path, pre] of prerenderedMap) {
+        const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
+        if (security !== false)
+          applySecurityHeaders(headers, security)
+        routes[path] = new Response(pre, { status: 200, headers })
+      }
     }
 
     for (const [path, handler] of fastStaticPages) {
