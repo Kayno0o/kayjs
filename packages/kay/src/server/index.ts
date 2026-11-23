@@ -7,17 +7,17 @@
 
 import type { BuildManifest, RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
-import type { KayConfig, KayPlugin, ServerPluginAPI } from '../plugins/index'
+import type { KayPlugin, ServerPluginAPI } from '../plugins/index'
 import type { ActionContext, ServerAction } from './action'
-import type { Cookies } from './cookies'
-import type { SecurityHeadersOptions } from './security'
+import type { CookieStore } from './cookies'
+import type { EmbeddedBody, EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOptions } from './http'
 import { existsSync, readFileSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
 import { loadConfig } from '../plugins/index'
 import { createRenderContext, renderCollectedHead, runWithRenderContext, streamChunkScript } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
 import { executeAction, isServerAction } from './action'
-import { CookieStore } from './cookies'
+import { extractRenderedIslands, finalizeResponse, makeRequestContext, MIME } from './http'
 import { Router } from './router'
 import { applySecurityHeaders } from './security'
 
@@ -27,82 +27,9 @@ export { action } from './action'
 export type { ActionContext, ActionResult, ServerAction } from './action'
 export type { CookieOptions, Cookies } from './cookies'
 export { defineEnv } from './env'
+export type { EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOptions } from './http'
 export type { SecurityHeadersOptions } from './security'
 export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
-
-export interface ServerOptions {
-  root: string
-  outDir?: string | undefined
-  assetPrefix?: string | undefined
-  port?: number | undefined
-  lang?: string | undefined
-  security?: SecurityHeadersOptions | false | undefined
-  trustedOrigins?: string[] | undefined
-  plugins?: KayPlugin[] | undefined
-}
-
-export interface RequestContext {
-  request: Request
-  url: URL
-  params: Record<string, string>
-  cookies: Cookies
-  locals: Record<string, unknown>
-  json: (data: unknown, init?: ResponseInit) => Response
-  text: (body: string, init?: ResponseInit) => Response
-  redirect: (location: string, status?: 301 | 302 | 303 | 307 | 308) => Response
-  deny: (status: number, message: string, fieldErrors?: Record<string, string>) => Response
-}
-
-export type Middleware = (ctx: RequestContext, next: () => Promise<Response>) => Response | Promise<Response>
-
-export interface KayApp {
-  handle: (request: Request) => Promise<Response>
-  serve: (port?: number) => ReturnType<typeof Bun.serve>
-}
-
-const ISLAND_TAG_RE = /<kay-island c="([^"]+)"([^>]*)>/g
-
-function extractRenderedIslands(html: string): { hasIslands: boolean, eagerChunks: string[] } {
-  let hasIslands = false
-  const eager = new Set<string>()
-  ISLAND_TAG_RE.lastIndex = 0
-  let m: RegExpExecArray | null
-  while ((m = ISLAND_TAG_RE.exec(html)) !== null) {
-    hasIslands = true
-    const attrs = m[2] ?? ''
-    if (!attrs.includes(' h="'))
-      eager.add(m[1]!)
-  }
-  return { hasIslands, eagerChunks: [...eager] }
-}
-
-const MIME: Record<string, string> = {
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.webmanifest': 'application/manifest+json; charset=utf-8',
-  '.txt': 'text/plain; charset=utf-8',
-  '.xml': 'application/xml; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.avif': 'image/avif',
-  '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
-  '.woff': 'font/woff',
-  '.ttf': 'font/ttf',
-  '.otf': 'font/otf',
-  '.pdf': 'application/pdf',
-  '.wasm': 'application/wasm',
-  '.mp4': 'video/mp4',
-  '.webm': 'video/webm',
-  '.map': 'application/json',
-}
 
 interface LoadedPageModule {
   default?: (props: Record<string, unknown>) => Html | string | Promise<Html | string>
@@ -125,47 +52,6 @@ interface LoadedMiddlewareModule {
 
 interface LoadedErrorModule {
   default: (props: { error: unknown }) => Html | string | Promise<Html | string>
-}
-
-type EmbeddedBody = Uint8Array<ArrayBuffer> | string
-
-interface EmbeddedServerConfig {
-  manifest: BuildManifest
-  modules: Record<string, unknown>
-  assets: Record<string, EmbeddedBody>
-  publicAssets?: Record<string, EmbeddedBody> | undefined
-  publicEtags?: Record<string, string> | undefined
-  prerendered: Record<string, string>
-  assetPrefix?: string | undefined
-  lang?: string | undefined
-  security?: SecurityHeadersOptions | false | undefined
-  trustedOrigins?: string[] | undefined
-  plugins?: KayPlugin[] | undefined
-}
-
-function makeRequestContext(request: Request, params: Record<string, string>): { ctx: RequestContext, cookieStore: CookieStore } {
-  const url = new URL(request.url)
-  const cookieStore = new CookieStore(request.headers.get('cookie'))
-  const ctx: RequestContext = {
-    request,
-    url,
-    params,
-    cookies: cookieStore,
-    locals: {},
-    json: (data, init) => Response.json(data, init),
-    text: (body, init) => new Response(body, { ...init, headers: { 'content-type': 'text/plain; charset=utf-8', ...init?.headers } }),
-    redirect: (location, status = 302) => new Response(null, { status, headers: { location } }),
-    deny: (status, message, fieldErrors) => Response.json({ ok: false, status, error: message, fieldErrors }, { status }),
-  }
-  return { ctx, cookieStore }
-}
-
-function finalizeResponse(res: Response, cookieStore: CookieStore, security: SecurityHeadersOptions | false | undefined): Response {
-  const headers = new Headers(res.headers)
-  cookieStore.applyTo(headers)
-  if (security !== false)
-    applySecurityHeaders(headers, security)
-  return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
 }
 
 export async function createServerFromEmbedded(config: EmbeddedServerConfig): Promise<KayApp> {
@@ -274,7 +160,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       lang,
       runtimeScript: manifest.runtimeScript,
       alwaysLoadRuntime,
-      preloadChunks: entry.islandChunks,
+      preloadChunks: entry.eagerIslandChunks ?? entry.islandChunks,
       styles: manifest.styles,
       hasIslands,
     })

@@ -27,11 +27,11 @@ afterAll(() => {
 })
 
 describe('Milestone 4: Compiler hardening (spreads, SVG, destructured .map, kay-slot)', () => {
-  it('compiles JSX spread attributes on intrinsic elements for SSR and DOM', () => {
+  it('compiles JSX spread attributes on intrinsic elements for SSR and DOM and folds static literal attrs', () => {
     const src = `
       import { signal } from 'kay'
       export function Btn({ label, ...rest }: { label: string, [k: string]: unknown }) {
-        return <button type="button" {...rest}>{label}</button>
+        return <button type="button" tabIndex={-1} rows={4} disabled={false} hidden={true} {...rest}>{label}</button>
       }
     `
     const ssr = compileSsr('Btn.tsx', src)
@@ -40,6 +40,12 @@ describe('Milestone 4: Compiler hardening (spreads, SVG, destructured .map, kay-
     const dom = compileDom('Btn.tsx', src)
     expect(dom.code).toContain('__omit(__p, ["label"])')
     expect(dom.code).toContain('__spread(')
+    // Static literals folded straight into template HTML — zero setAttr effects!
+    expect(dom.code).toContain('tabIndex=\\"-1\\"')
+    expect(dom.code).toContain('rows=\\"4\\"')
+    expect(dom.code).toContain(' hidden')
+    expect(dom.code).not.toContain('disabled')
+    expect(dom.code).not.toContain('__setAttr')
   })
 
   it('compiles SVG child root templates with isSvg=true and handles destructured .map()', () => {
@@ -262,22 +268,21 @@ describe('Milestone 4: CSS Modules, public/ static files, and plugins in --compi
     })
 
     try {
-      // Wait for binary to bind
-      let ready = false
-      for (let i = 0; i < 120; i++) {
-        try {
-          const r = await fetch(`http://127.0.0.1:${port}/hello.txt`)
-          if (r.ok) {
-            ready = true
-            expect(await r.text()).toBe('compiled-public-ok')
-            break
-          }
-        }
-        catch {
-          await Bun.sleep(25)
-        }
+      // Wait for binary to print "listening on" on stdout (deterministic, zero polling sleep!)
+      const reader = proc.stdout.getReader()
+      const decoder = new TextDecoder()
+      let stdoutBuf = ''
+      while (!stdoutBuf.includes('listening on')) {
+        const { done, value } = await reader.read()
+        if (done)
+          throw new Error(`compiled binary exited early: ${stdoutBuf}`)
+        stdoutBuf += decoder.decode(value)
       }
-      expect(ready).toBe(true)
+      reader.releaseLock()
+
+      const helloRes = await fetch(`http://127.0.0.1:${port}/hello.txt`)
+      expect(helloRes.status).toBe(200)
+      expect(await helloRes.text()).toBe('compiled-public-ok')
 
       const enHtml = await (await fetch(`http://127.0.0.1:${port}/`)).text()
       expect(enHtml).toContain('<html lang="en">')

@@ -37,6 +37,7 @@ export interface ModuleAnalysis {
   hasPaths: boolean
   usesRenderContext: boolean
   defaultHydrate: string | undefined
+  deferredIslandTags: Set<string>
   exportedActions: string[]
   imports: ImportInfo[]
   exportedNames: string[]
@@ -83,6 +84,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   let hasPaths = false
   let usesRenderContext = false
   let defaultHydrate: string | undefined
+  const deferredIslandTags = new Set<string>()
   const exportedActions: string[] = []
   const imports: ImportInfo[] = []
   const exportedNames: string[] = []
@@ -176,6 +178,15 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
   walk(program, (node) => {
     if (node.type === 'JSXElement' || node.type === 'JSXFragment')
       hasJsx = true
+    if (node.type === 'JSXOpeningElement' && node.name?.type === 'JSXIdentifier') {
+      const tag = node.name.name as string
+      if (tag.charCodeAt(0) >= 65 && tag.charCodeAt(0) <= 90) {
+        for (const attr of node.attributes as AstNode[]) {
+          if (attr.type === 'JSXAttribute' && attr.name?.name === '$hydrate' && attr.value?.type === 'Literal' && typeof attr.value.value === 'string' && attr.value.value !== 'load')
+            deferredIslandTags.add(tag)
+        }
+      }
+    }
     if (node.type === 'JSXAttribute' && node.name?.type === 'JSXIdentifier') {
       const attrName = node.name.name as string
       if (EVENT_ATTR.test(attrName) || attrName === 'ref')
@@ -201,6 +212,7 @@ export function analyzeModule(filename: string, code: string, program: AstNode =
     hasPaths,
     usesRenderContext,
     defaultHydrate,
+    deferredIslandTags,
     exportedActions,
     imports,
     exportedNames,

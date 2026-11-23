@@ -142,11 +142,16 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
     expect(manifest.publicFiles).toContain('manifest.webmanifest')
     expect(manifest.publicFiles).toContain('favicon.svg')
 
-    // Second build hits disk cache in .kay-cache/images/ and is much faster!
+    // Plant a stale file in .kay-cache/images/ and verify second build hits cache AND prunes stale files!
+    const staleCacheFile = join(dir, '.kay-cache/images/stale-old-variant.webp')
+    writeFileSync(staleCacheFile, 'stale')
+    expect(existsSync(staleCacheFile)).toBe(true)
+
     const t1 = performance.now()
     await build({ root: dir, plugins })
     const warmMs = performance.now() - t1
     expect(warmMs).toBeLessThan(coldMs + 200)
+    expect(existsSync(staleCacheFile)).toBe(false)
 
     const app = await testApp({ root: dir, plugins, prebuilt: true })
 
@@ -233,16 +238,28 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
     expect(delivered).toEqual(['a@b.test->c@d.test:Hello'])
 
     const prevEnv = process.env.NODE_ENV
+    const prevDev = process.env.KAY_DEV
     process.env.NODE_ENV = 'production'
+    delete process.env.KAY_DEV
     try {
       const strict = mailer({ optional: false })
       await expect(strict.send({ subject: 'Fail' })).rejects.toBeInstanceOf(MailNotConfiguredError)
+
+      // Verify mailPlugin does NOT expose /_kay/mail in production by default
+      const dir = makeTemp('kay-mail-prod-')
+      mkdirSync(join(dir, 'src/routes'), { recursive: true })
+      writeFileSync(join(dir, 'src/routes/index.tsx'), `export default async function Home() { return <h1>Prod</h1> }`)
+      const prodApp = await testApp({ root: dir, plugins: [mailPlugin(strict)] })
+      expect((await prodApp.get('/_kay/mail')).status).toBe(404)
+      expect((await prodApp.get('/_kay/mail.json')).status).toBe(404)
     }
     finally {
       if (prevEnv === undefined)
         delete process.env.NODE_ENV
       else
         process.env.NODE_ENV = prevEnv
+      if (prevDev !== undefined)
+        process.env.KAY_DEV = prevDev
     }
   })
 })

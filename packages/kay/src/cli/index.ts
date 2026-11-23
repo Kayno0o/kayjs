@@ -68,6 +68,7 @@ else if (cmd === 'build') {
   console.log(`kay build done in ${ms} ms (${manifest.routes.length} routes, ${manifest.assets.length} client assets, ${manifest.actions.length} actions)`)
 }
 else if (cmd === 'start') {
+  process.env.NODE_ENV ??= 'production'
   const port = Number(flagValue('--port') || process.env.PORT || 3000)
   const app = await createServer({ root })
   const server = app.serve(port)

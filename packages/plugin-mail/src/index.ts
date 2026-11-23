@@ -93,6 +93,10 @@ export interface Mailer {
   send(message: MailMessage): Promise<SentMail>
 }
 
+// Read NODE_ENV dynamically so Bun.build does not constant-fold it to "development" in compiled binaries.
+const NODE_ENV_KEY = 'NODE_ENV'
+const runtimeNodeEnv = (): string | undefined => process.env[NODE_ENV_KEY]
+
 export function mailer(options: MailerOptions = {}): Mailer {
   const outboxKey = Symbol.for(`kay.mail.outbox.${options.id ?? 'default'}`)
   const outbox: SentMail[] = ((globalThis as Record<symbol, SentMail[] | undefined>)[outboxKey] ??= [])
@@ -131,7 +135,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       if (transport !== undefined) {
         await transport.send(record)
       }
-      else if (process.env.NODE_ENV === 'production' && !options.optional) {
+      else if (runtimeNodeEnv() === 'production' && !options.optional) {
         throw new MailNotConfiguredError()
       }
 
@@ -152,11 +156,12 @@ export interface MailPluginOptions {
 
 export function mailPlugin(instance: Mailer, options: MailPluginOptions = {}): KayPlugin {
   const route = options.previewRoute ?? '/_kay/mail'
-  const enablePreview = options.preview ?? process.env.NODE_ENV !== 'production'
 
   return {
     name: '@kayjs/mail',
     server(api) {
+      const env = runtimeNodeEnv()
+      const enablePreview = options.preview ?? (env !== 'production' && (process.env.KAY_DEV === '1' || env === 'development' || env === 'test'))
       if (!enablePreview)
         return
 

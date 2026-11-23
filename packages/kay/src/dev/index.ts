@@ -24,6 +24,7 @@ function renderErrorOverlay(errText: string): string {
 }
 
 export async function devServer(options: DevServerOptions): Promise<{ url: string, stop: () => void }> {
+  process.env.KAY_DEV = '1'
   const root = resolve(options.root)
   const srcDir = resolve(root, 'src')
   const publicDir = resolve(root, 'public')

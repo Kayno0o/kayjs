@@ -66,6 +66,18 @@ function escapeStaticAttr(str: string): string {
     .replaceAll('>', '&gt;')
 }
 
+function staticLiteral(node: AstNode): { ok: true, value: string | number | boolean | null } | { ok: false } {
+  const n = unwrapParens(node)
+  if (n.type === 'Literal') {
+    const v = n.value
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null)
+      return { ok: true, value: v }
+  }
+  if (n.type === 'UnaryExpression' && n.operator === '-' && n.argument?.type === 'Literal' && typeof n.argument.value === 'number')
+    return { ok: true, value: -n.argument.value }
+  return { ok: false }
+}
+
 function collectPatternNames(pattern: AstNode, out: Set<string>): void {
   if (!pattern)
     return
@@ -447,7 +459,16 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           html += ` ${name}="${escapeStaticAttr(String(attr.value.value))}"`
         }
         else if (attr.value.type === 'JSXExpressionContainer') {
-          const exprCode = compileExpression(attr.value.expression, scopeRewrites)
+          const expr = attr.value.expression as AstNode
+          const lit = !DOM_PROPS.has(name) && name !== 'style' ? staticLiteral(expr) : { ok: false as const }
+          if (lit.ok) {
+            if (lit.value === true)
+              html += ` ${name}`
+            else if (lit.value !== false && lit.value !== null)
+              html += ` ${name}="${escapeStaticAttr(String(lit.value))}"`
+            continue
+          }
+          const exprCode = compileExpression(expr, scopeRewrites)
           if (name === 'class')
             ops.push(`${use('effect')}(() => ${use('setClass')}(${elVar}, ${exprCode}));`)
           else if (name === 'style')

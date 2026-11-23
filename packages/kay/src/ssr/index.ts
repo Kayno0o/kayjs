@@ -123,30 +123,13 @@ export function ssrChild(value: KayChild): string {
   return esc(String(value))
 }
 
-// Per-render island tracking context (synchronous within a single SSR render pass)
-let currentIslands: Set<string> | undefined
-
-export function withRenderContext<T>(fn: () => T): { result: T, islands: Set<string> } {
-  const prev = currentIslands
-  const islands = new Set<string>()
-  currentIslands = islands
-  try {
-    return { result: fn(), islands }
-  }
-  finally {
-    currentIslands = prev
-  }
-}
-
 export function ssrIsland(
-  id: string,
+  _id: string,
   chunk: string,
   render: () => string,
   props: Record<string, unknown>,
   hydrate?: HydrateStrategy,
 ): string {
-  currentIslands?.add(chunk)
-
   const propsAttr = Object.keys(props).length > 0
     ? ` p="${escAttr(JSON.stringify(props))}"`
     : ''

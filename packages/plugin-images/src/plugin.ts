@@ -4,7 +4,7 @@
 import type { BunPlugin } from 'bun'
 import type { KayPlugin } from 'kay/server'
 import type { ImageAsset } from './helpers'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 
 export interface ImagesPluginOptions {
@@ -13,6 +13,8 @@ export interface ImagesPluginOptions {
   quality?: number | undefined
   avifQuality?: number | undefined
   cacheDir?: string | undefined
+  /** Remove stale cache files unused by the current build (default: true). */
+  pruneCache?: boolean | undefined
 }
 
 const DEFAULT_WIDTHS = [320, 640, 960, 1280, 1920]
@@ -57,14 +59,18 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
   const quality = options.quality ?? 80
   const avifQuality = options.avifQuality ?? 55
   const cacheDirRel = options.cacheDir ?? '.kay-cache/images'
+  const pruneCache = options.pruneCache ?? true
   const magickAvailable = hasMagick()
 
   const emittedAssets = new Map<string, Uint8Array>()
+  const activeCacheFiles = new Set<string>()
+  let lastCacheRoot: string | undefined
 
   return {
     name: '@kayjs/images',
     bunPlugins: ({ root, assetPrefix }): BunPlugin[] => {
       const cacheRoot = resolve(root, cacheDirRel)
+      lastCacheRoot = cacheRoot
       const prefix = assetPrefix.replace(/\/$/, '')
 
       return [{
@@ -86,7 +92,9 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
             }
 
             mkdirSync(cacheRoot, { recursive: true })
-            const metaPath = join(cacheRoot, `${stem}-${hash}.json`)
+            const metaName = `${stem}-${hash}.json`
+            const metaPath = join(cacheRoot, metaName)
+            activeCacheFiles.add(metaName)
             let meta: CachedImageMeta | undefined
 
             if (existsSync(metaPath)) {
@@ -132,7 +140,9 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
             let fallbackSrc = ''
 
             for (const f of meta.files) {
-              const cachedFile = join(cacheRoot, basename(f.rel))
+              const cacheFileName = basename(f.rel)
+              activeCacheFiles.add(cacheFileName)
+              const cachedFile = join(cacheRoot, cacheFileName)
               if (!emittedAssets.has(f.rel))
                 emittedAssets.set(f.rel, new Uint8Array(readFileSync(cachedFile)))
               const url = `${prefix}/${f.rel}`
@@ -163,7 +173,14 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
     build(ctx) {
       for (const [rel, bytes] of emittedAssets)
         ctx.emitAsset(rel, bytes)
+      if (pruneCache && lastCacheRoot !== undefined && activeCacheFiles.size > 0 && existsSync(lastCacheRoot)) {
+        for (const entry of readdirSync(lastCacheRoot)) {
+          if (!activeCacheFiles.has(entry))
+            rmSync(join(lastCacheRoot, entry), { force: true })
+        }
+      }
       emittedAssets.clear()
+      activeCacheFiles.clear()
     },
   }
 }

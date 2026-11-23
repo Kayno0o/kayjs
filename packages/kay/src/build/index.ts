@@ -11,6 +11,7 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
 import { loadConfig } from '../plugins/index'
 import { actionHash } from '../server/action'
+import { compileExecutable } from './compile'
 
 export interface BuildOptions {
   root: string
@@ -42,6 +43,7 @@ export interface RouteManifestEntry {
   islandChunk?: string | undefined
   islandHydrate?: string | undefined
   islandChunks: string[]
+  eagerIslandChunks?: string[] | undefined
   usesRenderContext?: boolean | undefined
   prerender?: boolean | undefined
   prerendered?: Record<string, string> | undefined
@@ -516,36 +518,49 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
 
   const nonEmptyAssets = assetFiles.filter((rel) => {
     const abs = join(clientDir, rel)
-    return existsSync(abs) && readFileSync(abs).length > 0
+    if (!existsSync(abs))
+      return false
+    if (readFileSync(abs).length === 0) {
+      rmSync(abs, { force: true })
+      return false
+    }
+    return true
   })
 
-  function collectRouteIslands(file: string, seen = new Set<string>(), out = new Set<string>()): Set<string> {
+  function collectRouteIslands(file: string, seen = new Set<string>(), all = new Set<string>(), eager = new Set<string>()): void {
     if (seen.has(file))
-      return out
+      return
     seen.add(file)
     const analysis = analyses.get(file)
     if (analysis === undefined)
-      return out
+      return
     if (analysis.isInteractive) {
       const chunk = islandChunks.get(`${file}#default`)
-      if (chunk !== undefined)
-        out.add(chunk)
-      return out
+      if (chunk !== undefined) {
+        all.add(chunk)
+        if (analysis.defaultHydrate === undefined || analysis.defaultHydrate === 'load')
+          eager.add(chunk)
+      }
+      return
     }
     const bindings = pageIslandBindings.get(file)
     if (bindings !== undefined) {
-      for (const target of bindings.values()) {
+      for (const [localName, target] of bindings) {
         const chunk = islandChunks.get(`${target.file}#${target.exportName}`)
-        if (chunk !== undefined)
-          out.add(chunk)
+        if (chunk !== undefined) {
+          all.add(chunk)
+          const isDeferred = analysis.deferredIslandTags.has(localName)
+            || (target.defaultHydrate !== undefined && target.defaultHydrate !== 'load')
+          if (!isDeferred)
+            eager.add(chunk)
+        }
       }
     }
     for (const imp of analysis.imports) {
       const target = resolveImportPath(file, imp.source)
       if (target !== undefined && target.endsWith('.tsx'))
-        collectRouteIslands(target, seen, out)
+        collectRouteIslands(target, seen, all, eager)
     }
-    return out
   }
 
   function collectUsesRenderContext(file: string, seen = new Set<string>()): boolean {
@@ -570,9 +585,10 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     const layoutSrcs = ancestorFiles(routesDir, file, ['_layout.tsx'])
     const middlewareSrcs = ancestorFiles(routesDir, file, ['_middleware.ts', '_middleware.tsx'])
     const chunks = new Set<string>()
+    const eagerChunks = new Set<string>()
     for (const lf of layoutSrcs)
-      collectRouteIslands(lf, new Set(), chunks)
-    collectRouteIslands(file, new Set(), chunks)
+      collectRouteIslands(lf, new Set(), chunks, eagerChunks)
+    collectRouteIslands(file, new Set(), chunks, eagerChunks)
 
     let usesRenderContext = collectUsesRenderContext(file)
     if (!usesRenderContext) {
@@ -595,6 +611,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       islandChunk: islandChunks.get(islandKey),
       islandHydrate: analysis?.defaultHydrate,
       islandChunks: [...chunks],
+      eagerIslandChunks: [...eagerChunks],
       usesRenderContext,
       prerender: analysis?.hasPrerender || options.static === true,
     }
@@ -749,120 +766,17 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   // Step 4: Single-Executable Compile (`kay build --compile [outfile]`)
   if (options.compile) {
     const outfile = typeof options.compile === 'string' ? resolve(root, options.compile) : join(outDir, 'server-bin')
-    await compileExecutable(root, outDir, clientDir, manifest, assetPrefix, outfile)
+    await compileExecutable({
+      root,
+      outDir,
+      clientDir,
+      manifest,
+      assetPrefix,
+      outfile,
+      kaySrcRoot: KAY_SRC_ROOT,
+      resolveKaySpecifier,
+    })
   }
 
   return manifest
-}
-
-async function compileExecutable(
-  root: string,
-  outDir: string,
-  clientDir: string,
-  manifest: BuildManifest,
-  assetPrefix: string,
-  outfile: string,
-): Promise<void> {
-  const entryPath = join(outDir, '__compile_entry.ts')
-  const imports: string[] = []
-  const modEntries: string[] = []
-  const seenFiles = new Set<string>()
-  let idx = 0
-
-  const addMod = (rel: string) => {
-    if (seenFiles.has(rel))
-      return
-    seenFiles.add(rel)
-    const v = `_m${idx++}`
-    imports.push(`import * as ${v} from ${JSON.stringify(join(outDir, rel))};`)
-    modEntries.push(`${JSON.stringify(rel)}: ${v}`)
-  }
-
-  for (const r of manifest.routes) {
-    addMod(r.file)
-    for (const l of r.layouts) addMod(l)
-    for (const m of r.middlewares) addMod(m)
-  }
-  if (manifest.errorFile) addMod(manifest.errorFile)
-  if (manifest.notFoundFile) addMod(manifest.notFoundFile)
-  for (const a of manifest.actions) addMod(a.file)
-
-  const configPath = join(root, 'kay.config.ts')
-  const hasConfig = existsSync(configPath)
-  if (hasConfig)
-    imports.push(`import _kayConfig from ${JSON.stringify(configPath)};`)
-
-  // Embed client assets and public files natively via `with { type: "file" }` (0 base64, 0 startup decode!)
-  const embeddedAssets: string[] = []
-  let assetIdx = 0
-  for (const rel of manifest.assets) {
-    const v = `_a${assetIdx++}`
-    imports.push(`import ${v} from ${JSON.stringify(join(clientDir, rel))} with { type: "file" };`)
-    embeddedAssets.push(`${JSON.stringify(rel)}: ${v}`)
-  }
-  const embeddedPublic: string[] = []
-  const embeddedPublicEtags: string[] = []
-  let pubIdx = 0
-  for (const rel of manifest.publicFiles) {
-    const abs = join(outDir, 'public', rel)
-    const v = `_p${pubIdx++}`
-    const etag = `W/"${Bun.hash(readFileSync(abs)).toString(36)}"`
-    imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
-    embeddedPublic.push(`${JSON.stringify(rel)}: ${v}`)
-    embeddedPublicEtags.push(`${JSON.stringify(rel)}: ${JSON.stringify(etag)}`)
-  }
-  const embeddedPrerendered: string[] = []
-  for (const r of manifest.routes) {
-    if (r.prerendered) {
-      for (const [, relHtml] of Object.entries(r.prerendered)) {
-        const html = readFileSync(join(outDir, relHtml), 'utf8')
-        embeddedPrerendered.push(`${JSON.stringify(relHtml)}: ${JSON.stringify(html)}`)
-      }
-    }
-  }
-
-  const cfgSpread = hasConfig
-    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins`
-    : ''
-
-  const code = [
-    `import { createServerFromEmbedded } from ${JSON.stringify(join(KAY_SRC_ROOT, 'server/index.ts'))};`,
-    ...imports,
-    `const manifest = ${JSON.stringify(manifest)};`,
-    `const modules = { ${modEntries.join(', ')} };`,
-    `const assets = { ${embeddedAssets.join(', ')} };`,
-    `const publicAssets = { ${embeddedPublic.join(', ')} };`,
-    `const publicEtags = { ${embeddedPublicEtags.join(', ')} };`,
-    `const prerendered = { ${embeddedPrerendered.join(', ')} };`,
-    `const app = await createServerFromEmbedded({ manifest, modules, assets, publicAssets, publicEtags, prerendered, assetPrefix: ${JSON.stringify(assetPrefix)}${cfgSpread} });`,
-    `const port = Number(process.env.PORT ?? 3000);`,
-    `const server = app.serve(port);`,
-    `console.log(\`kay server listening on http://localhost:\${server.port}\`);`,
-  ].join('\n')
-
-  writeFileSync(entryPath, code)
-  try {
-    const kayResolvePlugin: BunPlugin = {
-      name: 'kay-v2-compile-resolve',
-      setup(b) {
-        b.onResolve({ filter: /^(?:@kayjs\/)?kay(?:\/.*)?$/ }, (args) => {
-          const resolved = resolveKaySpecifier(args.path)
-          return resolved !== undefined ? { path: resolved } : undefined
-        })
-      },
-    }
-    const res = await Bun.build({
-      entrypoints: [entryPath],
-      compile: { outfile },
-      minify: true,
-      plugins: [kayResolvePlugin],
-    })
-    if (!res.success) {
-      const msgs = res.logs.map(l => l.message).join('\n')
-      throw new Error(`kay build --compile failed:\n${msgs}`)
-    }
-  }
-  finally {
-    rmSync(entryPath, { force: true })
-  }
 }

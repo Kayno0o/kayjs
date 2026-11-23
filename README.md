@@ -63,18 +63,28 @@ export const createPost = action(
 ```
 
 ### Modular Plugins (`kay.config.ts`)
-Core stays tiny (~5.5k LOC). Everything optional plugs in cleanly:
+Core stays tiny (~6.5k LOC). Everything optional plugs in cleanly via `KayPlugin`:
 
 ```ts
 import { i18n } from '@kayjs/i18n'
+import { icons } from '@kayjs/icons'
+import { images } from '@kayjs/images'
+import { mailPlugin } from '@kayjs/mail'
+import { seo } from '@kayjs/seo'
 import { spa } from '@kayjs/spa'
 import { tailwind } from '@kayjs/tailwind'
+import tailwindPlugin from 'bun-plugin-tailwind'
 import { defineConfig } from 'kay/server'
+import { mail } from './src/mail'
 
 export default defineConfig({
   plugins: [
-    tailwind({ css: 'src/app.css' }),
+    tailwind({ css: 'src/app.css', bunPlugin: tailwindPlugin }),
+    icons(),
+    images({ widths: [320, 640, 960, 1280], formats: ['avif', 'webp'] }),
+    seo({ site: 'https://example.com', titleTemplate: '%s | My Site' }),
     i18n({ locales: ['en', 'fr'], defaultLocale: 'en' }),
+    mailPlugin(mail),
     spa(),
   ],
 })
