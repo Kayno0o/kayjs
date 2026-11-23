@@ -38,8 +38,18 @@
 
     &:hover:not(:disabled) { border-color: var(--ui-accent); color: var(--ui-accent); }
     &:disabled { opacity: 0.4; cursor: not-allowed; }
-    &[data-tone="accent"] { background: var(--ui-accent); border-color: var(--ui-accent); color: #051018; }
-    &[data-tone="danger"] { background: color-mix(in srgb, var(--ui-danger) 18%, transparent); border-color: var(--ui-danger); color: var(--ui-danger); }
+    &[data-tone="accent"] {
+      background: var(--ui-accent);
+      border-color: var(--ui-accent);
+      color: #051018;
+      &:hover:not(:disabled) { background: var(--ui-accent); border-color: var(--ui-accent); color: #051018; filter: brightness(1.08); }
+    }
+    &[data-tone="danger"] {
+      background: color-mix(in srgb, var(--ui-danger) 18%, transparent);
+      border-color: var(--ui-danger);
+      color: var(--ui-danger);
+      &:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-danger) 28%, transparent); border-color: var(--ui-danger); color: var(--ui-danger); }
+    }
     &[data-variant="ghost"] { background: transparent; border-color: transparent; }
     &[data-size="sm"] { font-size: 0.72rem; padding: 0.3rem 0.55rem; }
     &[data-size="lg"] { font-size: 0.85rem; padding: 0.6rem 1rem; }

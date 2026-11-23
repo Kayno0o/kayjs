@@ -141,12 +141,13 @@
       border-color: var(--ui-accent-fill);
       color: #090c13;
       font-weight: 600;
-      &:hover:not(:disabled) { filter: brightness(1.06); }
+      &:hover:not(:disabled) { background: var(--ui-accent-fill); border-color: var(--ui-accent-fill); color: #090c13; filter: brightness(1.06); }
     }
     &[data-tone="danger"] {
       background: color-mix(in srgb, var(--ui-danger) 15%, var(--ui-surface));
       border-color: color-mix(in srgb, var(--ui-danger) 55%, transparent);
       color: var(--ui-danger);
+      &:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-danger) 24%, var(--ui-surface)); border-color: var(--ui-danger); color: var(--ui-danger); }
     }
     &[data-variant="ghost"] {
       background: transparent;

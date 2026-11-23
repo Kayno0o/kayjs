@@ -39,8 +39,16 @@
     &:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-ink) 12%, var(--ui-surface-2)); }
     &:active:not(:disabled) { transform: scale(0.98); }
     &:disabled { opacity: 0.45; cursor: not-allowed; }
-    &[data-tone="accent"] { background: var(--ui-accent); color: #fff; }
-    &[data-tone="danger"] { background: var(--ui-danger); color: #fff; }
+    &[data-tone="accent"] {
+      background: var(--ui-accent);
+      color: #fff;
+      &:hover:not(:disabled) { background: var(--ui-accent); color: #fff; filter: brightness(1.06); }
+    }
+    &[data-tone="danger"] {
+      background: var(--ui-danger);
+      color: #fff;
+      &:hover:not(:disabled) { background: var(--ui-danger); color: #fff; filter: brightness(1.06); }
+    }
     &[data-variant="outline"] { background: transparent; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ui-ink) 18%, transparent); }
     &[data-variant="ghost"] { background: transparent; }
     &[data-size="sm"] { font-size: 0.8rem; padding: 0.45rem 0.9rem; }
