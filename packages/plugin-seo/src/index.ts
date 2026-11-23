@@ -39,6 +39,7 @@ export interface SeoPluginOptions {
   locale?: string | undefined
   jsonLd?: Record<string, unknown>[] | undefined
   sitemap?: boolean | undefined
+  sitemapExclude?: string[] | undefined
   redirects?: Record<string, RedirectTarget> | undefined
   favicon?: string | undefined
   manifest?: ManifestOptions | undefined
@@ -168,13 +169,16 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
 
       // 5. Sitemap XML
       if (site && options.sitemap !== false) {
+        const excluded = new Set(options.sitemapExclude ?? [])
         const urls = new Set<string>()
         for (const r of ctx.routes) {
           if (r.prerendered) {
-            for (const u of Object.keys(r.prerendered))
-              urls.add(u)
+            for (const u of Object.keys(r.prerendered)) {
+              if (!excluded.has(u))
+                urls.add(u)
+            }
           }
-          else if (!r.path.includes(':') && !r.path.includes('*') && !r.path.startsWith('/api/')) {
+          else if (!r.path.includes(':') && !r.path.includes('*') && !r.path.startsWith('/api/') && !excluded.has(r.path)) {
             urls.add(r.path)
           }
         }

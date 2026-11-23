@@ -19,13 +19,14 @@ class KayIsland extends HTMLElement {
     const h = this.getAttribute('h')
     if (typeof KAY_DEFERRED === 'undefined' || KAY_DEFERRED) {
       if (h === 'visible') {
+        const target = this.firstElementChild ?? this
         const io = new IntersectionObserver((entries) => {
           if (entries.some(e => e.isIntersecting)) {
             io.disconnect()
             void this._l(false)
           }
         }, { rootMargin: '200px' })
-        io.observe(this)
+        io.observe(target)
         return
       }
       if (h === 'idle') {

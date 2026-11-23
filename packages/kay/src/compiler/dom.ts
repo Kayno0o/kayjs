@@ -51,6 +51,13 @@ function isComponentTag(tag: string): boolean {
   return (first >= 65 && first <= 90) || tag.includes('.')
 }
 
+function unwrapParens(node: AstNode): AstNode {
+  let cur = node
+  while (cur.type === 'ParenthesizedExpression')
+    cur = cur.expression as AstNode
+  return cur
+}
+
 function escapeStaticAttr(str: string): string {
   return str
     .replaceAll('&', '&amp;')
@@ -461,6 +468,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
       for (let i = 0; i < meaningful.length; i++) {
         const child = meaningful[i]!
+        const isLast = i === meaningful.length - 1
 
         if (child.type === 'JSXText') {
           html += cleanJsxText(child.value as string)
@@ -471,8 +479,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         if (child.type === 'JSXElement') {
           const childTag = jsxTagName(child.openingElement.name)
           if (isComponentTag(childTag)) {
-            const anchorVar = meaningful.length === 1 ? 'null' : requestChild(elVar, domIndex)
-            if (meaningful.length > 1) {
+            const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
+            if (!isLast) {
               html += '<!---->'
               domIndex++
             }
@@ -502,8 +510,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         }
 
         if (child.type === 'JSXFragment') {
-          const anchorVar = meaningful.length === 1 ? 'null' : requestChild(elVar, domIndex)
-          if (meaningful.length > 1) {
+          const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
+          if (!isLast) {
             html += '<!---->'
             domIndex++
           }
@@ -529,8 +537,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               (cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression')
               && (cbBody?.type === 'JSXElement' || cbBody?.type === 'JSXFragment')
             ) {
-              const anchorVar = meaningful.length === 1 ? 'null' : requestChild(elVar, domIndex)
-              if (meaningful.length > 1) {
+              const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
+              if (!isLast) {
                 html += '<!---->'
                 domIndex++
               }
@@ -582,37 +590,41 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           }
 
           // Case 2: `cond && <jsx>` → `__show(...)`
-          if (expr.type === 'LogicalExpression' && expr.operator === '&&' && (expr.right.type === 'JSXElement' || expr.right.type === 'JSXFragment')) {
-            const anchorVar = meaningful.length === 1 ? 'null' : requestChild(elVar, domIndex)
-            if (meaningful.length > 1) {
-              html += '<!---->'
-              domIndex++
+          if (expr.type === 'LogicalExpression' && expr.operator === '&&') {
+            const right = unwrapParens(expr.right)
+            if (right.type === 'JSXElement' || right.type === 'JSXFragment') {
+              const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
+              if (!isLast) {
+                html += '<!---->'
+                domIndex++
+              }
+              const whenCode = compileExpression(expr.left, scopeRewrites)
+              const trueCode = compileRootJsx(right, scopeRewrites)
+              ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode});`)
+              continue
             }
-            const whenCode = compileExpression(expr.left, scopeRewrites)
-            const trueCode = compileRootJsx(expr.right, scopeRewrites)
-            ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode});`)
-            continue
           }
 
           // Case 3: `cond ? <a/> : <b/>` → `__show(...)`
-          if (
-            expr.type === 'ConditionalExpression'
-            && (expr.consequent.type === 'JSXElement' || expr.consequent.type === 'JSXFragment' || expr.alternate.type === 'JSXElement' || expr.alternate.type === 'JSXFragment')
-          ) {
-            const anchorVar = meaningful.length === 1 ? 'null' : requestChild(elVar, domIndex)
-            if (meaningful.length > 1) {
-              html += '<!---->'
-              domIndex++
+          if (expr.type === 'ConditionalExpression') {
+            const consNode = unwrapParens(expr.consequent)
+            const altNode = unwrapParens(expr.alternate)
+            if (consNode.type === 'JSXElement' || consNode.type === 'JSXFragment' || altNode.type === 'JSXElement' || altNode.type === 'JSXFragment') {
+              const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
+              if (!isLast) {
+                html += '<!---->'
+                domIndex++
+              }
+              const whenCode = compileExpression(expr.test, scopeRewrites)
+              const trueCode = consNode.type === 'JSXElement' || consNode.type === 'JSXFragment'
+                ? compileRootJsx(consNode, scopeRewrites)
+                : compileExpression(consNode, scopeRewrites)
+              const falseCode = altNode.type === 'JSXElement' || altNode.type === 'JSXFragment'
+                ? compileRootJsx(altNode, scopeRewrites)
+                : compileExpression(altNode, scopeRewrites)
+              ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode}, () => ${falseCode});`)
+              continue
             }
-            const whenCode = compileExpression(expr.test, scopeRewrites)
-            const trueCode = expr.consequent.type === 'JSXElement' || expr.consequent.type === 'JSXFragment'
-              ? compileRootJsx(expr.consequent, scopeRewrites)
-              : compileExpression(expr.consequent, scopeRewrites)
-            const falseCode = expr.alternate.type === 'JSXElement' || expr.alternate.type === 'JSXFragment'
-              ? compileRootJsx(expr.alternate, scopeRewrites)
-              : compileExpression(expr.alternate, scopeRewrites)
-            ops.push(`${use('show')}(${elVar}, ${anchorVar}, () => ${whenCode}, () => ${trueCode}, () => ${falseCode});`)
-            continue
           }
 
           // Case 4: Dynamic children slot / Node insertion (`{children}` / `{props.children}`)
@@ -620,8 +632,8 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
             || (expr.type === 'MemberExpression' && !expr.computed && expr.property?.name === 'children')
           const exprCode = compileExpression(expr, scopeRewrites)
           if (isChildrenExpr) {
-            const anchorVar = meaningful.length === 1 ? 'null' : requestChild(elVar, domIndex)
-            if (meaningful.length > 1) {
+            const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
+            if (!isLast) {
               html += '<!---->'
               domIndex++
             }

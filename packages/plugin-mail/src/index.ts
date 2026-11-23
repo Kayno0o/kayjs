@@ -77,6 +77,8 @@ export function resend(options: { apiKey?: string | undefined, endpoint?: string
 }
 
 export interface MailerOptions {
+  /** Optional name to share outbox across bundled server chunks (default: 'default'). */
+  id?: string | undefined
   from?: MailAddress | undefined
   to?: MailAddress | MailAddress[] | undefined
   transport?: MailTransport | undefined
@@ -92,7 +94,8 @@ export interface Mailer {
 }
 
 export function mailer(options: MailerOptions = {}): Mailer {
-  const outbox: SentMail[] = []
+  const outboxKey = Symbol.for(`kay.mail.outbox.${options.id ?? 'default'}`)
+  const outbox: SentMail[] = ((globalThis as Record<symbol, SentMail[] | undefined>)[outboxKey] ??= [])
 
   const getTransport = (): MailTransport | undefined => {
     if (options.transport !== undefined)

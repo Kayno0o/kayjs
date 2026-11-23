@@ -169,10 +169,13 @@ const delegated = new Set<string>()
 function dispatchEvent(event: Event): void {
   const key = `$$${event.type}`
   let node = event.target as (Node & Record<string, ((e: Event) => void) | undefined>) | null
+  let current: Node | null = null
+  Object.defineProperty(event, 'currentTarget', { configurable: true, get: () => current })
 
   while (node !== null) {
     const handler = node[key]
     if (handler !== undefined) {
+      current = node
       batch(() => handler(event))
       if (event.cancelBubble)
         return
@@ -301,7 +304,29 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
   let textNode: Text | undefined
 
   effect(() => {
-    const next = value()
+    let next: unknown
+    if (hydrating) {
+      let claimed: Node | null = marker !== null ? marker : parent.lastChild
+      if (marker !== null && marker.nodeType !== 8) {
+        const anchor = document.createComment('')
+        parent.insertBefore(anchor, marker.nextSibling)
+        marker = anchor
+      }
+      else if (marker !== null) {
+        claimed = null
+      }
+      const prevNode = hydrateNode
+      hydrateNode = claimed
+      try {
+        next = value()
+      }
+      finally {
+        hydrateNode = prevNode
+      }
+    }
+    else {
+      next = value()
+    }
 
     if (next == null || typeof next === 'boolean') {
       clearInserted(current)
@@ -425,7 +450,29 @@ export function show(
       return
 
     owner = createOwner(parentOwner)
-    const rendered = untrack(() => runWithOwner(owner, fn))
+    let rendered: Node | null
+    if (hydrating) {
+      let claimed: Node | null = marker !== null ? marker : parent.lastChild
+      if (marker !== null && marker.nodeType !== 8) {
+        const anchor = document.createComment('')
+        parent.insertBefore(anchor, marker.nextSibling)
+        marker = anchor
+      }
+      else if (marker !== null) {
+        claimed = null
+      }
+      const prevNode = hydrateNode
+      hydrateNode = claimed
+      try {
+        rendered = untrack(() => runWithOwner(owner, fn))
+      }
+      finally {
+        hydrateNode = prevNode
+      }
+    }
+    else {
+      rendered = untrack(() => runWithOwner(owner, fn))
+    }
     if (rendered === null)
       return
 
@@ -435,7 +482,8 @@ export function show(
     }
     else {
       nodes = [rendered]
-      parent.insertBefore(rendered, marker)
+      if (rendered.parentNode !== parent)
+        parent.insertBefore(rendered, marker)
     }
   })
 }

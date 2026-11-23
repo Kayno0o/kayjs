@@ -60,6 +60,22 @@ export interface KayApp {
   serve: (port?: number) => ReturnType<typeof Bun.serve>
 }
 
+const ISLAND_TAG_RE = /<kay-island c="([^"]+)"([^>]*)>/g
+
+function extractRenderedIslands(html: string): { hasIslands: boolean, eagerChunks: string[] } {
+  let hasIslands = false
+  const eager = new Set<string>()
+  ISLAND_TAG_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = ISLAND_TAG_RE.exec(html)) !== null) {
+    hasIslands = true
+    const attrs = m[2] ?? ''
+    if (!attrs.includes(' h="'))
+      eager.add(m[1]!)
+  }
+  return { hasIslands, eagerChunks: [...eager] }
+}
+
 const MIME: Record<string, string> = {
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
@@ -100,7 +116,7 @@ interface LoadedPageModule {
 }
 
 interface LoadedLayoutModule {
-  default: (props: { children: Html }) => Html | string | Promise<Html | string>
+  default: (props: { children: Html, url?: URL, params?: Record<string, string>, locals?: Record<string, unknown> }) => Html | string | Promise<Html | string>
 }
 
 interface LoadedMiddlewareModule {
@@ -281,11 +297,12 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       const singleLayout = layouts.length === 1 ? layouts[0]! : undefined
 
       fastHandler = (request: Request): Response | Promise<Response> => {
+        const reqUrl = new URL(request.url)
         const wrapLayouts = (inner: string): Response | Promise<Response> => {
           if (layouts.length === 0)
             return new Response(docPrefix + inner + docSuffix, { status: 200, headers })
           if (singleLayout !== undefined) {
-            const w = singleLayout.default({ children: raw(inner) })
+            const w = singleLayout.default({ children: raw(inner), url: reqUrl, params: {}, locals: {} })
             if (w instanceof Promise)
               return w.then(x => new Response(docPrefix + ssrChild(x as Html) + docSuffix, { status: 200, headers }))
             return new Response(docPrefix + ssrChild(w as Html) + docSuffix, { status: 200, headers })
@@ -293,7 +310,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           return (async () => {
             let cur = inner
             for (let i = layouts.length - 1; i >= 0; i--)
-              cur = ssrChild(await layouts[i]!.default({ children: raw(cur) }) as Html)
+              cur = ssrChild(await layouts[i]!.default({ children: raw(cur), url: reqUrl, params: {}, locals: {} }) as Html)
             return new Response(docPrefix + cur + docSuffix, { status: 200, headers })
           })()
         }
@@ -367,13 +384,15 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         inner = ssrChild(await mod.default!(pageProps) as Html)
       }
       for (let i = layouts.length - 1; i >= 0; i--)
-        inner = ssrChild(await layouts[i]!.default({ children: raw(inner) }) as Html)
+        inner = ssrChild(await layouts[i]!.default({ children: raw(inner), url: ctx.url, params: ctx.params, locals: ctx.locals }) as Html)
       return inner
     }
 
     const body = await runWithRenderContext(rctx, renderBody)
     const collectedHead = renderCollectedHead(rctx)
-    const hasIslands = entry.islandChunks.length > 0
+    const renderedIslands = extractRenderedIslands(body)
+    const hasIslands = renderedIslands.hasIslands || rctx.pending.length > 0 && entry.islandChunks.length > 0
+    const preloadChunks = rctx.pending.length > 0 ? entry.islandChunks : renderedIslands.eagerChunks
 
     // Streaming SSR path when <Suspense> boundaries are pending!
     if (rctx.pending.length > 0) {
@@ -384,7 +403,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         lang,
         runtimeScript: manifest.runtimeScript,
         alwaysLoadRuntime,
-        preloadChunks: entry.islandChunks,
+        preloadChunks,
         styles: manifest.styles,
         hasIslands,
       })
@@ -414,19 +433,17 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       return new Response(stream, { status: 200, headers })
     }
 
-    let html = collectedHead !== ''
-      ? renderDocument({
-          body,
-          head: collectedHead,
-          headTags: manifest.headTags,
-          lang,
-          runtimeScript: manifest.runtimeScript,
-          alwaysLoadRuntime,
-          preloadChunks: entry.islandChunks,
-          styles: manifest.styles,
-          hasIslands,
-        })
-      : route.docPrefix + body + route.docSuffix
+    let html = renderDocument({
+      body,
+      head: collectedHead,
+      headTags: manifest.headTags,
+      lang,
+      runtimeScript: manifest.runtimeScript,
+      alwaysLoadRuntime,
+      preloadChunks,
+      styles: manifest.styles,
+      hasIslands,
+    })
 
     for (let i = 0; i < htmlTransformers.length; i++)
       html = await htmlTransformers[i]!(html, ctx)
@@ -438,19 +455,35 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     return new Response(html, { status: 200, headers })
   }
 
-  async function renderError(error: unknown, cookieStore: CookieStore): Promise<Response> {
+  const rootLayoutFile = manifest.routes.find(r => r.layouts.length > 0)?.layouts[0]
+  const rootLayoutMod = rootLayoutFile !== undefined ? modules[rootLayoutFile] as LoadedLayoutModule | undefined : undefined
+
+  async function renderError(error: unknown, cookieStore: CookieStore, url?: URL): Promise<Response> {
     if (errorMod !== undefined) {
-      const body = ssrChild(await errorMod.default({ error }) as Html)
-      const html = renderDocument({ body, lang })
+      const rctx = createRenderContext()
+      const body = await runWithRenderContext(rctx, async () => {
+        let inner = ssrChild(await errorMod.default({ error }) as Html)
+        if (rootLayoutMod !== undefined)
+          inner = ssrChild(await rootLayoutMod.default({ children: raw(inner), url: url ?? new URL('http://localhost/500'), params: {}, locals: {} }) as Html)
+        return inner
+      })
+      const html = renderDocument({ body, head: renderCollectedHead(rctx), headTags: manifest.headTags, styles: manifest.styles, runtimeScript: manifest.runtimeScript, alwaysLoadRuntime, lang })
       return finalizeResponse(new Response(html, { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } }), cookieStore, security)
     }
     return finalizeResponse(new Response('Internal Server Error', { status: 500 }), cookieStore, security)
   }
 
-  async function renderNotFound(cookieStore: CookieStore): Promise<Response> {
-    if (notFoundMod?.default !== undefined) {
-      const body = ssrChild(await notFoundMod.default({}) as Html)
-      const html = renderDocument({ body, lang })
+  async function renderNotFound(cookieStore: CookieStore, url?: URL): Promise<Response> {
+    const notFoundFn = notFoundMod?.default
+    if (notFoundFn !== undefined) {
+      const rctx = createRenderContext()
+      const body = await runWithRenderContext(rctx, async () => {
+        let inner = ssrChild(await notFoundFn({}) as Html)
+        if (rootLayoutMod !== undefined)
+          inner = ssrChild(await rootLayoutMod.default({ children: raw(inner), url: url ?? new URL('http://localhost/404'), params: {}, locals: {} }) as Html)
+        return inner
+      })
+      const html = renderDocument({ body, head: renderCollectedHead(rctx), headTags: manifest.headTags, styles: manifest.styles, runtimeScript: manifest.runtimeScript, alwaysLoadRuntime, lang })
       return finalizeResponse(new Response(html, { status: 404, headers: { 'content-type': 'text/html; charset=utf-8' } }), cookieStore, security)
     }
     return finalizeResponse(new Response('Not Found', { status: 404 }), cookieStore, security)
@@ -549,7 +582,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
     const matched = router.match(effectivePath)
     if (matched === undefined)
-      return renderNotFound(cookieStore)
+      return renderNotFound(cookieStore, ctx.url)
 
     ctx.params = matched.params
     const route = matched.data
@@ -571,7 +604,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       return finalizeResponse(res, cookieStore, security)
     }
     catch (error) {
-      return renderError(error, cookieStore)
+      return renderError(error, cookieStore, ctx.url)
     }
   }
 
@@ -652,9 +685,10 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
       publicAssets[rel] = new Uint8Array(readFileSync(abs))
   }
 
+  const loadStamp = Date.now()
   const loadMod = async (rel: string) => {
     if (!(rel in modules))
-      modules[rel] = await import(join(outDir, rel))
+      modules[rel] = await import(`${join(outDir, rel)}?v=${loadStamp}`)
   }
 
   for (const r of manifest.routes) {

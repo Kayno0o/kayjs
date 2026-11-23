@@ -1,5 +1,8 @@
 node_modules/
 dist/
 .kay/
+.kay-cache/
+.kay-dev/
+bench-sites/
 *.tsbuildinfo
 .DS_Store

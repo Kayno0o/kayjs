@@ -106,6 +106,13 @@ function isComponentTag(tag: string): boolean {
   return (first >= 65 && first <= 90) || tag.includes('.')
 }
 
+function unwrapParens(node: AstNode): AstNode {
+  let cur = node
+  while (cur.type === 'ParenthesizedExpression')
+    cur = cur.expression as AstNode
+  return cur
+}
+
 function isSimpleLiteral(node: AstNode): { ok: true, value: string | number | boolean | null } | { ok: false } {
   if (node.type === 'Literal') {
     const v = node.value
@@ -264,6 +271,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
     for (let i = 0; i < meaningful.length; i++) {
       const child = meaningful[i]!
+      const isLast = i === meaningful.length - 1
       if (child.type === 'JSXText') {
         parts.pushStatic(cleanJsxText(child.value as string))
       }
@@ -309,18 +317,20 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
                 pushStmt(
                   `const ${arrVar} = ${target}; if (${arrVar}) for (let ${idxVar} = 0; ${idxVar} < ${arrVar}.length; ${idxVar}++) { const ${itemParam} = ${arrVar}[${idxVar}]; ${innerStmts.join(' ')} }`,
                 )
+                if (isIsland && !isLast)
+                  parts.pushStatic('<!---->')
                 continue
               }
             }
           }
         }
 
-        parts.pushExpr(compileExpressionAsString(expr, hasSiblings))
+        parts.pushExpr(compileExpressionAsString(expr, hasSiblings, isLast))
       }
     }
   }
 
-  function compileExpressionAsString(expr: AstNode, hasSiblings: boolean): string {
+  function compileExpressionAsString(expr: AstNode, hasSiblings: boolean, isLast = true): string {
     if (expr.type === 'JSXElement' || expr.type === 'JSXFragment')
       return compileJsxToStringExpr(expr)
 
@@ -342,19 +352,25 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       }
     }
 
-    if (expr.type === 'LogicalExpression' && expr.operator === '&&' && (expr.right.type === 'JSXElement' || expr.right.type === 'JSXFragment')) {
-      const left = compileSubExpression(expr.left)
-      return `(${left}) ? (${compileJsxToStringExpr(expr.right)}) : ""`
+    if (expr.type === 'LogicalExpression' && expr.operator === '&&') {
+      const right = unwrapParens(expr.right)
+      if (right.type === 'JSXElement' || right.type === 'JSXFragment') {
+        const left = compileSubExpression(expr.left)
+        const emptyVal = isIsland && !isLast ? '"<!---->"' : '""'
+        return `((${left}) ? (${compileJsxToStringExpr(right)}) : ${emptyVal})`
+      }
     }
 
-    if (
-      expr.type === 'ConditionalExpression'
-      && (expr.consequent.type === 'JSXElement' || expr.consequent.type === 'JSXFragment' || expr.alternate.type === 'JSXElement' || expr.alternate.type === 'JSXFragment')
-    ) {
-      const test = compileSubExpression(expr.test)
-      const cons = compileExpressionAsString(expr.consequent, false)
-      const alt = compileExpressionAsString(expr.alternate, false)
-      return `(${test}) ? (${cons}) : (${alt})`
+    if (expr.type === 'ConditionalExpression') {
+      const consNode = unwrapParens(expr.consequent)
+      const altNode = unwrapParens(expr.alternate)
+      if (consNode.type === 'JSXElement' || consNode.type === 'JSXFragment' || altNode.type === 'JSXElement' || altNode.type === 'JSXFragment') {
+        const test = compileSubExpression(expr.test)
+        const cons = compileExpressionAsString(consNode, false, true)
+        const alt = compileExpressionAsString(altNode, false, true)
+        const base = `((${test}) ? (${cons}) : (${alt}))`
+        return isIsland && !isLast ? `(${base} || "<!---->")` : base
+      }
     }
 
     const exprCode = compileSubExpression(expr)

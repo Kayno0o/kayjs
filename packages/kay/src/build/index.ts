@@ -381,15 +381,16 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     }
 
     const runtimeEntryPath = join(entriesDir, 'runtime.ts')
+    const runtimeDomSet = new Set<string>(['hydrate', ...(hasClientOnlyHydrate ? ['mount'] : []), ...usedDomExports])
+    const runtimeCoreSet = new Set<string>([...usedCoreExports].filter(s => !runtimeDomSet.has(s)))
+
     if (islandTargets.size > 0 || pluginClientEntries.length > 0) {
       const runtimeLines: string[] = []
       if (islandTargets.size > 0) {
         runtimeLines.push(`import { defineIslandElement } from 'kay/island';`)
-        runtimeLines.push(`export { hydrate${hasClientOnlyHydrate ? ', mount' : ''} } from 'kay/dom';`)
-        if (usedDomExports.size > 0)
-          runtimeLines.push(`export { ${[...usedDomExports].sort().join(', ')} } from 'kay/dom';`)
-        if (usedCoreExports.size > 0)
-          runtimeLines.push(`export { ${[...usedCoreExports].sort().join(', ')} } from 'kay';`)
+        runtimeLines.push(`export { ${[...runtimeDomSet].sort().join(', ')} } from 'kay/dom';`)
+        if (runtimeCoreSet.size > 0)
+          runtimeLines.push(`export { ${[...runtimeCoreSet].sort().join(', ')} } from 'kay';`)
         runtimeLines.push(`defineIslandElement();`)
       }
       for (const pe of pluginClientEntries)
@@ -410,14 +411,30 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       entryPoints.push(entryPath)
     }
 
+    const rewriteRuntimeImports = (src: string, re: RegExp, allowed: Set<string>, fallbackPkg: string): string =>
+      src.replace(re, (full, specList: string) => {
+        const shared: string[] = []
+        const separate: string[] = []
+        for (const part of specList.split(',')) {
+          const trimmed = part.trim()
+          const orig = trimmed.split(/\s+as\s+/)[0]!.trim()
+          if (allowed.has(orig))
+            shared.push(trimmed)
+          else if (trimmed !== '')
+            separate.push(trimmed)
+        }
+        const out: string[] = []
+        if (shared.length > 0)
+          out.push(`import { ${shared.join(', ')} } from ${JSON.stringify(runtimeEntryPath)}`)
+        if (separate.length > 0)
+          out.push(`import { ${separate.join(', ')} } from ${JSON.stringify(fallbackPkg)}`)
+        return out.length > 0 ? out.join(';\n') : full
+      })
+
     const clientPlugin: BunPlugin = {
       name: 'kay-v2-client',
       setup(b) {
         b.onResolve({ filter: /^(?:@kayjs\/)?kay(?:\/.*)?$/ }, (args) => {
-          if (args.importer !== runtimeEntryPath && !args.importer.startsWith(KAY_SRC_ROOT)) {
-            if (args.path === 'kay/dom' || args.path === '@kayjs/kay/dom')
-              return { path: runtimeEntryPath }
-          }
           const resolved = resolveKaySpecifier(args.path)
           return resolved !== undefined ? { path: resolved } : undefined
         })
@@ -438,24 +455,8 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
             const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
             compiled = applyTransforms(compileDom(args.path, raw, { analysis: analyses.get(args.path) }).code, args.path, 'client')
           }
-          const rewritten = compiled.replace(CORE_IMPORT_RE, (full, specList: string) => {
-            const shared: string[] = []
-            const separate: string[] = []
-            for (const part of specList.split(',')) {
-              const trimmed = part.trim()
-              const orig = trimmed.split(/\s+as\s+/)[0]!.trim()
-              if (usedCoreExports.has(orig))
-                shared.push(trimmed)
-              else if (trimmed !== '')
-                separate.push(trimmed)
-            }
-            const out: string[] = []
-            if (shared.length > 0)
-              out.push(`import { ${shared.join(', ')} } from ${JSON.stringify(runtimeEntryPath)}`)
-            if (separate.length > 0)
-              out.push(`import { ${separate.join(', ')} } from 'kay'`)
-            return out.length > 0 ? out.join(';\n') : full
-          })
+          let rewritten = rewriteRuntimeImports(compiled, CORE_IMPORT_RE, runtimeCoreSet, 'kay')
+          rewritten = rewriteRuntimeImports(rewritten, DOM_IMPORT_RE, runtimeDomSet, 'kay/dom')
           return { contents: rewritten, loader: 'tsx' }
         })
       },
@@ -751,8 +752,9 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     const prerenderDir = join(outDir, options.static ? 'static' : 'prerendered')
     mkdirSync(prerenderDir, { recursive: true })
 
+    const prerenderStamp = Date.now()
     for (const route of prerenderRoutes) {
-      const mod = await import(join(outDir, route.file)) as { paths?: () => Promise<string[]> | string[] }
+      const mod = await import(`${join(outDir, route.file)}?v=${prerenderStamp}`) as { paths?: () => Promise<string[]> | string[] }
       let urls: string[] = []
       if (!route.path.includes(':') && !route.path.includes('*')) {
         urls = [route.path]
