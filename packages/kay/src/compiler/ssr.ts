@@ -214,7 +214,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         if (attr.value?.type === 'Literal')
           innerHtmlExpr = JSON.stringify(String(attr.value.value))
         else if (attr.value?.type === 'JSXExpressionContainer')
-          innerHtmlExpr = `${use('ssrChild')}(${compileSubExpression(attr.value.expression)})`
+          innerHtmlExpr = `${use('ssrRaw')}(${compileSubExpression(attr.value.expression)})`
         continue
       }
 

@@ -22,6 +22,7 @@
       "@kayjs/auth/oauth": ["./packages/plugin-auth/src/oauth.ts"],
       "@kayjs/live": ["./packages/plugin-live/src/index.ts"],
       "@kayjs/live/client": ["./packages/plugin-live/src/client.ts"],
+      "@kayjs/content": ["./packages/plugin-content/src/index.ts"],
       "@kayjs/ui": ["./packages/ui/src/index.ts"],
       "@kayjs/ui/plugin": ["./packages/ui/src/plugin.ts"]
     }

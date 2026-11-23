@@ -30,11 +30,18 @@
         "kay": "^2.0.0-alpha.0",
       },
     },
+    "packages/plugin-content": {
+      "name": "@kayjs/content",
+      "version": "2.0.0-alpha.0",
+      "peerDependencies": {
+        "kay": "^2.0.0-alpha.0",
+      },
+    },
     "packages/plugin-i18n": {
       "name": "@kayjs/i18n",
       "version": "2.0.0-alpha.0",
       "peerDependencies": {
-        "kay": "workspace:*",
+        "kay": "^2.0.0-alpha.0",
       },
     },
     "packages/plugin-icons": {
@@ -76,14 +83,14 @@
       "name": "@kayjs/spa",
       "version": "2.0.0-alpha.0",
       "peerDependencies": {
-        "kay": "workspace:*",
+        "kay": "^2.0.0-alpha.0",
       },
     },
     "packages/plugin-tailwind": {
       "name": "@kayjs/tailwind",
       "version": "2.0.0-alpha.0",
       "peerDependencies": {
-        "kay": "workspace:*",
+        "kay": "^2.0.0-alpha.0",
       },
     },
     "packages/ui": {
@@ -98,6 +105,8 @@
     "@happy-dom/global-registrator": ["@happy-dom/global-registrator@21.0.4", "", { "dependencies": { "@types/node": ">=20.0.0", "happy-dom": "^21.0.4" } }, "sha512-Bbr0hW9hhDhBf3Jp0EyDlkCbFgbr0z2jd3BMKYOYW+fOkPM4Nx195GMXyCtRCGEgoNn6i09FabXrSkNFm2ONzg=="],
 
     "@kayjs/auth": ["@kayjs/auth@workspace:packages/plugin-auth"],
+
+    "@kayjs/content": ["@kayjs/content@workspace:packages/plugin-content"],
 
     "@kayjs/i18n": ["@kayjs/i18n@workspace:packages/plugin-i18n"],
 

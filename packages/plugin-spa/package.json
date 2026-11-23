@@ -2,11 +2,12 @@
   "name": "@kayjs/spa",
   "version": "2.0.0-alpha.0",
   "type": "module",
+  "sideEffects": ["./src/client.ts"],
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts"
   },
   "peerDependencies": {
-    "kay": "workspace:*"
+    "kay": "^2.0.0-alpha.0"
   }
 }

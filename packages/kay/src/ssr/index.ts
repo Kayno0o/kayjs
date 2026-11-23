@@ -34,6 +34,14 @@ export function esc(value: unknown): string {
   return str.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
+export function ssrRaw(value: unknown): string {
+  if (value == null || value === false)
+    return ''
+  if (typeof value === 'object' && '__html' in value)
+    return String((value as Html).__html)
+  return String(value)
+}
+
 export function escAttr(value: unknown): string {
   const str = String(value)
   if (bunEscape !== undefined)
