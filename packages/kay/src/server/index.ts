@@ -403,18 +403,19 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       })
     }
 
-    // 1b. Static public/ files
+    // 1b. Static public/ files (no-cache in dev so edits/plugins never get stuck in browser cache)
     if (request.method === 'GET' || request.method === 'HEAD') {
       const pub = publicMap.get(pathname)
       if (pub !== undefined) {
+        const cacheControl = process.env.KAY_DEV === '1' ? 'no-cache' : 'public, max-age=3600'
         if (request.headers.get('if-none-match') === pub.etag)
-          return new Response(null, { status: 304, headers: { 'etag': pub.etag, 'cache-control': 'public, max-age=3600' } })
+          return new Response(null, { status: 304, headers: { 'etag': pub.etag, 'cache-control': cacheControl } })
         return new Response(request.method === 'HEAD' ? null : toResponseBody(pub.body), {
           status: 200,
           headers: {
             'content-type': pub.type,
             'etag': pub.etag,
-            'cache-control': 'public, max-age=3600',
+            'cache-control': cacheControl,
           },
         })
       }
@@ -550,12 +551,13 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         : new Response(asset.body, { status: 200, headers })
     }
 
+    const pubCache = process.env.KAY_DEV === '1' ? 'no-cache' : 'public, max-age=3600'
     for (const [path, pub] of publicMap) {
       if (!(path in routes)) {
         const headers = {
           'content-type': pub.type,
           'etag': pub.etag,
-          'cache-control': 'public, max-age=3600',
+          'cache-control': pubCache,
         }
         routes[path] = typeof pub.body === 'string'
           ? () => new Response(Bun.file(pub.body as string), { status: 200, headers })
