@@ -33,6 +33,7 @@ export interface ShareCardInput {
 }
 
 const CARD_CFG_KEY = Symbol.for('kay.images.cardConfig')
+const HAS_MAGICK = Bun.which('magick') !== null
 
 export function configureShareCard(defaults: ShareCardDefaults): void {
   ;(globalThis as Record<symbol, ShareCardDefaults | undefined>)[CARD_CFG_KEY] = defaults
@@ -130,12 +131,14 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
   const ogDir = join(publicDir, 'og')
   mkdirSync(ogDir, { recursive: true })
 
-  const hasMagick = Bun.which('magick') !== null
   const site = cfg.site ? cfg.site.replace(/\/$/, '') : ''
 
-  if (hasMagick) {
+  if (HAS_MAGICK) {
     const fileName = `${slug}-${hash}.png`
     const outPath = join(ogDir, fileName)
+    if (existsSync(outPath))
+      return `${site}/og/${fileName}`
+
     const cacheDir = resolve(cfg.cacheDir ?? '.kay-cache/images')
     mkdirSync(cacheDir, { recursive: true })
     const cachedPng = join(cacheDir, `og-${fileName}`)
@@ -155,6 +158,8 @@ export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults):
   }
 
   const svgFile = `${slug}-${hash}.svg`
-  writeFileSync(join(ogDir, svgFile), svg)
+  const svgOut = join(ogDir, svgFile)
+  if (!existsSync(svgOut))
+    writeFileSync(svgOut, svg)
   return `${site}/og/${svgFile}`
 }

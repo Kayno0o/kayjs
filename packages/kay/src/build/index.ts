@@ -25,6 +25,8 @@ export interface BuildOptions {
   static?: boolean | undefined
   /** Run build-time prerendering for routes exporting `prerender = true` (default: true; disabled in `kay dev`). */
   prerender?: boolean | undefined
+  /** Copy `public/` files into `outDir/public` (default: true; disabled in `kay dev` where `public/` is served directly). */
+  copyPublic?: boolean | undefined
   /** Compile into a single standalone executable at this path (or true -> dist/server-bin). */
   compile?: string | boolean | undefined
 }
@@ -366,13 +368,18 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   }
   const allStandaloneCss = [...standaloneCssSet]
 
-  // Step 1: Single-pass Client Build (runs when islands, plugin client entries, or CSS exist)
+  // Step 1 & Step 2: Single-pass Client + Server Builds
+  // When there are no islands (e.g. static sites, blogs, docs), run client CSS and server builds in parallel!
   const islandChunks = new Map<string, string>()
   const assetFiles: string[] = []
   const styleUrls: string[] = []
   let runtimeScript: string | undefined
 
-  if (islandTargets.size > 0 || pluginClientEntries.length > 0 || allStandaloneCss.length > 0) {
+  const needsClientBuild = islandTargets.size > 0 || pluginClientEntries.length > 0 || allStandaloneCss.length > 0
+
+  const runClientBuild = async (): Promise<void> => {
+    if (!needsClientBuild)
+      return
     const entriesDir = join(outDir, '.entries')
     mkdirSync(entriesDir, { recursive: true })
     const entryPoints: string[] = []
@@ -497,69 +504,78 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     }
   }
 
-  // Step 2: Single-pass Server Build (routes + layouts + middlewares + error/404 + standalone action modules)
   const standaloneActionFiles = [...actionsByFile.keys()].filter(f => !allRouteFiles.includes(f))
   const serverEntries = [...specialFiles, ...pageFiles, ...standaloneActionFiles]
   const serverRoot = standaloneActionFiles.length > 0 ? root : routesDir
 
-  const serverPlugin: BunPlugin = {
-    name: 'kay-v2-server',
-    setup(b) {
-      b.onResolve({ filter: /^(?:@kayjs\/)?kay(?:\/.*)?$/ }, (args) => {
-        const resolved = resolveKaySpecifier(args.path)
-        return resolved !== undefined ? { path: resolved } : undefined
-      })
-      b.onResolve({ filter: /^@kayjs\// }, (args) => {
-        try {
-          return { path: Bun.resolveSync(args.path, args.resolveDir || root) }
-        }
-        catch {
-          return undefined
-        }
-      })
-      b.onLoad({ filter: /\.tsx$/ }, (args) => {
-        const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
-        const analysis = analyses.get(args.path)
-        const rawBindings = pageIslandBindings.get(args.path)
-        let islandMap: Map<string, IslandBinding> | undefined
-        if (rawBindings !== undefined) {
-          islandMap = new Map()
-          for (const [localName, target] of rawBindings) {
-            const chunk = islandChunks.get(`${target.file}#${target.exportName}`)
-            if (chunk !== undefined) {
-              islandMap.set(localName, {
-                id: target.id,
-                chunk,
-                defaultHydrate: target.defaultHydrate,
-              })
+  const runServerBuild = async (): Promise<void> => {
+    const serverPlugin: BunPlugin = {
+      name: 'kay-v2-server',
+      setup(b) {
+        b.onResolve({ filter: /^(?:@kayjs\/)?kay(?:\/.*)?$/ }, (args) => {
+          const resolved = resolveKaySpecifier(args.path)
+          return resolved !== undefined ? { path: resolved } : undefined
+        })
+        b.onResolve({ filter: /^@kayjs\// }, (args) => {
+          try {
+            return { path: Bun.resolveSync(args.path, args.resolveDir || root) }
+          }
+          catch {
+            return undefined
+          }
+        })
+        b.onLoad({ filter: /\.tsx$/ }, (args) => {
+          const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
+          const analysis = analyses.get(args.path)
+          const rawBindings = pageIslandBindings.get(args.path)
+          let islandMap: Map<string, IslandBinding> | undefined
+          if (rawBindings !== undefined) {
+            islandMap = new Map()
+            for (const [localName, target] of rawBindings) {
+              const chunk = islandChunks.get(`${target.file}#${target.exportName}`)
+              if (chunk !== undefined) {
+                islandMap.set(localName, {
+                  id: target.id,
+                  chunk,
+                  defaultHydrate: target.defaultHydrate,
+                })
+              }
             }
           }
-        }
-        const compiled = compileSsr(args.path, raw, {
-          analysis,
-          islands: islandMap,
-          isIsland: analysis?.isInteractive,
+          const compiled = compileSsr(args.path, raw, {
+            analysis,
+            islands: islandMap,
+            isIsland: analysis?.isInteractive,
+          })
+          return { contents: applyTransforms(compiled.code, args.path, 'server'), loader: 'tsx' }
         })
-        return { contents: applyTransforms(compiled.code, args.path, 'server'), loader: 'tsx' }
-      })
-    },
+      },
+    }
+
+    const serverResult = await Bun.build({
+      entrypoints: serverEntries,
+      outdir: serverDir,
+      root: serverRoot,
+      target: 'bun',
+      format: 'esm',
+      splitting: true,
+      packages: 'external',
+      minify: false,
+      plugins: [serverPlugin, ...pluginBunPlugins],
+    })
+
+    if (!serverResult.success) {
+      const msgs = serverResult.logs.map(l => l.message).join('\n')
+      throw new Error(`kay build (server) failed:\n${msgs}`)
+    }
   }
 
-  const serverResult = await Bun.build({
-    entrypoints: serverEntries,
-    outdir: serverDir,
-    root: serverRoot,
-    target: 'bun',
-    format: 'esm',
-    splitting: true,
-    packages: 'external',
-    minify: false,
-    plugins: [serverPlugin, ...pluginBunPlugins],
-  })
-
-  if (!serverResult.success) {
-    const msgs = serverResult.logs.map(l => l.message).join('\n')
-    throw new Error(`kay build (server) failed:\n${msgs}`)
+  if (islandTargets.size === 0) {
+    await Promise.all([runClientBuild(), runServerBuild()])
+  }
+  else {
+    await runClientBuild()
+    await runServerBuild()
   }
 
   const toOutRel = (srcFile: string): string =>
@@ -677,16 +693,19 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   for (const [k, v] of islandChunks)
     islandsRecord[k] = v
 
-  // Copy public/ static files into dist/public
+  // Copy public/ static files into dist/public (skipped in `kay dev`, where createServer streams directly from public/)
   const publicFiles: string[] = []
   const outPublicDir = join(outDir, 'public')
+  const shouldCopyPublic = options.copyPublic !== false
   if (existsSync(publicDir)) {
     for (const abs of walkAllFiles(publicDir).sort()) {
       const rel = relative(publicDir, abs).replace(/\\/g, '/')
       publicFiles.push(rel)
-      const dst = join(outPublicDir, rel)
-      mkdirSync(dirname(dst), { recursive: true })
-      writeFileSync(dst, readFileSync(abs))
+      if (shouldCopyPublic) {
+        const dst = join(outPublicDir, rel)
+        mkdirSync(dirname(dst), { recursive: true })
+        writeFileSync(dst, readFileSync(abs))
+      }
     }
   }
 
@@ -785,16 +804,20 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       }
 
       const map: Record<string, string> = {}
-      for (const u of urls) {
-        const res = await app.handle(new Request(`http://localhost${u}`))
-        if (res.status === 200) {
-          const html = await res.text()
-          const relHtml = u === '/' ? 'index.html' : `${u.replace(/^\//, '').replace(/\/$/, '')}/index.html`
-          const absHtml = join(prerenderDir, relHtml)
-          mkdirSync(dirname(absHtml), { recursive: true })
-          writeFileSync(absHtml, html)
-          map[u] = relative(outDir, absHtml).replace(/\\/g, '/')
-        }
+      const CONCURRENCY = 8
+      for (let i = 0; i < urls.length; i += CONCURRENCY) {
+        const batch = urls.slice(i, i + CONCURRENCY)
+        await Promise.all(batch.map(async (u) => {
+          const res = await app.handle(new Request(`http://localhost${u}`))
+          if (res.status === 200) {
+            const html = await res.text()
+            const relHtml = u === '/' ? 'index.html' : `${u.replace(/^\//, '').replace(/\/$/, '')}/index.html`
+            const absHtml = join(prerenderDir, relHtml)
+            mkdirSync(dirname(absHtml), { recursive: true })
+            writeFileSync(absHtml, html)
+            map[u] = relative(outDir, absHtml).replace(/\\/g, '/')
+          }
+        }))
       }
       route.prerendered = map
     }

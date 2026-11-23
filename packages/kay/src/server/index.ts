@@ -603,20 +603,23 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
 
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as BuildManifest
   const modules: Record<string, unknown> = {}
-  const assets: Record<string, Uint8Array<ArrayBuffer>> = {}
-  const publicAssets: Record<string, Uint8Array<ArrayBuffer>> = {}
+  const assets: Record<string, EmbeddedBody> = {}
+  const publicAssets: Record<string, EmbeddedBody> = {}
   const prerendered: Record<string, string> = {}
+  const isDev = process.env.KAY_DEV === '1'
+  const srcPublicDir = resolve(root, fileConfig.publicDir ?? 'public')
 
   for (const rel of manifest.assets) {
     const abs = join(clientDir, rel)
     if (existsSync(abs))
-      assets[rel] = new Uint8Array(readFileSync(abs))
+      assets[rel] = isDev ? abs : new Uint8Array(readFileSync(abs))
   }
 
   for (const rel of manifest.publicFiles ?? []) {
-    const abs = join(outDir, 'public', rel)
+    const outAbs = join(outDir, 'public', rel)
+    const abs = existsSync(outAbs) ? outAbs : join(srcPublicDir, rel)
     if (existsSync(abs))
-      publicAssets[rel] = new Uint8Array(readFileSync(abs))
+      publicAssets[rel] = isDev ? abs : new Uint8Array(readFileSync(abs))
   }
 
   const loadStamp = Date.now()

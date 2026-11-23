@@ -485,17 +485,28 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       return null
     }
 
-    const rendered = renderMarkdown(body, { ...renderOpts, locale: entryLocale, file: absFile })
+    const wordCount = body.trim().split(/\s+/).filter(Boolean).length
+    const readingMinutes = Math.max(1, Math.ceil(wordCount / 220))
+    let renderedCache: ReturnType<typeof renderMarkdown> | undefined
+    const getRendered = () => {
+      renderedCache ??= renderMarkdown(body, { ...renderOpts, locale: entryLocale, file: absFile })
+      return renderedCache
+    }
+
     const entry: ContentEntry<TData> = {
       slug,
       ...(entryLocale !== undefined ? { locale: entryLocale } : {}),
       file: absFile,
       data,
       body,
-      html: rendered.html,
-      headings: rendered.headings,
-      wordCount: rendered.wordCount,
-      readingMinutes: rendered.readingMinutes,
+      get html() {
+        return getRendered().html
+      },
+      get headings() {
+        return getRendered().headings
+      },
+      wordCount,
+      readingMinutes,
     }
     cache.set(absFile, { mtimeMs, entry })
     return entry
@@ -520,6 +531,18 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     all,
     get(slug, locale) {
       const clean = slug.replace(/^\/+|\/+$/g, '')
+      const targetLocale = localized ? (locale ?? defaultLocale) : undefined
+      const scanDir = targetLocale !== undefined ? join(absDir, targetLocale) : absDir
+      // O(1) direct file lookup before falling back to directory scan
+      for (const candidate of [
+        join(scanDir, `${clean}.md`),
+        join(scanDir, `${clean}.markdown`),
+        join(scanDir, clean, 'index.md'),
+        join(scanDir, clean, 'index.markdown'),
+      ]) {
+        if (existsSync(candidate))
+          return loadFile(candidate, scanDir, targetLocale) ?? undefined
+      }
       return all(locale).find(e => e.slug === clean)
     },
     byTag(tag, locale) {
