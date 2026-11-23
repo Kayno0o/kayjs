@@ -3,9 +3,11 @@
 
 import type { BunPlugin } from 'bun'
 import type { KayPlugin } from 'kay/server'
+import type { ShareCardDefaults } from './card'
 import type { ImageAsset } from './helpers'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
+import { configureShareCard } from './card'
 
 export interface ImagesPluginOptions {
   widths?: number[] | undefined
@@ -15,6 +17,8 @@ export interface ImagesPluginOptions {
   cacheDir?: string | undefined
   /** Remove stale cache files unused by the current build (default: true). */
   pruneCache?: boolean | undefined
+  /** Optional defaults for build-time `shareCard()` OG image generation. */
+  card?: ShareCardDefaults | undefined
 }
 
 const DEFAULT_WIDTHS = [320, 640, 960, 1280, 1920]
@@ -171,10 +175,17 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
       }]
     },
     build(ctx) {
+      configureShareCard({
+        ...options.card,
+        publicDir: join(ctx.outDir, 'public'),
+        cacheDir: resolve(ctx.root, cacheDirRel),
+      })
       for (const [rel, bytes] of emittedAssets)
         ctx.emitAsset(rel, bytes)
       if (pruneCache && lastCacheRoot !== undefined && activeCacheFiles.size > 0 && existsSync(lastCacheRoot)) {
         for (const entry of readdirSync(lastCacheRoot)) {
+          if (entry.startsWith('og-'))
+            continue
           if (!activeCacheFiles.has(entry))
             rmSync(join(lastCacheRoot, entry), { force: true })
         }

@@ -48,6 +48,8 @@ export interface KayPlugin {
   css?: string[] | undefined
   /** Post-process rendered HTML before sending. */
   transformHtml?: (html: string, ctx: RequestContext) => string | Promise<string>
+  /** Expand or filter prerender URLs for a route (e.g. @kayjs/i18n expanding `/posts/a` -> `['/posts/a', '/fr/posts/a']`). */
+  prerenderPaths?: (paths: string[], route: RouteManifestEntry) => string[] | Promise<string[]>
   /** Client bootstrap module path — bundled ONLY when this plugin is active. */
   clientEntry?: string | undefined
   /** Register custom CLI subcommands (e.g. `kay i18n check`). */

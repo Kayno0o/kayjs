@@ -1,3 +1,5 @@
+export { configureShareCard, shareCard } from './card'
+export type { ShareCardDefaults, ShareCardInput } from './card'
 export { image } from './helpers'
 export type { ImageAsset, ImageHelperOptions, ImgSpreadProps } from './helpers'
 export { Picture } from './Picture'

@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { contentPlugin, defineCollection, parseFrontmatter, renderMarkdown } from '../../plugin-content/src/index'
+import { alternateLinks, formatDate, formatNumber, i18n, localizePath } from '../../plugin-i18n/src/index'
+import { images, shareCard } from '../../plugin-images/src/index'
 import { build } from '../src/build/index'
 import { testApp } from '../src/test/index'
 
@@ -183,4 +185,144 @@ Hidden from production.
     expect(rssRes.status).toBe(200)
     expect(await rssRes.text()).toContain('<title>First Post</title>')
   })
+
+  it('supports nested YAML frontmatter, Shiki-style highlight hook, MDX-lite embedded components, localized prerendering, and shareCard()', async () => {
+    const dir = makeTemp('kay-content-adv-')
+    const enDir = join(dir, 'content/posts/en')
+    const frDir = join(dir, 'content/posts/fr')
+    mkdirSync(enDir, { recursive: true })
+    mkdirSync(frDir, { recursive: true })
+    mkdirSync(join(dir, 'src/routes/posts'), { recursive: true })
+
+    // 1. Nested YAML + custom highlight + embedded self-closing & paired components
+    const md = `---
+title: "Five frameworks"
+date: 2026-10-19
+social:
+  x: "Short post"
+  reddit:
+    title: "Long title"
+    subreddits: [webdev, bun]
+---
+## Benchmarks
+
+<BarChart
+  title="Build time"
+  rows={[
+    {"label": "Kay v2", "value": 18.8},
+    {"label": "Astro", "value": 1190}
+  ]}
+/>
+
+<Note tone="warning">
+Watch out for **hydration**!
+</Note>
+
+\`\`\`ts
+const tag = '<BarChart title="inside code fence" />'
+\`\`\`
+`
+    const { data, body } = parseFrontmatter(md)
+    expect((data.social as { reddit: { subreddits: string[] } }).reddit.subreddits).toEqual(['webdev', 'bun'])
+
+    const rendered = renderMarkdown(body, {
+      highlight: (code, lang) => `<pre data-lang="${lang ?? 'text'}"><code>${code.replaceAll('<', '&lt;')}</code></pre>`,
+      components: {
+        BarChart: ({ title, rows }: { title: string, rows: Array<{ label: string, value: number }> }) =>
+          `<figure data-chart="${title}">${rows.map(r => `<span>${r.label}:${r.value}</span>`).join('')}</figure>`,
+        Note: ({ tone, children }: { tone: string, children: { __html: string } }) =>
+          `<aside data-note="${tone}">${children.__html}</aside>`,
+      },
+    })
+    expect(rendered.html).toContain('<figure data-chart="Build time"><span>Kay v2:18.8</span><span>Astro:1190</span></figure>')
+    expect(rendered.html).toContain('<aside data-note="warning"><p>Watch out for <strong>hydration</strong>!</p></aside>')
+    expect(rendered.html).toContain('<pre data-lang="ts"><code>const tag = \'&lt;BarChart title="inside code fence" />\'</code></pre>')
+
+    // 2. i18n helpers
+    expect(localizePath('/posts/hello', 'fr', 'en', ['en', 'fr'])).toBe('/fr/posts/hello')
+    expect(localizePath('/fr/posts/hello', 'en', 'en', ['en', 'fr'])).toBe('/posts/hello')
+    expect(alternateLinks('/posts/hello', { site: 'https://log.kaynooo.fr', locales: ['en', 'fr'], defaultLocale: 'en' })).toEqual([
+      { locale: 'en', href: 'https://log.kaynooo.fr/posts/hello' },
+      { locale: 'fr', href: 'https://log.kaynooo.fr/fr/posts/hello' },
+    ])
+    expect(formatNumber(1234.5, 'en-US')).toContain('1,234.5')
+    expect(formatDate('2026-11-23', 'en-US', { year: 'numeric' })).toBe('2026')
+
+    // 3. Localized static export + shareCard() OG image generation
+    writeFileSync(join(enDir, 'hello.md'), `---
+title: Hello English
+date: 2026-11-20
+---
+English content.
+`)
+    writeFileSync(join(frDir, 'hello.md'), `---
+title: Bonjour Francais
+date: 2026-11-20
+---
+Contenu francais.
+`)
+
+    const contentPkg = join(import.meta.dir, '../../plugin-content/src/index.ts')
+    const imagesPkg = join(import.meta.dir, '../../plugin-images/src/index.ts')
+    writeFileSync(join(dir, 'src/posts.ts'), `
+      import { defineCollection } from ${JSON.stringify(contentPkg)}
+      export const posts = defineCollection<{ title: string }>({
+        dir: ${JSON.stringify(join(dir, 'content/posts'))},
+        localized: true,
+        defaultLocale: 'en',
+      })
+    `)
+    writeFileSync(join(dir, 'src/routes/posts/[slug].tsx'), `
+      import { Head } from 'kay'
+      import { shareCard } from ${JSON.stringify(imagesPkg)}
+      import { posts } from '../../posts'
+
+      export const prerender = true
+      export function paths() { return posts.paths('/posts', 'en') }
+
+      export default async function Post({ params, locals }: { params: { slug: string }, locals: { locale?: string } }) {
+        const loc = locals.locale ?? 'en'
+        const post = posts.get(params.slug, loc)!
+        const og = shareCard({ title: post.data.title, badge: 'devlog' })
+        return (
+          <article>
+            <Head>
+              <title>{post.data.title}</title>
+              <meta property="og:image" content={og} />
+            </Head>
+            <h1>{post.data.title}</h1>
+            <div innerHTML={post.html} />
+          </article>
+        )
+      }
+    `)
+
+    const plugins = [
+      i18n({ locales: ['en', 'fr'], defaultLocale: 'en', site: 'https://log.kaynooo.fr' }),
+      images({ card: { site: 'https://log.kaynooo.fr', background: '#090c13', color: '#dbe0ea' } }),
+    ]
+
+    const manifest = await build({ root: dir, plugins, static: true })
+    expect(manifest.runtimeScript).toBeUndefined() // 0 KB JS!
+    // Both /posts/hello and /fr/posts/hello statically exported!
+    const enHtmlPath = join(dir, 'dist/static/posts/hello/index.html')
+    const frHtmlPath = join(dir, 'dist/static/fr/posts/hello/index.html')
+    expect(existsSync(enHtmlPath)).toBe(true)
+    expect(existsSync(frHtmlPath)).toBe(true)
+
+    const enHtml = readFileSync(enHtmlPath, 'utf8')
+    const frHtml = readFileSync(frHtmlPath, 'utf8')
+    expect(enHtml).toContain('<html lang="en">')
+    expect(enHtml).toContain('<h1>Hello English</h1>')
+    expect(enHtml).toContain('hreflang="fr" href="https://log.kaynooo.fr/fr/posts/hello"')
+    expect(frHtml).toContain('<html lang="fr">')
+    expect(frHtml).toContain('<h1>Bonjour Francais</h1>')
+
+    // OG shareCard file exists in dist/static/og/!
+    const ogMatch = enHtml.match(/https:\/\/log\.kaynooo\.fr(\/og\/[^"]+)/)
+    expect(ogMatch).not.toBeNull()
+    expect(existsSync(join(dir, 'dist/static', ogMatch![1]!))).toBe(true)
+  })
 })
+
+void shareCard

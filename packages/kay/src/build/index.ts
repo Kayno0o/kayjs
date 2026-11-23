@@ -767,6 +767,11 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       if (urls.length === 0)
         continue
 
+      for (const plugin of plugins) {
+        if (plugin.prerenderPaths !== undefined)
+          urls = await plugin.prerenderPaths(urls, route)
+      }
+
       const map: Record<string, string> = {}
       for (const u of urls) {
         const res = await app.handle(new Request(`http://localhost${u}`))
@@ -790,6 +795,16 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         const dst = join(staticAssetDir, rel)
         mkdirSync(dirname(dst), { recursive: true })
         writeFileSync(dst, readFileSync(join(clientDir, rel)))
+      }
+      // Re-scan outPublicDir so any assets emitted during prerender (e.g. OG share cards) are included in --static
+      if (existsSync(outPublicDir)) {
+        for (const abs of walkAllFiles(outPublicDir)) {
+          const rel = relative(outPublicDir, abs).replace(/\\/g, '/')
+          if (!publicSet.has(rel)) {
+            publicSet.add(rel)
+            publicFiles.push(rel)
+          }
+        }
       }
       for (const rel of publicFiles) {
         const dst = join(prerenderDir, rel)

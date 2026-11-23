@@ -1,9 +1,10 @@
-// @kayjs/content — Zero-dependency Bun-native Markdown collections, frontmatter, Standard Schema validation,
-// heading TOC extraction, reading time, prerender paths(), and RSS feed plugin (`0 KB` client JS).
+// @kayjs/content — Zero-dependency Bun-native Markdown collections, nested YAML frontmatter (Bun.YAML),
+// Shiki/custom highlight hook, MDX-lite embedded TSX components, localized collections, TOC, and RSS (`0 KB` client JS).
 
 import type { KayPlugin, StandardSchemaV1 } from 'kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { raw, ssrRaw } from 'kay/ssr'
 
 export interface ContentHeading {
   level: number
@@ -13,6 +14,7 @@ export interface ContentHeading {
 
 export interface ContentEntry<TData = Record<string, unknown>> {
   readonly slug: string
+  readonly locale?: string | undefined
   readonly file: string
   readonly data: TData
   readonly body: string
@@ -22,53 +24,43 @@ export interface ContentEntry<TData = Record<string, unknown>> {
   readonly readingMinutes: number
 }
 
+export type MarkdownComponent = (props: any) => unknown
+export type CodeHighlighter = (code: string, language: string | undefined) => string
+
+export interface RenderMarkdownOptions {
+  highlight?: CodeHighlighter | undefined
+  components?: Record<string, MarkdownComponent> | undefined
+}
+
 export interface CollectionOptions<TData = Record<string, unknown>> {
-  /** Directory containing `.md` / `.markdown` files (relative to cwd or absolute). */
+  /** Directory containing `.md` / `.markdown` files (or `<locale>/*.md` when `localized: true`). */
   dir: string
+  /** When true, reads `<dir>/<locale>/<slug>.md` and filters queries by locale. */
+  localized?: boolean | undefined
+  /** Default locale when `localized: true` and no locale is passed (default: 'en'). */
+  defaultLocale?: string | undefined
   /** Optional Standard Schema (Zod, Valibot, ArkType, custom) to validate frontmatter. */
   schema?: StandardSchemaV1<unknown, TData> | undefined
-  /** Include entries with `draft: true` (default: false in production, true in dev when unset). */
+  /** Custom syntax highlighter for fenced code blocks (e.g. Shiki). */
+  highlight?: CodeHighlighter | undefined
+  /** Embedded Kay TSX components usable directly inside Markdown (`<Note>`, `<BarChart rows={[...]} />`). */
+  components?: Record<string, MarkdownComponent> | undefined
+  /** Include entries with `draft: true` (default: false). */
   includeDrafts?: boolean | undefined
   /** Custom comparator for `all()` (defaults to newest `date` first, then alphabetical `slug`). */
   sort?: ((a: ContentEntry<TData>, b: ContentEntry<TData>) => number) | undefined
 }
 
 export interface Collection<TData = Record<string, unknown>> {
-  all(): ContentEntry<TData>[]
-  get(slug: string): ContentEntry<TData> | undefined
-  byTag(tag: string): ContentEntry<TData>[]
+  all(locale?: string): ContentEntry<TData>[]
+  get(slug: string, locale?: string): ContentEntry<TData> | undefined
+  byTag(tag: string, locale?: string): ContentEntry<TData>[]
   /** Returns URL paths for `export const prerender = true; export const paths = () => col.paths('/blog')`. */
-  paths(prefix?: string): string[]
+  paths(prefix?: string, locale?: string): string[]
   clearCache(): void
 }
 
-function unquote(raw: string): string {
-  const s = raw.trim()
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith('\'') && s.endsWith('\'')))
-    return s.slice(1, -1)
-  return s
-}
-
-function parseScalar(raw: string): unknown {
-  const s = raw.trim()
-  if (s === '' || s === 'null' || s === '~')
-    return null
-  if (s === 'true')
-    return true
-  if (s === 'false')
-    return false
-  if (/^-?\d+(?:\.\d+)?$/.test(s))
-    return Number(s)
-  if (s.startsWith('[') && s.endsWith(']')) {
-    const inner = s.slice(1, -1).trim()
-    if (!inner)
-      return []
-    return inner.split(',').map(part => parseScalar(part))
-  }
-  return unquote(s)
-}
-
-/** Lightweight zero-dependency YAML frontmatter parser (scalars, inline arrays, block lists). */
+/** Parses full nested YAML frontmatter using Bun's native Zig `Bun.YAML.parse`. */
 export function parseFrontmatter(source: string): { data: Record<string, unknown>, body: string } {
   const normalized = source.replace(/\r\n/g, '\n')
   if (!normalized.startsWith('---\n'))
@@ -82,38 +74,10 @@ export function parseFrontmatter(source: string): { data: Record<string, unknown
   const restStart = normalized.indexOf('\n', end + 4)
   const body = restStart === -1 ? '' : normalized.slice(restStart + 1)
 
-  const data: Record<string, unknown> = {}
-  const lines = rawYaml.split('\n')
-  let activeListKey: string | undefined
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#'))
-      continue
-
-    if (activeListKey !== undefined && /^\s*-\s+/.test(line)) {
-      const val = parseScalar(line.replace(/^\s*-\s+/, ''))
-      ;(data[activeListKey] as unknown[]).push(val)
-      continue
-    }
-
-    activeListKey = undefined
-    const colon = line.indexOf(':')
-    if (colon <= 0)
-      continue
-    const key = line.slice(0, colon).trim()
-    const valuePart = line.slice(colon + 1).trim()
-
-    if (valuePart === '') {
-      data[key] = []
-      activeListKey = key
-    }
-    else {
-      data[key] = parseScalar(valuePart)
-    }
-  }
-
+  const parsed = rawYaml.trim() === '' ? {} : Bun.YAML.parse(rawYaml)
+  const data = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : {}
   return { data, body }
 }
 
@@ -131,24 +95,245 @@ function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, '').trim()
 }
 
-/** Renders Markdown via Bun's native Zig `Bun.markdown.html()`, adds unique heading IDs, and extracts TOC & reading time. */
-export function renderMarkdown(body: string): {
+// Parse JSX-style attributes inside embedded Markdown components: title="hi" count={42} rows={[...]} flag
+function parseComponentProps(attrSrc: string): Record<string, unknown> {
+  const props: Record<string, unknown> = {}
+  let i = 0
+  const len = attrSrc.length
+
+  while (i < len) {
+    while (i < len && /\s/.test(attrSrc[i]!)) i++
+    if (i >= len) break
+
+    const nameStart = i
+    while (i < len && /[\w:-]/.test(attrSrc[i]!)) i++
+    const name = attrSrc.slice(nameStart, i)
+    if (!name) {
+      i++
+      continue
+    }
+
+    while (i < len && /\s/.test(attrSrc[i]!)) i++
+    if (attrSrc[i] !== '=') {
+      props[name] = true
+      continue
+    }
+    i++ // skip '='
+    while (i < len && /\s/.test(attrSrc[i]!)) i++
+
+    const ch = attrSrc[i]
+    if (ch === '"' || ch === '\'') {
+      const quote = ch
+      i++
+      const valStart = i
+      while (i < len && attrSrc[i] !== quote) {
+        if (attrSrc[i] === '\\') i++
+        i++
+      }
+      props[name] = attrSrc.slice(valStart, i)
+      i++
+    }
+    else if (ch === '{') {
+      let depth = 0
+      const exprStart = i + 1
+      let inStr: string | null = null
+      while (i < len) {
+        const c = attrSrc[i]!
+        if (inStr !== null) {
+          if (c === '\\') { i += 2; continue }
+          if (c === inStr) inStr = null
+        }
+        else {
+          if (c === '"' || c === '\'' || c === '`') inStr = c
+          else if (c === '{') depth++
+          else if (c === '}') {
+            depth--
+            if (depth === 0) break
+          }
+        }
+        i++
+      }
+      const expr = attrSrc.slice(exprStart, i).trim()
+      i++ // skip closing '}'
+      try {
+        props[name] = JSON.parse(expr)
+      }
+      catch {
+        // eslint-disable-next-line no-new-func
+        props[name] = new Function(`return (${expr})`)()
+      }
+    }
+  }
+  return props
+}
+
+// Find the end of an opening JSX tag (`>` or `/>`), respecting strings and balanced `{...}` expressions.
+function findTagEnd(src: string, start: number): { end: number, selfClosing: boolean } | undefined {
+  let i = start
+  const len = src.length
+  let braceDepth = 0
+  let inStr: string | null = null
+
+  while (i < len) {
+    const c = src[i]!
+    if (inStr !== null) {
+      if (c === '\\') { i += 2; continue }
+      if (c === inStr) inStr = null
+      i++
+      continue
+    }
+    if (c === '"' || c === '\'' || c === '`') {
+      inStr = c
+      i++
+      continue
+    }
+    if (c === '{') {
+      braceDepth++
+      i++
+      continue
+    }
+    if (c === '}') {
+      braceDepth = Math.max(0, braceDepth - 1)
+      i++
+      continue
+    }
+    if (braceDepth === 0) {
+      if (c === '/' && src[i + 1] === '>')
+        return { end: i + 2, selfClosing: true }
+      if (c === '>')
+        return { end: i + 1, selfClosing: false }
+    }
+    i++
+  }
+  return undefined
+}
+
+function expandComponents(
+  md: string,
+  components: Record<string, MarkdownComponent>,
+  options: RenderMarkdownOptions,
+  slots: string[],
+): string {
+  const names = Object.keys(components)
+  if (names.length === 0)
+    return md
+
+  let out = ''
+  let i = 0
+  const len = md.length
+
+  while (i < len) {
+    const lt = md.indexOf('<', i)
+    if (lt === -1) {
+      out += md.slice(i)
+      break
+    }
+
+    const match = /^<([A-Z][\w]*)(?=[\s/>])/.exec(md.slice(lt))
+    if (!match || !(match[1]! in components)) {
+      out += md.slice(i, lt + 1)
+      i = lt + 1
+      continue
+    }
+
+    const tagName = match[1]!
+    const tagEnd = findTagEnd(md, lt + match[0].length)
+    if (!tagEnd) {
+      out += md.slice(i, lt + 1)
+      i = lt + 1
+      continue
+    }
+
+    out += md.slice(i, lt)
+    const attrSrc = md.slice(lt + match[0].length, tagEnd.selfClosing ? tagEnd.end - 2 : tagEnd.end - 1)
+    const props = parseComponentProps(attrSrc)
+    let afterIndex = tagEnd.end
+
+    if (!tagEnd.selfClosing) {
+      // Find matching closing </TagName> with nesting depth
+      const closeTag = `</${tagName}>`
+      const openRe = new RegExp(`<${tagName}(?=[\\s/>])|</${tagName}>`, 'g')
+      openRe.lastIndex = tagEnd.end
+      let depth = 1
+      let closeIdx = -1
+      let m: RegExpExecArray | null
+      while ((m = openRe.exec(md)) !== null) {
+        if (m[0] === closeTag) {
+          depth--
+          if (depth === 0) {
+            closeIdx = m.index
+            break
+          }
+        }
+        else {
+          const innerEnd = findTagEnd(md, m.index + m[0].length)
+          if (innerEnd && !innerEnd.selfClosing)
+            depth++
+        }
+      }
+      if (closeIdx !== -1) {
+        const innerMd = md.slice(tagEnd.end, closeIdx).trim()
+        const innerRendered = renderMarkdown(innerMd, options)
+        props.children = raw(innerRendered.html.trim())
+        afterIndex = closeIdx + closeTag.length
+      }
+    }
+
+    const renderedHtml = ssrRaw(components[tagName]!(props))
+    const slotIdx = slots.length
+    slots.push(renderedHtml)
+    out += `\n\n<div data-kay-md-slot="${slotIdx}"></div>\n\n`
+    i = afterIndex
+  }
+
+  return out
+}
+
+const FENCE_RE = /^([`~]{3,})([^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm
+
+/** Renders Markdown via Bun's native Zig `Bun.markdown.html()`, with optional Shiki `highlight`, embedded TSX `components`, heading IDs, TOC, and reading time. */
+export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}): {
   html: string
   headings: ContentHeading[]
   wordCount: number
   readingMinutes: number
 } {
-  const rawHtml = Bun.markdown.html(body, {
+  const slots: string[] = []
+  let processed = body
+
+  // 1. Extract fenced code blocks before component expansion so `<Tag>` inside ```code``` is never treated as a component
+  if (options.highlight !== undefined || options.components !== undefined) {
+    processed = processed.replace(FENCE_RE, (full, _fence: string, info: string, code: string) => {
+      if (options.highlight !== undefined) {
+        const lang = info.trim().split(/\s+/)[0] || undefined
+        const idx = slots.length
+        slots.push(options.highlight(code.replace(/\n$/, ''), lang))
+        return `\n\n<div data-kay-md-slot="${idx}"></div>\n\n`
+      }
+      // Protect code fences from component expansion when only components are configured
+      const idx = slots.length
+      slots.push(Bun.markdown.html(full, { tables: true, strikethrough: true, tasklists: true, autolinks: true }))
+      return `\n\n<div data-kay-md-slot="${idx}"></div>\n\n`
+    })
+  }
+
+  // 2. Expand embedded TSX components
+  if (options.components !== undefined)
+    processed = expandComponents(processed, options.components, options, slots)
+
+  // 3. Render remaining Markdown via native Zig Bun.markdown.html
+  let html = Bun.markdown.html(processed, {
     tables: true,
     strikethrough: true,
     tasklists: true,
     autolinks: true,
   })
 
+  // 4. Add unique heading IDs & collect TOC
   const headings: ContentHeading[] = []
   const usedIds = new Map<string, number>()
 
-  const html = rawHtml.replace(/<h([1-6])>([\s\S]*?)<\/h\1>/g, (_match, levelStr: string, inner: string) => {
+  html = html.replace(/<h([1-6])>([\s\S]*?)<\/h\1>/g, (_match, levelStr: string, inner: string) => {
     const level = Number(levelStr)
     const text = stripTags(inner)
     const base = slugifyHeading(text)
@@ -158,6 +343,11 @@ export function renderMarkdown(body: string): {
     headings.push({ level, id, text })
     return `<h${level} id="${id}">${inner}</h${level}>`
   })
+
+  // 5. Splice highlighted code blocks & embedded TSX components back in
+  if (slots.length > 0) {
+    html = html.replace(/<div data-kay-md-slot="(\d+)"><\/div>/g, (_m, idxStr: string) => slots[Number(idxStr)] ?? '')
+  }
 
   const words = body.trim().split(/\s+/).filter(Boolean).length
   const readingMinutes = Math.max(1, Math.ceil(words / 220))
@@ -180,8 +370,8 @@ function walkMarkdownFiles(dir: string, out: string[] = []): string[] {
 function defaultSort<T>(a: ContentEntry<T>, b: ContentEntry<T>): number {
   const ad = (a.data as Record<string, unknown>).date
   const bd = (b.data as Record<string, unknown>).date
-  const at = typeof ad === 'string' || typeof ad === 'number' ? Date.parse(String(ad)) : Number.NaN
-  const bt = typeof bd === 'string' || typeof bd === 'number' ? Date.parse(String(bd)) : Number.NaN
+  const at = ad instanceof Date ? ad.getTime() : (typeof ad === 'string' || typeof ad === 'number' ? Date.parse(String(ad)) : Number.NaN)
+  const bt = bd instanceof Date ? bd.getTime() : (typeof bd === 'string' || typeof bd === 'number' ? Date.parse(String(bd)) : Number.NaN)
   if (!Number.isNaN(at) && !Number.isNaN(bt) && at !== bt)
     return bt - at
   return a.slug.localeCompare(b.slug)
@@ -190,17 +380,23 @@ function defaultSort<T>(a: ContentEntry<T>, b: ContentEntry<T>): number {
 export function defineCollection<TData = Record<string, unknown>>(options: CollectionOptions<TData>): Collection<TData> {
   const absDir = resolve(options.dir)
   const includeDrafts = options.includeDrafts ?? false
+  const localized = options.localized ?? false
+  const defaultLocale = options.defaultLocale ?? 'en'
+  const renderOpts: RenderMarkdownOptions = {
+    highlight: options.highlight,
+    components: options.components,
+  }
   const cache = new Map<string, { mtimeMs: number, entry: ContentEntry<TData> }>()
 
-  function loadFile(absFile: string): ContentEntry<TData> {
+  function loadFile(absFile: string, baseDir: string, entryLocale?: string): ContentEntry<TData> {
     const mtimeMs = statSync(absFile).mtimeMs
     const cached = cache.get(absFile)
     if (cached !== undefined && cached.mtimeMs === mtimeMs)
       return cached.entry
 
-    const raw = readFileSync(absFile, 'utf8')
-    const { data: rawData, body } = parseFrontmatter(raw)
-    const slug = relative(absDir, absFile)
+    const rawSource = readFileSync(absFile, 'utf8')
+    const { data: rawData, body } = parseFrontmatter(rawSource)
+    const slug = relative(baseDir, absFile)
       .replace(/\\/g, '/')
       .replace(/\.(?:md|markdown)$/, '')
       .replace(/\/index$/, '')
@@ -220,9 +416,10 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       data = rawData as TData
     }
 
-    const rendered = renderMarkdown(body)
+    const rendered = renderMarkdown(body, renderOpts)
     const entry: ContentEntry<TData> = {
       slug,
+      ...(entryLocale !== undefined ? { locale: entryLocale } : {}),
       file: absFile,
       data,
       body,
@@ -235,11 +432,13 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     return entry
   }
 
-  function all(): ContentEntry<TData>[] {
-    const files = walkMarkdownFiles(absDir)
+  function all(locale?: string): ContentEntry<TData>[] {
+    const targetLocale = localized ? (locale ?? defaultLocale) : undefined
+    const scanDir = targetLocale !== undefined ? join(absDir, targetLocale) : absDir
+    const files = walkMarkdownFiles(scanDir)
     const entries: ContentEntry<TData>[] = []
     for (const f of files) {
-      const entry = loadFile(f)
+      const entry = loadFile(f, scanDir, targetLocale)
       if (!includeDrafts && (entry.data as Record<string, unknown>).draft === true)
         continue
       entries.push(entry)
@@ -250,20 +449,20 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
 
   return {
     all,
-    get(slug) {
+    get(slug, locale) {
       const clean = slug.replace(/^\/+|\/+$/g, '')
-      return all().find(e => e.slug === clean)
+      return all(locale).find(e => e.slug === clean)
     },
-    byTag(tag) {
+    byTag(tag, locale) {
       const needle = tag.toLowerCase()
-      return all().filter((e) => {
+      return all(locale).filter((e) => {
         const tags = (e.data as Record<string, unknown>).tags
         return Array.isArray(tags) && tags.some(t => String(t).toLowerCase() === needle)
       })
     },
-    paths(prefix = '') {
+    paths(prefix = '', locale) {
       const base = prefix.replace(/\/$/, '')
-      return all().map(e => `${base}/${e.slug}`)
+      return all(locale).map(e => `${base}/${e.slug}`)
     },
     clearCache() {
       cache.clear()
@@ -278,6 +477,7 @@ export interface RssFeedConfig<TData = Record<string, unknown>> {
   description: string
   site: string
   collection: Collection<TData>
+  locale?: string | undefined
   /** URL prefix prepended to each entry's slug (e.g. '/blog'). */
   linkPrefix?: string | undefined
   mapItem?: ((entry: ContentEntry<TData>) => {
@@ -300,14 +500,14 @@ function escapeXml(str: string): string {
 export function renderRss<TData>(feed: RssFeedConfig<TData>): string {
   const site = feed.site.replace(/\/$/, '')
   const prefix = (feed.linkPrefix ?? '').replace(/\/$/, '')
-  const items = feed.collection.all().map((entry) => {
-    const raw = entry.data as Record<string, unknown>
+  const items = feed.collection.all(feed.locale).map((entry) => {
+    const rawData = entry.data as Record<string, unknown>
     const mapped = feed.mapItem
       ? feed.mapItem(entry)
       : {
-          title: String(raw.title ?? entry.slug),
-          description: typeof raw.description === 'string' ? raw.description : undefined,
-          date: raw.date as string | Date | undefined,
+          title: String(rawData.title ?? entry.slug),
+          description: typeof rawData.description === 'string' ? rawData.description : undefined,
+          date: rawData.date as string | Date | undefined,
           link: `${site}${prefix}/${entry.slug}`,
         }
     const link = mapped.link ?? `${site}${prefix}/${entry.slug}`

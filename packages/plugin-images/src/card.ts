@@ -1,0 +1,160 @@
+// Build-time OG shareCard() generator for @kayjs/images:
+// Renders a crisp 1200x630 SVG social card and rasterizes to PNG via `magick` when available
+// (cached by content hash in `.kay-cache/images/`), with zero npm binary dependencies.
+
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+
+export interface ShareCardDefaults {
+  /** Base URL prepended to returned card URL (optional, e.g. 'https://log.kaynooo.fr'). */
+  site?: string | undefined
+  /** Output public directory where `og/*.png` is written (default: `dist/public`). */
+  publicDir?: string | undefined
+  /** Disk cache directory (default: `.kay-cache/images`). */
+  cacheDir?: string | undefined
+  background?: string | undefined
+  color?: string | undefined
+  accent?: string | undefined
+  mutedColor?: string | undefined
+  fontFamily?: string | undefined
+  width?: number | undefined
+  height?: number | undefined
+}
+
+export interface ShareCardInput {
+  title: string
+  subtitle?: string | undefined
+  badge?: string | undefined
+  /** Optional inline SVG markup or path to an SVG file embedded on the right side of the card. */
+  image?: string | undefined
+  background?: string | undefined
+  color?: string | undefined
+  accent?: string | undefined
+}
+
+const CARD_CFG_KEY = Symbol.for('kay.images.cardConfig')
+
+export function configureShareCard(defaults: ShareCardDefaults): void {
+  ;(globalThis as Record<symbol, ShareCardDefaults | undefined>)[CARD_CFG_KEY] = defaults
+}
+
+function getCardConfig(): ShareCardDefaults {
+  return (globalThis as Record<symbol, ShareCardDefaults | undefined>)[CARD_CFG_KEY] ?? {}
+}
+
+function escapeXml(str: string): string {
+  return str
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
+function wrapLines(text: string, maxChars: number, maxLines: number): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let cur = ''
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w
+    if (next.length > maxChars && cur) {
+      lines.push(cur)
+      cur = w
+      if (lines.length >= maxLines - 1)
+        break
+    }
+    else {
+      cur = next
+    }
+  }
+  if (cur && lines.length < maxLines)
+    lines.push(cur)
+  return lines
+}
+
+function buildCardSvg(input: ShareCardInput, cfg: ShareCardDefaults): string {
+  const width = cfg.width ?? 1200
+  const height = cfg.height ?? 630
+  const bg = input.background ?? cfg.background ?? '#090c13'
+  const fg = input.color ?? cfg.color ?? '#dbe0ea'
+  const accent = input.accent ?? cfg.accent ?? '#f5b83d'
+  const muted = cfg.mutedColor ?? '#8b95aa'
+  const font = cfg.fontFamily ?? 'system-ui, -apple-system, sans-serif'
+
+  const hasGraphic = Boolean(input.image)
+  const titleLines = wrapLines(input.title, hasGraphic ? 20 : 26, 3)
+  const subLines = input.subtitle ? wrapLines(input.subtitle, hasGraphic ? 42 : 56, 2) : []
+
+  const titleStartY = input.badge ? 235 : 210
+  const titleSvg = titleLines
+    .map((line, i) => `<text x="80" y="${titleStartY + i * 76}" fill="${fg}" font-family="${escapeXml(font)}" font-size="62" font-weight="700">${escapeXml(line)}</text>`)
+    .join('')
+
+  const subStartY = titleStartY + titleLines.length * 76 + 26
+  const subSvg = subLines
+    .map((line, i) => `<text x="80" y="${subStartY + i * 38}" fill="${muted}" font-family="${escapeXml(font)}" font-size="28" font-weight="400">${escapeXml(line)}</text>`)
+    .join('')
+
+  const badgeSvg = input.badge
+    ? `<text x="80" y="135" fill="${accent}" font-family="${escapeXml(font)}" font-size="24" font-weight="600" letter-spacing="3">${escapeXml(input.badge.toUpperCase())}</text>`
+    : ''
+
+  let graphicSvg = ''
+  if (input.image) {
+    const rawImg = input.image.trim().startsWith('<svg')
+      ? input.image
+      : (existsSync(input.image) ? readFileSync(input.image, 'utf8') : '')
+    if (rawImg.includes('<svg')) {
+      const dataUri = `data:image/svg+xml;base64,${Buffer.from(rawImg, 'utf8').toString('base64')}`
+      graphicSvg = `<image href="${dataUri}" x="${width - 340}" y="175" width="260" height="260" />`
+    }
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`
+    + `<rect width="${width}" height="${height}" fill="${bg}"/>`
+    + `<rect x="0" y="0" width="${width}" height="8" fill="${accent}"/>`
+    + `<rect x="44" y="44" width="${width - 88}" height="${height - 88}" fill="none" stroke="${muted}" stroke-opacity="0.2" stroke-width="1.5"/>`
+    + badgeSvg
+    + titleSvg
+    + subSvg
+    + graphicSvg
+    + `</svg>`
+}
+
+/** Generate a build-time OG social share card (PNG via ImageMagick when available, SVG fallback) and return its public URL. */
+export function shareCard(input: ShareCardInput, overrides?: ShareCardDefaults): string {
+  const cfg = { ...getCardConfig(), ...overrides }
+  const svg = buildCardSvg(input, cfg)
+  const hash = Bun.hash(svg).toString(36)
+  const slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'card'
+  const publicDir = resolve(cfg.publicDir ?? 'dist/public')
+  const ogDir = join(publicDir, 'og')
+  mkdirSync(ogDir, { recursive: true })
+
+  const hasMagick = Bun.which('magick') !== null
+  const site = cfg.site ? cfg.site.replace(/\/$/, '') : ''
+
+  if (hasMagick) {
+    const fileName = `${slug}-${hash}.png`
+    const outPath = join(ogDir, fileName)
+    const cacheDir = resolve(cfg.cacheDir ?? '.kay-cache/images')
+    mkdirSync(cacheDir, { recursive: true })
+    const cachedPng = join(cacheDir, `og-${fileName}`)
+
+    if (existsSync(cachedPng)) {
+      writeFileSync(outPath, readFileSync(cachedPng))
+      return `${site}/og/${fileName}`
+    }
+
+    const tmpSvg = join(cacheDir, `og-${slug}-${hash}.svg`)
+    writeFileSync(tmpSvg, svg)
+    const proc = Bun.spawnSync(['magick', tmpSvg, cachedPng], { stdout: 'pipe', stderr: 'pipe' })
+    if (proc.exitCode === 0 && existsSync(cachedPng)) {
+      writeFileSync(outPath, readFileSync(cachedPng))
+      return `${site}/og/${fileName}`
+    }
+  }
+
+  const svgFile = `${slug}-${hash}.svg`
+  writeFileSync(join(ogDir, svgFile), svg)
+  return `${site}/og/${svgFile}`
+}
