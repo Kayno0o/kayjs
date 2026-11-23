@@ -547,6 +547,23 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               const params = cb.params as AstNode[]
               const firstParam = params[0]
               const idxParam = params[1]?.type === 'Identifier' ? params[1].name as string : undefined
+
+              // Fast path: provably static constant array (e.g. `NAV.map(...)`) -> lightweight `eachStatic` (0 bytes of LIS reconciler!)
+              const isStaticArr = expr.callee.object.type === 'Identifier' && !scopeRewrites.has(expr.callee.object.name as string)
+              if (isStaticArr) {
+                const rawParams = params.map(p => code.slice(p.start, p.end)).join(', ')
+                const shadowed = new Map(scopeRewrites)
+                for (const p of params) {
+                  const names = new Set<string>()
+                  collectPatternNames(p, names)
+                  for (const n of names)
+                    shadowed.delete(n)
+                }
+                const rowBody = compileRootJsx(cbBody, shadowed)
+                ops.push(`${use('eachStatic')}(${elVar}, ${anchorVar}, ${eachCode}, (${rawParams}) => ${rowBody});`)
+                continue
+              }
+
               const keyAst = extractKeyExpr(cbBody)
 
               const rowSig = freshVar('_r')
@@ -851,9 +868,19 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
   if (used.size > 0) {
     const hasLoop = used.delete('loop')
+    const EXTRA_HELPERS = ['insert', 'omit', 'setInnerHtml', 'show', 'spread']
+    const usedExtras: string[] = []
+    for (const name of EXTRA_HELPERS) {
+      if (used.delete(name))
+        usedExtras.push(name)
+    }
     if (used.size > 0) {
       const specifiers = [...used].sort().map(name => `${name} as __${name}`).join(', ')
       header += `import { ${specifiers} } from 'kay/dom';\n`
+    }
+    if (usedExtras.length > 0) {
+      const specifiers = usedExtras.map(name => `${name} as __${name}`).join(', ')
+      header += `import { ${specifiers} } from 'kay/dom-extras';\n`
     }
     if (hasLoop)
       header += `import { loop as __loop } from 'kay/dom-loop';\n`

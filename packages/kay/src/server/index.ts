@@ -127,11 +127,14 @@ interface LoadedErrorModule {
   default: (props: { error: unknown }) => Html | string | Promise<Html | string>
 }
 
+type EmbeddedBody = Uint8Array<ArrayBuffer> | string
+
 interface EmbeddedServerConfig {
   manifest: BuildManifest
   modules: Record<string, unknown>
-  assets: Record<string, Uint8Array<ArrayBuffer>>
-  publicAssets?: Record<string, Uint8Array<ArrayBuffer>> | undefined
+  assets: Record<string, EmbeddedBody>
+  publicAssets?: Record<string, EmbeddedBody> | undefined
+  publicEtags?: Record<string, string> | undefined
   prerendered: Record<string, string>
   assetPrefix?: string | undefined
   lang?: string | undefined
@@ -166,7 +169,7 @@ function finalizeResponse(res: Response, cookieStore: CookieStore, security: Sec
 }
 
 export async function createServerFromEmbedded(config: EmbeddedServerConfig): Promise<KayApp> {
-  const { manifest, modules, assets, publicAssets = {}, prerendered, lang = 'en', security, plugins = [] } = config
+  const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered, lang = 'en', security, plugins = [] } = config
   const assetPrefix = (config.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const trustedOrigins = config.trustedOrigins ? new Set(config.trustedOrigins) : undefined
   const alwaysLoadRuntime = plugins.some(p => Boolean(p.clientEntry))
@@ -206,17 +209,19 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const hasPluginRequestHooks = globalMiddlewares.length > 0 || pluginRewrites.length > 0 || htmlTransformers.length > 0 || pluginRouteEntries.size > 0
 
   // Hashed build asset table (immutable cache)
-  const assetMap = new Map<string, { body: Uint8Array<ArrayBuffer>, type: string }>()
+  const assetMap = new Map<string, { body: EmbeddedBody, type: string }>()
   for (const [rel, body] of Object.entries(assets)) {
     assetMap.set(`${assetPrefix}/${rel}`, { body, type: MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream' })
   }
 
   // Static public/ file table (ETag + 304 support)
-  const publicMap = new Map<string, { body: Uint8Array<ArrayBuffer>, type: string, etag: string }>()
+  const publicMap = new Map<string, { body: EmbeddedBody, type: string, etag: string }>()
   for (const [rel, body] of Object.entries(publicAssets)) {
-    const etag = `W/"${Bun.hash(body).toString(36)}"`
+    const etag = publicEtags[rel] ?? (typeof body === 'string' ? `W/"${Bun.hash(rel).toString(36)}"` : `W/"${Bun.hash(body).toString(36)}"`)
     publicMap.set(`/${rel}`, { body, type: MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream', etag })
   }
+
+  const toResponseBody = (body: EmbeddedBody) => typeof body === 'string' ? Bun.file(body) : body
 
   // Register server actions and assign their live URLs
   const actionHandlers = new Map<string, ServerAction<unknown, unknown>>()
@@ -495,7 +500,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     // 1. Static client assets
     const asset = assetMap.get(pathname)
     if (asset !== undefined) {
-      return new Response(asset.body, {
+      return new Response(toResponseBody(asset.body), {
         status: 200,
         headers: {
           'content-type': asset.type,
@@ -510,7 +515,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       if (pub !== undefined) {
         if (request.headers.get('if-none-match') === pub.etag)
           return new Response(null, { status: 304, headers: { 'etag': pub.etag, 'cache-control': 'public, max-age=3600' } })
-        return new Response(request.method === 'HEAD' ? null : pub.body, {
+        return new Response(request.method === 'HEAD' ? null : toResponseBody(pub.body), {
           status: 200,
           headers: {
             'content-type': pub.type,
@@ -612,25 +617,25 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const routes: Record<string, Response | ((req: Request) => Response | Promise<Response>)> = {}
 
     for (const [path, asset] of assetMap) {
-      routes[path] = new Response(asset.body, {
-        status: 200,
-        headers: {
-          'content-type': asset.type,
-          'cache-control': 'public, max-age=31536000, immutable',
-        },
-      })
+      const headers = {
+        'content-type': asset.type,
+        'cache-control': 'public, max-age=31536000, immutable',
+      }
+      routes[path] = typeof asset.body === 'string'
+        ? () => new Response(Bun.file(asset.body as string), { status: 200, headers })
+        : new Response(asset.body, { status: 200, headers })
     }
 
     for (const [path, pub] of publicMap) {
       if (!(path in routes)) {
-        routes[path] = new Response(pub.body, {
-          status: 200,
-          headers: {
-            'content-type': pub.type,
-            'etag': pub.etag,
-            'cache-control': 'public, max-age=3600',
-          },
-        })
+        const headers = {
+          'content-type': pub.type,
+          'etag': pub.etag,
+          'cache-control': 'public, max-age=3600',
+        }
+        routes[path] = typeof pub.body === 'string'
+          ? () => new Response(Bun.file(pub.body as string), { status: 200, headers })
+          : new Response(pub.body, { status: 200, headers })
       }
     }
 

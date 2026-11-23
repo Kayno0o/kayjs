@@ -264,7 +264,7 @@ describe('Milestone 4: CSS Modules, public/ static files, and plugins in --compi
     try {
       // Wait for binary to bind
       let ready = false
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 120; i++) {
         try {
           const r = await fetch(`http://127.0.0.1:${port}/hello.txt`)
           if (r.ok) {

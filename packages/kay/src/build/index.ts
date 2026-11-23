@@ -67,6 +67,8 @@ export function resolveKaySpecifier(specifier: string): string | undefined {
     return join(KAY_SRC_ROOT, 'index.ts')
   if (specifier === 'kay/dom' || specifier === '@kayjs/kay/dom')
     return join(KAY_SRC_ROOT, 'dom/index.ts')
+  if (specifier === 'kay/dom-extras' || specifier === '@kayjs/kay/dom-extras')
+    return join(KAY_SRC_ROOT, 'dom/extras.ts')
   if (specifier === 'kay/dom-loop' || specifier === '@kayjs/kay/dom-loop')
     return join(KAY_SRC_ROOT, 'dom/loop.ts')
   if (specifier === 'kay/action' || specifier === '@kayjs/kay/action')
@@ -334,8 +336,6 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     const entryPoints: string[] = []
 
     const compiledDomCache = new Map<string, string>()
-    const usedCoreExports = new Set<string>()
-    const usedDomExports = new Set<string>()
     let hasDeferredHydrate = false
     let hasClientOnlyHydrate = false
 
@@ -352,45 +352,12 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         hasClientOnlyHydrate = true
     }
 
-    const CORE_IMPORT_RE = /import\s*\{([^}]+)\}\s*from\s*['"](?:@kayjs\/)?kay['"]/g
-    const DOM_IMPORT_RE = /import\s*\{([^}]+)\}\s*from\s*['"](?:@kayjs\/)?kay\/dom['"]/g
-    const CORE_SHARABLE = new Set(['signal', 'computed', 'effect', 'batch', 'untrack', 'root', 'onCleanup', 'onMount', 'getOwner'])
-
-    function collectUsedFrom(compiled: string): void {
-      for (const m of compiled.matchAll(CORE_IMPORT_RE)) {
-        for (const part of m[1]!.split(',')) {
-          const orig = part.trim().split(/\s+as\s+/)[0]!.trim()
-          if (CORE_SHARABLE.has(orig))
-            usedCoreExports.add(orig)
-        }
-      }
-      for (const m of compiled.matchAll(DOM_IMPORT_RE)) {
-        for (const part of m[1]!.split(',')) {
-          const orig = part.trim().split(/\s+as\s+/)[0]!.trim()
-          if (orig !== '')
-            usedDomExports.add(orig)
-        }
-      }
-    }
-
-    for (const [, target] of islandTargets) {
-      const raw = sources.get(target.file) ?? readFileSync(target.file, 'utf8')
-      const compiled = applyTransforms(compileDom(target.file, raw, { analysis: analyses.get(target.file) }).code, target.file, 'client')
-      compiledDomCache.set(target.file, compiled)
-      collectUsedFrom(compiled)
-    }
-
     const runtimeEntryPath = join(entriesDir, 'runtime.ts')
-    const runtimeDomSet = new Set<string>(['hydrate', ...(hasClientOnlyHydrate ? ['mount'] : []), ...usedDomExports])
-    const runtimeCoreSet = new Set<string>([...usedCoreExports].filter(s => !runtimeDomSet.has(s)))
-
     if (islandTargets.size > 0 || pluginClientEntries.length > 0) {
       const runtimeLines: string[] = []
       if (islandTargets.size > 0) {
         runtimeLines.push(`import { defineIslandElement } from 'kay/island';`)
-        runtimeLines.push(`export { ${[...runtimeDomSet].sort().join(', ')} } from 'kay/dom';`)
-        if (runtimeCoreSet.size > 0)
-          runtimeLines.push(`export { ${[...runtimeCoreSet].sort().join(', ')} } from 'kay';`)
+        runtimeLines.push(`export { hydrate${hasClientOnlyHydrate ? ', mount' : ''} } from 'kay/dom';`)
         runtimeLines.push(`defineIslandElement();`)
       }
       for (const pe of pluginClientEntries)
@@ -410,26 +377,6 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       writeFileSync(entryPath, exportStmt)
       entryPoints.push(entryPath)
     }
-
-    const rewriteRuntimeImports = (src: string, re: RegExp, allowed: Set<string>, fallbackPkg: string): string =>
-      src.replace(re, (full, specList: string) => {
-        const shared: string[] = []
-        const separate: string[] = []
-        for (const part of specList.split(',')) {
-          const trimmed = part.trim()
-          const orig = trimmed.split(/\s+as\s+/)[0]!.trim()
-          if (allowed.has(orig))
-            shared.push(trimmed)
-          else if (trimmed !== '')
-            separate.push(trimmed)
-        }
-        const out: string[] = []
-        if (shared.length > 0)
-          out.push(`import { ${shared.join(', ')} } from ${JSON.stringify(runtimeEntryPath)}`)
-        if (separate.length > 0)
-          out.push(`import { ${separate.join(', ')} } from ${JSON.stringify(fallbackPkg)}`)
-        return out.length > 0 ? out.join(';\n') : full
-      })
 
     const clientPlugin: BunPlugin = {
       name: 'kay-v2-client',
@@ -454,10 +401,9 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           if (compiled === undefined) {
             const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
             compiled = applyTransforms(compileDom(args.path, raw, { analysis: analyses.get(args.path) }).code, args.path, 'client')
+            compiledDomCache.set(args.path, compiled)
           }
-          let rewritten = rewriteRuntimeImports(compiled, CORE_IMPORT_RE, runtimeCoreSet, 'kay')
-          rewritten = rewriteRuntimeImports(rewritten, DOM_IMPORT_RE, runtimeDomSet, 'kay/dom')
-          return { contents: rewritten, loader: 'tsx' }
+          return { contents: compiled, loader: 'tsx' }
         })
       },
     }
@@ -846,16 +792,24 @@ async function compileExecutable(
   if (hasConfig)
     imports.push(`import _kayConfig from ${JSON.stringify(configPath)};`)
 
-  // Embed client assets, public files, and prerendered HTML directly in the binary
+  // Embed client assets and public files natively via `with { type: "file" }` (0 base64, 0 startup decode!)
   const embeddedAssets: string[] = []
+  let assetIdx = 0
   for (const rel of manifest.assets) {
-    const b64 = readFileSync(join(clientDir, rel)).toString('base64')
-    embeddedAssets.push(`${JSON.stringify(rel)}: Uint8Array.from(atob(${JSON.stringify(b64)}), c => c.charCodeAt(0))`)
+    const v = `_a${assetIdx++}`
+    imports.push(`import ${v} from ${JSON.stringify(join(clientDir, rel))} with { type: "file" };`)
+    embeddedAssets.push(`${JSON.stringify(rel)}: ${v}`)
   }
   const embeddedPublic: string[] = []
+  const embeddedPublicEtags: string[] = []
+  let pubIdx = 0
   for (const rel of manifest.publicFiles) {
-    const b64 = readFileSync(join(outDir, 'public', rel)).toString('base64')
-    embeddedPublic.push(`${JSON.stringify(rel)}: Uint8Array.from(atob(${JSON.stringify(b64)}), c => c.charCodeAt(0))`)
+    const abs = join(outDir, 'public', rel)
+    const v = `_p${pubIdx++}`
+    const etag = `W/"${Bun.hash(readFileSync(abs)).toString(36)}"`
+    imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
+    embeddedPublic.push(`${JSON.stringify(rel)}: ${v}`)
+    embeddedPublicEtags.push(`${JSON.stringify(rel)}: ${JSON.stringify(etag)}`)
   }
   const embeddedPrerendered: string[] = []
   for (const r of manifest.routes) {
@@ -878,8 +832,9 @@ async function compileExecutable(
     `const modules = { ${modEntries.join(', ')} };`,
     `const assets = { ${embeddedAssets.join(', ')} };`,
     `const publicAssets = { ${embeddedPublic.join(', ')} };`,
+    `const publicEtags = { ${embeddedPublicEtags.join(', ')} };`,
     `const prerendered = { ${embeddedPrerendered.join(', ')} };`,
-    `const app = await createServerFromEmbedded({ manifest, modules, assets, publicAssets, prerendered, assetPrefix: ${JSON.stringify(assetPrefix)}${cfgSpread} });`,
+    `const app = await createServerFromEmbedded({ manifest, modules, assets, publicAssets, publicEtags, prerendered, assetPrefix: ${JSON.stringify(assetPrefix)}${cfgSpread} });`,
     `const port = Number(process.env.PORT ?? 3000);`,
     `const server = app.serve(port);`,
     `console.log(\`kay server listening on http://localhost:\${server.port}\`);`,

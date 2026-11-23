@@ -1,5 +1,4 @@
 import type { IconData } from './types'
-import { raw } from 'kay/ssr'
 
 export interface IconComponentProps {
   icon: IconData
@@ -20,7 +19,7 @@ export function Icon({ icon, ...rest }: IconComponentProps) {
       aria-hidden={hasLabel ? undefined : 'true'}
       role={hasLabel ? 'img' : undefined}
       {...rest}
-      innerHTML={raw(icon.body)}
+      innerHTML={{ __html: icon.body }}
     />
   )
 }

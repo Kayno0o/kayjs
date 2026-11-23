@@ -12,6 +12,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./dom": "./src/dom/index.ts",
+    "./dom-extras": "./src/dom/extras.ts",
     "./dom-loop": "./src/dom/loop.ts",
     "./action": "./src/dom/action.ts",
     "./island": "./src/dom/island.ts",
