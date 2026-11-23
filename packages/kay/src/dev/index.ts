@@ -42,7 +42,7 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
     const outDir = `.kay-dev/b${n}`
     const t0 = performance.now()
     try {
-      await build({ root, routesDir: options.routesDir, outDir, minify: false })
+      await build({ root, routesDir: options.routesDir, outDir, minify: false, prerender: false })
       currentApp = await createServer({ root, outDir })
       lastError = undefined
       if (n > 2)

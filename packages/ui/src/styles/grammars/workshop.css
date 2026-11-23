@@ -237,7 +237,7 @@
   [data-ui="switch"] [data-part="track"] {
     border: var(--ui-border-w) solid var(--ui-line);
     background: var(--ui-surface);
-    &::after { background: var(--ui-line); inset-block-start: 1px; inset-inline-start: 1px; }
+    &::after { background: var(--ui-line); }
   }
   [data-ui="switch"] input:checked + [data-part="track"] {
     background: var(--ui-accent);

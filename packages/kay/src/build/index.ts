@@ -23,6 +23,8 @@ export interface BuildOptions {
   plugins?: KayPlugin[] | undefined
   /** Export a static site into dist/static (prerenders all static + paths() routes). */
   static?: boolean | undefined
+  /** Run build-time prerendering for routes exporting `prerender = true` (default: true; disabled in `kay dev`). */
+  prerender?: boolean | undefined
   /** Compile into a single standalone executable at this path (or true -> dist/server-bin). */
   compile?: string | boolean | undefined
 }
@@ -507,6 +509,14 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         const resolved = resolveKaySpecifier(args.path)
         return resolved !== undefined ? { path: resolved } : undefined
       })
+      b.onResolve({ filter: /^@kayjs\// }, (args) => {
+        try {
+          return { path: Bun.resolveSync(args.path, args.resolveDir || root) }
+        }
+        catch {
+          return undefined
+        }
+      })
       b.onLoad({ filter: /\.tsx$/ }, (args) => {
         const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
         const analysis = analyses.get(args.path)
@@ -542,6 +552,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     target: 'bun',
     format: 'esm',
     splitting: true,
+    packages: 'external',
     minify: false,
     plugins: [serverPlugin, ...pluginBunPlugins],
   })
@@ -745,8 +756,9 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
 
   writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
 
-  // Step 3: Hybrid Prerendering / Static Export
-  const prerenderRoutes = routeEntries.filter(r => r.prerender)
+  // Step 3: Hybrid Prerendering / Static Export (skipped in `kay dev` where routes render on-demand)
+  const shouldPrerender = options.prerender !== false || options.static === true
+  const prerenderRoutes = shouldPrerender ? routeEntries.filter(r => r.prerender) : []
   if (prerenderRoutes.length > 0) {
     const { createServer } = await import('../server/index')
     const app = await createServer({ root, outDir: relative(root, outDir), assetPrefix, plugins })

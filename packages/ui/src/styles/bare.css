@@ -126,15 +126,15 @@
     &::after {
       content: '';
       position: absolute;
-      inset-block-start: 2px;
+      inset-block: 2px;
       inset-inline-start: 2px;
-      inline-size: calc(1.25rem - 4px);
-      block-size: calc(1.25rem - 4px);
-      transition: transform 140ms ease;
+      aspect-ratio: 1;
+      transition: inset-inline-start 140ms ease, transform 140ms ease;
     }
   }
   [data-ui="switch"] input:checked + [data-part="track"]::after {
-    transform: translateX(1rem);
+    inset-inline-start: calc(100% - 2px);
+    transform: translateX(-100%);
   }
   [data-ui="radio-group"] {
     border: 0;
