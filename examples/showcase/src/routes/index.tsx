@@ -1,3 +1,5 @@
+import type { RequestContext } from 'kay/server'
+import type { Preferences } from '../actions/preferences'
 import {
   Accordion,
   AccordionItem,
@@ -24,7 +26,20 @@ import {
   Switch,
   Tabs,
 } from '@kayjs/ui'
+import { savePreferences } from '../actions/preferences'
 import { ToastTrigger } from '../components/ToastTrigger'
+
+export function load(ctx: RequestContext): { prefs: Preferences, saved: boolean } {
+  let prefs: Preferences = { project: 'my-kay-app', strict: true, compile: true, deploy: 'binary' }
+  const raw = ctx.cookies.get('showcase_prefs')
+  if (raw) {
+    try {
+      prefs = { ...prefs, ...(JSON.parse(raw) as Partial<Preferences>) }
+    }
+    catch {}
+  }
+  return { prefs, saved: ctx.url.searchParams.get('saved') === '1' }
+}
 
 const SAMPLE_ROWS = [
   { id: '1', pkg: 'kay', loc: 6400, role: 'Core compiler, signals, SSR, server' },
@@ -35,8 +50,10 @@ const SAMPLE_ROWS = [
   { id: '6', pkg: '@kayjs/seo', loc: 230, role: 'Meta, JSON-LD, sitemap, self-hosted fonts' },
 ]
 
-export default async function ShowcasePage({ locals, url }: { locals?: { user?: { email: string } }, url?: URL }) {
+export default function ShowcasePage({ data, locals, url }: { data?: { prefs: Preferences, saved: boolean }, locals?: { user?: { email: string } }, url?: URL }) {
   const blockedNext = !locals?.user ? url?.searchParams.get('next') : null
+  const prefs = data?.prefs ?? { project: 'my-kay-app', strict: true, compile: true, deploy: 'binary' }
+  const saved = data?.saved ?? false
   return (
     <Stack gap="2rem">
       {blockedNext && (
@@ -84,27 +101,34 @@ export default async function ShowcasePage({ locals, url }: { locals?: { user?: 
       <Grid min="19rem" gap="1.25rem">
         <Card>
           <CardHeader>Zero-JS Form Controls</CardHeader>
-          <CardBody>
-            <Stack gap="1rem">
-              <Field id="project" label="Project Name" hint="Lowercase slug">
-                <input id="project" name="project" type="text" placeholder="my-kay-app" />
-              </Field>
-              <Switch name="strict" label="Strict zero-JS static routes" checked />
-              <Checkbox name="compile" label="Build single executable (--compile)" checked />
-              <RadioGroup
-                name="deploy"
-                legend="Target"
-                defaultValue="binary"
-                options={[
-                  { value: 'binary', label: 'Single Bun binary', hint: '35ms cold start' },
-                  { value: 'static', label: 'Static HTML export', hint: 'CDN-ready' },
-                ]}
-              />
-            </Stack>
-          </CardBody>
-          <CardFooter>
-            <Button tone="accent">Save preferences</Button>
-          </CardFooter>
+          <form action={savePreferences} method="post">
+            <CardBody>
+              <Stack gap="1rem">
+                {saved && (
+                  <Notice tone="success">
+                    Saved <strong>{prefs.project}</strong> ({prefs.deploy}) with 0 KB form JS!
+                  </Notice>
+                )}
+                <Field id="project" label="Project Name" hint="Lowercase slug">
+                  <input id="project" name="project" type="text" value={prefs.project} placeholder="my-kay-app" />
+                </Field>
+                <Switch name="strict" label="Strict zero-JS static routes" checked={prefs.strict} />
+                <Checkbox name="compile" label="Build single executable (--compile)" checked={prefs.compile} />
+                <RadioGroup
+                  name="deploy"
+                  legend="Target"
+                  defaultValue={prefs.deploy}
+                  options={[
+                    { value: 'binary', label: 'Single Bun binary', hint: '35ms cold start' },
+                    { value: 'static', label: 'Static HTML export', hint: 'CDN-ready' },
+                  ]}
+                />
+              </Stack>
+            </CardBody>
+            <CardFooter>
+              <Button type="submit" tone="accent">Save preferences</Button>
+            </CardFooter>
+          </form>
         </Card>
 
         <Card>
