@@ -227,8 +227,13 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         if (entry.hasLoad && typeof mod.load === 'function') {
           const { ctx } = makeRequestContext(request, {})
           const loaded = mod.load(ctx)
-          if (loaded instanceof Promise)
-            return loaded.then(data => renderPage(data !== undefined ? { data } : {}))
+          if (loaded instanceof Promise) {
+            return loaded.then(data =>
+              data instanceof Response ? data : renderPage(data !== undefined ? { data } : {}),
+            )
+          }
+          if (loaded instanceof Response)
+            return loaded
           return renderPage(loaded !== undefined ? { data: loaded } : {})
         }
         return renderPage({})
@@ -253,6 +258,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       return finalizeResponse(new Response('Method Not Allowed', { status: 405 }), cookieStore, security)
 
     const data = entry.hasLoad && typeof mod.load === 'function' ? await mod.load(ctx) : undefined
+    if (data instanceof Response)
+      return finalizeResponse(data, cookieStore, security)
     const pageProps: Record<string, unknown> = {
       params: ctx.params,
       locals: ctx.locals,
@@ -477,13 +484,27 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         effectivePath = nextPath
     }
 
-    // Check custom plugin routes first (e.g. GET /sitemap.xml, POST /auth/callback)
+    // Check custom plugin routes first (e.g. GET /sitemap.xml, POST /auth/callback, GET /api/board)
+    // Run global plugin middlewares so ctx.locals (e.g. auth user/session) is available in plugin routes too.
     const pluginMatch = pluginRouter.match(effectivePath)
     if (pluginMatch !== undefined) {
       const methodHandler = pluginMatch.data.get(request.method.toUpperCase()) ?? pluginMatch.data.get('ALL')
       if (methodHandler !== undefined) {
         ctx.params = pluginMatch.params
-        const res = await methodHandler(ctx)
+        if (globalMiddlewares.length === 0) {
+          const res = await methodHandler(ctx)
+          return finalizeResponse(res, cookieStore, security)
+        }
+        let index = -1
+        const dispatch = async (i: number): Promise<Response> => {
+          if (i <= index)
+            throw new Error('kay: middleware called next() multiple times')
+          index = i
+          if (i < globalMiddlewares.length)
+            return globalMiddlewares[i]!(ctx, () => dispatch(i + 1))
+          return methodHandler(ctx)
+        }
+        const res = await dispatch(0)
         return finalizeResponse(res, cookieStore, security)
       }
     }

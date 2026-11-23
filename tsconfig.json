@@ -20,6 +20,8 @@
       "@kayjs/auth": ["./packages/plugin-auth/src/index.ts"],
       "@kayjs/auth/sqlite": ["./packages/plugin-auth/src/sqlite.ts"],
       "@kayjs/auth/oauth": ["./packages/plugin-auth/src/oauth.ts"],
+      "@kayjs/live": ["./packages/plugin-live/src/index.ts"],
+      "@kayjs/live/client": ["./packages/plugin-live/src/client.ts"],
       "@kayjs/ui": ["./packages/ui/src/index.ts"],
       "@kayjs/ui/plugin": ["./packages/ui/src/plugin.ts"]
     }

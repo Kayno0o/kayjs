@@ -51,6 +51,13 @@
         "kay": "^2.0.0-alpha.0",
       },
     },
+    "packages/plugin-live": {
+      "name": "@kayjs/live",
+      "version": "2.0.0-alpha.0",
+      "peerDependencies": {
+        "kay": "^2.0.0-alpha.0",
+      },
+    },
     "packages/plugin-mail": {
       "name": "@kayjs/mail",
       "version": "2.0.0-alpha.0",
@@ -97,6 +104,8 @@
     "@kayjs/icons": ["@kayjs/icons@workspace:packages/plugin-icons"],
 
     "@kayjs/images": ["@kayjs/images@workspace:packages/plugin-images"],
+
+    "@kayjs/live": ["@kayjs/live@workspace:packages/plugin-live"],
 
     "@kayjs/mail": ["@kayjs/mail@workspace:packages/plugin-mail"],
 

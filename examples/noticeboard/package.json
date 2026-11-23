@@ -1,0 +1,11 @@
+{
+  "name": "kay-v2-noticeboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun ../../packages/kay/src/cli/index.ts dev",
+    "build": "bun ../../packages/kay/src/cli/index.ts build",
+    "start": "bun ../../packages/kay/src/cli/index.ts start",
+    "compile": "bun ../../packages/kay/src/cli/index.ts build --compile ./noticeboard-server"
+  }
+}
