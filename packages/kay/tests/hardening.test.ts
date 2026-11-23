@@ -17,8 +17,19 @@ function makeTemp(prefix: string): string {
   return dir
 }
 function linkKay(dir: string): void {
-  mkdirSync(join(dir, 'node_modules'), { recursive: true })
+  mkdirSync(join(dir, 'node_modules/@kayjs'), { recursive: true })
   symlinkSync(KAY_PKG_DIR, join(dir, 'node_modules/kay'), 'dir')
+  const pkgRoot = join(KAY_PKG_DIR, '..')
+  const links: Record<string, string> = {
+    auth: 'plugin-auth',
+    content: 'plugin-content',
+    live: 'plugin-live',
+    mail: 'plugin-mail',
+    seo: 'plugin-seo',
+    ui: 'ui',
+  }
+  for (const [name, folder] of Object.entries(links))
+    symlinkSync(join(pkgRoot, folder), join(dir, 'node_modules/@kayjs', name), 'dir')
 }
 
 afterAll(() => {
@@ -348,5 +359,52 @@ describe('Milestone 4: kay new scaffolder & kay check validator', () => {
     const checkFail = await checkProject(fullDir, { skipTypecheck: true })
     expect(checkFail.ok).toBe(false)
     expect(checkFail.errors.some(e => e.includes('async route component'))).toBe(true)
+  })
+
+  it('scaffolds blog (0 KB JS + RSS) and app (@kayjs/auth + @kayjs/ui) templates that build and run end-to-end', async () => {
+    const dir = makeTemp('kay-m4-new-eco-')
+
+    // 1. Blog template (0 KB JS, prerendered posts, /rss.xml, /sitemap.xml)
+    const blogDir = join(dir, 'my-blog')
+    scaffoldProject(blogDir, { template: 'blog' })
+    linkKay(blogDir)
+    const blogCheck = await checkProject(blogDir, { skipTypecheck: true })
+    expect(blogCheck.ok).toBe(true)
+
+    const blogApp = await testApp({ root: blogDir })
+    expect(blogApp.manifest!.runtimeScript).toBeUndefined() // 0 KB client JS!
+    const blogHome = await blogApp.get('/')
+    expect(blogHome.status).toBe(200)
+    expect(await blogHome.text()).toContain('Welcome to my-blog')
+    const blogPost = await blogApp.get('/blog/welcome')
+    expect(blogPost.status).toBe(200)
+    expect(await blogPost.text()).toContain('<h2 id="fast-by-default">Fast by Default</h2>')
+    const rss = await blogApp.get('/rss.xml')
+    expect(rss.status).toBe(200)
+    expect(await rss.text()).toContain('<title>Welcome to my-blog</title>')
+
+    // 2. App template (@kayjs/auth + @kayjs/ui + guarded /dashboard)
+    const appDir = join(dir, 'my-saas')
+    scaffoldProject(appDir, { template: 'app' })
+    linkKay(appDir)
+    const appCheck = await checkProject(appDir, { skipTypecheck: true })
+    expect(appCheck.ok).toBe(true)
+
+    const saasApp = await testApp({ root: appDir })
+    const unauth = await saasApp.get('/dashboard')
+    expect(unauth.status).toBe(302)
+    expect(unauth.headers.get('location')).toBe('/login?next=%2Fdashboard')
+
+    const reg = await saasApp.submit('/auth/signup', {
+      email: 'founder@my-saas.dev',
+      password: 'strong-password-123',
+      redirect: '/dashboard',
+    })
+    expect(reg.status).toBe(303)
+    expect(reg.headers.get('location')).toBe('/dashboard')
+
+    const dash = await saasApp.get('/dashboard')
+    expect(dash.status).toBe(200)
+    expect(await dash.text()).toContain('founder@my-saas.dev')
   })
 })

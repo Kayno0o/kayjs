@@ -1,11 +1,26 @@
 {
   "name": "@kayjs/spa",
   "version": "2.0.0-alpha.0",
+  "description": "Opt-in SPA navigation with persistent islands plugin for Kay v2",
+  "license": "MIT",
   "type": "module",
-  "sideEffects": ["./src/client.ts"],
+  "sideEffects": [
+    "./src/client.ts"
+  ],
+  "files": [
+    "src"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kayno0o/kayjs",
+    "directory": "packages/plugin-spa"
   },
   "peerDependencies": {
     "kay": "^2.0.0-alpha.0"

@@ -1,14 +1,16 @@
 {
   "name": "kay",
   "version": "2.0.0-alpha.0",
+  "description": "Bun-native TSX web framework with zero-directive automatic islands, fine-grained signals, and single-binary deploys",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "bin": {
     "kay": "./src/cli/index.ts"
   },
-  "dependencies": {
-    "oxc-parser": "^0.155.0"
-  },
+  "files": [
+    "src"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./dom": "./src/dom/index.ts",
@@ -24,5 +26,16 @@
     "./test": "./src/test/index.ts",
     "./jsx-runtime": "./src/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx-runtime.ts"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kayno0o/kayjs",
+    "directory": "packages/kay"
+  },
+  "dependencies": {
+    "oxc-parser": "^0.155.0"
   }
 }

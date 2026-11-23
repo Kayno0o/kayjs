@@ -1,10 +1,23 @@
 {
   "name": "@kayjs/tailwind",
   "version": "2.0.0-alpha.0",
+  "description": "Tailwind CSS v4 integration plugin for Kay v2",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "files": [
+    "src"
+  ],
   "exports": {
     ".": "./src/index.ts"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kayno0o/kayjs",
+    "directory": "packages/plugin-tailwind"
   },
   "peerDependencies": {
     "kay": "^2.0.0-alpha.0"

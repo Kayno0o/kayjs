@@ -1,10 +1,23 @@
 {
   "name": "@kayjs/mail",
   "version": "2.0.0-alpha.0",
+  "description": "Zero-dependency email delivery (Resend / custom transport) and dev outbox plugin for Kay v2",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "files": [
+    "src"
+  ],
   "exports": {
     ".": "./src/index.ts"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kayno0o/kayjs",
+    "directory": "packages/plugin-mail"
   },
   "peerDependencies": {
     "kay": "^2.0.0-alpha.0"

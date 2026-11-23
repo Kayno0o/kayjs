@@ -5,8 +5,10 @@
     "packages/*"
   ],
   "scripts": {
+    "check": "tsc --noEmit",
     "test": "bun test packages/kay/tests",
-    "bench": "bun bench-app/bench.ts"
+    "bench": "bun bench-app/bench.ts",
+    "verify": "tsc --noEmit && bun test packages/kay/tests && bun bench-app/build.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^21.0.4",

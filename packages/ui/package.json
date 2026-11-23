@@ -1,8 +1,13 @@
 {
   "name": "@kayjs/ui",
   "version": "2.0.0-alpha.0",
+  "description": "Platform-first headless UI primitives and pure CSS @layer kui Style Grammars for Kay v2",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "files": [
+    "src"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./plugin": "./src/plugin.ts",
@@ -11,6 +16,14 @@
     "./grammars/workshop.css": "./src/styles/grammars/workshop.css",
     "./grammars/console.css": "./src/styles/grammars/console.css",
     "./grammars/soft.css": "./src/styles/grammars/soft.css"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kayno0o/kayjs",
+    "directory": "packages/ui"
   },
   "peerDependencies": {
     "kay": "^2.0.0-alpha.0"

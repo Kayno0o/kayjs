@@ -115,7 +115,7 @@ cd examples/noticeboard && bun run dev
 ## CLI Commands
 
 ```sh
-kay new my-app [--template fullstack]  # Scaffold a new project
+kay new my-app [--template minimal|fullstack|blog|app]  # Scaffold a new project
 kay check                              # Validate routes, compiler rules & types
 kay dev                                # Fast rebuild + live reload
 kay build                              # Production client + server build

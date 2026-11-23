@@ -36,11 +36,11 @@ const root = resolve(dirArg ?? process.cwd())
 
 if (cmd === 'new') {
   if (!dirArg) {
-    console.error('Usage: kay new <dir> [--template minimal|fullstack] [--force]')
+    console.error('Usage: kay new <dir> [--template minimal|fullstack|blog|app] [--force]')
     process.exit(1)
   }
   const tpl = flagValue('--template')
-  const template = tpl === 'fullstack' ? 'fullstack' : 'minimal'
+  const template = tpl === 'fullstack' || tpl === 'blog' || tpl === 'app' ? tpl : 'minimal'
   const res = scaffoldProject(root, { template, force: hasFlag('--force') })
   console.log(`Created Kay (${template}) project in ${res.root} (${res.files.length} files)`)
   console.log(`\nNext steps:\n  cd ${dirArg}\n  bun install\n  bun run dev`)
@@ -92,7 +92,7 @@ else {
     console.log(`Usage: kay <command> [dir] [options]
 
 Commands:
-  kay new <dir> [--template minimal|fullstack] [--force]
+  kay new <dir> [--template minimal|fullstack|blog|app] [--force]
                                        Scaffold a new Kay project
   kay check [dir]                      Validate routes, compiler rules, and TypeScript types
   kay dev [dir] [--port 3000]          Run dev server with fast reload

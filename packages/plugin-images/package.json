@@ -1,11 +1,24 @@
 {
   "name": "@kayjs/images",
   "version": "2.0.0-alpha.0",
+  "description": "Build-time responsive AVIF/WebP image optimization plugin for Kay v2",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "files": [
+    "src"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./ambient": "./src/ambient.d.ts"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kayno0o/kayjs",
+    "directory": "packages/plugin-images"
   },
   "peerDependencies": {
     "kay": "^2.0.0-alpha.0"

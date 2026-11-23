@@ -1,11 +1,24 @@
 {
   "name": "@kayjs/icons",
   "version": "2.0.0-alpha.0",
+  "description": "Compile-time Iconify SVG icon plugin (~icons/<set>/<name>) for Kay v2",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "files": [
+    "src"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./ambient": "./src/ambient.d.ts"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kayno0o/kayjs",
+    "directory": "packages/plugin-icons"
   },
   "peerDependencies": {
     "kay": "^2.0.0-alpha.0"
