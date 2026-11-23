@@ -45,9 +45,9 @@ jobs:
       - name: Install project deps
         run: bun install --silent --frozen-lockfile
 
-      - name: Install Chromium
+      - name: Install Chromium & ImageMagick
         run: |
-          apk info -e chromium ttf-freefont >/dev/null || apk add --no-cache chromium ttf-freefont
+          apk add --no-cache chromium ttf-freefont imagemagick imagemagick-webp imagemagick-heic imagemagick-svg
           echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
 
       - name: Verify (typecheck, tests & bench-app)
