@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/seo",
-  "version": "2.0.0-alpha.0",
+  "version": "2.0.0-alpha.1",
   "description": "SEO meta, JSON-LD, sitemap, redirects, and self-hosted fonts plugin for Kay v2",
   "license": "MIT",
   "type": "module",
@@ -20,6 +20,6 @@
     "directory": "packages/plugin-seo"
   },
   "peerDependencies": {
-    "kay": "^2.0.0-alpha.0"
+    "kay": "^2.0.0-alpha.1"
   }
 }

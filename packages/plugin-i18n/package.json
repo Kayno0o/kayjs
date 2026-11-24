@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/i18n",
-  "version": "2.0.0-alpha.0",
+  "version": "2.0.0-alpha.1",
   "description": "Locale URL rewriting and dictionary internationalization plugin for Kay v2",
   "license": "MIT",
   "type": "module",
@@ -20,6 +20,6 @@
     "directory": "packages/plugin-i18n"
   },
   "peerDependencies": {
-    "kay": "^2.0.0-alpha.0"
+    "kay": "^2.0.0-alpha.1"
   }
 }
