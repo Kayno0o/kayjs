@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { build } from '../src/build/index'
@@ -292,5 +292,48 @@ describe('end-to-end build, SSR, and DOM hydration', () => {
     finally {
       await GlobalRegistrator.unregister()
     }
+  })
+
+  test('islands sharing a file basename, or a default and a named export of one file, each get their own chunk', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-island-ids-'))
+    tempDirs.push(dir)
+    mkdirSync(join(dir, 'src/components/shop'), { recursive: true })
+    mkdirSync(join(dir, 'src/components/blog'), { recursive: true })
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    const counter = (label: string) => `
+      import { signal } from 'kay'
+      export default function Counter() {
+        const n = signal(0)
+        return <button type="button" onClick={() => n.value++}>{'${label}'}{n.value}</button>
+      }
+    `
+    writeFileSync(join(dir, 'src/components/shop/Counter.tsx'), counter('shop-counter'))
+    writeFileSync(join(dir, 'src/components/blog/Counter.tsx'), counter('blog-counter'))
+    writeFileSync(join(dir, 'src/components/ui.tsx'), `
+      import { signal } from 'kay'
+      export default function Ui() {
+        const n = signal(0)
+        return <i onClick={() => n.value++}>{'ui-default'}{n.value}</i>
+      }
+      export function Button() {
+        const n = signal(0)
+        return <b onClick={() => n.value++}>{'ui-button'}{n.value}</b>
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import ShopCounter from '../components/shop/Counter'
+      import BlogCounter from '../components/blog/Counter'
+      import Ui, { Button } from '../components/ui'
+      export default function Page() {
+        return <main><ShopCounter /><BlogCounter /><Ui /><Button /></main>
+      }
+    `)
+
+    const manifest = await build({ root: dir, minify: false })
+    const chunkText = (key: string) => readFileSync(join(dir, 'dist/client', manifest.islands[join(dir, key)]!.replace('/_kay/', '')), 'utf8')
+    expect(chunkText('src/components/shop/Counter.tsx#default')).toContain('shop-counter')
+    expect(chunkText('src/components/blog/Counter.tsx#default')).toContain('blog-counter')
+    expect(chunkText('src/components/ui.tsx#default')).toContain('Ui as default')
+    expect(chunkText('src/components/ui.tsx#Button')).toContain('Button as default')
   })
 })

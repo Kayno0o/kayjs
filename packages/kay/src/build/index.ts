@@ -384,6 +384,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
 
   // Discover all island roots referenced from static pages/layouts/errors (or sync interactive pages themselves)
   const islandTargets = new Map<string, IslandTarget>()
+  const islandIds = new Set<string>()
   const pageIslandBindings = new Map<string, Map<string, IslandTarget>>()
 
   function registerIsland(file: string, exportName: string): IslandTarget {
@@ -394,7 +395,11 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     const analysis = loadAnalysis(file)
     const baseName = basename(file, extname(file)).toLowerCase()
     const expLower = exportName.toLowerCase()
-    const id = exportName === 'default' || expLower === baseName ? baseName : `${baseName}-${expLower}`
+    let id = exportName === 'default' || expLower === baseName ? baseName : `${baseName}-${expLower}`
+    // The id names the entry file and the chunk: two islands sharing a basename keep it readable and add a hash of their path.
+    if (islandIds.has(id))
+      id = `${id}-${Bun.hash(relative(root, key)).toString(36).slice(0, 6)}`
+    islandIds.add(id)
     const target: IslandTarget = { id, file, exportName, defaultHydrate: analysis.defaultHydrate }
     islandTargets.set(key, target)
     return target
@@ -639,6 +644,9 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       for (const [outKey, info] of Object.entries(clientMetafile.outputs)) {
         const relOut = outKey.replace(/^\.\//, '')
         const url = `${assetPrefix}/${relOut}`
+        const islandKey = info.entryPoint !== undefined && relOut.endsWith('.js') ? islandEntryToKey.get(resolveMetaPath(info.entryPoint)) : undefined
+        if (islandKey !== undefined)
+          islandChunks.set(islandKey, url)
         if (relOut.endsWith('.css')) {
           if (info.entryPoint !== undefined) {
             const absEntry = resolveMetaPath(info.entryPoint)
@@ -667,16 +675,8 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       if (relFile.endsWith('.css')) {
         styleUrls.push(url)
       }
-      else if (output.kind === 'entry-point') {
-        if (relFile.startsWith('runtime-')) {
-          runtimeScript = url
-        }
-        else {
-          for (const [, target] of islandTargets) {
-            if (relFile.startsWith(`${target.id}-`))
-              islandChunks.set(`${target.file}#${target.exportName}`, url)
-          }
-        }
+      else if (output.kind === 'entry-point' && relFile.startsWith('runtime-')) {
+        runtimeScript = url
       }
     }
   }
