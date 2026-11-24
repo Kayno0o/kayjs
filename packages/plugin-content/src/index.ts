@@ -8,6 +8,7 @@ import { raw, ssrRaw } from 'kay/ssr'
 
 const KAY_ROOT_KEY = Symbol.for('kay.root')
 const IMAGE_RESOLVERS_KEY = Symbol.for('kay.content.imageResolvers')
+const COLLECTION_VERSION_KEY = Symbol.for('kay.content.collectionVersion')
 
 export interface ContentHeading {
   level: number
@@ -60,6 +61,8 @@ export interface CollectionRenderConfig {
   headingLinks?: boolean | undefined
   /** Optional image resolver (set to `false` to disable automatic `@kayjs/images` optimization). */
   resolveImage?: MarkdownImageResolver | false | undefined
+  /** Opt out of default Markdown HTML sanitization for fully trusted content (default: false). */
+  trusted?: boolean | undefined
 }
 
 export interface RenderMarkdownOptions {
@@ -73,6 +76,8 @@ export interface RenderMarkdownOptions {
   resolveImage?: MarkdownImageResolver | false | undefined
   /** Source file path passed to `resolveImage`. */
   file?: string | undefined
+  /** Opt out of default Markdown HTML sanitization for fully trusted content (default: false). */
+  trusted?: boolean | undefined
 }
 
 export interface CollectionOptions<TData = Record<string, unknown>> {
@@ -92,6 +97,8 @@ export interface CollectionOptions<TData = Record<string, unknown>> {
   headingLinks?: boolean | undefined
   /** Optional image resolver for rewriting Markdown images (defaults to auto-wired `@kayjs/images`; `false` disables). */
   resolveImage?: MarkdownImageResolver | false | undefined
+  /** Opt out of default Markdown HTML sanitization for fully trusted collections (default: false). */
+  trusted?: boolean | undefined
   /** Lazy renderer loader (`async () => ({ highlight, components })`) so config/index/RSS never load Shiki or TSX components. */
   render?: (() => CollectionRenderConfig | Promise<CollectionRenderConfig>) | undefined
   /** Include entries with `draft: true` (default: false). */
@@ -150,6 +157,258 @@ function stripTags(html: string): string {
     .replaceAll('&#39;', '\'')
     .replaceAll('&amp;', '&')
     .trim()
+}
+
+// Safe recursive-descent JSON5-literal parser for embedded Markdown component props.
+// Supports objects (unquoted/quoted keys, trailing commas), arrays (trailing commas),
+// single/double-quoted strings, numbers (sign, float, exponent, hex), booleans, null, undefined.
+// Rejects all arbitrary JS expressions (calls, operators, identifiers, templates, etc.).
+function parseLiteralValue(src: string): unknown {
+  let i = 0
+  const len = src.length
+
+  function skipWsAndComments(): void {
+    while (i < len) {
+      const ch = src[i]!
+      if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+        i++
+        continue
+      }
+      if (ch === '/' && src[i + 1] === '/') {
+        i += 2
+        while (i < len && src[i] !== '\n') i++
+        continue
+      }
+      if (ch === '/' && src[i + 1] === '*') {
+        i += 2
+        const end = src.indexOf('*/', i)
+        if (end === -1)
+          throw new SyntaxError('Unterminated block comment')
+        i = end + 2
+        continue
+      }
+      break
+    }
+  }
+
+  function parseString(quote: string): string {
+    i++ // skip opening quote
+    let out = ''
+    while (i < len) {
+      const ch = src[i]!
+      if (ch === quote) {
+        i++
+        return out
+      }
+      if (ch === '\\') {
+        i++
+        if (i >= len)
+          throw new SyntaxError('Unterminated string escape')
+        const esc = src[i++]!
+        switch (esc) {
+          case 'n': out += '\n'; break
+          case 'r': out += '\r'; break
+          case 't': out += '\t'; break
+          case 'b': out += '\b'; break
+          case 'f': out += '\f'; break
+          case 'v': out += '\v'; break
+          case '0': out += '\0'; break
+          case '\n': break
+          case '\r': if (src[i] === '\n') i++; break
+          case 'x': {
+            const hex = src.slice(i, i + 2)
+            if (!/^[0-9a-fA-F]{2}$/.test(hex))
+              throw new SyntaxError('Invalid hex escape')
+            out += String.fromCharCode(Number.parseInt(hex, 16))
+            i += 2
+            break
+          }
+          case 'u': {
+            if (src[i] === '{') {
+              const close = src.indexOf('}', i + 1)
+              if (close === -1)
+                throw new SyntaxError('Unterminated unicode escape')
+              const hex = src.slice(i + 1, close)
+              if (!/^[0-9a-fA-F]+$/.test(hex))
+                throw new SyntaxError('Invalid unicode escape')
+              out += String.fromCodePoint(Number.parseInt(hex, 16))
+              i = close + 1
+            }
+            else {
+              const hex = src.slice(i, i + 4)
+              if (!/^[0-9a-fA-F]{4}$/.test(hex))
+                throw new SyntaxError('Invalid unicode escape')
+              out += String.fromCharCode(Number.parseInt(hex, 16))
+              i += 4
+            }
+            break
+          }
+          default: out += esc; break
+        }
+        continue
+      }
+      if (ch === '\n' || ch === '\r')
+        throw new SyntaxError('Unescaped newline in string')
+      out += ch
+      i++
+    }
+    throw new SyntaxError('Unterminated string literal')
+  }
+
+  function parseNumber(): number {
+    const start = i
+    if (src[i] === '+' || src[i] === '-')
+      i++
+    if (src[i] === '0' && (src[i + 1] === 'x' || src[i + 1] === 'X')) {
+      i += 2
+      const hexStart = i
+      while (i < len && /[0-9a-fA-F]/.test(src[i]!)) i++
+      if (i === hexStart)
+        throw new SyntaxError('Invalid hex number')
+      const sign = src[start] === '-' ? -1 : 1
+      return sign * Number.parseInt(src.slice(hexStart, i), 16)
+    }
+    let hasDigits = false
+    while (i < len && /[0-9]/.test(src[i]!)) {
+      hasDigits = true
+      i++
+    }
+    if (src[i] === '.') {
+      i++
+      while (i < len && /[0-9]/.test(src[i]!)) {
+        hasDigits = true
+        i++
+      }
+    }
+    if (!hasDigits)
+      throw new SyntaxError('Invalid number')
+    if (src[i] === 'e' || src[i] === 'E') {
+      i++
+      if (src[i] === '+' || src[i] === '-')
+        i++
+      const expStart = i
+      while (i < len && /[0-9]/.test(src[i]!)) i++
+      if (i === expStart)
+        throw new SyntaxError('Invalid exponent')
+    }
+    const num = Number(src.slice(start, i))
+    if (Number.isNaN(num))
+      throw new SyntaxError('Invalid number')
+    return num
+  }
+
+  function parseArray(): unknown[] {
+    i++ // skip '['
+    const arr: unknown[] = []
+    while (true) {
+      skipWsAndComments()
+      if (i >= len)
+        throw new SyntaxError('Unterminated array')
+      if (src[i] === ']') {
+        i++
+        return arr
+      }
+      arr.push(parseValue())
+      skipWsAndComments()
+      if (src[i] === ',') {
+        i++
+        continue
+      }
+      if (src[i] === ']') {
+        i++
+        return arr
+      }
+      throw new SyntaxError('Expected "," or "]" in array')
+    }
+  }
+
+  function parseObject(): Record<string, unknown> {
+    i++ // skip '{'
+    const obj: Record<string, unknown> = {}
+    while (true) {
+      skipWsAndComments()
+      if (i >= len)
+        throw new SyntaxError('Unterminated object')
+      if (src[i] === '}') {
+        i++
+        return obj
+      }
+      let key: string
+      const ch = src[i]!
+      if (ch === '"' || ch === '\'') {
+        key = parseString(ch)
+      }
+      else if (/[A-Za-z_$]/.test(ch)) {
+        const keyStart = i
+        while (i < len && /[A-Za-z0-9_$]/.test(src[i]!)) i++
+        key = src.slice(keyStart, i)
+      }
+      else {
+        throw new SyntaxError('Expected object key')
+      }
+      skipWsAndComments()
+      if (src[i] !== ':')
+        throw new SyntaxError('Expected ":" after object key')
+      i++
+      const val = parseValue()
+      if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+        Object.defineProperty(obj, key, {
+          value: val,
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        })
+      }
+      skipWsAndComments()
+      if (src[i] === ',') {
+        i++
+        continue
+      }
+      if (src[i] === '}') {
+        i++
+        return obj
+      }
+      throw new SyntaxError('Expected "," or "}" in object')
+    }
+  }
+
+  function parseValue(): unknown {
+    skipWsAndComments()
+    if (i >= len)
+      throw new SyntaxError('Unexpected end of literal')
+    const ch = src[i]!
+    if (ch === '"' || ch === '\'')
+      return parseString(ch)
+    if (ch === '[')
+      return parseArray()
+    if (ch === '{')
+      return parseObject()
+    if (ch === '-' || ch === '+' || ch === '.' || (ch >= '0' && ch <= '9'))
+      return parseNumber()
+    if (src.startsWith('true', i) && !/[A-Za-z0-9_$]/.test(src[i + 4] ?? '')) {
+      i += 4
+      return true
+    }
+    if (src.startsWith('false', i) && !/[A-Za-z0-9_$]/.test(src[i + 5] ?? '')) {
+      i += 5
+      return false
+    }
+    if (src.startsWith('null', i) && !/[A-Za-z0-9_$]/.test(src[i + 4] ?? '')) {
+      i += 4
+      return null
+    }
+    if (src.startsWith('undefined', i) && !/[A-Za-z0-9_$]/.test(src[i + 9] ?? '')) {
+      i += 9
+      return undefined
+    }
+    throw new SyntaxError(`Unsupported non-literal expression at offset ${i}`)
+  }
+
+  const value = parseValue()
+  skipWsAndComments()
+  if (i !== len)
+    throw new SyntaxError(`Unexpected trailing token at offset ${i}`)
+  return value
 }
 
 // Parse JSX-style attributes inside embedded Markdown components: title="hi" count={42} rows={[...]} flag
@@ -213,11 +472,10 @@ function parseComponentProps(attrSrc: string): Record<string, unknown> {
       const expr = attrSrc.slice(exprStart, i).trim()
       i++ // skip closing '}'
       try {
-        props[name] = JSON.parse(expr)
+        props[name] = parseLiteralValue(expr)
       }
       catch {
-        // eslint-disable-next-line no-new-func
-        props[name] = new Function(`return (${expr})`)()
+        // Reject/ignore arbitrary non-literal JS expressions
       }
     }
   }
@@ -380,6 +638,242 @@ function resolveCollectionDir(dir: string): string {
   return resolve(dir)
 }
 
+const DROP_CONTENT_TAGS = new Set([
+  'script',
+  'style',
+  'iframe',
+  'object',
+  'applet',
+  'noscript',
+  'template',
+])
+
+const ALLOWED_MD_TAGS = new Set([
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'p', 'br', 'hr', 'div', 'span', 'section', 'article', 'aside', 'header', 'footer', 'nav', 'main',
+  'a', 'img', 'picture', 'source',
+  'pre', 'code', 'kbd', 'samp', 'var',
+  'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+  'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
+  'blockquote', 'q', 'cite', 'abbr', 'time', 'mark', 'small', 'ins', 'del', 's', 'u', 'b', 'i', 'strong', 'em', 'sup', 'sub', 'wbr',
+  'details', 'summary', 'figure', 'figcaption',
+  'input',
+])
+
+const URL_ATTRS = new Set(['href', 'src', 'cite', 'poster', 'action', 'formaction'])
+const FORBIDDEN_ATTRS = new Set(['srcdoc', 'action', 'formaction', 'xmlns', 'xlink:href'])
+const SAFE_DATA_IMAGE_RE = /^data:image\/(?:png|jpe?g|gif|webp|avif);base64,[a-z0-9+/=\s]+$/i
+const SAFE_SCHEME_RE = /^(?:https?|mailto|tel):/i
+const HAS_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i
+
+function decodeHtmlEntities(rawVal: string): string {
+  return rawVal
+    .replace(/&#x([0-9a-f]+);?/gi, (_, hex: string) => {
+      const cp = Number.parseInt(hex, 16)
+      return Number.isFinite(cp) && cp <= 0x10FFFF ? String.fromCodePoint(cp) : ''
+    })
+    .replace(/&#([0-9]+);?/g, (_, dec: string) => {
+      const cp = Number.parseInt(dec, 10)
+      return Number.isFinite(cp) && cp <= 0x10FFFF ? String.fromCodePoint(cp) : ''
+    })
+    .replaceAll('&colon;', ':')
+    .replaceAll('&tab;', '\t')
+    .replaceAll('&newline;', '\n')
+    .replaceAll('&amp;', '&')
+}
+
+function isSafeUrl(val: string): boolean {
+  const cleaned = decodeHtmlEntities(val).replace(/[\u0000-\u0020\u007F]+/g, '').trim()
+  if (cleaned === '')
+    return true
+  if (SAFE_SCHEME_RE.test(cleaned) || SAFE_DATA_IMAGE_RE.test(cleaned))
+    return true
+  if (HAS_SCHEME_RE.test(cleaned))
+    return false
+  return true
+}
+
+function parseTagAttributes(attrSrc: string): Array<{ name: string, value: string | null }> {
+  const attrs: Array<{ name: string, value: string | null }> = []
+  let i = 0
+  const len = attrSrc.length
+  while (i < len) {
+    while (i < len && /[\s/]/.test(attrSrc[i]!)) i++
+    if (i >= len) break
+    const nameStart = i
+    while (i < len && !/[\s=/>"'<]/.test(attrSrc[i]!)) i++
+    const name = attrSrc.slice(nameStart, i).toLowerCase()
+    if (!name) {
+      i++
+      continue
+    }
+    while (i < len && /\s/.test(attrSrc[i]!)) i++
+    if (attrSrc[i] !== '=') {
+      attrs.push({ name, value: null })
+      continue
+    }
+    i++ // skip '='
+    while (i < len && /\s/.test(attrSrc[i]!)) i++
+    if (i >= len) {
+      attrs.push({ name, value: '' })
+      break
+    }
+    const quote = attrSrc[i]!
+    if (quote === '"' || quote === '\'') {
+      i++
+      const valStart = i
+      while (i < len && attrSrc[i] !== quote) i++
+      attrs.push({ name, value: attrSrc.slice(valStart, i) })
+      if (i < len) i++
+    }
+    else {
+      const valStart = i
+      while (i < len && !/[\s>]/.test(attrSrc[i]!)) i++
+      attrs.push({ name, value: attrSrc.slice(valStart, i) })
+    }
+  }
+  return attrs
+}
+
+function sanitizePass(html: string): string {
+  let out = ''
+  let i = 0
+  const len = html.length
+
+  while (i < len) {
+    const lt = html.indexOf('<', i)
+    if (lt === -1) {
+      out += html.slice(i)
+      break
+    }
+    out += html.slice(i, lt)
+
+    // Strip HTML comments
+    if (html.startsWith('<!--', lt)) {
+      const end = html.indexOf('-->', lt + 4)
+      i = end === -1 ? len : end + 3
+      continue
+    }
+
+    // Parse tag start
+    let pos = lt + 1
+    const isClosing = html[pos] === '/'
+    if (isClosing)
+      pos++
+
+    const nameStart = pos
+    while (pos < len && /[A-Za-z0-9:-]/.test(html[pos]!)) pos++
+    const tagName = html.slice(nameStart, pos).toLowerCase()
+    if (!tagName) {
+      out += '&lt;'
+      i = lt + 1
+      continue
+    }
+
+    // Find tag end respecting quoted attribute values
+    let tagEnd = pos
+    let inQuote: string | null = null
+    while (tagEnd < len) {
+      const c = html[tagEnd]!
+      if (inQuote !== null) {
+        if (c === inQuote)
+          inQuote = null
+      }
+      else {
+        if (c === '"' || c === '\'')
+          inQuote = c
+        else if (c === '>')
+          break
+      }
+      tagEnd++
+    }
+    if (tagEnd >= len) {
+      // Unclosed tag at EOF: drop it
+      break
+    }
+
+    const attrSrc = html.slice(pos, tagEnd)
+    const selfClosing = !isClosing && /\/\s*$/.test(attrSrc)
+    i = tagEnd + 1
+
+    // Drop dangerous container tags together with their inner content
+    if (!isClosing && DROP_CONTENT_TAGS.has(tagName)) {
+      if (!selfClosing) {
+        const closeRe = new RegExp(`</${tagName}\\s*>`, 'gi')
+        closeRe.lastIndex = i
+        const m = closeRe.exec(html)
+        i = m ? m.index + m[0].length : len
+      }
+      continue
+    }
+
+    // Strip any non-allowlisted tag (e.g. <embed>, <form>, <base>, <meta>, <link>, <svg>, etc.)
+    if (!ALLOWED_MD_TAGS.has(tagName))
+      continue
+
+    if (isClosing) {
+      if (tagName !== 'input' && tagName !== 'br' && tagName !== 'hr' && tagName !== 'img')
+        out += `</${tagName}>`
+      continue
+    }
+
+    const rawAttrs = parseTagAttributes(attrSrc)
+
+    // Allow <input> strictly for GFM tasklist checkboxes
+    if (tagName === 'input') {
+      const typeAttr = rawAttrs.find(a => a.name === 'type')
+      if (typeAttr?.value?.toLowerCase() !== 'checkbox')
+        continue
+      const safeParts = ['type="checkbox"']
+      for (const a of rawAttrs) {
+        if (a.name === 'class' && a.value !== null)
+          safeParts.push(`class="${a.value.replaceAll('"', '&quot;')}"`)
+        else if (a.name === 'disabled')
+          safeParts.push('disabled')
+        else if (a.name === 'checked')
+          safeParts.push('checked')
+      }
+      out += `<input ${safeParts.join(' ')}>`
+      continue
+    }
+
+    const safeParts: string[] = []
+    for (const a of rawAttrs) {
+      if (a.name.startsWith('on') || FORBIDDEN_ATTRS.has(a.name))
+        continue
+      if (URL_ATTRS.has(a.name)) {
+        if (a.value === null || !isSafeUrl(a.value))
+          continue
+      }
+      else if (a.name === 'srcset' && a.value !== null) {
+        const candidates = a.value.split(',').map(s => s.trim().split(/\s+/)[0] ?? '')
+        if (!candidates.every(isSafeUrl))
+          continue
+      }
+      if (a.value === null)
+        safeParts.push(a.name)
+      else
+        safeParts.push(`${a.name}="${a.value.replaceAll('"', '&quot;')}"`)
+    }
+
+    const attrOut = safeParts.length > 0 ? ` ${safeParts.join(' ')}` : ''
+    out += selfClosing ? `<${tagName}${attrOut} />` : `<${tagName}${attrOut}>`
+  }
+
+  return out
+}
+
+function sanitizeMarkdownHtml(html: string): string {
+  let current = html
+  for (let pass = 0; pass < 3; pass++) {
+    const next = sanitizePass(current)
+    if (next === current)
+      return next
+    current = next
+  }
+  return current
+}
+
 const FENCE_RE = /^([`~]{3,})([^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm
 let slotBatchId = 0
 
@@ -421,6 +915,11 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
     tasklists: true,
     autolinks: true,
   })
+
+  // 3b. Sanitize rendered Markdown HTML by default unless `trusted: true` is opted into.
+  // Runs before splicing developer-supplied highlight/component slots so custom components remain intact.
+  if (options.trusted !== true)
+    html = sanitizeMarkdownHtml(html)
 
   // 4. Add unique heading IDs & collect TOC
   const headings: ContentHeading[] = []
@@ -526,6 +1025,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     components: options.components,
     headingLinks: options.headingLinks,
     resolveImage: options.resolveImage,
+    trusted: options.trusted,
   }
   let resolvedRenderOpts: RenderMarkdownOptions | undefined = options.render === undefined ? baseRenderOpts : undefined
   let pendingRenderOpts: Promise<RenderMarkdownOptions> | undefined
@@ -536,6 +1036,7 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       components: cfg.components ?? baseRenderOpts.components,
       headingLinks: cfg.headingLinks ?? baseRenderOpts.headingLinks,
       resolveImage: cfg.resolveImage !== undefined ? cfg.resolveImage : baseRenderOpts.resolveImage,
+      trusted: cfg.trusted !== undefined ? cfg.trusted : baseRenderOpts.trusted,
     }
   }
 
@@ -567,10 +1068,21 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
   }
 
   const cache = new Map<string, { mtimeMs: number, entry: ContentEntry<TData> | null }>()
+  const allCache = new Map<string, ContentEntry<TData>[]>()
+  const slugCache = new Map<string, Map<string, ContentEntry<TData>>>()
+  let cacheVersion = 0
+
+  function isDevMode(): boolean {
+    return process.env.KAY_DEV === '1'
+  }
 
   function loadFile(absFile: string, baseDir: string, entryLocale?: string): ContentEntry<TData> | null {
-    const mtimeMs = statSync(absFile).mtimeMs
+    const dev = isDevMode()
     const cached = cache.get(absFile)
+    if (!dev && cached !== undefined)
+      return cached.entry
+
+    const mtimeMs = statSync(absFile).mtimeMs
     if (cached !== undefined && cached.mtimeMs === mtimeMs)
       return cached.entry
 
@@ -650,19 +1162,31 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     const scanDir = localeDir(absDir, targetLocale)
     if (scanDir === undefined)
       return []
+    const dev = isDevMode()
+    if (!dev) {
+      const hit = allCache.get(scanDir)
+      if (hit !== undefined)
+        return hit.slice()
+    }
     const files = walkMarkdownFiles(scanDir)
     const entries: ContentEntry<TData>[] = []
+    const bySlug = new Map<string, ContentEntry<TData>>()
     for (const f of files) {
       const entry = loadFile(f, scanDir, targetLocale)
       if (entry === null)
         continue
       entries.push(entry)
+      bySlug.set(entry.slug, entry)
     }
     entries.sort(options.sort ?? defaultSort)
-    return entries
+    if (!dev) {
+      allCache.set(scanDir, entries)
+      slugCache.set(scanDir, bySlug)
+    }
+    return entries.slice()
   }
 
-  return {
+  const col: Collection<TData> & { [COLLECTION_VERSION_KEY]: () => number } = {
     get dir() {
       return getDir()
     },
@@ -674,6 +1198,12 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       const scanDir = localeDir(absDir, targetLocale)
       if (scanDir === undefined || !isInside(scanDir, resolve(scanDir, clean)))
         return undefined
+      const dev = isDevMode()
+      if (!dev) {
+        const cachedSlug = slugCache.get(scanDir)?.get(clean)
+        if (cachedSlug !== undefined)
+          return cachedSlug
+      }
       // O(1) direct file lookup before falling back to directory scan
       for (const candidate of [
         join(scanDir, `${clean}.md`),
@@ -681,8 +1211,18 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
         join(scanDir, clean, 'index.md'),
         join(scanDir, clean, 'index.markdown'),
       ]) {
-        if (existsSync(candidate))
-          return loadFile(candidate, scanDir, targetLocale) ?? undefined
+        if (existsSync(candidate)) {
+          const loaded = loadFile(candidate, scanDir, targetLocale) ?? undefined
+          if (!dev && loaded !== undefined) {
+            let map = slugCache.get(scanDir)
+            if (map === undefined) {
+              map = new Map()
+              slugCache.set(scanDir, map)
+            }
+            map.set(clean, loaded)
+          }
+          return loaded
+        }
       }
       return all(locale).find(e => e.slug === clean)
     },
@@ -699,8 +1239,13 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     },
     clearCache() {
       cache.clear()
+      allCache.clear()
+      slugCache.clear()
+      cacheVersion++
     },
+    [COLLECTION_VERSION_KEY]: () => cacheVersion,
   }
+  return col
 }
 
 export interface RssFeedConfig<TData = Record<string, unknown>> {
@@ -758,6 +1303,16 @@ export function renderRss<TData>(feed: RssFeedConfig<TData>): string {
     + `</channel></rss>`
 }
 
+function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
+  if (!ifNoneMatch)
+    return false
+  const trimmed = ifNoneMatch.trim()
+  if (trimmed === '*')
+    return true
+  const target = etag.replace(/^W\//, '')
+  return trimmed.split(',').some(part => part.trim().replace(/^W\//, '') === target)
+}
+
 export function contentPlugin(options: { feeds?: RssFeedConfig<any>[] | undefined, collections?: Collection<any>[] | undefined } = {}): KayPlugin {
   const feeds = options.feeds ?? []
   const extraCollections = options.collections ?? []
@@ -780,9 +1335,29 @@ export function contentPlugin(options: { feeds?: RssFeedConfig<any>[] | undefine
     server(api) {
       for (const feed of feeds) {
         const path = feed.path ?? '/rss.xml'
-        api.route('GET', path, () => new Response(renderRss(feed), {
-          headers: { 'content-type': 'application/rss+xml; charset=utf-8' },
-        }))
+        let memo: { xml: string, etag: string, version: number } | undefined
+        api.route('GET', path, (ctx) => {
+          const dev = process.env.KAY_DEV === '1'
+          const versionFn = (feed.collection as unknown as Record<symbol, (() => number) | undefined>)[COLLECTION_VERSION_KEY]
+          const version = versionFn ? versionFn() : -1
+          if (dev || memo === undefined || memo.version !== version) {
+            const xml = renderRss(feed)
+            const etag = `"${Bun.hash(xml).toString(36)}"`
+            memo = { xml, etag, version }
+          }
+          if (etagMatches(ctx.request.headers.get('if-none-match'), memo.etag)) {
+            return new Response(null, {
+              status: 304,
+              headers: { etag: memo.etag },
+            })
+          }
+          return new Response(memo.xml, {
+            headers: {
+              'content-type': 'application/rss+xml; charset=utf-8',
+              'etag': memo.etag,
+            },
+          })
+        })
       }
     },
   }

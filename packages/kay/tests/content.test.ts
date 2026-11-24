@@ -132,6 +132,8 @@ Hidden from production.
     expect(posts.get('../outside')).toBeUndefined()
     expect(posts.get('nested/../../outside')).toBeUndefined()
     expect(posts.get('nested/deep')?.data.title).toBe('Deep')
+    rmSync(join(contentDir, 'nested'), { recursive: true, force: true })
+    posts.clearCache()
     const localizedPosts = defineCollection({ dir: contentDir, localized: true })
     expect(localizedPosts.get('outside', '..')).toBeUndefined()
     expect(localizedPosts.all('..')).toEqual([])

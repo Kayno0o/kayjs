@@ -49,7 +49,10 @@ export interface SeoPluginOptions {
 
 function serializeJsonLd(schema: Record<string, unknown>): string {
   const payload = '@context' in schema ? schema : { '@context': 'https://schema.org', ...schema }
-  const safe = JSON.stringify(payload).replaceAll('</script', '<\\/script')
+  const safe = JSON.stringify(payload)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
   return `<script type="application/ld+json">${safe}</script>`
 }
 
@@ -210,12 +213,13 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
         if (m !== null) {
           const inner = m[1]!
           if (options.titleTemplate && (!options.name || !inner.includes(options.name))) {
-            const formatted = options.titleTemplate.replace('%s', inner)
-            out = out.replace(TITLE_TAG_RE, `<title>${formatted}</title>`)
+            const formatted = options.titleTemplate.replace('%s', () => inner)
+            out = out.replace(TITLE_TAG_RE, () => `<title>${formatted}</title>`)
           }
         }
         else if (options.name) {
-          out = out.replace('</head>', `<title>${escAttr(options.name)}</title></head>`)
+          const defaultTitle = escAttr(options.name)
+          out = out.replace('</head>', () => `<title>${defaultTitle}</title></head>`)
         }
       }
 
@@ -224,17 +228,18 @@ export function seo(options: SeoPluginOptions = {}): KayPlugin {
         const loc = typeof ctx.locals.locale === 'string' ? ctx.locals.locale : undefined
         const desc = (loc && options.description[loc]) ?? Object.values(options.description)[0]
         if (desc) {
+          const escapedDesc = escAttr(desc)
           out = out.replace(
             '</head>',
-            `<meta name="description" content="${escAttr(desc)}"><meta property="og:description" content="${escAttr(desc)}"></head>`,
+            () => `<meta name="description" content="${escapedDesc}"><meta property="og:description" content="${escapedDesc}"></head>`,
           )
         }
       }
 
       // Canonical URL
       if (site && !out.includes('rel="canonical"')) {
-        const canonical = `${site}${ctx.url.pathname}`
-        out = out.replace('</head>', `<link rel="canonical" href="${escAttr(canonical)}"></head>`)
+        const canonical = escAttr(`${site}${ctx.url.pathname}`)
+        out = out.replace('</head>', () => `<link rel="canonical" href="${canonical}"></head>`)
       }
 
       return out

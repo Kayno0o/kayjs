@@ -5,11 +5,31 @@ import type { BunPlugin } from 'bun'
 import type { KayPlugin } from 'kay/server'
 import type { ShareCardDefaults } from './card'
 import type { ImageAsset } from './helpers'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, dirname, extname, join, resolve } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { configureShareCard } from './card'
 
 const IMAGE_RESOLVERS_KEY = Symbol.for('kay.content.imageResolvers')
+const KAY_ROOT_KEY = Symbol.for('kay.root')
+
+const ALLOWED_IMAGE_EXTS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.avif',
+  '.gif',
+  '.svg',
+  '.ico',
+  '.bmp',
+  '.tiff',
+  '.tif',
+])
+
+function isInsideDir(dir: string, target: string): boolean {
+  const rel = relative(dir, target)
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+}
 
 export interface ImagesPluginOptions {
   widths?: number[] | undefined
@@ -196,6 +216,7 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
       const g = globalThis as Record<symbol, Map<string, ReturnType<typeof createMarkdownImageResolver>> | undefined>
       const registry = g[IMAGE_RESOLVERS_KEY] ??= new Map()
       registry.set(resolve(ctx.root), createMarkdownImageResolver({
+        root: resolve(ctx.root),
         outPublicDir: publicDir,
         cacheDir,
         widths,
@@ -231,6 +252,10 @@ export interface OptimizeImageFileOptions {
 
 /** Synchronously optimize a local image file (e.g. from Markdown) into `dist/public/img/` with disk caching. */
 export function optimizeImageFile(absPath: string, options: OptimizeImageFileOptions = {}): ImageAsset {
+  const ext = extname(absPath).toLowerCase()
+  if (!ALLOWED_IMAGE_EXTS.has(ext))
+    throw new Error(`@kayjs/images: unsupported image extension "${ext || '(none)'}" for "${absPath}"`)
+
   const widths = (options.widths ?? [640, 1280]).slice().sort((a, b) => a - b)
   const formats = options.formats ?? ['webp']
   const quality = options.quality ?? 80
@@ -328,6 +353,8 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
 
 export interface MarkdownImageResolverOptions extends OptimizeImageFileOptions {
   sizes?: string | undefined
+  /** Project root boundary confining resolved relative Markdown image paths. */
+  root?: string | undefined
 }
 
 /** Creates a `@kayjs/content` `resolveImage` function backed by `optimizeImageFile()`. Automatically wired by `images()`. */
@@ -336,10 +363,41 @@ export function createMarkdownImageResolver(options: MarkdownImageResolverOption
   return (src: string, file: string | undefined) => {
     if (!file || !src.startsWith('.'))
       return undefined
-    const abs = resolve(dirname(file), src)
+    const absFile = resolve(file)
+    let boundary: string
+    if (options.root !== undefined) {
+      boundary = resolve(options.root)
+    }
+    else {
+      const kayRoot = (globalThis as Record<symbol, unknown>)[KAY_ROOT_KEY]
+      boundary = (typeof kayRoot === 'string' && kayRoot !== '' && isInsideDir(resolve(kayRoot), absFile))
+        ? resolve(kayRoot)
+        : dirname(absFile)
+    }
+
+    const abs = resolve(dirname(absFile), src)
+    if (!isInsideDir(boundary, abs))
+      return undefined
+    if (!ALLOWED_IMAGE_EXTS.has(extname(abs).toLowerCase()))
+      return undefined
     if (!existsSync(abs))
       return undefined
-    const asset = optimizeImageFile(abs, options)
+
+    let realBoundary: string
+    let realTarget: string
+    try {
+      realBoundary = realpathSync(boundary)
+      realTarget = realpathSync(abs)
+    }
+    catch {
+      return undefined
+    }
+    if (!isInsideDir(realBoundary, realTarget))
+      return undefined
+    if (!ALLOWED_IMAGE_EXTS.has(extname(realTarget).toLowerCase()))
+      return undefined
+
+    const asset = optimizeImageFile(realTarget, options)
     const srcset = asset.webpSrcset ?? asset.avifSrcset
     return {
       src: asset.src,

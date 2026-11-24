@@ -2,8 +2,8 @@
 // - Intercepts internal <a> clicks with AbortController cancellation (no dropped rapid clicks)
 // - Diffs <head> stylesheets (zero-FOUC load-before-remove), <html lang>, <title>, meta/canonical tags
 // - Preserves [data-persist] islands alive across View Transitions swaps
-// - Restores scroll position on popstate and scrolls to #hash targets
-// - Prefetches eligible links on hover/focus intent (bounded 8-entry / 15s TTL cache, respects Save-Data)
+// - Restores scroll position on popstate, scrolls to #hash targets, manages focus & polite live announcements
+// - Opt-in prefetch via [data-kay-prefetch] (bounded 8-entry / 15s TTL cache, respects Save-Data)
 
 interface PrefetchEntry {
   html: string
@@ -16,6 +16,7 @@ const PREFETCH_MAX = 8
 const prefetchCache = new Map<string, PrefetchEntry>()
 const inflightPrefetch = new Map<string, Promise<PrefetchEntry | undefined>>()
 let activeController: AbortController | undefined
+let currentDocKey = typeof location !== 'undefined' ? `${location.pathname}${location.search}` : ''
 
 function isEligibleLink(link: HTMLAnchorElement): URL | undefined {
   if (link.target || link.hasAttribute('download') || link.hasAttribute('data-no-spa'))
@@ -88,6 +89,36 @@ export async function prefetch(url: string): Promise<void> {
 }
 
 const SYNC_HEAD_SELECTOR = 'meta[name="description"],meta[property^="og:"],meta[name^="twitter:"],link[rel="canonical"],link[rel="alternate"][hreflang]'
+const ANNOUNCER_ID = '__kay-spa-announcer'
+const SR_ONLY_STYLE = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0'
+
+function announcePageTitle(title: string): void {
+  let region = document.getElementById(ANNOUNCER_ID)
+  if (region === null) {
+    region = document.createElement('div')
+    region.id = ANNOUNCER_ID
+    region.setAttribute('role', 'status')
+    region.setAttribute('aria-live', 'polite')
+    region.setAttribute('aria-atomic', 'true')
+    region.setAttribute('style', SR_ONLY_STYLE)
+    document.body.appendChild(region)
+  }
+  region.textContent = title
+}
+
+function focusPrimaryLandmark(): void {
+  const target = document.querySelector<HTMLElement>('main') ?? document.querySelector<HTMLElement>('h1')
+  if (target === null)
+    return
+  if (!target.hasAttribute('tabindex'))
+    target.setAttribute('tabindex', '-1')
+  try {
+    target.focus({ preventScroll: true })
+  }
+  catch {
+    target.focus()
+  }
+}
 
 async function prepareHeadStyles(nextDoc: Document): Promise<() => void> {
   const currentLinks = [...document.head.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')]
@@ -193,6 +224,7 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
       return
 
     const nextFullUrl = hash && !finalUrl.includes('#') ? `${finalUrl}${hash}` : finalUrl
+    const nextParsed = new URL(nextFullUrl, location.href)
 
     const applySwap = () => {
       if (push)
@@ -218,12 +250,18 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
       document.body.replaceWith(nextDoc.body)
       if (push)
         history.pushState({ __kayScrollY: 0 }, '', nextFullUrl)
+      currentDocKey = `${nextParsed.pathname}${nextParsed.search}`
 
       if (typeof restoreScrollY === 'number') {
         window.scrollTo(0, restoreScrollY)
       }
       else if (hash.length > 1) {
-        const anchor = document.getElementById(decodeURIComponent(hash.slice(1)))
+        let anchorId = hash.slice(1)
+        try {
+          anchorId = decodeURIComponent(anchorId)
+        }
+        catch {}
+        const anchor = document.getElementById(anchorId)
         if (anchor !== null)
           anchor.scrollIntoView()
         else
@@ -232,6 +270,9 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
       else {
         window.scrollTo(0, 0)
       }
+
+      focusPrimaryLandmark()
+      announcePageTitle(document.title)
 
       window.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: nextFullUrl } }))
     }
@@ -243,9 +284,9 @@ export async function navigate(url: string, push = true, restoreScrollY?: number
       applySwap()
   }
   catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError')
+    if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError'))
       return
-    throw err
+    location.assign(url)
   }
   finally {
     if (activeController === controller)
@@ -276,6 +317,9 @@ if (typeof document !== 'undefined') {
     const link = target?.closest?.('a[href]') as HTMLAnchorElement | null
     if (!link || link.hasAttribute('data-no-prefetch'))
       return
+    // Prefetch is strictly opt-in via [data-kay-prefetch] so side-effecting links like /logout are never prefetched
+    if (link.closest('[data-kay-prefetch]') === null)
+      return
     const url = isEligibleLink(link)
     if (url === undefined)
       return
@@ -288,6 +332,9 @@ if (typeof document !== 'undefined') {
   document.addEventListener('focusin', onIntent, { passive: true })
 
   window.addEventListener('popstate', (event) => {
+    const nextDocKey = `${location.pathname}${location.search}`
+    if (nextDocKey === currentDocKey)
+      return
     const st = event.state as { __kayScrollY?: number } | null
     void navigate(location.href, false, typeof st?.__kayScrollY === 'number' ? st.__kayScrollY : 0)
   })

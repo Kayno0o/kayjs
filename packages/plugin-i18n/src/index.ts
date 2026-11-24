@@ -16,14 +16,22 @@ export interface I18nOptions {
 
 const INTERNAL_HREF_RE = /<a\b([^>]*?)\bhref="(\/[^"]*)"([^>]*)>/gi
 
+function collapseLeadingSlashes(p: string): string {
+  if (!p)
+    return '/'
+  const collapsed = p.replace(/^\/+/, '/')
+  return collapsed.startsWith('/') ? collapsed : `/${collapsed}`
+}
+
 export function stripLocalePrefix(pathname: string, locales: readonly string[]): { locale: string | undefined, path: string } {
-  const parts = pathname.split('/')
+  const normalized = collapseLeadingSlashes(pathname)
+  const parts = normalized.split('/')
   const first = parts[1]
   if (first !== undefined && locales.includes(first)) {
-    const rest = `/${parts.slice(2).join('/')}`
-    return { locale: first, path: rest === '/' ? '/' : rest.replace(/\/$/, '') || '/' }
+    const rest = collapseLeadingSlashes(`/${parts.slice(2).join('/')}`)
+    return { locale: first, path: rest === '/' ? '/' : rest.replace(/\/+$/, '') || '/' }
   }
-  return { locale: undefined, path: pathname || '/' }
+  return { locale: undefined, path: normalized }
 }
 
 export function localizePath(
@@ -34,9 +42,10 @@ export function localizePath(
   prefixDefault = false,
 ): string {
   const { path } = stripLocalePrefix(pathname, locales)
+  const safePath = collapseLeadingSlashes(path)
   if (targetLocale === defaultLocale && !prefixDefault)
-    return path
-  return path === '/' ? `/${targetLocale}` : `/${targetLocale}${path}`
+    return safePath
+  return safePath === '/' ? `/${targetLocale}` : `/${targetLocale}${safePath}`
 }
 
 export function alternateLinks(
@@ -119,14 +128,14 @@ export function i18n(options: I18nOptions): KayPlugin {
 
     transformHtml(html, ctx) {
       const locale = String(ctx.locals.locale ?? defaultLocale)
-      let out = html.replace(/<html\s+lang="[^"]*"/i, `<html lang="${locale}"`)
+      let out = html.replace(/<html\s+lang="[^"]*"/i, () => `<html lang="${locale}"`)
 
       if (site) {
         const { path } = stripLocalePrefix(ctx.url.pathname, locales)
         const links = alternateLinks(path, { site, locales, defaultLocale, prefixDefault })
         const tags = links.map(l => `<link rel="alternate" hreflang="${l.locale}" href="${l.href}">`).join('')
         if (tags && out.includes('</head>'))
-          out = out.replace('</head>', `${tags}</head>`)
+          out = out.replace('</head>', () => `${tags}</head>`)
       }
 
       // Prefix internal <a href="/..."> links for non-default locales
@@ -134,7 +143,7 @@ export function i18n(options: I18nOptions): KayPlugin {
         out = out.replace(INTERNAL_HREF_RE, (match, before: string, href: string, after: string) => {
           if (before.includes('data-no-localize') || after.includes('data-no-localize'))
             return match
-          if (href.startsWith('/_kay/') || href.startsWith('/_i18n/'))
+          if (href.startsWith('//') || href.startsWith('/_kay/') || href.startsWith('/_i18n/'))
             return match
           const seg = href.split('/')[1]
           if (seg !== undefined && localeSet.has(seg))

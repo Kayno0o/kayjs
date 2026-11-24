@@ -10,48 +10,135 @@ export interface Subscriber<TMember> {
   close(): void
 }
 
+export type LiveAuthorizeHook = (
+  ctx: RequestContext,
+  room: string,
+) => boolean | Response | Promise<boolean | Response>
+
+export interface RoomsOptions {
+  /** Maximum concurrent subscribers per room (default: 1000). */
+  maxConnectionsPerRoom?: number | undefined
+  /** Maximum concurrent subscribers per client key / IP (default: 10). */
+  maxConnectionsPerClient?: number | undefined
+  /** Maximum concurrent subscribers across all rooms (default: 10000). */
+  maxTotalConnections?: number | undefined
+  /** Derive a client key for per-client caps (defaults to ctx.ip / x-forwarded-for / x-real-ip / 'anonymous'). */
+  clientKey?: ((ctx: RequestContext) => string) | undefined
+  /** ReadableStream queue high-water mark before dropping stalled subscribers (default: 64). */
+  highWaterMark?: number | undefined
+  /** Optional authorization hook checked before opening an SSE stream. */
+  authorize?: LiveAuthorizeHook | undefined
+}
+
+export interface StreamOptions<TMember> {
+  room: string
+  member: TMember
+  pingMs?: number | undefined
+  onJoin?: ((room: string, member: TMember) => void) | undefined
+  onLeave?: ((room: string, member: TMember) => void) | undefined
+  maxConnectionsPerRoom?: number | undefined
+  maxConnectionsPerClient?: number | undefined
+  maxTotalConnections?: number | undefined
+  clientKey?: ((ctx: RequestContext) => string) | undefined
+  highWaterMark?: number | undefined
+}
+
+export interface LivePluginOptions<TMember> {
+  path: string
+  room?: string | ((ctx: RequestContext) => string) | undefined
+  member: (ctx: RequestContext) => TMember | Promise<TMember>
+  pingMs?: number | undefined
+  onJoin?: ((room: string, member: TMember) => void) | undefined
+  onLeave?: ((room: string, member: TMember) => void) | undefined
+  authorize?: LiveAuthorizeHook | undefined
+  maxConnectionsPerRoom?: number | undefined
+  maxConnectionsPerClient?: number | undefined
+  maxTotalConnections?: number | undefined
+  clientKey?: ((ctx: RequestContext) => string) | undefined
+  highWaterMark?: number | undefined
+}
+
 export interface Rooms<TMessage, TMember = undefined> {
   join(room: string, sub: Subscriber<TMember>): void
   leave(room: string, sub: Subscriber<TMember>): void
   members(room: string): TMember[]
   size(room: string): number
-  publish(room: string, message: TMessage, event?: string): void
+  publish(room: string, message: TMessage, event?: string, id?: string): void
   /** Coalesce burst presence updates into a single microtask broadcast per room. */
   coalesce(build: (room: string) => TMessage, event?: string): (room: string) => void
-  /** Create a streaming SSE Response for a room with automatic keepalive and disconnect cleanup. */
-  stream(ctx: RequestContext, options: {
-    room: string
-    member: TMember
-    pingMs?: number | undefined
-    onJoin?: ((room: string, member: TMember) => void) | undefined
-    onLeave?: ((room: string, member: TMember) => void) | undefined
-  }): Response
+  /** Create a streaming SSE Response for a room with automatic keepalive, caps, backpressure drop, and disconnect cleanup. */
+  stream(ctx: RequestContext, options: StreamOptions<TMember>): Response
   /** Optional KayPlugin helper to mount an SSE endpoint directly via `kay.config.ts`. */
-  plugin(options: {
-    path: string
-    room?: string | ((ctx: RequestContext) => string) | undefined
-    member: (ctx: RequestContext) => TMember | Promise<TMember>
-    pingMs?: number | undefined
-    onJoin?: ((room: string, member: TMember) => void) | undefined
-    onLeave?: ((room: string, member: TMember) => void) | undefined
-  }): KayPlugin
+  plugin(options: LivePluginOptions<TMember>): KayPlugin
 }
 
-const encoder = new TextEncoder()
+const DEFAULT_MAX_PER_ROOM = 1_000
+const DEFAULT_MAX_PER_CLIENT = 10
+const DEFAULT_MAX_TOTAL = 10_000
+const DEFAULT_HIGH_WATER_MARK = 64
 
-function encodeEvent(message: unknown, event?: string): Uint8Array {
-  const prefix = event ? `event: ${event}\n` : ''
-  return encoder.encode(`${prefix}data: ${JSON.stringify(message)}\n\n`)
+const encoder = new TextEncoder()
+const CR_LF_RE = /[\r\n]/
+
+function assertSafeSseField(value: string | undefined, label: string): void {
+  if (value !== undefined && CR_LF_RE.test(value))
+    throw new RangeError(`@kayjs/live: SSE ${label} must not contain CR or LF characters`)
+}
+
+function encodeEvent(message: unknown, event?: string, id?: string): Uint8Array {
+  assertSafeSseField(event, 'event name')
+  assertSafeSseField(id, 'event id')
+  let frame = ''
+  if (id)
+    frame += `id: ${id}\n`
+  if (event)
+    frame += `event: ${event}\n`
+  frame += `data: ${JSON.stringify(message)}\n\n`
+  return encoder.encode(frame)
+}
+
+function defaultClientKey(ctx: RequestContext): string {
+  const ip = (ctx as { ip?: string }).ip
+  if (typeof ip === 'string' && ip !== '')
+    return ip
+  const xff = ctx.request.headers.get('x-forwarded-for')
+  if (xff) {
+    const first = xff.split(',')[0]?.trim()
+    if (first)
+      return first
+  }
+  const realIp = ctx.request.headers.get('x-real-ip')?.trim()
+  if (realIp)
+    return realIp
+  return 'anonymous'
 }
 
 const PING_CHUNK = encoder.encode(': ping\n\n')
 const RETRY_CHUNK = encoder.encode('retry: 2000\n\n')
 
-export function createRooms<TMessage, TMember = undefined>(id?: string): Rooms<TMessage, TMember> {
-  // Share room map across bundled server chunks when `id` is provided
+export function createRooms<TMessage, TMember = undefined>(
+  idOrOptions?: string | RoomsOptions,
+  maybeOptions?: RoomsOptions,
+): Rooms<TMessage, TMember> {
+  const id = typeof idOrOptions === 'string' ? idOrOptions : undefined
+  const defaultOpts: RoomsOptions = typeof idOrOptions === 'object' && idOrOptions !== null
+    ? idOrOptions
+    : (maybeOptions ?? {})
+
+  // Share room map & client counts across bundled server chunks when `id` is provided
   const map: Map<string, Set<Subscriber<TMember>>> = id !== undefined
     ? (((globalThis as Record<symbol, Map<string, Set<Subscriber<TMember>>> | undefined>)[Symbol.for(`kay.live.rooms.${id}`)] ??= new Map()))
     : new Map()
+  const clientCounts: Map<string, number> = id !== undefined
+    ? (((globalThis as Record<symbol, Map<string, number> | undefined>)[Symbol.for(`kay.live.clients.${id}`)] ??= new Map()))
+    : new Map()
+
+  function totalConnections(): number {
+    let total = 0
+    for (const set of map.values())
+      total += set.size
+    return total
+  }
 
   function join(room: string, sub: Subscriber<TMember>): void {
     let set = map.get(room)
@@ -85,22 +172,26 @@ export function createRooms<TMessage, TMember = undefined>(id?: string): Rooms<T
     return map.get(room)?.size ?? 0
   }
 
-  function publish(room: string, message: TMessage, event?: string): void {
+  function publish(room: string, message: TMessage, event?: string, eventId?: string): void {
+    // Validate event & id eagerly even if room is empty so injection attempts always fail fast
+    assertSafeSseField(event, 'event name')
+    assertSafeSseField(eventId, 'event id')
     const set = map.get(room)
     if (set === undefined || set.size === 0)
       return
-    const chunk = encodeEvent(message, event)
+    const chunk = encodeEvent(message, event, eventId)
     for (const sub of [...set]) {
       try {
         sub.send(chunk)
       }
       catch {
-        leave(room, sub)
+        sub.close()
       }
     }
   }
 
   function coalesce(build: (room: string) => TMessage, event?: string): (room: string) => void {
+    assertSafeSseField(event, 'event name')
     const pending = new Set<string>()
     return (room: string) => {
       if (pending.has(room))
@@ -114,20 +205,34 @@ export function createRooms<TMessage, TMember = undefined>(id?: string): Rooms<T
     }
   }
 
-  function stream(
-    ctx: RequestContext,
-    opts: {
-      room: string
-      member: TMember
-      pingMs?: number | undefined
-      onJoin?: ((room: string, member: TMember) => void) | undefined
-      onLeave?: ((room: string, member: TMember) => void) | undefined
-    },
-  ): Response {
+  function stream(ctx: RequestContext, opts: StreamOptions<TMember>): Response {
     const { room, member, pingMs = 20_000, onJoin, onLeave } = opts
+    const maxPerRoom = opts.maxConnectionsPerRoom ?? defaultOpts.maxConnectionsPerRoom ?? DEFAULT_MAX_PER_ROOM
+    const maxPerClient = opts.maxConnectionsPerClient ?? defaultOpts.maxConnectionsPerClient ?? DEFAULT_MAX_PER_CLIENT
+    const maxTotal = opts.maxTotalConnections ?? defaultOpts.maxTotalConnections ?? DEFAULT_MAX_TOTAL
+    const highWaterMark = opts.highWaterMark ?? defaultOpts.highWaterMark ?? DEFAULT_HIGH_WATER_MARK
+    const resolveClientKey = opts.clientKey ?? defaultOpts.clientKey ?? defaultClientKey
+    const clientId = resolveClientKey(ctx)
+
+    const currentClientCount = clientCounts.get(clientId) ?? 0
+    if (maxPerClient > 0 && currentClientCount >= maxPerClient) {
+      return new Response('Too Many Requests', {
+        status: 429,
+        headers: { 'retry-after': '5' },
+      })
+    }
+
+    if ((maxPerRoom > 0 && size(room) >= maxPerRoom) || (maxTotal > 0 && totalConnections() >= maxTotal)) {
+      return new Response('Service Unavailable', {
+        status: 503,
+        headers: { 'retry-after': '5' },
+      })
+    }
+
     let cleaned = false
     let timer: ReturnType<typeof setInterval> | undefined
     let sub: Subscriber<TMember> | undefined
+    let countedClient = false
 
     const cleanup = () => {
       if (cleaned)
@@ -137,6 +242,14 @@ export function createRooms<TMessage, TMember = undefined>(id?: string): Rooms<T
         clearInterval(timer)
         timer = undefined
       }
+      if (countedClient) {
+        countedClient = false
+        const remaining = (clientCounts.get(clientId) ?? 1) - 1
+        if (remaining <= 0)
+          clientCounts.delete(clientId)
+        else
+          clientCounts.set(clientId, remaining)
+      }
       if (sub !== undefined) {
         leave(room, sub)
         onLeave?.(room, member)
@@ -145,21 +258,36 @@ export function createRooms<TMessage, TMember = undefined>(id?: string): Rooms<T
 
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
+        const drop = () => {
+          cleanup()
+          try {
+            controller.close()
+          }
+          catch {}
+        }
+
         sub = {
           id: crypto.randomUUID(),
           member,
           send(chunk) {
-            if (!cleaned)
-              controller.enqueue(chunk)
-          },
-          close() {
-            cleanup()
-            try {
-              controller.close()
+            if (cleaned)
+              return
+            if (controller.desiredSize !== null && controller.desiredSize <= 0) {
+              drop()
+              return
             }
-            catch {}
+            try {
+              controller.enqueue(chunk)
+            }
+            catch {
+              drop()
+            }
           },
+          close: drop,
         }
+
+        clientCounts.set(clientId, (clientCounts.get(clientId) ?? 0) + 1)
+        countedClient = true
 
         controller.enqueue(RETRY_CHUNK)
         join(room, sub)
@@ -168,28 +296,32 @@ export function createRooms<TMessage, TMember = undefined>(id?: string): Rooms<T
         if (pingMs > 0) {
           timer = setInterval(() => {
             if (!cleaned) {
-              try {
-                controller.enqueue(PING_CHUNK)
+              if (controller.desiredSize !== null && controller.desiredSize <= 0) {
+                drop()
               }
-              catch {
-                cleanup()
+              else {
+                try {
+                  controller.enqueue(PING_CHUNK)
+                }
+                catch {
+                  drop()
+                }
               }
             }
           }, pingMs)
         }
 
-        ctx.request.signal.addEventListener('abort', () => {
-          cleanup()
-          try {
-            controller.close()
-          }
-          catch {}
-        }, { once: true })
+        if (ctx.request.signal.aborted) {
+          drop()
+        }
+        else {
+          ctx.request.signal.addEventListener('abort', drop, { once: true })
+        }
       },
       cancel() {
         cleanup()
       },
-    })
+    }, { highWaterMark })
 
     return new Response(body, {
       status: 200,
@@ -201,19 +333,20 @@ export function createRooms<TMessage, TMember = undefined>(id?: string): Rooms<T
     })
   }
 
-  function plugin(opts: {
-    path: string
-    room?: string | ((ctx: RequestContext) => string) | undefined
-    member: (ctx: RequestContext) => TMember | Promise<TMember>
-    pingMs?: number | undefined
-    onJoin?: ((room: string, member: TMember) => void) | undefined
-    onLeave?: ((room: string, member: TMember) => void) | undefined
-  }): KayPlugin {
+  function plugin(opts: LivePluginOptions<TMember>): KayPlugin {
     return {
       name: `@kayjs/live(${opts.path})`,
       server(api) {
         api.route('GET', opts.path, async (ctx) => {
           const room = typeof opts.room === 'function' ? opts.room(ctx) : (opts.room ?? 'default')
+          const authFn = opts.authorize ?? defaultOpts.authorize
+          if (authFn !== undefined) {
+            const decision = await authFn(ctx, room)
+            if (decision instanceof Response)
+              return decision
+            if (decision === false)
+              return new Response('Forbidden', { status: 403 })
+          }
           const member = await opts.member(ctx)
           return stream(ctx, {
             room,
@@ -221,6 +354,11 @@ export function createRooms<TMessage, TMember = undefined>(id?: string): Rooms<T
             pingMs: opts.pingMs,
             onJoin: opts.onJoin,
             onLeave: opts.onLeave,
+            maxConnectionsPerRoom: opts.maxConnectionsPerRoom,
+            maxConnectionsPerClient: opts.maxConnectionsPerClient,
+            maxTotalConnections: opts.maxTotalConnections,
+            clientKey: opts.clientKey,
+            highWaterMark: opts.highWaterMark,
           })
         })
       },

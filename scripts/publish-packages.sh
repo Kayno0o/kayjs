@@ -46,25 +46,49 @@ publish() {
   elif [ "$stage" = true ]; then
     tarball="/tmp/kay-publish-$$.tgz"
     trap 'rm -f "$tarball"' EXIT
-    bun pm pack --quiet --filename "$tarball" > /dev/null
+    if ! bun pm pack --quiet --filename "$tarball" > /dev/null; then
+      rm -f "$tarball"
+      trap - EXIT
+      return 1
+    fi
     if [ -n "$tag" ]; then
       echo "Staging $package with dist-tag $tag..."
-      npm stage publish --access public --tag "$tag" "$tarball"
+      if ! npm stage publish --access public --tag "$tag" "$tarball"; then
+        rm -f "$tarball"
+        trap - EXIT
+        return 1
+      fi
     else
       echo "Staging $package..."
-      npm stage publish --access public "$tarball"
+      if ! npm stage publish --access public "$tarball"; then
+        rm -f "$tarball"
+        trap - EXIT
+        return 1
+      fi
     fi
     rm -f "$tarball"
     trap - EXIT
   elif [ -n "$tag" ]; then
     echo "Publishing $package with dist-tag $tag..."
-    bun publish --access public --tag "$tag"
+    if ! bun publish --access public --tag "$tag"; then
+      return 1
+    fi
   else
     echo "Publishing $package..."
-    bun publish --access public
+    if ! bun publish --access public; then
+      return 1
+    fi
   fi
 }
 
 for dir in packages/*/; do
-  [ "$(jq -r '.private // false' "$dir/package.json")" = true ] || (cd "$dir" && publish) || exit 1
+  private="$(jq -r '.private // false' "$dir/package.json")"
+  if [ "$private" = true ]; then
+    continue
+  fi
+  (
+    set -eu
+    cd "$dir"
+    publish
+  )
 done
