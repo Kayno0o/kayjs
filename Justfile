@@ -28,6 +28,10 @@ docs-dev:
 docs-build:
 	cd docs && bun run build
 
+# Build docs and audit layout, contrast, overflow, and tap targets with `page check`
+docs-qa: docs-build
+	@bun -e 'import { resolve } from "node:path"; const dist = resolve("docs/dist/static"); const srv = Bun.serve({ port: 0, async fetch(req) { const u = new URL(req.url); const p = u.pathname === "/" ? "/index.html" : u.pathname; let f = Bun.file(resolve(dist, "." + p)); if (!(await f.exists())) f = Bun.file(resolve(dist, "." + p + "/index.html")); if (!(await f.exists())) return new Response(Bun.file(resolve(dist, "404.html")), { status: 404 }); return new Response(f); } }); const base = `http://127.0.0.1:${srv.port}`; const proc = Bun.spawn(["page", "check", "-w", "1440,1024,400", `${base}/`, `${base}/docs/getting-started/quickstart`, `${base}/grammars`], { stdout: "inherit", stderr: "inherit" }); const code = await proc.exited; srv.stop(true); process.exit(code);'
+
 # Build and start the docs Caddy container on 127.0.0.1:3650
 docs-up:
 	docker compose -f docs/compose.yaml up -d --build

@@ -17,7 +17,7 @@
     --ui-line: color-mix(in srgb, var(--ui-ink) 12%, transparent);
     --ui-line-strong: color-mix(in srgb, var(--ui-ink) 22%, transparent);
     --ui-accent: light-dark(#95580a, #f5b83d);
-    --ui-accent-fill: light-dark(#b8730a, #f5b83d);
+    --ui-accent-fill: light-dark(#9a5c00, #f5b83d);
     --ui-info: light-dark(#24648c, #7cc4e8);
     --ui-success: light-dark(#1f6f4a, #7fd8a6);
     --ui-warning: light-dark(#95580a, #e6c07b);
@@ -197,8 +197,8 @@
   [data-ui="badge"] {
     display: inline-flex;
     align-items: center;
-    font: 500 0.72rem/1.25 var(--ui-font-mono);
-    padding: 0.14rem 0.45rem;
+    font: 500 0.75rem/1.25 var(--ui-font-mono);
+    padding: 0.16rem 0.48rem;
     border-radius: var(--ui-radius-inner);
     border: 1px solid var(--ui-line-strong);
     color: var(--ui-subtext);
@@ -240,7 +240,7 @@
     flex-direction: column;
     gap: 0.35rem;
     & [data-part="label"] {
-      font: 500 0.72rem/1.2 var(--ui-font-mono);
+      font: 500 0.75rem/1.25 var(--ui-font-mono);
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--ui-muted);
@@ -420,7 +420,7 @@
   }
 
   [data-ui="radio-group"] [data-part="legend"] {
-    font: 500 0.72rem/1.2 var(--ui-font-mono);
+    font: 500 0.75rem/1.25 var(--ui-font-mono);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--ui-muted);
@@ -471,11 +471,11 @@
       }
     }
     & [data-part="kbd"] {
-      font: 500 0.7rem/1 var(--ui-font-mono);
+      font: 500 0.75rem/1.2 var(--ui-font-mono);
       color: var(--ui-muted);
       border: 1px solid var(--ui-line-strong);
       border-radius: var(--ui-radius-inner);
-      padding: 0.12rem 0.35rem;
+      padding: 0.14rem 0.38rem;
     }
     & [data-part="empty"] { padding: 0.85rem 0.95rem; margin: 0; color: var(--ui-muted); font-size: 0.84rem; }
   }
@@ -504,7 +504,7 @@
     & th {
       border-bottom: 1px solid var(--ui-line);
       padding: 0.5rem 0.65rem;
-      font: 500 0.72rem/1.2 var(--ui-font-mono);
+      font: 500 0.75rem/1.25 var(--ui-font-mono);
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--ui-muted);

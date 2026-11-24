@@ -26,6 +26,29 @@
     outline-offset: 2px;
   }
 
+  /* Touch-friendly targets & iOS 16px input floor on small viewports */
+  @media (max-width: 600px) {
+    [data-ui="button"],
+    [data-ui="field"] :is(input, select),
+    [data-ui="select"] [data-part="trigger"],
+    [data-ui="tabs"] [data-part="trigger"],
+    [data-ui="accordion"] summary[data-part="trigger"],
+    [data-ui="radio-group"] label,
+    [data-ui="checkbox"],
+    [data-ui="switch"] {
+      min-block-size: 44px;
+    }
+    [data-ui="radio-group"] label {
+      display: flex;
+      align-items: center;
+    }
+    [data-ui="field"] :is(input, select, textarea),
+    dialog[data-ui="command"] [data-part="input"],
+    [data-ui="datatable"] [data-part="search"] {
+      font-size: max(1rem, 16px);
+    }
+  }
+
   /* Every Layout primitives (0 KB JS) */
   [data-layout="stack"] {
     display: flex;

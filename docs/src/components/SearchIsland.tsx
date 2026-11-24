@@ -10,7 +10,7 @@ export interface SearchDocItem {
 export function SearchIsland({ items }: { items: SearchDocItem[] }) {
   return (
     <CommandPalette
-      triggerLabel="Search docs… (⌘K)"
+      triggerLabel="Search (⌘K)"
       placeholder="Jump to a doc page…"
       items={items.map(item => ({
         id: item.id,
