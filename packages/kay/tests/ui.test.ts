@@ -272,6 +272,14 @@ describe('@kayjs/ui v2 — Platform-first primitives & Pure CSS Style Grammars',
       expect(await page.locator('[data-ui="select"] [data-part="value"]').textContent()).toBe('Pro')
       expect(await page.locator('input[name="plan"]').inputValue()).toBe('pro')
 
+      // 4b. Once closed, Menu and Select no longer capture arrow keys on the rest of the page
+      const arrowPrevented = await page.evaluate(() => {
+        const e = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+        document.body.dispatchEvent(e)
+        return e.defaultPrevented
+      })
+      expect(arrowPrevented).toBe(false)
+
       // 5. Toast push + dismiss
       await page.click('#push-toast')
       expect(await page.locator('[data-ui="toast"]').count()).toBe(1)

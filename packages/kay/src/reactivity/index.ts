@@ -38,7 +38,7 @@ interface SubNode {
   c: Link | undefined // cursor
   no: SubNode | undefined // nextOwned
   nq: SubNode | undefined // nextQueued
-  cl: (() => void) | undefined // effect cleanup
+  k: (() => void) | undefined // cleanup returned by the effect
   o: Owner | undefined // owner
   r(): void // run
 }
@@ -211,10 +211,13 @@ function propagate(dep: DepNode, flag: number): void {
   }
 }
 
+// One effect throwing must not strand the rest of the queue: every node still runs, the first error is rethrown after.
 function flush(): void {
   if (flushing || batchDepth > 0)
     return
   flushing = true
+  let failed = false
+  let error: unknown
   try {
     let rounds = 0
     while (qHead !== undefined) {
@@ -226,16 +229,33 @@ function flush(): void {
         const next: SubNode | undefined = node.nq
         node.nq = undefined
         node.f &= ~QUEUED
-        if (!(node.f & DISPOSED) && shouldRun(node))
-          node.r()
+        try {
+          if (!(node.f & DISPOSED) && shouldRun(node))
+            node.r()
+        }
+        catch (err) {
+          if (!failed) {
+            failed = true
+            error = err
+          }
+        }
         node = next
       }
     }
   }
   finally {
     flushing = false
+    let left = qHead
     qHead = qTail = undefined
+    while (left !== undefined) {
+      const next: SubNode | undefined = left.nq
+      left.nq = undefined
+      left.f &= ~QUEUED
+      left = next
+    }
   }
+  if (failed)
+    throw error
 }
 
 function shouldRun(sub: SubNode): boolean {
@@ -309,7 +329,7 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   c: Link | undefined = undefined
   no: SubNode | undefined = undefined
   nq: SubNode | undefined = undefined
-  cl: (() => void) | undefined = undefined
+  k: (() => void) | undefined = undefined
   o: Owner | undefined = undefined
   _f: () => T
   _v!: T
@@ -360,7 +380,8 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   }
 }
 
-class EffectNode implements SubNode {
+// An effect is also the owner of what its run creates (effects, onCleanup), released before the next run.
+class EffectNode implements SubNode, Owner {
   f = EFFECT | DIRTY
   e = -1
   d: Link | undefined = undefined
@@ -368,13 +389,19 @@ class EffectNode implements SubNode {
   c: Link | undefined = undefined
   no: SubNode | undefined = undefined
   nq: SubNode | undefined = undefined
-  cl: (() => void) | undefined = undefined
+  k: (() => void) | undefined = undefined
   o: Owner | undefined
+  p: Owner | undefined
+  fc: Owner | undefined = undefined
+  ns: Owner | undefined = undefined
+  fs: SubNode | undefined = undefined
+  cl: (() => void)[] | undefined = undefined
+  x = false
   _f: () => void | (() => void)
 
   constructor(fn: () => void | (() => void), owner: Owner | undefined) {
     this._f = fn
-    this.o = owner
+    this.o = this.p = owner
     if (owner !== undefined) {
       this.no = owner.fs
       owner.fs = this
@@ -384,9 +411,10 @@ class EffectNode implements SubNode {
   r(): void {
     if (this.f & DISPOSED)
       return
-    if (this.cl !== undefined) {
-      const fn = this.cl
-      this.cl = undefined
+    releaseOwned(this)
+    if (this.k !== undefined) {
+      const fn = this.k
+      this.k = undefined
       fn()
     }
     const prevSub = currentSub
@@ -395,11 +423,15 @@ class EffectNode implements SubNode {
     this.e = ++globalEpoch
     this.c = this.d
     currentSub = this
-    currentOwner = this.o
+    currentOwner = this
     try {
       const ret = (this._f)()
-      if (typeof ret === 'function')
-        this.cl = ret
+      if (typeof ret === 'function') {
+        if (this.f & DISPOSED)
+          ret()
+        else
+          this.k = ret
+      }
     }
     finally {
       unlinkRemaining(this)
@@ -430,7 +462,22 @@ export function disposeOwner(owner: Owner): void {
   if (owner.x)
     return
   owner.x = true
+  releaseOwned(owner)
+}
 
+function disposeSub(sub: SubNode): void {
+  sub.f |= DISPOSED
+  unlinkAll(sub)
+  if (sub.f & EFFECT)
+    disposeOwner(sub as EffectNode)
+  if (sub.k !== undefined) {
+    const fn = sub.k
+    sub.k = undefined
+    fn()
+  }
+}
+
+function releaseOwned(owner: Owner): void {
   let child = owner.fc
   owner.fc = undefined
   while (child !== undefined) {
@@ -445,13 +492,7 @@ export function disposeOwner(owner: Owner): void {
   while (sub !== undefined) {
     const next = sub.no
     sub.no = undefined
-    sub.f |= DISPOSED
-    unlinkAll(sub)
-    if (sub.cl !== undefined) {
-      const fn = sub.cl
-      sub.cl = undefined
-      fn()
-    }
+    disposeSub(sub)
     sub = next
   }
 
@@ -498,15 +539,8 @@ export function effect(fn: () => void | (() => void)): () => void {
   const node = new EffectNode(fn, currentOwner)
   node.r()
   return () => {
-    if (node.f & DISPOSED)
-      return
-    node.f |= DISPOSED
-    unlinkAll(node)
-    if (node.cl !== undefined) {
-      const cb = node.cl
-      node.cl = undefined
-      cb()
-    }
+    if (!(node.f & DISPOSED))
+      disposeSub(node)
   }
 }
 

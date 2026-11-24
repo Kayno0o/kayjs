@@ -174,4 +174,60 @@ describe('reactivity kernel', () => {
     expect(snapshot(state)).toEqual({ count: 1, nested: { label: 'bye' } })
     stop()
   })
+
+  test('an effect that throws does not stop the effects queued behind it', () => {
+    const s = signal(0)
+    const seen: number[] = []
+    const dispose = root((d) => {
+      effect(() => {
+        if (s.value === 1)
+          throw new Error('boom')
+      })
+      effect(() => {
+        seen.push(s.value)
+      })
+      return d
+    })
+
+    expect(() => { s.value = 1 }).toThrow('boom')
+    s.value = 2
+    s.value = 3
+    expect(seen).toEqual([0, 1, 2, 3])
+    dispose()
+  })
+
+  test('cleanups and effects created inside an effect are disposed before it re-runs', () => {
+    const s = signal(0)
+    const inner = signal(0)
+    const log: string[] = []
+    const dispose = root((d) => {
+      effect(() => {
+        const run = s.value
+        onCleanup(() => log.push(`cleanup ${run}`))
+        effect(() => {
+          log.push(`inner ${run}:${inner.value}`)
+        })
+      })
+      return d
+    })
+
+    s.value = 1
+    inner.value = 1
+    expect(log).toEqual(['inner 0:0', 'cleanup 0', 'inner 1:0', 'inner 1:1'])
+    dispose()
+    expect(log.at(-1)).toBe('cleanup 1')
+  })
+
+  test('push and splice on a store array notify length readers', () => {
+    const state = store({ items: [1, 2] })
+    const lengths: number[] = []
+    const stop = effect(() => {
+      lengths.push(state.items.length)
+    })
+
+    state.items.push(3)
+    state.items.splice(0, 1)
+    expect(lengths).toEqual([2, 3, 2])
+    stop()
+  })
 })

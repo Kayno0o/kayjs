@@ -57,12 +57,16 @@ function wrap<T extends object>(target: T): T {
         : value
       const had = Object.prototype.hasOwnProperty.call(obj, key)
       const prev = Reflect.get(obj, key, receiver)
+      const prevLength = Array.isArray(obj) ? obj.length : 0
       const ok = Reflect.set(obj, key, rawValue, receiver)
       if (!had || !Object.is(prev, rawValue)) {
         notifyKey(obj, key)
         if (!had || Array.isArray(obj))
           notifyKey(obj, OWN_KEYS)
       }
+      // Writing past the end grows the array without a later `length` write that differs, so readers of length are told here.
+      if (Array.isArray(obj) && key !== 'length' && obj.length !== prevLength)
+        notifyKey(obj, 'length')
       return ok
     },
     deleteProperty(obj, key) {
