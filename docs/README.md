@@ -8,7 +8,7 @@
 cd docs
 bun install
 bun run dev     # Fast incremental rebuilds + live reload on http://localhost:3000
-bun run build   # Static export + .br/.gz sidecars into docs/dist/static
+bun run build   # Static export + .br/.gz sidecars into docs/dist
 ```
 
 ## Docker deployment (Caddy precompressed static server)

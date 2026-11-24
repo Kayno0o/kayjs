@@ -131,7 +131,7 @@ describe('Ecosystem plugins (@kayjs/icons, @kayjs/images, @kayjs/seo, @kayjs/mai
     const webpAssets = manifest.assets.filter(a => a.startsWith('img/') && a.endsWith('.webp'))
     expect(avifAssets.length).toBe(3) // 320w, 640w, 800w
     expect(webpAssets.length).toBe(3)
-    expect(existsSync(join(dir, 'dist/static/_kay', avifAssets[0]!))).toBe(true)
+    expect(existsSync(join(dir, 'dist/_kay', avifAssets[0]!))).toBe(true)
 
     // Fonts emitted as immutable assets + @font-face stylesheet
     expect(manifest.assets.some(a => a.startsWith('fonts/') && a.endsWith('.woff2'))).toBe(true)

@@ -13,7 +13,7 @@ order: 4
 | `kay check` | Run TypeScript typechecking + Kay compiler validation |
 | `kay dev` | Fast incremental dev server with SSE live reload (`~60–170 ms` rebuilds) |
 | `kay build` | Single-pass production build into `dist/` |
-| `kay build --static` | Static HTML + asset export into `dist/static/` |
+| `kay build --static` | Static HTML + asset export into `dist/` |
 | `kay build --compile [out]` | Compile into a single standalone Bun executable |
 | `kay start` | Serve a built `dist/` app on `Bun.serve()` |
 | `kay ui-eject <grammar> [dest]` | Eject a `@kayjs/ui` CSS Grammar into your repo |

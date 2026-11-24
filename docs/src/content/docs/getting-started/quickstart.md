@@ -53,7 +53,7 @@ kay build --compile ./my-app-bin
 
 ```bash
 kay build --static
-# Serve dist/static/ from nginx, Caddy, Cloudflare Pages, or S3
+# Serve dist/ from nginx, Caddy, Cloudflare Pages, or S3
 ```
 
 </Tab>

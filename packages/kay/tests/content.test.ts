@@ -165,11 +165,12 @@ Hidden from production.
     })
 
     const manifest = await build({ root: dir, plugins: [plugin], static: true })
-    // 0 KB JS for the entire static blog!
+    // 0 KB JS for the entire static blog, and no server/ folder left in dist/!
     expect(manifest.runtimeScript).toBeUndefined()
-    expect(existsSync(join(dir, 'dist/public/rss.xml'))).toBe(true)
+    expect(existsSync(join(dir, 'dist/server'))).toBe(false)
+    expect(existsSync(join(dir, 'dist/rss.xml'))).toBe(true)
 
-    const rss = readFileSync(join(dir, 'dist/public/rss.xml'), 'utf8')
+    const rss = readFileSync(join(dir, 'dist/rss.xml'), 'utf8')
     expect(rss).toContain('<title>Second Post</title>')
     expect(rss).toContain('<link>https://kayjs.dev/blog/second</link>')
     expect(rss).not.toContain('Unfinished Draft')
@@ -323,9 +324,10 @@ Contenu francais.
 
     const manifest = await build({ root: dir, plugins, static: true })
     expect(manifest.runtimeScript).toBeUndefined() // 0 KB JS!
-    // Both /posts/hello and /fr/posts/hello statically exported!
-    const enHtmlPath = join(dir, 'dist/static/posts/hello/index.html')
-    const frHtmlPath = join(dir, 'dist/static/fr/posts/hello/index.html')
+    // Both /posts/hello and /fr/posts/hello statically exported directly into dist/!
+    const enHtmlPath = join(dir, 'dist/posts/hello/index.html')
+    const frHtmlPath = join(dir, 'dist/fr/posts/hello/index.html')
+    expect(existsSync(join(dir, 'dist/server'))).toBe(false)
     expect(existsSync(enHtmlPath)).toBe(true)
     expect(existsSync(frHtmlPath)).toBe(true)
 
@@ -337,10 +339,10 @@ Contenu francais.
     expect(frHtml).toContain('<html lang="fr">')
     expect(frHtml).toContain('<h1>Bonjour Francais</h1>')
 
-    // OG shareCard file exists in dist/static/og/!
+    // OG shareCard file exists in dist/og/!
     const ogMatch = enHtml.match(/https:\/\/log\.kaynooo\.fr(\/og\/[^"]+)/)
     expect(ogMatch).not.toBeNull()
-    expect(existsSync(join(dir, 'dist/static', ogMatch![1]!))).toBe(true)
+    expect(existsSync(join(dir, 'dist', ogMatch![1]!))).toBe(true)
   })
 
   it('#3516: supports lazy render() without content/meta split and auto-wires @kayjs/images for relative Markdown images', async () => {
@@ -451,13 +453,14 @@ date: 2026-11-24
 
     const manifest = await build({ root: dir, static: true })
     expect(manifest.runtimeScript).toBeUndefined()
-    const html = readFileSync(join(dir, 'dist/static/posts/hello/index.html'), 'utf8')
+    expect(existsSync(join(dir, 'dist/server'))).toBe(false)
+    const html = readFileSync(join(dir, 'dist/posts/hello/index.html'), 'utf8')
     expect(html).toContain('<span class="badge">fast</span>')
     // Relative ./img/chart.png was automatically optimized into /img/chart-... without any resolveImage code!
     const imgMatch = html.match(/src="(\/img\/chart-[^"]+)"/)
     expect(imgMatch).not.toBeNull()
-    expect(existsSync(join(dir, 'dist/static', imgMatch![1]!))).toBe(true)
-    expect(readFileSync(join(dir, 'dist/static/rss.xml'), 'utf8')).toContain('<title>Auto Images &amp; Single Collection</title>')
+    expect(existsSync(join(dir, 'dist', imgMatch![1]!))).toBe(true)
+    expect(readFileSync(join(dir, 'dist/rss.xml'), 'utf8')).toContain('<title>Auto Images &amp; Single Collection</title>')
   })
 })
 

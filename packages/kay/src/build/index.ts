@@ -40,7 +40,7 @@ export interface BuildOptions {
   cache?: BuildCache | undefined
   /** Print a per-route JS/CSS bundle weight report using Bun.build's metafile. */
   analyze?: boolean | undefined
-  /** Export a static site into dist/static (prerenders all static + paths() routes). */
+  /** Export a static site directly into outDir (dist/) with no server/ folder left behind. */
   static?: boolean | undefined
   /** Run build-time prerendering for routes exporting `prerender = true` (default: true; disabled in `kay dev`). */
   prerender?: boolean | undefined
@@ -226,12 +226,30 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const fileConfig = await loadConfig(root)
   const plugins: KayPlugin[] = options.plugins ?? fileConfig.plugins ?? []
   const routesDir = resolve(root, options.routesDir ?? fileConfig.routesDir ?? 'src/routes')
-  const outDir = resolve(root, options.outDir ?? fileConfig.outDir ?? 'dist')
+  const finalOutDir = resolve(root, options.outDir ?? fileConfig.outDir ?? 'dist')
+  const cacheBaseDir = join(root, '.kay-cache')
+  const cacheExisted = existsSync(cacheBaseDir)
+  const outDir = options.static
+    ? join(cacheBaseDir, `.static-stage-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+    : finalOutDir
   const publicDir = resolve(root, options.publicDir ?? fileConfig.publicDir ?? 'public')
   const clientDir = join(outDir, 'client')
   const serverDir = join(outDir, 'server')
   const assetPrefix = (options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const minify = options.minify ?? true
+
+  try {
+    return await buildInternal()
+  }
+  finally {
+    if (options.static) {
+      rmSync(outDir, { recursive: true, force: true })
+      if (!cacheExisted && existsSync(cacheBaseDir) && readdirSync(cacheBaseDir).length === 0)
+        rmSync(cacheBaseDir, { recursive: true, force: true })
+    }
+  }
+
+  async function buildInternal(): Promise<BuildManifest> {
 
   const pluginBunPlugins = plugins.flatMap((p) => {
     const bp = p.bunPlugins
@@ -1024,10 +1042,12 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   // Step 3: Hybrid Prerendering / Static Export (skipped in `kay dev` where routes render on-demand)
   const shouldPrerender = options.prerender !== false || options.static === true
   const prerenderRoutes = shouldPrerender ? routeEntries.filter(r => r.prerender) : []
-  if (prerenderRoutes.length > 0) {
+  if (prerenderRoutes.length > 0 || options.static) {
     const { createServer } = await import('../server/index')
     const app = await createServer({ root, outDir: relative(root, outDir), assetPrefix, plugins })
-    const prerenderDir = join(outDir, options.static ? 'static' : 'prerendered')
+    const prerenderDir = options.static ? finalOutDir : join(outDir, 'prerendered')
+    if (options.static)
+      rmSync(finalOutDir, { recursive: true, force: true })
     mkdirSync(prerenderDir, { recursive: true })
 
     const prerenderStamp = Date.now()
@@ -1061,7 +1081,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
             const absHtml = join(prerenderDir, relHtml)
             mkdirSync(dirname(absHtml), { recursive: true })
             writeFileSync(absHtml, html)
-            map[u] = relative(outDir, absHtml).replace(/\\/g, '/')
+            map[u] = relative(options.static ? finalOutDir : outDir, absHtml).replace(/\\/g, '/')
           }
         }))
       }
@@ -1073,15 +1093,17 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         const notFoundRes = await app.handle(new Request('http://localhost/__kay_404__'))
         writeFileSync(join(prerenderDir, '404.html'), await notFoundRes.text())
       }
-      // Copy client assets into dist/static/_kay/... and public/ files into dist/static/...
-      const staticAssetDir = join(prerenderDir, assetPrefix.replace(/^\//, ''))
-      mkdirSync(staticAssetDir, { recursive: true })
-      for (const rel of nonEmptyAssets) {
-        const dst = join(staticAssetDir, rel)
-        mkdirSync(dirname(dst), { recursive: true })
-        writeFileSync(dst, readFileSync(join(clientDir, rel)))
+      // Copy client assets into dist/_kay/... and public/ files into dist/...
+      if (nonEmptyAssets.length > 0) {
+        const staticAssetDir = join(prerenderDir, assetPrefix.replace(/^\//, ''))
+        mkdirSync(staticAssetDir, { recursive: true })
+        for (const rel of nonEmptyAssets) {
+          const dst = join(staticAssetDir, rel)
+          mkdirSync(dirname(dst), { recursive: true })
+          writeFileSync(dst, readFileSync(join(clientDir, rel)))
+        }
       }
-      // Re-scan outPublicDir so any assets emitted during prerender (e.g. OG share cards) are included in --static
+      // Re-scan outPublicDir so any assets emitted during prerender (e.g. OG share cards, optimized MD images) are included in --static
       if (existsSync(outPublicDir)) {
         for (const abs of walkAllFiles(outPublicDir)) {
           const rel = relative(outPublicDir, abs).replace(/\\/g, '/')
@@ -1112,8 +1134,9 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           writeFileSync(`${abs}.gz`, gz)
       }
     }
-
-    writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
+    else {
+      writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
+    }
   }
 
   // Step 4: Single-Executable Compile (`kay build --compile [outfile]`)
@@ -1135,6 +1158,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     console.log(formatBundleReport(manifest, clientDir, assetPrefix, clientMetafile))
 
   return manifest
+  }
 }
 
 export interface RouteBundleMetrics {

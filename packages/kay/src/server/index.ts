@@ -11,7 +11,7 @@ import type { KayPlugin, ServerPluginAPI } from '../plugins/index'
 import type { ActionContext, ServerAction } from './action'
 import type { CookieStore } from './cookies'
 import type { EmbeddedBody, EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOptions } from './http'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
 import { loadConfig } from '../plugins/index'
 import { createRenderContext, renderCollectedHead, runWithRenderContext, streamChunkScript } from '../ssr/context'
@@ -771,6 +771,87 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   return { handle, serve }
 }
 
+function createStaticDirServer(
+  outDir: string,
+  assetPrefix: string,
+  securityEntries: readonly [string, string][],
+  compressEnabled: boolean,
+): KayApp {
+  const cleanPrefix = `${assetPrefix.replace(/\/$/, '')}/`
+  const absRoot = resolve(outDir)
+  const compressCache = compressEnabled ? new CompressionCache() : undefined
+
+  function resolveStaticFile(pathname: string): string | undefined {
+    let decoded: string
+    try {
+      decoded = decodeURIComponent(pathname)
+    }
+    catch {
+      return undefined
+    }
+    const rel = decoded.replace(/^\/+/, '').replace(/\/+$/, '')
+    const candidates = rel === ''
+      ? ['index.html']
+      : [rel, `${rel}.html`, `${rel}/index.html`]
+    for (const c of candidates) {
+      const abs = resolve(absRoot, c)
+      if (abs !== absRoot && !abs.startsWith(`${absRoot}/`) && !abs.startsWith(`${absRoot}\\`))
+        continue
+      if (existsSync(abs) && statSync(abs).isFile())
+        return abs
+    }
+    return undefined
+  }
+
+  const initHeaders = (): Headers => {
+    const headers = new Headers()
+    for (let i = 0; i < securityEntries.length; i++)
+      headers.set(securityEntries[i]![0], securityEntries[i]![1])
+    return headers
+  }
+
+  const handle = async (req: Request): Promise<Response> => {
+    if (req.method !== 'GET' && req.method !== 'HEAD')
+      return new Response('Method Not Allowed', { status: 405 })
+
+    const url = new URL(req.url)
+    const filePath = resolveStaticFile(url.pathname)
+    if (filePath === undefined) {
+      const notFoundPath = join(absRoot, '404.html')
+      if (existsSync(notFoundPath) && statSync(notFoundPath).isFile()) {
+        const headers = initHeaders()
+        headers.set('content-type', 'text/html; charset=utf-8')
+        return new Response(req.method === 'HEAD' ? null : Bun.file(notFoundPath), { status: 404, headers })
+      }
+      return new Response('Not Found', { status: 404 })
+    }
+
+    const st = statSync(filePath)
+    const etag = `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`
+    const isImmutable = url.pathname.startsWith(cleanPrefix)
+    const cacheControl = isImmutable ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate'
+    const headers = initHeaders()
+    headers.set('content-type', MIME[extname(filePath).toLowerCase()] ?? 'application/octet-stream')
+    headers.set('cache-control', cacheControl)
+    headers.set('etag', etag)
+
+    if (req.headers.get('if-none-match') === etag)
+      return new Response(null, { status: 304, headers })
+
+    const res = new Response(req.method === 'HEAD' ? null : Bun.file(filePath), { status: 200, headers })
+    if (!compressEnabled || req.method === 'HEAD')
+      return res
+    return maybeCompressResponse(res, req, compressCache)
+  }
+
+  return {
+    handle,
+    serve(port = 3000) {
+      return Bun.serve({ port, fetch: handle })
+    },
+  }
+}
+
 export async function createServer(options: ServerOptions): Promise<KayApp> {
   const root = resolve(options.root)
   const fileConfig = await loadConfig(root)
@@ -779,8 +860,19 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
   const clientDir = join(outDir, 'client')
   const manifestPath = join(outDir, 'manifest.json')
 
-  if (!existsSync(manifestPath))
+  if (!existsSync(manifestPath)) {
+    if (existsSync(outDir) && readdirSync(outDir).length > 0) {
+      const securityOpt = options.security ?? fileConfig.security
+      const securityEntries = securityOpt === false ? [] : buildSecurityHeaderEntries(securityOpt ?? {})
+      return createStaticDirServer(
+        outDir,
+        options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay',
+        securityEntries,
+        (options.compress ?? fileConfig.compress) !== false,
+      )
+    }
     throw new Error(`kay server: missing ${manifestPath}. Run build() first.`)
+  }
 
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as BuildManifest
   const modules: Record<string, unknown> = {}

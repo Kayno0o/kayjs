@@ -35,8 +35,8 @@ kay build --compile ./server
 kay build --static
 ```
 
-Outputs a ready-to-host directory in `dist/static/` containing:
+Outputs a ready-to-host directory in `dist/` containing:
 - Every route and `paths()` page (expanded across locales if `@kayjs/i18n` is enabled)
 - `404.html` (if `src/routes/_404.tsx` exists)
-- Hashed client CSS/JS/font assets under `dist/static/_kay/`
+- Hashed client CSS/JS/font assets under `dist/_kay/`
 - All `public/` files, RSS feeds, `sitemap.xml`, and generated OG `shareCard()` PNGs

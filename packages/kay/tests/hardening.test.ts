@@ -197,9 +197,10 @@ describe('Milestone 4: CSS Modules, public/ static files, and plugins in --compi
     expect(manifest.runtimeScript).toBeUndefined()
     expect(manifest.styles.length).toBe(2)
     expect(manifest.publicFiles).toEqual(['images/dot.svg', 'robots.txt'])
-    // --static copied public files into dist/static/
-    expect(existsSync(join(dir, 'dist/static/robots.txt'))).toBe(true)
-    expect(existsSync(join(dir, 'dist/static/images/dot.svg'))).toBe(true)
+    // --static copied public files directly into dist/ with no server/ folder
+    expect(existsSync(join(dir, 'dist/server'))).toBe(false)
+    expect(existsSync(join(dir, 'dist/robots.txt'))).toBe(true)
+    expect(existsSync(join(dir, 'dist/images/dot.svg'))).toBe(true)
 
     const app = await testApp({ root: dir, prebuilt: true })
     const pageRes = await app.get('/')

@@ -21,7 +21,7 @@ RUN bun run build
 
 FROM caddy:2-alpine
 COPY docs/Caddyfile /etc/caddy/Caddyfile
-COPY --from=builder /repo/docs/dist/static /srv
+COPY --from=builder /repo/docs/dist /srv
 
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s \
