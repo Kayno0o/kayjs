@@ -7,6 +7,8 @@ import { type DocFrontmatter, docs, DOCS_ROOT, getFlatNav, getNavGroups, type Na
 
 export const prerender = true
 
+const COPY_CODE_SCRIPT = `document.addEventListener('click',function(e){var b=e.target&&e.target.closest?e.target.closest('.docs-code-copy'):null;if(!b)return;var p=b.closest('.docs-code');var pre=p&&p.querySelector('pre');var t=pre?pre.textContent||'':'';(navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t):Promise.reject()).catch(function(){var a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';document.body.appendChild(a);a.select();document.execCommand('copy');a.remove()}).finally(function(){b.textContent='Copied';b.setAttribute('data-copied','true');clearTimeout(b._t);b._t=setTimeout(function(){b.textContent='Copy';b.removeAttribute('data-copied')},1800)})});`
+
 export function paths(): string[] {
   return docs.paths('/docs')
 }
@@ -105,6 +107,7 @@ export default function DocPage({ data }: { data: DocPageData }) {
         <p class="docs-article-lead">{entry.data.description}</p>
 
         <div class="docs-prose" innerHTML={{ __html: entry.html }} />
+        <script>{COPY_CODE_SCRIPT}</script>
 
         <nav class="docs-pager" aria-label="Page pagination">
           {prev !== undefined
