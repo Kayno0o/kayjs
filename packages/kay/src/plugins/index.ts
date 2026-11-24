@@ -21,8 +21,19 @@ export interface BuildPluginContext {
   emitPublic(relPath: string, content: string | Uint8Array): string
   /** Add a stylesheet URL to <head> on every page. */
   addStyle(href: string): void
+  /** Add a stylesheet URL to <head> on a specific route path only. */
+  addRouteStyle(routePath: string, href: string): void
   /** Add raw HTML to <head> on every page (e.g. font preloads, default meta/OG, JSON-LD). */
   addHead(html: string): void
+  /** Add raw HTML to <head> on a specific route path only. */
+  addRouteHead(routePath: string, html: string): void
+}
+
+export interface CheckPluginContext {
+  readonly root: string
+  readonly routesDir: string
+  /** Report a validation error from `kay check`. */
+  error(message: string): void
 }
 
 export interface ServerPluginAPI {
@@ -52,6 +63,10 @@ export interface KayPlugin {
   prerenderPaths?: (paths: string[], route: RouteManifestEntry) => string[] | Promise<string[]>
   /** Client bootstrap module path — bundled ONLY when this plugin is active. */
   clientEntry?: string | undefined
+  /** Validate plugin-specific invariants during `kay check` (e.g. missing i18n keys, content frontmatter). */
+  check?: (ctx: CheckPluginContext) => void | Promise<void>
+  /** Extra directories or files (relative to app root or absolute) for `kay dev` to watch. */
+  watchPaths?: string[] | ((root: string) => string[]) | undefined
   /** Register custom CLI subcommands (e.g. `kay i18n check`). */
   commands?: Record<string, (args: string[], root: string) => void | Promise<void>> | undefined
 }

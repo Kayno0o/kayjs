@@ -2,9 +2,10 @@
 
 import type { FSWatcher } from 'node:fs'
 import type { KayApp } from '../server/index'
-import { existsSync, rmSync, watch } from 'node:fs'
+import { existsSync, rmSync, statSync, watch } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { build, createBuildCache } from '../build/index'
+import { loadConfig } from '../plugins/index'
 import { createServer } from '../server/index'
 
 export interface DevServerOptions {
@@ -163,6 +164,24 @@ export async function devServer(options: DevServerOptions): Promise<{ url: strin
     watchers.push(watch(publicDir, { recursive: true }, () => scheduleRebuild('full')))
   if (existsSync(configPath))
     watchers.push(watch(configPath, () => scheduleRebuild('config')))
+
+  // Watch plugin-declared extra paths (e.g. content/ or messages/ directories)
+  try {
+    const cfg = await loadConfig(root)
+    const watchedExtra = new Set<string>([srcDir, publicDir, configPath])
+    for (const plugin of cfg.plugins ?? []) {
+      const paths = typeof plugin.watchPaths === 'function' ? plugin.watchPaths(root) : (plugin.watchPaths ?? [])
+      for (const p of paths) {
+        const abs = resolve(root, p)
+        if (watchedExtra.has(abs) || !existsSync(abs))
+          continue
+        watchedExtra.add(abs)
+        const isDir = statSync(abs).isDirectory()
+        watchers.push(watch(abs, isDir ? { recursive: true } : {}, () => scheduleRebuild('full')))
+      }
+    }
+  }
+  catch {}
 
   const pingChunk = encoder.encode(': ping\n\n')
   const pingInterval = setInterval(() => {

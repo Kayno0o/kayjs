@@ -24,7 +24,7 @@ import { Router } from './router'
 import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, withCspHashes } from './security'
 
 export { defineConfig, definePlugin, loadConfig } from '../plugins/index'
-export type { BuildPluginContext, KayConfig, KayPlugin, ServerPluginAPI } from '../plugins/index'
+export type { BuildPluginContext, CheckPluginContext, KayConfig, KayPlugin, ServerPluginAPI } from '../plugins/index'
 export { action, getActionError } from './action'
 export type { ActionContext, ActionErrorFlash, ActionResult, ServerAction } from './action'
 export { CompressionCache, isCompressibleType, pickEncoding } from './compress'
@@ -332,9 +332,12 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
     const hasIslands = entry.islandChunks.length > 0
     const routeStyles = entry.styles ?? manifest.styles
+    const routeHeadTags = entry.headTags !== undefined && entry.headTags.length > 0
+      ? [...(manifest.headTags ?? []), ...entry.headTags]
+      : manifest.headTags
     const shell = renderDocument({
       body: '\0',
-      headTags: manifest.headTags,
+      headTags: routeHeadTags,
       lang,
       runtimeScript: manifest.runtimeScript,
       alwaysLoadRuntime,
@@ -492,13 +495,16 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const preloadChunks = rctx.pending.length > 0 ? entry.islandChunks : renderedIslands.eagerChunks
 
     const routeStyles = entry.styles ?? manifest.styles
+    const routeHeadTags = entry.headTags !== undefined && entry.headTags.length > 0
+      ? [...(manifest.headTags ?? []), ...entry.headTags]
+      : manifest.headTags
 
     // Streaming SSR path when <Suspense> boundaries are pending (never buffered for compression)!
     if (rctx.pending.length > 0) {
       const shell = renderDocument({
         body: '\0',
         head: collectedHead,
-        headTags: manifest.headTags,
+        headTags: routeHeadTags,
         lang,
         runtimeScript: manifest.runtimeScript,
         alwaysLoadRuntime,
@@ -531,7 +537,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     let html = renderDocument({
       body,
       head: collectedHead,
-      headTags: manifest.headTags,
+      headTags: routeHeadTags,
       lang,
       runtimeScript: manifest.runtimeScript,
       alwaysLoadRuntime,

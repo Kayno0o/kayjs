@@ -86,8 +86,10 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
 
   // 1. Validate kay.config.ts
   let routesDir = resolve(root, 'src/routes')
+  let plugins: Awaited<ReturnType<typeof loadConfig>>['plugins'] = []
   try {
     const cfg = await loadConfig(root)
+    plugins = cfg.plugins ?? []
     if (cfg.routesDir !== undefined)
       routesDir = resolve(root, cfg.routesDir)
   }
@@ -194,6 +196,27 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
       // Guardrail 4: dynamic prerender = true route missing paths()
       if (analysis.hasPrerender && (conflictKey.includes(':') || conflictKey.includes('*')) && !analysis.hasPaths) {
         errors.push(`kay check: ${rel}: dynamic route exports \`prerender = true\` without exporting \`paths()\`.`)
+      }
+    }
+  }
+
+  // 3c. Run plugin check(ctx) hooks
+  if (plugins && plugins.length > 0) {
+    const pluginCtx = {
+      root,
+      routesDir,
+      error(message: string) {
+        errors.push(message)
+      },
+    }
+    for (const plugin of plugins) {
+      if (plugin.check !== undefined) {
+        try {
+          await plugin.check(pluginCtx)
+        }
+        catch (err) {
+          errors.push(`${plugin.name}: ${err instanceof Error ? err.message : String(err)}`)
+        }
       }
     }
   }

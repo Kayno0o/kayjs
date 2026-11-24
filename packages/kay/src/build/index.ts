@@ -69,6 +69,8 @@ export interface RouteManifestEntry {
   eagerIslandChunks?: string[] | undefined
   /** Per-route stylesheets (global plugin styles + CSS imported by this route, its layouts, and its islands). */
   styles?: string[] | undefined
+  /** Per-route raw <head> HTML tags injected by plugins via `ctx.addRouteHead()`. */
+  headTags?: string[] | undefined
   usesRenderContext?: boolean | undefined
   prerender?: boolean | undefined
   prerendered?: Record<string, string> | undefined
@@ -971,9 +973,30 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           r.styles.push(href)
       }
     },
+    addRouteStyle(routePath, href) {
+      if (!styleSet.has(href)) {
+        styleSet.add(href)
+        styleUrls.push(href)
+      }
+      const route = routeEntries.find(r => r.path === routePath)
+      if (route !== undefined) {
+        route.styles ??= [...globalStyles]
+        if (!route.styles.includes(href))
+          route.styles.push(href)
+      }
+    },
     addHead(html) {
       if (html !== '')
         headTags.push(html)
+    },
+    addRouteHead(routePath, html) {
+      if (html === '')
+        return
+      const route = routeEntries.find(r => r.path === routePath)
+      if (route !== undefined) {
+        route.headTags ??= []
+        route.headTags.push(html)
+      }
     },
   }
 

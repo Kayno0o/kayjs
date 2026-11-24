@@ -147,6 +147,19 @@ export function i18n(options: I18nOptions): KayPlugin {
       return out
     },
 
+    check(ctx) {
+      const baseKeys = Object.keys(messages[defaultLocale] ?? {})
+      for (const loc of locales) {
+        if (loc === defaultLocale)
+          continue
+        const dict = messages[loc] ?? {}
+        for (const key of baseKeys) {
+          if (!(key in dict))
+            ctx.error(`[i18n] ${loc}: missing translation key "${key}"`)
+        }
+      }
+    },
+
     commands: {
       'i18n-check': () => {
         const baseKeys = Object.keys(messages[defaultLocale] ?? {})
