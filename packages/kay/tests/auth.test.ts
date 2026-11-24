@@ -251,7 +251,27 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       const replayRes = await app.get(verifyPath)
       expect(replayRes.status).toBe(400)
 
-      // 10. OAuth 2.0 + PKCE (S256) full round-trip + state tampering rejection
+      // 9b. A sign-in link is never built from a foreign Host
+      const foreignHost = await app.post('http://evil.example/auth/magic-link', { email: 'magic@example.com' }, { origin: 'http://evil.example' })
+      expect(foreignHost.status).toBe(500)
+      expect(mail.outbox.length).toBe(1)
+
+      // 9c. Proving an address by magic link drops the password and sessions set before the proof (pre-account takeover)
+      app.clearCookies()
+      expect((await app.post('/auth/signup', { email: 'victim@example.com', password: 'attacker-password' })).status).toBe(201)
+      const squatterCookie = app.cookies.get('kay_session')!
+      app.clearCookies()
+      await app.post('/auth/magic-link', { email: 'victim@example.com' })
+      const victimLink = new URL(mail.outbox[0]!.text!.match(/http:\/\/localhost[^\s]+/)![0])
+      expect((await app.get(victimLink.pathname + victimLink.search)).status).toBe(302)
+      app.clearCookies()
+      expect((await app.post('/auth/signin', { email: 'victim@example.com', password: 'attacker-password' })).status).toBe(401)
+      app.cookies.set('kay_session', squatterCookie)
+      expect(((await (await app.get('/auth/session')).json()) as { user: unknown }).user).toBeNull()
+
+      // 10. OAuth 2.0 + PKCE (S256) full round-trip + state tampering rejection, onto an address squatted by password sign-up
+      app.clearCookies()
+      expect((await app.post('/auth/signup', { email: 'oauth-user@example.com', password: 'attacker-password', name: 'OAuth User' })).status).toBe(201)
       app.clearCookies()
       const startOAuth = await app.get('/auth/oauth/mock?redirect=/dashboard')
       expect(startOAuth.status).toBe(302)
@@ -281,6 +301,8 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       const oauthSess = await (await app.get('/auth/session')).json() as { user: { email: string, name: string } }
       expect(oauthSess.user.email).toBe('oauth-user@example.com')
       expect(oauthSess.user.name).toBe('OAuth User')
+      app.clearCookies()
+      expect((await app.post('/auth/signin', { email: 'oauth-user@example.com', password: 'attacker-password' })).status).toBe(401)
 
       // 11. SQLite persistence survives re-opening the DB file
       store.db.close()

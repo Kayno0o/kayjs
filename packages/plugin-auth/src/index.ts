@@ -27,6 +27,7 @@ export type { AuthSession, AuthStore, AuthUser, OAuthAccount, PublicUser, TokenK
 
 const NODE_ENV_KEY = 'NODE_ENV'
 const runtimeNodeEnv = (): string | undefined => process.env[NODE_ENV_KEY]
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
 export interface AuthMailPayload {
   to: string
@@ -65,6 +66,8 @@ export interface AuthOptions {
   defaultRedirect?: string | undefined
   /** Trusted cross-origin origins allowed to POST to auth routes. */
   trustedOrigins?: string[] | undefined
+  /** Public origin of the site (`https://example.com`), used to build mailed sign-in links and OAuth callbacks. Without it, links are only built for a loopback host. */
+  site?: string | undefined
   /** OAuth 2.0 providers (e.g. `[github(...), discord(...), google(...)]`). */
   providers?: OAuthProvider[] | undefined
   /** Mail sender for magic links / verification emails (wires cleanly to `@kayjs/mail`). */
@@ -178,6 +181,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
   const defaultRedirect = options.defaultRedirect ?? '/'
   const trustedOrigins = options.trustedOrigins ? new Set(options.trustedOrigins) : undefined
   const secret = options.secret ?? process.env.AUTH_SECRET ?? randomToken(32)
+  const site = options.site !== undefined ? new URL(options.site).origin : undefined
   const allowRate = createRateLimiter(options.rateLimit)
 
   const providers = new Map<string, OAuthProvider>()
@@ -293,6 +297,20 @@ export function createAuth(options: AuthOptions = {}): Auth {
       updatedAt: now,
     })
     return toPublicUser(created)
+  }
+
+  // The request URL comes from the Host header, which the client controls: a link mailed to a victim must not point at it.
+  function mailedLinkOrigin(url: URL): string | undefined {
+    if (site !== undefined)
+      return site
+    return LOOPBACK_HOSTS.has(url.hostname) ? url.origin : undefined
+  }
+
+  // Whoever signed up with an address before it was proven may hold its password and sessions; proving it hands the account to the owner alone.
+  async function claimUnverified(user: AuthUser): Promise<AuthUser> {
+    if (user.passwordHash !== undefined)
+      await store.deleteUserSessions(user.id)
+    return (await store.updateUser(user.id, { emailVerified: true, passwordHash: undefined })) ?? user
   }
 
   async function sendMagicLink(email: string, origin: string, redirectTo?: string): Promise<string> {
@@ -462,7 +480,12 @@ export function createAuth(options: AuthOptions = {}): Auth {
         if (!isValidEmail(email))
           return ctx.json({ ok: false, error: 'Please enter a valid email address' }, { status: 400 })
 
-        await sendMagicLink(email, ctx.url.origin, body.redirect ?? body.next)
+        const linkOrigin = mailedLinkOrigin(ctx.url)
+        if (linkOrigin === undefined) {
+          console.error(`[kay/auth] refusing to mail a sign-in link for host ${ctx.url.host}: set the auth \`site\` option to the public origin`)
+          return ctx.json({ ok: false, error: 'Sign-in links are not configured' }, { status: 500 })
+        }
+        await sendMagicLink(email, linkOrigin, body.redirect ?? body.next)
         return ctx.json({ ok: true, message: 'If that address can sign in, a link has been sent.' })
       })
 
@@ -492,7 +515,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
           })
         }
         else if (!userRecord.emailVerified) {
-          userRecord = (await store.updateUser(userRecord.id, { emailVerified: true })) ?? userRecord
+          userRecord = await claimUnverified(userRecord)
         }
 
         await createSessionForUser(userRecord.id, ctx)
@@ -524,7 +547,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
           maxAge: 600,
         })
 
-        const callbackUrl = `${ctx.url.origin}${basePath}/oauth/${encodeURIComponent(provider.id)}/callback`
+        const callbackUrl = `${site ?? ctx.url.origin}${basePath}/oauth/${encodeURIComponent(provider.id)}/callback`
         const authUrl = new URL(provider.authorizeUrl)
         authUrl.searchParams.set('client_id', provider.clientId)
         authUrl.searchParams.set('redirect_uri', callbackUrl)
@@ -555,7 +578,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
         if (!saved || saved.exp <= Date.now() || saved.provider !== provider.id || saved.state !== returnedState)
           return ctx.json({ ok: false, error: 'Invalid or expired OAuth state' }, { status: 400 })
 
-        const callbackUrl = `${ctx.url.origin}${basePath}/oauth/${encodeURIComponent(provider.id)}/callback`
+        const callbackUrl = `${site ?? ctx.url.origin}${basePath}/oauth/${encodeURIComponent(provider.id)}/callback`
         const tokenBody = new URLSearchParams({
           grant_type: 'authorization_code',
           code,
@@ -591,7 +614,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
         else {
           const byEmail = await store.getUserByEmail(profile.email)
           if (byEmail && profile.emailVerified) {
-            userRecord = byEmail
+            userRecord = byEmail.emailVerified ? byEmail : await claimUnverified(byEmail)
           }
           else if (!byEmail) {
             const now = Date.now()
