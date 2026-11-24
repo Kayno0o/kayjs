@@ -11,10 +11,14 @@ export function escapeStaticText(str: string): string {
 
 const RAW_TEXT_ELEMENTS = new Set(['style', 'script'])
 const CLOSE_STYLE_RE = /<\/(style)/gi
-const CLOSE_SCRIPT_RE = /<\/(script)/gi
+const SCRIPT_UNSAFE_RE = /<(\/script|script|!--)/gi
 
 function escapeRawText(str: string, tag: 'style' | 'script'): string {
-  return str.replace(tag === 'script' ? CLOSE_SCRIPT_RE : CLOSE_STYLE_RE, '<\\/$1')
+  if (tag === 'script') {
+    return str.replace(SCRIPT_UNSAFE_RE, (_, body: string) =>
+      body.charCodeAt(0) === 47 ? `<\\${body}` : `\\u003c${body}`)
+  }
+  return str.replace(CLOSE_STYLE_RE, '<\\/$1')
 }
 
 const VOID_ELEMENTS = new Set([
@@ -23,6 +27,41 @@ const VOID_ELEMENTS = new Set([
 ])
 
 const EVENT_ATTR = /^on[A-Z]/
+const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href'])
+const UNSAFE_URL_RE = /^(?:javascript|vbscript):/i
+const STRING_BOOL_ATTRS = new Set(['draggable', 'spellcheck', 'contenteditable'])
+
+function isStringBoolAttr(name: string): boolean {
+  const lower = name.toLowerCase()
+  return lower.startsWith('aria-') || STRING_BOOL_ATTRS.has(lower)
+}
+
+function isUnsafeUrlAttr(name: string, value: unknown): boolean {
+  if (!URL_ATTRS.has(name.toLowerCase()))
+    return false
+  return UNSAFE_URL_RE.test(String(value).replace(/[\u0000-\u0020]+/g, ''))
+}
+
+function containsDirectAwait(root: AstNode): boolean {
+  let found = false
+  walk(root, (child) => {
+    if (found)
+      return false
+    if (child !== root && (
+      child.type === 'FunctionDeclaration'
+      || child.type === 'FunctionExpression'
+      || child.type === 'ArrowFunctionExpression'
+    )) {
+      return false
+    }
+    if (child.type === 'AwaitExpression') {
+      found = true
+      return false
+    }
+    return undefined
+  })
+  return found
+}
 
 export interface IslandBinding {
   id: string
@@ -33,6 +72,7 @@ export interface IslandBinding {
 export interface CompileSsrOptions {
   islands?: ReadonlyMap<string, IslandBinding> | undefined
   isIsland?: boolean | undefined
+  emitMarkers?: boolean | undefined
   analysis?: ModuleAnalysis | undefined
 }
 
@@ -138,17 +178,23 @@ function isSimpleLiteral(node: AstNode): { ok: true, value: string | number | bo
 
 function isStaticNullish(node: AstNode): boolean {
   return (node.type === 'Identifier' && node.name === 'undefined')
-    || (node.type === 'Literal' && (node.value === null || node.value === false))
+    || (node.type === 'Literal' && node.value === null)
 }
 
 function formatStaticAttrBranch(attrName: string, node: AstNode): string | undefined {
   if (isStaticNullish(node))
     return '""'
   if (node.type === 'Literal') {
-    if (node.value === true)
-      return JSON.stringify(` ${attrName}`)
-    if (typeof node.value === 'string' || typeof node.value === 'number')
+    if (typeof node.value === 'boolean') {
+      if (isStringBoolAttr(attrName))
+        return JSON.stringify(` ${attrName}="${node.value ? 'true' : 'false'}"`)
+      return node.value ? JSON.stringify(` ${attrName}`) : '""'
+    }
+    if (typeof node.value === 'string' || typeof node.value === 'number') {
+      if (isUnsafeUrlAttr(attrName, node.value))
+        return '""'
       return JSON.stringify(` ${attrName}="${escapeStaticAttr(String(node.value))}"`)
+    }
   }
   return undefined
 }
@@ -170,7 +216,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
   }
 
   const islands = options.islands
-  const isIsland = options.isIsland ?? analysis.isInteractive
+  const emitMarkers = options.emitMarkers ?? options.isIsland ?? analysis.isInteractive
 
   function compileSubExpression(node: AstNode): string {
     let hasNestedJsx = false
@@ -230,10 +276,11 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
       const name = rawName === 'className' ? 'class' : rawName === 'htmlFor' ? 'for' : rawName
       if (attr.value === null) {
-        parts.pushStatic(` ${name}`)
+        parts.pushStatic(isStringBoolAttr(name) ? ` ${name}="true"` : ` ${name}`)
       }
       else if (attr.value.type === 'Literal') {
-        parts.pushStatic(` ${name}="${escapeStaticAttr(String(attr.value.value))}"`)
+        if (!isUnsafeUrlAttr(name, attr.value.value))
+          parts.pushStatic(` ${name}="${escapeStaticAttr(String(attr.value.value))}"`)
       }
       else if (attr.value.type === 'JSXExpressionContainer') {
         const expr = attr.value.expression as AstNode
@@ -331,7 +378,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
           && expr.arguments?.length === 1
         ) {
           const cb = expr.arguments[0] as AstNode
-          if ((cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression') && cb.body !== null) {
+          if ((cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression') && !cb.async && cb.body !== null) {
             const body = (cb.body.type === 'ParenthesizedExpression' ? cb.body.expression : cb.body) as AstNode
             if (body.type === 'JSXElement' || body.type === 'JSXFragment') {
               const target = compileSubExpression(expr.callee.object)
@@ -358,7 +405,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
                 pushStmt(
                   `const ${arrVar} = ${target}; if (${arrVar}) for (let ${idxVar} = 0; ${idxVar} < ${arrVar}.length; ${idxVar}++) { const ${itemParam} = ${arrVar}[${idxVar}]; ${innerStmts.join(' ')} }`,
                 )
-                if (isIsland && !isLast)
+                if (emitMarkers && !isLast)
                   parts.pushStatic('<!---->')
                 continue
               }
@@ -383,13 +430,13 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       && expr.arguments?.length === 1
     ) {
       const cb = expr.arguments[0] as AstNode
-      if ((cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression') && cb.body !== null) {
+      if ((cb.type === 'ArrowFunctionExpression' || cb.type === 'FunctionExpression') && !cb.async && cb.body !== null) {
         const body = (cb.body.type === 'ParenthesizedExpression' ? cb.body.expression : cb.body) as AstNode
         if (body.type === 'JSXElement' || body.type === 'JSXFragment') {
           const target = compileSubExpression(expr.callee.object)
           const params = (cb.params as AstNode[]).map(p => code.slice(p.start, p.end)).join(', ')
           const rendered = `${use('ssrLoop')}(${target}, (${params}) => ${compileJsxToStringExpr(body)})`
-          return isIsland && !isLast ? `(${rendered}) + "<!---->"` : rendered
+          return emitMarkers && !isLast ? `(${rendered}) + "<!---->"` : rendered
         }
         if (body.type === 'BlockStatement') {
           let blockHasJsx = false
@@ -402,7 +449,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
           })
           if (blockHasJsx) {
             const rendered = `${use('esc')}(${compileSubExpression(expr)})`
-            return isIsland && !isLast ? `(${rendered}) + "<!---->"` : rendered
+            return emitMarkers && !isLast ? `(${rendered}) + "<!---->"` : rendered
           }
         }
       }
@@ -412,7 +459,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       const right = unwrapParens(expr.right)
       if (right.type === 'JSXElement' || right.type === 'JSXFragment') {
         const left = compileSubExpression(expr.left)
-        const emptyVal = isIsland && !isLast ? '"<!---->"' : '""'
+        const emptyVal = emitMarkers && !isLast ? '"<!---->"' : '""'
         return `((${left}) ? (${compileJsxToStringExpr(right)}) : ${emptyVal})`
       }
     }
@@ -425,13 +472,13 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         const cons = compileExpressionAsString(consNode, false, true)
         const alt = compileExpressionAsString(altNode, false, true)
         const base = `((${test}) ? (${cons}) : (${alt}))`
-        return isIsland && !isLast ? `(${base} || "<!---->")` : base
+        return emitMarkers && !isLast ? `(${base} || "<!---->")` : base
       }
     }
 
     const exprCode = compileSubExpression(expr)
     const rendered = `${use('esc')}(${exprCode})`
-    if (isIsland && hasSiblings)
+    if (emitMarkers && hasSiblings)
       return isLast ? `"<!---->" + ${rendered}` : `"<!---->" + ${rendered} + "<!---->"`
     return rendered
   }
@@ -526,7 +573,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
 
     const childExpr = hasChildren ? compileJsxToStringExpr({ type: 'JSXFragment', children: childNodes }) : '""'
 
-    const islandInfo = !isIsland ? islands?.get(tag) : undefined
+    const islandInfo = islands?.get(tag)
     if (islandInfo !== undefined) {
       const propsCode = `{ ${propEntries.join(', ')} }`
       const callPropsCode = hasChildren
@@ -534,8 +581,9 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         : propsCode
       const resolvedHydrate = staticHydrate ?? (hydrateExpr === undefined ? islandInfo.defaultHydrate : undefined)
 
-      // Compile-time static island props fast path: 0 JSON.stringify / Object.keys / escAttr at runtime!
-      if (allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
+      // Compile-time static island props fast path (only when not inside an island-reachable component):
+      // 0 JSON.stringify / Object.keys / escAttr at runtime, while still incrementing island depth!
+      if (!emitMarkers && allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
         const pAttr = Object.keys(staticPropsObj).length > 0
           ? ` p="${escapeStaticAttr(JSON.stringify(staticPropsObj))}"`
           : ''
@@ -545,14 +593,43 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         const openTag = `<kay-island c="${escapeStaticAttr(islandInfo.chunk)}"${pAttr}${hAttr}>`
         parts.pushStatic(openTag)
         if (resolvedHydrate !== 'client')
-          parts.pushExpr(`${use('ssrChild')}(${tag}(${callPropsCode}))`)
+          parts.pushExpr(`${use('ssrInIsland')}(() => ${use('ssrChild')}(${tag}(${callPropsCode})))`)
         parts.pushStatic('</kay-island>')
         return
       }
 
       const hydrateArg = hydrateExpr ?? (islandInfo.defaultHydrate !== undefined ? JSON.stringify(islandInfo.defaultHydrate) : 'undefined')
+      if (allStaticProps && (hydrateExpr === undefined || staticHydrate !== undefined)) {
+        parts.pushExpr(
+          `${use('ssrIsland')}(${JSON.stringify(islandInfo.id)}, ${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callPropsCode})), ${propsCode}, ${hydrateArg})`,
+        )
+        return
+      }
+
+      // Hoist dynamic island props into a single binding so expressions (side effects & await) evaluate once!
+      const pVar = `_p${loopCounter++}`
+      const argNames = [pVar]
+      const argExprs = [propsCode]
+      let callArg = pVar
+      if (hasChildren) {
+        let childSlotVal = childExpr
+        if (containsDirectAwait({ type: 'JSXFragment', children: childNodes })) {
+          const cVar = `_c${loopCounter++}`
+          argNames.push(cVar)
+          argExprs.push(childExpr)
+          childSlotVal = cVar
+        }
+        callArg = `{ ...${pVar}, children: ${use('raw')}("<kay-slot>" + (${childSlotVal}) + "</kay-slot>") }`
+      }
+      let hArg = hydrateArg
+      if (hydrateExpr !== undefined && staticHydrate === undefined) {
+        const hVar = `_h${loopCounter++}`
+        argNames.push(hVar)
+        argExprs.push(hydrateExpr)
+        hArg = hVar
+      }
       parts.pushExpr(
-        `${use('ssrIsland')}(${JSON.stringify(islandInfo.id)}, ${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callPropsCode})), ${propsCode}, ${hydrateArg})`,
+        `((${argNames.join(', ')}) => ${use('ssrIsland')}(${JSON.stringify(islandInfo.id)}, ${JSON.stringify(islandInfo.chunk)}, () => ${use('ssrChild')}(${tag}(${callArg})), ${pVar}, ${hArg}))(${argExprs.join(', ')})`,
       )
       return
     }
@@ -583,6 +660,8 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       return parts.toExpr()
 
     flush()
+    if (containsDirectAwait(node))
+      return `(await (async () => { let ${bufVar} = ""; ${stmts.join(' ')} return ${bufVar}; })())`
     return `(() => { let ${bufVar} = ""; ${stmts.join(' ')} return ${bufVar}; })()`
   }
 

@@ -20,7 +20,7 @@ export function Icon({ icon, ...rest }: IconComponentProps) {
       aria-hidden={hasLabel ? undefined : 'true'}
       role={hasLabel ? 'img' : undefined}
       {...rest}
-      innerHTML={{ __html: icon.body }}
+      innerHTML={icon.body}
     />
   )
 }

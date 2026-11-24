@@ -28,9 +28,32 @@ export function claimLoop(parent: Node, fn: () => void, skip = 0): boolean {
 }
 
 // `nodes` is the SSR range the render claimed through template() (a fragment hydrates to null, so the caller learns its nodes here).
-export function claimInsert<T>(parent: Node, marker: Node | null, fn: () => T): { result: T, marker: Node | null, claimed: Node | null, nodes: Node[] | undefined } {
+export function claimInsert<T>(
+  parent: Node,
+  marker: Node | null,
+  fn: () => T,
+  startMarker?: Node | null,
+): { result: T, marker: Node | null, claimed: Node | null, nodes: Node[] | undefined } {
   if (!hydrating)
     return { result: fn(), marker, claimed: null, nodes: undefined }
+
+  if (startMarker !== undefined) {
+    const first = startMarker === null ? parent.firstChild : startMarker.nextSibling
+    const claimed = first === marker ? null : first
+    const prevNode = hydrateNode
+    hydrateNode = claimed
+    let result: T
+    try {
+      result = fn()
+    }
+    finally {
+      hydrateNode = prevNode
+    }
+    const nodes: Node[] = []
+    for (let n: Node | null = claimed; n !== null && n !== marker; n = n.nextSibling)
+      nodes.push(n)
+    return { result, marker, claimed, nodes: nodes.length > 0 ? nodes : undefined }
+  }
 
   const claimed: Node | null = marker === null ? parent.lastChild : marker.nodeType === 8 ? null : marker
   const prevNode = hydrateNode
@@ -44,7 +67,16 @@ export function claimInsert<T>(parent: Node, marker: Node | null, fn: () => T): 
   finally {
     hydrateNode = prevNode
   }
-  if (marker === null || claimed === null)
+  if (marker === null) {
+    let nodes: Node[] | undefined
+    if (claimed !== null && end !== claimed) {
+      nodes = []
+      for (let n: Node | null = claimed; n !== null && n !== end; n = n.nextSibling)
+        nodes.push(n)
+    }
+    return { result, marker: null, claimed, nodes }
+  }
+  if (claimed === null)
     return { result, marker, claimed, nodes: undefined }
 
   // The anchor goes after the claimed range; a text value or a nested insert moves no cursor and claims the one node.
@@ -73,6 +105,10 @@ export function hydrate(container: Element, render: () => Node | DocumentFragmen
       render()
     })
   }
+  catch (err) {
+    disposeOwner(owner)
+    throw err
+  }
   finally {
     hydrating = prevHydrating
     hydrateNode = prevNode
@@ -90,6 +126,10 @@ export function mount(container: Element, render: () => Node | DocumentFragment 
     container.textContent = ''
     if (node !== null)
       container.appendChild(node)
+  }
+  catch (err) {
+    disposeOwner(owner)
+    throw err
   }
   finally {
     hydrating = prevHydrating
@@ -170,6 +210,14 @@ export function skipText(marker: Node): Node | null {
   return next !== null && next.nodeType === 3 ? next.nextSibling : next
 }
 
+/** Advance past an SSR-bracketed dynamic range (`<!---->...<!---->`) to its closing comment marker. */
+export function skipRange(marker: Node): Node | null {
+  let cur = marker.nextSibling
+  while (cur !== null && cur.nodeType !== 8)
+    cur = cur.nextSibling
+  return cur
+}
+
 export function setText(node: Text, value: unknown): void {
   const str = value == null || typeof value === 'boolean' ? '' : String(value)
   if (node.data !== str)
@@ -194,13 +242,49 @@ export function setClass(el: Element, value: unknown): void {
   }
 }
 
+const VALID_ATTR_NAME = /^[A-Za-z_:][-\w:.]*$/
+const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href'])
+const UNSAFE_URL_RE = /^(?:javascript|vbscript):/i
+const STRING_BOOL_ATTRS = new Set(['draggable', 'spellcheck', 'contenteditable'])
+
+function isBlockedAttr(name: string): boolean {
+  if (!VALID_ATTR_NAME.test(name))
+    return true
+  const lower = name.toLowerCase()
+  return lower.startsWith('on') || lower === 'innerhtml' || lower === 'srcdoc'
+}
+
+function isStringBoolAttr(name: string): boolean {
+  const lower = name.toLowerCase()
+  return lower.startsWith('aria-') || STRING_BOOL_ATTRS.has(lower)
+}
+
+function isUnsafeUrlAttr(name: string, value: unknown): boolean {
+  if (!URL_ATTRS.has(name.toLowerCase()))
+    return false
+  return UNSAFE_URL_RE.test(String(value).replace(/[\u0000-\u0020]+/g, ''))
+}
+
 export function setAttr(el: Element, name: string, value: unknown): void {
-  if (value == null || value === false)
+  if (isBlockedAttr(name))
+    return
+  if (value == null) {
     el.removeAttribute(name)
-  else if (value === true)
-    el.setAttribute(name, '')
-  else
+  }
+  else if (typeof value === 'boolean') {
+    if (isStringBoolAttr(name))
+      el.setAttribute(name, value ? 'true' : 'false')
+    else if (value)
+      el.setAttribute(name, '')
+    else
+      el.removeAttribute(name)
+  }
+  else if (isUnsafeUrlAttr(name, value)) {
+    el.removeAttribute(name)
+  }
+  else {
     el.setAttribute(name, String(value))
+  }
 }
 
 export function setProp(el: Element, name: string, value: unknown): void {

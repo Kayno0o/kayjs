@@ -26,6 +26,106 @@ const DELEGATED_EVENTS = new Set([
 
 const DOM_PROPS = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
 const EVENT_ATTR = /^on([A-Z]\w*)$/
+const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href'])
+const UNSAFE_URL_RE = /^(?:javascript|vbscript):/i
+const STRING_BOOL_ATTRS = new Set(['draggable', 'spellcheck', 'contenteditable'])
+
+function isStringBoolAttr(name: string): boolean {
+  const lower = name.toLowerCase()
+  return lower.startsWith('aria-') || STRING_BOOL_ATTRS.has(lower)
+}
+
+function isUnsafeUrlAttr(name: string, value: unknown): boolean {
+  if (!URL_ATTRS.has(name.toLowerCase()))
+    return false
+  return UNSAFE_URL_RE.test(String(value).replace(/[\u0000-\u0020]+/g, ''))
+}
+
+const HTML_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: '\u00A0',
+  ndash: '\u2013', mdash: '\u2014', lsquo: '\u2018', rsquo: '\u2019',
+  ldquo: '\u201C', rdquo: '\u201D', hellip: '\u2026', bull: '\u2022',
+  middot: '\u00B7', laquo: '\u00AB', raquo: '\u00BB', lsaquo: '\u2039',
+  rsaquo: '\u203A', shy: '\u00AD', ensp: '\u2002', emsp: '\u2003',
+  thinsp: '\u2009', zwnj: '\u200C', zwj: '\u200D', lrm: '\u200E',
+  rlm: '\u200F', prime: '\u2032', Prime: '\u2033', sect: '\u00A7',
+  para: '\u00B6', dagger: '\u2020', Dagger: '\u2021', permil: '\u2030',
+  copy: '\u00A9', reg: '\u00AE', trade: '\u2122', euro: '\u20AC',
+  pound: '\u00A3', yen: '\u00A5', cent: '\u00A2', curren: '\u00A4',
+  deg: '\u00B0', plusmn: '\u00B1', times: '\u00D7', divide: '\u00F7',
+  frac12: '\u00BD', frac14: '\u00BC', frac34: '\u00BE', sup1: '\u00B9',
+  sup2: '\u00B2', sup3: '\u00B3', micro: '\u00B5', minus: '\u2212',
+  ne: '\u2260', le: '\u2264', ge: '\u2265', approx: '\u2248', infin: '\u221E',
+  larr: '\u2190', uarr: '\u2191', rarr: '\u2192', darr: '\u2193',
+  harr: '\u2194', crarr: '\u21B5', check: '\u2713', cross: '\u2717',
+}
+
+const ENTITY_RE = /&(?:#(\d+)|#x([0-9a-fA-F]+)|([A-Za-z][A-Za-z0-9]*));/g
+
+function decodeHtmlEntities(str: string): string {
+  if (!str.includes('&'))
+    return str
+  return str.replace(ENTITY_RE, (match, dec: string | undefined, hex: string | undefined, named: string | undefined) => {
+    if (dec !== undefined) {
+      const cp = Number.parseInt(dec, 10)
+      return cp === 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? '\uFFFD' : String.fromCodePoint(cp)
+    }
+    if (hex !== undefined) {
+      const cp = Number.parseInt(hex, 16)
+      return cp === 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? '\uFFFD' : String.fromCodePoint(cp)
+    }
+    if (named !== undefined && Object.prototype.hasOwnProperty.call(HTML_ENTITIES, named))
+      return HTML_ENTITIES[named]!
+    return match
+  })
+}
+
+const PRIMITIVE_GLOBALS = new Set([
+  'String', 'Number', 'Boolean', 'parseInt', 'parseFloat',
+  'encodeURI', 'encodeURIComponent', 'decodeURI', 'decodeURIComponent',
+])
+
+const PRIMITIVE_METHODS = new Set([
+  'toString', 'toFixed', 'toPrecision', 'toExponential', 'toLocaleString',
+  'toLocaleDateString', 'toLocaleTimeString', 'toISOString', 'toUpperCase',
+  'toLowerCase', 'toLocaleUpperCase', 'toLocaleLowerCase', 'trim', 'trimStart',
+  'trimEnd', 'join', 'padStart', 'padEnd', 'repeat', 'replace', 'replaceAll',
+  'substring', 'substr', 'charAt', 'charCodeAt', 'codePointAt', 'indexOf',
+  'lastIndexOf', 'includes', 'startsWith', 'endsWith', 'getTime', 'getFullYear',
+  'getMonth', 'getDate', 'getHours', 'getMinutes', 'getSeconds',
+])
+
+function isKnownPrimitiveCall(node: AstNode): boolean {
+  const callee = node.callee as AstNode | undefined
+  if (!callee)
+    return false
+  if (callee.type === 'Identifier' && PRIMITIVE_GLOBALS.has(callee.name as string))
+    return true
+  if (callee.type === 'MemberExpression' && !callee.computed && callee.property?.type === 'Identifier') {
+    const prop = callee.property.name as string
+    if (callee.object?.type === 'Identifier') {
+      const obj = callee.object.name as string
+      if (obj === 'Math' || (obj === 'JSON' && prop === 'stringify') || (obj === 'Date' && prop === 'now'))
+        return true
+    }
+    if (PRIMITIVE_METHODS.has(prop))
+      return true
+  }
+  return false
+}
+
+function mayReturnNode(node: AstNode): boolean {
+  const cur = unwrapParens(node)
+  if (cur.type === 'TSAsExpression' || cur.type === 'TSNonNullExpression' || cur.type === 'TSSatisfiesExpression' || cur.type === 'TSTypeAssertion')
+    return mayReturnNode(cur.expression as AstNode)
+  if (cur.type === 'CallExpression')
+    return !isKnownPrimitiveCall(cur)
+  if (cur.type === 'LogicalExpression')
+    return mayReturnNode(cur.left as AstNode) || mayReturnNode(cur.right as AstNode)
+  if (cur.type === 'ConditionalExpression')
+    return mayReturnNode(cur.consequent as AstNode) || mayReturnNode(cur.alternate as AstNode)
+  return false
+}
 
 export interface CompileDomOptions {
   analysis?: ModuleAnalysis | undefined
@@ -442,7 +542,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     if (meaningful.length === 1) {
       const child = meaningful[0]!
       if (child.type === 'JSXText')
-        propEntries.push(`children: ${JSON.stringify(cleanJsxText(child.value as string))}`)
+        propEntries.push(`children: ${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value as string)))}`)
       else if (child.type === 'JSXElement' || child.type === 'JSXFragment')
         propEntries.push(`get children() { return ${compileRootJsx(child, scopeRewrites)} }`)
       else if (child.type === 'JSXExpressionContainer')
@@ -451,7 +551,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
     else if (meaningful.length > 1) {
       const items = meaningful.map((c) => {
         if (c.type === 'JSXText')
-          return JSON.stringify(cleanJsxText(c.value as string))
+          return JSON.stringify(decodeHtmlEntities(cleanJsxText(c.value as string)))
         if (c.type === 'JSXElement' || c.type === 'JSXFragment')
           return compileRootJsx(c, scopeRewrites)
         return compileExpression(c.expression, scopeRewrites)
@@ -508,6 +608,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
     const walkPlan: { parentVar: string, index: number, varName: string }[] = []
     const dynamicTextSlots = new Set<string>() // "parentVar:textIndex" for optional SSR text between <!---->...<!---->
+    const dynamicRangeSlots = new Set<string>() // "parentVar:closeIndex" for SSR range between <!---->...<!---->
 
     function requestChild(parentVar: string, index: number): string {
       const key = `${parentVar}:${index}`
@@ -562,19 +663,25 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
 
         const name = rawName === 'className' ? 'class' : rawName === 'htmlFor' ? 'for' : rawName
         if (attr.value === null) {
-          html += ` ${name}`
+          html += isStringBoolAttr(name) ? ` ${name}="true"` : ` ${name}`
         }
         else if (attr.value.type === 'Literal') {
-          html += ` ${name}="${escapeStaticAttr(String(attr.value.value))}"`
+          if (!isUnsafeUrlAttr(name, attr.value.value))
+            html += ` ${name}="${escapeStaticAttr(String(attr.value.value))}"`
         }
         else if (attr.value.type === 'JSXExpressionContainer') {
           const expr = attr.value.expression as AstNode
           const lit = !DOM_PROPS.has(name) && name !== 'style' ? staticLiteral(expr) : { ok: false as const }
           if (lit.ok) {
-            if (lit.value === true)
-              html += ` ${name}`
-            else if (lit.value !== false && lit.value !== null)
+            if (typeof lit.value === 'boolean') {
+              if (isStringBoolAttr(name))
+                html += ` ${name}="${lit.value ? 'true' : 'false'}"`
+              else if (lit.value === true)
+                html += ` ${name}`
+            }
+            else if (lit.value !== null && !isUnsafeUrlAttr(name, lit.value)) {
               html += ` ${name}="${escapeStaticAttr(String(lit.value))}"`
+            }
             continue
           }
           const exprCode = compileExpression(expr, scopeRewrites)
@@ -652,6 +759,12 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
                 if (slot.startsWith(prefix)) {
                   dynamicTextSlots.delete(slot)
                   dynamicTextSlots.add(`${realVar}:${slot.slice(prefix.length)}`)
+                }
+              }
+              for (const slot of [...dynamicRangeSlots]) {
+                if (slot.startsWith(prefix)) {
+                  dynamicRangeSlots.delete(slot)
+                  dynamicRangeSlots.add(`${realVar}:${slot.slice(prefix.length)}`)
                 }
               }
             }
@@ -808,17 +921,28 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
             }
           }
 
-          // Case 4: Dynamic children slot / Node insertion (`{children}`, `{props.children}`, or any expression containing JSX)
+          // Case 4: Dynamic children slot / Node insertion (`{children}`, `{props.children}`, JSX expressions, or call expressions)
           const isChildrenExpr = (expr.type === 'Identifier' && expr.name === 'children')
             || (expr.type === 'MemberExpression' && !expr.computed && expr.property?.name === 'children')
           const exprCode = compileExpression(expr, scopeRewrites)
-          if (isChildrenExpr || hasJsxDescendant(expr)) {
-            const anchorVar = isLast ? 'null' : requestChild(elVar, domIndex)
-            if (!isLast) {
+          if (isChildrenExpr || hasJsxDescendant(expr) || mayReturnNode(expr)) {
+            if (meaningful.length === 1) {
+              ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, null, null);`)
+            }
+            else if (isLast) {
+              const startVar = requestChild(elVar, domIndex)
               html += '<!---->'
               domIndex++
+              ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, null, ${startVar});`)
             }
-            ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, ${anchorVar});`)
+            else {
+              const startVar = requestChild(elVar, domIndex)
+              const endVar = requestChild(elVar, domIndex + 1)
+              html += '<!----><!---->'
+              dynamicRangeSlots.add(`${elVar}:${domIndex + 1}`)
+              domIndex += 2
+              ops.push(`${use('insert')}(${elVar}, () => ${exprCode}, ${endVar}, ${startVar});`)
+            }
             continue
           }
 
@@ -899,6 +1023,10 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
             expr = `${use('skipText')}(${expr})`
             pos += 2
           }
+          else if (dynamicRangeSlots.has(`${pVar}:${pos + 1}`)) {
+            expr = `${use('skipRange')}(${expr})`
+            pos += 1
+          }
           else {
             expr = `${expr}.nextSibling`
             pos += 1
@@ -932,7 +1060,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         if (child.type === 'JSXElement' || child.type === 'JSXFragment')
           return compileRootJsx(child, scopeRewrites)
         if (child.type === 'JSXText')
-          return `document.createTextNode(${JSON.stringify(cleanJsxText(child.value as string))})`
+          return `document.createTextNode(${JSON.stringify(decodeHtmlEntities(cleanJsxText(child.value as string)))})`
         return `document.createTextNode(String(${compileExpression(child.expression, scopeRewrites)} ?? ""))`
       })
       return `${use('frag')}(${items.join(', ')})`

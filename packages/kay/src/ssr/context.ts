@@ -15,13 +15,14 @@ export interface RenderContext {
   title: string | undefined
   pending: PendingChunk[]
   nextId: number
+  islandDepth: number
 }
 
 const STORAGE_KEY = Symbol.for('kay.render.storage')
 const renderStorage: AsyncLocalStorage<RenderContext> = ((globalThis as Record<symbol, AsyncLocalStorage<RenderContext> | undefined>)[STORAGE_KEY] ??= new AsyncLocalStorage<RenderContext>())
 
 export function createRenderContext(): RenderContext {
-  return { headParts: [], title: undefined, pending: [], nextId: 0 }
+  return { headParts: [], title: undefined, pending: [], nextId: 0, islandDepth: 0 }
 }
 
 export function runWithRenderContext<T>(ctx: RenderContext, fn: () => T): T {

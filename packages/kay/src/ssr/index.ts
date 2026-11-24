@@ -1,10 +1,16 @@
 // Kay v2 SSR runtime: flat string concatenation with fast-path escaping and zero-overhead islands.
 
 import type { Html, HydrateStrategy, KayChild } from '../jsx-runtime'
-import { KAY_STREAM_SCRIPT } from './context'
+import { currentRenderContext, KAY_STREAM_SCRIPT } from './context'
 
 export const KAY_ISLAND_STYLE = 'kay-island,kay-slot{display:contents}'
 export const KAY_SUSPENSE_STYLE = 'kay-s{display:contents}'
+
+export const RAW_HTML = Symbol.for('kay.html')
+
+function isRawHtml(value: unknown): value is Html {
+  return typeof value === 'object' && value !== null && (value as Record<symbol, unknown>)[RAW_HTML] === true && '__html' in value
+}
 
 const ESC_TEXT = /[&<>]/
 const ESC_ATTR = /[&"<>]/
@@ -22,8 +28,8 @@ export function esc(value: unknown): string {
     return String(value)
   if (value == null || typeof value === 'boolean')
     return ''
-  if (typeof value === 'object' && '__html' in value)
-    return (value as Html).__html
+  if (isRawHtml(value))
+    return value.__html
   if (Array.isArray(value)) {
     let out = ''
     for (let i = 0; i < value.length; i++)
@@ -41,15 +47,15 @@ export function esc(value: unknown): string {
 export function ssrRaw(value: unknown): string {
   if (value == null || value === false)
     return ''
-  if (typeof value === 'object' && '__html' in value)
-    return String((value as Html).__html)
+  if (isRawHtml(value))
+    return String(value.__html)
   return String(value)
 }
 
 const CLOSE_STYLE_RE = /<\/(style)/gi
-const CLOSE_SCRIPT_RE = /<\/(script)/gi
+const SCRIPT_UNSAFE_RE = /<(\/script|script|!--)/gi
 
-/** Emits raw text inside `<style>` or `<script>` without HTML entity escaping, neutralizing only its closing tag. */
+/** Emits raw text inside `<style>` or `<script>` without HTML entity escaping, neutralizing dangerous script/style sequences. */
 export function ssrRawText(tag: 'style' | 'script', value: unknown): string {
   if (value == null || typeof value === 'boolean')
     return ''
@@ -61,10 +67,14 @@ export function ssrRawText(tag: 'style' | 'script', value: unknown): string {
   }
   const str = typeof value === 'string'
     ? value
-    : typeof value === 'object' && '__html' in value
-      ? String((value as Html).__html)
+    : isRawHtml(value)
+      ? String(value.__html)
       : String(value)
-  return str.replace(tag === 'script' ? CLOSE_SCRIPT_RE : CLOSE_STYLE_RE, '<\\/$1')
+  if (tag === 'script') {
+    return str.replace(SCRIPT_UNSAFE_RE, (_, body: string) =>
+      body.charCodeAt(0) === 47 ? `<\\${body}` : `\\u003c${body}`)
+  }
+  return str.replace(CLOSE_STYLE_RE, '<\\/$1')
 }
 
 export function escAttr(value: unknown): string {
@@ -81,14 +91,42 @@ export function escAttr(value: unknown): string {
 }
 
 export function raw(html: string): Html {
-  return { __html: html }
+  return { __html: html, [RAW_HTML]: true } as Html
+}
+
+const VALID_ATTR_NAME = /^[A-Za-z_:][-\w:.]*$/
+const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href'])
+const UNSAFE_URL_RE = /^(?:javascript|vbscript):/i
+const STRING_BOOL_ATTRS = new Set(['draggable', 'spellcheck', 'contenteditable'])
+
+function isBlockedAttr(name: string): boolean {
+  if (!VALID_ATTR_NAME.test(name))
+    return true
+  const lower = name.toLowerCase()
+  return lower.startsWith('on') || lower === 'innerhtml' || lower === 'srcdoc'
+}
+
+function isStringBoolAttr(name: string): boolean {
+  const lower = name.toLowerCase()
+  return lower.startsWith('aria-') || STRING_BOOL_ATTRS.has(lower)
+}
+
+function isUnsafeUrlAttr(name: string, value: unknown): boolean {
+  if (!URL_ATTRS.has(name.toLowerCase()))
+    return false
+  return UNSAFE_URL_RE.test(String(value).replace(/[\u0000-\u0020]+/g, ''))
 }
 
 export function ssrAttr(name: string, value: unknown): string {
-  if (value == null || value === false)
+  if (value == null || isBlockedAttr(name))
     return ''
-  if (value === true)
-    return ` ${name}`
+  if (typeof value === 'boolean') {
+    if (isStringBoolAttr(name))
+      return ` ${name}="${value ? 'true' : 'false'}"`
+    return value ? ` ${name}` : ''
+  }
+  if (isUnsafeUrlAttr(name, value))
+    return ''
   return ` ${name}="${escAttr(value)}"`
 }
 
@@ -108,16 +146,16 @@ export function ssrStyle(value: unknown): string {
   return ''
 }
 
-const SPREAD_EVENT_RE = /^on[A-Z]/
-
 export function ssrSpread(props: Record<string, unknown> | null | undefined): string {
   if (props == null || typeof props !== 'object')
     return ''
   let out = ''
   for (const [rawKey, value] of Object.entries(props)) {
-    if (rawKey === 'key' || rawKey === 'ref' || rawKey === '$hydrate' || rawKey === 'children' || SPREAD_EVENT_RE.test(rawKey))
+    if (rawKey === 'key' || rawKey === 'ref' || rawKey === '$hydrate' || rawKey === 'children')
       continue
     const name = rawKey === 'className' ? 'class' : rawKey === 'htmlFor' ? 'for' : rawKey
+    if (isBlockedAttr(name))
+      continue
     out += name === 'style' ? ssrStyle(value) : ssrAttr(name, value)
   }
   return out
@@ -145,8 +183,8 @@ export function ssrChild(value: KayChild): string {
     return String(value)
   if (value == null || typeof value === 'boolean')
     return ''
-  if (typeof value === 'object' && '__html' in value)
-    return (value as Html).__html
+  if (isRawHtml(value))
+    return value.__html
   if (Array.isArray(value)) {
     let out = ''
     for (let i = 0; i < value.length; i++)
@@ -175,6 +213,33 @@ function serializeIslandProps(props: Record<string, unknown>): string {
   })
 }
 
+let fallbackIslandDepth = 0
+
+function getIslandDepth(): number {
+  const ctx = currentRenderContext()
+  return ctx !== undefined ? ctx.islandDepth : fallbackIslandDepth
+}
+
+export function ssrInIsland(render: () => string): string {
+  const ctx = currentRenderContext()
+  if (ctx !== undefined) {
+    ctx.islandDepth++
+    try {
+      return render()
+    }
+    finally {
+      ctx.islandDepth--
+    }
+  }
+  fallbackIslandDepth++
+  try {
+    return render()
+  }
+  finally {
+    fallbackIslandDepth--
+  }
+}
+
 export function ssrIsland(
   _id: string,
   chunk: string,
@@ -182,13 +247,16 @@ export function ssrIsland(
   props: Record<string, unknown>,
   hydrate?: HydrateStrategy,
 ): string {
+  if (getIslandDepth() > 0)
+    return render()
+
   const propsAttr = Object.keys(props).length > 0
     ? ` p="${escAttr(serializeIslandProps(props))}"`
     : ''
   const hydrateAttr = hydrate !== undefined && hydrate !== 'load'
     ? ` h="${escAttr(hydrate)}"`
     : ''
-  const inner = hydrate === 'client' ? '' : render()
+  const inner = hydrate === 'client' ? '' : ssrInIsland(render)
 
   return `<kay-island c="${escAttr(chunk)}"${propsAttr}${hydrateAttr}>${inner}</kay-island>`
 }

@@ -2,19 +2,34 @@
 // so Bun.build({ splitting: true }) keeps them out of minimal islands that don't use them.
 
 import type { Owner } from '../reactivity/index'
-import { batch, createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, untrack } from '../reactivity/index'
-import { claimInsert, setAttr, setClass, setProp, setStyle } from './index'
+import { createOwner, disposeOwner, effect, getOwner, runWithOwner, untrack } from '../reactivity/index'
+import { claimInsert, setAttr, setClass, setProp, setStyle, skipRange } from './index'
+
+const RAW_HTML = Symbol.for('kay.html')
+
+function isRawHtml(value: unknown): value is { __html: string } {
+  return typeof value === 'object' && value !== null && (value as Record<symbol, unknown>)[RAW_HTML] === true && '__html' in value
+}
 
 export function setInnerHtml(el: Element, value: unknown): void {
   const html = value == null || value === false
     ? ''
-    : (typeof value === 'object' && '__html' in value ? String((value as { __html: string }).__html) : String(value))
+    : isRawHtml(value)
+      ? String(value.__html)
+      : String(value)
   if (el.innerHTML !== html)
     el.innerHTML = html
 }
 
-const SPREAD_EVENT_RE = /^on([A-Z]\w*)$/
+const VALID_ATTR_NAME = /^[A-Za-z_:][-\w:.]*$/
 const SPREAD_DOM_PROPS = new Set(['value', 'checked', 'selected', 'muted', 'indeterminate'])
+
+function isBlockedSpreadAttr(name: string): boolean {
+  if (!VALID_ATTR_NAME.test(name))
+    return true
+  const lower = name.toLowerCase()
+  return lower.startsWith('on') || lower === 'innerhtml' || lower === 'srcdoc'
+}
 
 export function omit(props: Record<string, unknown>, excluded: string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {}
@@ -31,21 +46,6 @@ export function omit(props: Record<string, unknown>, excluded: string[]): Record
 
 export function spread(el: Element, getProps: () => Record<string, unknown> | null | undefined): void {
   let prevKeys: string[] = []
-  const listeners = new Map<string, (e: Event) => void>()
-
-  const removeListener = (ev: string) => {
-    const fn = listeners.get(ev)
-    if (fn !== undefined) {
-      el.removeEventListener(ev, fn)
-      listeners.delete(ev)
-    }
-  }
-
-  onCleanup(() => {
-    for (const [ev, fn] of listeners)
-      el.removeEventListener(ev, fn)
-    listeners.clear()
-  })
 
   effect(() => {
     const props = getProps() ?? {}
@@ -55,18 +55,16 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
       const k = prevKeys[i]!
       if (k in props)
         continue
-      const ev = SPREAD_EVENT_RE.exec(k)
-      if (ev !== null) {
-        removeListener(ev[1]!.toLowerCase())
-      }
-      else if (k === 'class' || k === 'className') {
+      if (k === 'class' || k === 'className') {
         setClass(el, '')
       }
       else if (k === 'style') {
         setStyle(el as HTMLElement, null)
       }
       else if (k !== 'key' && k !== 'ref' && k !== '$hydrate' && k !== 'children') {
-        el.removeAttribute(k === 'htmlFor' ? 'for' : k)
+        const name = k === 'htmlFor' ? 'for' : k
+        if (!isBlockedSpreadAttr(name))
+          el.removeAttribute(name)
       }
     }
 
@@ -80,21 +78,10 @@ export function spread(el: Element, getProps: () => Record<string, unknown> | nu
           (v as (node: Element) => void)(el)
         continue
       }
-      const ev = SPREAD_EVENT_RE.exec(k)
-      if (ev !== null) {
-        const type = ev[1]!.toLowerCase()
-        removeListener(type)
-        if (typeof v === 'function') {
-          const wrapped = (e: Event) => batch(() => (v as (ev: Event) => void)(e))
-          listeners.set(type, wrapped)
-          el.addEventListener(type, wrapped)
-        }
-        continue
-      }
       const name = k === 'className' ? 'class' : k === 'htmlFor' ? 'for' : k
-      if (name === 'innerHTML')
-        setInnerHtml(el, v)
-      else if (name === 'class')
+      if (isBlockedSpreadAttr(name))
+        continue
+      if (name === 'class')
         setClass(el, v)
       else if (name === 'style')
         setStyle(el as HTMLElement, v)
@@ -131,22 +118,42 @@ function claimTextNode(claimed: Node | null, str: string): Text | undefined {
   return undefined
 }
 
-export function insert(parent: Node, value: () => unknown, marker: Node | null = null): void {
+export function insert(parent: Node, value: () => unknown, marker: Node | null = null, startMarker?: Node | null): void {
   let current: Node | Node[] | null = null
   let textNode: Text | undefined
+  let firstRun = true
 
   effect(() => {
-    const res = claimInsert(parent, marker, value)
-    marker = res.marker
+    let res: { result: unknown, marker: Node | null, claimed: Node | null, nodes: Node[] | undefined }
+    if (firstRun) {
+      firstRun = false
+      let effMarker = marker
+      let effStart = startMarker
+      if (effStart === undefined && effMarker !== null && effMarker.nodeType === 8) {
+        const close = skipRange(effMarker)
+        if (close !== null) {
+          effStart = effMarker
+          effMarker = close
+        }
+      }
+      res = claimInsert(parent, effMarker, value, effStart)
+      marker = res.marker
+    }
+    else {
+      res = { result: value(), marker, claimed: null, nodes: undefined }
+    }
     const next = res.result
+    const ssrNodes = res.nodes
 
-    if (next == null && res.nodes !== undefined) {
-      current = res.nodes
+    if (next == null && ssrNodes !== undefined) {
+      current = ssrNodes
       return
     }
 
     if (next == null || typeof next === 'boolean') {
       clearInserted(current)
+      if (ssrNodes !== undefined)
+        clearInserted(ssrNodes)
       current = null
       if (textNode !== undefined)
         textNode.data = ''
@@ -163,8 +170,16 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
         const claimed = claimTextNode(res.claimed, str)
         if (claimed !== undefined) {
           textNode = claimed
+          if (ssrNodes !== undefined && ssrNodes.length > 1) {
+            for (let i = 0; i < ssrNodes.length; i++) {
+              if (ssrNodes[i] !== claimed)
+                ssrNodes[i]!.parentNode?.removeChild(ssrNodes[i]!)
+            }
+          }
         }
         else {
+          if (ssrNodes !== undefined)
+            clearInserted(ssrNodes)
           textNode = document.createTextNode(str)
           parent.insertBefore(textNode, marker)
         }
@@ -184,10 +199,18 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
       if (current === next)
         return
       if (current === null && next.parentNode === parent) {
+        if (ssrNodes !== undefined && ssrNodes.length > 1) {
+          for (let i = 0; i < ssrNodes.length; i++) {
+            if (ssrNodes[i] !== next)
+              ssrNodes[i]!.parentNode?.removeChild(ssrNodes[i]!)
+          }
+        }
         current = next
         return
       }
       clearInserted(current)
+      if (ssrNodes !== undefined)
+        clearInserted(ssrNodes)
       if (next.nodeType === 11) {
         const nodes = Array.from(next.childNodes)
         parent.insertBefore(next, marker)
@@ -202,6 +225,18 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
 
     if (Array.isArray(next)) {
       clearInserted(current)
+      if (ssrNodes !== undefined) {
+        const kept = new Set<Node>()
+        for (let i = 0; i < next.length; i++) {
+          const item = next[i]
+          if (item instanceof Node && item.parentNode === parent)
+            kept.add(item)
+        }
+        for (let i = 0; i < ssrNodes.length; i++) {
+          if (!kept.has(ssrNodes[i]!))
+            ssrNodes[i]!.parentNode?.removeChild(ssrNodes[i]!)
+        }
+      }
       const f = document.createDocumentFragment()
       const nodes: Node[] = []
       for (let i = 0; i < next.length; i++) {
