@@ -42,6 +42,27 @@ export function ssrRaw(value: unknown): string {
   return String(value)
 }
 
+const CLOSE_STYLE_RE = /<\/(style)/gi
+const CLOSE_SCRIPT_RE = /<\/(script)/gi
+
+/** Emits raw text inside `<style>` or `<script>` without HTML entity escaping, neutralizing only its closing tag. */
+export function ssrRawText(tag: 'style' | 'script', value: unknown): string {
+  if (value == null || typeof value === 'boolean')
+    return ''
+  if (Array.isArray(value)) {
+    let out = ''
+    for (let i = 0; i < value.length; i++)
+      out += ssrRawText(tag, value[i])
+    return out
+  }
+  const str = typeof value === 'string'
+    ? value
+    : typeof value === 'object' && '__html' in value
+      ? String((value as Html).__html)
+      : String(value)
+  return str.replace(tag === 'script' ? CLOSE_SCRIPT_RE : CLOSE_STYLE_RE, '<\\/$1')
+}
+
 export function escAttr(value: unknown): string {
   const str = String(value)
   if (bunEscape !== undefined)

@@ -9,6 +9,14 @@ export function escapeStaticText(str: string): string {
   return str.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
+const RAW_TEXT_ELEMENTS = new Set(['style', 'script'])
+const CLOSE_STYLE_RE = /<\/(style)/gi
+const CLOSE_SCRIPT_RE = /<\/(script)/gi
+
+function escapeRawText(str: string, tag: 'style' | 'script'): string {
+  return str.replace(tag === 'script' ? CLOSE_SCRIPT_RE : CLOSE_STYLE_RE, '<\\/$1')
+}
+
 const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
   'link', 'meta', 'param', 'source', 'track', 'wbr',
@@ -255,7 +263,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     if (innerHtmlExpr !== undefined)
       parts.pushExpr(innerHtmlExpr)
     else
-      emitChildrenIntoBuffer(node.children as AstNode[], bufVar, parts, flushParts, pushStmt)
+      emitChildrenIntoBuffer(node.children as AstNode[], bufVar, parts, flushParts, pushStmt, RAW_TEXT_ELEMENTS.has(tag) ? tag as 'style' | 'script' : undefined)
     parts.pushStatic(`</${tag}>`)
   }
 
@@ -265,6 +273,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
     parts: StringParts,
     flushParts: () => void,
     pushStmt: (stmt: string) => void,
+    rawTextTag?: 'style' | 'script',
   ): void {
     const meaningful = children.filter((c) => {
       if (c.type === 'JSXText')
@@ -279,7 +288,8 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       const child = meaningful[i]!
       const isLast = i === meaningful.length - 1
       if (child.type === 'JSXText') {
-        parts.pushStatic(cleanJsxText(child.value as string))
+        const text = cleanJsxText(child.value as string)
+        parts.pushStatic(rawTextTag !== undefined ? escapeRawText(text, rawTextTag) : text)
       }
       else if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
         emitIntoBuffer(child, bufVar, parts, flushParts, pushStmt)
@@ -287,9 +297,28 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       else if (child.type === 'JSXExpressionContainer') {
         const expr = child.expression as AstNode
 
-        // Fold static string literal expressions like `{' '}` directly into static text
+        // Fold static string literal expressions like `{' '}` or `<style>{':root { ... }'}</style>` directly into static text
         if (expr.type === 'Literal' && typeof expr.value === 'string') {
-          parts.pushStatic(escapeStaticText(expr.value))
+          parts.pushStatic(rawTextTag !== undefined ? escapeRawText(expr.value, rawTextTag) : escapeStaticText(expr.value))
+          continue
+        }
+
+        // Fold static no-substitution template literals inside `<style>`/`<script>` directly into raw text
+        if (
+          rawTextTag !== undefined
+          && expr.type === 'TemplateLiteral'
+          && (expr.expressions as AstNode[]).length === 0
+          && (expr.quasis as AstNode[]).length === 1
+        ) {
+          const cooked = expr.quasis[0]?.value?.cooked
+          if (typeof cooked === 'string') {
+            parts.pushStatic(escapeRawText(cooked, rawTextTag))
+            continue
+          }
+        }
+
+        if (rawTextTag !== undefined) {
+          parts.pushExpr(`${use('ssrRawText')}(${JSON.stringify(rawTextTag)}, ${compileSubExpression(expr)})`)
           continue
         }
 
