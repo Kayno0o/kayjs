@@ -1,7 +1,7 @@
 // HTTP helpers, MIME table, RequestContext factory, and island tag scanner for Kay v2 server.
 
 import type { BuildManifest } from '../build/index'
-import type { KayPlugin } from '../plugins/index'
+import type { KayPlugin, ServerErrorInfo } from '../plugins/index'
 import type { Cookies } from './cookies'
 import type { SecurityHeadersOptions } from './security'
 import { CookieStore } from './cookies'
@@ -16,6 +16,7 @@ export interface ServerOptions {
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
   compress?: boolean | undefined
+  onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
 }
 
@@ -35,7 +36,7 @@ export type Middleware = (ctx: RequestContext, next: () => Promise<Response>) =>
 
 export interface KayApp {
   handle: (request: Request) => Promise<Response>
-  serve: (port?: number) => ReturnType<typeof Bun.serve>
+  serve: (port?: number, hostname?: string) => ReturnType<typeof Bun.serve>
 }
 
 export type EmbeddedBody = Uint8Array<ArrayBuffer> | string
@@ -53,6 +54,7 @@ export interface EmbeddedServerConfig {
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
   compress?: boolean | undefined
+  onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
 }
 

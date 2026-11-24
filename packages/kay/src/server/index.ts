@@ -7,7 +7,7 @@
 
 import type { BuildManifest, RouteManifestEntry } from '../build/index'
 import type { Html, HydrateStrategy } from '../jsx-runtime'
-import type { KayPlugin, ServerPluginAPI } from '../plugins/index'
+import type { KayPlugin, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
 import type { ActionContext, ServerAction } from './action'
 import type { CookieStore } from './cookies'
 import type { EmbeddedBody, EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOptions } from './http'
@@ -24,7 +24,7 @@ import { Router } from './router'
 import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, withCspHashes } from './security'
 
 export { defineConfig, definePlugin, loadConfig } from '../plugins/index'
-export type { BuildPluginContext, CheckPluginContext, KayConfig, KayPlugin, ServerPluginAPI } from '../plugins/index'
+export type { BuildPluginContext, CheckPluginContext, KayConfig, KayPlugin, ServerErrorInfo, ServerPluginAPI } from '../plugins/index'
 export { action, getActionError } from './action'
 export type { ActionContext, ActionErrorFlash, ActionResult, ServerAction } from './action'
 export { CompressionCache, isCompressibleType, pickEncoding } from './compress'
@@ -174,6 +174,21 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   }
 
   const toResponseBody = (body: EmbeddedBody) => typeof body === 'string' ? Bun.file(body) : body
+  const errorHooks: ((info: ServerErrorInfo) => void)[] = []
+  if (config.onError !== undefined)
+    errorHooks.push(config.onError)
+  for (const p of plugins) {
+    if (p.onError !== undefined)
+      errorHooks.push(p.onError)
+  }
+  const notifyError = (error: unknown, request: Request, source: ServerErrorInfo['source']) => {
+    for (let i = 0; i < errorHooks.length; i++) {
+      try {
+        errorHooks[i]!({ error, request, source })
+      }
+      catch {}
+    }
+  }
 
   async function serveAsset(request: Request, pathname: string, asset: AssetEntry): Promise<Response> {
     if (request.method === 'HEAD')
@@ -367,70 +382,80 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       const fastHeaders = selectHtmlHeaders(hasIslands, false)
 
       fastHandler = (request: Request): Response | Promise<Response> => {
-        const reqUrl = new URL(request.url)
-        const respondHtml = (body: string): Response =>
-          compressedHtmlResponse(docPrefix + body + docSuffix, 200, fastHeaders, request, compressCache)
-
-        const wrapLayouts = (inner: string): Response | Promise<Response> => {
-          if (layouts.length === 0)
-            return respondHtml(inner)
-          if (singleLayout !== undefined) {
-            const w = singleLayout.default({ children: raw(inner), url: reqUrl, params: {}, locals: {} })
-            if (w instanceof Promise)
-              return w.then(x => respondHtml(ssrChild(x as Html)))
-            return respondHtml(ssrChild(w as Html))
-          }
-          return (async () => {
-            let cur = inner
-            for (let i = layouts.length - 1; i >= 0; i--)
-              cur = ssrChild(await layouts[i]!.default({ children: raw(cur), url: reqUrl, params: {}, locals: {} }) as Html)
-            return respondHtml(cur)
-          })()
+        const handleErr = (error: unknown): Promise<Response> => {
+          notifyError(error, request, 'route')
+          return renderError(error, makeRequestContext(request, {}).cookieStore, new URL(request.url))
         }
+        try {
+          const reqUrl = new URL(request.url)
+          const respondHtml = (body: string): Response =>
+            compressedHtmlResponse(docPrefix + body + docSuffix, 200, fastHeaders, request, compressCache)
 
-        const renderPage = (data: unknown): Response | Promise<Response> => {
-          const pageProps: Record<string, unknown> = {
-            params: {},
-            locals: {},
-            url: reqUrl,
-            ...(data !== undefined ? { data } : {}),
+          const wrapLayouts = (inner: string): Response | Promise<Response> => {
+            if (layouts.length === 0)
+              return respondHtml(inner)
+            if (singleLayout !== undefined) {
+              const w = singleLayout.default({ children: raw(inner), url: reqUrl, params: {}, locals: {} })
+              if (w instanceof Promise)
+                return w.then(x => respondHtml(ssrChild(x as Html)), handleErr)
+              return respondHtml(ssrChild(w as Html))
+            }
+            return (async () => {
+              let cur = inner
+              for (let i = layouts.length - 1; i >= 0; i--)
+                cur = ssrChild(await layouts[i]!.default({ children: raw(cur), url: reqUrl, params: {}, locals: {} }) as Html)
+              return respondHtml(cur)
+            })().catch(handleErr)
           }
-          if (entry.isIsland && entry.islandChunk !== undefined) {
-            const inner = ssrIsland(
-              entry.path,
-              entry.islandChunk,
-              () => ssrChild(mod.default!(pageProps) as Html),
-              data !== undefined ? { data } : {},
-              entry.islandHydrate as HydrateStrategy | undefined,
-            )
-            return wrapLayouts(inner)
-          }
-          const rendered = mod.default!(pageProps)
-          if (rendered instanceof Promise)
-            return rendered.then(r => wrapLayouts(ssrChild(r as Html)))
-          return wrapLayouts(ssrChild(rendered as Html))
-        }
 
-        if (entry.hasLoad && typeof mod.load === 'function') {
-          const { ctx, cookieStore } = makeRequestContext(request, {})
-          const finish = (res: Response | Promise<Response>): Response | Promise<Response> => {
-            if (!cookieStore.hasChanges)
-              return res
-            if (res instanceof Promise)
-              return res.then(r => finalizeResponse(r, cookieStore, securityEntries))
-            return finalizeResponse(res, cookieStore, securityEntries)
+          const renderPage = (data: unknown): Response | Promise<Response> => {
+            const pageProps: Record<string, unknown> = {
+              params: {},
+              locals: {},
+              url: reqUrl,
+              ...(data !== undefined ? { data } : {}),
+            }
+            if (entry.isIsland && entry.islandChunk !== undefined) {
+              const inner = ssrIsland(
+                entry.path,
+                entry.islandChunk,
+                () => ssrChild(mod.default!(pageProps) as Html),
+                data !== undefined ? { data } : {},
+                entry.islandHydrate as HydrateStrategy | undefined,
+              )
+              return wrapLayouts(inner)
+            }
+            const rendered = mod.default!(pageProps)
+            if (rendered instanceof Promise)
+              return rendered.then(r => wrapLayouts(ssrChild(r as Html)), handleErr)
+            return wrapLayouts(ssrChild(rendered as Html))
           }
-          const loaded = mod.load(ctx)
-          if (loaded instanceof Promise) {
-            return loaded.then(data =>
-              finish(data instanceof Response ? data : renderPage(data)),
-            )
+
+          if (entry.hasLoad && typeof mod.load === 'function') {
+            const { ctx, cookieStore } = makeRequestContext(request, {})
+            const finish = (res: Response | Promise<Response>): Response | Promise<Response> => {
+              if (!cookieStore.hasChanges)
+                return res
+              if (res instanceof Promise)
+                return res.then(r => finalizeResponse(r, cookieStore, securityEntries), handleErr)
+              return finalizeResponse(res, cookieStore, securityEntries)
+            }
+            const loaded = mod.load(ctx)
+            if (loaded instanceof Promise) {
+              return loaded.then(
+                data => finish(data instanceof Response ? data : renderPage(data)),
+                handleErr,
+              )
+            }
+            if (loaded instanceof Response)
+              return finish(loaded)
+            return finish(renderPage(loaded))
           }
-          if (loaded instanceof Response)
-            return finish(loaded)
-          return finish(renderPage(loaded))
+          return renderPage(undefined)
         }
-        return renderPage(undefined)
+        catch (error) {
+          return handleErr(error)
+        }
       }
       fastStaticPages.set(entry.path, fastHandler)
     }
@@ -634,8 +659,14 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
             return globalMiddlewares[i]!(ctx, () => dispatch(i + 1))
           return runAction()
         }
-        const res = await dispatch(0)
-        return finalizeResponse(res, cookieStore, securityEntries)
+        try {
+          const res = await dispatch(0)
+          return finalizeResponse(res, cookieStore, securityEntries)
+        }
+        catch (error) {
+          notifyError(error, request, 'action')
+          return renderError(error, cookieStore, ctx.url)
+        }
       }
     }
 
@@ -686,22 +717,28 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       if (methodHandler !== undefined) {
         ctx.params = pluginMatch.params
         let res: Response
-        if (globalMiddlewares.length === 0) {
-          res = await methodHandler(ctx)
-        }
-        else {
-          let index = -1
-          const dispatch = async (i: number): Promise<Response> => {
-            if (i <= index)
-              throw new Error('kay: middleware called next() multiple times')
-            index = i
-            if (i < globalMiddlewares.length)
-              return globalMiddlewares[i]!(ctx, () => dispatch(i + 1))
-            return methodHandler(ctx)
+        try {
+          if (globalMiddlewares.length === 0) {
+            res = await methodHandler(ctx)
           }
-          res = await dispatch(0)
+          else {
+            let index = -1
+            const dispatch = async (i: number): Promise<Response> => {
+              if (i <= index)
+                throw new Error('kay: middleware called next() multiple times')
+              index = i
+              if (i < globalMiddlewares.length)
+                return globalMiddlewares[i]!(ctx, () => dispatch(i + 1))
+              return methodHandler(ctx)
+            }
+            res = await dispatch(0)
+          }
+          return finalizeResponse(await maybeCompressResponse(res, request, compressCache), cookieStore, securityEntries)
         }
-        return finalizeResponse(await maybeCompressResponse(res, request, compressCache), cookieStore, securityEntries)
+        catch (error) {
+          notifyError(error, request, 'plugin')
+          return renderError(error, cookieStore, ctx.url)
+        }
       }
     }
 
@@ -729,11 +766,12 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       return finalizeResponse(res, cookieStore, securityEntries)
     }
     catch (error) {
+      notifyError(error, request, 'route')
       return renderError(error, cookieStore, ctx.url)
     }
   }
 
-  function serve(port = 3000) {
+  function serve(port = 3000, hostname?: string) {
     const routes: Record<string, (req: Request) => Response | Promise<Response>> = {}
 
     for (const [path, asset] of assetMap)
@@ -762,6 +800,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
     return Bun.serve({
       port,
+      ...(hostname ? { hostname } : {}),
       idleTimeout: 0,
       routes,
       fetch: handle,
@@ -934,6 +973,7 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
     security: options.security ?? fileConfig.security,
     trustedOrigins: options.trustedOrigins ?? fileConfig.trustedOrigins,
     compress: options.compress ?? fileConfig.compress,
+    onError: options.onError ?? fileConfig.onError,
     plugins,
   })
 }

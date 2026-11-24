@@ -186,4 +186,63 @@ describe('KayPlugin API (tailwind + i18n + spa + custom transform)', () => {
       }
     }
   })
+
+  test('fires onError hooks for route and plugin failures, binds hostname, and SSR-compiles external TSX component packages', async () => {
+    const extFixture = mkdtempSync(join(tmpdir(), 'kay-v2-ext-tsx-'))
+    try {
+      const write = (rel: string, content: string) => {
+        const abs = join(extFixture, rel)
+        mkdirSync(join(abs, '..'), { recursive: true })
+        writeFileSync(abs, content)
+      }
+      // Fake workspace/npm component library exporting a .tsx layout through a .ts barrel
+      write('node_modules/fake-shell/package.json', JSON.stringify({ name: 'fake-shell', type: 'module', exports: './src/index.ts' }))
+      write('node_modules/fake-shell/src/index.ts', `export { Shell } from './Shell.tsx'\n`)
+      write('node_modules/fake-shell/src/Shell.tsx', `/** @jsxImportSource kay */\nimport type { KayChild } from 'kay'\nexport function Shell({ children }: { children?: KayChild }) { return <div class="fake-shell"><main>{children}</main></div> }\n`)
+      write('src/routes/index.tsx', `import { Shell } from 'fake-shell'\nexport default function Home() { return <Shell><h1>Compiled Shell</h1></Shell> }\n`)
+      write('src/routes/boom.tsx', `export default function Boom(): never { throw new Error('route exploded') }\n`)
+
+      const errors: { source: string, message: string }[] = []
+      const errPlugin = definePlugin({
+        name: 'err-reporter',
+        server(api) {
+          api.route('GET', '/plugin-boom', () => {
+            throw new Error('plugin exploded')
+          })
+        },
+        onError(info) {
+          errors.push({ source: info.source, message: info.error instanceof Error ? info.error.message : String(info.error) })
+        },
+      })
+
+      const app = await testApp({ root: extFixture, plugins: [errPlugin] })
+
+      // External TSX package is compiled by Kay SSR even when outDir is inside root!
+      const homeRes = await app.get('/')
+      expect(homeRes.status).toBe(200)
+      const homeHtml = await homeRes.text()
+      expect(homeHtml).toContain('<div class="fake-shell"><main><h1>Compiled Shell</h1></main></div>')
+
+      // onError receives route & plugin errors
+      expect((await app.get('/boom')).status).toBe(500)
+      expect((await app.get('/plugin-boom')).status).toBe(500)
+      expect(errors).toEqual([
+        { source: 'route', message: 'route exploded' },
+        { source: 'plugin', message: 'plugin exploded' },
+      ])
+
+      // serve(port, hostname) binds cleanly to 127.0.0.1
+      const srv = app.app.serve(0, '127.0.0.1')
+      try {
+        const res = await fetch(`http://127.0.0.1:${srv.port}/`)
+        expect(res.status).toBe(200)
+      }
+      finally {
+        srv.stop(true)
+      }
+    }
+    finally {
+      rmSync(extFixture, { recursive: true, force: true })
+    }
+  })
 })

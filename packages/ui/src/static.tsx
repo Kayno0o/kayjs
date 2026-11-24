@@ -1,3 +1,4 @@
+/** @jsxImportSource kay */
 // Zero-JS static & native-platform primitives (`0 KB` client JS!).
 // Emit only semantic `data-ui`, `data-part`, `data-variant`, `data-tone`, `data-layout` attributes.
 

@@ -121,4 +121,43 @@ describe('TSX compiler', () => {
     expect(ssrRawText('style', raw('.x > .y { font: "Mono"; }'))).toBe('.x > .y { font: "Mono"; }')
     expect(ssrRawText('style', null)).toBe('')
   })
+
+  test('compiles BlockStatement .map() with keyed JSX, TypeScript non-null/as prop rewrites, and nested JSX expressions', () => {
+    const src = `
+      import { signal } from 'kay'
+      interface Item { id: string; kind: 'folder' | 'link'; label: string }
+      const LIST = [{ id: 'a', name: 'Alpha' }]
+      export function Explorer({ current, items }: { current: string; items: Item[] }) {
+        const picked = LIST.find(x => x.id === current)!
+        const tag = (current as string).toUpperCase()
+        const rows = signal(items)
+        return (
+          <section data-tag={tag} data-picked={picked.name}>
+            <ul>
+              {rows.value.map((row) => {
+                if (row.kind === 'folder')
+                  return <li key={row.id} class="folder">{row.label}</li>
+                return <li key={row.id} class="link">{row.label}</li>
+              })}
+            </ul>
+            <div>{picked.name || <span>Fallback</span>}</div>
+          </section>
+        )
+      }
+    `
+    const domOut = compileDom('Explorer.tsx', src)
+    // Destructured prop inside TSNonNullExpression & TSAsExpression must rewrite to __p.current
+    expect(domOut.code).toContain('x.id === __p.current')
+    expect(domOut.code).toContain('__p.current as string')
+    // BlockStatement .map() compiles to __loop with extracted key (never falls through to setText)
+    expect(domOut.code).toContain('__loop(')
+    expect(domOut.code).toContain('row.id')
+    // Expression with nested JSX compiles via __insert (never setText)
+    expect(domOut.code).toContain('__insert(')
+
+    const ssrOut = compileSsr('Explorer.tsx', src, { isIsland: true })
+    expect(ssrOut.code).toContain('__esc(')
+    expect(ssrOut.code).toContain('<li class=\\"folder\\">')
+    expect(ssrOut.code).toContain('<li class=\\"link\\">')
+  })
 })

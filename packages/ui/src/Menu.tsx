@@ -1,3 +1,4 @@
+/** @jsxImportSource kay */
 // Accessible dropdown Menu primitive with roving arrow-key navigation, Escape close & click-outside dismiss.
 
 import type { ButtonVariant } from './static'

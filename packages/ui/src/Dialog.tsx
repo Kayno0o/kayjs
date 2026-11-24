@@ -1,3 +1,4 @@
+/** @jsxImportSource kay */
 // Accessible native `<dialog>` primitive (top-layer, Esc-to-close, ::backdrop, focus return for free!).
 
 import type { KayChild, Signal } from 'kay'

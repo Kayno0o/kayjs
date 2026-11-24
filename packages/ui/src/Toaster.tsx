@@ -1,3 +1,4 @@
+/** @jsxImportSource kay */
 // Live-region Toast stack driven by the reactive `toast` store.
 
 import { toast } from './behaviors'

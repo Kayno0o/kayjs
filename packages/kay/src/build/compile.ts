@@ -15,10 +15,11 @@ export interface CompileExecutableOptions {
   outfile: string
   kaySrcRoot: string
   resolveKaySpecifier: (specifier: string) => string | undefined
+  bunPlugins?: BunPlugin[] | undefined
 }
 
 export async function compileExecutable(opts: CompileExecutableOptions): Promise<void> {
-  const { root, outDir, clientDir, manifest, assetPrefix, outfile, kaySrcRoot, resolveKaySpecifier } = opts
+  const { root, outDir, clientDir, manifest, assetPrefix, outfile, kaySrcRoot, resolveKaySpecifier, bunPlugins = [] } = opts
   const entryPath = join(outDir, '__compile_entry.ts')
   const imports: string[] = []
   const modEntries: string[] = []
@@ -81,7 +82,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
   }
 
   const cfgSpread = hasConfig
-    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins, compress: _kayConfig?.compress`
+    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins, compress: _kayConfig?.compress, onError: _kayConfig?.onError`
     : ''
 
   // Default NODE_ENV to 'production' in compiled binaries (dynamic key avoids Bun.build constant-folding).
@@ -96,10 +97,12 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
     `const publicEtags = { ${embeddedPublicEtags.join(', ')} };`,
     `const prerendered = {};`,
     `const prerenderedFiles = { ${embeddedPrerenderedFiles.join(', ')} };`,
+    `const port = Number(process.env.PORT ?? ${hasConfig ? '_kayConfig?.port ?? ' : ''}3000);`,
+    `const hostname = process.env.HOST || undefined;`,
+    `if (Bun.argv.includes('--health')) { const r = await fetch(\`http://\${hostname ?? '127.0.0.1'}:\${port}/\`).catch(() => null); process.exit(r && r.status < 500 ? 0 : 1); }`,
     `const app = await createServerFromEmbedded({ manifest, modules, assets, publicAssets, publicEtags, prerendered, prerenderedFiles, assetPrefix: ${JSON.stringify(assetPrefix)}${cfgSpread} });`,
-    `const port = Number(process.env.PORT ?? 3000);`,
-    `const server = app.serve(port);`,
-    `console.log(\`kay server listening on http://localhost:\${server.port}\`);`,
+    `const server = app.serve(port, hostname);`,
+    `console.log(\`kay server listening on http://\${hostname ?? 'localhost'}:\${server.port}\`);`,
   ].join('\n')
 
   writeFileSync(entryPath, code)
@@ -117,7 +120,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
       entrypoints: [entryPath],
       compile: { outfile },
       minify: true,
-      plugins: [kayResolvePlugin],
+      plugins: [kayResolvePlugin, ...bunPlugins],
     })
     if (!res.success) {
       const msgs = res.logs.map(l => l.message).join('\n')

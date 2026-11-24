@@ -101,6 +101,7 @@ export const toast = {
   success: (title: string, description?: string, durationMs?: number) => pushToast('success', title, description, durationMs),
   warning: (title: string, description?: string, durationMs?: number) => pushToast('warning', title, description, durationMs),
   danger: (title: string, description?: string, durationMs?: number) => pushToast('danger', title, description, durationMs),
+  error: (title: string, description?: string, durationMs?: number) => pushToast('danger', title, description, durationMs),
   dismiss(id: string) {
     toastSignal.value = toastSignal.value.filter(t => t.id !== id)
   },

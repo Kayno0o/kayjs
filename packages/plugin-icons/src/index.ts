@@ -1,3 +1,4 @@
+/// <reference path="./ambient.d.ts" />
 // @kayjs/icons — Zero-runtime inline SVG icons from @iconify-json/* via `import arrow from '~icons/tabler/arrow-right'`.
 // Built strictly on the public KayPlugin API (bunPlugins).
 
@@ -96,7 +97,12 @@ export function icons(options: IconsPluginOptions = {}): KayPlugin {
               resolved = Bun.resolveSync(pkgPath, root)
             }
             catch {
-              throw new Error(`@kayjs/icons: could not resolve "${pkgPath}". Install @iconify-json/${prefix}.`)
+              try {
+                resolved = Bun.resolveSync(pkgPath, process.cwd())
+              }
+              catch {
+                throw new Error(`@kayjs/icons: could not resolve "${pkgPath}". Install @iconify-json/${prefix}.`)
+              }
             }
             set = await Bun.file(resolved).json() as IconSet
             cache.set(prefix, set)

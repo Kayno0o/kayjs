@@ -1,3 +1,4 @@
+/// <reference path="./ambient.d.ts" />
 export { configureShareCard, shareCard } from './card'
 export type { ShareCardDefaults, ShareCardInput } from './card'
 export { image } from './helpers'

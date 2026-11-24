@@ -1,3 +1,4 @@
+/** @jsxImportSource kay */
 // Accessible Tabs primitive with roving arrow-key + Home/End keyboard navigation.
 
 import type { KayChild } from 'kay'

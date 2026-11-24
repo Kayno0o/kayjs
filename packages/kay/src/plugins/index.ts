@@ -45,10 +45,18 @@ export interface ServerPluginAPI {
   rewrite(fn: (pathname: string, ctx: RequestContext) => string | undefined): void
 }
 
+export interface ServerErrorInfo {
+  error: unknown
+  request: Request
+  source: 'route' | 'action' | 'plugin'
+}
+
 export interface KayPlugin {
   name: string
   /** Register server routes, global middleware, or URL rewrites. */
   server?: (api: ServerPluginAPI) => void | Promise<void>
+  /** Error hook called whenever a route, action, or plugin handler throws an unhandled error. */
+  onError?: (info: ServerErrorInfo) => void
   /** Build hook run after route compilation, before prerender / --static / --compile. */
   build?: (ctx: BuildPluginContext) => void | Promise<void>
   /** Code transform run during client & server compilation. */
@@ -73,6 +81,7 @@ export interface KayPlugin {
 
 export interface KayConfig {
   lang?: string | undefined
+  port?: number | undefined
   routesDir?: string | undefined
   outDir?: string | undefined
   publicDir?: string | undefined
@@ -80,6 +89,7 @@ export interface KayConfig {
   security?: SecurityHeadersOptions | false | undefined
   trustedOrigins?: string[] | undefined
   compress?: boolean | undefined
+  onError?: ((info: ServerErrorInfo) => void) | undefined
   plugins?: KayPlugin[] | undefined
 }
 

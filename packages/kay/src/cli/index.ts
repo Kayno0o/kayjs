@@ -70,10 +70,12 @@ else if (cmd === 'build') {
 }
 else if (cmd === 'start') {
   process.env.NODE_ENV ??= 'production'
-  const port = Number(flagValue('--port') || process.env.PORT || 3000)
+  const config = await loadConfig(root)
+  const port = Number(flagValue('--port') || process.env.PORT || config.port || 3000)
+  const hostname = process.env.HOST || undefined
   const app = await createServer({ root })
-  const server = app.serve(port)
-  console.log(`kay server listening on http://localhost:${server.port}`)
+  const server = app.serve(port, hostname)
+  console.log(`kay server listening on http://${hostname ?? 'localhost'}:${server.port}`)
 }
 else if (cmd === 'dev') {
   const port = Number(flagValue('--port') || process.env.PORT || 3000)

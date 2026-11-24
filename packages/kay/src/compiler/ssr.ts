@@ -388,7 +388,22 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         if (body.type === 'JSXElement' || body.type === 'JSXFragment') {
           const target = compileSubExpression(expr.callee.object)
           const params = (cb.params as AstNode[]).map(p => code.slice(p.start, p.end)).join(', ')
-          return `${use('ssrLoop')}(${target}, (${params}) => ${compileJsxToStringExpr(body)})`
+          const rendered = `${use('ssrLoop')}(${target}, (${params}) => ${compileJsxToStringExpr(body)})`
+          return isIsland && !isLast ? `(${rendered}) + "<!---->"` : rendered
+        }
+        if (body.type === 'BlockStatement') {
+          let blockHasJsx = false
+          walk(body, (c) => {
+            if (c.type === 'JSXElement' || c.type === 'JSXFragment') {
+              blockHasJsx = true
+              return false
+            }
+            return undefined
+          })
+          if (blockHasJsx) {
+            const rendered = `${use('esc')}(${compileSubExpression(expr)})`
+            return isIsland && !isLast ? `(${rendered}) + "<!---->"` : rendered
+          }
         }
       }
     }

@@ -1,3 +1,4 @@
+/** @jsxImportSource kay */
 // Accessible native `<dialog>` side/bottom Drawer primitive (top-layer, Esc-to-close, ::backdrop).
 
 import type { KayChild, Signal } from 'kay'

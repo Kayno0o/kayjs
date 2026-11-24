@@ -1,3 +1,4 @@
+/** @jsxImportSource kay */
 import type { ImageAsset } from './helpers'
 import { image } from './helpers'
 

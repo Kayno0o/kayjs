@@ -1,3 +1,4 @@
+/** @jsxImportSource kay */
 // Accessible custom Select (listbox) primitive with keyboard navigation + hidden input for native <form> submission.
 
 import type { Signal } from 'kay'

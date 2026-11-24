@@ -655,6 +655,41 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     '@kayjs/kay/test',
   ])
 
+  const reachesTsxCache = new Map<string, boolean>()
+  function reachesTsx(file: string, stack = new Set<string>()): boolean {
+    const cached = reachesTsxCache.get(file)
+    if (cached !== undefined)
+      return cached
+    if (file.endsWith('.tsx')) {
+      reachesTsxCache.set(file, true)
+      return true
+    }
+    if (stack.has(file))
+      return false
+    stack.add(file)
+    const analysis = analyses.get(file)
+    if (analysis === undefined) {
+      reachesTsxCache.set(file, false)
+      return false
+    }
+    for (const imp of analysis.imports) {
+      const target = resolveImportPath(file, imp.source)
+      if (target !== undefined && reachesTsx(target, stack)) {
+        reachesTsxCache.set(file, true)
+        return true
+      }
+    }
+    for (const re of analysis.reexports) {
+      const target = resolveImportPath(file, re.source)
+      if (target !== undefined && reachesTsx(target, stack)) {
+        reachesTsxCache.set(file, true)
+        return true
+      }
+    }
+    reachesTsxCache.set(file, false)
+    return false
+  }
+
   const runServerBuild = async (): Promise<void> => {
     const serverPlugin: BunPlugin = {
       name: 'kay-v2-server',
@@ -673,28 +708,28 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
             return undefined
           }
         })
-        if (outDirOutsideRoot) {
-          b.onResolve({ filter: /^[^./]/ }, (args) => {
-            if (args.path === 'bun' || args.path.startsWith('bun:') || args.path.startsWith('node:') || isAbsolute(args.path))
-              return undefined
-            let resolved: string | undefined
+        b.onResolve({ filter: /^[^./]/ }, (args) => {
+          if (args.path === 'bun' || args.path.startsWith('bun:') || args.path.startsWith('node:') || args.path.startsWith('~') || isAbsolute(args.path))
+            return undefined
+          let resolved: string | undefined
+          try {
+            resolved = Bun.resolveSync(args.path, args.resolveDir || root)
+          }
+          catch {
             try {
-              resolved = Bun.resolveSync(args.path, args.resolveDir || root)
+              resolved = Bun.resolveSync(args.path, root)
             }
             catch {
-              try {
-                resolved = Bun.resolveSync(args.path, root)
-              }
-              catch {
-                return undefined
-              }
+              return undefined
             }
-            const isInsideNodeModules = resolved.includes('/node_modules/') || resolved.includes('\\node_modules\\')
-            const relToRoot = relative(root, resolved)
-            const isLocalSource = !isInsideNodeModules && !relToRoot.startsWith('..') && !isAbsolute(relToRoot)
-            return isLocalSource ? undefined : { path: resolved, external: true }
-          })
-        }
+          }
+          // Bundle any package that exports/re-exports .tsx components so Kay's SSR compiler transforms them.
+          if (resolved.endsWith('.tsx') || reachesTsx(resolved))
+            return { path: resolved }
+          if (outDirOutsideRoot)
+            return { path: resolved, external: true }
+          return undefined
+        })
         b.onLoad({ filter: /\.tsx$/ }, (args) => {
           const analysis = analyses.get(args.path)
           const rawBindings = pageIslandBindings.get(args.path)
@@ -1151,6 +1186,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       outfile,
       kaySrcRoot: KAY_SRC_ROOT,
       resolveKaySpecifier,
+      bunPlugins: pluginBunPlugins,
     })
   }
 

@@ -1,3 +1,4 @@
+/** @jsxImportSource kay */
 // Accessible Cmd+K / Ctrl+K CommandPalette built on native `<dialog>` + fine-grained signals.
 
 import type { Signal } from 'kay'
