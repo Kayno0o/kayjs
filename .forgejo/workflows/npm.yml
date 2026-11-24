@@ -71,13 +71,13 @@ jobs:
 
       - name: Publish to npm
         run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "NPM_TOKEN is not set, npm is skipped"
+          if [ -z "$NPM_STAGE_TOKEN" ]; then
+            echo "NPM_STAGE_TOKEN is not set, npm is skipped"
             exit 0
           fi
           trap 'rm -f ~/.npmrc' EXIT
           echo "@kayjs:registry=https://registry.npmjs.org/" > ~/.npmrc
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+          echo "//registry.npmjs.org/:_authToken=${NPM_STAGE_TOKEN}" >> ~/.npmrc
           sh scripts/publish-packages.sh https://registry.npmjs.org/
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_STAGE_TOKEN: ${{ secrets.NPM_STAGE_TOKEN }}
