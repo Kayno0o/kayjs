@@ -171,6 +171,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         hasNestedJsx = true
         return false
       }
+      return undefined
     })
     if (!hasNestedJsx)
       return code.slice(node.start, node.end)
@@ -182,6 +183,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
         sub.replace(child.start - offset, child.end - offset, compileRootJsx(child))
         return false
       }
+      return undefined
     })
     return sub.toString()
   }
@@ -549,6 +551,7 @@ export function compileSsr(filename: string, code: string, options: CompileSsrOp
       editor.replace(node.start, node.end, compileRootJsx(node))
       return false
     }
+    return undefined
   })
 
   if (used.size > 0) {

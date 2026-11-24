@@ -93,7 +93,7 @@ describe('KayPlugin API (tailwind + i18n + spa + custom transform)', () => {
         return undefined
       },
       server(api) {
-        api.use(async (ctx, next) => {
+        api.use(async (_ctx, next) => {
           const res = await next()
           res.headers.set('x-plugin-mw', 'active')
           return res

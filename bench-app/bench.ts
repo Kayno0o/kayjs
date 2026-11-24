@@ -18,11 +18,10 @@ function median(values: number[]): number {
 
 // 1. Clean Build benchmark (median of 3 runs)
 const buildTimes: number[] = []
-let manifest!: Awaited<ReturnType<typeof build>>
 for (let i = 0; i < 3; i++) {
   rmSync(join(ROOT, 'dist'), { recursive: true, force: true })
   const t0 = performance.now()
-  manifest = await build({ root: ROOT, minify: true })
+  await build({ root: ROOT, minify: true })
   buildTimes.push(performance.now() - t0)
 }
 

@@ -254,6 +254,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         hasNestedJsx = true
         return false
       }
+      return undefined
     })
     if (!hasNestedJsx)
       return rewriteFreeIdentifiers(code, node, scopeRewrites)
@@ -268,6 +269,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         sub.replace(child.start - offset, child.end - offset, compileRootJsx(child, scopeRewrites))
         return false
       }
+      return undefined
     })
 
     // Also rewrite non-JSX free identifiers by applying identifier rewrites on non-JSX spans
@@ -374,12 +376,6 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
   }
 
   function compileElementTree(rootEl: AstNode, scopeRewrites: ReadonlyMap<string, string>): string {
-    interface NodeRef {
-      varName: string
-      parentVar: string
-      childIndex: number
-    }
-
     const ops: string[] = []
     const rootVar = freshVar('_e')
     const childRefs = new Map<string, string>() // "parentVar:index" -> varName
@@ -843,6 +839,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
         fnHasJsx = true
         return false
       }
+      return undefined
     })
     if (!fnHasJsx)
       return
@@ -888,6 +885,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
             stmtHasJsx = true
             return false
           }
+          return undefined
         })
         if (!stmtHasJsx) {
           const active = new Map<string, string>()
@@ -904,6 +902,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
               editor.replace(child.start, child.end, compileRootJsx(child, propRewrites))
               return false
             }
+            return undefined
           })
         }
         if (stmt.type === 'VariableDeclaration') {
@@ -918,6 +917,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
           editor.replace(child.start, child.end, compileRootJsx(child, propRewrites))
           return false
         }
+        return undefined
       })
     }
   }
@@ -931,6 +931,7 @@ export function compileDom(filename: string, code: string, options: CompileDomOp
       editor.replace(node.start, node.end, compileRootJsx(node, new Map()))
       return false
     }
+    return undefined
   })
 
   // Emit imports, hoisted templates, and delegated events
