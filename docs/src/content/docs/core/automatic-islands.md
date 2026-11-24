@@ -53,3 +53,9 @@ When you pass server-rendered JSX children into an interactive island (`<Modal><
 ## Server-only `async` routes
 
 An `export default async function Page()` route is strictly server-only. You can `await` databases or files directly inside it, and the compiler rejects accidental signals or event handlers inside the async page body (guiding you to extract the interactive piece into a child component).
+
+## What an island may import
+
+An island ships to the browser with every module it imports. If one of those modules, at any depth, imports a server-only module (`bun:sqlite`, `node:fs`, `kay/server` and the like) or reads `process.env`, `kay build` fails and `kay check` names the module and the island that reaches it. A file that only declares server actions is the exception: the browser gets a stub that calls the server, never its code.
+
+Client code may read `process.env.PUBLIC_*`. The build replaces each one with its value at build time, so never put a secret in a `PUBLIC_` variable.

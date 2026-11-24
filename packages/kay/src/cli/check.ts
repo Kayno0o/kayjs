@@ -4,6 +4,7 @@ import type { AstNode, ModuleAnalysis } from '../compiler/analyze'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { analyzeModule, walk } from '../compiler/analyze'
+import { readsPrivateEnv, SERVER_ONLY_MODULES } from '../compiler/server-only'
 import { loadConfig } from '../plugins/index'
 
 export interface CheckResult {
@@ -11,33 +12,6 @@ export interface CheckResult {
   checkedFiles: number
   errors: string[]
 }
-
-const SERVER_ONLY_MODULES = new Set([
-  'kay/server',
-  '@kayjs/kay/server',
-  'bun:sqlite',
-  'bun:ffi',
-  'bun:dns',
-  'node:fs',
-  'node:fs/promises',
-  'node:child_process',
-  'node:net',
-  'node:http',
-  'node:https',
-  'node:http2',
-  'node:os',
-  'node:worker_threads',
-  'node:cluster',
-  'node:dgram',
-  'node:tls',
-  'node:readline',
-  'fs',
-  'fs/promises',
-  'child_process',
-  'net',
-  'http',
-  'https',
-])
 
 const SERIALIZABLE_NEW_CTORS = new Set(['Date', 'Map', 'Set', 'URL', 'RegExp'])
 
@@ -67,6 +41,42 @@ function resolveLocalModule(fromFile: string, specifier: string): string | undef
       return c
   }
   return undefined
+}
+
+// Walks the local imports of an island the way the client build follows them: a module that only declares actions is stubbed there, so its imports stop the walk.
+function checkIslandReach(island: string, root: string, analyses: Map<string, ModuleAnalysis>, reported: Set<string>, errors: string[]): void {
+  const islandRel = relative(root, island).replace(/\\/g, '/')
+  const seen = new Set<string>()
+  const stack = [island]
+  while (stack.length > 0) {
+    const file = stack.pop()!
+    if (seen.has(file))
+      continue
+    seen.add(file)
+    const analysis = analyses.get(file)
+    if (analysis === undefined || (file !== island && !analysis.isInteractive && analysis.exportedActions.length > 0))
+      continue
+    const rel = relative(root, file).replace(/\\/g, '/')
+    const report = (key: string, message: string): void => {
+      if (reported.has(`${file}\0${key}`))
+        return
+      reported.add(`${file}\0${key}`)
+      errors.push(message)
+    }
+    for (const source of [...analysis.imports.map(i => i.source), ...analysis.reexports.map(r => r.source)]) {
+      if (SERVER_ONLY_MODULES.has(source)) {
+        report(source, file === island
+          ? `kay check: ${rel}: interactive island imports server-only module "${source}". Move server logic to a server action or async server component.`
+          : `kay check: ${rel}: imports server-only module "${source}" and is reachable from the island in ${islandRel}. Move server logic to a server action or async server component.`)
+        continue
+      }
+      const target = resolveLocalModule(file, source)
+      if (target !== undefined)
+        stack.push(target)
+    }
+    if (readsPrivateEnv(analysis.program))
+      report('process.env', `kay check: ${rel}: reads process.env and is reachable from the island in ${islandRel}. Only process.env.PUBLIC_* reaches the browser.`)
+  }
 }
 
 function normalizeRouteConflictKey(routesDir: string, file: string): string {
@@ -118,20 +128,14 @@ export async function checkProject(rootDir: string, options: { skipTypecheck?: b
 
   // 3b. Static guardrails: server-only imports in islands, non-serializable island props, route conflicts, missing paths()
   const seenRoutes = new Map<string, string>()
+  const reported = new Set<string>()
 
   for (const [file, analysis] of analyses) {
     const rel = relative(root, file).replace(/\\/g, '/')
 
-    // Guardrail 1: server-only imports inside interactive islands
-    if (analysis.isInteractive) {
-      for (const imp of analysis.imports) {
-        if (SERVER_ONLY_MODULES.has(imp.source)) {
-          errors.push(
-            `kay check: ${rel}: interactive island imports server-only module "${imp.source}". Move server logic to a server action or async server component.`,
-          )
-        }
-      }
-    }
+    // Guardrail 1: server-only imports and private env reads in an island or any module it imports
+    if (analysis.isInteractive)
+      checkIslandReach(file, root, analyses, reported, errors)
 
     // Guardrail 2: non-serializable props (functions / unsupported class instances) passed from static server code into an island
     if (!analysis.isInteractive && file.endsWith('.tsx')) {

@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
+import { readsPrivateEnv, SERVER_ONLY_FILTER } from '../compiler/server-only'
 import { loadConfig } from '../plugins/index'
 import { actionHash } from '../server/action'
 import { compileExecutable } from './compile'
@@ -221,6 +222,10 @@ interface IslandTarget {
   file: string
   exportName: string
   defaultHydrate: string | undefined
+}
+
+function clientLeakError(leaks: Set<string>): Error {
+  return new Error(`kay build (client): server code is reachable from an island:\n${[...leaks].map(l => `  ${l}`).join('\n')}\nMove server logic to a server action or async server component.`)
 }
 
 export async function build(options: BuildOptions): Promise<BuildManifest> {
@@ -520,9 +525,22 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       islandEntryToKey.set(entryPath, key)
     }
 
+    const clientLeaks = new Set<string>()
+    const publicEnvDefines: Record<string, string> = {}
+    for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith('PUBLIC_') && value !== undefined)
+        publicEnvDefines[`process.env.${key}`] = JSON.stringify(value)
+    }
+    const inlinedEnvKey = (key: string): boolean => key === 'NODE_ENV' || `process.env.${key}` in publicEnvDefines
     const clientPlugin: BunPlugin = {
       name: 'kay-v2-client',
       setup(b) {
+        // Bun swaps node built-ins for empty shims in a browser build, so a server-only import would ship silently.
+        b.onResolve({ filter: SERVER_ONLY_FILTER }, (args) => {
+          if (!args.importer.includes('/node_modules/'))
+            clientLeaks.add(`${relative(root, args.importer).replace(/\\/g, '/')} imports server-only module "${args.path}"`)
+          return undefined
+        })
         b.onResolve({ filter: /^(?:@kayjs\/)?kay(?:\/.*)?$/ }, (args) => {
           const resolved = resolveKaySpecifier(args.path)
           return resolved !== undefined ? { path: resolved } : undefined
@@ -573,14 +591,22 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         define: {
           KAY_DEFERRED: hasDeferredHydrate ? 'true' : 'false',
           KAY_CLIENT_ONLY: hasClientOnlyHydrate ? 'true' : 'false',
+          ...publicEnvDefines,
         },
         plugins: [clientPlugin, ...pluginBunPlugins],
       })
+    }
+    catch (err) {
+      if (clientLeaks.size > 0)
+        throw clientLeakError(clientLeaks)
+      throw err
     }
     finally {
       rmSync(entriesDir, { recursive: true, force: true })
     }
 
+    if (clientLeaks.size > 0)
+      throw clientLeakError(clientLeaks)
     if (!clientResult.success) {
       const msgs = clientResult.logs.map(l => l.message).join('\n')
       throw new Error(`kay build (client) failed:\n${msgs}`)
@@ -593,6 +619,21 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         return fromCwd
       return resolve(clientDir, p)
     }
+
+    // A process.env left in a chunk is a key the build did not inline: name the app module that put it there.
+    for (const output of clientResult.outputs) {
+      if (!output.path.endsWith('.js') || !(await output.text()).includes('process.env'))
+        continue
+      const relFile = relative(clientDir, output.path).replace(/\\/g, '/')
+      const info = clientMetafile?.outputs[relFile] ?? clientMetafile?.outputs[`./${relFile}`]
+      for (const [inKey, input] of Object.entries(info?.inputs ?? {})) {
+        const program = input.bytesInOutput > 0 ? analyses.get(resolveMetaPath(inKey))?.program : undefined
+        if (program !== undefined && readsPrivateEnv(program, inlinedEnvKey))
+          clientLeaks.add(`${relative(root, resolveMetaPath(inKey)).replace(/\\/g, '/')} reads process.env (only a process.env.PUBLIC_* set at build time is inlined)`)
+      }
+    }
+    if (clientLeaks.size > 0)
+      throw clientLeakError(clientLeaks)
 
     if (clientMetafile !== undefined) {
       for (const [outKey, info] of Object.entries(clientMetafile.outputs)) {

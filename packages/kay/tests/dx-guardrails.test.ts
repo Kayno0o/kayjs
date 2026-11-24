@@ -1,8 +1,9 @@
 import { afterAll, describe, expect, it } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { tailwind } from '../../plugin-tailwind/src/index'
+import { build } from '../src/build/index'
 import { checkProject } from '../src/cli/check'
 import { parseIslandProps } from '../src/dom/island'
 import { ssrIsland } from '../src/ssr/index'
@@ -66,6 +67,58 @@ describe('DX Guardrails, Rich Island Props, Progressive Form Errors & Tailwind A
     expect(res.errors.some(e => e.includes('createdAt'))).toBe(false) // Date IS serializable!
     expect(res.errors.some(e => e.includes('conflicting routes') && e.includes('/posts/:'))).toBe(true)
     expect(res.errors.some(e => e.includes('without exporting `paths()`'))).toBe(true)
+  })
+
+  it('fails the build and kay check when an island reaches a server-only module or a private env var through a helper', async () => {
+    const dir = makeTemp('kay-island-leak-')
+    mkdirSync(join(dir, 'src/routes'), { recursive: true })
+    mkdirSync(join(dir, 'src/lib'), { recursive: true })
+    writeFileSync(join(dir, 'src/lib/db.ts'), `
+      import { Database } from 'bun:sqlite'
+      // process.env in a comment is not a read
+      export const db = () => new Database(process.env.DATABASE_URL)
+    `)
+    writeFileSync(join(dir, 'src/lib/format.ts'), `
+      import { db } from './db'
+      export const label = (n: number) => db ? \`#\${n}\` : ''
+    `)
+    writeFileSync(join(dir, 'src/routes/index.tsx'), `
+      import { signal } from 'kay'
+      import { label } from '../lib/format'
+      function Counter() {
+        const n = signal(0)
+        return <button type="button" onClick={() => n.value++}>{label(n.value)}</button>
+      }
+      export async function load() { return { db: process.env.DATABASE_URL } }
+      export default function Home() { return <Counter /> }
+    `)
+
+    const checked = await checkProject(dir, { skipTypecheck: true })
+    expect(checked.errors.filter(e => e.includes('src/lib/db.ts'))).toEqual([
+      'kay check: src/lib/db.ts: imports server-only module "bun:sqlite" and is reachable from the island in src/routes/index.tsx. Move server logic to a server action or async server component.',
+      'kay check: src/lib/db.ts: reads process.env and is reachable from the island in src/routes/index.tsx. Only process.env.PUBLIC_* reaches the browser.',
+    ])
+    await expect(build({ root: dir, outDir: '.leak' })).rejects.toThrow('src/lib/db.ts imports server-only module "bun:sqlite"')
+
+    writeFileSync(join(dir, 'src/lib/format.ts'), `
+      export const label = (n: number) => \`\${process.env.API_KEY}\${n}\`
+    `)
+    await expect(build({ root: dir, outDir: '.env' })).rejects.toThrow('src/lib/format.ts reads process.env')
+
+    writeFileSync(join(dir, 'src/lib/format.ts'), `
+      export const label = (n: number) => \`\${process.env.PUBLIC_PREFIX}\${n}\`
+    `)
+    process.env.PUBLIC_PREFIX = 'item-'
+    try {
+      expect((await checkProject(dir, { skipTypecheck: true })).errors).toEqual([])
+      await build({ root: dir, outDir: '.public', prerender: false })
+      const js = readdirSync(join(dir, '.public/client')).filter(f => f.endsWith('.js')).map(f => readFileSync(join(dir, '.public/client', f), 'utf8')).join('')
+      expect(js).toContain('item-')
+      expect(js).not.toContain('process.env')
+    }
+    finally {
+      delete process.env.PUBLIC_PREFIX
+    }
   })
 
   it('round-trips Date, Set, Map, URL, RegExp, and BigInt across ssrIsland -> parseIslandProps', () => {
