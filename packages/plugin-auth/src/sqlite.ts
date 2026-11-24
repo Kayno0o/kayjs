@@ -137,6 +137,7 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
   const qLinkOAuth = db.query<null, [string, string, string, number]>(
     'INSERT OR REPLACE INTO kay_auth_oauth (provider, provider_account_id, user_id, created_at) VALUES (?, ?, ?, ?)',
   )
+  const qDelUserOAuth = db.query<null, [string]>('DELETE FROM kay_auth_oauth WHERE user_id = ?')
 
   const qInsertToken = db.query<null, [string, string | null, string, TokenKind, number]>(
     'INSERT INTO kay_auth_tokens (token_hash, user_id, email, kind, expires_at) VALUES (?, ?, ?, ?, ?)',
@@ -224,6 +225,9 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
     },
     linkOAuthAccount(account: OAuthAccount) {
       qLinkOAuth.run(account.provider, account.providerAccountId, account.userId, account.createdAt)
+    },
+    deleteUserOAuthAccounts(userId) {
+      qDelUserOAuth.run(userId)
     },
     createToken(token: VerificationToken) {
       qInsertToken.run(token.tokenHash, token.userId ?? null, normalizeEmail(token.email), token.kind, token.expiresAt)

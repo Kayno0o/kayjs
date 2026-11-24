@@ -21,6 +21,8 @@ export const mail = mailer({
 export const auth = createAuth({
   store: authStore,
   secret: process.env.AUTH_SECRET || 'noticeboard-dev-secret-change-me',
+  // Public origin of the board: sign-in links are mailed from it, and only localhost works without it.
+  site: process.env.SITE_URL || undefined,
   defaultRedirect: '/',
   sendMail: async (m) => {
     await mail.send({ to: m.to, subject: m.subject, text: m.text, html: m.html })

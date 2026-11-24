@@ -196,6 +196,32 @@ describe('reactivity kernel', () => {
     dispose()
   })
 
+  test('every effect error of one flush reaches the caller', () => {
+    const s = signal(0)
+    const dispose = root((d) => {
+      effect(() => {
+        if (s.value === 1)
+          throw new Error('first')
+      })
+      effect(() => {
+        if (s.value === 1)
+          throw new Error('second')
+      })
+      return d
+    })
+
+    let caught: unknown
+    try {
+      s.value = 1
+    }
+    catch (err) {
+      caught = err
+    }
+    expect(caught).toBeInstanceOf(AggregateError)
+    expect((caught as AggregateError).errors.map(e => (e as Error).message)).toEqual(['first', 'second'])
+    dispose()
+  })
+
   test('cleanups and effects created inside an effect are disposed before it re-runs', () => {
     const s = signal(0)
     const inner = signal(0)

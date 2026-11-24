@@ -211,13 +211,12 @@ function propagate(dep: DepNode, flag: number): void {
   }
 }
 
-// One effect throwing must not strand the rest of the queue: every node still runs, the first error is rethrown after.
+// One effect throwing must not strand the rest of the queue: every node still runs, then a lone error is rethrown as is and several as one AggregateError.
 function flush(): void {
   if (flushing || batchDepth > 0)
     return
   flushing = true
-  let failed = false
-  let error: unknown
+  const errors: unknown[] = []
   try {
     let rounds = 0
     while (qHead !== undefined) {
@@ -234,10 +233,7 @@ function flush(): void {
             node.r()
         }
         catch (err) {
-          if (!failed) {
-            failed = true
-            error = err
-          }
+          errors.push(err)
         }
         node = next
       }
@@ -254,8 +250,10 @@ function flush(): void {
       left = next
     }
   }
-  if (failed)
-    throw error
+  if (errors.length === 1)
+    throw errors[0]
+  if (errors.length > 1)
+    throw new AggregateError(errors, `kay: ${errors.length} effects threw`)
 }
 
 function shouldRun(sub: SubNode): boolean {

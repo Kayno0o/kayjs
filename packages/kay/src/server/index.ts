@@ -297,7 +297,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const act = mod?.[entry.exportName]
     if (isServerAction(act)) {
       ;(act as { url: string }).url = entry.url
-      const middlewares = (entry.middlewares ?? []).map(m => (modules[m] as LoadedMiddlewareModule).default)
+      const middlewares = entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default)
       actionHandlers.set(entry.url, { act, middlewares: [...globalMiddlewares, ...middlewares] })
     }
   }
@@ -958,7 +958,7 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
   if (manifest.notFoundFile) await loadMod(manifest.notFoundFile)
   for (const a of manifest.actions) {
     await loadMod(a.file)
-    for (const m of a.middlewares ?? []) await loadMod(m)
+    for (const m of a.middlewares) await loadMod(m)
   }
 
   return createServerFromEmbedded({

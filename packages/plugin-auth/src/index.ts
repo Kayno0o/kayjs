@@ -29,6 +29,14 @@ const NODE_ENV_KEY = 'NODE_ENV'
 const runtimeNodeEnv = (): string | undefined => process.env[NODE_ENV_KEY]
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
+// Mailed links and OAuth callbacks start with `site`, so anything but an http(s) origin is a config mistake.
+function siteOrigin(value: string): string {
+  const url = new URL(value)
+  if (url.protocol !== 'https:' && url.protocol !== 'http:')
+    throw new Error(`[kay/auth] \`site\` must be an http or https origin, got ${value}`)
+  return url.origin
+}
+
 export interface AuthMailPayload {
   to: string
   subject: string
@@ -181,7 +189,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
   const defaultRedirect = options.defaultRedirect ?? '/'
   const trustedOrigins = options.trustedOrigins ? new Set(options.trustedOrigins) : undefined
   const secret = options.secret ?? process.env.AUTH_SECRET ?? randomToken(32)
-  const site = options.site !== undefined ? new URL(options.site).origin : undefined
+  const site = options.site !== undefined ? siteOrigin(options.site) : undefined
   const allowRate = createRateLimiter(options.rateLimit)
 
   const providers = new Map<string, OAuthProvider>()
@@ -306,11 +314,13 @@ export function createAuth(options: AuthOptions = {}): Auth {
     return LOOPBACK_HOSTS.has(url.hostname) ? url.origin : undefined
   }
 
-  // Whoever signed up with an address before it was proven may hold its password and sessions; proving it hands the account to the owner alone.
+  // Whoever signed up with an address before it was proven may hold its password, sessions and provider links; proving it hands the account to the owner alone.
+  // The password goes first, so a squatter cannot sign in again between the purge and the update.
   async function claimUnverified(user: AuthUser): Promise<AuthUser> {
-    if (user.passwordHash !== undefined)
-      await store.deleteUserSessions(user.id)
-    return (await store.updateUser(user.id, { emailVerified: true, passwordHash: undefined })) ?? user
+    const claimed = (await store.updateUser(user.id, { emailVerified: true, passwordHash: undefined })) ?? user
+    await store.deleteUserSessions(user.id)
+    await store.deleteUserOAuthAccounts(user.id)
+    return claimed
   }
 
   async function sendMagicLink(email: string, origin: string, redirectTo?: string): Promise<string> {

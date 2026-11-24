@@ -239,6 +239,26 @@ export default function NotesPage() {
 }
 `)
 
+writeFixture('src/routes/admin/reports/_middleware.ts', `
+import type { Middleware } from 'kay/server'
+
+const reportsMiddleware: Middleware = async (ctx, next) => {
+  ctx.locals.chain = [ctx.locals.requestTag, ctx.locals.role].join('>')
+  return next()
+}
+export default reportsMiddleware
+`)
+
+writeFixture('src/routes/admin/reports/index.tsx', `
+import { action } from 'kay/server'
+
+export const reportChain = action(async ctx => ctx.locals.chain)
+
+export default function Reports() {
+  return <form action={reportChain} method="post"><button type="submit">Run</button></form>
+}
+`)
+
 afterAll(() => {
   rmSync(fixtureDir, { recursive: true, force: true })
 })
@@ -351,6 +371,19 @@ describe('Kay v2 Milestone 2 full-stack features', () => {
     const clientAssets = app.manifest!.assets.map(f => readFileSync(join(fixtureDir, 'dist/client', f), 'utf8')).join('\n')
     expect(clientAssets).not.toContain('TOP_SECRET_DB_PASSWORD_NEVER_IN_CLIENT')
     expect(clientAssets).toContain(actionUrl)
+  })
+
+  test('an action runs its folder _middleware.ts chain outermost first, and an action outside routes runs none', async () => {
+    const app = await testApp({ root: fixtureDir })
+    const chainUrl = app.manifest!.actions.find(a => a.exportName === 'reportChain')!.url
+    expect((await app.post(chainUrl, {})).status).toBe(302)
+    app.cookies.set('session', 'valid-token')
+    expect(await (await app.post(chainUrl, {})).json()).toEqual({ ok: true, data: 'from-root-mw>admin' })
+
+    const noteUrl = app.manifest!.actions.find(a => a.exportName === 'addNote')!.url
+    const noteRes = await app.post(noteUrl, { title: 'Outside routes' })
+    expect(noteRes.status).toBe(200)
+    expect(noteRes.headers.get('x-root-mw')).toBeNull()
   })
 
   test('defineEnv validates and freezes typed environment variables', () => {

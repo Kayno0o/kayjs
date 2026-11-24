@@ -55,6 +55,7 @@ export interface AuthStore {
 
   getOAuthAccount(provider: string, providerAccountId: string): OAuthAccount | undefined | Promise<OAuthAccount | undefined>
   linkOAuthAccount(account: OAuthAccount): void | Promise<void>
+  deleteUserOAuthAccounts(userId: string): void | Promise<void>
 
   createToken(token: VerificationToken): void | Promise<void>
   consumeToken(tokenHash: string, kind: TokenKind): VerificationToken | undefined | Promise<VerificationToken | undefined>
@@ -153,6 +154,12 @@ export function memoryAuthStore(id?: string): AuthStore {
     },
     linkOAuthAccount(account) {
       state.oauth.set(`${account.provider}:${account.providerAccountId}`, account)
+    },
+    deleteUserOAuthAccounts(userId) {
+      for (const [k, a] of state.oauth) {
+        if (a.userId === userId)
+          state.oauth.delete(k)
+      }
     },
     createToken(token) {
       state.tokens.set(token.tokenHash, { ...token, email: normalizeEmail(token.email) })

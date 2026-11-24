@@ -32,6 +32,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     // Local mock OAuth2 + PKCE server
     let lastCodeChallenge = ''
     let lastVerifiedVerifier = ''
+    let mockProfile = { id: 'oauth-42', email: 'oauth-user@example.com', emailVerified: true, name: 'OAuth User' }
     const mockOAuth = Bun.serve({
       port: 0,
       async fetch(req) {
@@ -53,12 +54,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
         if (url.pathname === '/userinfo') {
           if (req.headers.get('authorization') !== 'Bearer mock-access-token')
             return new Response('unauthorized', { status: 401 })
-          return Response.json({
-            id: 'oauth-42',
-            email: 'oauth-user@example.com',
-            emailVerified: true,
-            name: 'OAuth User',
-          })
+          return Response.json(mockProfile)
         }
         return new Response('not found', { status: 404 })
       },
@@ -304,6 +300,28 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       app.clearCookies()
       expect((await app.post('/auth/signin', { email: 'oauth-user@example.com', password: 'attacker-password' })).status).toBe(401)
 
+      // 10b. A provider account holding an unproven address loses its session and its link once the owner proves it
+      async function oauthCallback() {
+        const start = await app.get('/auth/oauth/mock')
+        const atProvider = await fetch(start.headers.get('location')!, { redirect: 'manual' })
+        const cb = new URL(atProvider.headers.get('location')!)
+        return app.get(cb.pathname + cb.search)
+      }
+      mockProfile = { id: 'squatter-7', email: 'claimed@example.com', emailVerified: false, name: 'Squatter' }
+      app.clearCookies()
+      expect((await oauthCallback()).status).toBe(302)
+      const oauthSquatterCookie = app.cookies.get('kay_session')!
+      app.clearCookies()
+      await app.post('/auth/magic-link', { email: 'claimed@example.com' })
+      const claimLink = new URL(mail.outbox[0]!.text!.match(/http:\/\/localhost[^\s]+/)![0])
+      expect((await app.get(claimLink.pathname + claimLink.search)).status).toBe(302)
+      app.clearCookies()
+      app.cookies.set('kay_session', oauthSquatterCookie)
+      expect(((await (await app.get('/auth/session')).json()) as { user: unknown }).user).toBeNull()
+      app.clearCookies()
+      expect((await oauthCallback()).status).toBe(409)
+      expect(((await (await app.get('/auth/session')).json()) as { user: unknown }).user).toBeNull()
+
       // 11. SQLite persistence survives re-opening the DB file
       store.db.close()
       const reopened = sqliteAuthStore(dbPath)
@@ -315,6 +333,54 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       mockOAuth.stop(true)
       delete (globalThis as Record<string, unknown>).__TEST_AUTH
     }
+  })
+
+  test('builds mailed sign-in links and OAuth callbacks from `site`, never from the request host', async () => {
+    const appDir = join(TMP, 'site-app')
+    mkdirSync(join(appDir, 'src', 'routes'), { recursive: true })
+    writeFileSync(join(appDir, 'src', 'routes', 'index.tsx'), 'export default function Home() { return <main>ok</main> }')
+    const mailed: string[] = []
+    let tokenRedirectUri = null as string | null
+    const tokenServer = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        tokenRedirectUri = new URLSearchParams(await req.text()).get('redirect_uri')
+        return Response.json({ access_token: 't' })
+      },
+    })
+    const auth = createAuth({
+      secret: 'site-test-secret-32-chars-minimum',
+      site: 'https://app.example/ignored/path',
+      sendMail: (m) => { mailed.push(m.text) },
+      providers: [oauthProvider({
+        id: 'mock',
+        clientId: 'cid',
+        clientSecret: 'csec',
+        authorizeUrl: 'https://provider.example/authorize',
+        tokenUrl: `http://127.0.0.1:${tokenServer.port}/token`,
+        scopes: ['email'],
+        fetchProfile: async () => ({ id: '1', email: 'a@b.c', emailVerified: true }),
+      })],
+    })
+    const app = await testApp({ root: appDir, plugins: [auth.plugin] })
+
+    const res = await app.post('http://evil.example/auth/magic-link', { email: 'user@example.com' }, { 'origin': 'http://evil.example', 'x-forwarded-host': 'evil.example' })
+    expect(res.status).toBe(200)
+    expect(mailed[0]).toMatch(/https:\/\/app\.example\/auth\/magic-link\/verify\?/)
+    expect(mailed[0]).not.toContain('evil.example')
+
+    const start = await app.get('http://evil.example/auth/oauth/mock', { 'x-forwarded-host': 'evil.example' })
+    const authorize = new URL(start.headers.get('location')!)
+    expect(authorize.searchParams.get('redirect_uri')).toBe('https://app.example/auth/oauth/mock/callback')
+    await app.get(`http://evil.example/auth/oauth/mock/callback?code=c&state=${authorize.searchParams.get('state')}`)
+    tokenServer.stop(true)
+    expect(tokenRedirectUri).toBe('https://app.example/auth/oauth/mock/callback')
+  })
+
+  test('refuses a `site` that is not an http or https origin', () => {
+    expect(() => createAuth({ secret: 's', site: 'javascript:alert(1)' })).toThrow('site')
+    expect(() => createAuth({ secret: 's', site: 'ftp://app.example' })).toThrow('site')
+    expect(() => createAuth({ secret: 's', site: 'http://app.example' })).not.toThrow()
   })
 
   test('rate-limits repeated failed sign-in attempts with 429', async () => {
