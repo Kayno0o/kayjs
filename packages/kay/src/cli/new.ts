@@ -15,7 +15,7 @@ export function scaffoldProject(targetDir: string, options: ScaffoldOptions = {}
   const root = resolve(targetDir)
   const name = basename(root).toLowerCase().replace(/[^a-z0-9-_]/g, '-') || 'kay-app'
   const template: ScaffoldTemplate = options.template ?? 'minimal'
-  const kayVersion = options.kayVersion ?? '^2.0.0-alpha.5'
+  const kayVersion = options.kayVersion ?? '^2.0.0-alpha.6'
 
   if (existsSync(root) && readdirSync(root).length > 0 && !options.force)
     throw new Error(`kay new: directory "${root}" is not empty (pass --force to overwrite)`)
