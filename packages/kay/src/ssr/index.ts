@@ -1,6 +1,10 @@
 // Kay v2 SSR runtime: flat string concatenation with fast-path escaping and zero-overhead islands.
 
 import type { Html, HydrateStrategy, KayChild } from '../jsx-runtime'
+import { KAY_STREAM_SCRIPT } from './context'
+
+export const KAY_ISLAND_STYLE = 'kay-island,kay-slot{display:contents}'
+export const KAY_SUSPENSE_STYLE = 'kay-s{display:contents}'
 
 const ESC_TEXT = /[&<>]/
 const ESC_ATTR = /[&"<>]/
@@ -180,10 +184,11 @@ export interface DocumentOptions {
   preloadChunks?: Iterable<string> | undefined
   styles?: Iterable<string> | undefined
   hasIslands?: boolean | undefined
+  hasSuspense?: boolean | undefined
 }
 
 export function renderDocument(options: DocumentOptions): string {
-  const { body, head = '', headTags, lang = 'en', runtimeScript, alwaysLoadRuntime, preloadChunks, styles, hasIslands } = options
+  const { body, head = '', headTags, lang = 'en', runtimeScript, alwaysLoadRuntime, preloadChunks, styles, hasIslands, hasSuspense } = options
   let headExtra = head
 
   if (headTags !== undefined) {
@@ -197,12 +202,15 @@ export function renderDocument(options: DocumentOptions): string {
   }
 
   if (hasIslands) {
-    headExtra += '<style>kay-island,kay-slot{display:contents}</style>'
+    headExtra += `<style>${KAY_ISLAND_STYLE}</style>`
     if (preloadChunks !== undefined) {
       for (const href of preloadChunks)
         headExtra += `<link rel="modulepreload" href="${escAttr(href)}">`
     }
   }
+
+  if (hasSuspense)
+    headExtra += `<style>${KAY_SUSPENSE_STYLE}</style><script>${KAY_STREAM_SCRIPT}</script>`
 
   if (runtimeScript !== undefined && (hasIslands || alwaysLoadRuntime))
     headExtra += `<script type="module" src="${escAttr(runtimeScript)}"></script>`

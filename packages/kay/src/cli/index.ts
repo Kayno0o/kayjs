@@ -60,10 +60,11 @@ else if (cmd === 'check') {
 }
 else if (cmd === 'build') {
   const isStatic = hasFlag('--static')
+  const analyze = hasFlag('--analyze')
   const compileFlag = flagValue('--compile')
   const compile = compileFlag === undefined ? undefined : (compileFlag === '' ? true : compileFlag)
   const t0 = performance.now()
-  const manifest = await build({ root, static: isStatic, compile })
+  const manifest = await build({ root, static: isStatic, compile, analyze })
   const ms = (performance.now() - t0).toFixed(1)
   console.log(`kay build done in ${ms} ms (${manifest.routes.length} routes, ${manifest.assets.length} client assets, ${manifest.actions.length} actions)`)
 }

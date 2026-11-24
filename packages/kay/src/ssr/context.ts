@@ -81,9 +81,12 @@ export function Suspense(props: { fallback?: KayChild, children?: KayChild | Pro
   })
 
   const fallbackHtml = ssrChild(props.fallback)
-  return raw(`<div id="k-s-${id}" style="display:contents">${fallbackHtml}</div>`)
+  return raw(`<kay-s id="k-s-${id}">${fallbackHtml}</kay-s>`)
 }
 
+/** Fixed streaming swap bootstrap (constant content -> deterministic SHA-256 CSP hash, zero per-chunk inline scripts). */
+export const KAY_STREAM_SCRIPT = `(()=>{const w=n=>{if(n.nodeType===1&&n.tagName==='TEMPLATE'&&n.dataset.ks){const s=document.getElementById('k-s-'+n.dataset.ks);if(s){s.replaceWith(n.content);n.remove()}}};const o=new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes)w(n)});o.observe(document.documentElement,{childList:true,subtree:true});document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('template[data-ks]').forEach(w);o.disconnect()},{once:true})})()`
+
 export function streamChunkScript(id: number, resolvedHtml: string): string {
-  return `<template id="k-p-${id}">${resolvedHtml}</template><script>(()=>{let s=document.getElementById("k-s-${id}"),t=document.getElementById("k-p-${id}");if(s&&t){s.replaceWith(t.content);t.remove()}document.currentScript?.remove()})()</script>`
+  return `<template data-ks="${id}">${resolvedHtml}</template>`
 }

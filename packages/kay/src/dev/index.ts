@@ -13,7 +13,7 @@ export interface DevServerOptions {
   routesDir?: string | undefined
 }
 
-const DEV_RELOAD_SCRIPT = `<script>(()=>{const s=new EventSource('/_kay/dev-events');s.onmessage=(e)=>{if(e.data.startsWith('css:')){const urls=JSON.parse(e.data.slice(4));const old=[...document.querySelectorAll('link[rel="stylesheet"][href^="/_kay/"]')];if(old.length===0){location.reload();return;}let left=urls.length;for(const u of urls){const l=document.createElement('link');l.rel='stylesheet';l.href=u;const done=()=>{if(--left===0)for(const o of old)o.remove();};l.onload=done;l.onerror=done;document.head.appendChild(l);}}else{location.reload();}};})();</script>`
+const DEV_RELOAD_SCRIPT = `<script>(()=>{const stem=u=>u.replace(/-[a-z0-9]+\\.css$/i,'');const s=new EventSource('/_kay/dev-events');s.onmessage=(e)=>{if(e.data.startsWith('css:')){const urls=JSON.parse(e.data.slice(4));const byStem=new Map(urls.map(u=>[stem(u),u]));const old=[...document.querySelectorAll('link[rel="stylesheet"][href^="/_kay/"]')];if(old.length===0){location.reload();return;}const next=[];for(const o of old){const m=byStem.get(stem(o.getAttribute('href')||''));if(m)next.push(m);}if(next.length===0){location.reload();return;}let left=next.length;for(const u of next){const l=document.createElement('link');l.rel='stylesheet';l.href=u;const done=()=>{if(--left===0)for(const o of old)o.remove();};l.onload=done;l.onerror=done;document.head.appendChild(l);}}else{location.reload();}};})();</script>`
 
 function renderErrorOverlay(errText: string): string {
   const escaped = errText

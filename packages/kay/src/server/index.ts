@@ -20,7 +20,7 @@ import { executeAction, isServerAction } from './action'
 import { CompressionCache, compressedHtmlResponse, isCompressibleType, maybeCompressResponse, pickEncoding } from './compress'
 import { extractRenderedIslands, finalizeResponse, makeRequestContext, MIME } from './http'
 import { Router } from './router'
-import { buildSecurityHeaderEntries } from './security'
+import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, withCspHashes } from './security'
 
 export { defineConfig, definePlugin, loadConfig } from '../plugins/index'
 export type { BuildPluginContext, KayConfig, KayPlugin, ServerPluginAPI } from '../plugins/index'
@@ -31,7 +31,7 @@ export type { CompressionEncoding } from './compress'
 export type { CookieOptions, Cookies } from './cookies'
 export { defineEnv } from './env'
 export type { EmbeddedServerConfig, KayApp, Middleware, RequestContext, ServerOptions } from './http'
-export { verifyOrigin } from './security'
+export { KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HASH, KAY_SUSPENSE_STYLE_HASH, verifyOrigin, withCspHashes } from './security'
 export type { SecurityHeadersOptions } from './security'
 export type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } from './standard-schema'
 
@@ -60,7 +60,7 @@ interface LoadedErrorModule {
 
 const textEncoder = new TextEncoder()
 
-type PrerenderEntry = { kind: 'file', path: string } | { kind: 'html', html: string }
+type PrerenderEntry = { kind: 'file', path: string, hasIslands: boolean } | { kind: 'html', html: string, hasIslands: boolean }
 
 export async function createServerFromEmbedded(config: EmbeddedServerConfig): Promise<KayApp> {
   const { manifest, modules, assets, publicAssets = {}, publicEtags = {}, prerendered, prerenderedFiles = {}, lang = 'en', security, plugins = [] } = config
@@ -78,6 +78,28 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     securityRecord[k] = v
   }
   const htmlBaseHeaders: Record<string, string> = { 'content-type': 'text/html; charset=utf-8', ...securityRecord }
+  const baseCsp = security !== false ? security?.csp : undefined
+  const makeHtmlHeaders = (hasIslands: boolean, hasSuspense: boolean): Record<string, string> => {
+    if (baseCsp === undefined || (!hasIslands && !hasSuspense))
+      return htmlBaseHeaders
+    const styleHashes: string[] = []
+    const scriptHashes: string[] = []
+    if (hasIslands)
+      styleHashes.push(KAY_ISLAND_STYLE_HASH)
+    if (hasSuspense) {
+      styleHashes.push(KAY_SUSPENSE_STYLE_HASH)
+      scriptHashes.push(KAY_STREAM_SCRIPT_HASH)
+    }
+    return { ...htmlBaseHeaders, 'content-security-policy': withCspHashes(baseCsp, { styleHashes, scriptHashes }) }
+  }
+  const htmlHeadersPlain = makeHtmlHeaders(false, false)
+  const htmlHeadersIslands = makeHtmlHeaders(true, false)
+  const htmlHeadersSuspense = makeHtmlHeaders(false, true)
+  const htmlHeadersBoth = makeHtmlHeaders(true, true)
+  const selectHtmlHeaders = (hasIslands: boolean, hasSuspense: boolean): Record<string, string> =>
+    hasIslands
+      ? (hasSuspense ? htmlHeadersBoth : htmlHeadersIslands)
+      : (hasSuspense ? htmlHeadersSuspense : htmlHeadersPlain)
   const compressEnabled = config.compress ?? (process.env.KAY_DEV !== '1')
   const compressCache = compressEnabled ? new CompressionCache() : undefined
 
@@ -220,9 +242,10 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   }
 
   async function servePrerendered(request: Request, pathname: string, pre: PrerenderEntry): Promise<Response> {
+    const base = selectHtmlHeaders(pre.hasIslands, false)
     const headers = compressCache !== undefined
-      ? { ...htmlBaseHeaders, vary: 'Accept-Encoding' }
-      : htmlBaseHeaders
+      ? { ...base, vary: 'Accept-Encoding' }
+      : base
 
     if (request.method === 'HEAD')
       return new Response(null, { status: 200, headers })
@@ -270,13 +293,14 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   const fastPrerenderedMap = new Map<string, PrerenderEntry>()
   for (const route of manifest.routes) {
     if (route.prerendered) {
+      const routeHasIslands = route.islandChunks.length > 0
       for (const [urlPath, relHtml] of Object.entries(route.prerendered)) {
         const filePath = prerenderedFiles[relHtml]
         const html = prerendered[relHtml]
         const entry: PrerenderEntry | undefined = filePath !== undefined
-          ? { kind: 'file', path: filePath }
+          ? { kind: 'file', path: filePath, hasIslands: routeHasIslands }
           : html !== undefined
-            ? { kind: 'html', html }
+            ? { kind: 'html', html, hasIslands: routeHasIslands }
             : undefined
         if (entry !== undefined) {
           prerenderedMap.set(urlPath, entry)
@@ -306,6 +330,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const middlewares = entry.middlewares.map(m => (modules[m] as LoadedMiddlewareModule).default)
 
     const hasIslands = entry.islandChunks.length > 0
+    const routeStyles = entry.styles ?? manifest.styles
     const shell = renderDocument({
       body: '\0',
       headTags: manifest.headTags,
@@ -313,7 +338,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       runtimeScript: manifest.runtimeScript,
       alwaysLoadRuntime,
       preloadChunks: entry.eagerIslandChunks ?? entry.islandChunks,
-      styles: manifest.styles,
+      styles: routeStyles,
       hasIslands,
     })
     const splitAt = shell.indexOf('\0')
@@ -335,11 +360,12 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     let fastHandler: ((req: Request) => Response | Promise<Response>) | undefined
     if (canFastPath) {
       const singleLayout = layouts.length === 1 ? layouts[0]! : undefined
+      const fastHeaders = selectHtmlHeaders(hasIslands, false)
 
       fastHandler = (request: Request): Response | Promise<Response> => {
         const reqUrl = new URL(request.url)
         const respondHtml = (body: string): Response =>
-          compressedHtmlResponse(docPrefix + body + docSuffix, 200, htmlBaseHeaders, request, compressCache)
+          compressedHtmlResponse(docPrefix + body + docSuffix, 200, fastHeaders, request, compressCache)
 
         const wrapLayouts = (inner: string): Response | Promise<Response> => {
           if (layouts.length === 0)
@@ -458,6 +484,8 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     const hasIslands = renderedIslands.hasIslands || rctx.pending.length > 0 && entry.islandChunks.length > 0
     const preloadChunks = rctx.pending.length > 0 ? entry.islandChunks : renderedIslands.eagerChunks
 
+    const routeStyles = entry.styles ?? manifest.styles
+
     // Streaming SSR path when <Suspense> boundaries are pending (never buffered for compression)!
     if (rctx.pending.length > 0) {
       const shell = renderDocument({
@@ -468,8 +496,9 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         runtimeScript: manifest.runtimeScript,
         alwaysLoadRuntime,
         preloadChunks,
-        styles: manifest.styles,
+        styles: routeStyles,
         hasIslands,
+        hasSuspense: true,
       })
       const splitAt = shell.indexOf('\0')
       const headHtml = shell.slice(0, splitAt)
@@ -489,7 +518,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         },
       })
 
-      return new Response(stream, { status: 200, headers: { ...htmlBaseHeaders } })
+      return new Response(stream, { status: 200, headers: { ...selectHtmlHeaders(hasIslands, true) } })
     }
 
     let html = renderDocument({
@@ -500,18 +529,19 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       runtimeScript: manifest.runtimeScript,
       alwaysLoadRuntime,
       preloadChunks,
-      styles: manifest.styles,
+      styles: routeStyles,
       hasIslands,
     })
 
     for (let i = 0; i < htmlTransformers.length; i++)
       html = await htmlTransformers[i]!(html, ctx)
 
-    return compressedHtmlResponse(html, 200, htmlBaseHeaders, ctx.request, compressCache)
+    return compressedHtmlResponse(html, 200, selectHtmlHeaders(hasIslands, false), ctx.request, compressCache)
   }
 
   const rootLayoutFile = manifest.routes.find(r => r.layouts.length > 0)?.layouts[0]
   const rootLayoutMod = rootLayoutFile !== undefined ? modules[rootLayoutFile] as LoadedLayoutModule | undefined : undefined
+  const fallbackStyles = manifest.globalStyles ?? manifest.styles
 
   async function renderError(error: unknown, cookieStore: CookieStore, url?: URL): Promise<Response> {
     if (errorMod !== undefined) {
@@ -522,7 +552,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           inner = ssrChild(await rootLayoutMod.default({ children: raw(inner), url: url ?? new URL('http://localhost/500'), params: {}, locals: {} }) as Html)
         return inner
       })
-      const html = renderDocument({ body, head: renderCollectedHead(rctx), headTags: manifest.headTags, styles: manifest.styles, runtimeScript: manifest.runtimeScript, alwaysLoadRuntime, lang })
+      const html = renderDocument({ body, head: renderCollectedHead(rctx), headTags: manifest.headTags, styles: fallbackStyles, runtimeScript: manifest.runtimeScript, alwaysLoadRuntime, lang })
       return finalizeResponse(new Response(html, { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } }), cookieStore, securityEntries)
     }
     return finalizeResponse(new Response('Internal Server Error', { status: 500 }), cookieStore, securityEntries)
@@ -538,7 +568,7 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           inner = ssrChild(await rootLayoutMod.default({ children: raw(inner), url: url ?? new URL('http://localhost/404'), params: {}, locals: {} }) as Html)
         return inner
       })
-      const html = renderDocument({ body, head: renderCollectedHead(rctx), headTags: manifest.headTags, styles: manifest.styles, runtimeScript: manifest.runtimeScript, alwaysLoadRuntime, lang })
+      const html = renderDocument({ body, head: renderCollectedHead(rctx), headTags: manifest.headTags, styles: fallbackStyles, runtimeScript: manifest.runtimeScript, alwaysLoadRuntime, lang })
       return finalizeResponse(new Response(html, { status: 404, headers: { 'content-type': 'text/html; charset=utf-8' } }), cookieStore, securityEntries)
     }
     return finalizeResponse(new Response('Not Found', { status: 404 }), cookieStore, securityEntries)

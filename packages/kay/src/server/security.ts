@@ -1,4 +1,68 @@
-// Built-in security basics: CSRF/Origin verification on state-changing requests + safe default headers.
+// Built-in security basics: CSRF/Origin verification on state-changing requests + safe default headers + strict CSP hashes.
+
+import { KAY_STREAM_SCRIPT } from '../ssr/context'
+import { KAY_ISLAND_STYLE, KAY_SUSPENSE_STYLE } from '../ssr/index'
+
+function cspSha256(content: string): string {
+  const digest = new Bun.CryptoHasher('sha256').update(content).digest('base64')
+  return `'sha256-${digest}'`
+}
+
+export const KAY_ISLAND_STYLE_HASH = cspSha256(KAY_ISLAND_STYLE)
+export const KAY_SUSPENSE_STYLE_HASH = cspSha256(KAY_SUSPENSE_STYLE)
+export const KAY_STREAM_SCRIPT_HASH = cspSha256(KAY_STREAM_SCRIPT)
+
+/** Augments a Content-Security-Policy header with exact SHA-256 hashes (no `'unsafe-inline'` required). */
+export function withCspHashes(
+  csp: string,
+  opts: { styleHashes?: readonly string[], scriptHashes?: readonly string[] },
+): string {
+  const styleHashes = opts.styleHashes ?? []
+  const scriptHashes = opts.scriptHashes ?? []
+  if (styleHashes.length === 0 && scriptHashes.length === 0)
+    return csp
+
+  const rawParts = csp.split(';').map(s => s.trim()).filter(Boolean)
+  const directives = new Map<string, string[]>()
+  const order: string[] = []
+  for (const part of rawParts) {
+    const tokens = part.split(/\s+/)
+    const name = tokens[0]!.toLowerCase()
+    if (!directives.has(name)) {
+      order.push(name)
+      directives.set(name, tokens.slice(1))
+    }
+  }
+
+  const defaultSrc = directives.get('default-src') ?? ["'self'"]
+  const addHashes = (dirName: string, hashes: readonly string[]) => {
+    if (hashes.length === 0)
+      return
+    let tokens = directives.get(dirName)
+    if (tokens === undefined) {
+      tokens = [...defaultSrc]
+      directives.set(dirName, tokens)
+      order.push(dirName)
+    }
+    if (tokens.includes("'unsafe-inline'"))
+      return
+    const noneIdx = tokens.indexOf("'none'")
+    if (noneIdx !== -1)
+      tokens.splice(noneIdx, 1)
+    for (const h of hashes) {
+      if (!tokens.includes(h))
+        tokens.push(h)
+    }
+  }
+
+  addHashes('style-src', styleHashes)
+  addHashes('script-src', scriptHashes)
+
+  return order.map((name) => {
+    const tokens = directives.get(name)!
+    return tokens.length > 0 ? `${name} ${tokens.join(' ')}` : name
+  }).join('; ')
+}
 
 export interface SecurityHeadersOptions {
   frameOptions?: 'DENY' | 'SAMEORIGIN' | false | undefined

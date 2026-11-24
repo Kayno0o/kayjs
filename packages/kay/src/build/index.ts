@@ -38,6 +38,8 @@ export interface BuildOptions {
   plugins?: KayPlugin[] | undefined
   /** Reusable incremental cache for `kay dev` (skips re-parsing/re-compiling unchanged files). */
   cache?: BuildCache | undefined
+  /** Print a per-route JS/CSS bundle weight report using Bun.build's metafile. */
+  analyze?: boolean | undefined
   /** Export a static site into dist/static (prerenders all static + paths() routes). */
   static?: boolean | undefined
   /** Run build-time prerendering for routes exporting `prerender = true` (default: true; disabled in `kay dev`). */
@@ -65,6 +67,8 @@ export interface RouteManifestEntry {
   islandHydrate?: string | undefined
   islandChunks: string[]
   eagerIslandChunks?: string[] | undefined
+  /** Per-route stylesheets (global plugin styles + CSS imported by this route, its layouts, and its islands). */
+  styles?: string[] | undefined
   usesRenderContext?: boolean | undefined
   prerender?: boolean | undefined
   prerendered?: Record<string, string> | undefined
@@ -73,6 +77,8 @@ export interface RouteManifestEntry {
 export interface BuildManifest {
   runtimeScript: string | undefined
   styles: string[]
+  /** Stylesheets applied globally (plugin CSS, ctx.addStyle, and root layout CSS) — used by _error/_404. */
+  globalStyles?: string[] | undefined
   headTags?: string[] | undefined
   routes: RouteManifestEntry[]
   errorFile?: string | undefined
@@ -431,9 +437,12 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   // Step 1 & Step 2: Single-pass Client + Server Builds
   // When there are no islands (e.g. static sites, blogs, docs), run client CSS and server builds in parallel!
   const islandChunks = new Map<string, string>()
+  const srcCssToUrl = new Map<string, string>()
+  const islandCssUrl = new Map<string, string>()
   const assetFiles: string[] = []
   const styleUrls: string[] = []
   let runtimeScript: string | undefined
+  let clientMetafile: Bun.BuildOutput['metafile']
 
   const needsClientBuild = islandTargets.size > 0 || pluginClientEntries.length > 0 || allStandaloneCss.length > 0
 
@@ -443,6 +452,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     const entriesDir = join(outDir, '.entries')
     mkdirSync(entriesDir, { recursive: true })
     const entryPoints: string[] = []
+    const islandEntryToKey = new Map<string, string>()
 
     const compiledDomCache = new Map<string, string>()
     let hasDeferredHydrate = false
@@ -478,13 +488,14 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     for (const cssFile of allStandaloneCss)
       entryPoints.push(cssFile)
 
-    for (const [, target] of islandTargets) {
+    for (const [key, target] of islandTargets) {
       const entryPath = join(entriesDir, `${target.id}.ts`)
       const exportStmt = target.exportName === 'default'
         ? `export { default } from ${JSON.stringify(target.file)};\n`
         : `export { ${target.exportName} as default } from ${JSON.stringify(target.file)};\n`
       writeFileSync(entryPath, exportStmt)
       entryPoints.push(entryPath)
+      islandEntryToKey.set(entryPath, key)
     }
 
     const clientPlugin: BunPlugin = {
@@ -535,6 +546,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         format: 'esm',
         splitting: true,
         minify,
+        metafile: true,
         naming: '[name]-[hash].[ext]',
         define: {
           KAY_DEFERRED: hasDeferredHydrate ? 'true' : 'false',
@@ -550,6 +562,39 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     if (!clientResult.success) {
       const msgs = clientResult.logs.map(l => l.message).join('\n')
       throw new Error(`kay build (client) failed:\n${msgs}`)
+    }
+
+    clientMetafile = clientResult.metafile
+    const resolveMetaPath = (p: string): string => {
+      const fromCwd = resolve(process.cwd(), p)
+      if (existsSync(fromCwd) || islandEntryToKey.has(fromCwd))
+        return fromCwd
+      return resolve(clientDir, p)
+    }
+
+    if (clientMetafile !== undefined) {
+      for (const [outKey, info] of Object.entries(clientMetafile.outputs)) {
+        const relOut = outKey.replace(/^\.\//, '')
+        const url = `${assetPrefix}/${relOut}`
+        if (relOut.endsWith('.css')) {
+          if (info.entryPoint !== undefined) {
+            const absEntry = resolveMetaPath(info.entryPoint)
+            if (absEntry.endsWith('.css'))
+              srcCssToUrl.set(absEntry, url)
+          }
+          for (const inKey of Object.keys(info.inputs ?? {})) {
+            if (inKey.endsWith('.css'))
+              srcCssToUrl.set(resolveMetaPath(inKey), url)
+          }
+        }
+        const cssBundle = (info as { cssBundle?: string }).cssBundle
+        if (cssBundle !== undefined && info.entryPoint !== undefined) {
+          const absEntry = resolveMetaPath(info.entryPoint)
+          const islandKey = islandEntryToKey.get(absEntry)
+          if (islandKey !== undefined)
+            islandCssUrl.set(islandKey, `${assetPrefix}/${cssBundle.replace(/^\.\//, '')}`)
+        }
+      }
     }
 
     for (const output of clientResult.outputs) {
@@ -760,15 +805,68 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     return false
   }
 
+  function collectRouteStyles(file: string, seen = new Set<string>(), out = new Set<string>()): void {
+    if (seen.has(file))
+      return
+    seen.add(file)
+    const analysis = analyses.get(file)
+    if (analysis === undefined)
+      return
+    if (analysis.isInteractive) {
+      const islCss = islandCssUrl.get(`${file}#default`)
+      if (islCss !== undefined)
+        out.add(islCss)
+    }
+    const bindings = pageIslandBindings.get(file)
+    if (bindings !== undefined) {
+      for (const [, target] of bindings) {
+        const islCss = islandCssUrl.get(`${target.file}#${target.exportName}`)
+        if (islCss !== undefined)
+          out.add(islCss)
+        collectRouteStyles(target.file, seen, out)
+      }
+    }
+    for (const imp of analysis.imports) {
+      const target = resolveImportPath(file, imp.source)
+      if (target === undefined)
+        continue
+      if (target.endsWith('.css')) {
+        const cssUrl = srcCssToUrl.get(target)
+        if (cssUrl !== undefined)
+          out.add(cssUrl)
+      }
+      else if (target.endsWith('.tsx') || target.endsWith('.ts')) {
+        collectRouteStyles(target, seen, out)
+      }
+    }
+  }
+
+  const globalPluginStyles: string[] = []
+  for (const cssFile of pluginCssFiles) {
+    const url = srcCssToUrl.get(cssFile)
+    if (url !== undefined && !globalPluginStyles.includes(url))
+      globalPluginStyles.push(url)
+  }
+
+  const rootLayoutSrc = join(routesDir, '_layout.tsx')
+  const globalStyleSet = new Set<string>(globalPluginStyles)
+  if (existsSync(rootLayoutSrc))
+    collectRouteStyles(rootLayoutSrc, new Set(), globalStyleSet)
+  const globalStyles = [...globalStyleSet]
+
   const routeEntries: RouteManifestEntry[] = pageFiles.map((file) => {
     const analysis = analyses.get(file)
     const layoutSrcs = ancestorFiles(routesDir, file, ['_layout.tsx'])
     const middlewareSrcs = ancestorFiles(routesDir, file, ['_middleware.ts', '_middleware.tsx'])
     const chunks = new Set<string>()
     const eagerChunks = new Set<string>()
-    for (const lf of layoutSrcs)
+    const routeStyles = new Set<string>(globalPluginStyles)
+    for (const lf of layoutSrcs) {
       collectRouteIslands(lf, new Set(), chunks, eagerChunks)
+      collectRouteStyles(lf, new Set(), routeStyles)
+    }
     collectRouteIslands(file, new Set(), chunks, eagerChunks)
+    collectRouteStyles(file, new Set(), routeStyles)
 
     let usesRenderContext = collectUsesRenderContext(file)
     if (!usesRenderContext) {
@@ -792,6 +890,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       islandHydrate: analysis?.defaultHydrate,
       islandChunks: [...chunks],
       eagerIslandChunks: [...eagerChunks],
+      styles: [...routeStyles],
       usesRenderContext,
       prerender: analysis?.hasPrerender || options.static === true,
     }
@@ -863,6 +962,14 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         styleSet.add(href)
         styleUrls.push(href)
       }
+      if (!globalStyleSet.has(href)) {
+        globalStyleSet.add(href)
+        globalStyles.push(href)
+      }
+      for (const r of routeEntries) {
+        if (r.styles !== undefined && !r.styles.includes(href))
+          r.styles.push(href)
+      }
     },
     addHead(html) {
       if (html !== '')
@@ -878,6 +985,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const manifest: BuildManifest = {
     runtimeScript,
     styles: styleUrls,
+    globalStyles,
     ...(headTags.length > 0 ? { headTags } : {}),
     routes: routeEntries,
     errorFile: hasErrorFile ? toOutRel(errorSrc) : undefined,
@@ -1000,5 +1108,160 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     })
   }
 
+  if (options.analyze)
+    console.log(formatBundleReport(manifest, clientDir, assetPrefix, clientMetafile))
+
   return manifest
+}
+
+export interface RouteBundleMetrics {
+  path: string
+  jsRaw: number
+  jsGzip: number
+  cssRaw: number
+  cssGzip: number
+  jsFiles: number
+  cssFiles: number
+}
+
+export function analyzeBundleWeights(
+  manifest: BuildManifest,
+  clientDir: string,
+  assetPrefix = '/_kay',
+  metafile?: Bun.BuildOutput['metafile'],
+): { routes: RouteBundleMetrics[], totalJsGzip: number, totalCssGzip: number, topModules: { path: string, bytes: number }[] } {
+  const prefix = `${assetPrefix.replace(/\/$/, '')}/`
+  const sizeCache = new Map<string, { raw: number, gzip: number }>()
+
+  const getSize = (url: string): { raw: number, gzip: number } => {
+    const cached = sizeCache.get(url)
+    if (cached !== undefined)
+      return cached
+    if (!url.startsWith(prefix))
+      return { raw: 0, gzip: 0 }
+    const abs = join(clientDir, url.slice(prefix.length))
+    if (!existsSync(abs))
+      return { raw: 0, gzip: 0 }
+    const buf = readFileSync(abs)
+    const entry = { raw: buf.byteLength, gzip: Bun.gzipSync(buf, { level: 9 }).byteLength }
+    sizeCache.set(url, entry)
+    return entry
+  }
+
+  // Collect transitive JS chunk imports from metafile so eager JS includes shared runtime chunks!
+  const jsDeps = new Map<string, string[]>()
+  const moduleBytes = new Map<string, number>()
+  if (metafile !== undefined) {
+    for (const [outKey, info] of Object.entries(metafile.outputs)) {
+      const rel = outKey.replace(/^\.\//, '')
+      const url = `${prefix}${rel}`
+      if (rel.endsWith('.js')) {
+        const deps: string[] = []
+        for (const imp of info.imports ?? []) {
+          if (imp.kind === 'import-statement')
+            deps.push(`${prefix}${imp.path.replace(/^\.\//, '')}`)
+        }
+        jsDeps.set(url, deps)
+      }
+      for (const [inPath, inInfo] of Object.entries(info.inputs ?? {}))
+        moduleBytes.set(inPath, (moduleBytes.get(inPath) ?? 0) + inInfo.bytesInOutput)
+    }
+  }
+
+  const collectTransitiveJs = (urls: readonly string[]): Set<string> => {
+    const seen = new Set<string>()
+    const stack = [...urls]
+    while (stack.length > 0) {
+      const cur = stack.pop()!
+      if (seen.has(cur))
+        continue
+      seen.add(cur)
+      for (const dep of jsDeps.get(cur) ?? [])
+        stack.push(dep)
+    }
+    return seen
+  }
+
+  const routes: RouteBundleMetrics[] = manifest.routes.map((r) => {
+    const eagerJsRoots: string[] = []
+    if (r.islandChunks.length > 0 && manifest.runtimeScript !== undefined)
+      eagerJsRoots.push(manifest.runtimeScript)
+    for (const c of r.eagerIslandChunks ?? r.islandChunks)
+      eagerJsRoots.push(c)
+
+    const jsSet = collectTransitiveJs(eagerJsRoots)
+    let jsRaw = 0
+    let jsGzip = 0
+    for (const u of jsSet) {
+      const s = getSize(u)
+      jsRaw += s.raw
+      jsGzip += s.gzip
+    }
+
+    const cssList = r.styles ?? manifest.styles
+    let cssRaw = 0
+    let cssGzip = 0
+    for (const u of cssList) {
+      const s = getSize(u)
+      cssRaw += s.raw
+      cssGzip += s.gzip
+    }
+
+    return {
+      path: r.path,
+      jsRaw,
+      jsGzip,
+      cssRaw,
+      cssGzip,
+      jsFiles: jsSet.size,
+      cssFiles: cssList.length,
+    }
+  })
+
+  let totalJsGzip = 0
+  let totalCssGzip = 0
+  for (const rel of manifest.assets) {
+    const s = getSize(`${prefix}${rel}`)
+    if (rel.endsWith('.js'))
+      totalJsGzip += s.gzip
+    else if (rel.endsWith('.css'))
+      totalCssGzip += s.gzip
+  }
+
+  const topModules = [...moduleBytes.entries()]
+    .map(([path, bytes]) => ({ path, bytes }))
+    .sort((a, b) => b.bytes - a.bytes)
+    .slice(0, 10)
+
+  return { routes, totalJsGzip, totalCssGzip, topModules }
+}
+
+export function formatBundleReport(
+  manifest: BuildManifest,
+  clientDir: string,
+  assetPrefix = '/_kay',
+  metafile?: Bun.BuildOutput['metafile'],
+): string {
+  const report = analyzeBundleWeights(manifest, clientDir, assetPrefix, metafile)
+  const kb = (b: number) => `${(b / 1024).toFixed(2)} KB`
+  const lines = [
+    '\n=== KAY BUNDLE WEIGHT REPORT ===',
+    `Total emitted: JS ${kb(report.totalJsGzip)} gz | CSS ${kb(report.totalCssGzip)} gz`,
+    '',
+    'Route'.padEnd(28) + 'Eager JS (gz)'.padStart(16) + 'CSS (gz)'.padStart(14) + 'Files'.padStart(10),
+  ]
+  for (const r of report.routes) {
+    lines.push(
+      r.path.padEnd(28)
+      + kb(r.jsGzip).padStart(16)
+      + kb(r.cssGzip).padStart(14)
+      + `${r.jsFiles}j/${r.cssFiles}c`.padStart(10),
+    )
+  }
+  if (report.topModules.length > 0) {
+    lines.push('', 'Top modules (minified output bytes):')
+    for (const m of report.topModules.slice(0, 8))
+      lines.push(`  ${kb(m.bytes).padStart(9)}  ${m.path}`)
+  }
+  return lines.join('\n')
 }

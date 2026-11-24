@@ -306,13 +306,13 @@ describe('Kay v2 Milestone 2 full-stack features', () => {
     expect(errHtml).toContain('Oops')
     expect(errHtml).toContain('kaboom!')
 
-    // 6. Streaming <Suspense>
+    // 6. Streaming <Suspense> (inline-free strict-CSP swap via <kay-s> + <template data-ks>)
     const streamRes = await app.get('/stream')
     expect(streamRes.status).toBe(200)
     const streamHtml = await streamRes.text()
-    expect(streamHtml).toContain('<div id="k-s-0" style="display:contents"><p class="fallback">Loading...</p></div>')
-    expect(streamHtml).toContain('<template id="k-p-0"><p class="loaded">Streamed content ready!</p></template>')
-    expect(streamHtml).toContain('replaceWith(t.content)')
+    expect(streamHtml).toContain('<kay-s id="k-s-0"><p class="fallback">Loading...</p></kay-s>')
+    expect(streamHtml).toContain('<template data-ks="0"><p class="loaded">Streamed content ready!</p></template>')
+    expect(streamHtml).toContain('s.replaceWith(n.content)')
 
     // 7. Unified Standard-Schema action(): SSR <form action>, FormData validation, RPC JSON, CSRF block, client stub stripping!
     const notesRes = await app.get('/notes')
