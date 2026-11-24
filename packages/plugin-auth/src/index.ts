@@ -1,11 +1,11 @@
 // @kayjs/auth — Zero-dependency Bun-native authentication plugin for Kay v2.
 // Built strictly on the public KayPlugin API (`api.use` + `api.route`).
-// Supports Argon2id passwords, hashed DB sessions with sliding renewal, magic links,
-// OAuth 2.0 + PKCE (S256), role/route guards, and in-memory or `bun:sqlite` stores.
+// Supports Argon2id passwords, hashed DB sessions with sliding renewal, email verification,
+// magic links, OAuth 2.0 + PKCE (S256), role/route guards, RGPD helpers, and memory or `bun:sqlite` stores.
 
 import type { KayPlugin, Middleware, RequestContext } from 'kay/server'
 import type { OAuthProvider } from './oauth'
-import type { AuthSession, AuthStore, AuthUser, PublicUser } from './store'
+import type { AuthSession, AuthStore, AuthUser, PublicUser, UserExport } from './store'
 import { verifyOrigin } from 'kay/server'
 import {
   hashPassword,
@@ -23,11 +23,14 @@ export { safeRedirect } from './crypto'
 export { discord, github, google, oauthProvider } from './oauth'
 export type { OAuthPresetConfig, OAuthProfile, OAuthProvider } from './oauth'
 export { memoryAuthStore, normalizeEmail, toPublicUser } from './store'
-export type { AuthSession, AuthStore, AuthUser, OAuthAccount, PublicUser, TokenKind, VerificationToken } from './store'
+export type { AuthSession, AuthStore, AuthUser, OAuthAccount, PublicUser, TokenKind, UserExport, VerificationToken } from './store'
 
 const NODE_ENV_KEY = 'NODE_ENV'
 const runtimeNodeEnv = (): string | undefined => process.env[NODE_ENV_KEY]
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+const DEFAULT_PRUNE_INTERVAL_MS = 15 * 60 * 1000
+const DEFAULT_RATE_LIMIT_MAX_KEYS = 10_000
+const MIN_PROD_SECRET_BYTES = 32
 
 // Mailed links and OAuth callbacks start with `site`, so anything but an http(s) origin is a config mistake.
 function siteOrigin(value: string): string {
@@ -51,12 +54,24 @@ export interface RateLimitOptions {
   max?: number | undefined
   /** Window duration in ms (default: 60_000). */
   windowMs?: number | undefined
+  /** Maximum distinct keys kept in memory before evicting oldest entries (default: 10_000). */
+  maxKeys?: number | undefined
+}
+
+export interface RateLimiter {
+  allow(key: string): boolean
+  sweep(now?: number): number
+  size(): number
 }
 
 export interface AuthOptions {
   /** Storage adapter (defaults to `memoryAuthStore()`). Use `sqliteAuthStore()` for production SQLite. */
   store?: AuthStore | undefined
-  /** Secret used to sign short-lived OAuth state/PKCE cookies. Defaults to `AUTH_SECRET` env or random per-process key. */
+  /**
+   * Secret used to sign short-lived OAuth state/PKCE cookies.
+   * Defaults to `AUTH_SECRET` env, or a random per-process key in development.
+   * In `NODE_ENV=production`, a non-empty secret of at least 32 UTF-8 bytes is required.
+   */
   secret?: string | undefined
   /** Route prefix (default: '/auth'). */
   basePath?: string | undefined
@@ -74,14 +89,35 @@ export interface AuthOptions {
   defaultRedirect?: string | undefined
   /** Trusted cross-origin origins allowed to POST to auth routes. */
   trustedOrigins?: string[] | undefined
-  /** Public origin of the site (`https://example.com`), used to build mailed sign-in links and OAuth callbacks. Without it, links are only built for a loopback host. */
+  /** Public origin of the site (`https://example.com`), used to build mailed sign-in/verification links and OAuth callbacks. Without it, links are only built for a loopback host. */
   site?: string | undefined
   /** OAuth 2.0 providers (e.g. `[github(...), discord(...), google(...)]`). */
   providers?: OAuthProvider[] | undefined
   /** Mail sender for magic links / verification emails (wires cleanly to `@kayjs/mail`). */
   sendMail?: ((mail: AuthMailPayload) => void | Promise<void>) | undefined
-  /** Optional per-key rate limit on sensitive auth POSTs (`false` disables). */
+  /**
+   * Require email verification before opening a session on password sign-up / sign-in (default: `true`).
+   * Set explicitly to `false` only when you intentionally allow unverified password sessions (e.g. local dev without mail).
+   */
+  requireEmailVerification?: boolean | undefined
+  /**
+   * Trust `X-Forwarded-For` / `X-Real-IP` headers as a fallback when `ctx.ip` is not populated by the server (default: `false`).
+   * When `ctx.ip` is provided by Kay's `trustProxy`-aware server, `ctx.ip` is always used.
+   */
+  trustProxy?: boolean | undefined
+  /** Optional per-key rate limit on auth endpoints (`false` disables). */
   rateLimit?: RateLimitOptions | false | undefined
+  /** Periodic interval in ms to purge expired sessions, tokens, and rate-limit buckets (default: 15 minutes; `false` disables). */
+  pruneIntervalMs?: number | false | undefined
+  /**
+   * Control recording of client IP addresses on sessions (RGPD data minimization):
+   * - `true`: store full client IP (default)
+   * - `'truncate'`: anonymize IPv4 to /24 (`a.b.c.0`) and IPv6 to /48 (`a:b:c::`)
+   * - `false`: do not record IP on sessions
+   */
+  storeIp?: boolean | 'truncate' | undefined
+  /** Whether to record the `User-Agent` header on sessions (default: `true`). */
+  storeUserAgent?: boolean | undefined
 }
 
 export interface GuardOptions {
@@ -105,6 +141,12 @@ export interface Auth {
   signOut(ctx: RequestContext): Promise<void>
   revokeAllSessions(userId: string): Promise<void>
   sendMagicLink(email: string, origin: string, redirectTo?: string): Promise<string>
+  sendVerificationEmail(email: string, origin: string, redirectTo?: string): Promise<string>
+  listSessions(userId: string): Promise<AuthSession[]>
+  exportUser(userId: string): Promise<UserExport | null>
+  deleteUser(userId: string): Promise<void>
+  pruneExpired(): Promise<void>
+  dispose(): void
 }
 
 interface OAuthStateCookie {
@@ -150,34 +192,122 @@ function isValidEmail(email: string): boolean {
   return at > 0 && at === e.lastIndexOf('@') && e.indexOf('.', at + 2) > at + 1 && !/\s/.test(e)
 }
 
-function clientIp(req: Request): string {
-  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    || req.headers.get('x-real-ip')?.trim()
-    || 'local'
+function resolveClientIp(ctx: RequestContext, trustProxy: boolean): string {
+  const ctxIp = (ctx as { ip?: string | undefined }).ip?.trim()
+  if (ctxIp)
+    return ctxIp
+  if (trustProxy) {
+    const forwarded = ctx.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || ctx.request.headers.get('x-real-ip')?.trim()
+    if (forwarded)
+      return forwarded
+  }
+  return 'unknown'
 }
 
-function createRateLimiter(opts: RateLimitOptions | false | undefined): (key: string) => boolean {
-  if (opts === false)
-    return () => true
+function formatSessionIp(ip: string, mode: boolean | 'truncate'): string | undefined {
+  if (mode === false || ip === 'unknown')
+    return undefined
+  if (mode === true)
+    return ip
+  // Truncate mode: IPv4 -> /24, IPv4-mapped IPv6 -> /120, IPv6 -> /48
+  const v4 = /^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/.exec(ip)
+  if (v4)
+    return `${v4[1]}.0`
+  const v4Mapped = /^(::ffff:\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/i.exec(ip)
+  if (v4Mapped)
+    return `${v4Mapped[1]}.0`
+  if (ip.includes(':')) {
+    const [head = '', tail = ''] = ip.split('::')
+    const headParts = head ? head.split(':').filter(Boolean) : []
+    const tailParts = ip.includes('::') && tail ? tail.split(':').filter(Boolean) : []
+    const full = ip.includes('::')
+      ? [...headParts, ...Array.from({ length: Math.max(0, 8 - headParts.length - tailParts.length) }, () => '0'), ...tailParts]
+      : headParts
+    if (full.length >= 3)
+      return `${full.slice(0, 3).join(':')}::`
+  }
+  return undefined
+}
+
+export function createRateLimiter(opts: RateLimitOptions | false | undefined): RateLimiter {
+  if (opts === false) {
+    return {
+      allow: () => true,
+      sweep: () => 0,
+      size: () => 0,
+    }
+  }
   const max = opts?.max ?? 15
   const windowMs = opts?.windowMs ?? 60_000
+  const maxKeys = Math.max(1, opts?.maxKeys ?? DEFAULT_RATE_LIMIT_MAX_KEYS)
   const hits = new Map<string, number[]>()
+  let lastSweep = Date.now()
 
-  return (key: string): boolean => {
-    const now = Date.now()
+  function sweep(now = Date.now()): number {
     const cutoff = now - windowMs
-    const list = (hits.get(key) ?? []).filter(t => t > cutoff)
-    if (list.length >= max) {
-      hits.set(key, list)
-      return false
+    let removed = 0
+    for (const [k, list] of hits) {
+      const fresh = list.filter(t => t > cutoff)
+      if (fresh.length === 0) {
+        hits.delete(k)
+        removed++
+      }
+      else if (fresh.length !== list.length) {
+        hits.set(k, fresh)
+      }
     }
-    list.push(now)
-    hits.set(key, list)
-    return true
+    lastSweep = now
+    return removed
+  }
+
+  return {
+    sweep,
+    size: () => hits.size,
+    allow(key: string): boolean {
+      const now = Date.now()
+      const cutoff = now - windowMs
+
+      if (now - lastSweep >= windowMs || hits.size >= maxKeys)
+        sweep(now)
+
+      const existing = hits.get(key)
+      const list = existing ? existing.filter(t => t > cutoff) : []
+      if (list.length >= max) {
+        hits.delete(key)
+        hits.set(key, list)
+        return false
+      }
+      list.push(now)
+      hits.delete(key)
+      hits.set(key, list)
+
+      if (hits.size > maxKeys) {
+        for (const oldest of hits.keys()) {
+          if (hits.size <= maxKeys)
+            break
+          hits.delete(oldest)
+        }
+      }
+      return true
+    },
   }
 }
 
 export function createAuth(options: AuthOptions = {}): Auth {
+  if (options.secret !== undefined && options.secret.trim().length === 0)
+    throw new Error('[kay/auth] `secret` must not be empty')
+
+  const envSecret = process.env.AUTH_SECRET
+  const configuredSecret = options.secret ?? (envSecret && envSecret.trim().length > 0 ? envSecret : undefined)
+  if (runtimeNodeEnv() === 'production') {
+    if (configuredSecret === undefined)
+      throw new Error('[kay/auth] `secret` (or `AUTH_SECRET` env) is required in production and must be at least 32 bytes')
+    if (Buffer.byteLength(configuredSecret, 'utf8') < MIN_PROD_SECRET_BYTES)
+      throw new Error(`[kay/auth] \`secret\` must be at least ${MIN_PROD_SECRET_BYTES} UTF-8 bytes in production`)
+  }
+  const secret = configuredSecret ?? randomToken(32)
+
   const store = options.store ?? memoryAuthStore()
   const basePath = (options.basePath ?? '/auth').replace(/\/$/, '')
   const cookieName = options.cookieName ?? 'kay_session'
@@ -188,9 +318,30 @@ export function createAuth(options: AuthOptions = {}): Auth {
   const defaultRole = options.defaultRole ?? 'user'
   const defaultRedirect = options.defaultRedirect ?? '/'
   const trustedOrigins = options.trustedOrigins ? new Set(options.trustedOrigins) : undefined
-  const secret = options.secret ?? process.env.AUTH_SECRET ?? randomToken(32)
   const site = options.site !== undefined ? siteOrigin(options.site) : undefined
-  const allowRate = createRateLimiter(options.rateLimit)
+  const requireEmailVerification = options.requireEmailVerification !== false
+  const trustProxy = options.trustProxy === true
+  const storeIp = options.storeIp ?? true
+  const storeUserAgent = options.storeUserAgent !== false
+  const rateLimiter = createRateLimiter(options.rateLimit)
+
+  const pruneIntervalMs = options.pruneIntervalMs === false
+    ? undefined
+    : (options.pruneIntervalMs ?? DEFAULT_PRUNE_INTERVAL_MS)
+
+  let pruneTimer: ReturnType<typeof setInterval> | undefined
+  if (pruneIntervalMs !== undefined && pruneIntervalMs > 0) {
+    pruneTimer = setInterval(() => {
+      try {
+        void Promise.resolve(store.pruneExpired?.()).catch(() => {})
+        rateLimiter.sweep()
+      }
+      catch {
+        // Ignore prune errors if the underlying store has been closed
+      }
+    }, pruneIntervalMs)
+    pruneTimer.unref?.()
+  }
 
   const providers = new Map<string, OAuthProvider>()
   for (const p of options.providers ?? [])
@@ -198,7 +349,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
 
   const isSecureCookie = (ctx: RequestContext): boolean =>
     ctx.url.protocol === 'https:'
-    || ctx.request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() === 'https'
+    || (trustProxy && ctx.request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() === 'https')
     || runtimeNodeEnv() === 'production'
 
   async function resolveRequestSession(ctx: RequestContext): Promise<{ user: PublicUser, session: AuthSession } | undefined> {
@@ -250,13 +401,15 @@ export function createAuth(options: AuthOptions = {}): Auth {
   async function createSessionForUser(userId: string, ctx: RequestContext): Promise<AuthSession> {
     const rawToken = randomToken(32)
     const now = Date.now()
+    const recordedIp = formatSessionIp(resolveClientIp(ctx, trustProxy), storeIp)
+    const recordedUa = storeUserAgent ? (ctx.request.headers.get('user-agent') ?? undefined) : undefined
     const session: AuthSession = {
       id: sha256Hex(rawToken),
       userId,
       createdAt: now,
       expiresAt: now + sessionTtlMs,
-      userAgent: ctx.request.headers.get('user-agent') ?? undefined,
-      ip: clientIp(ctx.request),
+      ...(recordedUa !== undefined ? { userAgent: recordedUa } : {}),
+      ...(recordedIp !== undefined ? { ip: recordedIp } : {}),
     }
     await store.createSession(session)
     ctx.cookies.set(cookieName, rawToken, {
@@ -323,6 +476,40 @@ export function createAuth(options: AuthOptions = {}): Auth {
     return claimed
   }
 
+  async function issueVerificationToken(userId: string | undefined, email: string, origin: string | undefined, redirectTo?: string): Promise<string> {
+    const normalized = normalizeEmail(email)
+    const rawToken = randomToken(32)
+    await store.createToken({
+      tokenHash: sha256Hex(rawToken),
+      ...(userId !== undefined ? { userId } : {}),
+      email: normalized,
+      kind: 'verify-email',
+      expiresAt: Date.now() + tokenTtlMs,
+    })
+
+    const next = safeRedirect(redirectTo, defaultRedirect)
+    const path = `${basePath}/verify-email?token=${encodeURIComponent(rawToken)}&redirect=${encodeURIComponent(next)}`
+    const url = origin !== undefined ? `${origin.replace(/\/$/, '')}${path}` : path
+
+    if (options.sendMail && origin !== undefined) {
+      await options.sendMail({
+        to: normalized,
+        subject: 'Verify your email address',
+        text: `Confirm your email address using this one-time link: ${url}`,
+        html: `<p>Click to verify your email address: <a href="${url}">Verify email</a></p>`,
+        url,
+        kind: 'verify-email',
+      })
+    }
+    return url
+  }
+
+  async function sendVerificationEmail(email: string, origin: string, redirectTo?: string): Promise<string> {
+    const normalized = normalizeEmail(email)
+    const existing = await store.getUserByEmail(normalized)
+    return issueVerificationToken(existing?.id, normalized, origin, redirectTo)
+  }
+
   async function sendMagicLink(email: string, origin: string, redirectTo?: string): Promise<string> {
     const normalized = normalizeEmail(email)
     const rawToken = randomToken(32)
@@ -378,6 +565,30 @@ export function createAuth(options: AuthOptions = {}): Auth {
     }
   }
 
+  async function handleVerifyEmail(ctx: RequestContext, rawToken: string, redirectTarget: string, redirectStatus: 302 | 303): Promise<Response> {
+    if (!rawToken)
+      return ctx.json({ ok: false, error: 'Missing token' }, { status: 400 })
+
+    const consumed = await store.consumeToken(sha256Hex(rawToken), 'verify-email')
+    if (!consumed)
+      return ctx.json({ ok: false, error: 'Invalid or expired verification link' }, { status: 400 })
+
+    const userRecord: AuthUser | undefined = consumed.userId
+      ? await store.getUserById(consumed.userId)
+      : await store.getUserByEmail(consumed.email)
+    if (!userRecord)
+      return ctx.json({ ok: false, error: 'Invalid or expired verification link' }, { status: 400 })
+
+    const verified = (await store.updateUser(userRecord.id, { emailVerified: true })) ?? { ...userRecord, emailVerified: true }
+    await createSessionForUser(verified.id, ctx)
+    const pub = toPublicUser(verified)
+    ctx.locals.user = pub
+
+    if (wantsJson(ctx.request))
+      return ctx.json({ ok: true, user: pub }, { status: 200 })
+    return ctx.redirect(redirectTarget, redirectStatus)
+  }
+
   const plugin: KayPlugin = {
     name: '@kayjs/auth',
     server(api) {
@@ -396,11 +607,12 @@ export function createAuth(options: AuthOptions = {}): Auth {
       })
 
       api.route('POST', `${basePath}/signup`, async (ctx) => {
-        const originCheck = verifyOrigin(ctx.request, trustedOrigins)
+        const originCheck = verifyOrigin(ctx.request, trustedOrigins, trustProxy)
         if (!originCheck.ok)
           return ctx.json({ ok: false, error: originCheck.reason }, { status: 403 })
 
-        if (!allowRate(`signup:${clientIp(ctx.request)}`))
+        const ip = resolveClientIp(ctx, trustProxy)
+        if (!rateLimiter.allow(`signup:ip:${ip}`))
           return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
 
         let body: Record<string, string>
@@ -412,6 +624,9 @@ export function createAuth(options: AuthOptions = {}): Auth {
         }
 
         const email = normalizeEmail(body.email ?? '')
+        if (email && !rateLimiter.allow(`signup:email:${email}`))
+          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+
         const password = body.password ?? ''
         const name = body.name?.trim() || undefined
         const redirectTarget = safeRedirect(body.redirect ?? body.next, defaultRedirect)
@@ -423,6 +638,20 @@ export function createAuth(options: AuthOptions = {}): Auth {
         if (await store.getUserByEmail(email))
           return respondAuthError(ctx, 409, 'An account with this email already exists')
 
+        if (requireEmailVerification) {
+          const linkOrigin = mailedLinkOrigin(ctx.url)
+          if (options.sendMail && linkOrigin === undefined) {
+            console.error(`[kay/auth] refusing to mail a verification link for host ${ctx.url.host}: set the auth \`site\` option to the public origin`)
+            return ctx.json({ ok: false, error: 'Verification links are not configured' }, { status: 500 })
+          }
+          const user = await createUser({ email, password, name, emailVerified: false })
+          await issueVerificationToken(user.id, user.email, linkOrigin, redirectTarget)
+
+          if (wantsJson(ctx.request))
+            return ctx.json({ ok: true, verificationRequired: true, user }, { status: 202 })
+          return ctx.redirect(redirectTarget, 303)
+        }
+
         const user = await createUser({ email, password, name })
         await createSessionForUser(user.id, ctx)
         ctx.locals.user = user
@@ -432,12 +661,45 @@ export function createAuth(options: AuthOptions = {}): Auth {
         return ctx.redirect(redirectTarget, 303)
       })
 
-      api.route('POST', `${basePath}/signin`, async (ctx) => {
-        const originCheck = verifyOrigin(ctx.request, trustedOrigins)
+      api.route('GET', `${basePath}/verify-email`, async (ctx) => {
+        const ip = resolveClientIp(ctx, trustProxy)
+        if (!rateLimiter.allow(`verify-email:ip:${ip}`))
+          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+
+        const rawToken = ctx.url.searchParams.get('token') ?? ''
+        const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect)
+        return handleVerifyEmail(ctx, rawToken, redirectTarget, 302)
+      })
+
+      api.route('POST', `${basePath}/verify-email`, async (ctx) => {
+        const originCheck = verifyOrigin(ctx.request, trustedOrigins, trustProxy)
         if (!originCheck.ok)
           return ctx.json({ ok: false, error: originCheck.reason }, { status: 403 })
 
-        if (!allowRate(`signin:${clientIp(ctx.request)}`))
+        const ip = resolveClientIp(ctx, trustProxy)
+        if (!rateLimiter.allow(`verify-email:ip:${ip}`))
+          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+
+        let body: Record<string, string>
+        try {
+          body = await readBody(ctx.request)
+        }
+        catch {
+          return ctx.json({ ok: false, error: 'Invalid request body' }, { status: 400 })
+        }
+
+        const rawToken = body.token ?? ctx.url.searchParams.get('token') ?? ''
+        const redirectTarget = safeRedirect(body.redirect ?? body.next ?? ctx.url.searchParams.get('redirect'), defaultRedirect)
+        return handleVerifyEmail(ctx, rawToken, redirectTarget, 303)
+      })
+
+      api.route('POST', `${basePath}/signin`, async (ctx) => {
+        const originCheck = verifyOrigin(ctx.request, trustedOrigins, trustProxy)
+        if (!originCheck.ok)
+          return ctx.json({ ok: false, error: originCheck.reason }, { status: 403 })
+
+        const ip = resolveClientIp(ctx, trustProxy)
+        if (!rateLimiter.allow(`signin:ip:${ip}`))
           return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
 
         let body: Record<string, string>
@@ -449,6 +711,9 @@ export function createAuth(options: AuthOptions = {}): Auth {
         }
 
         const email = normalizeEmail(body.email ?? '')
+        if (email && !rateLimiter.allow(`signin:email:${email}`))
+          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+
         const password = body.password ?? ''
         const redirectTarget = safeRedirect(body.redirect ?? body.next, defaultRedirect)
 
@@ -456,6 +721,9 @@ export function createAuth(options: AuthOptions = {}): Auth {
         const valid = await verifyPassword(password, userRecord?.passwordHash)
         if (!userRecord || !valid)
           return respondAuthError(ctx, 401, 'Invalid email or password')
+
+        if (requireEmailVerification && !userRecord.emailVerified)
+          return respondAuthError(ctx, 403, 'Email not verified')
 
         await createSessionForUser(userRecord.id, ctx)
         const pub = toPublicUser(userRecord)
@@ -467,7 +735,7 @@ export function createAuth(options: AuthOptions = {}): Auth {
       })
 
       api.route('POST', `${basePath}/signout`, async (ctx) => {
-        const originCheck = verifyOrigin(ctx.request, trustedOrigins)
+        const originCheck = verifyOrigin(ctx.request, trustedOrigins, trustProxy)
         if (!originCheck.ok)
           return ctx.json({ ok: false, error: originCheck.reason }, { status: 403 })
 
@@ -478,15 +746,25 @@ export function createAuth(options: AuthOptions = {}): Auth {
       })
 
       api.route('POST', `${basePath}/magic-link`, async (ctx) => {
-        const originCheck = verifyOrigin(ctx.request, trustedOrigins)
+        const originCheck = verifyOrigin(ctx.request, trustedOrigins, trustProxy)
         if (!originCheck.ok)
           return ctx.json({ ok: false, error: originCheck.reason }, { status: 403 })
 
-        if (!allowRate(`magic:${clientIp(ctx.request)}`))
+        const ip = resolveClientIp(ctx, trustProxy)
+        if (!rateLimiter.allow(`magic:ip:${ip}`))
           return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
 
-        const body = await readBody(ctx.request)
+        let body: Record<string, string>
+        try {
+          body = await readBody(ctx.request)
+        }
+        catch {
+          return ctx.json({ ok: false, error: 'Invalid request body' }, { status: 400 })
+        }
+
         const email = normalizeEmail(body.email ?? '')
+        if (email && !rateLimiter.allow(`magic:email:${email}`))
+          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
         if (!isValidEmail(email))
           return ctx.json({ ok: false, error: 'Please enter a valid email address' }, { status: 400 })
 
@@ -500,6 +778,10 @@ export function createAuth(options: AuthOptions = {}): Auth {
       })
 
       api.route('GET', `${basePath}/magic-link/verify`, async (ctx) => {
+        const ip = resolveClientIp(ctx, trustProxy)
+        if (!rateLimiter.allow(`magic-verify:ip:${ip}`))
+          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+
         const rawToken = ctx.url.searchParams.get('token') ?? ''
         const redirectTarget = safeRedirect(ctx.url.searchParams.get('redirect'), defaultRedirect)
         if (!rawToken)
@@ -533,6 +815,10 @@ export function createAuth(options: AuthOptions = {}): Auth {
       })
 
       api.route('GET', `${basePath}/oauth/:provider`, (ctx) => {
+        const ip = resolveClientIp(ctx, trustProxy)
+        if (!rateLimiter.allow(`oauth-start:ip:${ip}`))
+          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+
         const provider = providers.get(ctx.params.provider ?? '')
         if (!provider)
           return ctx.json({ ok: false, error: 'Unknown OAuth provider' }, { status: 404 })
@@ -572,6 +858,10 @@ export function createAuth(options: AuthOptions = {}): Auth {
       })
 
       api.route('GET', `${basePath}/oauth/:provider/callback`, async (ctx) => {
+        const ip = resolveClientIp(ctx, trustProxy)
+        if (!rateLimiter.allow(`oauth-cb:ip:${ip}`))
+          return ctx.json({ ok: false, error: 'Too many requests' }, { status: 429 })
+
         const provider = providers.get(ctx.params.provider ?? '')
         if (!provider)
           return ctx.json({ ok: false, error: 'Unknown OAuth provider' }, { status: 404 })
@@ -679,5 +969,25 @@ export function createAuth(options: AuthOptions = {}): Auth {
       await store.deleteUserSessions(userId)
     },
     sendMagicLink,
+    sendVerificationEmail,
+    async listSessions(userId) {
+      return await store.listSessions(userId)
+    },
+    async exportUser(userId) {
+      return await store.exportUser(userId)
+    },
+    async deleteUser(userId) {
+      await store.deleteUser(userId)
+    },
+    async pruneExpired() {
+      await store.pruneExpired?.()
+      rateLimiter.sweep()
+    },
+    dispose() {
+      if (pruneTimer !== undefined) {
+        clearInterval(pruneTimer)
+        pruneTimer = undefined
+      }
+    },
   }
 }

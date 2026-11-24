@@ -162,18 +162,27 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       const badCsrf = await app.post('/auth/signup', { email: 'a@b.com', password: 'password123' }, { origin: 'https://evil.example' })
       expect(badCsrf.status).toBe(403)
 
-      // 3. Signup with password (Argon2id + SQLite + session cookie)
+      // 3. Signup with password (Argon2id + SQLite) sends verification email without opening a session yet (#3526 box 11)
       const signupRes = await app.post('/auth/signup', {
         email: 'Alice@Example.com',
         password: 'super-secret-password',
         name: 'Alice',
       })
-      expect(signupRes.status).toBe(201)
-      const signupBody = await signupRes.json() as { ok: boolean, user: { email: string, passwordHash?: string } }
+      expect(signupRes.status).toBe(202)
+      const signupBody = await signupRes.json() as { ok: boolean, verificationRequired?: boolean, user: { email: string, passwordHash?: string } }
       expect(signupBody.ok).toBe(true)
+      expect(signupBody.verificationRequired).toBe(true)
       expect(signupBody.user.email).toBe('alice@example.com')
       expect(signupBody.user.passwordHash).toBeUndefined() // never leaked!
+      expect(app.cookies.has('kay_session')).toBe(false)
+
+      // Complete email verification to open Alice's session
+      expect(mail.outbox.length).toBe(1)
+      const aliceVerifyUrl = new URL(mail.outbox[0]!.text!.match(/http:\/\/localhost[^\s]+/)![0])
+      const aliceVerifyRes = await app.get(aliceVerifyUrl.pathname + aliceVerifyUrl.search)
+      expect(aliceVerifyRes.status).toBe(302)
       expect(app.cookies.has('kay_session')).toBe(true)
+      mail.outbox.length = 0
 
       // 4. Dashboard renders with ctx.locals.user & server action sees ctx.locals.user via global middleware!
       const dashRes = await app.get('/dashboard')
@@ -252,10 +261,19 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       expect(foreignHost.status).toBe(500)
       expect(mail.outbox.length).toBe(1)
 
-      // 9c. Proving an address by magic link drops the password and sessions set before the proof (pre-account takeover)
+      // 9c. Proving an address by magic link drops the password and any sessions set before the proof (pre-account takeover)
       app.clearCookies()
-      expect((await app.post('/auth/signup', { email: 'victim@example.com', password: 'attacker-password' })).status).toBe(201)
-      const squatterCookie = app.cookies.get('kay_session')!
+      expect((await app.post('/auth/signup', { email: 'victim@example.com', password: 'attacker-password' })).status).toBe(202)
+      expect(app.cookies.has('kay_session')).toBe(false)
+      const victimUser = await store.getUserByEmail('victim@example.com')
+      let squatterCookie = ''
+      await auth.createSessionForUser(victimUser!.id, {
+        request: new Request('http://localhost/'),
+        url: new URL('http://localhost/'),
+        params: {},
+        locals: {},
+        cookies: { get: () => undefined, set(_n: string, v: string) { squatterCookie = v }, delete() {} },
+      } as never)
       app.clearCookies()
       await app.post('/auth/magic-link', { email: 'victim@example.com' })
       const victimLink = new URL(mail.outbox[0]!.text!.match(/http:\/\/localhost[^\s]+/)![0])
@@ -267,7 +285,7 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
 
       // 10. OAuth 2.0 + PKCE (S256) full round-trip + state tampering rejection, onto an address squatted by password sign-up
       app.clearCookies()
-      expect((await app.post('/auth/signup', { email: 'oauth-user@example.com', password: 'attacker-password', name: 'OAuth User' })).status).toBe(201)
+      expect((await app.post('/auth/signup', { email: 'oauth-user@example.com', password: 'attacker-password', name: 'OAuth User' })).status).toBe(202)
       app.clearCookies()
       const startOAuth = await app.get('/auth/oauth/mock?redirect=/dashboard')
       expect(startOAuth.status).toBe(302)
@@ -390,10 +408,11 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     writeFileSync(join(routesDir, 'index.tsx'), 'export default function Home() { return <main>ok</main> }')
 
     const auth = createAuth({
-      secret: 'rate-limit-test-secret',
+      secret: 'rate-limit-test-secret-32-chars-min',
+      trustProxy: true,
       rateLimit: { max: 2, windowMs: 60_000 },
     })
-    const app = await testApp({ root: appDir, plugins: [auth.plugin] })
+    const app = await testApp({ root: appDir, trustProxy: true, plugins: [auth.plugin] })
 
     const r1 = await app.post('/auth/signin', { email: 'x@y.com', password: 'wrong' })
     const r2 = await app.post('/auth/signin', { email: 'x@y.com', password: 'wrong' })
@@ -402,12 +421,12 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     expect(r2.status).toBe(401)
     expect(r3.status).toBe(429)
 
-    // Reverse proxy HTTPS -> HTTP origin verification works with X-Forwarded-Proto
+    // Reverse proxy HTTPS -> HTTP origin verification works with X-Forwarded-Proto when trustProxy: true
     const proxied = await app.post('/auth/signup', { email: 'proxy@example.com', password: 'password123' }, {
       'origin': 'https://3000.kevyn.fr',
       'x-forwarded-proto': 'https',
       'x-forwarded-host': '3000.kevyn.fr',
     })
-    expect(proxied.status).toBe(201)
+    expect(proxied.status).toBe(202)
   })
 })

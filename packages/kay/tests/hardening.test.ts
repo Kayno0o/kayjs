@@ -406,8 +406,10 @@ describe('Milestone 4: kay new scaffolder & kay check validator', () => {
     expect(reg.status).toBe(303)
     expect(reg.headers.get('location')).toBe('/dashboard')
 
+    // Sign-up does not open a session before email verification (#3526 box 11)
     const dash = await saasApp.get('/dashboard')
-    expect(dash.status).toBe(200)
-    expect(await dash.text()).toContain('founder@my-saas.dev')
+    expect(dash.status).toBe(302)
+    expect(dash.headers.get('location')).toBe('/login?next=%2Fdashboard')
+    expect(existsSync(join(appDir, 'data/auth.sqlite'))).toBe(true)
   })
 })

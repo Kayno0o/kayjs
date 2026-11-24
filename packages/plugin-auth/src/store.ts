@@ -41,13 +41,23 @@ export interface VerificationToken {
   expiresAt: number
 }
 
+export interface UserExport {
+  user: PublicUser
+  sessions: AuthSession[]
+  oauthAccounts: Array<{ provider: string, providerAccountId: string, createdAt: number }>
+  exportedAt: number
+}
+
 export interface AuthStore {
   getUserById(id: string): AuthUser | undefined | Promise<AuthUser | undefined>
   getUserByEmail(email: string): AuthUser | undefined | Promise<AuthUser | undefined>
   createUser(user: AuthUser): AuthUser | Promise<AuthUser>
   updateUser(id: string, patch: Partial<Omit<AuthUser, 'id' | 'createdAt'>>): AuthUser | undefined | Promise<AuthUser | undefined>
+  deleteUser(userId: string): void | Promise<void>
+  exportUser(userId: string): UserExport | null | Promise<UserExport | null>
 
   getSession(tokenHash: string): AuthSession | undefined | Promise<AuthSession | undefined>
+  listSessions(userId: string): AuthSession[] | Promise<AuthSession[]>
   createSession(session: AuthSession): void | Promise<void>
   updateSessionExpiry(tokenHash: string, expiresAt: number): void | Promise<void>
   deleteSession(tokenHash: string): void | Promise<void>
@@ -59,6 +69,8 @@ export interface AuthStore {
 
   createToken(token: VerificationToken): void | Promise<void>
   consumeToken(tokenHash: string, kind: TokenKind): VerificationToken | undefined | Promise<VerificationToken | undefined>
+
+  pruneExpired(): void | Promise<void>
 }
 
 export function normalizeEmail(email: string): string {
@@ -122,6 +134,52 @@ export function memoryAuthStore(id?: string): AuthStore {
       state.users.set(userId, next)
       return next
     },
+    deleteUser(userId) {
+      const cur = state.users.get(userId)
+      state.users.delete(userId)
+      if (cur)
+        state.usersByEmail.delete(cur.email)
+      for (const [k, s] of state.sessions) {
+        if (s.userId === userId)
+          state.sessions.delete(k)
+      }
+      for (const [k, a] of state.oauth) {
+        if (a.userId === userId)
+          state.oauth.delete(k)
+      }
+      for (const [k, t] of state.tokens) {
+        if (t.userId === userId || (cur && t.email === cur.email))
+          state.tokens.delete(k)
+      }
+    },
+    exportUser(userId) {
+      const cur = state.users.get(userId)
+      if (!cur)
+        return null
+      const now = Date.now()
+      const sessions: AuthSession[] = []
+      for (const [k, s] of state.sessions) {
+        if (s.expiresAt <= now) {
+          state.sessions.delete(k)
+          continue
+        }
+        if (s.userId === userId)
+          sessions.push({ ...s })
+      }
+      sessions.sort((a, b) => b.createdAt - a.createdAt)
+      const oauthAccounts: UserExport['oauthAccounts'] = []
+      for (const a of state.oauth.values()) {
+        if (a.userId === userId)
+          oauthAccounts.push({ provider: a.provider, providerAccountId: a.providerAccountId, createdAt: a.createdAt })
+      }
+      oauthAccounts.sort((a, b) => a.createdAt - b.createdAt)
+      return {
+        user: toPublicUser(cur),
+        sessions,
+        oauthAccounts,
+        exportedAt: now,
+      }
+    },
     getSession(tokenHash) {
       const s = state.sessions.get(tokenHash)
       if (!s)
@@ -131,6 +189,20 @@ export function memoryAuthStore(id?: string): AuthStore {
         return undefined
       }
       return s
+    },
+    listSessions(userId) {
+      const now = Date.now()
+      const sessions: AuthSession[] = []
+      for (const [k, s] of state.sessions) {
+        if (s.expiresAt <= now) {
+          state.sessions.delete(k)
+          continue
+        }
+        if (s.userId === userId)
+          sessions.push({ ...s })
+      }
+      sessions.sort((a, b) => b.createdAt - a.createdAt)
+      return sessions
     },
     createSession(session) {
       state.sessions.set(session.id, session)
@@ -172,6 +244,17 @@ export function memoryAuthStore(id?: string): AuthStore {
       if (tok.expiresAt <= Date.now())
         return undefined
       return tok
+    },
+    pruneExpired() {
+      const now = Date.now()
+      for (const [k, s] of state.sessions) {
+        if (s.expiresAt <= now)
+          state.sessions.delete(k)
+      }
+      for (const [k, t] of state.tokens) {
+        if (t.expiresAt <= now)
+          state.tokens.delete(k)
+      }
     },
   }
 }

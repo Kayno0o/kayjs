@@ -1,9 +1,11 @@
 // Zero-dependency production SQLite AuthStore built natively on `bun:sqlite`.
 // Works out-of-the-box in single-binary `kay build --compile` deployments.
 
-import type { AuthSession, AuthStore, AuthUser, OAuthAccount, TokenKind, VerificationToken } from './store'
+import type { AuthSession, AuthStore, AuthUser, OAuthAccount, TokenKind, UserExport, VerificationToken } from './store'
+import { mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { normalizeEmail } from './store'
+import { normalizeEmail, toPublicUser } from './store'
 
 interface UserRow {
   id: string
@@ -70,7 +72,9 @@ function rowToSession(row: SessionRow | null): AuthSession | undefined {
   }
 }
 
-export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthStore & { readonly db: Database, pruneExpired(): void } {
+export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthStore & { readonly db: Database } {
+  if (typeof dbOrPath === 'string' && dbOrPath !== ':memory:' && !dbOrPath.startsWith('file:'))
+    mkdirSync(dirname(dbOrPath), { recursive: true })
   const db = typeof dbOrPath === 'string' ? new Database(dbOrPath, { create: true }) : dbOrPath
 
   db.exec(`
@@ -98,6 +102,7 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
       ip TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_kay_auth_sessions_user ON kay_auth_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_kay_auth_sessions_exp ON kay_auth_sessions(expires_at);
 
     CREATE TABLE IF NOT EXISTS kay_auth_oauth (
       provider TEXT NOT NULL,
@@ -106,6 +111,7 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
       created_at INTEGER NOT NULL,
       PRIMARY KEY (provider, provider_account_id)
     );
+    CREATE INDEX IF NOT EXISTS idx_kay_auth_oauth_user ON kay_auth_oauth(user_id);
 
     CREATE TABLE IF NOT EXISTS kay_auth_tokens (
       token_hash TEXT PRIMARY KEY,
@@ -114,6 +120,7 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
       kind TEXT NOT NULL,
       expires_at INTEGER NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_kay_auth_tokens_exp ON kay_auth_tokens(expires_at);
   `)
 
   const qUserById = db.query<UserRow, [string]>('SELECT * FROM kay_auth_users WHERE id = ?')
@@ -124,8 +131,12 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
   const qUpdateUser = db.query<null, [string, string | null, string | null, string, number, string | null, number, string]>(
     'UPDATE kay_auth_users SET email = ?, name = ?, avatar_url = ?, role = ?, email_verified = ?, password_hash = ?, updated_at = ? WHERE id = ?',
   )
+  const qDelUser = db.query<null, [string]>('DELETE FROM kay_auth_users WHERE id = ?')
 
   const qGetSession = db.query<SessionRow, [string]>('SELECT * FROM kay_auth_sessions WHERE id = ?')
+  const qListUserSessions = db.query<SessionRow, [string, number]>(
+    'SELECT * FROM kay_auth_sessions WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC',
+  )
   const qInsertSession = db.query<null, [string, string, number, number, string | null, string | null]>(
     'INSERT INTO kay_auth_sessions (id, user_id, expires_at, created_at, user_agent, ip) VALUES (?, ?, ?, ?, ?, ?)',
   )
@@ -134,6 +145,7 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
   const qDelUserSessions = db.query<null, [string]>('DELETE FROM kay_auth_sessions WHERE user_id = ?')
 
   const qGetOAuth = db.query<OAuthRow, [string, string]>('SELECT * FROM kay_auth_oauth WHERE provider = ? AND provider_account_id = ?')
+  const qListUserOAuth = db.query<OAuthRow, [string]>('SELECT * FROM kay_auth_oauth WHERE user_id = ? ORDER BY created_at ASC')
   const qLinkOAuth = db.query<null, [string, string, string, number]>(
     'INSERT OR REPLACE INTO kay_auth_oauth (provider, provider_account_id, user_id, created_at) VALUES (?, ?, ?, ?)',
   )
@@ -144,6 +156,22 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
   )
   const qGetToken = db.query<TokenRow, [string, TokenKind]>('SELECT * FROM kay_auth_tokens WHERE token_hash = ? AND kind = ?')
   const qDelToken = db.query<null, [string]>('DELETE FROM kay_auth_tokens WHERE token_hash = ?')
+  const qDelUserTokens = db.query<null, [string]>('DELETE FROM kay_auth_tokens WHERE user_id = ?')
+  const qDelEmailTokens = db.query<null, [string]>('DELETE FROM kay_auth_tokens WHERE email = ?')
+
+  const delUserTx = db.transaction((userId: string) => {
+    const user = qUserById.get(userId)
+    qDelUserSessions.run(userId)
+    qDelUserOAuth.run(userId)
+    qDelUserTokens.run(userId)
+    if (user)
+      qDelEmailTokens.run(user.email)
+    qDelUser.run(userId)
+  })
+
+  function listActiveSessions(userId: string, now = Date.now()): AuthSession[] {
+    return qListUserSessions.all(userId, now).map(row => rowToSession(row)!)
+  }
 
   return {
     db,
@@ -195,6 +223,27 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
       )
       return next
     },
+    deleteUser(userId) {
+      delUserTx(userId)
+    },
+    exportUser(userId): UserExport | null {
+      const user = rowToUser(qUserById.get(userId))
+      if (!user)
+        return null
+      const now = Date.now()
+      const sessions = listActiveSessions(userId, now)
+      const oauthAccounts = qListUserOAuth.all(userId).map(r => ({
+        provider: r.provider,
+        providerAccountId: r.provider_account_id,
+        createdAt: r.created_at,
+      }))
+      return {
+        user: toPublicUser(user),
+        sessions,
+        oauthAccounts,
+        exportedAt: now,
+      }
+    },
     getSession(tokenHash) {
       const s = rowToSession(qGetSession.get(tokenHash))
       if (!s)
@@ -204,6 +253,9 @@ export function sqliteAuthStore(dbOrPath: string | Database = ':memory:'): AuthS
         return undefined
       }
       return s
+    },
+    listSessions(userId) {
+      return listActiveSessions(userId)
     },
     createSession(session) {
       qInsertSession.run(session.id, session.userId, session.expiresAt, session.createdAt, session.userAgent ?? null, session.ip ?? null)
