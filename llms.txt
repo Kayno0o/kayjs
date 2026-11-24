@@ -28,6 +28,7 @@
     - `@kayjs/auth`: Argon2id passwords, hashed DB sessions, magic links, OAuth 2.0 + PKCE (`github()`, `discord()`, `google()`, `oauthProvider()`), `auth.guard()`, per-IP rate limiting, `memoryAuthStore()` & `sqliteAuthStore()` (`bun:sqlite`).
     - `@kayjs/content`: Zero-dep `Bun.markdown` + `Bun.YAML` nested frontmatter + Standard Schema, lazy memoized Markdown rendering + O(1) `get(slug)`, `highlight(code, lang)` hook (Shiki-ready), MDX-lite embedded TSX `components`, `headingLinks`, `resolveImage`, localized collections (`localized: true`), TOC, and RSS feeds (`contentPlugin`).
     - `@kayjs/live`: Typed SSE rooms (`createRooms`), microtask-coalesced presence (`coalesce`), `useLive()` browser signal hook.
+    - `@kayjs/mcp`: Opt-in MCP Streamable HTTP (`2025-03-26`) plugin exposing typed `action()` handlers & Standard JSON Schema tools at `/mcp/tools` with bearer auth (inline / env / key file; `404` unconfigured, `401` invalid).
     - `@kayjs/images`: Build-time AVIF/WebP pipeline + disk cache (`images()`, `image()`, `<Picture>`, `optimizeImageFile()`) + 1200×630 OG PNG `shareCard()`.
     - `@kayjs/seo`: `titleTemplate`, localized `description`, multi-favicon, OG/Twitter/JSON-LD, `sitemap.xml` (`extraUrls`), redirects, self-hosted fonts (`@fontsource/*`).
     - `@kayjs/i18n`: Locale URL rewriting, `<html lang>` + internal link prefixing, automatic `prerenderPaths` expansion, `hreflang` alternates, `localizePath()`, `formatDate()`, `formatNumber()`.

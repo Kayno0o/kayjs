@@ -73,6 +73,13 @@
         "kay": "^2.0.0-alpha.4",
       },
     },
+    "packages/plugin-mcp": {
+      "name": "@kayjs/mcp",
+      "version": "2.0.0-alpha.4",
+      "peerDependencies": {
+        "kay": "^2.0.0-alpha.4",
+      },
+    },
     "packages/plugin-seo": {
       "name": "@kayjs/seo",
       "version": "2.0.0-alpha.4",
@@ -120,6 +127,8 @@
     "@kayjs/live": ["@kayjs/live@workspace:packages/plugin-live"],
 
     "@kayjs/mail": ["@kayjs/mail@workspace:packages/plugin-mail"],
+
+    "@kayjs/mcp": ["@kayjs/mcp@workspace:packages/plugin-mcp"],
 
     "@kayjs/seo": ["@kayjs/seo@workspace:packages/plugin-seo"],
 
