@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/mail",
-  "version": "2.0.0-alpha.4",
+  "version": "2.0.0-alpha.5",
   "description": "Zero-dependency email delivery (Resend / custom transport) and dev outbox plugin for Kay v2",
   "license": "MIT",
   "type": "module",
@@ -20,6 +20,6 @@
     "directory": "packages/plugin-mail"
   },
   "peerDependencies": {
-    "kay": "^2.0.0-alpha.4"
+    "kay": "^2.0.0-alpha.5"
   }
 }
