@@ -2,7 +2,7 @@
 // LIS minimal DOM moves (swap = 2 moves), and O(1) parent.textContent = '' clear.
 
 import type { Owner, Signal } from '../reactivity/index'
-import { createOwner, disposeOwner, effect, getOwner, runWithOwner, signal, untrack } from '../reactivity/index'
+import { createOwner, disposeOwner, effect, getOwner, onCleanup, runWithOwner, signal, untrack } from '../reactivity/index'
 import { claimLoop } from './index'
 
 interface Row<T> {
@@ -27,6 +27,11 @@ export function loop<T>(
   const parentOwner = getOwner()
   const needsIndex = renderRow.length >= 2
   let rows: Row<T>[] = []
+  if (parentOwner !== undefined) {
+    onCleanup(() => {
+      rows = []
+    })
+  }
 
   const makeRow = (itemVal: T, idx: number, key: unknown): Row<T> => {
     const owner = createOwner(parentOwner)

@@ -35,7 +35,7 @@ function getDep(target: object, key: PropertyKey): Signal<number> {
 function notifyKey(target: object, key: PropertyKey): void {
   const dep = depsCache.get(target)?.get(key)
   if (dep !== undefined)
-    dep.value++
+    dep.value = dep.peek() + 1
 }
 
 function wrap<T extends object>(target: T): T {

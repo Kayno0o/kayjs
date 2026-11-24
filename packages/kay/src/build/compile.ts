@@ -56,9 +56,18 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
   const embeddedAssets: string[] = []
   let assetIdx = 0
   for (const rel of manifest.assets) {
+    const abs = join(clientDir, rel)
     const v = `_a${assetIdx++}`
-    imports.push(`import ${v} from ${JSON.stringify(join(clientDir, rel))} with { type: "file" };`)
+    imports.push(`import ${v} from ${JSON.stringify(abs)} with { type: "file" };`)
     embeddedAssets.push(`${JSON.stringify(rel)}: ${v}`)
+    for (const ext of ['.br', '.gz'] as const) {
+      const sidecarAbs = `${abs}${ext}`
+      if (existsSync(sidecarAbs)) {
+        const sv = `_a${assetIdx++}`
+        imports.push(`import ${sv} from ${JSON.stringify(sidecarAbs)} with { type: "file" };`)
+        embeddedAssets.push(`${JSON.stringify(`${rel}${ext}`)}: ${sv}`)
+      }
+    }
   }
   const embeddedPublic: string[] = []
   const embeddedPublicEtags: string[] = []
@@ -85,7 +94,7 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
   }
 
   const cfgSpread = hasConfig
-    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins, compress: _kayConfig?.compress, onError: _kayConfig?.onError`
+    ? `, plugins: _kayConfig?.plugins, lang: _kayConfig?.lang, security: _kayConfig?.security, trustedOrigins: _kayConfig?.trustedOrigins, trustProxy: _kayConfig?.trustProxy, maxRequestBodySize: _kayConfig?.maxRequestBodySize, compress: _kayConfig?.compress, onError: _kayConfig?.onError`
     : ''
 
   // Default NODE_ENV to 'production' in compiled binaries (dynamic key avoids Bun.build constant-folding).

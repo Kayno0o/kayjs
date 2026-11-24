@@ -36,6 +36,7 @@ interface SubNode {
   d: Link | undefined // deps head
   dt: Link | undefined // deps tail
   c: Link | undefined // cursor
+  po: SubNode | undefined // prevOwned
   no: SubNode | undefined // nextOwned
   nq: SubNode | undefined // nextQueued
   k: (() => void) | undefined // cleanup returned by the effect
@@ -46,6 +47,7 @@ interface SubNode {
 export interface Owner {
   p: Owner | undefined // parent
   fc: Owner | undefined // firstChild
+  ps: Owner | undefined // prevSibling
   ns: Owner | undefined // nextSibling
   fs: SubNode | undefined // firstSub
   cl: (() => void)[] | undefined // cleanups
@@ -125,6 +127,8 @@ function linkSub(dep: DepNode, sub: SubNode): void {
 
 function unlink(l: Link): void {
   const { d, s, pd, nd, ps, ns } = l
+  if (d.ls === s)
+    d.ls = undefined
   if (pd !== undefined)
     pd.nd = nd
   else
@@ -161,6 +165,8 @@ function unlinkAll(sub: SubNode): void {
   while (l !== undefined) {
     const next = l.nd
     const { d, ps, ns } = l
+    if (d.ls === sub)
+      d.ls = undefined
     if (ps !== undefined)
       ps.ns = ns
     else
@@ -258,6 +264,8 @@ function flush(): void {
 
 function shouldRun(sub: SubNode): boolean {
   const f = sub.f
+  if (f & DISPOSED)
+    return false
   if (f & DIRTY)
     return true
   if (!(f & CHECK))
@@ -325,6 +333,7 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   d: Link | undefined = undefined
   dt: Link | undefined = undefined
   c: Link | undefined = undefined
+  po: SubNode | undefined = undefined
   no: SubNode | undefined = undefined
   nq: SubNode | undefined = undefined
   k: (() => void) | undefined = undefined
@@ -333,11 +342,26 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   _v!: T
   _i = false
 
-  constructor(fn: () => T) {
+  constructor(fn: () => T, owner: Owner | undefined) {
     this._f = fn
+    if (owner !== undefined) {
+      if (owner.x) {
+        this.f |= DISPOSED
+      }
+      else {
+        this.o = owner
+        const first = owner.fs
+        this.no = first
+        if (first !== undefined)
+          first.po = this
+        owner.fs = this
+      }
+    }
   }
 
   r(): void {
+    if (this.f & DISPOSED)
+      return
     if (this.f & RUNNING)
       throw new Error('kay: cyclic computed')
     const prevSub = currentSub
@@ -364,15 +388,17 @@ class ComputedNode<T> implements DepNode, SubNode, ReadonlySignal<T> {
   }
 
   get value(): T {
-    if (shouldRun(this))
-      this.r()
-    if (currentSub !== undefined)
-      linkSub(this, currentSub)
+    if (!(this.f & DISPOSED)) {
+      if (shouldRun(this))
+        this.r()
+      if (currentSub !== undefined)
+        linkSub(this, currentSub)
+    }
     return this._v
   }
 
   peek(): T {
-    if (shouldRun(this))
+    if (!(this.f & DISPOSED) && shouldRun(this))
       this.r()
     return this._v
   }
@@ -385,12 +411,14 @@ class EffectNode implements SubNode, Owner {
   d: Link | undefined = undefined
   dt: Link | undefined = undefined
   c: Link | undefined = undefined
+  po: SubNode | undefined = undefined
   no: SubNode | undefined = undefined
   nq: SubNode | undefined = undefined
   k: (() => void) | undefined = undefined
   o: Owner | undefined
   p: Owner | undefined
   fc: Owner | undefined = undefined
+  ps: Owner | undefined = undefined
   ns: Owner | undefined = undefined
   fs: SubNode | undefined = undefined
   cl: (() => void)[] | undefined = undefined
@@ -401,7 +429,10 @@ class EffectNode implements SubNode, Owner {
     this._f = fn
     this.o = this.p = owner
     if (owner !== undefined) {
-      this.no = owner.fs
+      const first = owner.fs
+      this.no = first
+      if (first !== undefined)
+        first.po = this
       owner.fs = this
     }
   }
@@ -444,27 +475,65 @@ export function createOwner(parent: Owner | undefined = currentOwner): Owner {
   const owner: Owner = {
     p: parent,
     fc: undefined,
+    ps: undefined,
     ns: undefined,
     fs: undefined,
     cl: undefined,
     x: false,
   }
   if (parent !== undefined) {
-    owner.ns = parent.fc
+    const first = parent.fc
+    owner.ns = first
+    if (first !== undefined)
+      first.ps = owner
     parent.fc = owner
   }
   return owner
+}
+
+function unlinkOwner(owner: Owner): void {
+  const parent = owner.p
+  if (parent === undefined)
+    return
+  const prev = owner.ps
+  const next = owner.ns
+  if (prev !== undefined)
+    prev.ns = next
+  else if (parent.fc === owner)
+    parent.fc = next
+  if (next !== undefined)
+    next.ps = prev
+  owner.p = owner.ps = owner.ns = undefined
+}
+
+function unlinkOwnedSub(sub: SubNode): void {
+  const owner = sub.o
+  if (owner === undefined)
+    return
+  const prev = sub.po
+  const next = sub.no
+  if (prev !== undefined)
+    prev.no = next
+  else if (owner.fs === sub)
+    owner.fs = next
+  if (next !== undefined)
+    next.po = prev
+  sub.o = sub.po = sub.no = undefined
 }
 
 export function disposeOwner(owner: Owner): void {
   if (owner.x)
     return
   owner.x = true
+  unlinkOwner(owner)
   releaseOwned(owner)
 }
 
 function disposeSub(sub: SubNode): void {
+  if (sub.f & DISPOSED)
+    return
   sub.f |= DISPOSED
+  unlinkOwnedSub(sub)
   unlinkAll(sub)
   if (sub.f & EFFECT)
     disposeOwner(sub as EffectNode)
@@ -480,7 +549,7 @@ function releaseOwned(owner: Owner): void {
   owner.fc = undefined
   while (child !== undefined) {
     const next = child.ns
-    child.ns = undefined
+    child.p = child.ps = child.ns = undefined
     disposeOwner(child)
     child = next
   }
@@ -489,7 +558,7 @@ function releaseOwned(owner: Owner): void {
   owner.fs = undefined
   while (sub !== undefined) {
     const next = sub.no
-    sub.no = undefined
+    sub.o = sub.po = sub.no = undefined
     disposeSub(sub)
     sub = next
   }
@@ -530,7 +599,7 @@ export function signal<T>(initial: T): Signal<T> {
 }
 
 export function computed<T>(fn: () => T): ReadonlySignal<T> {
-  return new ComputedNode(fn)
+  return new ComputedNode(fn, currentOwner)
 }
 
 export function effect(fn: () => void | (() => void)): () => void {

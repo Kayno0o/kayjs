@@ -6,7 +6,8 @@
 import type { BunPlugin } from 'bun'
 import type { IslandBinding, ModuleAnalysis } from '../compiler/index'
 import type { BuildPluginContext, KayPlugin } from '../plugins/index'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 import { analyzeModule, compileDom, compileSsr } from '../compiler/index'
@@ -49,6 +50,8 @@ export interface BuildOptions {
   copyPublic?: boolean | undefined
   /** Compile into a single standalone executable at this path (or true -> dist/server-bin). */
   compile?: string | boolean | undefined
+  /** Run in development mode (keeps NODE_ENV as development and skips production client asset precompression; auto-detected via KAY_DEV=1). */
+  dev?: boolean | undefined
 }
 
 export interface ActionManifestEntry {
@@ -161,17 +164,123 @@ function resolveImportPath(fromFile: string, specifier: string): string | undefi
   }
 }
 
+const SPECIAL_ROUTE_FILES = new Set(['_layout.tsx', '_middleware.ts', '_middleware.tsx', '_error.tsx', '_404.tsx'])
+const ROUTE_EXPORTS = new Set(['default', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'])
+const TEST_FILE_RE = /\.(?:test|spec)\.(?:tsx|ts)$/
+const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.mjs', '.css', '.svg', '.xml', '.json', '.txt', '.webmanifest', '.wasm'])
+
 function walkRoutes(dir: string, out: string[] = []): string[] {
   if (!existsSync(dir))
     return out
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name)
-    if (entry.isDirectory())
+    if (entry.isDirectory()) {
+      if (entry.name.startsWith('_'))
+        continue
       walkRoutes(full, out)
-    else if (entry.name.endsWith('.tsx') || entry.name.endsWith('.ts'))
+    }
+    else if (
+      (entry.name.endsWith('.tsx') || entry.name.endsWith('.ts'))
+      && !entry.name.endsWith('.d.ts')
+      && !TEST_FILE_RE.test(entry.name)
+    ) {
       out.push(full)
+    }
   }
   return out
+}
+
+function hasRouteHandlerExport(analysis: ModuleAnalysis): boolean {
+  for (const name of analysis.exportedNames) {
+    if (ROUTE_EXPORTS.has(name))
+      return true
+  }
+  for (const stmt of analysis.program.body as { type: string, exportKind?: string, specifiers?: { exportKind?: string, exported?: { name?: string, value?: string } }[] }[]) {
+    if (stmt.type === 'ExportNamedDeclaration' && stmt.exportKind !== 'type' && stmt.specifiers !== undefined) {
+      for (const spec of stmt.specifiers) {
+        if (spec.exportKind === 'type')
+          continue
+        const exported = spec.exported?.name ?? spec.exported?.value
+        if (exported !== undefined && ROUTE_EXPORTS.has(exported))
+          return true
+      }
+    }
+  }
+  return false
+}
+
+function normalizeRoutePattern(routePath: string): string {
+  return routePath
+    .split('/')
+    .map(seg => (seg.startsWith(':') ? ':' : seg.startsWith('*') ? '*' : seg))
+    .join('/')
+}
+
+function isOutside(base: string, target: string): boolean {
+  const rel = relative(base, target)
+  return rel === '..' || rel.startsWith('../') || rel.startsWith('..\\') || isAbsolute(rel)
+}
+
+function isStrictDescendant(base: string, target: string): boolean {
+  const rel = relative(base, target)
+  return rel !== '' && rel !== '..' && !rel.startsWith('../') && !rel.startsWith('..\\') && !isAbsolute(rel)
+}
+
+function assertSafeOutDir(root: string, outDir: string, routesDir: string, publicDir: string): void {
+  // Refuse filesystem root, home dir, tmpdir root, or root/ancestors of root
+  if (dirname(outDir) === outDir || outDir === tmpdir() || outDir === resolve(process.env.HOME ?? '\0')) {
+    throw new Error(`kay build: refusing unsafe outDir "${outDir}" — cannot wipe a root or shared system directory.`)
+  }
+  if (!isOutside(outDir, root)) {
+    throw new Error(`kay build: refusing unsafe outDir "${outDir}" — outDir cannot be or contain project root "${root}".`)
+  }
+  if (existsSync(outDir)) {
+    try {
+      const realRoot = realpathSync(root)
+      const realOut = realpathSync(outDir)
+      if (dirname(realOut) === realOut || !isOutside(realOut, realRoot)) {
+        throw new Error(`kay build: refusing unsafe outDir "${outDir}" — resolved target "${realOut}" is or contains project root "${realRoot}".`)
+      }
+    }
+    catch (err) {
+      if (err instanceof Error && err.message.startsWith('kay build: refusing unsafe outDir'))
+        throw err
+    }
+  }
+  const protectedTargets: [string, string][] = [
+    ['src', resolve(root, 'src')],
+    ['routesDir', routesDir],
+    ['publicDir', publicDir],
+    ['kay.config.ts', resolve(root, 'kay.config.ts')],
+    ['package.json', resolve(root, 'package.json')],
+  ]
+  for (const [label, target] of protectedTargets) {
+    if (!isOutside(outDir, target)) {
+      throw new Error(`kay build: refusing unsafe outDir "${outDir}" — it equals or contains protected path ${label} ("${target}").`)
+    }
+  }
+  // If outDir is outside root (e.g. an external temp build dir), refuse it if it looks like another project directory.
+  if (!isStrictDescendant(root, outDir) && existsSync(outDir)) {
+    for (const marker of ['package.json', 'kay.config.ts', 'src']) {
+      if (existsSync(join(outDir, marker))) {
+        throw new Error(`kay build: refusing unsafe external outDir "${outDir}" — it contains "${marker}".`)
+      }
+    }
+  }
+}
+
+function precompressFile(abs: string, minBytes: number): void {
+  if (!COMPRESSIBLE_EXTS.has(extname(abs).toLowerCase()))
+    return
+  const raw = readFileSync(abs)
+  if (raw.byteLength < minBytes)
+    return
+  const br = brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } })
+  if (br.byteLength < raw.byteLength)
+    writeFileSync(`${abs}.br`, br)
+  const gz = Bun.gzipSync(raw, { level: 9 })
+  if (gz.byteLength < raw.byteLength)
+    writeFileSync(`${abs}.gz`, gz)
 }
 
 function walkAllFiles(dir: string, out: string[] = []): string[] {
@@ -229,27 +338,51 @@ function clientLeakError(leaks: Set<string>): Error {
 }
 
 export async function build(options: BuildOptions): Promise<BuildManifest> {
+  if (options.static && options.compile) {
+    throw new Error('kay build: --static and --compile cannot be used together (static export produces HTML/assets without a server binary).')
+  }
+
   const root = resolve(options.root)
   const fileConfig = await loadConfig(root)
   const plugins: KayPlugin[] = options.plugins ?? fileConfig.plugins ?? []
   const routesDir = resolve(root, options.routesDir ?? fileConfig.routesDir ?? 'src/routes')
   const finalOutDir = resolve(root, options.outDir ?? fileConfig.outDir ?? 'dist')
+  const publicDir = resolve(root, options.publicDir ?? fileConfig.publicDir ?? 'public')
+
+  assertSafeOutDir(root, finalOutDir, routesDir, publicDir)
+
+  const isDev = options.dev ?? (process.env.KAY_DEV === '1')
   const cacheBaseDir = join(root, '.kay-cache')
   const cacheExisted = existsSync(cacheBaseDir)
+  const stageSuffix = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const outDir = options.static
-    ? join(cacheBaseDir, `.static-stage-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+    ? join(cacheBaseDir, `.static-stage-${stageSuffix}`)
     : finalOutDir
-  const publicDir = resolve(root, options.publicDir ?? fileConfig.publicDir ?? 'public')
+  const staticStageDir = options.static
+    ? join(dirname(finalOutDir), `.${basename(finalOutDir)}.stage-${stageSuffix}`)
+    : undefined
   const clientDir = join(outDir, 'client')
   const serverDir = join(outDir, 'server')
   const assetPrefix = (options.assetPrefix ?? fileConfig.assetPrefix ?? '/_kay').replace(/\/$/, '')
   const minify = options.minify ?? true
 
+  const prevNodeEnv = process.env.NODE_ENV
+  if (!isDev)
+    process.env.NODE_ENV ??= 'production'
+
   try {
     return await buildInternal()
   }
   finally {
+    if (!isDev) {
+      if (prevNodeEnv !== undefined)
+        process.env.NODE_ENV = prevNodeEnv
+      else
+        delete process.env.NODE_ENV
+    }
     if (options.static) {
+      if (staticStageDir !== undefined && existsSync(staticStageDir))
+        rmSync(staticStageDir, { recursive: true, force: true })
       rmSync(outDir, { recursive: true, force: true })
       if (!cacheExisted && existsSync(cacheBaseDir) && readdirSync(cacheBaseDir).length === 0)
         rmSync(cacheBaseDir, { recursive: true, force: true })
@@ -288,8 +421,8 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   mkdirSync(serverDir, { recursive: true })
 
   const allRouteFiles = walkRoutes(routesDir).sort()
-  const specialFiles = allRouteFiles.filter(f => basename(f).startsWith('_'))
-  const pageFiles = allRouteFiles.filter(f => !basename(f).startsWith('_'))
+  const specialFiles = allRouteFiles.filter(f => SPECIAL_ROUTE_FILES.has(basename(f)))
+  const candidatePageFiles = allRouteFiles.filter(f => !basename(f).startsWith('_'))
   const errorSrc = join(routesDir, '_error.tsx')
   const notFoundSrc = join(routesDir, '_404.tsx')
   const hasErrorFile = existsSync(errorSrc)
@@ -364,8 +497,27 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     return { file, exportName }
   }
 
-  for (const f of allRouteFiles)
+  for (const f of specialFiles)
     loadAnalysis(f)
+  for (const f of candidatePageFiles)
+    loadAnalysis(f)
+
+  // Skip helper files inside routes/ that export neither a default component nor an HTTP method handler
+  const pageFiles = candidatePageFiles.filter(f => hasRouteHandlerExport(analyses.get(f)!))
+
+  // Detect conflicting route patterns at build time (e.g. about.tsx vs about/index.tsx, [id].tsx vs [slug].tsx)
+  const seenRoutePatterns = new Map<string, { file: string, path: string }>()
+  for (const file of pageFiles) {
+    const routePath = fileToRoutePath(routesDir, file)
+    const normalized = normalizeRoutePattern(routePath)
+    const existing = seenRoutePatterns.get(normalized)
+    if (existing !== undefined) {
+      const relA = relative(root, existing.file).replace(/\\/g, '/')
+      const relB = relative(root, file).replace(/\\/g, '/')
+      throw new Error(`kay build: conflicting routes for pattern "${routePath}": "${relA}" (${existing.path}) and "${relB}" (${routePath})`)
+    }
+    seenRoutePatterns.set(normalized, { file, path: routePath })
+  }
 
   // Discover all server actions (keyed by source file -> exportName -> action URL)
   const actionsByFile = new Map<string, { exportName: string, url: string }[]>()
@@ -458,15 +610,24 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
 
   // The client compiles every module an island imports to hydrate against SSR markers, so their SSR must emit them too.
   const islandReach = new Set<string>()
+  const reachSeen = new Set<string>()
   const reachStack = [...islandTargets.values()].map(t => t.file)
   while (reachStack.length > 0) {
     const file = reachStack.pop()!
-    if (islandReach.has(file))
+    if (reachSeen.has(file))
       continue
-    islandReach.add(file)
-    for (const imp of analyses.get(file)?.imports ?? []) {
+    reachSeen.add(file)
+    if (file.endsWith('.tsx'))
+      islandReach.add(file)
+    const analysis = analyses.get(file)
+    for (const imp of analysis?.imports ?? []) {
       const target = resolveImportPath(file, imp.source)
-      if (target !== undefined && target.endsWith('.tsx'))
+      if (target !== undefined && (target.endsWith('.tsx') || target.endsWith('.ts')))
+        reachStack.push(target)
+    }
+    for (const re of analysis?.reexports ?? []) {
+      const target = resolveImportPath(file, re.source)
+      if (target !== undefined && (target.endsWith('.tsx') || target.endsWith('.ts')))
         reachStack.push(target)
     }
   }
@@ -611,6 +772,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         define: {
           KAY_DEFERRED: hasDeferredHydrate ? 'true' : 'false',
           KAY_CLIENT_ONLY: hasClientOnlyHydrate ? 'true' : 'false',
+          'process.env.NODE_ENV': JSON.stringify(isDev ? 'development' : 'production'),
           ...publicEnvDefines,
         },
         plugins: [clientPlugin, ...pluginBunPlugins],
@@ -696,7 +858,8 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     }
   }
 
-  const standaloneActionFiles = [...actionsByFile.keys()].filter(f => !allRouteFiles.includes(f))
+  const routeEntryFiles = new Set([...specialFiles, ...pageFiles])
+  const standaloneActionFiles = [...actionsByFile.keys()].filter(f => !routeEntryFiles.has(f))
   const serverEntries = [...specialFiles, ...pageFiles, ...standaloneActionFiles]
   const serverRoot = standaloneActionFiles.length > 0 ? root : routesDir
 
@@ -792,8 +955,9 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           const analysis = analyses.get(args.path)
           const rawBindings = pageIslandBindings.get(args.path)
           let islandMap: Map<string, IslandBinding> | undefined
-          const inIsland = analysis?.isInteractive === true || islandReach.has(args.path)
-          let islandKey = inIsland ? '1' : '0'
+          const isInteractive = analysis?.isInteractive === true
+          const emitMarkers = isInteractive || islandReach.has(args.path)
+          let islandKey = `${isInteractive ? '1' : '0'}:${emitMarkers ? '1' : '0'}`
           if (rawBindings !== undefined) {
             islandMap = new Map()
             for (const [localName, target] of rawBindings) {
@@ -813,11 +977,13 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
           if (cachedSsr !== undefined && cachedSsr.mtimeMs === stamp!.mtimeMs && cachedSsr.size === stamp!.size && cachedSsr.key === islandKey)
             return { contents: cachedSsr.code, loader: 'tsx' }
           const raw = sources.get(args.path) ?? readFileSync(args.path, 'utf8')
-          const compiled = compileSsr(args.path, raw, {
+          const ssrOpts = {
             analysis,
             islands: islandMap,
-            isIsland: inIsland,
-          })
+            isIsland: isInteractive,
+            emitMarkers,
+          } as Parameters<typeof compileSsr>[2]
+          const compiled = compileSsr(args.path, raw, ssrOpts)
           const outCode = applyTransforms(compiled.code, args.path, 'server')
           if (cache !== undefined && stamp !== undefined)
             cache.ssrCompiled.set(args.path, { mtimeMs: stamp.mtimeMs, size: stamp.size, key: islandKey, code: outCode })
@@ -835,6 +1001,9 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       splitting: true,
       packages: 'external',
       minify: false,
+      define: {
+        'process.env.NODE_ENV': 'process.env.NODE_ENV',
+      },
       plugins: [serverPlugin, ...pluginBunPlugins],
     })
 
@@ -1119,6 +1288,12 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       await plugin.build(buildPluginCtx)
   }
 
+  // Precompress hashed client assets (.br / .gz sidecars) for production server builds (skip in dev & --static, which compresses its own output)
+  if (!isDev && !options.static) {
+    for (const rel of nonEmptyAssets)
+      precompressFile(join(clientDir, rel), 256)
+  }
+
   const manifest: BuildManifest = {
     runtimeScript,
     styles: styleUrls,
@@ -1141,9 +1316,7 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   if (prerenderRoutes.length > 0 || options.static) {
     const { createServer } = await import('../server/index')
     const app = await createServer({ root, outDir: relative(root, outDir), assetPrefix, plugins })
-    const prerenderDir = options.static ? finalOutDir : join(outDir, 'prerendered')
-    if (options.static)
-      rmSync(finalOutDir, { recursive: true, force: true })
+    const prerenderDir = options.static ? staticStageDir! : join(outDir, 'prerendered')
     mkdirSync(prerenderDir, { recursive: true })
 
     const prerenderStamp = Date.now()
@@ -1155,6 +1328,9 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
       }
       else if (typeof mod.paths === 'function') {
         urls = await mod.paths()
+      }
+      else if (options.static) {
+        console.warn(`kay build --static: skipping dynamic route "${route.path}" (${route.file}) because it does not export a paths() function.`)
       }
 
       if (urls.length === 0)
@@ -1171,14 +1347,18 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         const batch = urls.slice(i, i + CONCURRENCY)
         await Promise.all(batch.map(async (u) => {
           const res = await app.handle(new Request(`http://localhost${u}`))
-          if (res.status === 200) {
-            const html = await res.text()
-            const relHtml = u === '/' ? 'index.html' : `${u.replace(/^\//, '').replace(/\/$/, '')}/index.html`
-            const absHtml = join(prerenderDir, relHtml)
-            mkdirSync(dirname(absHtml), { recursive: true })
-            writeFileSync(absHtml, html)
-            map[u] = relative(options.static ? finalOutDir : outDir, absHtml).replace(/\\/g, '/')
+          const isExplicit404 = u === '/404' && res.status === 404
+          if (res.status !== 200 && !isExplicit404) {
+            if (options.static)
+              throw new Error(`kay build --static: route "${u}" returned HTTP ${res.status} (expected 200).`)
+            return
           }
+          const html = await res.text()
+          const relHtml = u === '/' ? 'index.html' : `${u.replace(/^\//, '').replace(/\/$/, '')}/index.html`
+          const absHtml = join(prerenderDir, relHtml)
+          mkdirSync(dirname(absHtml), { recursive: true })
+          writeFileSync(absHtml, html)
+          map[u] = relative(options.static ? prerenderDir : outDir, absHtml).replace(/\\/g, '/')
         }))
       }
       route.prerendered = map
@@ -1187,9 +1367,11 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
     if (options.static) {
       if (hasNotFoundFile) {
         const notFoundRes = await app.handle(new Request('http://localhost/__kay_404__'))
+        if (notFoundRes.status >= 500)
+          throw new Error(`kay build --static: _404 page returned HTTP ${notFoundRes.status}.`)
         writeFileSync(join(prerenderDir, '404.html'), await notFoundRes.text())
       }
-      // Copy client assets into dist/_kay/... and public/ files into dist/...
+      // Copy client assets into <stage>/_kay/... and public/ files into <stage>/...
       if (nonEmptyAssets.length > 0) {
         const staticAssetDir = join(prerenderDir, assetPrefix.replace(/^\//, ''))
         mkdirSync(staticAssetDir, { recursive: true })
@@ -1215,19 +1397,28 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
         writeFileSync(dst, readFileSync(join(outDir, 'public', rel)))
       }
       // Emit precompressed .br and .gz sidecars for compressible static files (>= 128 B)
-      const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.svg', '.xml', '.json', '.txt', '.webmanifest'])
-      for (const abs of walkAllFiles(prerenderDir)) {
-        if (!COMPRESSIBLE.has(extname(abs).toLowerCase()))
-          continue
-        const raw = readFileSync(abs)
-        if (raw.byteLength < 128)
-          continue
-        const br = brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } })
-        if (br.byteLength < raw.byteLength)
-          writeFileSync(`${abs}.br`, br)
-        const gz = Bun.gzipSync(raw, { level: 9 })
-        if (gz.byteLength < raw.byteLength)
-          writeFileSync(`${abs}.gz`, gz)
+      for (const abs of walkAllFiles(prerenderDir))
+        precompressFile(abs, 128)
+
+      // Atomically swap staged static output into finalOutDir only after every page and asset succeeded
+      if (existsSync(finalOutDir)) {
+        const backupDir = join(dirname(finalOutDir), `.${basename(finalOutDir)}.prev-${stageSuffix}`)
+        renameSync(finalOutDir, backupDir)
+        try {
+          renameSync(prerenderDir, finalOutDir)
+        }
+        catch (err) {
+          try {
+            renameSync(backupDir, finalOutDir)
+          }
+          catch {}
+          throw err
+        }
+        rmSync(backupDir, { recursive: true, force: true })
+      }
+      else {
+        mkdirSync(dirname(finalOutDir), { recursive: true })
+        renameSync(prerenderDir, finalOutDir)
       }
     }
     else {
