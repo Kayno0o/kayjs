@@ -136,6 +136,10 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
     `)
 
     writeFileSync(join(routesDir, 'admin', 'index.tsx'), `
+      import { action } from 'kay/server'
+
+      export const purge = action(async () => ({ purged: true }))
+
       export default function Admin() {
         return <main><h1>Secret Admin</h1></main>
       }
@@ -186,9 +190,13 @@ describe('@kayjs/auth — Zero-dependency Bun-native Auth plugin', () => {
       expect(actionRes.status).toBe(200)
       expect(await actionRes.json()).toEqual({ ok: true, data: { author: 'alice@example.com', role: 'user' } })
 
-      // 5. Role guard blocks non-admin user with 403
+      // 5. Role guard blocks non-admin user with 403, on the page and on an action declared beside it
       const adminDenied = await app.get('/admin')
       expect(adminDenied.status).toBe(403)
+
+      const purgeUrl = app.manifest!.actions.find(a => a.exportName === 'purge')!.url
+      const purgeDenied = await app.post(purgeUrl, {})
+      expect(purgeDenied.status).toBe(403)
 
       // 6. Sign out revokes session in SQLite and clears cookie
       const signoutRes = await app.post('/auth/signout', {})

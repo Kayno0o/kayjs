@@ -54,6 +54,8 @@ export interface ActionManifestEntry {
   url: string
   file: string
   exportName: string
+  /** `_middleware.ts` chain of the folder declaring the action, outermost first. */
+  middlewares: string[]
 }
 
 export interface RouteManifestEntry {
@@ -954,8 +956,10 @@ export async function build(options: BuildOptions): Promise<BuildManifest> {
   const actionEntries: ActionManifestEntry[] = []
   for (const [srcFile, list] of actionsByFile) {
     const outFile = toOutRel(srcFile)
+    const inRoutes = !relative(routesDir, srcFile).startsWith('..')
+    const middlewares = inRoutes ? ancestorFiles(routesDir, srcFile, ['_middleware.ts', '_middleware.tsx']).map(toOutRel) : []
     for (const a of list)
-      actionEntries.push({ url: a.url, file: outFile, exportName: a.exportName })
+      actionEntries.push({ url: a.url, file: outFile, exportName: a.exportName, middlewares })
   }
 
   const islandsRecord: Record<string, string> = {}

@@ -42,7 +42,10 @@ export async function compileExecutable(opts: CompileExecutableOptions): Promise
   }
   if (manifest.errorFile) addMod(manifest.errorFile)
   if (manifest.notFoundFile) addMod(manifest.notFoundFile)
-  for (const a of manifest.actions) addMod(a.file)
+  for (const a of manifest.actions) {
+    addMod(a.file)
+    for (const m of a.middlewares) addMod(m)
+  }
 
   const configPath = join(root, 'kay.config.ts')
   const hasConfig = existsSync(configPath)

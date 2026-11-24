@@ -291,13 +291,14 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
   }
 
   // Register server actions and assign their live URLs
-  const actionHandlers = new Map<string, ServerAction<unknown, unknown>>()
+  const actionHandlers = new Map<string, { act: ServerAction<unknown, unknown>, middlewares: Middleware[] }>()
   for (const entry of manifest.actions) {
     const mod = modules[entry.file] as Record<string, unknown> | undefined
     const act = mod?.[entry.exportName]
     if (isServerAction(act)) {
       ;(act as { url: string }).url = entry.url
-      actionHandlers.set(entry.url, act)
+      const middlewares = (entry.middlewares ?? []).map(m => (modules[m] as LoadedMiddlewareModule).default)
+      actionHandlers.set(entry.url, { act, middlewares: [...globalMiddlewares, ...middlewares] })
     }
   }
 
@@ -629,10 +630,11 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
         return servePublic(request, pathname, pub)
     }
 
-    // 2. Server actions (POST /_kay/action/<id>) — run global plugin middlewares first so ctx.locals (e.g. auth user) is populated
+    // 2. Server actions (POST /_kay/action/<id>): global plugin middlewares, then the _middleware.ts chain of the action's folder
     if (request.method === 'POST') {
-      const act = actionHandlers.get(pathname)
-      if (act !== undefined) {
+      const handler = actionHandlers.get(pathname)
+      if (handler !== undefined) {
+        const { act, middlewares } = handler
         const { ctx, cookieStore } = makeRequestContext(request, {})
         const runAction = async (): Promise<Response> => {
           const actionCtx: ActionContext = {
@@ -646,17 +648,13 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           }
           return executeAction(act, request, actionCtx, trustedOrigins)
         }
-        if (globalMiddlewares.length === 0) {
-          const res = await runAction()
-          return finalizeResponse(res, cookieStore, securityEntries)
-        }
         let index = -1
         const dispatch = async (i: number): Promise<Response> => {
           if (i <= index)
             throw new Error('kay: middleware called next() multiple times')
           index = i
-          if (i < globalMiddlewares.length)
-            return globalMiddlewares[i]!(ctx, () => dispatch(i + 1))
+          if (i < middlewares.length)
+            return middlewares[i]!(ctx, () => dispatch(i + 1))
           return runAction()
         }
         try {
@@ -958,7 +956,10 @@ export async function createServer(options: ServerOptions): Promise<KayApp> {
   }
   if (manifest.errorFile) await loadMod(manifest.errorFile)
   if (manifest.notFoundFile) await loadMod(manifest.notFoundFile)
-  for (const a of manifest.actions) await loadMod(a.file)
+  for (const a of manifest.actions) {
+    await loadMod(a.file)
+    for (const m of a.middlewares ?? []) await loadMod(m)
+  }
 
   return createServerFromEmbedded({
     manifest,
