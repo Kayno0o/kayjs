@@ -5,6 +5,19 @@ import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } f
 import { isTrustedOrigin, verifyOrigin } from './security'
 import { validateSchema } from './standard-schema'
 
+export const ACTION_ERROR_COOKIE = '__kay_action_err'
+
+export interface ActionErrorFlash {
+  action: string
+  error: string
+  fieldErrors?: Record<string, string> | undefined
+  values?: Record<string, string> | undefined
+}
+
+export function getActionError(locals?: Record<string, unknown>): ActionErrorFlash | undefined {
+  return locals?.actionError as ActionErrorFlash | undefined
+}
+
 export interface ActionContext {
   request: Request
   url: URL
@@ -126,6 +139,40 @@ export async function executeAction(
 
     const checked = await validateSchema(act.schema, rawBody)
     if (!checked.ok) {
+      // Zero-JS progressive HTML <form> submit: flash fieldErrors + submitted string values and redirect 303 back to trusted Referer
+      if (!wantsJson) {
+        const referer = request.headers.get('referer')
+        if (referer) {
+          let refUrl: URL | undefined
+          try {
+            refUrl = new URL(referer)
+          }
+          catch {
+            refUrl = undefined
+          }
+          if (refUrl !== undefined && isTrustedOrigin(refUrl.origin, request, trustedOrigins)) {
+            const values: Record<string, string> = {}
+            if (rawBody !== null && typeof rawBody === 'object') {
+              for (const [k, v] of Object.entries(rawBody as Record<string, unknown>)) {
+                if (typeof v === 'string' && !/password|secret|token/i.test(k) && v.length <= 512)
+                  values[k] = v
+              }
+            }
+            const flash: ActionErrorFlash = {
+              action: act.url,
+              error: 'Validation failed',
+              fieldErrors: checked.fieldErrors,
+              ...(Object.keys(values).length > 0 ? { values } : {}),
+            }
+            ctx.cookies.set(ACTION_ERROR_COOKIE, JSON.stringify(flash), {
+              httpOnly: true,
+              sameSite: 'lax',
+              maxAge: 60,
+            })
+            return Response.redirect(refUrl.href, 303)
+          }
+        }
+      }
       return Response.json(
         { ok: false, status: 400, error: 'Validation failed', fieldErrors: checked.fieldErrors, issues: checked.issues },
         { status: 400 },

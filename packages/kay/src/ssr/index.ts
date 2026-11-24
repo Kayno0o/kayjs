@@ -156,6 +156,25 @@ export function ssrChild(value: KayChild): string {
   return esc(String(value))
 }
 
+function serializeIslandProps(props: Record<string, unknown>): string {
+  return JSON.stringify(props, function (this: Record<string, unknown>, key: string, value: unknown) {
+    const orig = key !== '' && this != null && typeof this === 'object' ? this[key] : value
+    if (orig instanceof Date)
+      return { __k: 'D', v: orig.toISOString() }
+    if (orig instanceof Set)
+      return { __k: 'S', v: [...orig] }
+    if (orig instanceof Map)
+      return { __k: 'M', v: [...orig.entries()] }
+    if (orig instanceof URL)
+      return { __k: 'U', v: orig.href }
+    if (orig instanceof RegExp)
+      return { __k: 'R', v: [orig.source, orig.flags] }
+    if (typeof orig === 'bigint')
+      return { __k: 'B', v: orig.toString() }
+    return value
+  })
+}
+
 export function ssrIsland(
   _id: string,
   chunk: string,
@@ -164,7 +183,7 @@ export function ssrIsland(
   hydrate?: HydrateStrategy,
 ): string {
   const propsAttr = Object.keys(props).length > 0
-    ? ` p="${escAttr(JSON.stringify(props))}"`
+    ? ` p="${escAttr(serializeIslandProps(props))}"`
     : ''
   const hydrateAttr = hydrate !== undefined && hydrate !== 'load'
     ? ` h="${escAttr(hydrate)}"`

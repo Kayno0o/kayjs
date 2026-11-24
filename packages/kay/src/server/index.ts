@@ -16,7 +16,8 @@ import { extname, join, resolve } from 'node:path'
 import { loadConfig } from '../plugins/index'
 import { createRenderContext, renderCollectedHead, runWithRenderContext, streamChunkScript } from '../ssr/context'
 import { raw, renderDocument, ssrChild, ssrIsland } from '../ssr/index'
-import { executeAction, isServerAction } from './action'
+import { ACTION_ERROR_COOKIE, executeAction, isServerAction } from './action'
+import type { ActionErrorFlash } from './action'
 import { CompressionCache, compressedHtmlResponse, isCompressibleType, maybeCompressResponse, pickEncoding } from './compress'
 import { extractRenderedIslands, finalizeResponse, makeRequestContext, MIME } from './http'
 import { Router } from './router'
@@ -24,8 +25,8 @@ import { buildSecurityHeaderEntries, KAY_ISLAND_STYLE_HASH, KAY_STREAM_SCRIPT_HA
 
 export { defineConfig, definePlugin, loadConfig } from '../plugins/index'
 export type { BuildPluginContext, KayConfig, KayPlugin, ServerPluginAPI } from '../plugins/index'
-export { action } from './action'
-export type { ActionContext, ActionResult, ServerAction } from './action'
+export { action, getActionError } from './action'
+export type { ActionContext, ActionErrorFlash, ActionResult, ServerAction } from './action'
 export { CompressionCache, isCompressibleType, pickEncoding } from './compress'
 export type { CompressionEncoding } from './compress'
 export type { CookieOptions, Cookies } from './cookies'
@@ -384,13 +385,19 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           })()
         }
 
-        const renderPage = (pageProps: Record<string, unknown>): Response | Promise<Response> => {
+        const renderPage = (data: unknown): Response | Promise<Response> => {
+          const pageProps: Record<string, unknown> = {
+            params: {},
+            locals: {},
+            url: reqUrl,
+            ...(data !== undefined ? { data } : {}),
+          }
           if (entry.isIsland && entry.islandChunk !== undefined) {
             const inner = ssrIsland(
               entry.path,
               entry.islandChunk,
               () => ssrChild(mod.default!(pageProps) as Html),
-              pageProps,
+              data !== undefined ? { data } : {},
               entry.islandHydrate as HydrateStrategy | undefined,
             )
             return wrapLayouts(inner)
@@ -413,14 +420,14 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           const loaded = mod.load(ctx)
           if (loaded instanceof Promise) {
             return loaded.then(data =>
-              finish(data instanceof Response ? data : renderPage(data !== undefined ? { data } : {})),
+              finish(data instanceof Response ? data : renderPage(data)),
             )
           }
           if (loaded instanceof Response)
             return finish(loaded)
-          return finish(renderPage(loaded !== undefined ? { data: loaded } : {}))
+          return finish(renderPage(loaded))
         }
-        return renderPage({})
+        return renderPage(undefined)
       }
       fastStaticPages.set(entry.path, fastHandler)
     }
@@ -626,15 +633,17 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
       }
     }
 
+    const hasActionErrorFlash = (request.headers.get('cookie') ?? '').includes(`${ACTION_ERROR_COOKIE}=`)
+
     // 3. Prerendered static HTML (safe even when plugins add routes or build-time transformHtml!)
-    if (request.method === 'GET' || request.method === 'HEAD') {
+    if (!hasActionErrorFlash && (request.method === 'GET' || request.method === 'HEAD')) {
       const pre = fastPrerenderedMap.get(pathname)
       if (pre !== undefined)
         return servePrerendered(request, pathname, pre)
     }
 
     // 4. Ultra-fast static route path
-    if (request.method === 'GET' || request.method === 'HEAD') {
+    if (!hasActionErrorFlash && (request.method === 'GET' || request.method === 'HEAD')) {
       const fast = fastStaticPages.get(pathname)
       if (fast !== undefined)
         return fast(request)
@@ -642,6 +651,18 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
 
     // 5. Full Router + Plugin Rewrites + Plugin Routes + Middleware + Streaming/Head/Error pipeline
     const { ctx, cookieStore } = makeRequestContext(request, {})
+
+    // Hydrate & clear one-shot progressive form validation flash cookie
+    if (hasActionErrorFlash && request.method === 'GET') {
+      const rawFlash = ctx.cookies.get(ACTION_ERROR_COOKIE)
+      if (rawFlash !== undefined) {
+        try {
+          ctx.locals.actionError = JSON.parse(rawFlash) as ActionErrorFlash
+        }
+        catch {}
+        ctx.cookies.delete(ACTION_ERROR_COOKIE)
+      }
+    }
 
     // Apply plugin URL rewrites (e.g. @kayjs/i18n stripping /fr prefix and setting ctx.locals.locale)
     let effectivePath = pathname
@@ -718,13 +739,19 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
     }
 
     for (const [path, pre] of fastPrerenderedMap) {
-      if (!(path in routes))
-        routes[path] = req => (req.method === 'GET' || req.method === 'HEAD') ? servePrerendered(req, path, pre) : handle(req)
+      if (!(path in routes)) {
+        routes[path] = req => (req.method === 'GET' || req.method === 'HEAD') && !(req.headers.get('cookie') ?? '').includes(`${ACTION_ERROR_COOKIE}=`)
+          ? servePrerendered(req, path, pre)
+          : handle(req)
+      }
     }
 
     for (const [path, handler] of fastStaticPages) {
-      if (!(path in routes))
-        routes[path] = req => (req.method === 'GET' || req.method === 'HEAD') ? handler(req) : handle(req)
+      if (!(path in routes)) {
+        routes[path] = req => (req.method === 'GET' || req.method === 'HEAD') && !(req.headers.get('cookie') ?? '').includes(`${ACTION_ERROR_COOKIE}=`)
+          ? handler(req)
+          : handle(req)
+      }
     }
 
     return Bun.serve({
