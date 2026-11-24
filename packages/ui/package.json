@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/ui",
-  "version": "2.0.0-alpha.6",
+  "version": "2.0.0-alpha.7",
   "description": "Platform-first headless UI primitives and pure CSS @layer kui Style Grammars for Kay v2",
   "license": "MIT",
   "type": "module",
@@ -27,6 +27,6 @@
     "directory": "packages/ui"
   },
   "peerDependencies": {
-    "kay": "^2.0.0-alpha.6"
+    "kay": "^2.0.0-alpha.7"
   }
 }

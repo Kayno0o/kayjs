@@ -1,6 +1,6 @@
 {
   "name": "@kayjs/tailwind",
-  "version": "2.0.0-alpha.6",
+  "version": "2.0.0-alpha.7",
   "description": "Tailwind CSS v4 integration plugin for Kay v2",
   "license": "MIT",
   "type": "module",
@@ -20,6 +20,6 @@
     "directory": "packages/plugin-tailwind"
   },
   "peerDependencies": {
-    "kay": "^2.0.0-alpha.6"
+    "kay": "^2.0.0-alpha.7"
   }
 }

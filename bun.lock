@@ -16,7 +16,7 @@
     },
     "packages/kay": {
       "name": "@kayjs/kay",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "bin": {
         "kay": "./src/cli/index.ts",
       },
@@ -26,86 +26,86 @@
     },
     "packages/plugin-auth": {
       "name": "@kayjs/auth",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/plugin-content": {
       "name": "@kayjs/content",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/plugin-i18n": {
       "name": "@kayjs/i18n",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/plugin-icons": {
       "name": "@kayjs/icons",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/plugin-images": {
       "name": "@kayjs/images",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/plugin-live": {
       "name": "@kayjs/live",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/plugin-mail": {
       "name": "@kayjs/mail",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/plugin-mcp": {
       "name": "@kayjs/mcp",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/plugin-seo": {
       "name": "@kayjs/seo",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/plugin-spa": {
       "name": "@kayjs/spa",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/plugin-tailwind": {
       "name": "@kayjs/tailwind",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
     "packages/ui": {
       "name": "@kayjs/ui",
-      "version": "2.0.0-alpha.6",
+      "version": "2.0.0-alpha.7",
       "peerDependencies": {
-        "kay": "^2.0.0-alpha.6",
+        "kay": "^2.0.0-alpha.7",
       },
     },
   },
