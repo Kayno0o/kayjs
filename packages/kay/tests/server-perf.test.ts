@@ -348,9 +348,8 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
     await build({ root: dir, compile: binPath })
     expect(existsSync(binPath)).toBe(true)
 
-    const port = 35567 + Math.floor(Math.random() * 5000)
     const proc = Bun.spawn([binPath], {
-      env: { ...process.env, PORT: String(port) },
+      env: { ...process.env, PORT: '0' },
       stdout: 'pipe',
       stderr: 'pipe',
     })
@@ -362,10 +361,11 @@ describe('Server compression, zero-copy serving, and fast-path preservation (#35
       while (!buf.includes('listening on')) {
         const { done, value } = await reader.read()
         if (done)
-          throw new Error(`compiled binary exited early: ${buf}`)
+          throw new Error(`compiled binary exited early: ${buf} ${await new Response(proc.stderr).text()}`)
         buf += dec.decode(value)
       }
       reader.releaseLock()
+      const port = Number(/listening on http:\/\/[^:]+:(\d+)/.exec(buf)![1])
 
       // Use raw TCP/Bun.fetch with decompress: false to verify Content-Encoding on the wire!
       const zstdRes = await fetch(`http://127.0.0.1:${port}/`, {

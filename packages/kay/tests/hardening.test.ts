@@ -272,9 +272,8 @@ describe('Milestone 4: CSS Modules, public/ static files, and plugins in --compi
     await build({ root: dir, compile: binPath })
     expect(existsSync(binPath)).toBe(true)
 
-    const port = 34567 + Math.floor(Math.random() * 5000)
     const proc = Bun.spawn([binPath], {
-      env: { ...process.env, PORT: String(port) },
+      env: { ...process.env, PORT: '0' },
       stdout: 'pipe',
       stderr: 'pipe',
     })
@@ -287,10 +286,11 @@ describe('Milestone 4: CSS Modules, public/ static files, and plugins in --compi
       while (!stdoutBuf.includes('listening on')) {
         const { done, value } = await reader.read()
         if (done)
-          throw new Error(`compiled binary exited early: ${stdoutBuf}`)
+          throw new Error(`compiled binary exited early: ${stdoutBuf} ${await new Response(proc.stderr).text()}`)
         stdoutBuf += decoder.decode(value)
       }
       reader.releaseLock()
+      const port = Number(/listening on http:\/\/[^:]+:(\d+)/.exec(stdoutBuf)![1])
 
       const helloRes = await fetch(`http://127.0.0.1:${port}/hello.txt`)
       expect(helloRes.status).toBe(200)
