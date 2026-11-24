@@ -559,9 +559,12 @@ export async function createServerFromEmbedded(config: EmbeddedServerConfig): Pr
           'etag': pub.etag,
           'cache-control': pubCache,
         }
-        routes[path] = typeof pub.body === 'string'
-          ? () => new Response(Bun.file(pub.body as string), { status: 200, headers })
-          : new Response(pub.body, { status: 200, headers })
+        routes[path] = (req: Request) => {
+          if (req.headers.get('if-none-match') === pub.etag)
+            return new Response(null, { status: 304, headers: { 'etag': pub.etag, 'cache-control': pubCache } })
+          const body = typeof pub.body === 'string' ? Bun.file(pub.body) : pub.body
+          return new Response(req.method === 'HEAD' ? null : body, { status: 200, headers })
+        }
       }
     }
 

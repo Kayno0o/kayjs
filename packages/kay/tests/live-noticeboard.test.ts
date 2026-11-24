@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright-core'
 import { createRooms } from '../../plugin-live/src/index'
@@ -122,6 +123,202 @@ describe('@kayjs/live + full-stack examples/noticeboard (auth + mail + live SSE 
     finally {
       await browser.close()
       server.stop(true)
+    }
+  })
+
+  it('compiles examples/noticeboard with --compile and runs full-stack from an isolated temp directory', async () => {
+    const buildDir = mkdtempSync(join(tmpdir(), 'kay-noticeboard-compile-build-'))
+    const runCwd = mkdtempSync(join(tmpdir(), 'kay-noticeboard-compile-run-'))
+    const binPath = join(buildDir, 'noticeboard-bin')
+    const dbFile = join(runCwd, 'noticeboard.sqlite')
+    let proc: Bun.Subprocess<'ignore', 'pipe', 'pipe'> | undefined
+
+    try {
+      const manifest = await build({
+        root: NOTICEBOARD_ROOT,
+        outDir: buildDir,
+        minify: true,
+        compile: binPath,
+      })
+      expect(existsSync(binPath)).toBe(true)
+      const pinAction = manifest.actions.find(a => a.exportName === 'pinNotice')
+      expect(pinAction).toBeDefined()
+      expect(manifest.styles.length).toBeGreaterThan(0)
+      expect(manifest.publicFiles).toContain('robots.txt')
+
+      // Spawn the standalone executable from an empty temp directory outside the repo tree
+      proc = Bun.spawn([binPath], {
+        cwd: runCwd,
+        env: {
+          PATH: process.env.PATH ?? '',
+          PORT: '0',
+          NOTICEBOARD_DB: dbFile,
+        },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      })
+
+      const reader = proc.stdout.getReader()
+      const decoder = new TextDecoder()
+      let stdoutBuf = ''
+      let port = 0
+      const deadline = Date.now() + 10_000
+      while (Date.now() < deadline) {
+        const { value, done } = await reader.read()
+        if (done)
+          break
+        stdoutBuf += decoder.decode(value)
+        const match = /http:\/\/localhost:(\d+)/.exec(stdoutBuf)
+        if (match) {
+          port = Number(match[1])
+          break
+        }
+      }
+      reader.releaseLock()
+      expect(port).toBeGreaterThan(0)
+
+      const origin = `http://127.0.0.1:${port}`
+
+      // 1. SSR HTML + security headers + custom 404
+      const homeRes = await fetch(`${origin}/`)
+      expect(homeRes.status).toBe(200)
+      const homeHtml = await homeRes.text()
+      expect(homeHtml).toContain('<title>Board — Noticeboard</title>')
+      expect(homeHtml).toContain('Sign in to pin')
+      expect(homeRes.headers.get('x-content-type-options')).toBe('nosniff')
+
+      const missingRes = await fetch(`${origin}/notices/99999`)
+      expect(missingRes.status).toBe(404)
+
+      // 2. Embedded static client assets (CSS + runtime JS) & public/ file with ETag/304
+      const cssRes = await fetch(`${origin}${manifest.styles[0]!}`)
+      expect(cssRes.status).toBe(200)
+      expect(cssRes.headers.get('content-type')).toContain('text/css')
+      expect((await cssRes.text()).length).toBeGreaterThan(100)
+
+      if (manifest.runtimeScript) {
+        const rtRes = await fetch(`${origin}${manifest.runtimeScript}`)
+        expect(rtRes.status).toBe(200)
+        expect(rtRes.headers.get('content-type')).toContain('javascript')
+      }
+
+      const robotsRes = await fetch(`${origin}/robots.txt`)
+      expect(robotsRes.status).toBe(200)
+      expect(await robotsRes.text()).toContain('Allow: /')
+      const etag = robotsRes.headers.get('etag')
+      expect(etag).toBeTruthy()
+      const robots304 = await fetch(`${origin}/robots.txt`, { headers: { 'if-none-match': etag! } })
+      expect(robots304.status).toBe(304)
+
+      // 3. Guarded action rejects unauthenticated POST with 401
+      const unauthAction = await fetch(`${origin}${pinAction!.url}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'origin': origin },
+        body: JSON.stringify({ title: 'Blocked', body: 'Not signed in' }),
+      })
+      expect(unauthAction.status).toBe(401)
+
+      // 4. Auth signup + signout + signin against isolated SQLite DB
+      const bobSignup = await fetch(`${origin}/auth/signup`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'origin': origin },
+        body: JSON.stringify({ email: 'bob@compiled.local', password: 'bob-password-123', name: 'Bob' }),
+      })
+      expect(bobSignup.status).toBe(201)
+
+      const aliceSignup = await fetch(`${origin}/auth/signup`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'origin': origin },
+        body: JSON.stringify({ email: 'alice@compiled.local', password: 'alice-password-123', name: 'Alice' }),
+      })
+      expect(aliceSignup.status).toBe(201)
+      const signupCookie = aliceSignup.headers.getSetCookie()[0]!.split(';')[0]!
+
+      const signOutRes = await fetch(`${origin}/auth/signout`, {
+        method: 'POST',
+        headers: { 'origin': origin, 'cookie': signupCookie },
+      })
+      expect(signOutRes.status).toBe(200)
+
+      const signInRes = await fetch(`${origin}/auth/signin`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'origin': origin },
+        body: JSON.stringify({ email: 'alice@compiled.local', password: 'alice-password-123' }),
+      })
+      expect(signInRes.status).toBe(200)
+      const sessionCookie = signInRes.headers.getSetCookie()[0]!.split(';')[0]!
+
+      // Authenticated SSR shows signed-in user
+      const authedHome = await fetch(`${origin}/`, { headers: { cookie: sessionCookie } })
+      expect(authedHome.status).toBe(200)
+      expect(await authedHome.text()).toContain('Alice')
+
+      // 5. Standard-Schema validation error (400 + fieldErrors)
+      const invalidAction = await fetch(`${origin}${pinAction!.url}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'origin': origin, 'cookie': sessionCookie },
+        body: JSON.stringify({ title: '   ', body: '' }),
+      })
+      expect(invalidAction.status).toBe(400)
+      const invalidJson = await invalidAction.json() as { ok: boolean, fieldErrors: Record<string, string> }
+      expect(invalidJson.ok).toBe(false)
+      expect(invalidJson.fieldErrors.title).toBe('Write a title')
+
+      // 6. Live SSE subscription + authenticated Standard-Schema action() submit -> receives live posted event!
+      const sseController = new AbortController()
+      const sseRes = await fetch(`${origin}/api/board`, { signal: sseController.signal })
+      expect(sseRes.status).toBe(200)
+      expect(sseRes.headers.get('content-type')).toContain('text/event-stream')
+      const sseReader = sseRes.body!.getReader()
+      const sseDecoder = new TextDecoder()
+
+      const readUntil = async (needle: string): Promise<string> => {
+        let buf = ''
+        const end = Date.now() + 5_000
+        while (Date.now() < end) {
+          const { value, done } = await sseReader.read()
+          if (done)
+            break
+          buf += sseDecoder.decode(value, { stream: true })
+          if (buf.includes(needle))
+            return buf
+        }
+        return buf
+      }
+
+      const initialEvent = await readUntil('"type":"present"')
+      expect(initialEvent).toContain('"guests":1')
+
+      const pinRes = await fetch(`${origin}${pinAction!.url}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'origin': origin, 'cookie': sessionCookie },
+        body: JSON.stringify({ title: 'Compiled Launch', body: 'Running from an isolated temp directory!' }),
+      })
+      expect(pinRes.status).toBe(200)
+      const pinJson = await pinRes.json() as { ok: boolean, data: { id: number, title: string, author: string } }
+      expect(pinJson.ok).toBe(true)
+      expect(pinJson.data.title).toBe('Compiled Launch')
+      expect(pinJson.data.author).toBe('Alice')
+
+      const postedEvent = await readUntil('"type":"posted"')
+      expect(postedEvent).toContain('Compiled Launch')
+      sseController.abort()
+
+      // 7. Persisted SQLite detail route renders SSR HTML
+      const detailRes = await fetch(`${origin}/notices/${pinJson.data.id}`)
+      expect(detailRes.status).toBe(200)
+      const detailHtml = await detailRes.text()
+      expect(detailHtml).toContain('Compiled Launch')
+      expect(detailHtml).toContain('Running from an isolated temp directory!')
+      expect(existsSync(dbFile)).toBe(true)
+    }
+    finally {
+      if (proc !== undefined) {
+        proc.kill()
+        await proc.exited
+      }
+      rmSync(buildDir, { recursive: true, force: true })
+      rmSync(runCwd, { recursive: true, force: true })
     }
   })
 })
