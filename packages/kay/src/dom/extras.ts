@@ -120,6 +120,17 @@ function clearInserted(current: Node | Node[] | null): void {
   }
 }
 
+function claimTextNode(claimed: Node | null, str: string): Text | undefined {
+  if (claimed === null || claimed.nodeType !== 3)
+    return undefined
+  const text = claimed as Text
+  if (text.data === str)
+    return text
+  if (str.length > 0 && text.data.endsWith(str))
+    return text.splitText(text.data.length - str.length)
+  return undefined
+}
+
 export function insert(parent: Node, value: () => unknown, marker: Node | null = null): void {
   let current: Node | Node[] | null = null
   let textNode: Text | undefined
@@ -144,8 +155,14 @@ export function insert(parent: Node, value: () => unknown, marker: Node | null =
         current = null
       }
       if (textNode === undefined) {
-        textNode = document.createTextNode(str)
-        parent.insertBefore(textNode, marker)
+        const claimed = claimTextNode(res.claimed, str)
+        if (claimed !== undefined) {
+          textNode = claimed
+        }
+        else {
+          textNode = document.createTextNode(str)
+          parent.insertBefore(textNode, marker)
+        }
       }
       else if (textNode.data !== str) {
         textNode.data = str
@@ -207,8 +224,8 @@ export function show(
   parent: Node,
   marker: Node | null,
   when: () => unknown,
-  renderTrue: () => Node | null,
-  renderFalse?: () => Node | null,
+  renderTrue: () => unknown,
+  renderFalse?: () => unknown,
 ): void {
   const parentOwner = getOwner()
   let branch: 0 | 1 | 2 = 0
@@ -242,17 +259,56 @@ export function show(
     const res = claimInsert(parent, marker, () => untrack(() => runWithOwner(owner, fn)))
     marker = res.marker
     const rendered = res.result
-    if (rendered === null)
+    if (rendered == null || typeof rendered === 'boolean')
       return
 
-    if (rendered.nodeType === 11) {
-      nodes = Array.from(rendered.childNodes)
-      parent.insertBefore(rendered, marker)
+    if (typeof rendered === 'string' || typeof rendered === 'number') {
+      const str = String(rendered)
+      if (str === '')
+        return
+      const text = claimTextNode(res.claimed, str) ?? document.createTextNode(str)
+      if (text.parentNode !== parent)
+        parent.insertBefore(text, marker)
+      nodes = [text]
+      return
     }
-    else {
-      nodes = [rendered]
-      if (rendered.parentNode !== parent)
+
+    if (rendered instanceof Node) {
+      if (rendered.nodeType === 11) {
+        nodes = Array.from(rendered.childNodes)
         parent.insertBefore(rendered, marker)
+      }
+      else {
+        nodes = [rendered]
+        if (rendered.parentNode !== parent)
+          parent.insertBefore(rendered, marker)
+      }
+      return
+    }
+
+    if (Array.isArray(rendered)) {
+      const f = document.createDocumentFragment()
+      const list: Node[] = []
+      for (let i = 0; i < rendered.length; i++) {
+        const item = rendered[i]
+        if (item instanceof Node) {
+          if (item.nodeType === 11)
+            list.push(...Array.from(item.childNodes))
+          else
+            list.push(item)
+          f.appendChild(item)
+        }
+        else if (item != null && typeof item !== 'boolean') {
+          const str = String(item)
+          if (str !== '') {
+            const t = document.createTextNode(str)
+            list.push(t)
+            f.appendChild(t)
+          }
+        }
+      }
+      parent.insertBefore(f, marker)
+      nodes = list
     }
   })
 }

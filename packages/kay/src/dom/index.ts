@@ -27,9 +27,9 @@ export function claimLoop(parent: Node, fn: () => void, skip = 0): boolean {
   return true
 }
 
-export function claimInsert<T>(parent: Node, marker: Node | null, fn: () => T): { result: T, marker: Node | null } {
+export function claimInsert<T>(parent: Node, marker: Node | null, fn: () => T): { result: T, marker: Node | null, claimed: Node | null } {
   if (!hydrating)
-    return { result: fn(), marker }
+    return { result: fn(), marker, claimed: null }
 
   let claimed: Node | null = marker !== null ? marker : parent.lastChild
   let nextMarker = marker
@@ -45,7 +45,7 @@ export function claimInsert<T>(parent: Node, marker: Node | null, fn: () => T): 
   const prevNode = hydrateNode
   hydrateNode = claimed
   try {
-    return { result: fn(), marker: nextMarker }
+    return { result: fn(), marker: nextMarker, claimed }
   }
   finally {
     hydrateNode = prevNode
