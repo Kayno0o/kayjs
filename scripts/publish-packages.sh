@@ -1,10 +1,18 @@
 #!/bin/sh
 # Publishes every non-private package under packages/* to the given registry:
-#   scripts/publish-packages.sh <registry url>
+#   scripts/publish-packages.sh [--stage] <registry url>
 # Prerelease versions (-alpha, -beta, -rc) are published under their matching
 # dist-tag so the stable `latest` tag (e.g. Kay v1) is never overwritten.
+# With --stage, tarballs are packed by bun and submitted via `npm stage publish`
+# for stage-only npm tokens (E_STAGE_REQUIRED).
 # Versions already present on the registry are skipped so reruns are idempotent.
 set -eu
+
+stage=false
+if [ "${1:-}" = "--stage" ]; then
+  stage=true
+  shift
+fi
 
 registry="$1"
 
@@ -35,6 +43,19 @@ publish() {
 
   if bun pm view "$package" version > /dev/null 2>&1; then
     echo "$package is already published"
+  elif [ "$stage" = true ]; then
+    tarball="/tmp/kay-publish-$$.tgz"
+    trap 'rm -f "$tarball"' EXIT
+    bun pm pack --quiet --filename "$tarball" > /dev/null
+    if [ -n "$tag" ]; then
+      echo "Staging $package with dist-tag $tag..."
+      npm stage publish --access public --tag "$tag" "$tarball"
+    else
+      echo "Staging $package..."
+      npm stage publish --access public "$tarball"
+    fi
+    rm -f "$tarball"
+    trap - EXIT
   elif [ -n "$tag" ]; then
     echo "Publishing $package with dist-tag $tag..."
     bun publish --access public --tag "$tag"
