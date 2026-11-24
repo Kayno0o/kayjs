@@ -379,6 +379,8 @@ describe('Milestone 4: kay new scaffolder & kay check validator', () => {
     expect(await blogHome.text()).toContain('Welcome to my-blog')
     const blogPost = await blogApp.get('/blog/welcome')
     expect(blogPost.status).toBe(200)
+    expect((await blogApp.get('/blog/..%2F..%2FREADME')).status).toBe(404)
+    expect((await blogApp.get('/blog/missing')).status).toBe(404)
     expect(await blogPost.text()).toContain('<h2 id="fast-by-default">Fast by Default</h2>')
     const rss = await blogApp.get('/rss.xml')
     expect(rss.status).toBe(200)

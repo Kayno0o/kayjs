@@ -125,6 +125,17 @@ Hidden from production.
     expect(posts.byTag('bun').map(p => p.slug)).toEqual(['first'])
     expect(posts.paths('/blog')).toEqual(['/blog/second', '/blog/first'])
 
+    // get() never leaves the collection folder, whatever the slug or locale
+    writeFileSync(join(dir, 'content/outside.md'), '---\ntitle: Outside\n---\nPrivate.\n')
+    mkdirSync(join(contentDir, 'nested'))
+    writeFileSync(join(contentDir, 'nested/deep.md'), '---\ntitle: Deep\n---\nNested.\n')
+    expect(posts.get('../outside')).toBeUndefined()
+    expect(posts.get('nested/../../outside')).toBeUndefined()
+    expect(posts.get('nested/deep')?.data.title).toBe('Deep')
+    const localizedPosts = defineCollection({ dir: contentDir, localized: true })
+    expect(localizedPosts.get('outside', '..')).toBeUndefined()
+    expect(localizedPosts.all('..')).toEqual([])
+
     // Expose collection path to route files
     const contentPkg = join(import.meta.dir, '../../plugin-content/src/index.ts')
     writeFileSync(join(dir, 'src/posts.ts'), `

@@ -488,6 +488,11 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
   return { html, headings, wordCount: words, readingMinutes }
 }
 
+function isInside(dir: string, target: string): boolean {
+  const rel = relative(dir, target)
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+}
+
 function walkMarkdownFiles(dir: string, out: string[] = []): string[] {
   if (!existsSync(dir))
     return out
@@ -631,10 +636,20 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
     return entry
   }
 
+  // Slugs and locales usually come from URL params: a path built from them must stay inside the collection folder.
+  function localeDir(absDir: string, targetLocale: string | undefined): string | undefined {
+    if (targetLocale === undefined)
+      return absDir
+    const scanDir = resolve(absDir, targetLocale)
+    return isInside(absDir, scanDir) && scanDir !== absDir ? scanDir : undefined
+  }
+
   function all(locale?: string): ContentEntry<TData>[] {
     const absDir = getDir()
     const targetLocale = localized ? (locale ?? defaultLocale) : undefined
-    const scanDir = targetLocale !== undefined ? join(absDir, targetLocale) : absDir
+    const scanDir = localeDir(absDir, targetLocale)
+    if (scanDir === undefined)
+      return []
     const files = walkMarkdownFiles(scanDir)
     const entries: ContentEntry<TData>[] = []
     for (const f of files) {
@@ -656,7 +671,9 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       const absDir = getDir()
       const clean = slug.replace(/^\/+|\/+$/g, '')
       const targetLocale = localized ? (locale ?? defaultLocale) : undefined
-      const scanDir = targetLocale !== undefined ? join(absDir, targetLocale) : absDir
+      const scanDir = localeDir(absDir, targetLocale)
+      if (scanDir === undefined || !isInside(scanDir, resolve(scanDir, clean)))
+        return undefined
       // O(1) direct file lookup before falling back to directory scan
       for (const candidate of [
         join(scanDir, `${clean}.md`),

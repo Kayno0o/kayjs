@@ -323,7 +323,8 @@ export default async function BlogIndex() {
   )
 }
 `
-    files['src/routes/blog/[slug].tsx'] = `import { Button, Stack } from '@kayjs/ui'
+    files['src/routes/blog/[slug].tsx'] = `import type { RequestContext } from 'kay/server'
+import { Button, Stack } from '@kayjs/ui'
 import { Head } from 'kay'
 import { posts } from '../../posts'
 
@@ -332,11 +333,15 @@ export function paths() {
   return posts.paths('/blog')
 }
 
-export default async function PostPage({ params }: { params: { slug: string } }) {
-  const post = posts.get(params.slug)
+export async function load(ctx: RequestContext) {
+  const post = posts.get(ctx.params.slug ?? '')
   if (!post)
-    return <p>Post not found.</p>
+    return new Response('Not found', { status: 404 })
+  return { post }
+}
 
+export default function PostPage({ data }: { data: { post: NonNullable<ReturnType<typeof posts.get>> } }) {
+  const { post } = data
   return (
     <Stack gap="1.25rem">
       <Head><title>{post.data.title}</title></Head>
