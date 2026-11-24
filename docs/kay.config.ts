@@ -7,7 +7,7 @@ import { images } from '@kayjs/images'
 import { seo } from '@kayjs/seo'
 import { grammarCssPath, ui } from '@kayjs/ui/plugin'
 import { defineConfig } from 'kay/server'
-import { docsMeta } from './src/docs-meta'
+import { docs } from './src/content'
 import { pageWeight } from './src/page-weight'
 
 const SITE = process.env.SITE_URL ?? 'https://kayjs.kaynooo.fr'
@@ -66,7 +66,7 @@ export default defineConfig({
       },
       extraUrls: () => [
         '/grammars',
-        ...docsMeta.paths('/docs'),
+        ...docs.paths('/docs'),
       ],
     }),
     pageWeight(),

@@ -342,6 +342,123 @@ Contenu francais.
     expect(ogMatch).not.toBeNull()
     expect(existsSync(join(dir, 'dist/static', ogMatch![1]!))).toBe(true)
   })
+
+  it('#3516: supports lazy render() without content/meta split and auto-wires @kayjs/images for relative Markdown images', async () => {
+    const dir = makeTemp('kay-content-3516-')
+    const imgDir = join(dir, 'src/content/posts/img')
+    mkdirSync(imgDir, { recursive: true })
+    mkdirSync(join(dir, 'src/routes/posts'), { recursive: true })
+
+    // Valid 1x1 PNG
+    const pngBytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    )
+    writeFileSync(join(imgDir, 'chart.png'), pngBytes)
+    writeFileSync(join(dir, 'src/content/posts/hello.md'), `---
+title: Auto Images & Single Collection
+date: 2026-11-24
+---
+## Overview
+
+![Chart](./img/chart.png)
+
+<Badge label="fast" />
+`)
+
+    // 1. Unit check: lazy render() is NOT called on metadata operations, throws clearly if html read early, runs once on entry.render()
+    let renderLoaderCalls = 0
+    const col = defineCollection<{ title: string }>({
+      dir: join(dir, 'src/content/posts'),
+      render: async () => {
+        renderLoaderCalls++
+        return {
+          components: {
+            Badge: ({ label }: { label: string }) => `<span data-badge="${label}">${label}</span>`,
+          },
+        }
+      },
+    })
+
+    expect(col.paths('/posts')).toEqual(['/posts/hello'])
+    expect(col.all().length).toBe(1)
+    expect(renderLoaderCalls).toBe(0)
+
+    const e = col.get('hello')!
+    expect(() => e.html).toThrow(/await entry\.render\(\)/)
+    const rendered = await e.render()
+    expect(renderLoaderCalls).toBe(1)
+    expect(rendered.html).toContain('<span data-badge="fast">fast</span>')
+    // Cached synchronously afterwards
+    expect(e.html).toContain('<span data-badge="fast">fast</span>')
+    expect(e.headings).toEqual([{ level: 2, id: 'overview', text: 'Overview' }])
+    await e.render()
+    expect(renderLoaderCalls).toBe(1)
+
+    // 2. Full build check: single src/content.ts imported by kay.config.ts + routes, auto-wired @kayjs/images with zero resolveImage boilerplate
+    const contentPkg = join(import.meta.dir, '../../plugin-content/src/index.ts')
+    const imagesPkg = join(import.meta.dir, '../../plugin-images/src/index.ts')
+
+    writeFileSync(join(dir, 'src/Badge.tsx'), `
+      export function Badge({ label }: { label: string }) {
+        return <span class="badge">{label}</span>
+      }
+    `)
+    writeFileSync(join(dir, 'src/content.ts'), `
+      import { defineCollection } from ${JSON.stringify(contentPkg)}
+      export const posts = defineCollection<{ title: string }>({
+        dir: 'src/content/posts',
+        render: async () => {
+          const { Badge } = await import('./Badge')
+          return { components: { Badge } }
+        },
+      })
+    `)
+    writeFileSync(join(dir, 'kay.config.ts'), `
+      import { contentPlugin } from ${JSON.stringify(contentPkg)}
+      import { images } from ${JSON.stringify(imagesPkg)}
+      import { posts } from './src/content'
+
+      export default {
+        plugins: [
+          images({ widths: [640], formats: ['webp'], quality: 80 }),
+          contentPlugin({
+            feeds: [{
+              path: '/rss.xml',
+              title: 'Auto Feed',
+              description: 'Single collection',
+              site: 'https://example.com',
+              collection: posts,
+              linkPrefix: '/posts',
+            }],
+          }),
+        ],
+      }
+    `)
+    writeFileSync(join(dir, 'src/routes/posts/[slug].tsx'), `
+      import { posts } from '../../content'
+      export const prerender = true
+      export function paths() { return posts.paths('/posts') }
+      export async function load({ params }: { params: { slug: string } }) {
+        const post = posts.get(params.slug)!
+        await post.render()
+        return { post }
+      }
+      export default function PostPage({ data }: { data: { post: { data: { title: string }, html: string } } }) {
+        return <article><h1>{data.post.data.title}</h1><div innerHTML={data.post.html} /></article>
+      }
+    `)
+
+    const manifest = await build({ root: dir, static: true })
+    expect(manifest.runtimeScript).toBeUndefined()
+    const html = readFileSync(join(dir, 'dist/static/posts/hello/index.html'), 'utf8')
+    expect(html).toContain('<span class="badge">fast</span>')
+    // Relative ./img/chart.png was automatically optimized into /img/chart-... without any resolveImage code!
+    const imgMatch = html.match(/src="(\/img\/chart-[^"]+)"/)
+    expect(imgMatch).not.toBeNull()
+    expect(existsSync(join(dir, 'dist/static', imgMatch![1]!))).toBe(true)
+    expect(readFileSync(join(dir, 'dist/static/rss.xml'), 'utf8')).toContain('<title>Auto Images &amp; Single Collection</title>')
+  })
 })
 
 void shareCard

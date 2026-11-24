@@ -1,6 +1,6 @@
 import type { KayChild } from 'kay'
 import { SearchIsland } from '../components/SearchIsland'
-import { getFlatNav } from '../docs-meta'
+import { getFlatNav } from '../content'
 
 export default function Layout({ children, url }: { children: KayChild, url: URL }) {
   const pathname = url.pathname

@@ -3,13 +3,23 @@
 
 import type { KayPlugin, StandardSchemaV1 } from 'kay/server'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import { raw, ssrRaw } from 'kay/ssr'
+
+const KAY_ROOT_KEY = Symbol.for('kay.root')
+const IMAGE_RESOLVERS_KEY = Symbol.for('kay.content.imageResolvers')
 
 export interface ContentHeading {
   level: number
   id: string
   text: string
+}
+
+export interface RenderedMarkdown {
+  readonly html: string
+  readonly headings: readonly ContentHeading[]
+  readonly wordCount: number
+  readonly readingMinutes: number
 }
 
 export interface ContentEntry<TData = Record<string, unknown>> {
@@ -22,6 +32,8 @@ export interface ContentEntry<TData = Record<string, unknown>> {
   readonly headings: readonly ContentHeading[]
   readonly wordCount: number
   readonly readingMinutes: number
+  /** Lazily resolves async collection renderers (`highlight`, `components`) and renders Markdown once. */
+  render(): Promise<RenderedMarkdown>
 }
 
 export type MarkdownComponent = (props: any) => unknown
@@ -30,6 +42,7 @@ export type CodeHighlighter = (code: string, language: string | undefined) => st
 export interface MarkdownImageResult {
   src: string
   srcset?: string | undefined
+  avifSrcset?: string | undefined
   sizes?: string | undefined
   width?: number | undefined
   height?: number | undefined
@@ -38,6 +51,17 @@ export interface MarkdownImageResult {
 
 export type MarkdownImageResolver = (src: string, file: string | undefined) => MarkdownImageResult | string | undefined
 
+export interface CollectionRenderConfig {
+  /** Custom syntax highlighter for fenced code blocks (e.g. Shiki). */
+  highlight?: CodeHighlighter | undefined
+  /** Embedded Kay TSX components usable directly inside Markdown (`<Note>`, `<BarChart rows={[...]} />`). */
+  components?: Record<string, MarkdownComponent> | undefined
+  /** Wrap h2-h6 headings in self-referencing `<a href="#id">` links. */
+  headingLinks?: boolean | undefined
+  /** Optional image resolver (set to `false` to disable automatic `@kayjs/images` optimization). */
+  resolveImage?: MarkdownImageResolver | false | undefined
+}
+
 export interface RenderMarkdownOptions {
   highlight?: CodeHighlighter | undefined
   components?: Record<string, MarkdownComponent> | undefined
@@ -45,8 +69,8 @@ export interface RenderMarkdownOptions {
   headingLinks?: boolean | undefined
   /** Active locale passed into embedded components as `props.locale`. */
   locale?: string | undefined
-  /** Optional image resolver for rewriting `<img src="...">` (e.g. relative `./img/*.png` via `@kayjs/images`). */
-  resolveImage?: MarkdownImageResolver | undefined
+  /** Optional image resolver for rewriting `<img src="...">` (defaults to auto-wired `@kayjs/images` when active; `false` disables). */
+  resolveImage?: MarkdownImageResolver | false | undefined
   /** Source file path passed to `resolveImage`. */
   file?: string | undefined
 }
@@ -66,8 +90,10 @@ export interface CollectionOptions<TData = Record<string, unknown>> {
   components?: Record<string, MarkdownComponent> | undefined
   /** Wrap h2-h6 headings in self-referencing `<a href="#id">` links. */
   headingLinks?: boolean | undefined
-  /** Optional image resolver for rewriting Markdown images (e.g. relative `./img/*.png` via `@kayjs/images`). */
-  resolveImage?: MarkdownImageResolver | undefined
+  /** Optional image resolver for rewriting Markdown images (defaults to auto-wired `@kayjs/images`; `false` disables). */
+  resolveImage?: MarkdownImageResolver | false | undefined
+  /** Lazy renderer loader (`async () => ({ highlight, components })`) so config/index/RSS never load Shiki or TSX components. */
+  render?: (() => CollectionRenderConfig | Promise<CollectionRenderConfig>) | undefined
   /** Include entries with `draft: true` (default: false). */
   includeDrafts?: boolean | undefined
   /** Custom comparator for `all()` (defaults to newest `date` first, then alphabetical `slug`). */
@@ -75,6 +101,7 @@ export interface CollectionOptions<TData = Record<string, unknown>> {
 }
 
 export interface Collection<TData = Record<string, unknown>> {
+  readonly dir: string
   all(locale?: string): ContentEntry<TData>[]
   get(slug: string, locale?: string): ContentEntry<TData> | undefined
   byTag(tag: string, locale?: string): ContentEntry<TData>[]
@@ -323,6 +350,36 @@ function expandComponents(
   return out
 }
 
+function findDefaultImageResolver(file: string | undefined): MarkdownImageResolver | undefined {
+  if (!file)
+    return undefined
+  const registry = (globalThis as Record<symbol, unknown>)[IMAGE_RESOLVERS_KEY] as Map<string, MarkdownImageResolver> | undefined
+  if (!registry || registry.size === 0)
+    return undefined
+  const absFile = resolve(file)
+  let bestRoot = ''
+  let bestResolver: MarkdownImageResolver | undefined
+  for (const [root, resolver] of registry) {
+    if ((absFile === root || absFile.startsWith(`${root}/`) || absFile.startsWith(`${root}\\`)) && root.length > bestRoot.length) {
+      bestRoot = root
+      bestResolver = resolver
+    }
+  }
+  return bestResolver
+}
+
+function resolveCollectionDir(dir: string): string {
+  if (isAbsolute(dir))
+    return dir
+  const kayRoot = (globalThis as Record<symbol, unknown>)[KAY_ROOT_KEY]
+  if (typeof kayRoot === 'string' && kayRoot !== '') {
+    const candidate = resolve(kayRoot, dir)
+    if (existsSync(candidate))
+      return candidate
+  }
+  return resolve(dir)
+}
+
 const FENCE_RE = /^([`~]{3,})([^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm
 let slotBatchId = 0
 
@@ -382,13 +439,16 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
     return `<h${level} id="${id}">${inner}</h${level}>`
   })
 
-  // 4b. Optional image rewriting (e.g. relative `./img/*.png` -> optimized responsive @kayjs/images)
-  if (options.resolveImage !== undefined) {
+  // 4b. Image rewriting (explicit resolveImage or auto-wired @kayjs/images; `false` disables)
+  const resolveImageFn = options.resolveImage === false
+    ? undefined
+    : (options.resolveImage ?? findDefaultImageResolver(options.file))
+  if (resolveImageFn !== undefined) {
     html = html.replace(/<img\b([^>]*?)>/gi, (full, attrs: string) => {
       const srcMatch = /\bsrc="([^"]+)"/i.exec(attrs)
       if (!srcMatch)
         return full
-      const resolved = options.resolveImage!(srcMatch[1]!, options.file)
+      const resolved = resolveImageFn(srcMatch[1]!, options.file)
       if (!resolved)
         return full
       const info: MarkdownImageResult = typeof resolved === 'string' ? { src: resolved } : resolved
@@ -404,7 +464,12 @@ export function renderMarkdown(body: string, options: RenderMarkdownOptions = {}
       if (info.height !== undefined && info.height > 0)
         parts.push(`height="${info.height}"`)
       parts.push(`loading="${info.loading ?? 'lazy'}"`, 'decoding="async"')
-      return `<img ${parts.join(' ')}>`
+      const imgTag = `<img ${parts.join(' ')}>`
+      if (info.avifSrcset) {
+        const sizesAttr = info.sizes ? ` sizes="${escapeXml(info.sizes)}"` : ''
+        return `<picture><source type="image/avif" srcset="${escapeXml(info.avifSrcset)}"${sizesAttr}>${imgTag}</picture>`
+      }
+      return imgTag
     })
   }
 
@@ -447,16 +512,55 @@ function defaultSort<T>(a: ContentEntry<T>, b: ContentEntry<T>): number {
 }
 
 export function defineCollection<TData = Record<string, unknown>>(options: CollectionOptions<TData>): Collection<TData> {
-  const absDir = resolve(options.dir)
+  const getDir = () => resolveCollectionDir(options.dir)
   const includeDrafts = options.includeDrafts ?? false
   const localized = options.localized ?? false
   const defaultLocale = options.defaultLocale ?? 'en'
-  const renderOpts: RenderMarkdownOptions = {
+  const baseRenderOpts: RenderMarkdownOptions = {
     highlight: options.highlight,
     components: options.components,
     headingLinks: options.headingLinks,
     resolveImage: options.resolveImage,
   }
+  let resolvedRenderOpts: RenderMarkdownOptions | undefined = options.render === undefined ? baseRenderOpts : undefined
+  let pendingRenderOpts: Promise<RenderMarkdownOptions> | undefined
+
+  function mergeRenderConfig(cfg: CollectionRenderConfig): RenderMarkdownOptions {
+    return {
+      highlight: cfg.highlight ?? baseRenderOpts.highlight,
+      components: cfg.components ?? baseRenderOpts.components,
+      headingLinks: cfg.headingLinks ?? baseRenderOpts.headingLinks,
+      resolveImage: cfg.resolveImage !== undefined ? cfg.resolveImage : baseRenderOpts.resolveImage,
+    }
+  }
+
+  function ensureRenderOptsSync(): RenderMarkdownOptions {
+    if (resolvedRenderOpts !== undefined)
+      return resolvedRenderOpts
+    const loaded = options.render!()
+    if (loaded instanceof Promise) {
+      pendingRenderOpts ??= loaded.then((cfg) => {
+        resolvedRenderOpts = mergeRenderConfig(cfg)
+        return resolvedRenderOpts
+      })
+      throw new Error(
+        `@kayjs/content: collection "${options.dir}" uses an async "render" loader; call \`await entry.render()\` (e.g. in \`load()\`) before reading \`entry.html\` or \`entry.headings\`.`,
+      )
+    }
+    resolvedRenderOpts = mergeRenderConfig(loaded)
+    return resolvedRenderOpts
+  }
+
+  async function ensureRenderOptsAsync(): Promise<RenderMarkdownOptions> {
+    if (resolvedRenderOpts !== undefined)
+      return resolvedRenderOpts
+    pendingRenderOpts ??= Promise.resolve(options.render!()).then((cfg) => {
+      resolvedRenderOpts = mergeRenderConfig(cfg)
+      return resolvedRenderOpts
+    })
+    return pendingRenderOpts
+  }
+
   const cache = new Map<string, { mtimeMs: number, entry: ContentEntry<TData> | null }>()
 
   function loadFile(absFile: string, baseDir: string, entryLocale?: string): ContentEntry<TData> | null {
@@ -494,9 +598,16 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
 
     const wordCount = body.trim().split(/\s+/).filter(Boolean).length
     const readingMinutes = Math.max(1, Math.ceil(wordCount / 220))
-    let renderedCache: ReturnType<typeof renderMarkdown> | undefined
-    const getRendered = () => {
-      renderedCache ??= renderMarkdown(body, { ...renderOpts, locale: entryLocale, file: absFile })
+    let renderedCache: RenderedMarkdown | undefined
+    const getRenderedSync = (): RenderedMarkdown => {
+      renderedCache ??= renderMarkdown(body, { ...ensureRenderOptsSync(), locale: entryLocale, file: absFile })
+      return renderedCache
+    }
+    const renderAsync = async (): Promise<RenderedMarkdown> => {
+      if (renderedCache !== undefined)
+        return renderedCache
+      const opts = await ensureRenderOptsAsync()
+      renderedCache ??= renderMarkdown(body, { ...opts, locale: entryLocale, file: absFile })
       return renderedCache
     }
 
@@ -507,19 +618,21 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
       data,
       body,
       get html() {
-        return getRendered().html
+        return getRenderedSync().html
       },
       get headings() {
-        return getRendered().headings
+        return getRenderedSync().headings
       },
       wordCount,
       readingMinutes,
+      render: renderAsync,
     }
     cache.set(absFile, { mtimeMs, entry })
     return entry
   }
 
   function all(locale?: string): ContentEntry<TData>[] {
+    const absDir = getDir()
     const targetLocale = localized ? (locale ?? defaultLocale) : undefined
     const scanDir = targetLocale !== undefined ? join(absDir, targetLocale) : absDir
     const files = walkMarkdownFiles(scanDir)
@@ -535,8 +648,12 @@ export function defineCollection<TData = Record<string, unknown>>(options: Colle
   }
 
   return {
+    get dir() {
+      return getDir()
+    },
     all,
     get(slug, locale) {
+      const absDir = getDir()
       const clean = slug.replace(/^\/+|\/+$/g, '')
       const targetLocale = localized ? (locale ?? defaultLocale) : undefined
       const scanDir = targetLocale !== undefined ? join(absDir, targetLocale) : absDir
@@ -624,10 +741,19 @@ export function renderRss<TData>(feed: RssFeedConfig<TData>): string {
     + `</channel></rss>`
 }
 
-export function contentPlugin(options: { feeds?: RssFeedConfig<any>[] | undefined } = {}): KayPlugin {
+export function contentPlugin(options: { feeds?: RssFeedConfig<any>[] | undefined, collections?: Collection<any>[] | undefined } = {}): KayPlugin {
   const feeds = options.feeds ?? []
+  const extraCollections = options.collections ?? []
   return {
     name: '@kayjs/content',
+    watchPaths: () => {
+      const dirs = new Set<string>()
+      for (const f of feeds)
+        dirs.add(f.collection.dir)
+      for (const c of extraCollections)
+        dirs.add(c.dir)
+      return [...dirs]
+    },
     build(ctx) {
       for (const feed of feeds) {
         const rel = (feed.path ?? '/rss.xml').replace(/^\/+/, '')

@@ -91,10 +91,12 @@ export function definePlugin(plugin: KayPlugin): KayPlugin {
   return plugin
 }
 
+const KAY_ROOT_KEY = Symbol.for('kay.root')
 let configReloadSeq = 0
 
 export async function loadConfig(root: string, options?: { fresh?: boolean }): Promise<KayConfig> {
   const absRoot = resolve(root)
+  ;(globalThis as Record<symbol, unknown>)[KAY_ROOT_KEY] = absRoot
   const configPath = join(absRoot, 'kay.config.ts')
   if (!existsSync(configPath))
     return {}

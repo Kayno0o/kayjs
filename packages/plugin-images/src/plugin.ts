@@ -6,8 +6,10 @@ import type { KayPlugin } from 'kay/server'
 import type { ShareCardDefaults } from './card'
 import type { ImageAsset } from './helpers'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, extname, join, resolve } from 'node:path'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 import { configureShareCard } from './card'
+
+const IMAGE_RESOLVERS_KEY = Symbol.for('kay.content.imageResolvers')
 
 export interface ImagesPluginOptions {
   widths?: number[] | undefined
@@ -19,6 +21,8 @@ export interface ImagesPluginOptions {
   pruneCache?: boolean | undefined
   /** Optional defaults for build-time `shareCard()` OG image generation. */
   card?: ShareCardDefaults | undefined
+  /** Default `sizes` attribute for relative images auto-optimized inside `@kayjs/content` Markdown. */
+  markdownSizes?: string | undefined
 }
 
 const DEFAULT_WIDTHS = [320, 640, 960, 1280, 1920]
@@ -135,6 +139,13 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
                 }
               }
 
+              if (files.length === 0) {
+                const rel = `img/${stem}-${hash}${extname(args.path).toLowerCase()}`
+                emittedAssets.set(rel, rawBytes)
+                const asset: ImageAsset = { src: `${prefix}/${rel}`, width: dims.width, height: dims.height }
+                return { contents: `export default ${JSON.stringify(asset)};\n`, loader: 'js' }
+              }
+
               meta = { width: dims.width, height: dims.height, files }
               writeFileSync(metaPath, JSON.stringify(meta))
             }
@@ -175,11 +186,24 @@ export function images(options: ImagesPluginOptions = {}): KayPlugin {
       }]
     },
     build(ctx) {
+      const publicDir = join(ctx.outDir, 'public')
+      const cacheDir = resolve(ctx.root, cacheDirRel)
       configureShareCard({
         ...options.card,
-        publicDir: join(ctx.outDir, 'public'),
-        cacheDir: resolve(ctx.root, cacheDirRel),
+        publicDir,
+        cacheDir,
       })
+      const g = globalThis as Record<symbol, Map<string, ReturnType<typeof createMarkdownImageResolver>> | undefined>
+      const registry = g[IMAGE_RESOLVERS_KEY] ??= new Map()
+      registry.set(resolve(ctx.root), createMarkdownImageResolver({
+        outPublicDir: publicDir,
+        cacheDir,
+        widths,
+        formats,
+        quality,
+        avifQuality,
+        sizes: options.markdownSizes,
+      }))
       for (const [rel, bytes] of emittedAssets)
         ctx.emitAsset(rel, bytes)
       if (pruneCache && lastCacheRoot !== undefined && activeCacheFiles.size > 0 && existsSync(lastCacheRoot)) {
@@ -263,6 +287,12 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
       }
     }
 
+    if (files.length === 0) {
+      const fileName = `${stem}-${hash}${extname(absPath).toLowerCase()}`
+      writeFileSync(join(imgOutDir, fileName), rawBytes)
+      return { src: `/img/${fileName}`, width: dims.width, height: dims.height }
+    }
+
     meta = { width: dims.width, height: dims.height, files }
     writeFileSync(metaPath, JSON.stringify(meta))
   }
@@ -293,5 +323,32 @@ export function optimizeImageFile(absPath: string, options: OptimizeImageFileOpt
     height: meta.height,
     ...(webpEntries.length > 0 ? { webpSrcset: webpEntries.join(', ') } : {}),
     ...(avifEntries.length > 0 ? { avifSrcset: avifEntries.join(', ') } : {}),
+  }
+}
+
+export interface MarkdownImageResolverOptions extends OptimizeImageFileOptions {
+  sizes?: string | undefined
+}
+
+/** Creates a `@kayjs/content` `resolveImage` function backed by `optimizeImageFile()`. Automatically wired by `images()`. */
+export function createMarkdownImageResolver(options: MarkdownImageResolverOptions = {}) {
+  const sizes = options.sizes ?? '(min-width: 48rem) 42rem, 100vw'
+  return (src: string, file: string | undefined) => {
+    if (!file || !src.startsWith('.'))
+      return undefined
+    const abs = resolve(dirname(file), src)
+    if (!existsSync(abs))
+      return undefined
+    const asset = optimizeImageFile(abs, options)
+    const srcset = asset.webpSrcset ?? asset.avifSrcset
+    return {
+      src: asset.src,
+      ...(srcset !== undefined ? { srcset } : {}),
+      ...(asset.avifSrcset !== undefined && asset.webpSrcset !== undefined ? { avifSrcset: asset.avifSrcset } : {}),
+      ...(srcset !== undefined ? { sizes } : {}),
+      width: asset.width,
+      height: asset.height,
+      loading: 'lazy' as const,
+    }
   }
 }

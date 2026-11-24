@@ -9,22 +9,33 @@ order: 3
 
 ## Defining a collection
 
+Define one collection and import it from `kay.config.ts`, index pages, and post pages alike. Use `render` to lazy-load heavy Shiki highlighters and embedded TSX components only when a page renders Markdown:
+
 ```ts
 // src/content.ts
 import { defineCollection } from '@kayjs/content'
-import { Note } from './components/Note'
-import { highlight } from './highlight'
 
 export const posts = defineCollection({
   dir: 'src/content/posts',
   localized: true,          // Reads <dir>/<locale>/<slug>.md
   defaultLocale: 'en',
   headingLinks: true,       // Wraps h2-h6 in self-referencing <a href="#id">
-  highlight,                // Optional Shiki or custom syntax highlighter
-  components: { Note },     // Embedded Kay TSX components inside Markdown
   schema: postSchema,       // Any Standard Schema validator
+  render: async () => {
+    const [{ highlight }, { Note }] = await Promise.all([
+      import('./highlight'),
+      import('./components/Note'),
+    ])
+    return { highlight, components: { Note } }
+  },
 })
 ```
+
+In your detail route's `load()`, call `await entry.render()` once — `entry.html` and `entry.headings` are then cached synchronously. Routes and config hooks that only read frontmatter (`.all()`, `.paths()`, RSS, sitemaps) never load Shiki or TSX components.
+
+## Automatic `@kayjs/images` optimization
+
+When `@kayjs/images` is enabled in `kay.config.ts`, relative Markdown images (`![Diagram](./img/arch.png)`) are automatically optimized using your `images()` plugin widths, formats, quality, and disk cache — no manual `resolveImage` wiring needed. Pass `resolveImage: false` to opt out, or pass a custom `resolveImage` function to override.
 
 ## Fast lazy rendering & O(1) lookup
 

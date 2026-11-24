@@ -22,12 +22,13 @@ interface DocPageData {
   ogImage: string
 }
 
-export function load(ctx: RequestContext): DocPageData | Response {
+export async function load(ctx: RequestContext): Promise<DocPageData | Response> {
   const slug = ctx.params.slug ?? ''
   const entry = docs.get(slug)
   if (!entry)
     return new Response('Doc page not found', { status: 404 })
 
+  await entry.render()
   const groups = getNavGroups()
   const flat = getFlatNav()
   const idx = flat.findIndex(item => item.slug === entry.slug)
